@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f8f6;
+  --foreground: #0b0b0b;
+
+  --surface-1: #ffffff;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+
+  /* series de gráfico ancoradas nas cores da Lojas Maia */
+  --series-1: #1b5e3c; /* verde da marca */
+  --series-2: #f2871a; /* laranja da marca */
+  --series-3: #eda100; /* amarelo */
+  --series-4: #4a3aa7; /* violeta */
+  --series-5: #2a78d6; /* azul */
+  --series-6: #e34948; /* vermelho */
+  --series-7: #1baf7a; /* verde-agua */
+  --series-8: #e87ba4; /* magenta */
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  --brand-green: #1b5e3c;
+  --brand-green-ink: #ffffff;
+  --brand-orange: #f2871a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
