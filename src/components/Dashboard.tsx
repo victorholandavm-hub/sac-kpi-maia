@@ -11,6 +11,7 @@ import { StoreBreakdownTable } from "./StoreBreakdownTable";
 import { WaitingTable } from "./WaitingTable";
 import { RangePicker } from "./RangePicker";
 import { Header } from "./Header";
+import { PreviousWeekCard } from "./PreviousWeekCard";
 import { categoryLabel, storeLabel, productLabel, blockingLabel } from "@/lib/labels";
 
 export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) {
@@ -29,6 +30,8 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         <Header />
         <RangePicker range={range} />
       </div>
+
+      <PreviousWeekCard data={data.previousWeek} />
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatTile label="Total de chamados" value={data.totalTickets} />

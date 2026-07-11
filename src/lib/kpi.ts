@@ -50,6 +50,14 @@ export type WaitingRow = {
   aguardando_ha_horas: number;
 };
 
+export type PreviousWeekSummary = {
+  from: string;
+  to: string;
+  totalTickets: number;
+  topStore: Count | null;
+  topCategory: Count | null;
+};
+
 export type StoreBreakdown = {
   store: string;
   total: number;
@@ -89,6 +97,7 @@ export type KpiData = {
   categoryCoverage: Coverage;
   storeCoverage: Coverage;
   productCoverage: Coverage;
+  previousWeek: PreviousWeekSummary;
 };
 
 function median(values: number[]): number | null {
@@ -146,6 +155,46 @@ function toAttentionRow(row: TicketRow, now: number): AttentionRow {
     summary_ai: row.summary_ai,
     opened_at: row.opened_at,
     aberto_ha_horas: Math.round(((now - new Date(row.opened_at).getTime()) / 3_600_000) * 10) / 10,
+  };
+}
+
+// Semana calculada no fuso de Joao Pessoa (America/Fortaleza, UTC-3, sem horario de verao),
+// usando metodos UTC pra ficar independente do fuso do servidor onde o codigo roda.
+const BUSINESS_TZ_OFFSET_MS = -3 * 60 * 60 * 1000;
+
+function getPreviousWeekRange(nowUtc: Date): { from: Date; to: Date; fromLabel: string; toLabel: string } {
+  const local = new Date(nowUtc.getTime() + BUSINESS_TZ_OFFSET_MS);
+  const day = local.getUTCDay(); // 0=domingo, 1=segunda, ...
+  const diffToMonday = (day + 6) % 7;
+
+  const thisMondayLocal = new Date(local);
+  thisMondayLocal.setUTCHours(0, 0, 0, 0);
+  thisMondayLocal.setUTCDate(thisMondayLocal.getUTCDate() - diffToMonday);
+
+  const prevMondayLocal = new Date(thisMondayLocal);
+  prevMondayLocal.setUTCDate(prevMondayLocal.getUTCDate() - 7);
+  const prevSundayLocal = new Date(thisMondayLocal.getTime() - 1);
+
+  return {
+    from: new Date(prevMondayLocal.getTime() - BUSINESS_TZ_OFFSET_MS),
+    to: new Date(prevSundayLocal.getTime() - BUSINESS_TZ_OFFSET_MS),
+    fromLabel: prevMondayLocal.toISOString().slice(0, 10),
+    toLabel: prevSundayLocal.toISOString().slice(0, 10),
+  };
+}
+
+function buildPreviousWeekSummary(allRows: TicketRow[], now: Date): PreviousWeekSummary {
+  const { from, to, fromLabel, toLabel } = getPreviousWeekRange(now);
+  const weekRows = allRows.filter((r) => {
+    const opened = new Date(r.opened_at).getTime();
+    return opened >= from.getTime() && opened <= to.getTime();
+  });
+  return {
+    from: fromLabel,
+    to: toLabel,
+    totalTickets: weekRows.length,
+    topStore: topCounts(weekRows, "store_tag")[0] ?? null,
+    topCategory: topCounts(weekRows, "category")[0] ?? null,
   };
 }
 
@@ -318,6 +367,7 @@ export async function getKpiData(
   const recurrenceCount = rows.filter((r) => r.is_recurrence).length;
 
   const byCategory = topCounts(rows, "category");
+  const previousWeek = buildPreviousWeekSummary(allRows, new Date());
 
   return {
     totalTickets: rows.length,
@@ -353,5 +403,6 @@ export async function getKpiData(
     categoryCoverage: computeCoverage(rows, "category"),
     storeCoverage: computeCoverage(rows, "store_tag"),
     productCoverage: computeCoverage(rows, "product"),
+    previousWeek,
   };
 }
