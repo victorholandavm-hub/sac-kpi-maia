@@ -58,6 +58,30 @@ export type PreviousWeekSummary = {
   topCategory: Count | null;
 };
 
+export type EscalationRow = {
+  id: number;
+  conversation_id: string;
+  ghl_conversation_id: string;
+  ticket_opened_at: string;
+  store_tag: string | null;
+  target: string;
+  asked_at: string;
+  answered_at: string | null;
+  wait_minutes: number | null;
+  ask_excerpt: string | null;
+  answer_excerpt: string | null;
+  waiting_hours_so_far: number | null;
+};
+
+export type EscalationTargetStat = { target: string; count: number; avgWaitMinutes: number | null };
+
+export type EscalationSummary = {
+  completedCount: number;
+  pendingCount: number;
+  avgWaitMinutes: number | null;
+  byTarget: EscalationTargetStat[];
+};
+
 export type StoreBreakdown = {
   store: string;
   total: number;
@@ -98,6 +122,8 @@ export type KpiData = {
   storeCoverage: Coverage;
   productCoverage: Coverage;
   previousWeek: PreviousWeekSummary;
+  escalations: EscalationSummary;
+  escalationList: EscalationRow[];
 };
 
 function median(values: number[]): number | null {
@@ -195,6 +221,37 @@ function buildPreviousWeekSummary(allRows: TicketRow[], now: Date): PreviousWeek
     totalTickets: weekRows.length,
     topStore: topCounts(weekRows, "store_tag")[0] ?? null,
     topCategory: topCounts(weekRows, "category")[0] ?? null,
+  };
+}
+
+function buildEscalationSummary(rows: EscalationRow[]): EscalationSummary {
+  const completed = rows.filter((r) => r.wait_minutes !== null);
+  const pending = rows.filter((r) => r.wait_minutes === null);
+
+  const byTargetMap = new Map<string, number[]>();
+  for (const r of completed) {
+    const list = byTargetMap.get(r.target) ?? [];
+    list.push(r.wait_minutes as number);
+    byTargetMap.set(r.target, list);
+  }
+  const byTarget: EscalationTargetStat[] = [...byTargetMap.entries()]
+    .map(([target, waits]) => ({
+      target,
+      count: waits.length,
+      avgWaitMinutes: Math.round((waits.reduce((a, b) => a + b, 0) / waits.length) * 10) / 10,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const avgWaitMinutes =
+    completed.length > 0
+      ? Math.round((completed.reduce((a, b) => a + (b.wait_minutes as number), 0) / completed.length) * 10) / 10
+      : null;
+
+  return {
+    completedCount: completed.length,
+    pendingCount: pending.length,
+    avgWaitMinutes,
+    byTarget,
   };
 }
 
@@ -313,14 +370,40 @@ export async function getKpiData(
     return true;
   });
 
+  const now = Date.now();
+
+  const allEscalationRows: EscalationRow[] = [];
+  for (let page = 0; ; page++) {
+    const { data: pageRows, error: escalationError } = await supabase
+      .from("v_escalations")
+      .select("*")
+      .order("asked_at", { ascending: false })
+      .range(page * pageSize, page * pageSize + pageSize - 1);
+    if (escalationError) throw escalationError;
+    allEscalationRows.push(
+      ...(pageRows ?? []).map(
+        (r): EscalationRow => ({
+          ...r,
+          waiting_hours_so_far:
+            r.wait_minutes === null ? Math.round(((now - new Date(r.asked_at).getTime()) / 3_600_000) * 10) / 10 : null,
+        })
+      )
+    );
+    if (!pageRows || pageRows.length < pageSize) break;
+  }
+  const escalationRows = allEscalationRows.filter((r) => {
+    const opened = new Date(r.ticket_opened_at).getTime();
+    if (range.from && opened < range.from.getTime()) return false;
+    if (opened > range.to.getTime()) return false;
+    return true;
+  });
+
   const resolvedRows = rows.filter((r) => r.resolved_effective);
   const openRows = rows.filter((r) => !r.resolved_effective);
   const resolutionHours = rows
     .filter((r) => r.resolved_by_tag)
     .map((r) => r.resolution_hours)
     .filter((h): h is number => h !== null);
-
-  const now = Date.now();
   const highUrgencyOpen = openRows.filter((r) => r.urgency === "alta");
 
   const dailyMap = new Map<string, number>();
@@ -368,6 +451,10 @@ export async function getKpiData(
 
   const byCategory = topCounts(rows, "category");
   const previousWeek = buildPreviousWeekSummary(allRows, new Date());
+  const escalations = buildEscalationSummary(escalationRows);
+  const escalationList = [...escalationRows].sort(
+    (a, b) => new Date(b.asked_at).getTime() - new Date(a.asked_at).getTime()
+  );
 
   return {
     totalTickets: rows.length,
@@ -404,5 +491,7 @@ export async function getKpiData(
     storeCoverage: computeCoverage(rows, "store_tag"),
     productCoverage: computeCoverage(rows, "product"),
     previousWeek,
+    escalations,
+    escalationList,
   };
 }

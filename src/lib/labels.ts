@@ -75,3 +75,14 @@ export function blockingLabel(tag: string): string {
     .replace(/^aguardando-/, "Aguardando ")
     .replace(/-/g, " ");
 }
+
+const ESCALATION_TARGET_LABELS: Record<string, string> = {
+  loja: "Loja",
+  gerente: "Gerente da loja",
+  operacao: "Operação/outro setor",
+  outro: "Outro",
+};
+
+export function escalationTargetLabel(target: string): string {
+  return ESCALATION_TARGET_LABELS[target] ?? target;
+}

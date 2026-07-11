@@ -9,6 +9,8 @@ import { BacklogTable } from "./BacklogTable";
 import { BacklogTrendChart } from "./BacklogTrendChart";
 import { StoreBreakdownTable } from "./StoreBreakdownTable";
 import { WaitingTable } from "./WaitingTable";
+import { EscalationBreakdown } from "./EscalationBreakdown";
+import { EscalationPendingTable } from "./EscalationPendingTable";
 import { RangePicker } from "./RangePicker";
 import { Header } from "./Header";
 import { PreviousWeekCard } from "./PreviousWeekCard";
@@ -53,13 +55,21 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           value={data.pctWithinSla !== null ? `${data.pctWithinSla}%` : "—"}
         />
         <StatTile label="Taxa de reincidência" value={data.recurrencePct !== null ? `${data.recurrencePct}%` : "—"} />
-        <StatTile label="Esperando resposta externa" value={data.waitingCount} />
+        <StatTile label="Esperando resposta externa (tag)" value={data.waitingCount} />
+        <StatTile
+          label="Espera média por info. externa (IA)"
+          value={data.escalations.avgWaitMinutes !== null ? Math.round((data.escalations.avgWaitMinutes / 60) * 10) / 10 : "—"}
+          suffix={data.escalations.avgWaitMinutes !== null ? "h" : undefined}
+        />
+        <StatTile label="Ciclos de consulta ainda em aberto (IA)" value={data.escalations.pendingCount} />
       </section>
       <p className="text-xs -mt-4" style={{ color: "var(--text-muted)" }}>
         Tempo de resolução calculado apenas para os {data.resolvedByTagCount} chamados com a tag de
         status aplicada. 1ª resposta/SLA já considera horário comercial (seg-sex 8h-18h, sáb 8h-17h)
         para {data.firstResponseSampleSize} chamados com mensagens suficientes — ainda assim é uma
-        aproximação nossa e pode não bater exatamente com o relatório nativo do GHL.
+        aproximação nossa e pode não bater exatamente com o relatório nativo do GHL. A espera por
+        informação externa é lida diretamente do texto das conversas por IA (
+        {data.escalations.completedCount} ciclos concluídos analisados), sem depender de tags.
       </p>
 
       {data.paretoSummary ? (
@@ -95,6 +105,11 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
       </section>
 
       <WaitingTable data={data.waitingList} />
+
+      <section className="grid md:grid-cols-2 gap-4">
+        <EscalationBreakdown data={data.escalations.byTarget} />
+        <EscalationPendingTable data={data.escalationList} />
+      </section>
     </div>
   );
 }
