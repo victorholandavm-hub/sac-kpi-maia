@@ -14,6 +14,7 @@ import { EscalationPendingTable } from "./EscalationPendingTable";
 import { RangePicker } from "./RangePicker";
 import { Header } from "./Header";
 import { PreviousWeekCard } from "./PreviousWeekCard";
+import { AgentQueue } from "./AgentQueue";
 import { categoryLabel, storeLabel, productLabel, blockingLabel } from "@/lib/labels";
 
 export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) {
@@ -77,6 +78,8 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           {data.paretoSummary}
         </p>
       ) : null}
+
+      <AgentQueue data={data.agentQueue} />
 
       <section className="grid md:grid-cols-3 gap-4">
         <BarRanking title="Principais categorias de problema" data={byCategory} coverage={data.categoryCoverage} />

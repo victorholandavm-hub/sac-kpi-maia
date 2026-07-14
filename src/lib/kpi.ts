@@ -82,6 +82,11 @@ export type EscalationSummary = {
   byTarget: EscalationTargetStat[];
 };
 
+export type AgentQueueGroup = {
+  agent: string;
+  tickets: AttentionRow[];
+};
+
 export type StoreBreakdown = {
   store: string;
   total: number;
@@ -124,6 +129,7 @@ export type KpiData = {
   previousWeek: PreviousWeekSummary;
   escalations: EscalationSummary;
   escalationList: EscalationRow[];
+  agentQueue: AgentQueueGroup[];
 };
 
 function median(values: number[]): number | null {
@@ -182,6 +188,30 @@ function toAttentionRow(row: TicketRow, now: number): AttentionRow {
     opened_at: row.opened_at,
     aberto_ha_horas: Math.round(((now - new Date(row.opened_at).getTime()) / 3_600_000) * 10) / 10,
   };
+}
+
+function buildAgentQueue(openRows: TicketRow[], now: number): AgentQueueGroup[] {
+  const groups = new Map<string, TicketRow[]>();
+  for (const r of openRows) {
+    const key = r.is_sac_agent && r.agent_name ? r.agent_name : "Sem atendente";
+    const list = groups.get(key) ?? [];
+    list.push(r);
+    groups.set(key, list);
+  }
+
+  const urgencyRank: Record<string, number> = { alta: 0, media: 1, baixa: 2 };
+  return [...groups.entries()]
+    .map(([agent, agentRows]) => ({
+      agent,
+      tickets: [...agentRows]
+        .sort((a, b) => {
+          const rankDiff = (urgencyRank[a.urgency] ?? 3) - (urgencyRank[b.urgency] ?? 3);
+          if (rankDiff !== 0) return rankDiff;
+          return new Date(a.opened_at).getTime() - new Date(b.opened_at).getTime();
+        })
+        .map((r) => toAttentionRow(r, now)),
+    }))
+    .sort((a, b) => b.tickets.length - a.tickets.length);
 }
 
 // Semana calculada no fuso de Joao Pessoa (America/Fortaleza, UTC-3, sem horario de verao),
@@ -432,6 +462,7 @@ export async function getKpiData(
     "store_tag"
   );
   const waitingList = buildWaitingList(openRows, now);
+  const agentQueue = buildAgentQueue(openRows, now);
 
   const firstResponseRows = rows.filter((r) => r.first_response_minutes !== null);
   const avgFirstResponseMinutes =
@@ -493,5 +524,6 @@ export async function getKpiData(
     previousWeek,
     escalations,
     escalationList,
+    agentQueue,
   };
 }
