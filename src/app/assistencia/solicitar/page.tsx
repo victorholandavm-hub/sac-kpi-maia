@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listStores } from "@/lib/serviceRequests";
 import { PublicRequestForm } from "@/components/assistencia/PublicRequestForm";
 
@@ -22,7 +23,7 @@ export default async function SolicitarAssistenciaPage({
 
       {enviado ? (
         <div
-          className="rounded-lg border p-4"
+          className="rounded-lg border p-4 flex flex-col gap-1"
           style={{ background: "var(--surface-1)", borderColor: "var(--status-good)" }}
         >
           <p className="text-sm font-medium" style={{ color: "var(--status-good)" }}>
@@ -32,6 +33,9 @@ export default async function SolicitarAssistenciaPage({
             A assistência vai analisar o prazo pedido e dar retorno. Se precisar enviar outra, use o
             formulário abaixo.
           </p>
+          <Link href="/assistencia/loja" className="text-sm underline self-start mt-1" style={{ color: "var(--text-secondary)" }}>
+            Ver demanda em aberto
+          </Link>
         </div>
       ) : null}
 

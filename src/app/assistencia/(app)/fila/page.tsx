@@ -33,7 +33,7 @@ function buildHref(params: { status?: string; q?: string; page?: number }) {
   if (params.q) sp.set("q", params.q);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
-  return qs ? `/assistencia?${qs}` : "/assistencia";
+  return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
 }
 
 const FILTERS: { label: string; value: string | null }[] = [
@@ -93,7 +93,7 @@ export default async function AssistenciaQueuePage({
         {totalPages > 1 ? ` · página ${page} de ${totalPages}` : ""}
       </p>
 
-      <form action="/assistencia" method="GET" className="flex items-center gap-2 flex-wrap">
+      <form action="/assistencia/fila" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
         <input
           type="search"

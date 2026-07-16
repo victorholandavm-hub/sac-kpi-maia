@@ -273,3 +273,49 @@ export async function getRequestDetail(
 
   return { request, events };
 }
+
+export type OpenRequestForLoja = {
+  id: string;
+  type: RequestType;
+  status: RequestStatus;
+  storeName: string;
+  clientName: string | null;
+  productSummary: string | null;
+  createdAt: string;
+};
+
+const OPEN_LOJA_LIMIT = 200;
+
+// Visão pública pra loja (sem login) acompanhar quanta demanda ainda está em aberto,
+// sem expor CPF/telefone/endereço do cliente — só o necessário pra dar noção de volume.
+export async function listOpenRequestsForLoja(): Promise<OpenRequestForLoja[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("service_requests")
+    .select("id, type, status, client_name, created_at, stores(name), items:service_request_items(product)")
+    .not("status", "in", "(concluida,cancelada)")
+    .order("created_at", { ascending: true })
+    .limit(OPEN_LOJA_LIMIT);
+
+  if (error) throw new Error(error.message);
+
+  type Row = {
+    id: string;
+    type: RequestType;
+    status: RequestStatus;
+    client_name: string | null;
+    created_at: string;
+    stores: { name: string } | null;
+    items: { product: string }[] | null;
+  };
+
+  return ((data ?? []) as unknown as Row[]).map((row) => ({
+    id: row.id,
+    type: row.type,
+    status: row.status,
+    storeName: row.stores?.name ?? "—",
+    clientName: row.client_name,
+    productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
+    createdAt: row.created_at,
+  }));
+}

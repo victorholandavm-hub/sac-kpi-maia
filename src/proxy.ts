@@ -21,9 +21,9 @@ function checkBasicAuth(req: NextRequest, expectedUser: string | undefined, expe
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Formulário público de solicitação de assistência: sem login individual, só uma
+  // Área da loja (painel de demanda em aberto + formulário): sem login individual, só uma
   // senha única compartilhada entre as lojas (evita deixar o link totalmente aberto).
-  if (pathname.startsWith("/assistencia/solicitar")) {
+  if (pathname.startsWith("/assistencia/solicitar") || pathname.startsWith("/assistencia/loja")) {
     return checkBasicAuth(
       req,
       process.env.LOJA_REQUEST_USER,
@@ -32,8 +32,9 @@ export function proxy(req: NextRequest) {
     );
   }
 
-  // Demais rotas de /assistencia (login, fila, detalhe) usam Supabase Auth próprio,
-  // verificado dentro da aplicação (ver src/lib/dal.ts) — não passam pelo Basic Auth.
+  // Tela inicial pública (escolher "gerente de loja" ou "equipe assistência") e demais
+  // rotas de /assistencia (login, fila, detalhe) usam Supabase Auth próprio, verificado
+  // dentro da aplicação (ver src/lib/dal.ts) — não passam pelo Basic Auth.
   if (pathname.startsWith("/assistencia")) {
     return NextResponse.next();
   }

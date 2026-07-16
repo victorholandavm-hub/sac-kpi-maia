@@ -29,7 +29,7 @@ export async function signIn(_state: FormState, formData: FormData): Promise<For
     return { error: "E-mail ou senha inválidos." };
   }
 
-  redirect("/assistencia");
+  redirect("/assistencia/fila");
 }
 
 export async function signOut() {
@@ -145,7 +145,7 @@ export async function approveDeadline(requestId: string) {
     note: current.requested_deadline ? `Prazo aprovado: ${current.requested_deadline}` : null,
   });
 
-  revalidatePath("/assistencia");
+  revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
 }
 
@@ -168,7 +168,7 @@ export async function rejectDeadline(requestId: string, newDate: string) {
     note: `Nova data proposta: ${newDate}`,
   });
 
-  revalidatePath("/assistencia");
+  revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
 }
 
@@ -211,7 +211,7 @@ export async function claimRequest(requestId: string) {
   }
   await admin.from("service_request_events").insert(events);
 
-  revalidatePath("/assistencia");
+  revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
 }
 
@@ -247,7 +247,7 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
     note: note?.trim() || null,
   });
 
-  revalidatePath("/assistencia");
+  revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
 }
 
@@ -288,7 +288,7 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
     note: `Montador definido: ${trimmed}`,
   });
 
-  revalidatePath("/assistencia");
+  revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
 }
 
@@ -333,7 +333,7 @@ export async function updateRequestDetails(
     note: "Dados da solicitação corrigidos.",
   });
 
-  revalidatePath("/assistencia");
+  revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
   redirect(`/assistencia/${requestId}`);
 }
