@@ -29,6 +29,14 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(`${process.env.ASSISTENCIA_REDIRECT_URL}${pathname}${search}`, 308);
   }
 
+  // Este projeto Vercel é exclusivo do módulo de assistência (não tem o painel de
+  // KPIs do SAC). Sem isso, qualquer acesso fora de /assistencia (a raiz do domínio,
+  // um link digitado sem o caminho completo, etc.) cairia na checagem de senha do
+  // painel do SAC logo abaixo — que nem existe aqui — confundindo quem acessa.
+  if (!pathname.startsWith("/assistencia") && process.env.ASSISTENCIA_ONLY_PROJECT) {
+    return NextResponse.redirect(new URL("/assistencia", req.url), 307);
+  }
+
   // Área da loja (painel de demanda em aberto + formulário): sem login individual, só uma
   // senha única compartilhada entre as lojas (evita deixar o link totalmente aberto).
   if (pathname.startsWith("/assistencia/solicitar") || pathname.startsWith("/assistencia/loja")) {
