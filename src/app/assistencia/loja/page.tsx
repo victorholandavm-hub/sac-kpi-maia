@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { listOpenRequestsForLoja } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, STATUS_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
+import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { StatTile } from "@/components/StatTile";
 
 // Precisa refletir a demanda em aberto em tempo real — nunca gerar estático.
 export const dynamic = "force-dynamic";
@@ -9,19 +11,14 @@ export const dynamic = "force-dynamic";
 export default async function LojaHomePage() {
   const openRequests = await listOpenRequestsForLoja();
 
+  const byStatus: Record<string, number> = {};
+  for (const r of openRequests) {
+    byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold" style={{ color: "var(--brand-green)" }}>
-            Gerente de loja
-          </h1>
-          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-            Demanda em aberto de todas as lojas — {openRequests.length} solicitaç
-            {openRequests.length === 1 ? "ão" : "ões"} ainda não concluída
-            {openRequests.length === 1 ? "" : "s"}.
-          </p>
-        </div>
+      <AssistenciaHeader title="Gerente de loja" subtitle="Demanda em aberto de todas as lojas">
         <Link
           href="/assistencia/solicitar"
           className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
@@ -29,7 +26,14 @@ export default async function LojaHomePage() {
         >
           + Nova solicitação
         </Link>
-      </div>
+      </AssistenciaHeader>
+
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <StatTile label="Em aberto" value={openRequests.length} />
+        <StatTile label={STATUS_LABELS.aberta} value={byStatus.aberta ?? 0} />
+        <StatTile label={STATUS_LABELS.em_contato} value={byStatus.em_contato ?? 0} />
+        <StatTile label={STATUS_LABELS.em_andamento} value={byStatus.em_andamento ?? 0} />
+      </section>
 
       {openRequests.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
@@ -65,6 +69,10 @@ export default async function LojaHomePage() {
           </div>
         </div>
       )}
+
+      <Link href="/assistencia" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
+        ← Voltar
+      </Link>
     </div>
   );
 }

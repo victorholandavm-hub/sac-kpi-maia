@@ -44,5 +44,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/ghl-webhook|api/sync|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/ghl-webhook|api/sync|_next/static|_next/image|favicon.ico|logo.png).*)"],
 };

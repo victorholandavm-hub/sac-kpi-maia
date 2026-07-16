@@ -30,6 +30,8 @@
   --brand-green: #1b5e3c;
   --brand-green-ink: #ffffff;
   --brand-orange: #f2871a;
+  --brand-green-soft: #e4ece8;
+  --brand-orange-soft: #fdf1e4;
 }
 
 @theme inline {

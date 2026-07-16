@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listStores } from "@/lib/serviceRequests";
 import { PublicRequestForm } from "@/components/assistencia/PublicRequestForm";
+import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 
 export default async function SolicitarAssistenciaPage({
   searchParams,
@@ -12,14 +13,10 @@ export default async function SolicitarAssistenciaPage({
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--brand-green)" }}>
-          Solicitar assistência — Lojas Maia
-        </h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-          Montagem, desmontagem, recolhimento de peças ou notificação externa.
-        </p>
-      </div>
+      <AssistenciaHeader
+        title="Solicitar assistência"
+        subtitle="Montagem, desmontagem, recolhimento de peças ou notificação externa."
+      />
 
       {enviado ? (
         <div
