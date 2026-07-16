@@ -53,6 +53,8 @@ function eventDescription(event: {
       return `${actor} aprovou o prazo pedido.`;
     case "deadline_rejected":
       return `${actor} recusou o prazo e propôs outra data.`;
+    case "edited":
+      return `${actor} corrigiu os dados da solicitação.`;
     default:
       return actor;
   }
@@ -85,13 +87,22 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           </h2>
         </div>
         {canManage ? (
-          <Link
-            href={`/assistencia/pecas/nova?service_request_id=${request.id}`}
-            className="text-sm underline"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Solicitar peça para este chamado
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/assistencia/${request.id}/editar`}
+              className="text-sm underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Editar
+            </Link>
+            <Link
+              href={`/assistencia/pecas/nova?service_request_id=${request.id}`}
+              className="text-sm underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Solicitar peça para este chamado
+            </Link>
+          </div>
         ) : null}
       </div>
 

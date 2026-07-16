@@ -10,12 +10,13 @@ const TABS = [
   { label: "Estoque", href: "/assistencia/estoque" },
 ];
 
-export function AssistenciaNav() {
+export function AssistenciaNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
+  const tabs = isAdmin ? [...TABS, { label: "Admin", href: "/assistencia/admin" }] : TABS;
 
   return (
     <nav className="flex items-center gap-2">
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = tab.href === "/assistencia" ? pathname === "/assistencia" : pathname.startsWith(tab.href);
         return (
           <Link

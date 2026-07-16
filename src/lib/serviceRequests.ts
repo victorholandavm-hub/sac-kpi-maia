@@ -196,7 +196,14 @@ export type ServiceRequestDetail = ServiceRequestSummary & {
 
 export type RequestEvent = {
   id: string;
-  eventType: "created" | "status_changed" | "assigned" | "note_added" | "deadline_approved" | "deadline_rejected";
+  eventType:
+    | "created"
+    | "status_changed"
+    | "assigned"
+    | "note_added"
+    | "deadline_approved"
+    | "deadline_rejected"
+    | "edited";
   fromStatus: string | null;
   toStatus: string | null;
   note: string | null;

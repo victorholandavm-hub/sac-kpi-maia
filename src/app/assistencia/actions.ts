@@ -291,3 +291,49 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
   revalidatePath("/assistencia");
   revalidatePath(`/assistencia/${requestId}`);
 }
+
+export async function updateRequestDetails(
+  requestId: string,
+  _state: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+
+  const clientName = String(formData.get("client_name") ?? "").trim();
+  if (!clientName) return { error: "Informe o nome do cliente." };
+  const storeId = String(formData.get("store_id") ?? "").trim();
+  if (!storeId) return { error: "Selecione a loja." };
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin
+    .from("service_requests")
+    .update({
+      store_id: storeId,
+      order_code: emptyToNull(formData.get("order_code")),
+      client_name: clientName,
+      client_cpf: emptyToNull(formData.get("client_cpf")),
+      client_phone: emptyToNull(formData.get("client_phone")),
+      client_address: emptyToNull(formData.get("client_address")),
+      client_neighborhood: emptyToNull(formData.get("client_neighborhood")),
+      reason: emptyToNull(formData.get("reason")),
+      restriction_note: emptyToNull(formData.get("restriction_note")),
+      notes: emptyToNull(formData.get("notes")),
+    })
+    .eq("id", requestId);
+
+  if (error) {
+    return { error: `Não foi possível salvar: ${error.message}` };
+  }
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "edited",
+    note: "Dados da solicitação corrigidos.",
+  });
+
+  revalidatePath("/assistencia");
+  revalidatePath(`/assistencia/${requestId}`);
+  redirect(`/assistencia/${requestId}`);
+}

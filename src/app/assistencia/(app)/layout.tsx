@@ -28,7 +28,7 @@ export default async function AssistenciaAppLayout({ children }: { children: Rea
             </button>
           </form>
         </div>
-        <AssistenciaNav />
+        <AssistenciaNav isAdmin={profile.role === "admin"} />
       </header>
       {children}
     </div>
