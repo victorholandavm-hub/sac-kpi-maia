@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { StoreIcon, WrenchIcon } from "@/components/assistencia/RoleIcons";
 
+// Nunca servir isso de cache estático/CDN — sempre gerar fresco a cada request.
+export const dynamic = "force-dynamic";
+
 export default function AssistenciaHomePage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
