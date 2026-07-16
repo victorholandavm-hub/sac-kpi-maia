@@ -19,7 +19,15 @@ function checkBasicAuth(req: NextRequest, expectedUser: string | undefined, expe
 }
 
 export function proxy(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, search } = req.nextUrl;
+
+  // Este projeto Vercel (o painel de KPIs do SAC) não hospeda mais o módulo de
+  // assistência — ele mora em um projeto/domínio separado. Se ASSISTENCIA_REDIRECT_URL
+  // estiver definida (só neste projeto, nunca no projeto da assistência), qualquer
+  // acesso a /assistencia aqui é redirecionado para lá, em vez de servir a rota local.
+  if (pathname.startsWith("/assistencia") && process.env.ASSISTENCIA_REDIRECT_URL) {
+    return NextResponse.redirect(`${process.env.ASSISTENCIA_REDIRECT_URL}${pathname}${search}`, 308);
+  }
 
   // Área da loja (painel de demanda em aberto + formulário): sem login individual, só uma
   // senha única compartilhada entre as lojas (evita deixar o link totalmente aberto).
