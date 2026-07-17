@@ -1,3 +1,5 @@
+import { signOutDashboard } from "@/app/login/actions";
+
 export function Header() {
   return (
     <header
@@ -6,7 +8,7 @@ export function Header() {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo.png" alt="Lojas Maia" className="h-14 w-14 object-contain shrink-0" />
-      <div>
+      <div className="flex-1">
         <h1 className="text-2xl font-semibold" style={{ color: "var(--brand-green)" }}>
           Painel de KPIs — SAC Maia
         </h1>
@@ -15,6 +17,11 @@ export function Header() {
           conversas — usada para preencher o que a tag não capturou.
         </p>
       </div>
+      <form action={signOutDashboard}>
+        <button type="submit" className="text-sm underline shrink-0" style={{ color: "var(--text-secondary)" }}>
+          Sair
+        </button>
+      </form>
     </header>
   );
 }

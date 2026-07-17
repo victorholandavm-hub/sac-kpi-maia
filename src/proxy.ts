@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { computeDashboardToken, DASHBOARD_COOKIE_NAME } from "@/lib/dashboardSession";
 
 function checkBasicAuth(req: NextRequest, expectedUser: string | undefined, expectedPassword: string | undefined, realm: string) {
   const header = req.headers.get("authorization");
@@ -18,7 +19,7 @@ function checkBasicAuth(req: NextRequest, expectedUser: string | undefined, expe
   });
 }
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
   // Este projeto Vercel (o painel de KPIs do SAC) não hospeda mais o módulo de
@@ -55,8 +56,21 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Painel de KPIs do SAC: Basic Auth único, como já era.
-  return checkBasicAuth(req, process.env.DASHBOARD_USER, process.env.DASHBOARD_PASSWORD, "Painel SAC Maia");
+  // Página de login própria do painel do SAC — sempre acessível, senão ninguém
+  // conseguiria entrar.
+  if (pathname === "/login") {
+    return NextResponse.next();
+  }
+
+  // Painel de KPIs do SAC: login com sessão em cookie assinado (troca do Basic Auth
+  // do navegador, que ficava sujeito a comportamentos estranhos de cache/protection
+  // space entre diferentes domínios/dispositivos).
+  const expectedToken = await computeDashboardToken();
+  const sessionCookie = req.cookies.get(DASHBOARD_COOKIE_NAME)?.value;
+  if (expectedToken && sessionCookie === expectedToken) {
+    return NextResponse.next();
+  }
+  return NextResponse.redirect(new URL("/login", req.url));
 }
 
 export const config = {
