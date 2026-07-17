@@ -8,6 +8,7 @@ const TABS = [
   { label: "Solicitações", href: "/assistencia/fila" },
   { label: "Agenda", href: "/assistencia/agenda" },
   { label: "Peças", href: "/assistencia/pecas" },
+  { label: "Fornecedores", href: "/assistencia/fornecedores" },
   { label: "Pagamentos", href: "/assistencia/pagamentos" },
   { label: "Estoque", href: "/assistencia/estoque" },
   { label: "Relatórios", href: "/assistencia/relatorios" },

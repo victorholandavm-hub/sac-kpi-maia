@@ -3,6 +3,7 @@ import { getProfile } from "@/lib/dal";
 import { countRequestsOverview } from "@/lib/serviceRequests";
 import { countPartOrdersOverview } from "@/lib/partOrders";
 import { countPendingPayments } from "@/lib/payments";
+import { countSupplierReturnsOverview } from "@/lib/supplierReturns";
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: string }) {
   return (
@@ -49,10 +50,11 @@ function Card({
 
 export default async function InicioPage() {
   const profile = await getProfile();
-  const [requests, parts, pendingPayments] = await Promise.all([
+  const [requests, parts, pendingPayments, supplierReturns] = await Promise.all([
     countRequestsOverview(profile),
     countPartOrdersOverview(),
     countPendingPayments(),
+    countSupplierReturnsOverview(),
   ]);
 
   return (
@@ -76,6 +78,11 @@ export default async function InicioPage() {
         <Card href="/assistencia/pecas" title="Peças" description="Pedidos de peça de reposição junto aos fornecedores.">
           <Stat label="Aguardando chegar" value={parts.awaiting} />
           <Stat label="Prontas para enviar" value={parts.readyToSend} />
+        </Card>
+
+        <Card href="/assistencia/fornecedores" title="Fornecedores" description="Remessas de peça defeituosa para conserto/reembolso.">
+          <Stat label="Em aberto" value={supplierReturns.open} />
+          <Stat label="Atrasadas" value={supplierReturns.overdue} tone={supplierReturns.overdue > 0 ? "var(--status-critical)" : undefined} />
         </Card>
 
         <Card href="/assistencia/pagamentos" title="Pagamentos" description="Valor por item e liberação de pagamento do montador.">

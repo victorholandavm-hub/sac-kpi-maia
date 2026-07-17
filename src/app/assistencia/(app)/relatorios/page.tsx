@@ -1,5 +1,6 @@
 import { getRequestsReport, type ReportRow } from "@/lib/serviceRequests";
 import { listPaymentItems } from "@/lib/payments";
+import { getSupplierReconciliation } from "@/lib/supplierReturns";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 
 function formatBRL(value: number) {
@@ -82,9 +83,10 @@ export default async function RelatoriosPage({
   const dateFrom = from || firstDayOfMonth();
   const dateTo = to || today();
 
-  const [report, paymentItems] = await Promise.all([
+  const [report, paymentItems, supplierReconciliation] = await Promise.all([
     getRequestsReport({ dateFrom, dateTo }),
     listPaymentItems({ dateFrom, dateTo }),
+    getSupplierReconciliation(),
   ]);
 
   const byAssembler = new Map<string, { total: number; pendente: number; itens: number }>();
@@ -193,6 +195,52 @@ export default async function RelatoriosPage({
                   </td>
                   <td className="text-right px-4 py-2" style={{ color: v.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" }}>
                     {formatBRL(v.pendente)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--gridline)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            Reconciliação com fornecedor (acumulado, todas as remessas)
+          </h3>
+        </div>
+        {supplierReconciliation.length === 0 ? (
+          <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
+            Nenhuma remessa registrada ainda.
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
+                <th className="text-left font-normal px-4 py-2">Fornecedor</th>
+                <th className="text-right font-normal px-4 py-2">Em devolução</th>
+                <th className="text-right font-normal px-4 py-2">Faturado</th>
+                <th className="text-right font-normal px-4 py-2">Reembolsado</th>
+                <th className="text-right font-normal px-4 py-2">Pendente</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+              {supplierReconciliation.map((r) => (
+                <tr key={r.supplier}>
+                  <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
+                    {r.supplier}
+                  </td>
+                  <td className="text-right px-4 py-2" style={{ color: "var(--text-primary)" }}>
+                    {formatBRL(r.emDevolucao)}
+                  </td>
+                  <td className="text-right px-4 py-2" style={{ color: "var(--text-primary)" }}>
+                    {formatBRL(r.faturado)}
+                  </td>
+                  <td className="text-right px-4 py-2" style={{ color: "var(--status-good)" }}>
+                    {formatBRL(r.reembolsado)}
+                  </td>
+                  <td className="text-right px-4 py-2" style={{ color: r.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" }}>
+                    {formatBRL(r.pendente)}
                   </td>
                 </tr>
               ))}

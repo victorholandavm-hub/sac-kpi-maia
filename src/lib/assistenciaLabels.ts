@@ -64,6 +64,22 @@ export const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
 };
 
+export const SUPPLIER_RETURN_STATUS_LABELS: Record<string, string> = {
+  aguardando_envio: "Aguardando envio",
+  enviado: "Enviado ao fornecedor",
+  recebido: "Recebido pelo fornecedor",
+  reembolsado: "Reembolsado",
+  finalizado: "Finalizado",
+};
+
+export const SUPPLIER_RETURN_STATUS_COLORS: Record<string, string> = {
+  aguardando_envio: "var(--status-warning)",
+  enviado: "var(--series-5)",
+  recebido: "var(--brand-orange)",
+  reembolsado: "var(--status-good)",
+  finalizado: "var(--text-muted)",
+};
+
 export const SAC_CATEGORIES = [
   "atraso_entrega",
   "entrega_parcial",
