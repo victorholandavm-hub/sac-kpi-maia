@@ -63,3 +63,27 @@ export const ROLE_LABELS: Record<string, string> = {
   assistencia: "Assistência",
   admin: "Administrador",
 };
+
+export const SAC_CATEGORIES = [
+  "atraso_entrega",
+  "entrega_parcial",
+  "produto_encomenda",
+  "pedido_sinalizado_atraso",
+  "cobranca_indevida",
+  "produto_avaria",
+  "cancelamento_estorno",
+  "endereco_errado",
+  "ameaca_procon",
+] as const;
+
+export const SAC_CATEGORY_LABELS: Record<string, string> = {
+  atraso_entrega: "Atraso na entrega",
+  entrega_parcial: "Entrega parcial",
+  produto_encomenda: "Produto sob encomenda",
+  pedido_sinalizado_atraso: "Pedido sinalizado para atrasar",
+  cobranca_indevida: "Cobrança indevida / Serasa",
+  produto_avaria: "Produto com avaria",
+  cancelamento_estorno: "Cancelamento / estorno",
+  endereco_errado: "Endereço errado / cliente ausente",
+  ameaca_procon: "Ameaça de Procon/ReclameAqui",
+};

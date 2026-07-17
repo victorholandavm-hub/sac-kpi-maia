@@ -2,13 +2,22 @@ import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
-import { REQUEST_TYPE_LABELS, STATUS_LABELS, DEADLINE_STATUS_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import {
+  REQUEST_TYPE_LABELS,
+  STATUS_LABELS,
+  DEADLINE_STATUS_LABELS,
+  SHIFT_LABELS,
+  SAC_CATEGORY_LABELS,
+} from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { RequestActions } from "@/components/assistencia/RequestActions";
 import { DeadlineActions } from "@/components/assistencia/DeadlineActions";
 import { AssemblerNameField } from "@/components/assistencia/AssemblerNameField";
 import { ScheduleField } from "@/components/assistencia/ScheduleField";
 import { RequestItemsTable } from "@/components/assistencia/RequestItemsTable";
+import { SacCategoryField } from "@/components/assistencia/SacCategoryField";
+import { LegalDeadlineField } from "@/components/assistencia/LegalDeadlineField";
+import { EscalationRiskToggle } from "@/components/assistencia/EscalationRiskToggle";
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -103,6 +112,13 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
             >
               Solicitar peça para este chamado
             </Link>
+            <Link
+              href={`/assistencia/${request.id}/despacho`}
+              className="text-sm underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Imprimir despacho
+            </Link>
           </div>
         ) : null}
       </div>
@@ -168,11 +184,30 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           label={request.deadlineStatus === "recusado" ? "Nova data proposta" : "Prazo aprovado"}
           value={formatDateOnly(request.approvedDeadline)}
         />
+        {request.type === "notificacao_externa" ? (
+          <>
+            <Row label="Protocolo" value={request.protocolNumber} />
+            {canManage ? (
+              <SacCategoryField requestId={request.id} value={request.sacCategory} />
+            ) : (
+              <Row label="Categoria SAC" value={request.sacCategory ? SAC_CATEGORY_LABELS[request.sacCategory] : null} />
+            )}
+            {canManage ? (
+              <LegalDeadlineField requestId={request.id} legalDeadline={request.legalDeadline} />
+            ) : (
+              <Row label="Prazo legal" value={formatDateOnly(request.legalDeadline)} />
+            )}
+          </>
+        ) : null}
         <Row label="Criada em" value={new Date(request.createdAt).toLocaleString("pt-BR")} />
         {request.completedAt ? (
           <Row label="Encerrada em" value={new Date(request.completedAt).toLocaleString("pt-BR")} />
         ) : null}
       </div>
+
+      {canManage && request.type === "notificacao_externa" ? (
+        <EscalationRiskToggle requestId={request.id} atRisk={request.escalationRisk} />
+      ) : null}
 
       {canManage && request.deadlineStatus === "pendente" ? <DeadlineActions requestId={request.id} /> : null}
 

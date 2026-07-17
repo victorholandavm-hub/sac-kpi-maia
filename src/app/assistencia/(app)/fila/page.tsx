@@ -173,6 +173,14 @@ export default async function AssistenciaQueuePage({
                             Prazo pendente
                           </span>
                         ) : null}
+                        {r.escalationRisk ? (
+                          <span
+                            className="text-xs font-medium px-2 py-0.5 rounded-full"
+                            style={{ color: "var(--status-critical)", border: "1px solid var(--status-critical)" }}
+                          >
+                            ⚠ Risco de escalonamento
+                          </span>
+                        ) : null}
                         <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                           {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                         </span>

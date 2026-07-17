@@ -9,7 +9,7 @@ export default async function AssistenciaAppLayout({ children }: { children: Rea
 
   return (
     <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 print:hidden">
         <AssistenciaHeader
           title="Assistência — Lojas Maia"
           subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}${profile.storeId ? ` · Loja ${profile.storeId}` : ""}`}

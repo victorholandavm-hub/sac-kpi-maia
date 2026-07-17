@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
-import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 
 const REQUEST_TYPES = [
   "montagem",
@@ -105,6 +105,7 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       notes: emptyToNull(formData.get("notes")),
       seller_name: emptyToNull(formData.get("seller_name")),
       invoice_number: emptyToNull(formData.get("invoice_number")),
+      sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
     })
     .select("id")
     .single();
@@ -120,6 +121,17 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     if (itemsError) {
       return { error: `Solicitação criada, mas falhou ao salvar os itens: ${itemsError.message}` };
     }
+  }
+
+  // Notificação SAC: gera um protocolo pro cliente e um prazo legal padrão
+  // (30 dias, ajustável depois pela assistência).
+  if (type === "notificacao_externa") {
+    const protocolNumber = `SAC-${new Date().getFullYear()}-${data.id.slice(0, 8).toUpperCase()}`;
+    const legalDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await admin
+      .from("service_requests")
+      .update({ protocol_number: protocolNumber, legal_deadline: legalDeadline })
+      .eq("id", data.id);
   }
 
   await admin.from("service_request_events").insert({
@@ -333,6 +345,67 @@ export async function setSchedule(requestId: string, scheduledDate: string, shif
 
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/agenda");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
+export async function setSacCategory(requestId: string, category: string) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  if (!SAC_CATEGORIES.includes(category as (typeof SAC_CATEGORIES)[number])) {
+    throw new Error("Categoria inválida.");
+  }
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("service_requests").update({ sac_category: category }).eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: `Categoria SAC definida: ${SAC_CATEGORY_LABELS[category] ?? category}.`,
+  });
+
+  revalidatePath("/assistencia/fila");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
+export async function setLegalDeadline(requestId: string, newDate: string) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  if (!newDate) throw new Error("Informe uma data.");
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("service_requests").update({ legal_deadline: newDate }).eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: `Prazo legal ajustado para ${newDate}.`,
+  });
+
+  revalidatePath("/assistencia/fila");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
+export async function setEscalationRisk(requestId: string, atRisk: boolean) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("service_requests").update({ escalation_risk: atRisk }).eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: atRisk ? "Marcado como risco de escalonamento (Procon/ReclameAqui)." : "Risco de escalonamento removido.",
+  });
+
+  revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
 }
 

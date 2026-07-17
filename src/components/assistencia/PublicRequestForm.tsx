@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createPublicRequest, type FormState } from "@/app/assistencia/actions";
-import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 import type { Store } from "@/lib/serviceRequests";
 
 const TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
@@ -79,6 +79,21 @@ export function PublicRequestForm({ stores }: { stores: Store[] }) {
           ))}
         </select>
       </Field>
+
+      {type === "notificacao_externa" ? (
+        <Field label="Categoria da notificação *">
+          <select name="sac_category" required defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
+            <option value="" disabled>
+              Selecione…
+            </option>
+            {SAC_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {SAC_CATEGORY_LABELS[c]}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : null}
 
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Código do pedido/venda">
