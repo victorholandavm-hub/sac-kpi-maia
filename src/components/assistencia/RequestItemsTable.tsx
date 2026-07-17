@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setItemUnitValue, setItemPaymentReleased } from "@/app/assistencia/pagamentos-actions";
+import { setItemUnitValue, setItemPaymentReleased, setItemPaymentAuthorizedBy } from "@/app/assistencia/pagamentos-actions";
 import type { RequestItem } from "@/lib/serviceRequests";
 
 function formatBRL(value: number) {
@@ -19,6 +19,8 @@ function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) 
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(item.unitValue !== null ? String(item.unitValue) : "");
   const [error, setError] = useState<string | null>(null);
+  const [editingAuth, setEditingAuth] = useState(false);
+  const [authValue, setAuthValue] = useState(item.paymentAuthorizedBy ?? "");
 
   const total = item.unitValue !== null ? item.unitValue * item.quantity : null;
 
@@ -44,6 +46,23 @@ function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) 
     startTransition(async () => {
       try {
         await setItemPaymentReleased(item.id, requestId, !item.paymentReleased);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erro inesperado.");
+      }
+    });
+  }
+
+  function saveAuth() {
+    if (!authValue.trim()) {
+      setError("Informe o nome do gerente.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      try {
+        await setItemPaymentAuthorizedBy(item.id, requestId, authValue);
+        setEditingAuth(false);
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erro inesperado.");
@@ -98,6 +117,35 @@ function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) 
             em {formatDate(item.paymentReleasedAt)}
           </span>
         ) : null}
+      </div>
+      <div className="flex items-center gap-2 w-full text-xs" style={{ color: "var(--text-muted)" }}>
+        <span>Autorizado por (gerente):</span>
+        {editingAuth ? (
+          <>
+            <input
+              value={authValue}
+              onChange={(e) => setAuthValue(e.target.value)}
+              className="w-40 rounded border px-2 py-1 text-xs"
+              style={{ borderColor: "var(--border)" }}
+              autoFocus
+            />
+            <button
+              disabled={pending}
+              onClick={saveAuth}
+              className="rounded px-2 py-1 disabled:opacity-60"
+              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            >
+              Salvar
+            </button>
+            <button onClick={() => setEditingAuth(false)} className="underline">
+              cancelar
+            </button>
+          </>
+        ) : (
+          <button onClick={() => setEditingAuth(true)} className="underline" style={{ color: "var(--text-secondary)" }}>
+            {item.paymentAuthorizedBy ?? "definir"}
+          </button>
+        )}
       </div>
       {error ? (
         <p className="text-xs w-full" style={{ color: "var(--status-critical)" }}>

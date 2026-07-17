@@ -133,6 +133,8 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
         <Row label="Código do pedido/venda" value={request.orderCode} />
+        <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
+        <Row label="Vendedor(a)" value={request.sellerName} />
         <Row label="Cliente" value={request.clientName} />
         <Row label="CPF" value={request.clientCpf} />
         <Row label="Telefone" value={request.clientPhone} />

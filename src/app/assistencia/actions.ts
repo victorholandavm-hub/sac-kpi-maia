@@ -103,6 +103,8 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       reason: emptyToNull(formData.get("reason")),
       restriction_note: emptyToNull(formData.get("restriction_note")),
       notes: emptyToNull(formData.get("notes")),
+      seller_name: emptyToNull(formData.get("seller_name")),
+      invoice_number: emptyToNull(formData.get("invoice_number")),
     })
     .select("id")
     .single();
@@ -231,6 +233,9 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   if (!STATUSES.includes(newStatus as (typeof STATUSES)[number])) {
     throw new Error("Status inválido.");
   }
+  if (newStatus === "remarcar" && !note?.trim()) {
+    throw new Error("Informe o motivo da remarcação.");
+  }
 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
@@ -358,6 +363,8 @@ export async function updateRequestDetails(
       reason: emptyToNull(formData.get("reason")),
       restriction_note: emptyToNull(formData.get("restriction_note")),
       notes: emptyToNull(formData.get("notes")),
+      seller_name: emptyToNull(formData.get("seller_name")),
+      invoice_number: emptyToNull(formData.get("invoice_number")),
     })
     .eq("id", requestId);
 

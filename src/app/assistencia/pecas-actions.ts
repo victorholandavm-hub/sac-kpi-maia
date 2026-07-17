@@ -31,6 +31,8 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
     await admin.from("suppliers").upsert({ name: supplier }, { onConflict: "name" });
   }
 
+  const defaultExpectedAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   const { data, error } = await admin
     .from("part_orders")
     .insert({
@@ -47,6 +49,7 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
       representative: emptyToNull(formData.get("representative")),
       requested_by: profile.fullName,
       notes: emptyToNull(formData.get("notes")),
+      expected_at: emptyToNull(formData.get("expected_at")) ?? defaultExpectedAt,
     })
     .select("id")
     .single();
@@ -73,6 +76,19 @@ export async function updatePartOrderStatus(id: string, newStatus: string) {
   if (newStatus === "encerrado") patch.closed_at = today;
 
   const { error } = await admin.from("part_orders").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/assistencia/pecas");
+  revalidatePath(`/assistencia/pecas/${id}`);
+}
+
+export async function setExpectedAt(id: string, newDate: string) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  if (!newDate) throw new Error("Informe uma data.");
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("part_orders").update({ expected_at: newDate }).eq("id", id);
   if (error) throw new Error(error.message);
 
   revalidatePath("/assistencia/pecas");

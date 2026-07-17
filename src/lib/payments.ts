@@ -15,6 +15,7 @@ export type PaymentItem = {
   unitValue: number | null;
   paymentReleased: boolean;
   paymentReleasedAt: string | null;
+  paymentAuthorizedBy: string | null;
   assemblerName: string | null;
   clientName: string | null;
   storeName: string;
@@ -28,6 +29,7 @@ type PaymentItemRow = {
   unit_value: number | null;
   payment_released: boolean;
   payment_released_at: string | null;
+  payment_authorized_by: string | null;
   request: {
     id: string;
     assembler_name: string | null;
@@ -42,7 +44,7 @@ export async function listPaymentItems(opts: { assemblerName?: string } = {}): P
   const { data, error } = await admin
     .from("service_request_items")
     .select(
-      "id, product, quantity, unit_value, payment_released, payment_released_at, request:service_requests(id, assembler_name, client_name, created_at, stores(name))"
+      "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, assembler_name, client_name, created_at, stores(name))"
     )
     .not("unit_value", "is", null)
     .order("created_at", { ascending: false });
@@ -59,6 +61,7 @@ export async function listPaymentItems(opts: { assemblerName?: string } = {}): P
       unitValue: row.unit_value,
       paymentReleased: row.payment_released,
       paymentReleasedAt: row.payment_released_at,
+      paymentAuthorizedBy: row.payment_authorized_by,
       assemblerName: row.request!.assembler_name,
       clientName: row.request!.client_name,
       storeName: row.request!.stores?.name ?? "",

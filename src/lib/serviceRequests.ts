@@ -47,6 +47,7 @@ export type RequestItem = {
   unitValue: number | null;
   paymentReleased: boolean;
   paymentReleasedAt: string | null;
+  paymentAuthorizedBy: string | null;
 };
 
 type ItemRow = {
@@ -56,6 +57,7 @@ type ItemRow = {
   unit_value: number | null;
   payment_released: boolean;
   payment_released_at: string | null;
+  payment_authorized_by: string | null;
 };
 
 export type ServiceRequestSummary = {
@@ -81,6 +83,8 @@ export type ServiceRequestSummary = {
   assemblerName: string | null;
   scheduledDate: string | null;
   shift: Shift | null;
+  sellerName: string | null;
+  invoiceNumber: string | null;
 };
 
 type SummaryRow = {
@@ -99,6 +103,8 @@ type SummaryRow = {
   assembler_name: string | null;
   scheduled_date: string | null;
   shift: Shift | null;
+  seller_name: string | null;
+  invoice_number: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -110,7 +116,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at)";
+  "id, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, seller_name, invoice_number, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -120,6 +126,7 @@ function toItem(row: ItemRow): RequestItem {
     unitValue: row.unit_value,
     paymentReleased: row.payment_released,
     paymentReleasedAt: row.payment_released_at,
+    paymentAuthorizedBy: row.payment_authorized_by,
   };
 }
 
@@ -142,6 +149,8 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     assemblerName: row.assembler_name,
     scheduledDate: row.scheduled_date,
     shift: row.shift,
+    sellerName: row.seller_name,
+    invoiceNumber: row.invoice_number,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
@@ -266,7 +275,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at)";
+  "id, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, seller_name, invoice_number, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 export async function getRequestDetail(
   profile: Profile,

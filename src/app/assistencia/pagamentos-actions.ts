@@ -26,6 +26,32 @@ export async function setItemUnitValue(itemId: string, requestId: string, unitVa
   revalidatePath("/assistencia/pagamentos");
 }
 
+export async function setItemPaymentAuthorizedBy(itemId: string, requestId: string, managerName: string) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  const trimmed = managerName.trim();
+  if (!trimmed) throw new Error("Informe o nome do gerente.");
+
+  const admin = getSupabaseAdmin();
+  const { data: item } = await admin.from("service_request_items").select("product").eq("id", itemId).single();
+
+  const { error } = await admin
+    .from("service_request_items")
+    .update({ payment_authorized_by: trimmed })
+    .eq("id", itemId);
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: `Pagamento de "${item?.product ?? "item"}" autorizado pelo gerente: ${trimmed}.`,
+  });
+
+  revalidatePath(`/assistencia/${requestId}`);
+  revalidatePath("/assistencia/pagamentos");
+}
+
 export async function setItemPaymentReleased(itemId: string, requestId: string, released: boolean) {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin");

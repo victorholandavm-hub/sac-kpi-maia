@@ -38,6 +38,7 @@ export type PartOrder = {
   partArrivedAt: string | null;
   sentToClientAt: string | null;
   closedAt: string | null;
+  expectedAt: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -61,13 +62,14 @@ type PartOrderRow = {
   part_arrived_at: string | null;
   sent_to_client_at: string | null;
   closed_at: string | null;
+  expected_at: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
 };
 
 const PART_ORDER_COLUMNS =
-  "id, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, notes, created_at, updated_at";
+  "id, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, created_at, updated_at";
 
 function toPartOrder(row: PartOrderRow): PartOrder {
   return {
@@ -88,6 +90,7 @@ function toPartOrder(row: PartOrderRow): PartOrder {
     partArrivedAt: row.part_arrived_at,
     sentToClientAt: row.sent_to_client_at,
     closedAt: row.closed_at,
+    expectedAt: row.expected_at,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

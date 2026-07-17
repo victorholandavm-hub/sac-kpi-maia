@@ -27,6 +27,8 @@ export function RequestActions({
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [remarcarReason, setRemarcarReason] = useState("");
+  const [askingRemarcarReason, setAskingRemarcarReason] = useState(false);
 
   function run(action: () => Promise<void>) {
     setError(null);
@@ -37,6 +39,18 @@ export function RequestActions({
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erro inesperado.");
       }
+    });
+  }
+
+  function confirmRemarcar() {
+    if (!remarcarReason.trim()) {
+      setError("Informe o motivo da remarcação.");
+      return;
+    }
+    run(async () => {
+      await updateStatus(requestId, "remarcar", remarcarReason);
+      setRemarcarReason("");
+      setAskingRemarcarReason(false);
     });
   }
 
@@ -68,13 +82,50 @@ export function RequestActions({
             <button
               key={s}
               disabled={pending}
-              onClick={() => run(() => updateStatus(requestId, s))}
+              onClick={() => (s === "remarcar" ? setAskingRemarcarReason(true) : run(() => updateStatus(requestId, s)))}
               className="text-sm rounded px-3 py-2 border disabled:opacity-60"
               style={{ borderColor: "var(--border)" }}
             >
               Marcar como {STATUS_LABELS[s] ?? s}
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {askingRemarcarReason ? (
+        <div className="flex flex-col gap-2 rounded border p-3" style={{ borderColor: "var(--status-critical)" }}>
+          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+            Qual o motivo da remarcação?
+          </span>
+          <textarea
+            value={remarcarReason}
+            onChange={(e) => setRemarcarReason(e.target.value)}
+            rows={2}
+            placeholder="Ex: cliente ausente, chovendo, técnico sem tempo…"
+            className="rounded border px-3 py-2 text-sm"
+            style={{ borderColor: "var(--border)" }}
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <button
+              disabled={pending || !remarcarReason.trim()}
+              onClick={confirmRemarcar}
+              className="text-sm rounded px-3 py-2 disabled:opacity-60"
+              style={{ background: "var(--status-critical)", color: "#fff" }}
+            >
+              Confirmar remarcação
+            </button>
+            <button
+              onClick={() => {
+                setAskingRemarcarReason(false);
+                setRemarcarReason("");
+              }}
+              className="text-sm underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              cancelar
+            </button>
+          </div>
         </div>
       ) : null}
 

@@ -21,6 +21,12 @@ function daysSince(dateStr: string): number {
   return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
 }
 
+function isOverdue(expectedAt: string | null): boolean {
+  if (!expectedAt) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return today > expectedAt;
+}
+
 function buildHref(params: { status?: string; q?: string; supplier?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -145,8 +151,10 @@ export default async function PecasQueuePage({
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                  {o.status === "aguardando_peca" ? (
-                    <span style={{ color: "var(--status-warning)" }}>{daysSince(o.createdAt)} dias aguardando</span>
+                  {o.status !== "encerrado" ? (
+                    <span style={{ color: isOverdue(o.expectedAt) ? "var(--status-critical)" : "var(--status-warning)" }}>
+                      {daysSince(o.createdAt)} dias aguardando{isOverdue(o.expectedAt) ? " · atrasado" : ""}
+                    </span>
                   ) : (
                     <span>{new Date(o.createdAt).toLocaleDateString("pt-BR")}</span>
                   )}

@@ -80,8 +80,17 @@ export function PublicRequestForm({ stores }: { stores: Store[] }) {
         </select>
       </Field>
 
-      <Field label="Código do pedido/venda">
-        <input name="order_code" className="rounded border px-3 py-2" style={inputStyle} />
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label="Código do pedido/venda">
+          <input name="order_code" className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+        <Field label="Nº da nota fiscal">
+          <input name="invoice_number" className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+      </div>
+
+      <Field label="Vendedor(a)">
+        <input name="seller_name" className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
       <Field label="Nome do cliente *">

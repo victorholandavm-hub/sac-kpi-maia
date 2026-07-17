@@ -31,8 +31,17 @@ export function EditRequestForm({ request, stores }: { request: ServiceRequestDe
         </select>
       </Field>
 
-      <Field label="Código do pedido/venda">
-        <input name="order_code" defaultValue={request.orderCode ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label="Código do pedido/venda">
+          <input name="order_code" defaultValue={request.orderCode ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+        <Field label="Nº da nota fiscal">
+          <input name="invoice_number" defaultValue={request.invoiceNumber ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+      </div>
+
+      <Field label="Vendedor(a)">
+        <input name="seller_name" defaultValue={request.sellerName ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
       <Field label="Nome do cliente *">
