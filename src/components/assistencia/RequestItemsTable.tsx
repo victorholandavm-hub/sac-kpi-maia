@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { setItemUnitValue, setItemPaymentReleased, setItemPaymentAuthorizedBy } from "@/app/assistencia/pagamentos-actions";
+import { useQuickAction } from "./useQuickAction";
 import type { RequestItem } from "@/lib/serviceRequests";
 
 function formatBRL(value: number) {
@@ -14,11 +14,9 @@ function formatDate(value: string) {
 }
 
 function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(item.unitValue !== null ? String(item.unitValue) : "");
-  const [error, setError] = useState<string | null>(null);
   const [editingAuth, setEditingAuth] = useState(false);
   const [authValue, setAuthValue] = useState(item.paymentAuthorizedBy ?? "");
 
@@ -27,47 +25,31 @@ function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) 
   function saveValue() {
     const parsed = parseFloat(value.replace(",", "."));
     if (!Number.isFinite(parsed) || parsed < 0) {
-      setError("Valor inválido.");
+      showToast("Valor inválido.", "error");
       return;
     }
-    setError(null);
-    startTransition(async () => {
-      try {
-        await setItemUnitValue(item.id, requestId, parsed);
-        setEditing(false);
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Erro inesperado.");
-      }
-    });
+    run(async () => {
+      await setItemUnitValue(item.id, requestId, parsed);
+      setEditing(false);
+    }, "Valor atualizado.");
   }
 
   function toggleReleased() {
-    startTransition(async () => {
-      try {
-        await setItemPaymentReleased(item.id, requestId, !item.paymentReleased);
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Erro inesperado.");
-      }
-    });
+    run(
+      () => setItemPaymentReleased(item.id, requestId, !item.paymentReleased),
+      item.paymentReleased ? "Pagamento revertido para pendente." : "Pagamento aprovado."
+    );
   }
 
   function saveAuth() {
     if (!authValue.trim()) {
-      setError("Informe o nome do gerente.");
+      showToast("Informe o nome do gerente.", "error");
       return;
     }
-    setError(null);
-    startTransition(async () => {
-      try {
-        await setItemPaymentAuthorizedBy(item.id, requestId, authValue);
-        setEditingAuth(false);
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Erro inesperado.");
-      }
-    });
+    run(async () => {
+      await setItemPaymentAuthorizedBy(item.id, requestId, authValue);
+      setEditingAuth(false);
+    }, "Autorização registrada.");
   }
 
   return (
@@ -147,11 +129,6 @@ function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) 
           </button>
         )}
       </div>
-      {error ? (
-        <p className="text-xs w-full" style={{ color: "var(--status-critical)" }}>
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

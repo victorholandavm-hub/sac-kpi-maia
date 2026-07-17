@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { updateSupplierReturnStatus, addSupplierReturnNote } from "@/app/assistencia/fornecedores-actions";
+import { useQuickAction } from "./useQuickAction";
 import { SUPPLIER_RETURN_STATUS_LABELS } from "@/lib/assistenciaLabels";
 
 const NEXT_STATUSES: Record<string, string[]> = {
@@ -14,23 +14,9 @@ const NEXT_STATUSES: Record<string, string[]> = {
 };
 
 export function SupplierReturnActions({ returnId, status }: { returnId: string; status: string }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run, showToast } = useQuickAction();
   const [note, setNote] = useState("");
   const [reimbursedValue, setReimbursedValue] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  function run(action: () => Promise<void>) {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await action();
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Erro inesperado.");
-      }
-    });
-  }
 
   const nextStatuses = NEXT_STATUSES[status] ?? [];
 
@@ -54,10 +40,10 @@ export function SupplierReturnActions({ returnId, status }: { returnId: string; 
             onClick={() => {
               const parsed = parseFloat(reimbursedValue.replace(",", "."));
               if (!Number.isFinite(parsed) || parsed < 0) {
-                setError("Valor inválido.");
+                showToast("Valor inválido.", "error");
                 return;
               }
-              run(() => updateSupplierReturnStatus(returnId, "reembolsado", parsed));
+              run(() => updateSupplierReturnStatus(returnId, "reembolsado", parsed), "Marcado como reembolsado.");
             }}
             className="text-sm rounded px-3 py-2 border disabled:opacity-60"
             style={{ borderColor: "var(--border)" }}
@@ -71,7 +57,9 @@ export function SupplierReturnActions({ returnId, status }: { returnId: string; 
             <button
               key={s}
               disabled={pending}
-              onClick={() => run(() => updateSupplierReturnStatus(returnId, s))}
+              onClick={() =>
+                run(() => updateSupplierReturnStatus(returnId, s), `Status atualizado para ${SUPPLIER_RETURN_STATUS_LABELS[s] ?? s}.`)
+              }
               className="text-sm rounded px-3 py-2 border disabled:opacity-60"
               style={{ borderColor: "var(--border)" }}
             >
@@ -100,7 +88,7 @@ export function SupplierReturnActions({ returnId, status }: { returnId: string; 
             run(async () => {
               await addSupplierReturnNote(returnId, note);
               setNote("");
-            })
+            }, "Nota adicionada.")
           }
           className="text-sm rounded px-3 py-2 self-start border disabled:opacity-60"
           style={{ borderColor: "var(--border)" }}
@@ -108,12 +96,6 @@ export function SupplierReturnActions({ returnId, status }: { returnId: string; 
           Adicionar nota
         </button>
       </div>
-
-      {error ? (
-        <p className="text-sm" style={{ color: "var(--status-critical)" }}>
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

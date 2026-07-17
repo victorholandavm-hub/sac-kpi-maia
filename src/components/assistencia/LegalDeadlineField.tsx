@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { setLegalDeadline } from "@/app/assistencia/actions";
+import { useQuickAction } from "./useQuickAction";
 
 function formatDateOnly(value: string | null): string | null {
   if (!value) return null;
@@ -11,11 +11,9 @@ function formatDateOnly(value: string | null): string | null {
 }
 
 export function LegalDeadlineField({ requestId, legalDeadline }: { requestId: string; legalDeadline: string | null }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [date, setDate] = useState(legalDeadline ?? "");
-  const [error, setError] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
   const overdue = !!legalDeadline && today > legalDeadline;
@@ -54,18 +52,12 @@ export function LegalDeadlineField({ requestId, legalDeadline }: { requestId: st
         />
         <button
           disabled={pending || !date}
-          onClick={() => {
-            setError(null);
-            startTransition(async () => {
-              try {
-                await setLegalDeadline(requestId, date);
-                setEditing(false);
-                router.refresh();
-              } catch (e) {
-                setError(e instanceof Error ? e.message : "Erro inesperado.");
-              }
-            });
-          }}
+          onClick={() =>
+            run(async () => {
+              await setLegalDeadline(requestId, date);
+              setEditing(false);
+            }, "Prazo legal atualizado.")
+          }
           className="text-xs rounded px-2 py-1 disabled:opacity-60"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
         >
@@ -82,11 +74,6 @@ export function LegalDeadlineField({ requestId, legalDeadline }: { requestId: st
           cancelar
         </button>
       </div>
-      {error ? (
-        <p className="text-xs" style={{ color: "var(--status-critical)" }}>
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

@@ -1,18 +1,16 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { setEscalationRisk } from "@/app/assistencia/actions";
+import { useQuickAction } from "./useQuickAction";
 
 export function EscalationRiskToggle({ requestId, atRisk }: { requestId: string; atRisk: boolean }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run } = useQuickAction();
 
   function toggle() {
-    startTransition(async () => {
-      await setEscalationRisk(requestId, !atRisk);
-      router.refresh();
-    });
+    run(
+      () => setEscalationRisk(requestId, !atRisk),
+      atRisk ? "Risco de escalonamento removido." : "Marcado como risco de escalonamento."
+    );
   }
 
   return (

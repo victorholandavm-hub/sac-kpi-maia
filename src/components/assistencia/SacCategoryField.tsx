@@ -1,21 +1,16 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { setSacCategory } from "@/app/assistencia/actions";
+import { useQuickAction } from "./useQuickAction";
 import { SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 
 export function SacCategoryField({ requestId, value }: { requestId: string; value: string | null }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run } = useQuickAction();
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const category = e.target.value;
     if (!category) return;
-    startTransition(async () => {
-      await setSacCategory(requestId, category);
-      router.refresh();
-    });
+    run(() => setSacCategory(requestId, category), "Categoria SAC atualizada.");
   }
 
   return (

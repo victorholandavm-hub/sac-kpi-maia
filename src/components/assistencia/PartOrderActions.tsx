@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { updatePartOrderStatus, addPartOrderNote } from "@/app/assistencia/pecas-actions";
+import { useQuickAction } from "./useQuickAction";
 import { PART_ORDER_STATUS_LABELS } from "@/lib/assistenciaLabels";
 
 const NEXT_STATUSES: Record<string, string[]> = {
@@ -13,22 +13,8 @@ const NEXT_STATUSES: Record<string, string[]> = {
 };
 
 export function PartOrderActions({ orderId, status }: { orderId: string; status: string }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run } = useQuickAction();
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  function run(action: () => Promise<void>) {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await action();
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Erro inesperado.");
-      }
-    });
-  }
 
   const nextStatuses = NEXT_STATUSES[status] ?? [];
 
@@ -47,7 +33,9 @@ export function PartOrderActions({ orderId, status }: { orderId: string; status:
             <button
               key={s}
               disabled={pending}
-              onClick={() => run(() => updatePartOrderStatus(orderId, s))}
+              onClick={() =>
+                run(() => updatePartOrderStatus(orderId, s), `Status atualizado para ${PART_ORDER_STATUS_LABELS[s] ?? s}.`)
+              }
               className="text-sm rounded px-3 py-2 border disabled:opacity-60"
               style={{ borderColor: "var(--border)" }}
             >
@@ -76,7 +64,7 @@ export function PartOrderActions({ orderId, status }: { orderId: string; status:
             run(async () => {
               await addPartOrderNote(orderId, note);
               setNote("");
-            })
+            }, "Nota adicionada.")
           }
           className="text-sm rounded px-3 py-2 self-start border disabled:opacity-60"
           style={{ borderColor: "var(--border)" }}
@@ -84,12 +72,6 @@ export function PartOrderActions({ orderId, status }: { orderId: string; status:
           Adicionar nota
         </button>
       </div>
-
-      {error ? (
-        <p className="text-sm" style={{ color: "var(--status-critical)" }}>
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

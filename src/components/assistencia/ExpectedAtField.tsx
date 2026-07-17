@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { setExpectedAt } from "@/app/assistencia/pecas-actions";
+import { useQuickAction } from "./useQuickAction";
 
 function formatDateOnly(value: string | null): string | null {
   if (!value) return null;
@@ -11,11 +11,9 @@ function formatDateOnly(value: string | null): string | null {
 }
 
 export function ExpectedAtField({ orderId, expectedAt }: { orderId: string; expectedAt: string | null }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [date, setDate] = useState(expectedAt ?? "");
-  const [error, setError] = useState<string | null>(null);
 
   if (!editing) {
     return (
@@ -51,18 +49,12 @@ export function ExpectedAtField({ orderId, expectedAt }: { orderId: string; expe
         />
         <button
           disabled={pending || !date}
-          onClick={() => {
-            setError(null);
-            startTransition(async () => {
-              try {
-                await setExpectedAt(orderId, date);
-                setEditing(false);
-                router.refresh();
-              } catch (e) {
-                setError(e instanceof Error ? e.message : "Erro inesperado.");
-              }
-            });
-          }}
+          onClick={() =>
+            run(async () => {
+              await setExpectedAt(orderId, date);
+              setEditing(false);
+            }, "Prazo esperado atualizado.")
+          }
           className="text-xs rounded px-2 py-1 disabled:opacity-60"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
         >
@@ -79,11 +71,6 @@ export function ExpectedAtField({ orderId, expectedAt }: { orderId: string; expe
           cancelar
         </button>
       </div>
-      {error ? (
-        <p className="text-xs" style={{ color: "var(--status-critical)" }}>
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

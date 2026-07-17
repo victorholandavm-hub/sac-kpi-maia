@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { setSchedule } from "@/app/assistencia/actions";
+import { useQuickAction } from "./useQuickAction";
 import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { SHIFTS, type Shift } from "@/lib/serviceRequests";
 
@@ -21,12 +21,10 @@ export function ScheduleField({
   scheduledDate: string | null;
   shift: Shift | null;
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [date, setDate] = useState(scheduledDate ?? "");
   const [selectedShift, setSelectedShift] = useState<string>(shift ?? "");
-  const [error, setError] = useState<string | null>(null);
 
   if (!editing) {
     return (
@@ -81,18 +79,12 @@ export function ScheduleField({
         </select>
         <button
           disabled={pending}
-          onClick={() => {
-            setError(null);
-            startTransition(async () => {
-              try {
-                await setSchedule(requestId, date, selectedShift);
-                setEditing(false);
-                router.refresh();
-              } catch (e) {
-                setError(e instanceof Error ? e.message : "Erro inesperado.");
-              }
-            });
-          }}
+          onClick={() =>
+            run(async () => {
+              await setSchedule(requestId, date, selectedShift);
+              setEditing(false);
+            }, "Agenda atualizada.")
+          }
           className="text-xs rounded px-2 py-1 disabled:opacity-60"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
         >
@@ -110,11 +102,6 @@ export function ScheduleField({
           cancelar
         </button>
       </div>
-      {error ? (
-        <p className="text-xs" style={{ color: "var(--status-critical)" }}>
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

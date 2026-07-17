@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { setAssemblerName } from "@/app/assistencia/actions";
+import { useQuickAction } from "./useQuickAction";
 
 export function AssemblerNameField({
   requestId,
@@ -13,11 +13,9 @@ export function AssemblerNameField({
   value: string | null;
   assemblers: string[];
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(value ?? "");
-  const [error, setError] = useState<string | null>(null);
 
   if (!editing) {
     return (
@@ -62,18 +60,12 @@ export function AssemblerNameField({
         </datalist>
         <button
           disabled={pending || !name.trim()}
-          onClick={() => {
-            setError(null);
-            startTransition(async () => {
-              try {
-                await setAssemblerName(requestId, name);
-                setEditing(false);
-                router.refresh();
-              } catch (e) {
-                setError(e instanceof Error ? e.message : "Erro inesperado.");
-              }
-            });
-          }}
+          onClick={() =>
+            run(async () => {
+              await setAssemblerName(requestId, name);
+              setEditing(false);
+            }, "Montador atualizado.")
+          }
           className="text-xs rounded px-2 py-1 disabled:opacity-60"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
         >
@@ -90,11 +82,6 @@ export function AssemblerNameField({
           cancelar
         </button>
       </div>
-      {error ? (
-        <p className="text-xs" style={{ color: "var(--status-critical)" }}>
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

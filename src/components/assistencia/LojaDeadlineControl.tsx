@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { proposeNewDeadline } from "@/app/assistencia/actions";
+import { useQuickAction } from "./useQuickAction";
 import type { DeadlineStatus } from "@/lib/serviceRequests";
 
 function formatDateOnly(value: string | null): string | null {
@@ -22,11 +22,9 @@ export function LojaDeadlineControl({
   deadlineStatus: DeadlineStatus;
   approvedDeadline: string | null;
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [date, setDate] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const shownDate = deadlineStatus === "aprovado" ? approvedDeadline : deadlineStatus === "recusado" ? approvedDeadline : requestedDeadline;
   const statusLabel =
@@ -64,19 +62,13 @@ export function LojaDeadlineControl({
           />
           <button
             disabled={pending || !date}
-            onClick={() => {
-              setError(null);
-              startTransition(async () => {
-                try {
-                  await proposeNewDeadline(requestId, date);
-                  setEditing(false);
-                  setDate("");
-                  router.refresh();
-                } catch (e) {
-                  setError(e instanceof Error ? e.message : "Erro inesperado.");
-                }
-              });
-            }}
+            onClick={() =>
+              run(async () => {
+                await proposeNewDeadline(requestId, date);
+                setEditing(false);
+                setDate("");
+              }, "Nova data proposta.")
+            }
             className="text-xs rounded px-2 py-1 disabled:opacity-60"
             style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
           >
@@ -87,11 +79,6 @@ export function LojaDeadlineControl({
           </button>
         </div>
       )}
-      {error ? (
-        <p className="text-xs" style={{ color: "var(--status-critical)" }}>
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

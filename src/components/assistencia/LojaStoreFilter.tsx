@@ -1,21 +1,20 @@
 "use client";
 
-import { useTransition } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { setLojaStorePreference } from "@/app/assistencia/actions";
+import { useQuickAction } from "./useQuickAction";
 import type { Store } from "@/lib/serviceRequests";
 
 export function LojaStoreFilter({ stores, selectedStoreId }: { stores: Store[]; selectedStoreId: string }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [pending, startTransition] = useTransition();
+  const { pending, run } = useQuickAction();
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const storeId = e.target.value;
-    startTransition(async () => {
+    run(async () => {
       await setLojaStorePreference(storeId);
       router.push(storeId ? `${pathname}?store=${storeId}` : pathname);
-      router.refresh();
     });
   }
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { claimRequest, updateStatus, addNote } from "@/app/assistencia/actions";
+import { useQuickAction } from "./useQuickAction";
 import { STATUS_LABELS } from "@/lib/assistenciaLabels";
 
 const NEXT_STATUSES: Record<string, string[]> = {
@@ -23,35 +23,21 @@ export function RequestActions({
   status: string;
   isAssignedToMe: boolean;
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run, showToast } = useQuickAction();
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [remarcarReason, setRemarcarReason] = useState("");
   const [askingRemarcarReason, setAskingRemarcarReason] = useState(false);
 
-  function run(action: () => Promise<void>) {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await action();
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Erro inesperado.");
-      }
-    });
-  }
-
   function confirmRemarcar() {
     if (!remarcarReason.trim()) {
-      setError("Informe o motivo da remarcação.");
+      showToast("Informe o motivo da remarcação.", "error");
       return;
     }
     run(async () => {
       await updateStatus(requestId, "remarcar", remarcarReason);
       setRemarcarReason("");
       setAskingRemarcarReason(false);
-    });
+    }, "Solicitação remarcada.");
   }
 
   const nextStatuses = NEXT_STATUSES[status] ?? [];
@@ -68,7 +54,7 @@ export function RequestActions({
       {!isAssignedToMe ? (
         <button
           disabled={pending}
-          onClick={() => run(() => claimRequest(requestId))}
+          onClick={() => run(() => claimRequest(requestId), "Solicitação assumida.")}
           className="text-sm rounded px-3 py-2 self-start disabled:opacity-60"
           style={{ background: "var(--brand-orange)", color: "#fff" }}
         >
@@ -82,7 +68,11 @@ export function RequestActions({
             <button
               key={s}
               disabled={pending}
-              onClick={() => (s === "remarcar" ? setAskingRemarcarReason(true) : run(() => updateStatus(requestId, s)))}
+              onClick={() =>
+                s === "remarcar"
+                  ? setAskingRemarcarReason(true)
+                  : run(() => updateStatus(requestId, s), `Status atualizado para ${STATUS_LABELS[s] ?? s}.`)
+              }
               className="text-sm rounded px-3 py-2 border disabled:opacity-60"
               style={{ borderColor: "var(--border)" }}
             >
@@ -144,7 +134,7 @@ export function RequestActions({
             run(async () => {
               await addNote(requestId, note);
               setNote("");
-            })
+            }, "Nota adicionada.")
           }
           className="text-sm rounded px-3 py-2 self-start border disabled:opacity-60"
           style={{ borderColor: "var(--border)" }}
@@ -152,12 +142,6 @@ export function RequestActions({
           Adicionar nota
         </button>
       </div>
-
-      {error ? (
-        <p className="text-sm" style={{ color: "var(--status-critical)" }}>
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

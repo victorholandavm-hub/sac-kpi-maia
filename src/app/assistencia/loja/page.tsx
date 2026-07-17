@@ -7,6 +7,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
 import { LojaStoreFilter } from "@/components/assistencia/LojaStoreFilter";
 import { LojaDeadlineControl } from "@/components/assistencia/LojaDeadlineControl";
+import { ToastProvider } from "@/components/assistencia/ToastProvider";
 
 // Precisa refletir a demanda em aberto em tempo real — nunca gerar estático.
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export default async function LojaHomePage({
   }
 
   return (
+    <ToastProvider>
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="Gerente de loja" subtitle="Demanda em aberto de todas as lojas">
         <Link
@@ -98,5 +100,6 @@ export default async function LojaHomePage({
         ← Voltar
       </Link>
     </div>
+    </ToastProvider>
   );
 }
