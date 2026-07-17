@@ -10,6 +10,7 @@ const TABS = [
   { label: "Peças", href: "/assistencia/pecas" },
   { label: "Pagamentos", href: "/assistencia/pagamentos" },
   { label: "Estoque", href: "/assistencia/estoque" },
+  { label: "Relatórios", href: "/assistencia/relatorios" },
 ];
 
 export function AssistenciaNav({ isAdmin }: { isAdmin: boolean }) {

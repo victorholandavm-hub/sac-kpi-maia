@@ -39,7 +39,9 @@ type PaymentItemRow = {
   } | null;
 };
 
-export async function listPaymentItems(opts: { assemblerName?: string } = {}): Promise<PaymentItem[]> {
+export async function listPaymentItems(
+  opts: { assemblerName?: string; dateFrom?: string; dateTo?: string } = {}
+): Promise<PaymentItem[]> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("service_request_items")
@@ -68,7 +70,12 @@ export async function listPaymentItems(opts: { assemblerName?: string } = {}): P
       createdAt: row.request!.created_at,
     }));
 
-  return opts.assemblerName ? items.filter((i) => i.assemblerName === opts.assemblerName) : items;
+  return items.filter((i) => {
+    if (opts.assemblerName && i.assemblerName !== opts.assemblerName) return false;
+    if (opts.dateFrom && i.createdAt < opts.dateFrom) return false;
+    if (opts.dateTo && i.createdAt > `${opts.dateTo}T23:59:59`) return false;
+    return true;
+  });
 }
 
 export async function countPendingPayments(): Promise<number> {

@@ -479,3 +479,56 @@ export async function countRequestsOverview(profile: Profile): Promise<RequestsO
     needsReschedule: remarcarRes.count ?? 0,
   };
 }
+
+export type ReportRow = { key: string; total: number; concluida: number; cancelada: number };
+
+export type RequestsReport = {
+  byStore: ReportRow[];
+  bySeller: ReportRow[];
+  byType: ReportRow[];
+  totalRequests: number;
+};
+
+// Relatório por período — a planilha permitia filtrar/dinamizar por data,
+// loja, vendedor; aqui é a mesma coisa, mas dentro do app.
+export async function getRequestsReport(opts: { dateFrom?: string; dateTo?: string } = {}): Promise<RequestsReport> {
+  const admin = getSupabaseAdmin();
+  let query = admin.from("service_requests").select("store_id, seller_name, type, status, created_at, stores(name)");
+
+  if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
+  if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  type Row = {
+    store_id: string;
+    seller_name: string | null;
+    type: RequestType;
+    status: RequestStatus;
+    created_at: string;
+    stores: { name: string } | null;
+  };
+  const rows = (data ?? []) as unknown as Row[];
+
+  function aggregate(keyFn: (r: Row) => string | null): ReportRow[] {
+    const map = new Map<string, ReportRow>();
+    for (const r of rows) {
+      const key = keyFn(r);
+      if (!key) continue;
+      const entry = map.get(key) ?? { key, total: 0, concluida: 0, cancelada: 0 };
+      entry.total++;
+      if (r.status === "concluida") entry.concluida++;
+      if (r.status === "cancelada") entry.cancelada++;
+      map.set(key, entry);
+    }
+    return [...map.values()].sort((a, b) => b.total - a.total);
+  }
+
+  return {
+    byStore: aggregate((r) => r.stores?.name ?? r.store_id),
+    bySeller: aggregate((r) => r.seller_name),
+    byType: aggregate((r) => r.type),
+    totalRequests: rows.length,
+  };
+}
