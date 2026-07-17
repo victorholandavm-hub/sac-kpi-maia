@@ -1,24 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { computeDashboardToken, DASHBOARD_COOKIE_NAME } from "@/lib/dashboardSession";
 
-function checkBasicAuth(req: NextRequest, expectedUser: string | undefined, expectedPassword: string | undefined, realm: string) {
-  const header = req.headers.get("authorization");
-  if (header?.startsWith("Basic ")) {
-    const decoded = atob(header.slice(6));
-    const separatorIndex = decoded.indexOf(":");
-    const user = decoded.slice(0, separatorIndex);
-    const password = decoded.slice(separatorIndex + 1);
-    if (expectedUser && expectedPassword && user === expectedUser && password === expectedPassword) {
-      return NextResponse.next();
-    }
-  }
-
-  return new NextResponse("Autenticação necessária.", {
-    status: 401,
-    headers: { "WWW-Authenticate": `Basic realm="${realm}"` },
-  });
-}
-
 export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
@@ -38,20 +20,10 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/assistencia", req.url), 307);
   }
 
-  // Área da loja (painel de demanda em aberto + formulário): sem login individual, só uma
-  // senha única compartilhada entre as lojas (evita deixar o link totalmente aberto).
-  if (pathname.startsWith("/assistencia/solicitar") || pathname.startsWith("/assistencia/loja")) {
-    return checkBasicAuth(
-      req,
-      process.env.LOJA_REQUEST_USER,
-      process.env.LOJA_REQUEST_PASSWORD,
-      "Solicitação de assistência"
-    );
-  }
-
-  // Tela inicial pública (escolher "gerente de loja" ou "equipe assistência") e demais
-  // rotas de /assistencia (login, fila, detalhe) usam Supabase Auth próprio, verificado
-  // dentro da aplicação (ver src/lib/dal.ts) — não passam pelo Basic Auth.
+  // Todo o módulo de assistência (tela inicial, área da loja, formulário de
+  // solicitação) é público, sem senha nenhuma. A única autenticação real é o login
+  // individual da equipe assistência (Supabase Auth), verificado dentro da
+  // aplicação ao entrar em "Equipe assistência" (ver src/lib/dal.ts) — não aqui.
   if (pathname.startsWith("/assistencia")) {
     return NextResponse.next();
   }
