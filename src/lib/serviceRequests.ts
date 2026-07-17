@@ -1,17 +1,31 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import type { Profile } from "./dal";
 
-export type RequestType = "montagem" | "desmontagem" | "recolhimento" | "notificacao_externa";
-export type RequestStatus = "aberta" | "em_contato" | "em_andamento" | "concluida" | "cancelada";
+export type RequestType =
+  | "montagem"
+  | "desmontagem"
+  | "recolhimento"
+  | "troca_peca"
+  | "vistoria"
+  | "notificacao_externa";
+export type RequestStatus = "aberta" | "em_contato" | "em_andamento" | "remarcar" | "concluida" | "cancelada";
 export type DeadlineStatus = "pendente" | "aprovado" | "recusado";
+export type Shift = "manha" | "tarde" | "dia" | "urgencia";
 
 export const REQUEST_STATUSES: RequestStatus[] = [
   "aberta",
   "em_contato",
   "em_andamento",
+  "remarcar",
   "concluida",
   "cancelada",
 ];
+
+export const SHIFTS: Shift[] = ["manha", "tarde", "dia", "urgencia"];
+
+export function isShift(value: string | undefined | null): value is Shift {
+  return !!value && (SHIFTS as string[]).includes(value);
+}
 
 export function isRequestStatus(value: string | undefined | null): value is RequestStatus {
   return !!value && (REQUEST_STATUSES as string[]).includes(value);
@@ -63,6 +77,8 @@ export type ServiceRequestSummary = {
   assignedToId: string | null;
   assignedToName: string | null;
   assemblerName: string | null;
+  scheduledDate: string | null;
+  shift: Shift | null;
 };
 
 type SummaryRow = {
@@ -79,6 +95,8 @@ type SummaryRow = {
   deadline_status: DeadlineStatus;
   approved_deadline: string | null;
   assembler_name: string | null;
+  scheduled_date: string | null;
+  shift: Shift | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -90,7 +108,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released)";
+  "id, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -119,6 +137,8 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     deadlineStatus: row.deadline_status,
     approvedDeadline: row.approved_deadline,
     assemblerName: row.assembler_name,
+    scheduledDate: row.scheduled_date,
+    shift: row.shift,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
@@ -230,7 +250,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released)";
+  "id, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released)";
 
 export async function getRequestDetail(
   profile: Profile,
@@ -318,4 +338,81 @@ export async function listOpenRequestsForLoja(): Promise<OpenRequestForLoja[]> {
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
     createdAt: row.created_at,
   }));
+}
+
+const SHIFT_ORDER: Record<Shift, number> = { manha: 0, dia: 1, tarde: 2, urgencia: 3 };
+
+// Agenda de visitas técnicas: toda solicitação com data marcada, ordenada por
+// data e depois por turno — substitui o controle que era feito à parte na
+// planilha "Agenda de Assistência".
+export async function listScheduledRequests(profile: Profile): Promise<ServiceRequestSummary[]> {
+  const admin = getSupabaseAdmin();
+  let query = admin
+    .from("service_requests")
+    .select(SUMMARY_COLUMNS)
+    .not("scheduled_date", "is", null)
+    .order("scheduled_date", { ascending: true });
+
+  if (profile.role === "gerente") {
+    query = query.eq("store_id", profile.storeId ?? "__none__");
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as unknown as SummaryRow[])
+    .map(toSummary)
+    .sort((a, b) => {
+      const dateCompare = (a.scheduledDate ?? "").localeCompare(b.scheduledDate ?? "");
+      if (dateCompare !== 0) return dateCompare;
+      return (SHIFT_ORDER[a.shift ?? "dia"] ?? 99) - (SHIFT_ORDER[b.shift ?? "dia"] ?? 99);
+    });
+}
+
+export type RequestsOverview = {
+  openNoContact: number;
+  pendingDeadline: number;
+  scheduledToday: number;
+  needsReschedule: number;
+};
+
+// Contagens rápidas ("o que precisa de mim agora") pra tela inicial —
+// sem trazer as linhas inteiras, só o total de cada uma.
+export async function countRequestsOverview(profile: Profile): Promise<RequestsOverview> {
+  const admin = getSupabaseAdmin();
+  const today = new Date().toISOString().slice(0, 10);
+  const storeId = profile.role === "gerente" ? profile.storeId ?? "__none__" : null;
+
+  let openQuery = admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "aberta");
+  let deadlineQuery = admin
+    .from("service_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("deadline_status", "pendente")
+    .not("status", "in", "(concluida,cancelada)");
+  let todayQuery = admin
+    .from("service_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("scheduled_date", today);
+  let remarcarQuery = admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "remarcar");
+
+  if (storeId) {
+    openQuery = openQuery.eq("store_id", storeId);
+    deadlineQuery = deadlineQuery.eq("store_id", storeId);
+    todayQuery = todayQuery.eq("store_id", storeId);
+    remarcarQuery = remarcarQuery.eq("store_id", storeId);
+  }
+
+  const [openRes, deadlineRes, todayRes, remarcarRes] = await Promise.all([
+    openQuery,
+    deadlineQuery,
+    todayQuery,
+    remarcarQuery,
+  ]);
+
+  return {
+    openNoContact: openRes.count ?? 0,
+    pendingDeadline: deadlineRes.count ?? 0,
+    scheduledToday: todayRes.count ?? 0,
+    needsReschedule: remarcarRes.count ?? 0,
+  };
 }

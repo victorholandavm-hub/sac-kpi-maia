@@ -67,3 +67,14 @@ export async function listPaymentItems(opts: { assemblerName?: string } = {}): P
 
   return opts.assemblerName ? items.filter((i) => i.assemblerName === opts.assemblerName) : items;
 }
+
+export async function countPendingPayments(): Promise<number> {
+  const admin = getSupabaseAdmin();
+  const { count, error } = await admin
+    .from("service_request_items")
+    .select("id", { count: "exact", head: true })
+    .not("unit_value", "is", null)
+    .eq("payment_released", false);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}

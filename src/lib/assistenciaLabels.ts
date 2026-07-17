@@ -2,6 +2,8 @@ export const REQUEST_TYPE_LABELS: Record<string, string> = {
   montagem: "Montagem",
   desmontagem: "Desmontagem",
   recolhimento: "Recolhimento de peça",
+  troca_peca: "Troca de peça",
+  vistoria: "Vistoria",
   notificacao_externa: "Notificação externa",
 };
 
@@ -9,6 +11,7 @@ export const STATUS_LABELS: Record<string, string> = {
   aberta: "Aberta",
   em_contato: "Em contato",
   em_andamento: "Em andamento",
+  remarcar: "Remarcar",
   concluida: "Concluída",
   cancelada: "Cancelada",
 };
@@ -17,8 +20,16 @@ export const STATUS_COLORS: Record<string, string> = {
   aberta: "var(--status-warning)",
   em_contato: "var(--series-5)",
   em_andamento: "var(--brand-orange)",
+  remarcar: "var(--status-critical)",
   concluida: "var(--status-good)",
   cancelada: "var(--text-muted)",
+};
+
+export const SHIFT_LABELS: Record<string, string> = {
+  manha: "Manhã",
+  tarde: "Tarde",
+  dia: "Dia",
+  urgencia: "Urgência",
 };
 
 export const DEADLINE_STATUS_LABELS: Record<string, string> = {

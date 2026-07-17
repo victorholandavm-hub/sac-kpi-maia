@@ -5,9 +5,18 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
+import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
 
-const REQUEST_TYPES = ["montagem", "desmontagem", "recolhimento", "notificacao_externa"] as const;
-const STATUSES = ["aberta", "em_contato", "em_andamento", "concluida", "cancelada"] as const;
+const REQUEST_TYPES = [
+  "montagem",
+  "desmontagem",
+  "recolhimento",
+  "troca_peca",
+  "vistoria",
+  "notificacao_externa",
+] as const;
+const STATUSES = ["aberta", "em_contato", "em_andamento", "remarcar", "concluida", "cancelada"] as const;
+const SHIFTS = ["manha", "tarde", "dia", "urgencia"] as const;
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const str = String(value ?? "").trim();
@@ -29,7 +38,7 @@ export async function signIn(_state: FormState, formData: FormData): Promise<For
     return { error: "E-mail ou senha inválidos." };
   }
 
-  redirect("/assistencia/fila");
+  redirect("/assistencia/inicio");
 }
 
 export async function signOut() {
@@ -289,6 +298,35 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
   });
 
   revalidatePath("/assistencia/fila");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
+export async function setSchedule(requestId: string, scheduledDate: string, shift: string) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  if (shift && !SHIFTS.includes(shift as (typeof SHIFTS)[number])) {
+    throw new Error("Turno inválido.");
+  }
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin
+    .from("service_requests")
+    .update({ scheduled_date: scheduledDate || null, shift: shift || null })
+    .eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  const shiftLabel = SHIFT_LABELS[shift] ?? shift;
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: scheduledDate
+      ? `Visita agendada: ${scheduledDate}${shift ? ` (${shiftLabel})` : ""}`
+      : "Agendamento removido.",
+  });
+
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/agenda");
   revalidatePath(`/assistencia/${requestId}`);
 }
 

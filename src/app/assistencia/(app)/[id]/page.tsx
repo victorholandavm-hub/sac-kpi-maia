@@ -2,11 +2,12 @@ import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
-import { REQUEST_TYPE_LABELS, STATUS_LABELS, DEADLINE_STATUS_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, STATUS_LABELS, DEADLINE_STATUS_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { RequestActions } from "@/components/assistencia/RequestActions";
 import { DeadlineActions } from "@/components/assistencia/DeadlineActions";
 import { AssemblerNameField } from "@/components/assistencia/AssemblerNameField";
+import { ScheduleField } from "@/components/assistencia/ScheduleField";
 import { RequestItemsTable } from "@/components/assistencia/RequestItemsTable";
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
@@ -146,6 +147,18 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           <AssemblerNameField requestId={request.id} value={request.assemblerName} assemblers={assemblers} />
         ) : (
           <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
+        )}
+        {canManage ? (
+          <ScheduleField requestId={request.id} scheduledDate={request.scheduledDate} shift={request.shift} />
+        ) : (
+          <Row
+            label="Visita agendada"
+            value={
+              request.scheduledDate
+                ? `${formatDateOnly(request.scheduledDate)}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}`
+                : null
+            }
+          />
         )}
         <Row label="Prazo pedido" value={formatDateOnly(request.requestedDeadline)} />
         <Row label="Status do prazo" value={DEADLINE_STATUS_LABELS[request.deadlineStatus]} />

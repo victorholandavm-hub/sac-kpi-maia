@@ -5,7 +5,7 @@ import { createPublicRequest, type FormState } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import type { Store } from "@/lib/serviceRequests";
 
-const TYPES = ["montagem", "desmontagem", "recolhimento", "notificacao_externa"] as const;
+const TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -25,9 +25,10 @@ export function PublicRequestForm({ stores }: { stores: Store[] }) {
   const [type, setType] = useState<(typeof TYPES)[number]>("montagem");
   const [items, setItems] = useState<Item[]>([{ product: "", quantity: 1 }]);
 
-  const showAddress = type === "montagem" || type === "desmontagem" || type === "recolhimento";
+  const showAddress =
+    type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria";
   const showItems = type !== "notificacao_externa";
-  const showRestriction = type === "recolhimento";
+  const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
 
   function updateItem(index: number, patch: Partial<Item>) {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));

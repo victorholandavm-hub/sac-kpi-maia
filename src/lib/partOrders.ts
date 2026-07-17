@@ -127,3 +127,12 @@ export async function getPartOrder(id: string): Promise<PartOrder | null> {
   if (error || !data) return null;
   return toPartOrder(data as unknown as PartOrderRow);
 }
+
+export async function countPartOrdersOverview(): Promise<{ awaiting: number; readyToSend: number }> {
+  const admin = getSupabaseAdmin();
+  const [awaitingRes, readyRes] = await Promise.all([
+    admin.from("part_orders").select("id", { count: "exact", head: true }).eq("status", "aguardando_peca"),
+    admin.from("part_orders").select("id", { count: "exact", head: true }).eq("status", "peca_recebida"),
+  ]);
+  return { awaiting: awaitingRes.count ?? 0, readyToSend: readyRes.count ?? 0 };
+}

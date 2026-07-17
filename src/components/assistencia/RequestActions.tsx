@@ -8,7 +8,8 @@ import { STATUS_LABELS } from "@/lib/assistenciaLabels";
 const NEXT_STATUSES: Record<string, string[]> = {
   aberta: ["em_contato", "cancelada"],
   em_contato: ["em_andamento", "cancelada"],
-  em_andamento: ["concluida", "cancelada"],
+  em_andamento: ["remarcar", "concluida", "cancelada"],
+  remarcar: ["em_andamento", "concluida", "cancelada"],
   concluida: [],
   cancelada: [],
 };
