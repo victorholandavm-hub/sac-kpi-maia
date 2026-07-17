@@ -19,14 +19,14 @@ export function AssistenciaNav({ isAdmin }: { isAdmin: boolean }) {
   const tabs = isAdmin ? [...TABS, { label: "Admin", href: "/assistencia/admin" }] : TABS;
 
   return (
-    <nav className="flex items-center gap-2">
+    <nav className="flex items-center gap-2 overflow-x-auto min-w-0 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
       {tabs.map((tab) => {
         const active = pathname.startsWith(tab.href);
         return (
           <Link
             key={tab.href}
             href={tab.href}
-            className="text-sm px-3 py-1.5 rounded-full"
+            className="text-sm px-3 py-1.5 rounded-full shrink-0 whitespace-nowrap"
             style={{
               background: active ? "var(--brand-green)" : "transparent",
               color: active ? "var(--brand-green-ink)" : "var(--text-secondary)",

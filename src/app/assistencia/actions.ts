@@ -507,6 +507,10 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
       shift: shift || null,
       assembler_name: assemblerName,
+      // Criação rápida não coleta prazo pedido pela loja, então não há nada
+      // pra "aprovar" — sem isso, o padrão do banco (pendente) fazia a tela
+      // sempre mostrar "prazo pendente de aprovação" sem sentido.
+      deadline_status: "aprovado",
     })
     .select("id")
     .single();

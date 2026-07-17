@@ -133,7 +133,7 @@ export default async function PecasQueuePage({
                 href={`/assistencia/pecas/${o.id}`}
                 className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
               >
-                <div className="flex flex-col gap-1 min-w-0">
+                <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                   <div className="flex items-center gap-2 flex-wrap">
                     <StatusBadge status={o.status} />
                     <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>

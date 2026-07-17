@@ -31,7 +31,7 @@ export default async function LojaHomePage({
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6">
+    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="Gerente de loja" subtitle="Demanda em aberto de todas as lojas">
         <Link
           href="/assistencia/solicitar"
@@ -62,7 +62,7 @@ export default async function LojaHomePage({
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
             {openRequests.map((r) => (
               <div key={r.id} className="flex items-center justify-between gap-4 p-4 flex-wrap">
-                <div className="flex flex-col gap-1 min-w-0">
+                <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                   <div className="flex items-center gap-2 flex-wrap">
                     <StatusBadge status={r.status} />
                     <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>

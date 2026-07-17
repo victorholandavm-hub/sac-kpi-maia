@@ -91,7 +91,7 @@ export default async function EstoquePage({
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
             {movements.map((m) => (
               <div key={m.id} className="flex items-center justify-between gap-4 p-4 flex-wrap">
-                <div className="flex flex-col gap-1 min-w-0">
+                <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span
                       className="text-xs font-medium px-2 py-0.5 rounded-full"

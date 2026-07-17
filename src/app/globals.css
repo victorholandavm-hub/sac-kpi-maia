@@ -46,3 +46,12 @@ body {
   color: var(--foreground);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
+
+/* Rede de segurança contra overflow horizontal no mobile: elementos com
+   conteúdo largo (texto longo, listas de opções, barras de navegação com
+   scroll próprio) não devem esticar a página inteira — cada um cuida do
+   próprio overflow interno (overflow-x-auto, truncate etc.). */
+html,
+body {
+  overflow-x: hidden;
+}

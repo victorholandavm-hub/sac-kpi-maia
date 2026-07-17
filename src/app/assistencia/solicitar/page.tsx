@@ -12,7 +12,7 @@ export default async function SolicitarAssistenciaPage({
   const stores = await listStores();
 
   return (
-    <div className="max-w-xl mx-auto p-6 flex flex-col gap-6">
+    <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader
         title="Solicitar assistência"
         subtitle="Montagem, desmontagem, recolhimento de peças ou notificação externa."

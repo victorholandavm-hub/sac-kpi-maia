@@ -108,7 +108,7 @@ export default async function AgendaPage({
                         className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
                         style={rowOverdue ? { background: "rgba(208, 59, 59, 0.07)" } : undefined}
                       >
-                        <div className="flex flex-col gap-1 min-w-0">
+                        <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                           <div className="flex items-center gap-2 flex-wrap">
                             <StatusBadge status={r.status} />
                             {rowOverdue ? (

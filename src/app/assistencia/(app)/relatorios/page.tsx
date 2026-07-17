@@ -41,34 +41,36 @@ function ReportTable({
           {emptyMessage}
         </p>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-              <th className="text-left font-normal px-4 py-2">{keyLabel}</th>
-              <th className="text-right font-normal px-4 py-2">Total</th>
-              <th className="text-right font-normal px-4 py-2">Concluídas</th>
-              <th className="text-right font-normal px-4 py-2">Canceladas</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-            {rows.map((r) => (
-              <tr key={r.key}>
-                <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                  {labelFor(r.key)}
-                </td>
-                <td className="text-right px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                  {r.total}
-                </td>
-                <td className="text-right px-4 py-2" style={{ color: "var(--status-good)" }}>
-                  {r.concluida}
-                </td>
-                <td className="text-right px-4 py-2" style={{ color: "var(--text-muted)" }}>
-                  {r.cancelada}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
+                <th className="text-left font-normal px-4 py-2 whitespace-nowrap">{keyLabel}</th>
+                <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Total</th>
+                <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Concluídas</th>
+                <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Canceladas</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+              {rows.map((r) => (
+                <tr key={r.key}>
+                  <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                    {labelFor(r.key)}
+                  </td>
+                  <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                    {r.total}
+                  </td>
+                  <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--status-good)" }}>
+                    {r.concluida}
+                  </td>
+                  <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                    {r.cancelada}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -172,34 +174,36 @@ export default async function RelatoriosPage({
             Nenhum pagamento no período.
           </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-                <th className="text-left font-normal px-4 py-2">Montador</th>
-                <th className="text-right font-normal px-4 py-2">Itens</th>
-                <th className="text-right font-normal px-4 py-2">Total</th>
-                <th className="text-right font-normal px-4 py-2">Pendente</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-              {assemblerRows.map(([name, v]) => (
-                <tr key={name}>
-                  <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                    {name}
-                  </td>
-                  <td className="text-right px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                    {v.itens}
-                  </td>
-                  <td className="text-right px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                    {formatBRL(v.total)}
-                  </td>
-                  <td className="text-right px-4 py-2" style={{ color: v.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" }}>
-                    {formatBRL(v.pendente)}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Montador</th>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Itens</th>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Total</th>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Pendente</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                {assemblerRows.map(([name, v]) => (
+                  <tr key={name}>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                      {name}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                      {v.itens}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                      {formatBRL(v.total)}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: v.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" }}>
+                      {formatBRL(v.pendente)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -214,38 +218,40 @@ export default async function RelatoriosPage({
             Nenhuma remessa registrada ainda.
           </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-                <th className="text-left font-normal px-4 py-2">Fornecedor</th>
-                <th className="text-right font-normal px-4 py-2">Em devolução</th>
-                <th className="text-right font-normal px-4 py-2">Faturado</th>
-                <th className="text-right font-normal px-4 py-2">Reembolsado</th>
-                <th className="text-right font-normal px-4 py-2">Pendente</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-              {supplierReconciliation.map((r) => (
-                <tr key={r.supplier}>
-                  <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                    {r.supplier}
-                  </td>
-                  <td className="text-right px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                    {formatBRL(r.emDevolucao)}
-                  </td>
-                  <td className="text-right px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                    {formatBRL(r.faturado)}
-                  </td>
-                  <td className="text-right px-4 py-2" style={{ color: "var(--status-good)" }}>
-                    {formatBRL(r.reembolsado)}
-                  </td>
-                  <td className="text-right px-4 py-2" style={{ color: r.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" }}>
-                    {formatBRL(r.pendente)}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Fornecedor</th>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Em devolução</th>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Faturado</th>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Reembolsado</th>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Pendente</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                {supplierReconciliation.map((r) => (
+                  <tr key={r.supplier}>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                      {r.supplier}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                      {formatBRL(r.emDevolucao)}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                      {formatBRL(r.faturado)}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--status-good)" }}>
+                      {formatBRL(r.reembolsado)}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: r.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" }}>
+                      {formatBRL(r.pendente)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

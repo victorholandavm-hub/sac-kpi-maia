@@ -114,7 +114,7 @@ export default async function PagamentosPage({
                     href={`/assistencia/${item.requestId}`}
                     className="flex items-center justify-between gap-4 p-3 flex-wrap hover:opacity-80"
                   >
-                    <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex flex-col gap-0.5 min-w-0 w-0 grow">
                       <span className="text-sm" style={{ color: "var(--text-primary)" }}>
                         {item.quantity > 1 ? `${item.quantity}x ` : ""}
                         {item.product}
