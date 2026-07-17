@@ -60,9 +60,18 @@ export default async function PagamentosPage({
             Só pendentes de liberação
           </Link>
         </div>
-        <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Total: <strong>{formatBRL(grandTotal)}</strong> · Pendente:{" "}
-          <strong style={{ color: "var(--status-warning)" }}>{formatBRL(pendingTotal)}</strong>
+        <div className="flex items-center gap-4">
+          <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Total: <strong>{formatBRL(grandTotal)}</strong> · Pendente:{" "}
+            <strong style={{ color: "var(--status-warning)" }}>{formatBRL(pendingTotal)}</strong>
+          </div>
+          <Link
+            href="/assistencia/nova-rapida"
+            className="text-sm px-3 py-2 rounded font-medium whitespace-nowrap"
+            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          >
+            + Nova
+          </Link>
         </div>
       </div>
 

@@ -342,12 +342,24 @@ export async function listOpenRequestsForLoja(): Promise<OpenRequestForLoja[]> {
 
 const SHIFT_ORDER: Record<Shift, number> = { manha: 0, dia: 1, tarde: 2, urgencia: 3 };
 
+export type AgendaRange = "atrasado" | "hoje" | "semana";
+
 // Agenda de visitas técnicas: toda solicitação com data marcada, ordenada por
 // data e depois por turno — substitui o controle que era feito à parte na
 // planilha "Agenda de Assistência".
-export async function listScheduledRequests(profile: Profile): Promise<ServiceRequestSummary[]> {
+export async function listScheduledRequests(
+  profile: Profile,
+  opts: { range?: AgendaRange } = {}
+): Promise<ServiceRequestSummary[]> {
   const admin = getSupabaseAdmin();
-  let query = admin
+  const today = new Date().toISOString().slice(0, 10);
+  const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  // Tipado como `any` de propósito: encadear vários `.eq()`/`.lt()` condicionais
+  // no builder do Supabase faz o TypeScript tentar inferir um tipo genérico tão
+  // profundo que trava a compilação ("Type instantiation is excessively deep").
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query: any = admin
     .from("service_requests")
     .select(SUMMARY_COLUMNS)
     .not("scheduled_date", "is", null)
@@ -357,7 +369,15 @@ export async function listScheduledRequests(profile: Profile): Promise<ServiceRe
     query = query.eq("store_id", profile.storeId ?? "__none__");
   }
 
-  const { data, error } = await query;
+  if (opts.range === "atrasado") {
+    query = query.lt("scheduled_date", today).not("status", "in", "(concluida,cancelada)");
+  } else if (opts.range === "hoje") {
+    query = query.eq("scheduled_date", today);
+  } else if (opts.range === "semana") {
+    query = query.gte("scheduled_date", today).lte("scheduled_date", in7Days);
+  }
+
+  const { data, error } = (await query) as { data: SummaryRow[] | null; error: { message: string } | null };
   if (error) throw new Error(error.message);
 
   return ((data ?? []) as unknown as SummaryRow[])

@@ -375,3 +375,87 @@ export async function updateRequestDetails(
   revalidatePath(`/assistencia/${requestId}`);
   redirect(`/assistencia/${requestId}`);
 }
+
+// Criação rápida a partir da Agenda ou de Pagamentos: cria a solicitação com só
+// o essencial (evita ter que passar pela tela cheia de "Nova solicitação" pra
+// coisas pontuais, do jeito que dava pra digitar direto na planilha).
+export async function createQuickRequest(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+
+  const storeId = String(formData.get("store_id") ?? "").trim();
+  if (!storeId) return { error: "Selecione a loja." };
+
+  const type = String(formData.get("type") ?? "");
+  if (!REQUEST_TYPES.includes(type as (typeof REQUEST_TYPES)[number])) {
+    return { error: "Tipo de solicitação inválido." };
+  }
+
+  const clientName = String(formData.get("client_name") ?? "").trim();
+  if (!clientName) return { error: "Informe o nome do cliente." };
+
+  const shift = String(formData.get("shift") ?? "").trim();
+  if (shift && !SHIFTS.includes(shift as (typeof SHIFTS)[number])) {
+    return { error: "Turno inválido." };
+  }
+
+  const assemblerName = emptyToNull(formData.get("assembler_name"));
+  const product = emptyToNull(formData.get("product"));
+  const unitValueRaw = String(formData.get("unit_value") ?? "").trim();
+  const unitValue = unitValueRaw ? parseFloat(unitValueRaw.replace(",", ".")) : null;
+  if (unitValueRaw && (unitValue === null || Number.isNaN(unitValue) || unitValue < 0)) {
+    return { error: "Valor inválido." };
+  }
+
+  const admin = getSupabaseAdmin();
+
+  if (assemblerName) {
+    await admin.from("assemblers").upsert({ name: assemblerName }, { onConflict: "name" });
+  }
+
+  const { data, error } = await admin
+    .from("service_requests")
+    .insert({
+      type,
+      store_id: storeId,
+      requested_by: profile.id,
+      client_name: clientName,
+      client_phone: emptyToNull(formData.get("client_phone")),
+      client_address: emptyToNull(formData.get("client_address")),
+      reason: emptyToNull(formData.get("reason")),
+      scheduled_date: emptyToNull(formData.get("scheduled_date")),
+      shift: shift || null,
+      assembler_name: assemblerName,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    return { error: `Não foi possível criar: ${error?.message ?? "erro desconhecido"}` };
+  }
+
+  if (product) {
+    const quantity = Math.max(1, parseInt(String(formData.get("quantity") ?? "1"), 10) || 1);
+    const { error: itemError } = await admin.from("service_request_items").insert({
+      request_id: data.id,
+      product,
+      quantity,
+      unit_value: unitValue,
+    });
+    if (itemError) {
+      return { error: `Solicitação criada, mas falhou ao salvar o item: ${itemError.message}` };
+    }
+  }
+
+  await admin.from("service_request_events").insert({
+    request_id: data.id,
+    actor_id: profile.id,
+    event_type: "created",
+    to_status: "aberta",
+  });
+
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/agenda");
+  revalidatePath("/assistencia/pagamentos");
+  redirect(`/assistencia/${data.id}`);
+}
