@@ -18,6 +18,7 @@ import { RequestItemsTable } from "@/components/assistencia/RequestItemsTable";
 import { SacCategoryField } from "@/components/assistencia/SacCategoryField";
 import { LegalDeadlineField } from "@/components/assistencia/LegalDeadlineField";
 import { EscalationRiskToggle } from "@/components/assistencia/EscalationRiskToggle";
+import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -89,6 +90,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
   return (
     <div className="flex flex-col gap-4">
+      <RealtimeQueueRefresher requestId={request.id} />
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
           <StatusBadge status={request.status} />

@@ -4,6 +4,7 @@ import { countRequestsOverview } from "@/lib/serviceRequests";
 import { countPartOrdersOverview } from "@/lib/partOrders";
 import { countPendingPayments } from "@/lib/payments";
 import { countSupplierReturnsOverview } from "@/lib/supplierReturns";
+import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: string }) {
   return (
@@ -59,6 +60,7 @@ export default async function InicioPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <RealtimeQueueRefresher />
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
         Olá, {profile.fullName.split(" ")[0]}. Aqui está o que precisa da sua atenção agora — tudo o que antes era
         controlado por planilha já é lançado direto aqui.

@@ -5,6 +5,7 @@ import { listAssemblers } from "@/lib/payments";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
+import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 
 function itemsSummary(items: RequestItem[]): string | null {
   if (items.length === 0) return null;
@@ -68,6 +69,7 @@ export default async function AssistenciaQueuePage({
 
   return (
     <div className="flex flex-col gap-4">
+      <RealtimeQueueRefresher />
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           {FILTERS.map((f) => (
