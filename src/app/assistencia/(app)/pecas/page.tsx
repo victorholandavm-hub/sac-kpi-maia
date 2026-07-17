@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { listPartOrders, isPartOrderStatus, type PartOrder } from "@/lib/partOrders";
+import { listPartOrders, listSuppliers, isPartOrderStatus, type PartOrder } from "@/lib/partOrders";
 import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
+import { FilterSelect } from "@/components/assistencia/FilterSelect";
 
 function StatusBadge({ status }: { status: string }) {
   const color = PART_ORDER_STATUS_COLORS[status] ?? "var(--text-muted)";
@@ -20,10 +21,11 @@ function daysSince(dateStr: string): number {
   return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
 }
 
-function buildHref(params: { status?: string; q?: string }) {
+function buildHref(params: { status?: string; q?: string; supplier?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
+  if (params.supplier) sp.set("supplier", params.supplier);
   const qs = sp.toString();
   return qs ? `/assistencia/pecas?${qs}` : "/assistencia/pecas";
 }
@@ -39,11 +41,14 @@ const FILTERS: { label: string; value: string | null }[] = [
 export default async function PecasQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; supplier?: string }>;
 }) {
-  const { status, q } = await searchParams;
+  const { status, q, supplier } = await searchParams;
   const filterStatus = isPartOrderStatus(status) ? status : undefined;
-  const orders: PartOrder[] = await listPartOrders({ status: filterStatus, q });
+  const [orders, suppliers]: [PartOrder[], string[]] = await Promise.all([
+    listPartOrders({ status: filterStatus, q, supplier }),
+    listSuppliers(),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -52,7 +57,7 @@ export default async function PecasQueuePage({
           {FILTERS.map((f) => (
             <Link
               key={f.label}
-              href={buildHref({ status: f.value ?? undefined, q })}
+              href={buildHref({ status: f.value ?? undefined, q, supplier })}
               className="text-xs px-3 py-1 rounded-full border"
               style={{
                 borderColor: "var(--border)",
@@ -74,8 +79,13 @@ export default async function PecasQueuePage({
         </Link>
       </div>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterSelect name="supplier" placeholder="Todos os fornecedores" options={suppliers} />
+      </div>
+
       <form action="/assistencia/pecas" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
+        {supplier ? <input type="hidden" name="supplier" value={supplier} /> : null}
         <input
           type="search"
           name="q"
@@ -93,7 +103,7 @@ export default async function PecasQueuePage({
         </button>
         {q ? (
           <Link
-            href={buildHref({ status: filterStatus })}
+            href={buildHref({ status: filterStatus, supplier })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >

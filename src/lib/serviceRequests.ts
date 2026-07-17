@@ -46,6 +46,7 @@ export type RequestItem = {
   quantity: number;
   unitValue: number | null;
   paymentReleased: boolean;
+  paymentReleasedAt: string | null;
 };
 
 type ItemRow = {
@@ -54,6 +55,7 @@ type ItemRow = {
   quantity: number;
   unit_value: number | null;
   payment_released: boolean;
+  payment_released_at: string | null;
 };
 
 export type ServiceRequestSummary = {
@@ -108,7 +110,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released)";
+  "id, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -117,6 +119,7 @@ function toItem(row: ItemRow): RequestItem {
     quantity: row.quantity,
     unitValue: row.unit_value,
     paymentReleased: row.payment_released,
+    paymentReleasedAt: row.payment_released_at,
   };
 }
 
@@ -158,22 +161,31 @@ export type ListRequestsResult = {
 
 export async function listRequests(
   profile: Profile,
-  opts: { status?: RequestStatus; q?: string; page?: number } = {}
+  opts: { status?: RequestStatus; q?: string; page?: number; storeId?: string; assemblerName?: string } = {}
 ): Promise<ListRequestsResult> {
   const admin = getSupabaseAdmin();
   const page = Math.max(1, opts.page ?? 1);
   const pageSize = REQUESTS_PAGE_SIZE;
 
-  let query = admin
+  // Tipado como `any` de propósito (ver listScheduledRequests): encadear vários
+  // filtros condicionais faz o TypeScript travar tentando inferir um tipo
+  // genérico profundo demais.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query: any = admin
     .from("service_requests")
     .select(SUMMARY_COLUMNS, { count: "exact" })
     .order("created_at", { ascending: false });
 
   if (profile.role === "gerente") {
     query = query.eq("store_id", profile.storeId ?? "__none__");
+  } else if (opts.storeId) {
+    query = query.eq("store_id", opts.storeId);
   }
   if (opts.status) {
     query = query.eq("status", opts.status);
+  }
+  if (opts.assemblerName) {
+    query = query.eq("assembler_name", opts.assemblerName);
   }
 
   const q = opts.q?.trim();
@@ -195,7 +207,11 @@ export async function listRequests(
 
   query = query.range((page - 1) * pageSize, page * pageSize - 1);
 
-  const { data, error, count } = await query;
+  const { data, error, count } = (await query) as {
+    data: SummaryRow[] | null;
+    error: { message: string } | null;
+    count: number | null;
+  };
   if (error) throw new Error(error.message);
 
   return {
@@ -250,7 +266,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released)";
+  "id, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at)";
 
 export async function getRequestDetail(
   profile: Profile,
@@ -302,20 +318,32 @@ export type OpenRequestForLoja = {
   clientName: string | null;
   productSummary: string | null;
   createdAt: string;
+  requestedDeadline: string | null;
+  deadlineStatus: DeadlineStatus;
+  approvedDeadline: string | null;
 };
 
 const OPEN_LOJA_LIMIT = 200;
 
 // Visão pública pra loja (sem login) acompanhar quanta demanda ainda está em aberto,
-// sem expor CPF/telefone/endereço do cliente — só o necessário pra dar noção de volume.
-export async function listOpenRequestsForLoja(): Promise<OpenRequestForLoja[]> {
+// sem expor CPF/telefone/endereço do cliente — só o necessário pra dar noção de volume
+// (e agora também o prazo definido pela assistência, pra loja acompanhar/renegociar).
+export async function listOpenRequestsForLoja(opts: { storeId?: string } = {}): Promise<OpenRequestForLoja[]> {
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin
+  let query = admin
     .from("service_requests")
-    .select("id, type, status, client_name, created_at, stores(name), items:service_request_items(product)")
+    .select(
+      "id, type, status, client_name, created_at, requested_deadline, deadline_status, approved_deadline, stores(name), items:service_request_items(product)"
+    )
     .not("status", "in", "(concluida,cancelada)")
     .order("created_at", { ascending: true })
     .limit(OPEN_LOJA_LIMIT);
+
+  if (opts.storeId) {
+    query = query.eq("store_id", opts.storeId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
 
@@ -325,6 +353,9 @@ export async function listOpenRequestsForLoja(): Promise<OpenRequestForLoja[]> {
     status: RequestStatus;
     client_name: string | null;
     created_at: string;
+    requested_deadline: string | null;
+    deadline_status: DeadlineStatus;
+    approved_deadline: string | null;
     stores: { name: string } | null;
     items: { product: string }[] | null;
   };
@@ -334,6 +365,9 @@ export async function listOpenRequestsForLoja(): Promise<OpenRequestForLoja[]> {
     type: row.type,
     status: row.status,
     storeName: row.stores?.name ?? "—",
+    requestedDeadline: row.requested_deadline,
+    deadlineStatus: row.deadline_status,
+    approvedDeadline: row.approved_deadline,
     clientName: row.client_name,
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
     createdAt: row.created_at,

@@ -1,8 +1,13 @@
 import Link from "next/link";
-import { listPaymentItems, type PaymentItem } from "@/lib/payments";
+import { listPaymentItems, listAssemblers, type PaymentItem } from "@/lib/payments";
+import { FilterSelect } from "@/components/assistencia/FilterSelect";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("pt-BR");
 }
 
 function groupByAssembler(items: PaymentItem[]) {
@@ -22,10 +27,10 @@ function groupByAssembler(items: PaymentItem[]) {
 export default async function PagamentosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pendentes?: string }>;
+  searchParams: Promise<{ pendentes?: string; assembler?: string }>;
 }) {
-  const { pendentes } = await searchParams;
-  const allItems = await listPaymentItems();
+  const { pendentes, assembler } = await searchParams;
+  const [allItems, assemblers] = await Promise.all([listPaymentItems({ assemblerName: assembler }), listAssemblers()]);
   const items = pendentes ? allItems.filter((i) => !i.paymentReleased) : allItems;
   const groups = groupByAssembler(items);
   const grandTotal = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
@@ -36,7 +41,7 @@ export default async function PagamentosPage({
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <Link
-            href="/assistencia/pagamentos"
+            href={assembler ? `/assistencia/pagamentos?assembler=${assembler}` : "/assistencia/pagamentos"}
             className="text-xs px-3 py-1 rounded-full border"
             style={{
               borderColor: "var(--border)",
@@ -48,7 +53,7 @@ export default async function PagamentosPage({
             Todos
           </Link>
           <Link
-            href="/assistencia/pagamentos?pendentes=1"
+            href={`/assistencia/pagamentos?pendentes=1${assembler ? `&assembler=${assembler}` : ""}`}
             className="text-xs px-3 py-1 rounded-full border"
             style={{
               borderColor: "var(--border)",
@@ -59,6 +64,7 @@ export default async function PagamentosPage({
           >
             Só pendentes de liberação
           </Link>
+          <FilterSelect name="assembler" placeholder="Todos os montadores" options={assemblers} />
         </div>
         <div className="flex items-center gap-4">
           <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
@@ -119,6 +125,9 @@ export default async function PagamentosPage({
                     </div>
                     <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-muted)" }}>
                       <span>{formatBRL((item.unitValue ?? 0) * item.quantity)}</span>
+                      {item.paymentReleased && item.paymentReleasedAt ? (
+                        <span>em {formatDate(item.paymentReleasedAt)}</span>
+                      ) : null}
                       <span
                         className="px-2 py-0.5 rounded-full"
                         style={{

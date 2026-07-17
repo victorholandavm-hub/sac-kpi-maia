@@ -1,15 +1,29 @@
 import Link from "next/link";
-import { listOpenRequestsForLoja } from "@/lib/serviceRequests";
+import { listOpenRequestsForLoja, listStores } from "@/lib/serviceRequests";
+import { getLojaStorePreference } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, STATUS_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
+import { LojaStoreFilter } from "@/components/assistencia/LojaStoreFilter";
+import { LojaDeadlineControl } from "@/components/assistencia/LojaDeadlineControl";
 
 // Precisa refletir a demanda em aberto em tempo real — nunca gerar estático.
 export const dynamic = "force-dynamic";
 
-export default async function LojaHomePage() {
-  const openRequests = await listOpenRequestsForLoja();
+export default async function LojaHomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ store?: string }>;
+}) {
+  const { store } = await searchParams;
+  const storePref = store !== undefined ? store : await getLojaStorePreference();
+  const storeId = storePref ?? "";
+
+  const [openRequests, stores] = await Promise.all([
+    listOpenRequestsForLoja({ storeId: storeId || undefined }),
+    listStores(),
+  ]);
 
   const byStatus: Record<string, number> = {};
   for (const r of openRequests) {
@@ -27,6 +41,8 @@ export default async function LojaHomePage() {
           + Nova solicitação
         </Link>
       </AssistenciaHeader>
+
+      <LojaStoreFilter stores={stores} selectedStoreId={storeId} />
 
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatTile label="Em aberto" value={openRequests.length} />
@@ -61,9 +77,17 @@ export default async function LojaHomePage() {
                     {r.productSummary ? ` · ${r.productSummary}` : ""}
                   </p>
                 </div>
-                <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                  {new Date(r.createdAt).toLocaleDateString("pt-BR")}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                    {new Date(r.createdAt).toLocaleDateString("pt-BR")}
+                  </span>
+                  <LojaDeadlineControl
+                    requestId={r.id}
+                    requestedDeadline={r.requestedDeadline}
+                    deadlineStatus={r.deadlineStatus}
+                    approvedDeadline={r.approvedDeadline}
+                  />
+                </div>
               </div>
             ))}
           </div>

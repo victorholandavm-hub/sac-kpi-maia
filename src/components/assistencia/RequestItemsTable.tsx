@@ -9,6 +9,10 @@ function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString("pt-BR");
+}
+
 function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -78,10 +82,22 @@ function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) 
             {total !== null ? formatBRL(total) : "definir valor"}
           </button>
         )}
-        <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
-          <input type="checkbox" checked={item.paymentReleased} disabled={pending} onChange={toggleReleased} />
-          liberado
-        </label>
+        <button
+          onClick={toggleReleased}
+          disabled={pending}
+          className="text-xs font-medium px-2.5 py-1 rounded-full border disabled:opacity-60 whitespace-nowrap"
+          style={{
+            color: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
+            borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
+          }}
+        >
+          {item.paymentReleased ? "✓ Aprovado" : "Aprovar pagamento"}
+        </button>
+        {item.paymentReleased && item.paymentReleasedAt ? (
+          <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+            em {formatDate(item.paymentReleasedAt)}
+          </span>
+        ) : null}
       </div>
       {error ? (
         <p className="text-xs w-full" style={{ color: "var(--status-critical)" }}>

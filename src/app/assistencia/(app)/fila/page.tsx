@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/dal";
-import { listRequests, isRequestStatus, type RequestItem, type ServiceRequestSummary } from "@/lib/serviceRequests";
+import { listRequests, listStores, isRequestStatus, type RequestItem, type ServiceRequestSummary } from "@/lib/serviceRequests";
+import { listAssemblers } from "@/lib/payments";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
+import { FilterSelect } from "@/components/assistencia/FilterSelect";
 
 function itemsSummary(items: RequestItem[]): string | null {
   if (items.length === 0) return null;
@@ -27,10 +29,12 @@ function groupByDate(requests: ServiceRequestSummary[]) {
   return groups;
 }
 
-function buildHref(params: { status?: string; q?: string; page?: number }) {
+function buildHref(params: { status?: string; q?: string; page?: number; store?: string; assembler?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
+  if (params.store) sp.set("store", params.store);
+  if (params.assembler) sp.set("assembler", params.assembler);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
@@ -48,13 +52,17 @@ const FILTERS: { label: string; value: string | null }[] = [
 export default async function AssistenciaQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string; store?: string; assembler?: string }>;
 }) {
   const profile = await getProfile();
-  const { status, q, page: pageParam } = await searchParams;
+  const { status, q, page: pageParam, store, assembler } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-  const { items: requests, total, pageSize } = await listRequests(profile, { status: filterStatus, q, page });
+  const [{ items: requests, total, pageSize }, stores, assemblers] = await Promise.all([
+    listRequests(profile, { status: filterStatus, q, page, storeId: store, assemblerName: assembler }),
+    listStores(),
+    listAssemblers(),
+  ]);
   const groups = groupByDate(requests);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -65,7 +73,7 @@ export default async function AssistenciaQueuePage({
           {FILTERS.map((f) => (
             <Link
               key={f.label}
-              href={buildHref({ status: f.value ?? undefined, q })}
+              href={buildHref({ status: f.value ?? undefined, q, store, assembler })}
               className="text-xs px-3 py-1 rounded-full border"
               style={{
                 borderColor: "var(--border)",
@@ -93,8 +101,15 @@ export default async function AssistenciaQueuePage({
         {totalPages > 1 ? ` · página ${page} de ${totalPages}` : ""}
       </p>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+        <FilterSelect name="assembler" placeholder="Todos os montadores" options={assemblers} />
+      </div>
+
       <form action="/assistencia/fila" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
+        {store ? <input type="hidden" name="store" value={store} /> : null}
+        {assembler ? <input type="hidden" name="assembler" value={assembler} /> : null}
         <input
           type="search"
           name="q"
@@ -112,7 +127,7 @@ export default async function AssistenciaQueuePage({
         </button>
         {q ? (
           <Link
-            href={buildHref({ status: filterStatus })}
+            href={buildHref({ status: filterStatus, store, assembler })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -190,7 +205,7 @@ export default async function AssistenciaQueuePage({
         <div className="flex items-center justify-center gap-4 pt-2">
           {page > 1 ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page - 1 })}
+              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
@@ -202,7 +217,7 @@ export default async function AssistenciaQueuePage({
           </span>
           {page < totalPages ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page + 1 })}
+              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >

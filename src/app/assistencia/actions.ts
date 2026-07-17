@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
@@ -458,4 +459,52 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   revalidatePath("/assistencia/agenda");
   revalidatePath("/assistencia/pagamentos");
   redirect(`/assistencia/${data.id}`);
+}
+
+// Sem sessão — chamada a partir do painel público da loja (/assistencia/loja),
+// pra propor uma nova data mesmo depois que a assistência já tinha definido
+// uma. Reabre a negociação de prazo (mesmo fluxo de aprovação já existente).
+export async function proposeNewDeadline(requestId: string, newDate: string) {
+  if (!newDate) throw new Error("Informe uma data.");
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin
+    .from("service_requests")
+    .update({ requested_deadline: newDate, deadline_status: "pendente" })
+    .eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: null,
+    event_type: "note_added",
+    note: `Loja propôs nova data: ${newDate}.`,
+  });
+
+  revalidatePath("/assistencia/loja");
+  revalidatePath("/assistencia/fila");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
+const LOJA_STORE_COOKIE = "loja_store_pref";
+
+// Sem sessão — lembra qual loja a pessoa escolheu no painel público, pra não
+// precisar reselecionar toda vez que entrar do mesmo aparelho.
+export async function setLojaStorePreference(storeId: string) {
+  const cookieStore = await cookies();
+  if (storeId) {
+    cookieStore.set(LOJA_STORE_COOKIE, storeId, {
+      httpOnly: false,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 365,
+      path: "/",
+    });
+  } else {
+    cookieStore.delete(LOJA_STORE_COOKIE);
+  }
+}
+
+export async function getLojaStorePreference(): Promise<string | null> {
+  const cookieStore = await cookies();
+  return cookieStore.get(LOJA_STORE_COOKIE)?.value ?? null;
 }

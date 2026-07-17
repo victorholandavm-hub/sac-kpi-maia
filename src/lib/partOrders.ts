@@ -94,12 +94,17 @@ function toPartOrder(row: PartOrderRow): PartOrder {
   };
 }
 
-export async function listPartOrders(opts: { status?: PartOrderStatus; q?: string } = {}): Promise<PartOrder[]> {
+export async function listPartOrders(
+  opts: { status?: PartOrderStatus; q?: string; supplier?: string } = {}
+): Promise<PartOrder[]> {
   const admin = getSupabaseAdmin();
   let query = admin.from("part_orders").select(PART_ORDER_COLUMNS).order("created_at", { ascending: false });
 
   if (opts.status) {
     query = query.eq("status", opts.status);
+  }
+  if (opts.supplier) {
+    query = query.eq("supplier", opts.supplier);
   }
 
   const q = opts.q?.trim();
