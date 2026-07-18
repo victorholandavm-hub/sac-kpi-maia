@@ -62,6 +62,7 @@ type ItemRow = {
 
 export type ServiceRequestSummary = {
   id: string;
+  ticketNumber: number;
   type: RequestType;
   status: RequestStatus;
   storeId: string;
@@ -93,6 +94,7 @@ export type ServiceRequestSummary = {
 
 type SummaryRow = {
   id: string;
+  ticket_number: number;
   type: RequestType;
   status: RequestStatus;
   store_id: string;
@@ -124,7 +126,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -141,6 +143,7 @@ function toItem(row: ItemRow): RequestItem {
 function toSummary(row: SummaryRow): ServiceRequestSummary {
   return {
     id: row.id,
+    ticketNumber: row.ticket_number,
     type: row.type,
     status: row.status,
     storeId: row.store_id,
@@ -223,6 +226,10 @@ export async function listRequests(
     if (matchingIds.length > 0) {
       orParts.push(`id.in.(${matchingIds.join(",")})`);
     }
+    const ticketNumberMatch = /^#?(\d+)$/.exec(q);
+    if (ticketNumberMatch) {
+      orParts.push(`ticket_number.eq.${ticketNumberMatch[1]}`);
+    }
     query = query.or(orParts.join(","));
   }
 
@@ -287,7 +294,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 export async function getRequestDetail(
   profile: Profile,
@@ -333,12 +340,14 @@ export async function getRequestDetail(
 
 export type OpenRequestForLoja = {
   id: string;
+  ticketNumber: number;
   type: RequestType;
   status: RequestStatus;
   storeName: string;
   clientName: string | null;
   productSummary: string | null;
   createdAt: string;
+  completedAt: string | null;
   requestedDeadline: string | null;
   deadlineStatus: DeadlineStatus;
   approvedDeadline: string | null;
@@ -346,19 +355,26 @@ export type OpenRequestForLoja = {
 
 const OPEN_LOJA_LIMIT = 200;
 
-// Visão pública pra loja (sem login) acompanhar quanta demanda ainda está em aberto,
-// sem expor CPF/telefone/endereço do cliente — só o necessário pra dar noção de volume
-// (e agora também o prazo definido pela assistência, pra loja acompanhar/renegociar).
-export async function listOpenRequestsForLoja(opts: { storeId?: string } = {}): Promise<OpenRequestForLoja[]> {
+// Visão pública pra loja (sem login) acompanhar a demanda em aberto (ou, com
+// `onlyCompleted`, o histórico de concluídas) sem expor CPF/telefone/endereço
+// do cliente — só o necessário pra dar noção de volume (e o prazo definido
+// pela assistência, pra loja acompanhar/renegociar).
+export async function listOpenRequestsForLoja(
+  opts: { storeId?: string; onlyCompleted?: boolean } = {}
+): Promise<OpenRequestForLoja[]> {
   const admin = getSupabaseAdmin();
   let query = admin
     .from("service_requests")
     .select(
-      "id, type, status, client_name, created_at, requested_deadline, deadline_status, approved_deadline, stores(name), items:service_request_items(product)"
+      "id, ticket_number, type, status, client_name, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, stores(name), items:service_request_items(product)"
     )
-    .not("status", "in", "(concluida,cancelada)")
-    .order("created_at", { ascending: true })
     .limit(OPEN_LOJA_LIMIT);
+
+  if (opts.onlyCompleted) {
+    query = query.eq("status", "concluida").order("completed_at", { ascending: false });
+  } else {
+    query = query.not("status", "in", "(concluida,cancelada)").order("created_at", { ascending: true });
+  }
 
   if (opts.storeId) {
     query = query.eq("store_id", opts.storeId);
@@ -370,10 +386,12 @@ export async function listOpenRequestsForLoja(opts: { storeId?: string } = {}): 
 
   type Row = {
     id: string;
+    ticket_number: number;
     type: RequestType;
     status: RequestStatus;
     client_name: string | null;
     created_at: string;
+    completed_at: string | null;
     requested_deadline: string | null;
     deadline_status: DeadlineStatus;
     approved_deadline: string | null;
@@ -383,6 +401,7 @@ export async function listOpenRequestsForLoja(opts: { storeId?: string } = {}): 
 
   return ((data ?? []) as unknown as Row[]).map((row) => ({
     id: row.id,
+    ticketNumber: row.ticket_number,
     type: row.type,
     status: row.status,
     storeName: row.stores?.name ?? "—",
@@ -392,6 +411,7 @@ export async function listOpenRequestsForLoja(opts: { storeId?: string } = {}): 
     clientName: row.client_name,
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
     createdAt: row.created_at,
+    completedAt: row.completed_at,
   }));
 }
 

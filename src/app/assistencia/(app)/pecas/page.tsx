@@ -135,6 +135,9 @@ export default async function PecasQueuePage({
               >
                 <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                   <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                      #{o.ticketNumber}
+                    </span>
                     <StatusBadge status={o.status} />
                     <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                       {o.partName}

@@ -22,6 +22,7 @@ export async function listSuppliers(): Promise<string[]> {
 
 export type PartOrder = {
   id: string;
+  ticketNumber: number;
   serviceRequestId: string | null;
   clientName: string | null;
   clientCpf: string | null;
@@ -46,6 +47,7 @@ export type PartOrder = {
 
 type PartOrderRow = {
   id: string;
+  ticket_number: number;
   service_request_id: string | null;
   client_name: string | null;
   client_cpf: string | null;
@@ -69,11 +71,12 @@ type PartOrderRow = {
 };
 
 const PART_ORDER_COLUMNS =
-  "id, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, created_at, updated_at";
+  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, created_at, updated_at";
 
 function toPartOrder(row: PartOrderRow): PartOrder {
   return {
     id: row.id,
+    ticketNumber: row.ticket_number,
     serviceRequestId: row.service_request_id,
     clientName: row.client_name,
     clientCpf: row.client_cpf,

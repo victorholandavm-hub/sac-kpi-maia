@@ -110,6 +110,9 @@ export default async function AgendaPage({
                       >
                         <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                           <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                              #{r.ticketNumber}
+                            </span>
                             <StatusBadge status={r.status} />
                             {rowOverdue ? (
                               <span

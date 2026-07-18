@@ -93,6 +93,9 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       <RealtimeQueueRefresher requestId={request.id} />
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-mono" style={{ color: "var(--text-muted)" }}>
+            Chamado #{request.ticketNumber}
+          </span>
           <StatusBadge status={request.status} />
           <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             {REQUEST_TYPE_LABELS[request.type] ?? request.type} · {request.storeName}

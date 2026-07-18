@@ -116,7 +116,7 @@ export default async function AssistenciaQueuePage({
           type="search"
           name="q"
           defaultValue={q ?? ""}
-          placeholder="Buscar por cliente, produto, CPF, telefone ou código do pedido…"
+          placeholder="Buscar por nº do chamado, cliente, produto, CPF, telefone ou código do pedido…"
           className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
           style={{ borderColor: "var(--border)" }}
         />
@@ -166,6 +166,9 @@ export default async function AssistenciaQueuePage({
                   >
                     <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                       <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                          #{r.ticketNumber}
+                        </span>
                         <StatusBadge status={r.status} />
                         {r.deadlineStatus === "pendente" ? (
                           <span

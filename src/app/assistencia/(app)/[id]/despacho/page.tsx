@@ -42,9 +42,14 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
         style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold" style={{ color: "var(--brand-green)" }}>
-            Relatório Logístico
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-semibold" style={{ color: "var(--brand-green)" }}>
+              Relatório Logístico
+            </h1>
+            <span className="text-sm font-mono" style={{ color: "var(--text-muted)" }}>
+              Chamado #{request.ticketNumber}
+            </span>
+          </div>
           {isUrgente ? (
             <span
               className="text-sm font-bold px-3 py-1 rounded-full"

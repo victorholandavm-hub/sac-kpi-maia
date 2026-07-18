@@ -15,21 +15,30 @@ export const dynamic = "force-dynamic";
 export default async function LojaHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ store?: string }>;
+  searchParams: Promise<{ store?: string; view?: string }>;
 }) {
-  const { store } = await searchParams;
+  const { store, view } = await searchParams;
   const storePref = store !== undefined ? store : await getLojaStorePreference();
   const storeId = storePref ?? "";
+  const showCompleted = view === "concluidas";
 
-  const [openRequests, stores] = await Promise.all([
-    listOpenRequestsForLoja({ storeId: storeId || undefined }),
+  const [requests, stores] = await Promise.all([
+    listOpenRequestsForLoja({ storeId: storeId || undefined, onlyCompleted: showCompleted }),
     listStores(),
   ]);
 
   const byStatus: Record<string, number> = {};
-  for (const r of openRequests) {
+  for (const r of requests) {
     byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
   }
+
+  const viewHref = (v: string) => {
+    const sp = new URLSearchParams();
+    if (storeId) sp.set("store", storeId);
+    if (v !== "abertas") sp.set("view", v);
+    const qs = sp.toString();
+    return qs ? `/assistencia/loja?${qs}` : "/assistencia/loja";
+  };
 
   return (
     <ToastProvider>
@@ -46,26 +55,58 @@ export default async function LojaHomePage({
 
       <LojaStoreFilter stores={stores} selectedStoreId={storeId} />
 
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatTile label="Em aberto" value={openRequests.length} />
-        <StatTile label={STATUS_LABELS.aberta} value={byStatus.aberta ?? 0} />
-        <StatTile label={STATUS_LABELS.em_contato} value={byStatus.em_contato ?? 0} />
-        <StatTile label={STATUS_LABELS.em_andamento} value={byStatus.em_andamento ?? 0} />
-      </section>
+      <div className="flex items-center gap-2">
+        <Link
+          href={viewHref("abertas")}
+          className="text-xs px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: !showCompleted ? "var(--surface-1)" : "transparent",
+            color: !showCompleted ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: !showCompleted ? 600 : 400,
+          }}
+        >
+          Em aberto
+        </Link>
+        <Link
+          href={viewHref("concluidas")}
+          className="text-xs px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: showCompleted ? "var(--surface-1)" : "transparent",
+            color: showCompleted ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: showCompleted ? 600 : 400,
+          }}
+        >
+          Concluídas
+        </Link>
+      </div>
 
-      {openRequests.length === 0 ? (
+      {!showCompleted ? (
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatTile label="Em aberto" value={requests.length} />
+          <StatTile label={STATUS_LABELS.aberta} value={byStatus.aberta ?? 0} />
+          <StatTile label={STATUS_LABELS.em_contato} value={byStatus.em_contato ?? 0} />
+          <StatTile label={STATUS_LABELS.em_andamento} value={byStatus.em_andamento ?? 0} />
+        </section>
+      ) : null}
+
+      {requests.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhuma solicitação em aberto no momento.
+            {showCompleted ? "Nenhuma solicitação concluída ainda." : "Nenhuma solicitação em aberto no momento."}
           </p>
         </div>
       ) : (
         <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-            {openRequests.map((r) => (
+            {requests.map((r) => (
               <div key={r.id} className="flex items-center justify-between gap-4 p-4 flex-wrap">
                 <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                   <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                      #{r.ticketNumber}
+                    </span>
                     <StatusBadge status={r.status} />
                     <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                       {REQUEST_TYPE_LABELS[r.type] ?? r.type}
@@ -81,14 +122,18 @@ export default async function LojaHomePage({
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                    {new Date(r.createdAt).toLocaleDateString("pt-BR")}
+                    {showCompleted && r.completedAt
+                      ? `Concluída em ${new Date(r.completedAt).toLocaleDateString("pt-BR")}`
+                      : new Date(r.createdAt).toLocaleDateString("pt-BR")}
                   </span>
-                  <LojaDeadlineControl
-                    requestId={r.id}
-                    requestedDeadline={r.requestedDeadline}
-                    deadlineStatus={r.deadlineStatus}
-                    approvedDeadline={r.approvedDeadline}
-                  />
+                  {!showCompleted ? (
+                    <LojaDeadlineControl
+                      requestId={r.id}
+                      requestedDeadline={r.requestedDeadline}
+                      deadlineStatus={r.deadlineStatus}
+                      approvedDeadline={r.approvedDeadline}
+                    />
+                  ) : null}
                 </div>
               </div>
             ))}
