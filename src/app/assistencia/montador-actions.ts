@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { saveRequestPhoto } from "@/lib/servicePhotos";
+import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import {
   MONTADOR_COOKIE_NAME,
   MONTADOR_SESSION_MAX_AGE,
@@ -22,12 +23,19 @@ export async function montadorSignIn(_state: MontadorFormState, formData: FormDa
   if (!name) return { error: "Selecione seu nome." };
   if (!/^\d{4}$/.test(pin)) return { error: "Digite os 4 números do seu PIN." };
 
+  const lockout = await checkPinLockout("assemblers", "name", name);
+  if (lockout.locked) {
+    return { error: `Muitas tentativas erradas. Tente de novo em ${lockout.minutesLeft} minuto(s).` };
+  }
+
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.from("assemblers").select("name, pin_hash").eq("name", name).maybeSingle();
 
   if (error || !data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
+    await recordFailedPinAttempt("assemblers", "name", name);
     return { error: "Nome ou PIN incorretos." };
   }
+  await resetPinAttempts("assemblers", "name", name);
 
   const cookieStore = await cookies();
   cookieStore.set(MONTADOR_COOKIE_NAME, signMontadorSession(data.name), {

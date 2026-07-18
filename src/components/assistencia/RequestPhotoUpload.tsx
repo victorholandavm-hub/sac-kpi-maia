@@ -14,7 +14,7 @@ export function RequestPhotoUpload({ requestId }: { requestId: string }) {
       <input
         key={inputKey}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
         capture="environment"
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         className="text-xs"

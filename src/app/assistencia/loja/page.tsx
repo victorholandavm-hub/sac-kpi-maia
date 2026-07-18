@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { listOpenRequestsForLoja, listStores } from "@/lib/serviceRequests";
 import { getLojaStorePreference } from "@/app/assistencia/actions";
+import { getLojaGerenteSession, lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
 import { REQUEST_TYPE_LABELS, STATUS_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -17,6 +19,11 @@ export default async function LojaHomePage({
 }: {
   searchParams: Promise<{ store?: string; view?: string }>;
 }) {
+  const gerenteStoreId = await getLojaGerenteSession();
+  if (!gerenteStoreId) {
+    redirect("/assistencia/loja/login");
+  }
+
   const { store, view } = await searchParams;
   const storePref = store !== undefined ? store : await getLojaStorePreference();
   const storeId = storePref ?? "";
@@ -44,13 +51,20 @@ export default async function LojaHomePage({
     <ToastProvider>
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="Gerente de loja" subtitle="Demanda em aberto de todas as lojas">
-        <Link
-          href="/assistencia/solicitar"
-          className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-        >
-          + Nova solicitação
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/assistencia/solicitar"
+            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
+            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          >
+            + Nova solicitação
+          </Link>
+          <form action={lojaGerenteSignOut}>
+            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              Sair
+            </button>
+          </form>
+        </div>
       </AssistenciaHeader>
 
       <LojaStoreFilter stores={stores} selectedStoreId={storeId} />

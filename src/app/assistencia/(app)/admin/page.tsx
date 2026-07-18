@@ -1,10 +1,11 @@
 import { getProfile } from "@/lib/dal";
-import { listStores } from "@/lib/serviceRequests";
+import { listStoresWithPinStatus } from "@/lib/serviceRequests";
 import { listAssemblersWithPinStatus } from "@/lib/payments";
 import { listSuppliers } from "@/lib/partOrders";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
 import { AddSimpleEntryForm } from "@/components/assistencia/AddSimpleEntryForm";
 import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
+import { StorePinField } from "@/components/assistencia/StorePinField";
 
 export default async function AdminPage() {
   const profile = await getProfile();
@@ -17,7 +18,7 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, assemblers, suppliers] = await Promise.all([listStores(), listAssemblersWithPinStatus(), listSuppliers()]);
+  const [stores, assemblers, suppliers] = await Promise.all([listStoresWithPinStatus(), listAssemblersWithPinStatus(), listSuppliers()]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -84,11 +85,12 @@ export default async function AdminPage() {
         </h3>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           Renomear/fundir lojas ainda não tem tela própria — fala comigo se precisar corrigir alguma.
+          Defina um PIN de 4 números pra cada loja acessar <span className="font-mono">/assistencia/loja</span>.
         </p>
-        <ul className="grid sm:grid-cols-2 gap-x-4 max-h-64 overflow-y-auto">
+        <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 max-h-64 overflow-y-auto">
           {stores.map((s) => (
-            <li key={s.id} className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              <span style={{ color: "var(--text-muted)" }}>{s.id}</span> — {s.name}
+            <li key={s.id}>
+              <StorePinField storeId={s.id} storeName={s.name} hasPin={s.hasPin} />
             </li>
           ))}
         </ul>

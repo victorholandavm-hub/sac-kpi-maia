@@ -30,7 +30,7 @@ export default async function SolicitarAssistenciaPage({
             A assistência vai analisar o prazo pedido e dar retorno. Se precisar enviar outra, use o
             formulário abaixo.
           </p>
-          <Link href="/assistencia/loja" className="text-sm underline self-start mt-1" style={{ color: "var(--text-secondary)" }}>
+          <Link href="/assistencia/loja/login" className="text-sm underline self-start mt-1" style={{ color: "var(--text-secondary)" }}>
             Ver demanda em aberto
           </Link>
         </div>

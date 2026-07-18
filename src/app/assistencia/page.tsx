@@ -23,7 +23,7 @@ export default function AssistenciaHomePage() {
 
         <div className="flex flex-col gap-4">
           <Link
-            href="/assistencia/loja"
+            href="/assistencia/loja/login"
             className="group rounded-xl border p-5 flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
             style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
           >
@@ -35,7 +35,7 @@ export default function AssistenciaHomePage() {
                 Gerente de loja
               </span>
               <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-                Solicitar assistência e ver a demanda em aberto
+                Ver a demanda em aberto e negociar prazos da sua loja
               </span>
             </div>
           </Link>

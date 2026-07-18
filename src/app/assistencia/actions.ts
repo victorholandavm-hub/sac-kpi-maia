@@ -8,6 +8,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
 import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 import { saveRequestPhoto } from "@/lib/servicePhotos";
+import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 
 const REQUEST_TYPES = [
   "montagem",
@@ -557,13 +558,28 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   redirect(`/assistencia/${data.id}`);
 }
 
-// Sem sessão — chamada a partir do painel público da loja (/assistencia/loja),
-// pra propor uma nova data mesmo depois que a assistência já tinha definido
-// uma. Reabre a negociação de prazo (mesmo fluxo de aprovação já existente).
+// Chamada a partir do painel da loja (/assistencia/loja, protegido por login
+// de loja + PIN — ver src/lib/lojaAuth.ts), pra propor uma nova data mesmo
+// depois que a assistência já tinha definido uma. Reabre a negociação de
+// prazo (mesmo fluxo de aprovação já existente). Verifica que o chamado é da
+// MESMA loja autenticada — sem isso, qualquer sessão de loja conseguiria
+// mudar o prazo de um chamado de outra loja.
 export async function proposeNewDeadline(requestId: string, newDate: string) {
   if (!newDate) throw new Error("Informe uma data.");
 
+  const storeId = await getLojaGerenteSession();
+  if (!storeId) throw new Error("Sessão expirada. Faça login de novo.");
+
   const admin = getSupabaseAdmin();
+  const { data: request, error: fetchError } = await admin
+    .from("service_requests")
+    .select("store_id")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (fetchError || !request || request.store_id !== storeId) {
+    throw new Error("Esse chamado não é da sua loja.");
+  }
+
   const { error } = await admin
     .from("service_requests")
     .update({ requested_deadline: newDate, deadline_status: "pendente" })

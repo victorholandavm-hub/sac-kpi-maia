@@ -3,6 +3,17 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 
 const BUCKET = "service-request-photos";
 const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hora — tempo suficiente pra abrir a página e ver as fotos
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// Allowlist explícita de formatos de foto real — nunca SVG (pode conter script
+// embutido e roda quando alguém abre a URL assinada direto no navegador).
+const ALLOWED_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/heic": "heic",
+  "image/heif": "heif",
+};
 
 export type RequestPhoto = {
   id: string;
@@ -41,17 +52,20 @@ export async function saveRequestPhoto(opts: {
   file: File;
   uploadedBy: string | null;
 }): Promise<void> {
-  if (!opts.file.type.startsWith("image/")) {
-    throw new Error("Só é possível anexar imagens.");
+  const ext = ALLOWED_TYPES[opts.file.type];
+  if (!ext) {
+    throw new Error("Formato de imagem não suportado. Envie uma foto em JPEG, PNG, WEBP ou HEIC.");
+  }
+  if (opts.file.size > MAX_FILE_SIZE_BYTES) {
+    throw new Error("A foto é grande demais (máximo 10 MB).");
   }
 
   const admin = getSupabaseAdmin();
-  const ext = opts.file.name.split(".").pop() || "jpg";
   const path = `${opts.requestId}/${randomUUID()}.${ext}`;
 
   const buffer = Buffer.from(await opts.file.arrayBuffer());
   const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, buffer, {
-    contentType: opts.file.type || "image/jpeg",
+    contentType: opts.file.type,
   });
   if (uploadError) throw new Error(uploadError.message);
 

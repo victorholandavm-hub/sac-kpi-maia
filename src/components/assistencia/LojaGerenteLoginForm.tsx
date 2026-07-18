@@ -1,0 +1,56 @@
+"use client";
+
+import { useActionState } from "react";
+import { lojaGerenteSignIn, type LojaGerenteFormState } from "@/app/assistencia/loja-actions";
+import type { Store } from "@/lib/serviceRequests";
+
+export function LojaGerenteLoginForm({ stores }: { stores: Store[] }) {
+  const [state, formAction, pending] = useActionState<LojaGerenteFormState, FormData>(lojaGerenteSignIn, undefined);
+
+  return (
+    <form
+      action={formAction}
+      className="rounded-xl border p-6 flex flex-col gap-4"
+      style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
+    >
+      <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
+        Sua loja
+        <select name="storeId" required className="rounded border px-3 py-2" style={{ borderColor: "var(--border)" }}>
+          <option value="">Selecione…</option>
+          {stores.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
+        PIN (4 números)
+        <input
+          name="pin"
+          type="text"
+          inputMode="numeric"
+          pattern="\d{4}"
+          maxLength={4}
+          required
+          autoComplete="off"
+          className="rounded border px-3 py-2 text-center text-2xl tracking-[0.5em]"
+          style={{ borderColor: "var(--border)" }}
+        />
+      </label>
+      {state?.error ? (
+        <p className="text-sm" style={{ color: "var(--status-critical)" }}>
+          {state.error}
+        </p>
+      ) : null}
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded px-3 py-2 font-medium disabled:opacity-60"
+        style={{ background: "var(--brand-orange)", color: "#fff" }}
+      >
+        {pending ? "Entrando…" : "Entrar"}
+      </button>
+    </form>
+  );
+}

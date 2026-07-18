@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
 import { hashPin } from "@/lib/montadorAuth";
+import { resetPinAttempts } from "@/lib/pinLockout";
 
 export type FormState = { error?: string; success?: boolean } | undefined;
 
@@ -71,6 +72,21 @@ export async function setAssemblerPin(name: string, pin: string): Promise<void> 
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("assemblers").update({ pin_hash: hashPin(pin) }).eq("name", name);
   if (error) throw new Error(error.message);
+  await resetPinAttempts("assemblers", "name", name);
+
+  revalidatePath("/assistencia/admin");
+}
+
+export async function setStorePin(storeId: string, pin: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("stores").update({ pin_hash: hashPin(pin) }).eq("id", storeId);
+  if (error) throw new Error(error.message);
+  await resetPinAttempts("stores", "id", storeId);
 
   revalidatePath("/assistencia/admin");
 }
