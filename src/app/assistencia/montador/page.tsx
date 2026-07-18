@@ -2,8 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getMontadorSession, montadorSignOut } from "@/app/assistencia/montador-actions";
 import { listRequestsForAssembler } from "@/lib/serviceRequests";
+import { listRequestPhotos } from "@/lib/servicePhotos";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
+import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
+import { MontadorPhotoUpload } from "@/components/assistencia/MontadorPhotoUpload";
+import { ToastProvider } from "@/components/assistencia/ToastProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +31,12 @@ export default async function MontadorHomePage({
   const showCompleted = view === "concluidas";
 
   const requests = await listRequestsForAssembler(assemblerName, { onlyCompleted: showCompleted });
+  const photosByRequest = new Map(
+    await Promise.all(requests.map(async (r) => [r.id, await listRequestPhotos(r.id)] as const))
+  );
 
   return (
+    <ToastProvider>
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -131,10 +139,14 @@ export default async function MontadorHomePage({
                   {r.reason}
                 </p>
               ) : null}
+
+              <PhotoGallery photos={photosByRequest.get(r.id) ?? []} />
+              <MontadorPhotoUpload requestId={r.id} />
             </div>
           ))}
         </div>
       )}
     </div>
+    </ToastProvider>
   );
 }

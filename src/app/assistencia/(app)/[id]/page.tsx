@@ -19,6 +19,9 @@ import { SacCategoryField } from "@/components/assistencia/SacCategoryField";
 import { LegalDeadlineField } from "@/components/assistencia/LegalDeadlineField";
 import { EscalationRiskToggle } from "@/components/assistencia/EscalationRiskToggle";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
+import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
+import { RequestPhotoUpload } from "@/components/assistencia/RequestPhotoUpload";
+import { listRequestPhotos } from "@/lib/servicePhotos";
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -87,6 +90,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
   const { request, events } = result;
   const canManage = profile.role === "assistencia" || profile.role === "admin";
   const assemblers = canManage ? await listAssemblers() : [];
+  const photos = await listRequestPhotos(request.id);
 
   return (
     <div className="flex flex-col gap-4">
@@ -148,6 +152,22 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           </ul>
         </div>
       ) : null}
+
+      <div
+        className="rounded-lg border p-4 flex flex-col gap-3"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      >
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          Fotos
+        </h3>
+        <PhotoGallery photos={photos} />
+        {photos.length === 0 ? (
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Nenhuma foto anexada ainda.
+          </p>
+        ) : null}
+        {canManage ? <RequestPhotoUpload requestId={request.id} /> : null}
+      </div>
 
       <div
         className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"

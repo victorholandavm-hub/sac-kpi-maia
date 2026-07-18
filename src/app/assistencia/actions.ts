@@ -7,6 +7,7 @@ import { getSupabaseServer } from "@/lib/supabaseServer";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
 import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
+import { saveRequestPhoto } from "@/lib/servicePhotos";
 
 const REQUEST_TYPES = [
   "montagem",
@@ -293,6 +294,17 @@ export async function addNote(requestId: string, note: string) {
   });
   if (error) throw new Error(error.message);
 
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
+export async function addRequestPhoto(requestId: string, formData: FormData): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+
+  const file = formData.get("photo");
+  if (!(file instanceof File) || file.size === 0) throw new Error("Selecione uma foto.");
+
+  await saveRequestPhoto({ requestId, file, uploadedBy: profile.fullName });
   revalidatePath(`/assistencia/${requestId}`);
 }
 
