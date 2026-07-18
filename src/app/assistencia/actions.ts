@@ -9,7 +9,7 @@ import { getProfile, requireRole } from "@/lib/dal";
 import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
-import { getGerenteStoreId } from "@/lib/gerentes";
+import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 
 const REQUEST_TYPES = [
@@ -66,14 +66,19 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
   const requestedByName = String(formData.get("requested_by_name") ?? "").trim();
   const requestedDeadline = String(formData.get("requested_deadline") ?? "").trim();
 
-  // Se há uma sessão de gerente de loja válida, a loja da solicitação é
-  // sempre a dele — ignora qualquer valor vindo do form (mesmo que alguém
-  // tente adulterar o <select> pelo devtools), pra garantir que um gerente só
-  // consiga solicitar para a própria loja.
+  // Se há uma sessão de gerente de loja válida, a solicitação só pode ser
+  // para uma das lojas dele. Se ele cuida de uma loja só, não há ambiguidade
+  // e a gente força o valor (ignora o que veio do form, mesmo que alguém
+  // tente adulterar o <select> pelo devtools). Se cuida de várias, valida
+  // que o valor escolhido está entre as dele.
   const gerenteName = await getLojaGerenteSession();
   if (gerenteName) {
-    const gerenteStoreId = await getGerenteStoreId(gerenteName);
-    if (gerenteStoreId) storeId = gerenteStoreId;
+    const gerenteStoreIds = await getGerenteStoreIds(gerenteName);
+    if (gerenteStoreIds.length === 1) {
+      storeId = gerenteStoreIds[0];
+    } else if (gerenteStoreIds.length > 1 && !gerenteStoreIds.includes(storeId)) {
+      return { error: "Selecione uma das lojas que você gerencia." };
+    }
   }
 
   if (!storeId) return { error: "Selecione a loja." };
@@ -593,15 +598,15 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
 // de loja + PIN — ver src/lib/lojaAuth.ts), pra propor uma nova data mesmo
 // depois que a assistência já tinha definido uma. Reabre a negociação de
 // prazo (mesmo fluxo de aprovação já existente). Verifica que o chamado é da
-// MESMA loja autenticada — sem isso, qualquer sessão de loja conseguiria
-// mudar o prazo de um chamado de outra loja.
+// UMA DAS lojas do gerente autenticado — sem isso, qualquer sessão de loja
+// conseguiria mudar o prazo de um chamado de outra loja.
 export async function proposeNewDeadline(requestId: string, newDate: string) {
   if (!newDate) throw new Error("Informe uma data.");
 
   const gerenteName = await getLojaGerenteSession();
   if (!gerenteName) throw new Error("Sessão expirada. Faça login de novo.");
-  const storeId = await getGerenteStoreId(gerenteName);
-  if (!storeId) throw new Error("Gerente não encontrado.");
+  const gerenteStoreIds = await getGerenteStoreIds(gerenteName);
+  if (gerenteStoreIds.length === 0) throw new Error("Gerente sem loja vinculada.");
 
   const admin = getSupabaseAdmin();
   const { data: request, error: fetchError } = await admin
@@ -609,8 +614,8 @@ export async function proposeNewDeadline(requestId: string, newDate: string) {
     .select("store_id")
     .eq("id", requestId)
     .maybeSingle();
-  if (fetchError || !request || request.store_id !== storeId) {
-    throw new Error("Esse chamado não é da sua loja.");
+  if (fetchError || !request || !gerenteStoreIds.includes(request.store_id)) {
+    throw new Error("Esse chamado não é de uma loja sua.");
   }
 
   const { error } = await admin

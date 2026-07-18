@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
 import { hashPin } from "@/lib/montadorAuth";
 import { resetPinAttempts } from "@/lib/pinLockout";
+import { setGerenteStores } from "@/lib/gerentes";
 
 export type FormState = { error?: string; success?: boolean } | undefined;
 
@@ -77,18 +78,25 @@ export async function setAssemblerPin(name: string, pin: string): Promise<void> 
   revalidatePath("/assistencia/admin");
 }
 
+// Cria o gerente (se ainda não existir) e (re)define de quais lojas ele
+// cuida — chamar de novo pro mesmo nome com outras lojas marcadas substitui
+// a lista inteira, então essa mesma ação serve tanto pra cadastrar quanto
+// pra editar as lojas de um gerente já existente (um gerente pode cuidar de
+// mais de uma loja).
 export async function addGerente(_state: FormState, formData: FormData): Promise<FormState> {
   const profile = await getProfile();
   requireRole(profile, "admin");
 
   const name = String(formData.get("name") ?? "").trim();
-  const storeId = String(formData.get("store_id") ?? "").trim();
+  const storeIds = formData.getAll("store_ids").map(String).filter(Boolean);
   if (!name) return { error: "Informe o nome." };
-  if (!storeId) return { error: "Selecione a loja." };
+  if (storeIds.length === 0) return { error: "Selecione ao menos uma loja." };
 
   const admin = getSupabaseAdmin();
-  const { error } = await admin.from("gerentes").upsert({ name, store_id: storeId }, { onConflict: "name" });
+  const { error } = await admin.from("gerentes").upsert({ name }, { onConflict: "name" });
   if (error) return { error: error.message };
+
+  await setGerenteStores(name, storeIds);
 
   revalidatePath("/assistencia/admin");
   return { success: true };

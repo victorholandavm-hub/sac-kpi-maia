@@ -92,12 +92,13 @@ export default async function AdminPage() {
         </h3>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           Cada gerente entra com o próprio nome + PIN de 4 números em <span className="font-mono">/assistencia/loja</span>{" "}
-          e só consegue solicitar/negociar prazo para a loja vinculada abaixo.
+          e só consegue solicitar/negociar prazo para as lojas vinculadas abaixo (pode ser mais de uma).
+          Pra mudar as lojas de um gerente já cadastrado, adicione ele de novo marcando o novo conjunto de lojas.
         </p>
         <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 max-h-64 overflow-y-auto">
           {gerentes.map((g) => (
             <li key={g.name}>
-              <GerentePinField name={g.name} storeName={g.storeName} hasPin={g.hasPin} />
+              <GerentePinField name={g.name} storeNames={g.storeNames} hasPin={g.hasPin} />
             </li>
           ))}
         </ul>

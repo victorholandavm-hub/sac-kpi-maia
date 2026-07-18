@@ -22,11 +22,13 @@ type Item = { product: string; quantity: number };
 
 export function PublicRequestForm({
   stores,
-  lockedStore,
+  restrictedStores,
   defaultStoreId,
 }: {
   stores: Store[];
-  lockedStore?: Store | null;
+  // null = qualquer loja (visitante sem login); array = só essas (gerente
+  // autenticado, que pode cuidar de uma ou mais lojas — ver src/lib/gerentes.ts).
+  restrictedStores?: Store[] | null;
   defaultStoreId?: string;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPublicRequest, undefined);
@@ -55,15 +57,15 @@ export function PublicRequestForm({
           <input name="requested_by_name" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
         <Field label="Loja solicitante *">
-          {lockedStore ? (
+          {restrictedStores && restrictedStores.length === 1 ? (
             <>
               <input
-                value={lockedStore.name}
+                value={restrictedStores[0].name}
                 disabled
                 className="rounded border px-3 py-2"
                 style={{ ...inputStyle, background: "var(--surface-1)", color: "var(--text-secondary)" }}
               />
-              <input type="hidden" name="store_id" value={lockedStore.id} />
+              <input type="hidden" name="store_id" value={restrictedStores[0].id} />
             </>
           ) : (
             <select
@@ -76,7 +78,7 @@ export function PublicRequestForm({
               <option value="" disabled>
                 Selecione…
               </option>
-              {stores.map((s) => (
+              {(restrictedStores ?? stores).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>

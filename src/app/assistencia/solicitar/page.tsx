@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listStores } from "@/lib/serviceRequests";
-import { getGerenteStoreId } from "@/lib/gerentes";
+import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { PublicRequestForm } from "@/components/assistencia/PublicRequestForm";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -16,8 +16,8 @@ export default async function SolicitarAssistenciaPage({
   const stores = await listStores();
 
   const gerenteName = await getLojaGerenteSession();
-  const gerenteStoreId = gerenteName ? await getGerenteStoreId(gerenteName) : null;
-  const lockedStore = gerenteStoreId ? stores.find((s) => s.id === gerenteStoreId) ?? null : null;
+  const gerenteStoreIds = gerenteName ? await getGerenteStoreIds(gerenteName) : [];
+  const restrictedStores = gerenteName ? stores.filter((s) => gerenteStoreIds.includes(s.id)) : null;
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
@@ -56,7 +56,7 @@ export default async function SolicitarAssistenciaPage({
         </div>
       ) : null}
 
-      <PublicRequestForm stores={stores} lockedStore={lockedStore} defaultStoreId={store} />
+      <PublicRequestForm stores={stores} restrictedStores={restrictedStores} defaultStoreId={store} />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { setGerentePin } from "@/app/assistencia/admin-actions";
 import { useQuickAction } from "./useQuickAction";
 
-export function GerentePinField({ name, storeName, hasPin }: { name: string; storeName: string; hasPin: boolean }) {
+export function GerentePinField({ name, storeNames, hasPin }: { name: string; storeNames: string[]; hasPin: boolean }) {
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [pin, setPin] = useState("");
@@ -13,7 +13,7 @@ export function GerentePinField({ name, storeName, hasPin }: { name: string; sto
     return (
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          {name} <span style={{ color: "var(--text-muted)" }}>— {storeName}</span>
+          {name} <span style={{ color: "var(--text-muted)" }}>— {storeNames.join(", ")}</span>
         </span>
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: hasPin ? "var(--status-good)" : "var(--text-muted)" }}>
