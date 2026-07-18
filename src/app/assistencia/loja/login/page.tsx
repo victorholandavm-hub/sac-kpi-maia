@@ -1,11 +1,18 @@
 import Link from "next/link";
-import { listStores } from "@/lib/serviceRequests";
+import { redirect } from "next/navigation";
+import { listGerentes } from "@/lib/gerentes";
+import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { LojaGerenteLoginForm } from "@/components/assistencia/LojaGerenteLoginForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function LojaGerenteLoginPage() {
-  const stores = await listStores();
+  const existingSession = await getLojaGerenteSession();
+  if (existingSession) {
+    redirect("/assistencia/loja");
+  }
+
+  const gerentes = await listGerentes();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -23,7 +30,7 @@ export default async function LojaGerenteLoginPage() {
           </div>
         </div>
 
-        <LojaGerenteLoginForm stores={stores} />
+        <LojaGerenteLoginForm gerentes={gerentes} />
 
         <Link href="/assistencia/solicitar" className="text-sm underline text-center" style={{ color: "var(--text-secondary)" }}>
           Só quero enviar uma solicitação, sem entrar

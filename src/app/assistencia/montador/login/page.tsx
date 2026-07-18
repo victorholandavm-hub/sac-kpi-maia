@@ -1,10 +1,17 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { listAssemblers } from "@/lib/payments";
+import { getMontadorSession } from "@/app/assistencia/montador-actions";
 import { MontadorLoginForm } from "@/components/assistencia/MontadorLoginForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function MontadorLoginPage() {
+  const existingSession = await getMontadorSession();
+  if (existingSession) {
+    redirect("/assistencia/montador");
+  }
+
   const assemblers = await listAssemblers();
 
   return (

@@ -92,3 +92,68 @@ export async function montadorDeletePhoto(photoId: string): Promise<void> {
   await deleteRequestPhoto(photoId);
   revalidatePath("/assistencia/montador");
 }
+
+export async function montadorCompleteRequest(requestId: string): Promise<void> {
+  const assemblerName = await getMontadorSession();
+  if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
+
+  const admin = getSupabaseAdmin();
+  const { data: request, error } = await admin
+    .from("service_requests")
+    .select("assembler_name, status")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (error || !request || request.assembler_name !== assemblerName) {
+    throw new Error("Esse chamado não é seu.");
+  }
+  if (request.status === "concluida" || request.status === "cancelada") {
+    throw new Error("Esse chamado já foi encerrado.");
+  }
+
+  const { error: updateError } = await admin
+    .from("service_requests")
+    .update({ status: "concluida", completed_at: new Date().toISOString() })
+    .eq("id", requestId);
+  if (updateError) throw new Error(updateError.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: null,
+    event_type: "status_changed",
+    from_status: request.status,
+    to_status: "concluida",
+    note: `Concluído pelo montador ${assemblerName}.`,
+  });
+
+  revalidatePath("/assistencia/montador");
+  revalidatePath("/assistencia/fila");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
+export async function montadorAddNote(requestId: string, note: string): Promise<void> {
+  const assemblerName = await getMontadorSession();
+  if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
+  const trimmed = note.trim();
+  if (!trimmed) throw new Error("Escreva uma observação.");
+
+  const admin = getSupabaseAdmin();
+  const { data: request, error } = await admin
+    .from("service_requests")
+    .select("assembler_name")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (error || !request || request.assembler_name !== assemblerName) {
+    throw new Error("Esse chamado não é seu.");
+  }
+
+  const { error: insertError } = await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: null,
+    event_type: "note_added",
+    note: `${assemblerName} (montador): ${trimmed}`,
+  });
+  if (insertError) throw new Error(insertError.message);
+
+  revalidatePath("/assistencia/montador");
+  revalidatePath(`/assistencia/${requestId}`);
+}

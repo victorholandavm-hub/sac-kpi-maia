@@ -39,15 +39,6 @@ export async function listStores(): Promise<Store[]> {
   return data ?? [];
 }
 
-export type StoreWithPinStatus = Store & { hasPin: boolean };
-
-export async function listStoresWithPinStatus(): Promise<StoreWithPinStatus[]> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("stores").select("id, name, pin_hash").order("id");
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((s) => ({ id: s.id, name: s.name, hasPin: !!s.pin_hash }));
-}
-
 export type RequestItem = {
   id: string;
   product: string;

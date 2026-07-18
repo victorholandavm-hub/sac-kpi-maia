@@ -9,6 +9,7 @@ import { getProfile, requireRole } from "@/lib/dal";
 import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
+import { getGerenteStoreId } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 
 const REQUEST_TYPES = [
@@ -61,9 +62,19 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     return { error: "Muitas solicitações enviadas em pouco tempo. Aguarde alguns minutos e tente de novo." };
   }
 
-  const storeId = String(formData.get("store_id") ?? "").trim();
+  let storeId = String(formData.get("store_id") ?? "").trim();
   const requestedByName = String(formData.get("requested_by_name") ?? "").trim();
   const requestedDeadline = String(formData.get("requested_deadline") ?? "").trim();
+
+  // Se há uma sessão de gerente de loja válida, a loja da solicitação é
+  // sempre a dele — ignora qualquer valor vindo do form (mesmo que alguém
+  // tente adulterar o <select> pelo devtools), pra garantir que um gerente só
+  // consiga solicitar para a própria loja.
+  const gerenteName = await getLojaGerenteSession();
+  if (gerenteName) {
+    const gerenteStoreId = await getGerenteStoreId(gerenteName);
+    if (gerenteStoreId) storeId = gerenteStoreId;
+  }
 
   if (!storeId) return { error: "Selecione a loja." };
   if (!requestedByName) return { error: "Informe seu primeiro nome." };
@@ -587,8 +598,10 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
 export async function proposeNewDeadline(requestId: string, newDate: string) {
   if (!newDate) throw new Error("Informe uma data.");
 
-  const storeId = await getLojaGerenteSession();
-  if (!storeId) throw new Error("Sessão expirada. Faça login de novo.");
+  const gerenteName = await getLojaGerenteSession();
+  if (!gerenteName) throw new Error("Sessão expirada. Faça login de novo.");
+  const storeId = await getGerenteStoreId(gerenteName);
+  if (!storeId) throw new Error("Gerente não encontrado.");
 
   const admin = getSupabaseAdmin();
   const { data: request, error: fetchError } = await admin
@@ -610,7 +623,7 @@ export async function proposeNewDeadline(requestId: string, newDate: string) {
     request_id: requestId,
     actor_id: null,
     event_type: "note_added",
-    note: `Loja propôs nova data: ${newDate}.`,
+    note: `${gerenteName} (loja) propôs nova data: ${newDate}.`,
   });
 
   revalidatePath("/assistencia/loja");

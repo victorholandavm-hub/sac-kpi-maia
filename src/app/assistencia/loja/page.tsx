@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listOpenRequestsForLoja, listStores } from "@/lib/serviceRequests";
+import { getGerenteStoreId } from "@/lib/gerentes";
 import { getLojaStorePreference } from "@/app/assistencia/actions";
 import { getLojaGerenteSession, lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
 import { REQUEST_TYPE_LABELS, STATUS_LABELS } from "@/lib/assistenciaLabels";
@@ -19,10 +20,11 @@ export default async function LojaHomePage({
 }: {
   searchParams: Promise<{ store?: string; view?: string }>;
 }) {
-  const gerenteStoreId = await getLojaGerenteSession();
-  if (!gerenteStoreId) {
+  const gerenteName = await getLojaGerenteSession();
+  if (!gerenteName) {
     redirect("/assistencia/loja/login");
   }
+  const gerenteStoreId = await getGerenteStoreId(gerenteName);
 
   const { store, view } = await searchParams;
   const storePref = store !== undefined ? store : await getLojaStorePreference();
@@ -53,7 +55,7 @@ export default async function LojaHomePage({
       <AssistenciaHeader title="Gerente de loja" subtitle="Demanda em aberto de todas as lojas">
         <div className="flex items-center gap-3">
           <Link
-            href="/assistencia/solicitar"
+            href={gerenteStoreId ? `/assistencia/solicitar?store=${gerenteStoreId}` : "/assistencia/solicitar"}
             className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
             style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
           >

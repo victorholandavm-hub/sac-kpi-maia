@@ -7,7 +7,9 @@ import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
 import { MontadorPhotoUpload } from "@/components/assistencia/MontadorPhotoUpload";
+import { MontadorRequestActions } from "@/components/assistencia/MontadorRequestActions";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
+import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -38,21 +40,16 @@ export default async function MontadorHomePage({
   return (
     <ToastProvider>
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold" style={{ color: "var(--brand-green)" }}>
-            Olá, {assemblerName}
-          </h1>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Seus chamados de montagem, desmontagem, recolhimento e vistoria.
-          </p>
-        </div>
+      <AssistenciaHeader
+        title={`Olá, ${assemblerName}`}
+        subtitle="Seus chamados de montagem, desmontagem, recolhimento e vistoria."
+      >
         <form action={montadorSignOut}>
           <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             Sair
           </button>
         </form>
-      </div>
+      </AssistenciaHeader>
 
       <div className="flex items-center gap-2">
         <Link
@@ -142,6 +139,7 @@ export default async function MontadorHomePage({
 
               <PhotoGallery photos={photosByRequest.get(r.id) ?? []} deleteMode="montador" currentActor={assemblerName} />
               <MontadorPhotoUpload requestId={r.id} />
+              {!showCompleted ? <MontadorRequestActions requestId={r.id} /> : null}
             </div>
           ))}
         </div>

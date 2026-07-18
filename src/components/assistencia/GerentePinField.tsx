@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { setStorePin } from "@/app/assistencia/admin-actions";
+import { setGerentePin } from "@/app/assistencia/admin-actions";
 import { useQuickAction } from "./useQuickAction";
 
-export function StorePinField({ storeId, storeName, hasPin }: { storeId: string; storeName: string; hasPin: boolean }) {
+export function GerentePinField({ name, storeName, hasPin }: { name: string; storeName: string; hasPin: boolean }) {
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [pin, setPin] = useState("");
@@ -13,7 +13,7 @@ export function StorePinField({ storeId, storeName, hasPin }: { storeId: string;
     return (
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          <span style={{ color: "var(--text-muted)" }}>{storeId}</span> — {storeName}
+          {name} <span style={{ color: "var(--text-muted)" }}>— {storeName}</span>
         </span>
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: hasPin ? "var(--status-good)" : "var(--text-muted)" }}>
@@ -30,7 +30,7 @@ export function StorePinField({ storeId, storeName, hasPin }: { storeId: string;
   return (
     <div className="flex items-center justify-between gap-2 flex-wrap">
       <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        {storeName}
+        {name}
       </span>
       <div className="flex items-center gap-2">
         <input
@@ -50,10 +50,10 @@ export function StorePinField({ storeId, storeName, hasPin }: { storeId: string;
               return;
             }
             run(async () => {
-              await setStorePin(storeId, pin);
+              await setGerentePin(name, pin);
               setEditing(false);
               setPin("");
-            }, `PIN de ${storeName} definido.`);
+            }, `PIN de ${name} definido.`);
           }}
           className="text-xs rounded px-2 py-1 disabled:opacity-60"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}

@@ -77,16 +77,33 @@ export async function setAssemblerPin(name: string, pin: string): Promise<void> 
   revalidatePath("/assistencia/admin");
 }
 
-export async function setStorePin(storeId: string, pin: string): Promise<void> {
+export async function addGerente(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  const name = String(formData.get("name") ?? "").trim();
+  const storeId = String(formData.get("store_id") ?? "").trim();
+  if (!name) return { error: "Informe o nome." };
+  if (!storeId) return { error: "Selecione a loja." };
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("gerentes").upsert({ name, store_id: storeId }, { onConflict: "name" });
+  if (error) return { error: error.message };
+
+  revalidatePath("/assistencia/admin");
+  return { success: true };
+}
+
+export async function setGerentePin(name: string, pin: string): Promise<void> {
   const profile = await getProfile();
   requireRole(profile, "admin");
 
   if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
 
   const admin = getSupabaseAdmin();
-  const { error } = await admin.from("stores").update({ pin_hash: hashPin(pin) }).eq("id", storeId);
+  const { error } = await admin.from("gerentes").update({ pin_hash: hashPin(pin) }).eq("name", name);
   if (error) throw new Error(error.message);
-  await resetPinAttempts("stores", "id", storeId);
+  await resetPinAttempts("gerentes", "name", name);
 
   revalidatePath("/assistencia/admin");
 }

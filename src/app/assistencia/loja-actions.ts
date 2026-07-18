@@ -15,28 +15,28 @@ import {
 export type LojaGerenteFormState = { error?: string } | undefined;
 
 export async function lojaGerenteSignIn(_state: LojaGerenteFormState, formData: FormData): Promise<LojaGerenteFormState> {
-  const storeId = String(formData.get("storeId") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
 
-  if (!storeId) return { error: "Selecione sua loja." };
+  if (!name) return { error: "Selecione seu nome." };
   if (!/^\d{4}$/.test(pin)) return { error: "Digite os 4 números do seu PIN." };
 
-  const lockout = await checkPinLockout("stores", "id", storeId);
+  const lockout = await checkPinLockout("gerentes", "name", name);
   if (lockout.locked) {
     return { error: `Muitas tentativas erradas. Tente de novo em ${lockout.minutesLeft} minuto(s).` };
   }
 
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("stores").select("id, pin_hash").eq("id", storeId).maybeSingle();
+  const { data, error } = await admin.from("gerentes").select("name, pin_hash").eq("name", name).maybeSingle();
 
   if (error || !data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
-    await recordFailedPinAttempt("stores", "id", storeId);
-    return { error: "Loja ou PIN incorretos." };
+    await recordFailedPinAttempt("gerentes", "name", name);
+    return { error: "Nome ou PIN incorretos." };
   }
-  await resetPinAttempts("stores", "id", storeId);
+  await resetPinAttempts("gerentes", "name", name);
 
   const cookieStore = await cookies();
-  cookieStore.set(LOJA_GERENTE_COOKIE_NAME, signLojaGerenteSession(data.id), {
+  cookieStore.set(LOJA_GERENTE_COOKIE_NAME, signLojaGerenteSession(data.name), {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
@@ -53,6 +53,9 @@ export async function lojaGerenteSignOut() {
   redirect("/assistencia/loja/login");
 }
 
+// Retorna o NOME do gerente autenticado (não o id da loja) — use
+// getGerenteStoreId(nome) (src/lib/gerentes.ts) pra descobrir a loja dele,
+// sempre buscando no banco em vez de confiar em algo guardado no cookie.
 export async function getLojaGerenteSession(): Promise<string | null> {
   const cookieStore = await cookies();
   return verifyLojaGerenteSession(cookieStore.get(LOJA_GERENTE_COOKIE_NAME)?.value);

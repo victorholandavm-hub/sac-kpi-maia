@@ -1,11 +1,13 @@
 import { getProfile } from "@/lib/dal";
-import { listStoresWithPinStatus } from "@/lib/serviceRequests";
+import { listStores } from "@/lib/serviceRequests";
+import { listGerentesWithPinStatus } from "@/lib/gerentes";
 import { listAssemblersWithPinStatus } from "@/lib/payments";
 import { listSuppliers } from "@/lib/partOrders";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
 import { AddSimpleEntryForm } from "@/components/assistencia/AddSimpleEntryForm";
+import { AddGerenteForm } from "@/components/assistencia/AddGerenteForm";
 import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
-import { StorePinField } from "@/components/assistencia/StorePinField";
+import { GerentePinField } from "@/components/assistencia/GerentePinField";
 
 export default async function AdminPage() {
   const profile = await getProfile();
@@ -18,7 +20,12 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, assemblers, suppliers] = await Promise.all([listStoresWithPinStatus(), listAssemblersWithPinStatus(), listSuppliers()]);
+  const [stores, gerentes, assemblers, suppliers] = await Promise.all([
+    listStores(),
+    listGerentesWithPinStatus(),
+    listAssemblersWithPinStatus(),
+    listSuppliers(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -81,19 +88,20 @@ export default async function AdminPage() {
         style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
         <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Lojas cadastradas ({stores.length})
+          Gerentes de loja ({gerentes.length})
         </h3>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Renomear/fundir lojas ainda não tem tela própria — fala comigo se precisar corrigir alguma.
-          Defina um PIN de 4 números pra cada loja acessar <span className="font-mono">/assistencia/loja</span>.
+          Cada gerente entra com o próprio nome + PIN de 4 números em <span className="font-mono">/assistencia/loja</span>{" "}
+          e só consegue solicitar/negociar prazo para a loja vinculada abaixo.
         </p>
         <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 max-h-64 overflow-y-auto">
-          {stores.map((s) => (
-            <li key={s.id}>
-              <StorePinField storeId={s.id} storeName={s.name} hasPin={s.hasPin} />
+          {gerentes.map((g) => (
+            <li key={g.name}>
+              <GerentePinField name={g.name} storeName={g.storeName} hasPin={g.hasPin} />
             </li>
           ))}
         </ul>
+        <AddGerenteForm stores={stores} />
       </section>
     </div>
   );

@@ -20,7 +20,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 type Item = { product: string; quantity: number };
 
-export function PublicRequestForm({ stores }: { stores: Store[] }) {
+export function PublicRequestForm({
+  stores,
+  lockedStore,
+  defaultStoreId,
+}: {
+  stores: Store[];
+  lockedStore?: Store | null;
+  defaultStoreId?: string;
+}) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPublicRequest, undefined);
   const [type, setType] = useState<(typeof TYPES)[number]>("montagem");
   const [items, setItems] = useState<Item[]>([{ product: "", quantity: 1 }]);
@@ -47,16 +55,34 @@ export function PublicRequestForm({ stores }: { stores: Store[] }) {
           <input name="requested_by_name" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
         <Field label="Loja solicitante *">
-          <select name="store_id" required className="rounded border px-3 py-2" style={inputStyle} defaultValue="">
-            <option value="" disabled>
-              Selecione…
-            </option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
+          {lockedStore ? (
+            <>
+              <input
+                value={lockedStore.name}
+                disabled
+                className="rounded border px-3 py-2"
+                style={{ ...inputStyle, background: "var(--surface-1)", color: "var(--text-secondary)" }}
+              />
+              <input type="hidden" name="store_id" value={lockedStore.id} />
+            </>
+          ) : (
+            <select
+              name="store_id"
+              required
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+              defaultValue={defaultStoreId ?? ""}
+            >
+              <option value="" disabled>
+                Selecione…
               </option>
-            ))}
-          </select>
+              {stores.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
       </div>
 

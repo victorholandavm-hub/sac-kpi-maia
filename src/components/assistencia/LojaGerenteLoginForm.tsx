@@ -2,9 +2,9 @@
 
 import { useActionState } from "react";
 import { lojaGerenteSignIn, type LojaGerenteFormState } from "@/app/assistencia/loja-actions";
-import type { Store } from "@/lib/serviceRequests";
+import type { Gerente } from "@/lib/gerentes";
 
-export function LojaGerenteLoginForm({ stores }: { stores: Store[] }) {
+export function LojaGerenteLoginForm({ gerentes }: { gerentes: Gerente[] }) {
   const [state, formAction, pending] = useActionState<LojaGerenteFormState, FormData>(lojaGerenteSignIn, undefined);
 
   return (
@@ -14,12 +14,12 @@ export function LojaGerenteLoginForm({ stores }: { stores: Store[] }) {
       style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
     >
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
-        Sua loja
-        <select name="storeId" required className="rounded border px-3 py-2" style={{ borderColor: "var(--border)" }}>
+        Seu nome
+        <select name="name" required className="rounded border px-3 py-2" style={{ borderColor: "var(--border)" }}>
           <option value="">Selecione…</option>
-          {stores.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
+          {gerentes.map((g) => (
+            <option key={g.name} value={g.name}>
+              {g.name}
             </option>
           ))}
         </select>
