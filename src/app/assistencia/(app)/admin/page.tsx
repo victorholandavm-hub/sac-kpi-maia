@@ -1,9 +1,10 @@
 import { getProfile } from "@/lib/dal";
 import { listStores } from "@/lib/serviceRequests";
-import { listAssemblers } from "@/lib/payments";
+import { listAssemblersWithPinStatus } from "@/lib/payments";
 import { listSuppliers } from "@/lib/partOrders";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
 import { AddSimpleEntryForm } from "@/components/assistencia/AddSimpleEntryForm";
+import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
 
 export default async function AdminPage() {
   const profile = await getProfile();
@@ -16,7 +17,7 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, assemblers, suppliers] = await Promise.all([listStores(), listAssemblers(), listSuppliers()]);
+  const [stores, assemblers, suppliers] = await Promise.all([listStores(), listAssemblersWithPinStatus(), listSuppliers()]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -42,10 +43,14 @@ export default async function AdminPage() {
           <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
             Montadores
           </h3>
-          <ul className="flex flex-col gap-1">
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Defina um PIN de 4 números pra cada um acessar a própria área em{" "}
+            <span className="font-mono">/assistencia/montador</span>.
+          </p>
+          <ul className="flex flex-col gap-2">
             {assemblers.map((a) => (
-              <li key={a} className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                {a}
+              <li key={a.name}>
+                <AssemblerPinField name={a.name} hasPin={a.hasPin} />
               </li>
             ))}
           </ul>

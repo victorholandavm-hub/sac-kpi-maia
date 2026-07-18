@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { StoreIcon, WrenchIcon } from "@/components/assistencia/RoleIcons";
+import { StoreIcon, WrenchIcon, HardHatIcon } from "@/components/assistencia/RoleIcons";
 
 // Nunca servir isso de cache estático/CDN — sempre gerar fresco a cada request.
 export const dynamic = "force-dynamic";
@@ -54,6 +54,24 @@ export default function AssistenciaHomePage() {
               </span>
               <span className="text-sm" style={{ color: "var(--text-muted)" }}>
                 Login individual para gerenciar a fila
+              </span>
+            </div>
+          </Link>
+
+          <Link
+            href="/assistencia/montador/login"
+            className="group rounded-xl border p-5 flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+            style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
+          >
+            <div className="rounded-full p-3 shrink-0" style={{ background: "var(--brand-orange-soft)" }}>
+              <HardHatIcon color="var(--brand-orange)" />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-base font-medium" style={{ color: "var(--text-primary)" }}>
+                Montador
+              </span>
+              <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                Ver seus próprios chamados
               </span>
             </div>
           </Link>

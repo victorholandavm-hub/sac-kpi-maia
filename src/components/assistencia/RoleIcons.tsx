@@ -25,3 +25,17 @@ export function WrenchIcon({ color }: { color: string }) {
     </svg>
   );
 }
+
+export function HardHatIcon({ color }: { color: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>
+      <path
+        d="M4 16.5h16M4.5 16.5C4.5 11 8 7 12 7s7.5 4 8 9.5M12 7V4.5M9.5 16.5V13a2.5 2.5 0 0 1 5 0v3.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

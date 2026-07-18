@@ -415,6 +415,89 @@ export async function listOpenRequestsForLoja(
   }));
 }
 
+export type AssemblerRequestView = {
+  id: string;
+  ticketNumber: number;
+  type: RequestType;
+  status: RequestStatus;
+  storeName: string;
+  clientName: string | null;
+  clientPhone: string | null;
+  clientAddress: string | null;
+  clientNeighborhood: string | null;
+  productSummary: string | null;
+  reason: string | null;
+  scheduledDate: string | null;
+  shift: Shift | null;
+  createdAt: string;
+  completedAt: string | null;
+};
+
+const ASSEMBLER_VIEW_LIMIT = 200;
+
+// Portal do montador (login por nome + PIN, ver src/lib/montadorAuth.ts): só as
+// próprias demandas, com o contato/endereço do cliente que ele precisa pra ir
+// até lá — diferente da visão da loja, que redige esses dados por ser 100%
+// pública sem PIN nenhum.
+export async function listRequestsForAssembler(
+  assemblerName: string,
+  opts: { onlyCompleted?: boolean } = {}
+): Promise<AssemblerRequestView[]> {
+  const admin = getSupabaseAdmin();
+  let query = admin
+    .from("service_requests")
+    .select(
+      "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, scheduled_date, shift, created_at, completed_at, stores(name), items:service_request_items(product)"
+    )
+    .eq("assembler_name", assemblerName)
+    .limit(ASSEMBLER_VIEW_LIMIT);
+
+  if (opts.onlyCompleted) {
+    query = query.eq("status", "concluida").order("completed_at", { ascending: false });
+  } else {
+    query = query.not("status", "in", "(concluida,cancelada)").order("created_at", { ascending: true });
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  type Row = {
+    id: string;
+    ticket_number: number;
+    type: RequestType;
+    status: RequestStatus;
+    client_name: string | null;
+    client_phone: string | null;
+    client_address: string | null;
+    client_neighborhood: string | null;
+    reason: string | null;
+    scheduled_date: string | null;
+    shift: Shift | null;
+    created_at: string;
+    completed_at: string | null;
+    stores: { name: string } | null;
+    items: { product: string }[] | null;
+  };
+
+  return ((data ?? []) as unknown as Row[]).map((row) => ({
+    id: row.id,
+    ticketNumber: row.ticket_number,
+    type: row.type,
+    status: row.status,
+    storeName: row.stores?.name ?? "—",
+    clientName: row.client_name,
+    clientPhone: row.client_phone,
+    clientAddress: row.client_address,
+    clientNeighborhood: row.client_neighborhood,
+    productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
+    reason: row.reason,
+    scheduledDate: row.scheduled_date,
+    shift: row.shift,
+    createdAt: row.created_at,
+    completedAt: row.completed_at,
+  }));
+}
+
 const SHIFT_ORDER: Record<Shift, number> = { manha: 0, dia: 1, tarde: 2, urgencia: 3 };
 
 export type AgendaRange = "atrasado" | "hoje" | "semana";

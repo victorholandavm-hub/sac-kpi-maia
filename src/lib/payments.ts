@@ -7,6 +7,15 @@ export async function listAssemblers(): Promise<string[]> {
   return (data ?? []).map((a) => a.name as string);
 }
 
+export type AssemblerWithPinStatus = { name: string; hasPin: boolean };
+
+export async function listAssemblersWithPinStatus(): Promise<AssemblerWithPinStatus[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("assemblers").select("name, pin_hash").order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((a) => ({ name: a.name as string, hasPin: !!a.pin_hash }));
+}
+
 export type PaymentItem = {
   itemId: string;
   requestId: string;
