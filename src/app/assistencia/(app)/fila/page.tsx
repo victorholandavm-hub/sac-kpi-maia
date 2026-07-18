@@ -55,12 +55,12 @@ export default async function AssistenciaQueuePage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; page?: string; store?: string; assembler?: string }>;
 }) {
-  const profile = await getProfile();
+  await getProfile();
   const { status, q, page: pageParam, store, assembler } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const [{ items: requests, total, pageSize }, stores, assemblers] = await Promise.all([
-    listRequests(profile, { status: filterStatus, q, page, storeId: store, assemblerName: assembler }),
+    listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: assembler }),
     listStores(),
     listAssemblers(),
   ]);

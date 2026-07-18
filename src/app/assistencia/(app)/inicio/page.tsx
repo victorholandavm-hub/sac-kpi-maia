@@ -52,7 +52,7 @@ function Card({
 export default async function InicioPage() {
   const profile = await getProfile();
   const [requests, parts, pendingPayments, supplierReturns] = await Promise.all([
-    countRequestsOverview(profile),
+    countRequestsOverview(),
     countPartOrdersOverview(),
     countPendingPayments(),
     countSupplierReturnsOverview(),

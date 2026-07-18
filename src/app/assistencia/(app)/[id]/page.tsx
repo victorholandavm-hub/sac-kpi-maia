@@ -77,7 +77,7 @@ function eventDescription(event: {
 export default async function SolicitacaoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const profile = await getProfile();
-  const result = await getRequestDetail(profile, id);
+  const result = await getRequestDetail(id);
 
   if (!result) {
     return (

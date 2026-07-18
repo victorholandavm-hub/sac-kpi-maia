@@ -20,7 +20,7 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin");
-  const result = await getRequestDetail(profile, id);
+  const result = await getRequestDetail(id);
 
   if (!result) {
     return (

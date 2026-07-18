@@ -14,7 +14,7 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
     );
   }
 
-  const result = await getRequestDetail(profile, id);
+  const result = await getRequestDetail(id);
   if (!result) {
     return (
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>

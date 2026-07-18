@@ -9,6 +9,7 @@ import { getProfile, requireRole } from "@/lib/dal";
 import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
+import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 
 const REQUEST_TYPES = [
   "montagem",
@@ -50,9 +51,16 @@ export async function signOut() {
   redirect("/assistencia/login");
 }
 
-// Sem sessão do Supabase Auth — usado pelo formulário público em /assistencia/solicitar,
-// protegido só pela senha compartilhada checada em src/proxy.ts.
+// Sem sessão do Supabase Auth — usado pelo formulário público em
+// /assistencia/solicitar, que é totalmente aberto (sem login/senha nenhuma).
+// O único freio é o limite de envios por IP (src/lib/rateLimit.ts).
 export async function createPublicRequest(_state: FormState, formData: FormData): Promise<FormState> {
+  const ip = await getClientIp();
+  const { allowed } = await checkAndRecordPublicSubmission(ip);
+  if (!allowed) {
+    return { error: "Muitas solicitações enviadas em pouco tempo. Aguarde alguns minutos e tente de novo." };
+  }
+
   const storeId = String(formData.get("store_id") ?? "").trim();
   const requestedByName = String(formData.get("requested_by_name") ?? "").trim();
   const requestedDeadline = String(formData.get("requested_deadline") ?? "").trim();

@@ -8,7 +8,7 @@ export default async function NovoPedidoPecaPage({
 }: {
   searchParams: Promise<{ service_request_id?: string }>;
 }) {
-  const profile = await getProfile();
+  await getProfile();
   const { service_request_id } = await searchParams;
   const suppliers = await listSuppliers();
 
@@ -21,7 +21,7 @@ export default async function NovoPedidoPecaPage({
   } = {};
 
   if (service_request_id) {
-    const result = await getRequestDetail(profile, service_request_id);
+    const result = await getRequestDetail(service_request_id);
     if (result) {
       defaultValues = {
         serviceRequestId: result.request.id,

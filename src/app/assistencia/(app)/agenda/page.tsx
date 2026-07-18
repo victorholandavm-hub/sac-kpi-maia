@@ -37,12 +37,12 @@ export default async function AgendaPage({
 }: {
   searchParams: Promise<{ range?: string }>;
 }) {
-  const profile = await getProfile();
+  await getProfile();
   const { range } = await searchParams;
   const filterRange = (["atrasado", "hoje", "semana"] as const).includes(range as AgendaRange)
     ? (range as AgendaRange)
     : undefined;
-  const requests = await listScheduledRequests(profile, { range: filterRange });
+  const requests = await listScheduledRequests({ range: filterRange });
   const groups = groupByDate(requests);
   const todayKey = new Date().toISOString().slice(0, 10);
 

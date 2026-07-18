@@ -1,5 +1,4 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import type { Profile } from "./dal";
 
 export type RequestType =
   | "montagem"
@@ -193,7 +192,6 @@ export type ListRequestsResult = {
 };
 
 export async function listRequests(
-  profile: Profile,
   opts: { status?: RequestStatus; q?: string; page?: number; storeId?: string; assemblerName?: string } = {}
 ): Promise<ListRequestsResult> {
   const admin = getSupabaseAdmin();
@@ -209,9 +207,7 @@ export async function listRequests(
     .select(SUMMARY_COLUMNS, { count: "exact" })
     .order("created_at", { ascending: false });
 
-  if (profile.role === "gerente") {
-    query = query.eq("store_id", profile.storeId ?? "__none__");
-  } else if (opts.storeId) {
+  if (opts.storeId) {
     query = query.eq("store_id", opts.storeId);
   }
   if (opts.status) {
@@ -306,7 +302,6 @@ const DETAIL_COLUMNS =
   "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 export async function getRequestDetail(
-  profile: Profile,
   id: string
 ): Promise<{ request: ServiceRequestDetail; events: RequestEvent[] } | null> {
   const admin = getSupabaseAdmin();
@@ -314,10 +309,6 @@ export async function getRequestDetail(
 
   if (error || !data) return null;
   const row = data as unknown as DetailRow;
-
-  if (profile.role === "gerente" && row.store_id !== profile.storeId) {
-    return null;
-  }
 
   const { data: eventRows } = await admin
     .from("service_request_events")
@@ -515,7 +506,6 @@ export type AgendaRange = "atrasado" | "hoje" | "semana";
 // data e depois por turno — substitui o controle que era feito à parte na
 // planilha "Agenda de Assistência".
 export async function listScheduledRequests(
-  profile: Profile,
   opts: { range?: AgendaRange } = {}
 ): Promise<ServiceRequestSummary[]> {
   const admin = getSupabaseAdmin();
@@ -531,10 +521,6 @@ export async function listScheduledRequests(
     .select(SUMMARY_COLUMNS)
     .not("scheduled_date", "is", null)
     .order("scheduled_date", { ascending: true });
-
-  if (profile.role === "gerente") {
-    query = query.eq("store_id", profile.storeId ?? "__none__");
-  }
 
   if (opts.range === "atrasado") {
     query = query.lt("scheduled_date", today).not("status", "in", "(concluida,cancelada)");
@@ -565,29 +551,21 @@ export type RequestsOverview = {
 
 // Contagens rápidas ("o que precisa de mim agora") pra tela inicial —
 // sem trazer as linhas inteiras, só o total de cada uma.
-export async function countRequestsOverview(profile: Profile): Promise<RequestsOverview> {
+export async function countRequestsOverview(): Promise<RequestsOverview> {
   const admin = getSupabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
-  const storeId = profile.role === "gerente" ? profile.storeId ?? "__none__" : null;
 
-  let openQuery = admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "aberta");
-  let deadlineQuery = admin
+  const openQuery = admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "aberta");
+  const deadlineQuery = admin
     .from("service_requests")
     .select("id", { count: "exact", head: true })
     .eq("deadline_status", "pendente")
     .not("status", "in", "(concluida,cancelada)");
-  let todayQuery = admin
+  const todayQuery = admin
     .from("service_requests")
     .select("id", { count: "exact", head: true })
     .eq("scheduled_date", today);
-  let remarcarQuery = admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "remarcar");
-
-  if (storeId) {
-    openQuery = openQuery.eq("store_id", storeId);
-    deadlineQuery = deadlineQuery.eq("store_id", storeId);
-    todayQuery = todayQuery.eq("store_id", storeId);
-    remarcarQuery = remarcarQuery.eq("store_id", storeId);
-  }
+  const remarcarQuery = admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "remarcar");
 
   const [openRes, deadlineRes, todayRes, remarcarRes] = await Promise.all([
     openQuery,

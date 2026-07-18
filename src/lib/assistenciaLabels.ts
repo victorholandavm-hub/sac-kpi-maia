@@ -59,7 +59,6 @@ export const MOVEMENT_TYPE_LABELS: Record<string, string> = {
 };
 
 export const ROLE_LABELS: Record<string, string> = {
-  gerente: "Gerente de loja",
   assistencia: "Assistência",
   admin: "Administrador",
 };
