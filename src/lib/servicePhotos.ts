@@ -67,12 +67,35 @@ export async function saveRequestPhoto(opts: {
   const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, buffer, {
     contentType: opts.file.type,
   });
-  if (uploadError) throw new Error(uploadError.message);
+  if (uploadError) {
+    console.error("saveRequestPhoto upload failed:", uploadError.message);
+    throw new Error("Não foi possível enviar a foto agora. Tente de novo em instantes.");
+  }
 
   const { error: insertError } = await admin.from("service_request_photos").insert({
     request_id: opts.requestId,
     storage_path: path,
     uploaded_by: opts.uploadedBy,
   });
-  if (insertError) throw new Error(insertError.message);
+  if (insertError) {
+    console.error("saveRequestPhoto insert failed:", insertError.message);
+    await admin.storage.from(BUCKET).remove([path]);
+    throw new Error("Não foi possível salvar a foto agora. Tente de novo em instantes.");
+  }
+}
+
+// Chame antes de apagar uma solicitação manualmente (não há tela no app pra
+// isso hoje — só acontece via limpeza administrativa direta no banco) pra não
+// deixar arquivo órfão no Storage: o ON DELETE CASCADE da tabela só apaga a
+// linha, nunca o arquivo de fato.
+export async function deleteRequestPhotos(requestId: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { data: rows, error } = await admin
+    .from("service_request_photos")
+    .select("storage_path")
+    .eq("request_id", requestId);
+  if (error) throw new Error(error.message);
+  if (rows && rows.length > 0) {
+    await admin.storage.from(BUCKET).remove(rows.map((r) => r.storage_path as string));
+  }
 }
