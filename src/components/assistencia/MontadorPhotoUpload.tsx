@@ -7,6 +7,7 @@ import { useQuickAction } from "./useQuickAction";
 export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
   const { pending, run } = useQuickAction();
   const [file, setFile] = useState<File | null>(null);
+  const [caption, setCaption] = useState("");
   const [inputKey, setInputKey] = useState(0);
 
   return (
@@ -19,15 +20,24 @@ export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         className="text-xs"
       />
+      <input
+        value={caption}
+        onChange={(e) => setCaption(e.target.value)}
+        placeholder="Legenda (opcional)"
+        className="rounded border px-2 py-1 text-xs w-40"
+        style={{ borderColor: "var(--border)" }}
+      />
       <button
         disabled={pending || !file}
         onClick={() => {
           if (!file) return;
           const formData = new FormData();
           formData.set("photo", file);
+          formData.set("caption", caption);
           run(async () => {
             await montadorUploadPhoto(requestId, formData);
             setFile(null);
+            setCaption("");
             setInputKey((k) => k + 1);
           }, "Foto enviada.");
         }}

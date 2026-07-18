@@ -49,6 +49,9 @@ export default async function SupplierReturnDetailPage({ params }: { params: Pro
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-sm font-mono" style={{ color: "var(--text-muted)" }}>
+          Chamado #{supplierReturn.ticketNumber}
+        </span>
         <StatusBadge status={supplierReturn.status} />
         <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           {supplierReturn.partName}

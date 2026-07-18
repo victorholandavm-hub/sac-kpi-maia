@@ -130,6 +130,9 @@ export default async function FornecedoresPage({
                 >
                   <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                     <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                        #{r.ticketNumber}
+                      </span>
                       <StatusBadge status={r.status} />
                       {overdue ? (
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ color: "var(--status-critical)", border: "1px solid var(--status-critical)" }}>

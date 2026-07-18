@@ -51,6 +51,7 @@ export async function saveRequestPhoto(opts: {
   requestId: string;
   file: File;
   uploadedBy: string | null;
+  caption?: string | null;
 }): Promise<void> {
   const ext = ALLOWED_TYPES[opts.file.type];
   if (!ext) {
@@ -72,16 +73,42 @@ export async function saveRequestPhoto(opts: {
     throw new Error("Não foi possível enviar a foto agora. Tente de novo em instantes.");
   }
 
+  const caption = opts.caption?.trim() || null;
   const { error: insertError } = await admin.from("service_request_photos").insert({
     request_id: opts.requestId,
     storage_path: path,
     uploaded_by: opts.uploadedBy,
+    caption,
   });
   if (insertError) {
     console.error("saveRequestPhoto insert failed:", insertError.message);
     await admin.storage.from(BUCKET).remove([path]);
     throw new Error("Não foi possível salvar a foto agora. Tente de novo em instantes.");
   }
+}
+
+export async function getPhotoForAuth(
+  photoId: string
+): Promise<{ requestId: string; uploadedBy: string | null; storagePath: string } | null> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("service_request_photos")
+    .select("request_id, uploaded_by, storage_path")
+    .eq("id", photoId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return { requestId: data.request_id as string, uploadedBy: data.uploaded_by as string | null, storagePath: data.storage_path as string };
+}
+
+export async function deleteRequestPhoto(photoId: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("service_request_photos").select("storage_path").eq("id", photoId).maybeSingle();
+  if (error || !data) throw new Error("Foto não encontrada.");
+
+  await admin.storage.from(BUCKET).remove([data.storage_path as string]);
+
+  const { error: delError } = await admin.from("service_request_photos").delete().eq("id", photoId);
+  if (delError) throw new Error(delError.message);
 }
 
 // Chame antes de apagar uma solicitação manualmente (não há tela no app pra

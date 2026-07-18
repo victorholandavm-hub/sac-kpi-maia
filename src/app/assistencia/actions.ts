@@ -7,7 +7,7 @@ import { getSupabaseServer } from "@/lib/supabaseServer";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
 import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
-import { saveRequestPhoto } from "@/lib/servicePhotos";
+import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 
 const REQUEST_TYPES = [
@@ -304,9 +304,21 @@ export async function addRequestPhoto(requestId: string, formData: FormData): Pr
 
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) throw new Error("Selecione uma foto.");
+  const caption = String(formData.get("caption") ?? "");
 
-  await saveRequestPhoto({ requestId, file, uploadedBy: profile.fullName });
+  await saveRequestPhoto({ requestId, file, uploadedBy: profile.fullName, caption });
   revalidatePath(`/assistencia/${requestId}`);
+}
+
+export async function deleteRequestPhotoAsStaff(photoId: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+
+  const info = await getPhotoForAuth(photoId);
+  if (!info) throw new Error("Foto não encontrada.");
+
+  await deleteRequestPhoto(photoId);
+  revalidatePath(`/assistencia/${info.requestId}`);
 }
 
 export async function setAssemblerName(requestId: string, assemblerName: string) {

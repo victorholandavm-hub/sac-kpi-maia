@@ -140,7 +140,7 @@ export default async function MontadorHomePage({
                 </p>
               ) : null}
 
-              <PhotoGallery photos={photosByRequest.get(r.id) ?? []} />
+              <PhotoGallery photos={photosByRequest.get(r.id) ?? []} deleteMode="montador" currentActor={assemblerName} />
               <MontadorPhotoUpload requestId={r.id} />
             </div>
           ))}

@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { saveRequestPhoto } from "@/lib/servicePhotos";
+import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import {
   MONTADOR_COOKIE_NAME,
@@ -76,7 +76,19 @@ export async function montadorUploadPhoto(requestId: string, formData: FormData)
 
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) throw new Error("Selecione uma foto.");
+  const caption = String(formData.get("caption") ?? "");
 
-  await saveRequestPhoto({ requestId, file, uploadedBy: assemblerName });
+  await saveRequestPhoto({ requestId, file, uploadedBy: assemblerName, caption });
+  revalidatePath("/assistencia/montador");
+}
+
+export async function montadorDeletePhoto(photoId: string): Promise<void> {
+  const assemblerName = await getMontadorSession();
+  if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
+
+  const info = await getPhotoForAuth(photoId);
+  if (!info || info.uploadedBy !== assemblerName) throw new Error("Essa foto não é sua.");
+
+  await deleteRequestPhoto(photoId);
   revalidatePath("/assistencia/montador");
 }

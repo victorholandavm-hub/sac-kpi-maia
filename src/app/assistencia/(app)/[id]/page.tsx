@@ -160,7 +160,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
           Fotos
         </h3>
-        <PhotoGallery photos={photos} />
+        <PhotoGallery photos={photos} deleteMode={canManage ? "staff" : undefined} />
         {photos.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Nenhuma foto anexada ainda.

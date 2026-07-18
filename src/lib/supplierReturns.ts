@@ -16,6 +16,7 @@ export function isSupplierReturnStatus(value: string | undefined | null): value 
 
 export type SupplierReturn = {
   id: string;
+  ticketNumber: number;
   supplier: string | null;
   product: string | null;
   partName: string;
@@ -34,6 +35,7 @@ export type SupplierReturn = {
 
 type SupplierReturnRow = {
   id: string;
+  ticket_number: number;
   supplier: string | null;
   product: string | null;
   part_name: string;
@@ -51,11 +53,12 @@ type SupplierReturnRow = {
 };
 
 const COLUMNS =
-  "id, supplier, product, part_name, invoice_number, invoice_value, sent_at, expected_return_at, received_at, reimbursed_value, status, requested_by, notes, created_at, updated_at";
+  "id, ticket_number, supplier, product, part_name, invoice_number, invoice_value, sent_at, expected_return_at, received_at, reimbursed_value, status, requested_by, notes, created_at, updated_at";
 
 function toSupplierReturn(row: SupplierReturnRow): SupplierReturn {
   return {
     id: row.id,
+    ticketNumber: row.ticket_number,
     supplier: row.supplier,
     product: row.product,
     partName: row.part_name,
