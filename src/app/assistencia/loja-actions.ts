@@ -35,13 +35,16 @@ export async function lojaGerenteSignIn(_state: LojaGerenteFormState, formData: 
   }
   await resetPinAttempts("gerentes", "name", name);
 
+  // Path em /assistencia (não só /assistencia/loja) porque o /assistencia/solicitar
+  // também precisa ler essa sessão, pra travar a loja da solicitação à(s) loja(s)
+  // do gerente — ver createPublicRequest em src/app/assistencia/actions.ts.
   const cookieStore = await cookies();
   cookieStore.set(LOJA_GERENTE_COOKIE_NAME, signLojaGerenteSession(data.name), {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
     maxAge: LOJA_GERENTE_SESSION_MAX_AGE,
-    path: "/assistencia/loja",
+    path: "/assistencia",
   });
 
   redirect("/assistencia/loja");
@@ -49,7 +52,7 @@ export async function lojaGerenteSignIn(_state: LojaGerenteFormState, formData: 
 
 export async function lojaGerenteSignOut() {
   const cookieStore = await cookies();
-  cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia/loja" });
+  cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia" });
   redirect("/assistencia/loja/login");
 }
 
