@@ -1,0 +1,15 @@
+name: Sync GHL (a cada 2h)
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar /api/sync
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://sac-kpi-maia.vercel.app/api/sync"
