@@ -22,8 +22,9 @@ type Item = { product: string; quantity: number };
 
 // `stores` já vem restrito às lojas do gerente autenticado (um gerente pode
 // cuidar de mais de uma — ver src/lib/gerentes.ts e src/app/assistencia/solicitar/page.tsx,
-// que exige sessão antes de renderizar este formulário).
-export function PublicRequestForm({ stores }: { stores: Store[] }) {
+// que exige sessão antes de renderizar este formulário). `requesterName` vem
+// da mesma sessão (nome+PIN) — não pedimos de novo no formulário.
+export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; requesterName: string }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPublicRequest, undefined);
   const [type, setType] = useState<(typeof TYPES)[number]>("montagem");
   const [items, setItems] = useState<Item[]>([{ product: "", quantity: 1 }]);
@@ -46,8 +47,14 @@ export function PublicRequestForm({ stores }: { stores: Store[] }) {
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
       <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Seu primeiro nome *">
-          <input name="requested_by_name" required className="rounded border px-3 py-2" style={inputStyle} />
+        <Field label="Solicitante">
+          <input
+            value={requesterName}
+            disabled
+            className="rounded border px-3 py-2"
+            style={{ ...inputStyle, background: "var(--surface-1)", color: "var(--text-secondary)" }}
+          />
+          <input type="hidden" name="requested_by_name" value={requesterName} />
         </Field>
         <Field label="Loja solicitante *">
           {stores.length === 1 ? (

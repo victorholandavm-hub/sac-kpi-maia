@@ -79,11 +79,12 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     return { error: "Selecione uma das lojas que você gerencia." };
   }
 
-  const requestedByName = String(formData.get("requested_by_name") ?? "").trim();
+  // Nome do solicitante vem da sessão do gerente, não do form (o campo no
+  // formulário é só leitura) — evita adulteração via devtools, igual ao store_id acima.
+  const requestedByName = gerenteName;
   const requestedDeadline = String(formData.get("requested_deadline") ?? "").trim();
 
   if (!storeId) return { error: "Selecione a loja." };
-  if (!requestedByName) return { error: "Informe seu primeiro nome." };
   if (!requestedDeadline) return { error: "Informe o prazo desejado." };
 
   const type = String(formData.get("type") ?? "");
@@ -134,7 +135,7 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       invoice_number: emptyToNull(formData.get("invoice_number")),
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
     })
-    .select("id")
+    .select("id, ticket_number")
     .single();
 
   if (error || !data) {
@@ -168,7 +169,7 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     to_status: "aberta",
   });
 
-  redirect("/assistencia/solicitar?enviado=1");
+  redirect(`/assistencia/solicitar?enviado=1&chamado=${data.ticket_number}`);
 }
 
 export async function approveDeadline(requestId: string) {

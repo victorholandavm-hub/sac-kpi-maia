@@ -11,9 +11,9 @@ export const dynamic = "force-dynamic";
 export default async function SolicitarAssistenciaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ enviado?: string }>;
+  searchParams: Promise<{ enviado?: string; chamado?: string }>;
 }) {
-  const { enviado } = await searchParams;
+  const { enviado, chamado } = await searchParams;
 
   // Só gerente autenticado pode solicitar — sem isso qualquer visitante do
   // link público conseguia abrir chamado em nome de qualquer loja.
@@ -42,7 +42,7 @@ export default async function SolicitarAssistenciaPage({
           style={{ background: "var(--surface-1)", borderColor: "var(--status-good)" }}
         >
           <p className="text-sm font-medium" style={{ color: "var(--status-good)" }}>
-            Solicitação enviada com sucesso!
+            Solicitação enviada com sucesso!{chamado ? ` Chamado #${chamado}.` : ""}
           </p>
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
             A assistência vai analisar o prazo pedido e dar retorno. Se precisar enviar outra, use o
@@ -54,7 +54,7 @@ export default async function SolicitarAssistenciaPage({
         </div>
       ) : null}
 
-      <PublicRequestForm stores={restrictedStores} />
+      <PublicRequestForm stores={restrictedStores} requesterName={gerenteName} />
     </div>
   );
 }
