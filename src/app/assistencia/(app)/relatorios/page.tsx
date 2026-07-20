@@ -1,7 +1,9 @@
-import { getRequestsReport, type ReportRow } from "@/lib/serviceRequests";
+import { getRequestsReport, getServiceTypeIndicators, type ReportRow } from "@/lib/serviceRequests";
 import { listPaymentItems } from "@/lib/payments";
 import { getSupplierReconciliation } from "@/lib/supplierReturns";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+
+const REQUEST_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -12,8 +14,26 @@ function firstDayOfMonth(): string {
   return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
 }
 
+function sixMonthsAgoFirstDay(): string {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString().slice(0, 10);
+}
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+const MONTH_ABBREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function formatMonth(month: string): string {
+  const [y, m] = month.split("-");
+  return `${MONTH_ABBREV[Number(m) - 1]}/${y}`;
+}
+
+function formatDays(days: number | null): string {
+  if (days === null) return "—";
+  const rounded = Math.max(0, days);
+  return `${rounded.toFixed(1)} dia${rounded >= 2 ? "s" : ""}`;
 }
 
 function ReportTable({
@@ -79,16 +99,21 @@ function ReportTable({
 export default async function RelatoriosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; tipo?: string; indFrom?: string; indTo?: string }>;
 }) {
-  const { from, to } = await searchParams;
+  const { from, to, tipo, indFrom, indTo } = await searchParams;
   const dateFrom = from || firstDayOfMonth();
   const dateTo = to || today();
 
-  const [report, paymentItems, supplierReconciliation] = await Promise.all([
+  const indicatorType = (REQUEST_TYPES as readonly string[]).includes(tipo ?? "") ? (tipo as (typeof REQUEST_TYPES)[number]) : "montagem";
+  const indicatorDateFrom = indFrom || sixMonthsAgoFirstDay();
+  const indicatorDateTo = indTo || today();
+
+  const [report, paymentItems, supplierReconciliation, indicators] = await Promise.all([
     getRequestsReport({ dateFrom, dateTo }),
     listPaymentItems({ dateFrom, dateTo }),
     getSupplierReconciliation(),
+    getServiceTypeIndicators(indicatorType, { dateFrom: indicatorDateFrom, dateTo: indicatorDateTo }),
   ]);
 
   const byAssembler = new Map<string, { total: number; pendente: number; itens: number }>();
@@ -145,6 +170,164 @@ export default async function RelatoriosPage({
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Pendente de liberação
           </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          Indicadores de {REQUEST_TYPE_LABELS[indicatorType]?.toLowerCase() ?? indicatorType}
+        </h3>
+
+        <form action="/assistencia/relatorios" method="GET" className="flex items-center gap-2 flex-wrap">
+          <input type="hidden" name="from" value={dateFrom} />
+          <input type="hidden" name="to" value={dateTo} />
+          <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+            Tipo
+            <select name="tipo" defaultValue={indicatorType} className="rounded border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }}>
+              {REQUEST_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {REQUEST_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+            De
+            <input type="date" name="indFrom" defaultValue={indicatorDateFrom} className="rounded border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
+          </label>
+          <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+            Até
+            <input type="date" name="indTo" defaultValue={indicatorDateTo} className="rounded border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
+          </label>
+          <button type="submit" className="text-sm px-3 py-2 rounded border" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+            Aplicar
+          </button>
+        </form>
+
+        <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
+          <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--gridline)" }}>
+            <h4 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              Por mês
+            </h4>
+          </div>
+          {indicators.byMonth.length === 0 ? (
+            <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
+              Nenhuma solicitação desse tipo no período.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Mês</th>
+                    <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Total</th>
+                    <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Concluídas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                  {indicators.byMonth.map((m) => (
+                    <tr key={m.month}>
+                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                        {formatMonth(m.month)}
+                      </td>
+                      <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                        {m.total}
+                      </td>
+                      <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--status-good)" }}>
+                        {m.concluida}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
+            <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--gridline)" }}>
+              <h4 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                Por montador
+              </h4>
+            </div>
+            {indicators.byAssembler.length === 0 ? (
+              <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
+                Nenhuma solicitação desse tipo no período.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Montador</th>
+                      <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Total</th>
+                      <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Concluídas</th>
+                      <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Tempo médio</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                    {indicators.byAssembler.map((a) => (
+                      <tr key={a.assemblerName}>
+                        <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                          {a.assemblerName}
+                        </td>
+                        <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                          {a.total}
+                        </td>
+                        <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--status-good)" }}>
+                          {a.concluida}
+                        </td>
+                        <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                          {formatDays(a.avgDaysToComplete)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
+            <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--gridline)" }}>
+              <h4 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                Por loja
+              </h4>
+            </div>
+            {indicators.byStore.length === 0 ? (
+              <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
+                Nenhuma solicitação desse tipo no período.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Loja</th>
+                      <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Total</th>
+                      <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Concluídas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                    {indicators.byStore.map((s) => (
+                      <tr key={s.storeId}>
+                        <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                          {s.storeName}
+                        </td>
+                        <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                          {s.total}
+                        </td>
+                        <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--status-good)" }}>
+                          {s.concluida}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

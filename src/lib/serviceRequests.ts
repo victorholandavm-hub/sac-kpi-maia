@@ -625,3 +625,87 @@ export async function getRequestsReport(opts: { dateFrom?: string; dateTo?: stri
     totalRequests: rows.length,
   };
 }
+
+export type MonthCount = { month: string; total: number; concluida: number };
+export type AssemblerCount = { assemblerName: string; total: number; concluida: number; avgDaysToComplete: number | null };
+export type StoreCount = { storeId: string; storeName: string; total: number; concluida: number };
+
+export type ServiceTypeIndicators = {
+  byMonth: MonthCount[];
+  byAssembler: AssemblerCount[];
+  byStore: StoreCount[];
+};
+
+// Indicadores operacionais de UM tipo de solicitação por vez (padrão:
+// montagem) — volume por mês, por montador (com tempo médio até concluir) e
+// por loja. Complementa getRequestsReport, que agrega todos os tipos juntos
+// sem quebrar por mês nem por montador.
+export async function getServiceTypeIndicators(
+  type: RequestType,
+  opts: { dateFrom?: string; dateTo?: string } = {}
+): Promise<ServiceTypeIndicators> {
+  const admin = getSupabaseAdmin();
+  let query = admin
+    .from("service_requests")
+    .select("store_id, assembler_name, status, created_at, completed_at, stores(name)")
+    .eq("type", type);
+
+  if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
+  if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  type Row = {
+    store_id: string;
+    assembler_name: string | null;
+    status: RequestStatus;
+    created_at: string;
+    completed_at: string | null;
+    stores: { name: string } | null;
+  };
+  const rows = (data ?? []) as unknown as Row[];
+
+  const monthMap = new Map<string, MonthCount>();
+  const assemblerMap = new Map<string, { total: number; concluida: number; daysSum: number; daysCount: number }>();
+  const storeMap = new Map<string, StoreCount>();
+
+  for (const r of rows) {
+    const month = r.created_at.slice(0, 7);
+    const monthEntry = monthMap.get(month) ?? { month, total: 0, concluida: 0 };
+    monthEntry.total++;
+    if (r.status === "concluida") monthEntry.concluida++;
+    monthMap.set(month, monthEntry);
+
+    const assemblerName = r.assembler_name ?? "Sem montador definido";
+    const assemblerEntry = assemblerMap.get(assemblerName) ?? { total: 0, concluida: 0, daysSum: 0, daysCount: 0 };
+    assemblerEntry.total++;
+    if (r.status === "concluida") {
+      assemblerEntry.concluida++;
+      if (r.completed_at) {
+        const days = (new Date(r.completed_at).getTime() - new Date(r.created_at).getTime()) / 86_400_000;
+        assemblerEntry.daysSum += days;
+        assemblerEntry.daysCount++;
+      }
+    }
+    assemblerMap.set(assemblerName, assemblerEntry);
+
+    const storeEntry = storeMap.get(r.store_id) ?? { storeId: r.store_id, storeName: r.stores?.name ?? r.store_id, total: 0, concluida: 0 };
+    storeEntry.total++;
+    if (r.status === "concluida") storeEntry.concluida++;
+    storeMap.set(r.store_id, storeEntry);
+  }
+
+  return {
+    byMonth: [...monthMap.values()].sort((a, b) => a.month.localeCompare(b.month)),
+    byAssembler: [...assemblerMap.entries()]
+      .map(([assemblerName, v]) => ({
+        assemblerName,
+        total: v.total,
+        concluida: v.concluida,
+        avgDaysToComplete: v.daysCount > 0 ? v.daysSum / v.daysCount : null,
+      }))
+      .sort((a, b) => b.total - a.total),
+    byStore: [...storeMap.values()].sort((a, b) => b.total - a.total),
+  };
+}
