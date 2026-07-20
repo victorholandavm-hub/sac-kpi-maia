@@ -20,17 +20,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 type Item = { product: string; quantity: number };
 
-export function PublicRequestForm({
-  stores,
-  restrictedStores,
-  defaultStoreId,
-}: {
-  stores: Store[];
-  // null = qualquer loja (visitante sem login); array = só essas (gerente
-  // autenticado, que pode cuidar de uma ou mais lojas — ver src/lib/gerentes.ts).
-  restrictedStores?: Store[] | null;
-  defaultStoreId?: string;
-}) {
+// `stores` já vem restrito às lojas do gerente autenticado (um gerente pode
+// cuidar de mais de uma — ver src/lib/gerentes.ts e src/app/assistencia/solicitar/page.tsx,
+// que exige sessão antes de renderizar este formulário).
+export function PublicRequestForm({ stores }: { stores: Store[] }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPublicRequest, undefined);
   const [type, setType] = useState<(typeof TYPES)[number]>("montagem");
   const [items, setItems] = useState<Item[]>([{ product: "", quantity: 1 }]);
@@ -57,28 +50,22 @@ export function PublicRequestForm({
           <input name="requested_by_name" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
         <Field label="Loja solicitante *">
-          {restrictedStores && restrictedStores.length === 1 ? (
+          {stores.length === 1 ? (
             <>
               <input
-                value={restrictedStores[0].name}
+                value={stores[0].name}
                 disabled
                 className="rounded border px-3 py-2"
                 style={{ ...inputStyle, background: "var(--surface-1)", color: "var(--text-secondary)" }}
               />
-              <input type="hidden" name="store_id" value={restrictedStores[0].id} />
+              <input type="hidden" name="store_id" value={stores[0].id} />
             </>
           ) : (
-            <select
-              name="store_id"
-              required
-              className="rounded border px-3 py-2"
-              style={inputStyle}
-              defaultValue={defaultStoreId ?? ""}
-            >
+            <select name="store_id" required className="rounded border px-3 py-2" style={inputStyle} defaultValue="">
               <option value="" disabled>
                 Selecione…
               </option>
-              {(restrictedStores ?? stores).map((s) => (
+              {stores.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>

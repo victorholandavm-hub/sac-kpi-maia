@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { listStores } from "@/lib/serviceRequests";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
@@ -10,14 +11,19 @@ export const dynamic = "force-dynamic";
 export default async function SolicitarAssistenciaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ enviado?: string; store?: string }>;
+  searchParams: Promise<{ enviado?: string }>;
 }) {
-  const { enviado, store } = await searchParams;
-  const stores = await listStores();
+  const { enviado } = await searchParams;
 
+  // Só gerente autenticado pode solicitar — sem isso qualquer visitante do
+  // link público conseguia abrir chamado em nome de qualquer loja.
   const gerenteName = await getLojaGerenteSession();
-  const gerenteStoreIds = gerenteName ? await getGerenteStoreIds(gerenteName) : [];
-  const restrictedStores = gerenteName ? stores.filter((s) => gerenteStoreIds.includes(s.id)) : null;
+  if (!gerenteName) {
+    redirect("/assistencia/loja/login");
+  }
+
+  const [stores, gerenteStoreIds] = await Promise.all([listStores(), getGerenteStoreIds(gerenteName)]);
+  const restrictedStores = stores.filter((s) => gerenteStoreIds.includes(s.id));
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
@@ -26,11 +32,7 @@ export default async function SolicitarAssistenciaPage({
         subtitle="Montagem, desmontagem, recolhimento de peças ou notificação externa."
       />
 
-      <Link
-        href={gerenteName ? "/assistencia/loja" : "/assistencia"}
-        className="text-sm underline self-start"
-        style={{ color: "var(--text-secondary)" }}
-      >
+      <Link href="/assistencia/loja" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
         ← Voltar
       </Link>
 
@@ -46,17 +48,13 @@ export default async function SolicitarAssistenciaPage({
             A assistência vai analisar o prazo pedido e dar retorno. Se precisar enviar outra, use o
             formulário abaixo.
           </p>
-          <Link
-            href={gerenteName ? "/assistencia/loja" : "/assistencia/loja/login"}
-            className="text-sm underline self-start mt-1"
-            style={{ color: "var(--text-secondary)" }}
-          >
+          <Link href="/assistencia/loja" className="text-sm underline self-start mt-1" style={{ color: "var(--text-secondary)" }}>
             Ver demanda em aberto
           </Link>
         </div>
       ) : null}
 
-      <PublicRequestForm stores={stores} restrictedStores={restrictedStores} defaultStoreId={store} />
+      <PublicRequestForm stores={restrictedStores} />
     </div>
   );
 }

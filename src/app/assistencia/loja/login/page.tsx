@@ -32,10 +32,6 @@ export default async function LojaGerenteLoginPage() {
 
         <LojaGerenteLoginForm gerentes={gerentes} />
 
-        <Link href="/assistencia/solicitar" className="text-sm underline text-center" style={{ color: "var(--text-secondary)" }}>
-          Só quero enviar uma solicitação, sem entrar
-        </Link>
-
         <Link href="/assistencia" className="text-sm underline text-center" style={{ color: "var(--text-secondary)" }}>
           ← Voltar
         </Link>

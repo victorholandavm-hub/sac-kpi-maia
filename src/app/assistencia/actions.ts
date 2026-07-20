@@ -52,9 +52,11 @@ export async function signOut() {
   redirect("/assistencia/login");
 }
 
-// Sem sessão do Supabase Auth — usado pelo formulário público em
-// /assistencia/solicitar, que é totalmente aberto (sem login/senha nenhuma).
-// O único freio é o limite de envios por IP (src/lib/rateLimit.ts).
+// Sem sessão do Supabase Auth (usa a sessão de gerente de loja por PIN — ver
+// src/lib/gerentes.ts) — /assistencia/solicitar exige login de gerente antes
+// de mostrar o formulário, então chegar aqui sem sessão válida é só alguém
+// chamando a action direto. Rate limit por IP fica como defesa extra contra
+// um PIN vazado sendo usado pra spam (src/lib/rateLimit.ts).
 export async function createPublicRequest(_state: FormState, formData: FormData): Promise<FormState> {
   const ip = await getClientIp();
   const { allowed } = await checkAndRecordPublicSubmission(ip);
@@ -62,24 +64,23 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     return { error: "Muitas solicitações enviadas em pouco tempo. Aguarde alguns minutos e tente de novo." };
   }
 
+  const gerenteName = await getLojaGerenteSession();
+  if (!gerenteName) return { error: "Sessão expirada. Faça login de novo." };
+
+  // A solicitação só pode ser para uma das lojas do gerente. Se ele cuida de
+  // uma loja só, não há ambiguidade e a gente força o valor (ignora o que
+  // veio do form, mesmo que alguém tente adulterar o <select> pelo devtools).
+  // Se cuida de várias, valida que o valor escolhido está entre as dele.
   let storeId = String(formData.get("store_id") ?? "").trim();
+  const gerenteStoreIds = await getGerenteStoreIds(gerenteName);
+  if (gerenteStoreIds.length === 1) {
+    storeId = gerenteStoreIds[0];
+  } else if (!gerenteStoreIds.includes(storeId)) {
+    return { error: "Selecione uma das lojas que você gerencia." };
+  }
+
   const requestedByName = String(formData.get("requested_by_name") ?? "").trim();
   const requestedDeadline = String(formData.get("requested_deadline") ?? "").trim();
-
-  // Se há uma sessão de gerente de loja válida, a solicitação só pode ser
-  // para uma das lojas dele. Se ele cuida de uma loja só, não há ambiguidade
-  // e a gente força o valor (ignora o que veio do form, mesmo que alguém
-  // tente adulterar o <select> pelo devtools). Se cuida de várias, valida
-  // que o valor escolhido está entre as dele.
-  const gerenteName = await getLojaGerenteSession();
-  if (gerenteName) {
-    const gerenteStoreIds = await getGerenteStoreIds(gerenteName);
-    if (gerenteStoreIds.length === 1) {
-      storeId = gerenteStoreIds[0];
-    } else if (gerenteStoreIds.length > 1 && !gerenteStoreIds.includes(storeId)) {
-      return { error: "Selecione uma das lojas que você gerencia." };
-    }
-  }
 
   if (!storeId) return { error: "Selecione a loja." };
   if (!requestedByName) return { error: "Informe seu primeiro nome." };
