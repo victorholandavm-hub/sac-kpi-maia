@@ -82,6 +82,13 @@ export type EscalationSummary = {
   byTarget: EscalationTargetStat[];
 };
 
+export type EscalationStoreStat = {
+  store: string;
+  count: number;
+  avgWaitMinutes: number | null;
+  pendingCount: number;
+};
+
 export type AgentQueueGroup = {
   agent: string;
   tickets: AttentionRow[];
@@ -129,6 +136,7 @@ export type KpiData = {
   previousWeek: PreviousWeekSummary;
   escalations: EscalationSummary;
   escalationList: EscalationRow[];
+  escalationByStore: EscalationStoreStat[];
   agentQueue: AgentQueueGroup[];
 };
 
@@ -283,6 +291,43 @@ function buildEscalationSummary(rows: EscalationRow[]): EscalationSummary {
     avgWaitMinutes,
     byTarget,
   };
+}
+
+function buildEscalationByStore(
+  rows: EscalationRow[],
+  storeLabelFn: (tag: string) => string
+): EscalationStoreStat[] {
+  const storeRows = rows.filter((r) => r.store_tag && (r.target === "loja" || r.target === "gerente"));
+  const byStoreMap = new Map<string, EscalationRow[]>();
+  for (const r of storeRows) {
+    const key = r.store_tag as string;
+    const list = byStoreMap.get(key) ?? [];
+    list.push(r);
+    byStoreMap.set(key, list);
+  }
+
+  return [...byStoreMap.entries()]
+    .map(([store, storeEscRows]) => {
+      const completed = storeEscRows.filter((r) => r.wait_minutes !== null);
+      const avgWaitMinutes =
+        completed.length > 0
+          ? Math.round(
+              (completed.reduce((a, b) => a + (b.wait_minutes as number), 0) / completed.length) * 10
+            ) / 10
+          : null;
+      return {
+        store: storeLabelFn(store),
+        count: storeEscRows.length,
+        avgWaitMinutes,
+        pendingCount: storeEscRows.length - completed.length,
+      };
+    })
+    .sort((a, b) => {
+      if (a.avgWaitMinutes === null && b.avgWaitMinutes === null) return b.count - a.count;
+      if (a.avgWaitMinutes === null) return 1;
+      if (b.avgWaitMinutes === null) return -1;
+      return b.avgWaitMinutes - a.avgWaitMinutes;
+    });
 }
 
 function buildWaitingList(openRows: TicketRow[], now: number): WaitingRow[] {
@@ -524,6 +569,7 @@ export async function getKpiData(
     previousWeek,
     escalations,
     escalationList,
+    escalationByStore: buildEscalationByStore(escalationRows, labelFns.storeLabel),
     agentQueue,
   };
 }

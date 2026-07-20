@@ -10,6 +10,7 @@ import { BacklogTrendChart } from "./BacklogTrendChart";
 import { StoreBreakdownTable } from "./StoreBreakdownTable";
 import { WaitingTable } from "./WaitingTable";
 import { EscalationBreakdown } from "./EscalationBreakdown";
+import { EscalationByStoreTable } from "./EscalationByStoreTable";
 import { EscalationPendingTable } from "./EscalationPendingTable";
 import { RangePicker } from "./RangePicker";
 import { Header } from "./Header";
@@ -111,8 +112,10 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
 
       <section className="grid md:grid-cols-2 gap-4">
         <EscalationBreakdown data={data.escalations.byTarget} />
-        <EscalationPendingTable data={data.escalationList} />
+        <EscalationByStoreTable data={data.escalationByStore} />
       </section>
+
+      <EscalationPendingTable data={data.escalationList} />
     </div>
   );
 }
