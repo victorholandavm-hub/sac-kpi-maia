@@ -40,6 +40,20 @@ export function HardHatIcon({ color }: { color: string }) {
   );
 }
 
+export function HeadsetIcon({ color }: { color: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>
+      <path
+        d="M4 13v-1a8 8 0 0 1 16 0v1M4 13v4a2 2 0 0 0 2 2h1v-6H5a1 1 0 0 0-1 1ZM20 13v4a2 2 0 0 1-2 2h-1v-6h2a1 1 0 0 1 1 1ZM12 19v1a2 2 0 0 1-2 2H9"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function TruckIcon({ color }: { color: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>

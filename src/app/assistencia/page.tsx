@@ -1,13 +1,49 @@
 import Link from "next/link";
-import { StoreIcon, WrenchIcon, HardHatIcon, TruckIcon } from "@/components/assistencia/RoleIcons";
+import { StoreIcon, WrenchIcon, HeadsetIcon, HardHatIcon, TruckIcon } from "@/components/assistencia/RoleIcons";
 
 // Nunca servir isso de cache estático/CDN — sempre gerar fresco a cada request.
 export const dynamic = "force-dynamic";
 
+function RoleCard({
+  href,
+  icon,
+  iconBg,
+  borderColor,
+  title,
+  subtitle,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  iconBg: string;
+  borderColor: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group aspect-square rounded-xl border p-4 flex flex-col items-center justify-center gap-2 text-center transition-all hover:-translate-y-0.5 hover:shadow-md"
+      style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: `3px solid ${borderColor}` }}
+    >
+      <div className="rounded-full p-3 shrink-0" style={{ background: iconBg }}>
+        {icon}
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          {title}
+        </span>
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {subtitle}
+        </span>
+      </div>
+    </Link>
+  );
+}
+
 export default function AssistenciaHomePage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="max-w-md w-full flex flex-col gap-8 text-center">
+      <div className="max-w-sm w-full flex flex-col gap-8 text-center">
         <div className="flex flex-col items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Lojas Maia" className="h-20 w-20 object-contain" />
@@ -21,78 +57,47 @@ export default function AssistenciaHomePage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <Link
+        <div className="grid grid-cols-2 gap-4">
+          <RoleCard
             href="/assistencia/loja/login"
-            className="group rounded-xl border p-5 flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
-            style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
-          >
-            <div className="rounded-full p-3 shrink-0" style={{ background: "var(--brand-orange-soft)" }}>
-              <StoreIcon color="var(--brand-orange)" />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-base font-medium" style={{ color: "var(--text-primary)" }}>
-                Gerente de loja
-              </span>
-              <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-                Ver a demanda em aberto e negociar prazos da sua loja
-              </span>
-            </div>
-          </Link>
-
-          <Link
+            icon={<StoreIcon color="var(--brand-orange)" />}
+            iconBg="var(--brand-orange-soft)"
+            borderColor="var(--brand-orange)"
+            title="Gerente de loja"
+            subtitle="Prazos da sua loja"
+          />
+          <RoleCard
             href="/assistencia/login"
-            className="group rounded-xl border p-5 flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
-            style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-green)" }}
-          >
-            <div className="rounded-full p-3 shrink-0" style={{ background: "var(--brand-green-soft)" }}>
-              <WrenchIcon color="var(--brand-green)" />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-base font-medium" style={{ color: "var(--text-primary)" }}>
-                Equipe assistência
-              </span>
-              <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-                Login individual para gerenciar a fila
-              </span>
-            </div>
-          </Link>
-
-          <Link
+            icon={<WrenchIcon color="var(--brand-green)" />}
+            iconBg="var(--brand-green-soft)"
+            borderColor="var(--brand-green)"
+            title="Equipe assistência"
+            subtitle="Fila e chamados"
+          />
+          <RoleCard
+            href="/assistencia/login"
+            icon={<HeadsetIcon color="var(--brand-green)" />}
+            iconBg="var(--brand-green-soft)"
+            borderColor="var(--brand-green)"
+            title="SAC"
+            subtitle="Notificação e troca"
+          />
+          <RoleCard
             href="/assistencia/montador/login"
-            className="group rounded-xl border p-5 flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
-            style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
-          >
-            <div className="rounded-full p-3 shrink-0" style={{ background: "var(--brand-orange-soft)" }}>
-              <HardHatIcon color="var(--brand-orange)" />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-base font-medium" style={{ color: "var(--text-primary)" }}>
-                Montador
-              </span>
-              <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-                Ver seus próprios chamados
-              </span>
-            </div>
-          </Link>
-
-          <Link
+            icon={<HardHatIcon color="var(--brand-orange)" />}
+            iconBg="var(--brand-orange-soft)"
+            borderColor="var(--brand-orange)"
+            title="Montador"
+            subtitle="Meus chamados"
+          />
+          <RoleCard
             href="/assistencia/motorista/login"
-            className="group rounded-xl border p-5 flex items-center gap-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
-            style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-green)" }}
-          >
-            <div className="rounded-full p-3 shrink-0" style={{ background: "var(--brand-green-soft)" }}>
-              <TruckIcon color="var(--brand-green)" />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-base font-medium" style={{ color: "var(--text-primary)" }}>
-                Motorista
-              </span>
-              <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-                Ver suas rotas de entrega e recolhimento
-              </span>
-            </div>
-          </Link>
+            icon={<TruckIcon color="var(--brand-green)" />}
+            iconBg="var(--brand-green-soft)"
+            borderColor="var(--brand-green)"
+            title="Motorista"
+            subtitle="Minhas rotas"
+          />
         </div>
       </div>
     </div>

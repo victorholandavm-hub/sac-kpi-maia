@@ -15,10 +15,10 @@ export default function LoginPage() {
           <img src="/logo.png" alt="Lojas Maia" className="h-16 w-16 object-contain" />
           <div>
             <h1 className="text-xl font-semibold" style={{ color: "var(--brand-green)" }}>
-              Equipe assistência
+              Assistência e SAC
             </h1>
             <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-              Solicitações de montagem, desmontagem e recolhimento.
+              Entre com seu e-mail e senha.
             </p>
           </div>
         </div>
