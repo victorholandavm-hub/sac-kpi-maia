@@ -127,7 +127,7 @@ export default async function LojaHomePage({
                           <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
                             #{r.ticketNumber}
                           </span>
-                          <StatusBadge status={r.status} />
+                          <StatusBadge status={r.status} showInfo />
                           <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                             {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                           </span>

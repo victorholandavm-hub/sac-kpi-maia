@@ -16,6 +16,14 @@ export const STATUS_LABELS: Record<string, string> = {
   cancelada: "Cancelada",
 };
 
+// Explicação em linguagem simples pro gerente de loja, que não conhece o
+// fluxo interno da assistência — só os status que geram dúvida (aberta,
+// concluída e cancelada já são autoexplicativos).
+export const STATUS_DESCRIPTIONS: Partial<Record<string, string>> = {
+  em_contato: "A assistência já viu a solicitação e está avaliando os detalhes antes de agendar o atendimento.",
+  em_andamento: "Já tem um montador definido e o atendimento está em andamento.",
+};
+
 export const STATUS_COLORS: Record<string, string> = {
   aberta: "var(--status-warning)",
   em_contato: "var(--series-5)",

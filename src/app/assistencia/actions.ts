@@ -376,10 +376,16 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("status")
+    .select("status, assembler_name")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+
+  // Só avança pra "em andamento" com um montador de fato definido — sem
+  // isso, fica em "em contato" até alguém assumir a montagem.
+  if (newStatus === "em_andamento" && !current.assembler_name) {
+    throw new Error("Defina o montador antes de marcar como Em andamento.");
+  }
 
   const completedAt = newStatus === "concluida" || newStatus === "cancelada" ? new Date().toISOString() : null;
 

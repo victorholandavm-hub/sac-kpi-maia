@@ -18,6 +18,33 @@ export function AssemblerNameField({
   const [name, setName] = useState(value ?? "");
 
   if (!editing) {
+    if (!value) {
+      // Sem montador definido, a solicitação não pode avançar pra "Em
+      // andamento" (ver RequestActions/updateStatus) — precisa chamar
+      // atenção pra isso não passar despercebido no meio da grade de campos.
+      return (
+        <div
+          className="flex flex-col gap-1 rounded-lg p-3 sm:col-span-2"
+          style={{ border: "1px solid var(--status-warning)", background: "rgba(217, 119, 6, 0.08)" }}
+        >
+          <span className="text-xs font-medium" style={{ color: "var(--status-warning)" }}>
+            Nome do montador — obrigatório pra iniciar o atendimento
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              Não definido
+            </span>
+            <button
+              onClick={() => setEditing(true)}
+              className="text-xs rounded px-2 py-1 font-medium"
+              style={{ background: "var(--status-warning)", color: "#fff" }}
+            >
+              Definir montador
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col gap-0.5">
         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -25,14 +52,14 @@ export function AssemblerNameField({
         </span>
         <div className="flex items-center gap-2">
           <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-            {value ?? "Não definido"}
+            {value}
           </span>
           <button
             onClick={() => setEditing(true)}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
-            {value ? "editar" : "definir"}
+            editar
           </button>
         </div>
       </div>

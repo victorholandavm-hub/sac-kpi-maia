@@ -246,6 +246,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           requestId={request.id}
           status={request.status}
           isAssignedToMe={request.assignedToId === profile.id}
+          hasAssembler={!!request.assemblerName}
         />
       ) : null}
 
