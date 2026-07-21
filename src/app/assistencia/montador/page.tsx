@@ -89,58 +89,66 @@ export default async function MontadorHomePage({
           {requests.map((r) => (
             <div
               key={r.id}
-              className="rounded-lg border p-4 flex flex-col gap-2"
+              className="rounded-lg border p-4 flex flex-col gap-3"
               style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
             >
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                  #{r.ticketNumber}
-                </span>
-                <StatusBadge status={r.status} />
-                <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                  {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                </span>
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  {r.storeName}
-                </span>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                    #{r.ticketNumber}
+                  </span>
+                  <StatusBadge status={r.status} />
+                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                    {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+                  </span>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    {r.storeName}
+                  </span>
+                </div>
+
+                {r.scheduledDate ? (
+                  <p className="text-sm font-medium" style={{ color: "var(--brand-green)" }}>
+                    {formatDateOnly(r.scheduledDate)}
+                    {r.scheduledTime ? ` às ${r.scheduledTime.slice(0, 5)}` : ""}
+                    {r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
+                  </p>
+                ) : null}
+
+                <p className="text-sm" style={{ color: "var(--text-primary)" }}>
+                  {r.clientName ?? "Sem nome de cliente"}
+                </p>
+                {r.productSummary ? (
+                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                    {r.productSummary}
+                  </p>
+                ) : null}
+                {r.clientAddress ? (
+                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                    {r.clientAddress}
+                    {r.clientNeighborhood ? ` — ${r.clientNeighborhood}` : ""}
+                  </p>
+                ) : null}
+                {r.clientPhone ? (
+                  <a
+                    href={`tel:${r.clientPhone.replace(/\D/g, "")}`}
+                    className="text-sm font-medium rounded-lg px-3 py-2.5 self-start"
+                    style={{ background: "rgba(22, 163, 74, 0.1)", color: "var(--brand-green)" }}
+                  >
+                    📞 {r.clientPhone}
+                  </a>
+                ) : null}
+                {r.reason ? (
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    {r.reason}
+                  </p>
+                ) : null}
               </div>
 
-              {r.scheduledDate ? (
-                <p className="text-sm font-medium" style={{ color: "var(--brand-green)" }}>
-                  {formatDateOnly(r.scheduledDate)}
-                  {r.scheduledTime ? ` às ${r.scheduledTime.slice(0, 5)}` : ""}
-                  {r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
-                </p>
-              ) : null}
-
-              <p className="text-sm" style={{ color: "var(--text-primary)" }}>
-                {r.clientName ?? "Sem nome de cliente"}
-              </p>
-              {r.productSummary ? (
-                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                  {r.productSummary}
-                </p>
-              ) : null}
-              {r.clientAddress ? (
-                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                  {r.clientAddress}
-                  {r.clientNeighborhood ? ` — ${r.clientNeighborhood}` : ""}
-                </p>
-              ) : null}
-              {r.clientPhone ? (
-                <a href={`tel:${r.clientPhone.replace(/\D/g, "")}`} className="text-sm underline self-start" style={{ color: "var(--brand-green)" }}>
-                  📞 {r.clientPhone}
-                </a>
-              ) : null}
-              {r.reason ? (
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  {r.reason}
-                </p>
-              ) : null}
-
-              <PhotoGallery photos={photosByRequest.get(r.id) ?? []} deleteMode="montador" currentActor={assemblerName} />
-              <MontadorPhotoUpload requestId={r.id} />
-              {!showCompleted ? <MontadorRequestActions requestId={r.id} /> : null}
+              <div className="flex flex-col gap-3 pt-1" style={{ borderTop: "1px solid var(--gridline)" }}>
+                <PhotoGallery photos={photosByRequest.get(r.id) ?? []} deleteMode="montador" currentActor={assemblerName} />
+                <MontadorPhotoUpload requestId={r.id} />
+                {!showCompleted ? <MontadorRequestActions requestId={r.id} /> : null}
+              </div>
             </div>
           ))}
         </div>

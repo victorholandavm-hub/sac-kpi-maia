@@ -11,13 +11,13 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-col gap-2">
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={2}
           placeholder="Relatar observação, avaria ou outro detalhe…"
-          className="rounded border px-2 py-1 text-xs flex-1 min-w-[180px]"
+          className="rounded-lg border px-3 py-2.5 text-sm"
           style={{ borderColor: "var(--border)" }}
         />
         <button
@@ -28,7 +28,7 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
               setNote("");
             }, "Observação enviada.")
           }
-          className="text-xs rounded px-2 py-1 border disabled:opacity-60"
+          className="text-sm rounded-lg px-3 py-2.5 border font-medium self-start disabled:opacity-60"
           style={{ borderColor: "var(--border)" }}
         >
           Enviar observação
@@ -39,32 +39,34 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
         <button
           disabled={pending}
           onClick={() => setConfirming(true)}
-          className="text-xs rounded px-2 py-1 self-start disabled:opacity-60"
+          className="text-sm rounded-lg px-3 py-3 font-medium disabled:opacity-60"
           style={{ background: "var(--status-good)", color: "#fff" }}
         >
           Marcar como concluído
         </button>
       ) : (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs" style={{ color: "var(--text-primary)" }}>
+        <div className="flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: "var(--status-good)" }}>
+          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
             Confirmar que esse chamado foi concluído?
           </span>
-          <button
-            disabled={pending}
-            onClick={() => {
-              run(async () => {
-                await montadorCompleteRequest(requestId);
-                setConfirming(false);
-              }, "Chamado marcado como concluído.");
-            }}
-            className="text-xs rounded px-2 py-1 disabled:opacity-60"
-            style={{ background: "var(--status-good)", color: "#fff" }}
-          >
-            Sim, concluído
-          </button>
-          <button onClick={() => setConfirming(false)} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
-            cancelar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={pending}
+              onClick={() => {
+                run(async () => {
+                  await montadorCompleteRequest(requestId);
+                  setConfirming(false);
+                }, "Chamado marcado como concluído.");
+              }}
+              className="text-sm rounded-lg px-3 py-2.5 font-medium disabled:opacity-60 flex-1"
+              style={{ background: "var(--status-good)", color: "#fff" }}
+            >
+              Sim, concluído
+            </button>
+            <button onClick={() => setConfirming(false)} className="text-sm underline px-2" style={{ color: "var(--text-secondary)" }}>
+              cancelar
+            </button>
+          </div>
         </div>
       )}
     </div>
