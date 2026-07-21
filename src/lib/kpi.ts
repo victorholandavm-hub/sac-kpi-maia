@@ -94,6 +94,16 @@ export type AgentQueueGroup = {
   tickets: AttentionRow[];
 };
 
+export type AgentStat = {
+  agent: string;
+  total: number;
+  resolvedCount: number;
+  avgResolutionHours: number | null;
+  medianResolutionHours: number | null;
+  avgFirstResponseMinutes: number | null;
+  pctWithinSla: number | null;
+};
+
 export type StoreBreakdown = {
   store: string;
   total: number;
@@ -138,6 +148,7 @@ export type KpiData = {
   escalationList: EscalationRow[];
   escalationByStore: EscalationStoreStat[];
   agentQueue: AgentQueueGroup[];
+  byAgentStats: AgentStat[];
 };
 
 function median(values: number[]): number | null {
@@ -182,6 +193,49 @@ function byAgentCounts(rows: TicketRow[]): Count[] {
   return [...counts.entries()]
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count);
+}
+
+function buildAgentStats(rows: TicketRow[]): AgentStat[] {
+  const byAgent = new Map<string, TicketRow[]>();
+  for (const row of rows) {
+    if (!row.is_sac_agent || !row.agent_name) continue;
+    const list = byAgent.get(row.agent_name) ?? [];
+    list.push(row);
+    byAgent.set(row.agent_name, list);
+  }
+
+  return [...byAgent.entries()]
+    .map(([agent, agentRows]) => {
+      const resolutionHours = agentRows
+        .filter((r) => r.resolved_by_tag)
+        .map((r) => r.resolution_hours)
+        .filter((h): h is number => h !== null);
+      const firstResponseRows = agentRows.filter((r) => r.first_response_minutes !== null);
+
+      return {
+        agent,
+        total: agentRows.length,
+        resolvedCount: agentRows.filter((r) => r.resolved_effective).length,
+        avgResolutionHours:
+          resolutionHours.length > 0
+            ? Math.round((resolutionHours.reduce((a, b) => a + b, 0) / resolutionHours.length) * 10) / 10
+            : null,
+        medianResolutionHours: median(resolutionHours),
+        avgFirstResponseMinutes:
+          firstResponseRows.length > 0
+            ? Math.round(
+                (firstResponseRows.reduce((sum, r) => sum + (r.first_response_minutes ?? 0), 0) /
+                  firstResponseRows.length) *
+                  10
+              ) / 10
+            : null,
+        pctWithinSla:
+          firstResponseRows.length > 0
+            ? Math.round((firstResponseRows.filter((r) => r.within_sla).length / firstResponseRows.length) * 100)
+            : null,
+      };
+    })
+    .sort((a, b) => b.total - a.total);
 }
 
 function toAttentionRow(row: TicketRow, now: number): AttentionRow {
@@ -571,5 +625,6 @@ export async function getKpiData(
     escalationList,
     escalationByStore: buildEscalationByStore(escalationRows, labelFns.storeLabel),
     agentQueue,
+    byAgentStats: buildAgentStats(rows),
   };
 }

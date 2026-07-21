@@ -16,6 +16,7 @@ import { RangePicker } from "./RangePicker";
 import { Header } from "./Header";
 import { PreviousWeekCard } from "./PreviousWeekCard";
 import { AgentQueue } from "./AgentQueue";
+import { AgentStatsTable } from "./AgentStatsTable";
 import { categoryLabel, storeLabel, productLabel, blockingLabel } from "@/lib/labels";
 
 export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) {
@@ -81,6 +82,8 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
       ) : null}
 
       <AgentQueue data={data.agentQueue} />
+
+      <AgentStatsTable data={data.byAgentStats} />
 
       <section className="grid md:grid-cols-3 gap-4">
         <BarRanking title="Principais categorias de problema" data={byCategory} coverage={data.categoryCoverage} />
