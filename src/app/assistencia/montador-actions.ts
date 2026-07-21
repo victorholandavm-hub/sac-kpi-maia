@@ -17,21 +17,28 @@ import {
 export type MontadorFormState = { error?: string } | undefined;
 
 export async function montadorSignIn(_state: MontadorFormState, formData: FormData): Promise<MontadorFormState> {
-  const name = String(formData.get("name") ?? "").trim();
+  const typedName = String(formData.get("name") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
 
-  if (!name) return { error: "Selecione seu nome." };
+  if (!typedName) return { error: "Informe seu nome." };
   if (!/^\d{4}$/.test(pin)) return { error: "Digite os 4 números do seu PIN." };
+
+  // Nome não diferencia maiúsculas/minúsculas ("Janailson" == "janailson") —
+  // busca todo mundo e compara em minúsculo em vez de usar `ilike` (que trata
+  // % e _ como curinga, o que um nome digitado não deveria acionar). Usa o
+  // nome como está gravado no banco (não o que a pessoa digitou) daqui pra
+  // frente, pra bloqueio de tentativas e sessão não divergirem por causa de caixa.
+  const admin = getSupabaseAdmin();
+  const { data: assemblers } = await admin.from("assemblers").select("name, pin_hash");
+  const data = (assemblers ?? []).find((a) => a.name.toLowerCase() === typedName.toLowerCase());
+  const name = data?.name ?? typedName;
 
   const lockout = await checkPinLockout("assemblers", "name", name);
   if (lockout.locked) {
     return { error: `Muitas tentativas erradas. Tente de novo em ${lockout.minutesLeft} minuto(s).` };
   }
 
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("assemblers").select("name, pin_hash").eq("name", name).maybeSingle();
-
-  if (error || !data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
+  if (!data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
     await recordFailedPinAttempt("assemblers", "name", name);
     return { error: "Nome ou PIN incorretos." };
   }

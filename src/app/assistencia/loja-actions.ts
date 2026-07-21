@@ -15,21 +15,25 @@ import {
 export type LojaGerenteFormState = { error?: string } | undefined;
 
 export async function lojaGerenteSignIn(_state: LojaGerenteFormState, formData: FormData): Promise<LojaGerenteFormState> {
-  const name = String(formData.get("name") ?? "").trim();
+  const typedName = String(formData.get("name") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
 
-  if (!name) return { error: "Selecione seu nome." };
+  if (!typedName) return { error: "Informe seu nome." };
   if (!/^\d{4}$/.test(pin)) return { error: "Digite os 4 números do seu PIN." };
+
+  // Nome não diferencia maiúsculas/minúsculas — ver mesma lógica em
+  // montadorSignIn (src/app/assistencia/montador-actions.ts).
+  const admin = getSupabaseAdmin();
+  const { data: gerentes } = await admin.from("gerentes").select("name, pin_hash");
+  const data = (gerentes ?? []).find((g) => g.name.toLowerCase() === typedName.toLowerCase());
+  const name = data?.name ?? typedName;
 
   const lockout = await checkPinLockout("gerentes", "name", name);
   if (lockout.locked) {
     return { error: `Muitas tentativas erradas. Tente de novo em ${lockout.minutesLeft} minuto(s).` };
   }
 
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("gerentes").select("name, pin_hash").eq("name", name).maybeSingle();
-
-  if (error || !data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
+  if (!data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
     await recordFailedPinAttempt("gerentes", "name", name);
     return { error: "Nome ou PIN incorretos." };
   }
