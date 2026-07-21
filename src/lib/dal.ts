@@ -48,3 +48,11 @@ export function requireRole(profile: Profile, ...roles: Role[]) {
     throw new Error(`Ação não permitida para o papel "${profile.role}".`);
   }
 }
+
+// SAC só gerencia notificações/trocas de produto em /assistencia/sac — não
+// enxerga a fila normal de montagem/assistência. Chamar no topo de toda
+// página do grupo (app) que não seja o detalhe de um chamado específico
+// (que o SAC também precisa acessar pros próprios chamados).
+export function redirectIfSac(profile: Profile) {
+  if (profile.role === "sac") redirect("/assistencia/sac");
+}

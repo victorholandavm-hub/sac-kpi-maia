@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getProfile } from "@/lib/dal";
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listScheduledRequests, type ServiceRequestSummary, type AgendaRange } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
@@ -37,7 +37,7 @@ export default async function AgendaPage({
 }: {
   searchParams: Promise<{ range?: string }>;
 }) {
-  await getProfile();
+  redirectIfSac(await getProfile());
   const { range } = await searchParams;
   const filterRange = (["atrasado", "hoje", "semana"] as const).includes(range as AgendaRange)
     ? (range as AgendaRange)

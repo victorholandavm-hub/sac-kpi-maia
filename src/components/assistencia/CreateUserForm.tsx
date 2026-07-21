@@ -50,6 +50,7 @@ export function CreateUserForm() {
       <select name="role" defaultValue="assistencia" className="rounded border px-3 py-2 text-sm" style={inputStyle}>
         <option value="assistencia">Assistência</option>
         <option value="admin">Admin</option>
+        <option value="sac">SAC</option>
       </select>
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>

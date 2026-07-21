@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getProfile } from "@/lib/dal";
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { countRequestsOverview } from "@/lib/serviceRequests";
 import { countPartOrdersOverview } from "@/lib/partOrders";
 import { countPendingPayments } from "@/lib/payments";
@@ -51,6 +51,7 @@ function Card({
 
 export default async function InicioPage() {
   const profile = await getProfile();
+  redirectIfSac(profile);
   const [requests, parts, pendingPayments, supplierReturns] = await Promise.all([
     countRequestsOverview(),
     countPartOrdersOverview(),

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getProfile } from "@/lib/dal";
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, type RequestItem, type ServiceRequestSummary } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
@@ -55,7 +55,7 @@ export default async function AssistenciaQueuePage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; page?: string; store?: string; assembler?: string }>;
 }) {
-  await getProfile();
+  redirectIfSac(await getProfile());
   const { status, q, page: pageParam, store, assembler } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);

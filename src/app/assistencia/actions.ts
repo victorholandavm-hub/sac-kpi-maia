@@ -106,7 +106,7 @@ export async function chooseAssistenciaIdentity(profileId: string) {
 
   const admin = getSupabaseAdmin();
   const { data: profile } = await admin.from("profiles").select("id, role").eq("id", profileId).maybeSingle();
-  if (!profile || profile.role !== "assistencia") {
+  if (!profile || (profile.role !== "assistencia" && profile.role !== "sac")) {
     redirect("/assistencia/quem-e-voce?erro=1");
   }
 
@@ -323,7 +323,7 @@ export async function rejectDeadline(requestId: string, newDate: string) {
 
 export async function claimRequest(requestId: string) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
@@ -366,7 +366,7 @@ export async function claimRequest(requestId: string) {
 
 export async function updateStatus(requestId: string, newStatus: string, note?: string) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
   if (!STATUSES.includes(newStatus as (typeof STATUSES)[number])) {
     throw new Error("Status inválido.");
   }
@@ -411,7 +411,7 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
 
 export async function addNote(requestId: string, note: string) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
   const trimmed = note.trim();
   if (!trimmed) throw new Error("Nota vazia.");
 
@@ -429,7 +429,7 @@ export async function addNote(requestId: string, note: string) {
 
 export async function addRequestPhoto(requestId: string, formData: FormData): Promise<void> {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
 
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) throw new Error("Selecione uma foto.");
@@ -441,7 +441,7 @@ export async function addRequestPhoto(requestId: string, formData: FormData): Pr
 
 export async function deleteRequestPhotoAsStaff(photoId: string): Promise<void> {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
 
   const info = await getPhotoForAuth(photoId);
   if (!info) throw new Error("Foto não encontrada.");
@@ -720,6 +720,90 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/agenda");
   revalidatePath("/assistencia/pagamentos");
+  redirect(`/assistencia/${data.id}`);
+}
+
+// Criação de chamado pelo SAC — troca de produto (recolher o errado/avariado
+// e entregar o correto numa rota só, ver src/lib/driverAuth.ts) ou
+// notificação externa. Mesmo formato do relatório logístico que já existia
+// em planilha: cliente, endereço, telefone, produto e a instrução de
+// recolhimento em texto livre.
+export async function createSacRequest(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin", "sac");
+
+  const storeId = String(formData.get("store_id") ?? "").trim();
+  if (!storeId) return { error: "Selecione a loja." };
+
+  const type = String(formData.get("type") ?? "troca_produto");
+  if (type !== "troca_produto" && type !== "notificacao_externa") {
+    return { error: "Tipo inválido." };
+  }
+
+  const clientName = String(formData.get("client_name") ?? "").trim();
+  if (!clientName) return { error: "Informe o nome do cliente." };
+
+  const driverName = emptyToNull(formData.get("driver_name"));
+  const product = emptyToNull(formData.get("product"));
+  const quantity = Math.max(1, parseInt(String(formData.get("quantity") ?? "1"), 10) || 1);
+
+  const admin = getSupabaseAdmin();
+  if (driverName) {
+    await admin.from("drivers").upsert({ name: driverName }, { onConflict: "name" });
+  }
+
+  const { data, error } = await admin
+    .from("service_requests")
+    .insert({
+      type,
+      store_id: storeId,
+      requested_by: profile.id,
+      client_name: clientName,
+      client_phone: emptyToNull(formData.get("client_phone")),
+      client_address: emptyToNull(formData.get("client_address")),
+      client_neighborhood: emptyToNull(formData.get("client_neighborhood")),
+      reason: emptyToNull(formData.get("reason")),
+      restriction_note: emptyToNull(formData.get("restriction_note")),
+      driver_name: driverName,
+      sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
+      // Criado direto pelo SAC, não pela loja — não há prazo pra aprovar.
+      deadline_status: "aprovado",
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    return { error: `Não foi possível criar: ${error?.message ?? "erro desconhecido"}` };
+  }
+
+  if (product) {
+    const { error: itemError } = await admin.from("service_request_items").insert({
+      request_id: data.id,
+      product,
+      quantity,
+    });
+    if (itemError) {
+      return { error: `Solicitação criada, mas falhou ao salvar o item: ${itemError.message}` };
+    }
+  }
+
+  if (type === "notificacao_externa") {
+    const protocolNumber = `SAC-${new Date().getFullYear()}-${data.id.slice(0, 8).toUpperCase()}`;
+    const legalDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await admin
+      .from("service_requests")
+      .update({ protocol_number: protocolNumber, legal_deadline: legalDeadline })
+      .eq("id", data.id);
+  }
+
+  await admin.from("service_request_events").insert({
+    request_id: data.id,
+    actor_id: profile.id,
+    event_type: "created",
+    to_status: "aberta",
+  });
+
+  revalidatePath("/assistencia/sac");
   redirect(`/assistencia/${data.id}`);
 }
 

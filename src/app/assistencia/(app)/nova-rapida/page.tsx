@@ -1,8 +1,10 @@
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listStores } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
 import { QuickCreateRequestForm } from "@/components/assistencia/QuickCreateRequestForm";
 
 export default async function NovaRapidaPage() {
+  redirectIfSac(await getProfile());
   const [stores, assemblers] = await Promise.all([listStores(), listAssemblers()]);
 
   return (

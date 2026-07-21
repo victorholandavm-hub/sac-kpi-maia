@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPaymentItems, listAssemblers, type PaymentItem } from "@/lib/payments";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 
@@ -29,6 +30,7 @@ export default async function PagamentosPage({
 }: {
   searchParams: Promise<{ pendentes?: string; assembler?: string }>;
 }) {
+  redirectIfSac(await getProfile());
   const { pendentes, assembler } = await searchParams;
   const [allItems, assemblers] = await Promise.all([listPaymentItems({ assemblerName: assembler }), listAssemblers()]);
   const items = pendentes ? allItems.filter((i) => !i.paymentReleased) : allItems;

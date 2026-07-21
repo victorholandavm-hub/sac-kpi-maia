@@ -1,3 +1,4 @@
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { getRequestsReport, getServiceTypeIndicators, type ReportRow } from "@/lib/serviceRequests";
 import { listPaymentItems } from "@/lib/payments";
 import { getSupplierReconciliation } from "@/lib/supplierReturns";
@@ -101,6 +102,7 @@ export default async function RelatoriosPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string; tipo?: string; indFrom?: string; indTo?: string }>;
 }) {
+  redirectIfSac(await getProfile());
   const { from, to, tipo, indFrom, indTo } = await searchParams;
   const dateFrom = from || firstDayOfMonth();
   const dateTo = to || today();

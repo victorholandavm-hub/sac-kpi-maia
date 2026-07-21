@@ -89,7 +89,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
   }
 
   const { request, events } = result;
-  const canManage = profile.role === "assistencia" || profile.role === "admin";
+  const canManage = profile.role === "assistencia" || profile.role === "admin" || profile.role === "sac";
   const assemblers = canManage ? await listAssemblers() : [];
   const drivers = canManage && request.type === "troca_produto" ? await listDrivers() : [];
   const photos = await listRequestPhotos(request.id);

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listStockMovements, isMovementType } from "@/lib/stockMovements";
 import { MOVEMENT_TYPE_LABELS } from "@/lib/assistenciaLabels";
 
@@ -28,6 +29,7 @@ export default async function EstoquePage({
 }: {
   searchParams: Promise<{ type?: string; q?: string }>;
 }) {
+  redirectIfSac(await getProfile());
   const { type, q } = await searchParams;
   const filterType = isMovementType(type) ? type : undefined;
   const movements = await listStockMovements({ movementType: filterType, q });

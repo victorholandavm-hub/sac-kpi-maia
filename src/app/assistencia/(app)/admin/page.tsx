@@ -1,12 +1,13 @@
 import { getProfile } from "@/lib/dal";
 import { listStores } from "@/lib/serviceRequests";
 import { listGerentesWithPinStatus } from "@/lib/gerentes";
-import { listAssemblersWithPinStatus } from "@/lib/payments";
+import { listAssemblersWithPinStatus, listDriversWithPinStatus } from "@/lib/payments";
 import { listSuppliers } from "@/lib/partOrders";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
 import { AddSimpleEntryForm } from "@/components/assistencia/AddSimpleEntryForm";
 import { AddGerenteForm } from "@/components/assistencia/AddGerenteForm";
 import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
+import { DriverPinField } from "@/components/assistencia/DriverPinField";
 import { GerentePinField } from "@/components/assistencia/GerentePinField";
 
 export default async function AdminPage() {
@@ -20,10 +21,11 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, gerentes, assemblers, suppliers] = await Promise.all([
+  const [stores, gerentes, assemblers, drivers, suppliers] = await Promise.all([
     listStores(),
     listGerentesWithPinStatus(),
     listAssemblersWithPinStatus(),
+    listDriversWithPinStatus(),
     listSuppliers(),
   ]);
 
@@ -63,6 +65,27 @@ export default async function AdminPage() {
             ))}
           </ul>
           <AddSimpleEntryForm kind="assembler" />
+        </section>
+
+        <section
+          className="rounded-lg border p-4 flex flex-col gap-2"
+          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        >
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            Motoristas
+          </h3>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Defina um PIN de 4 números pra cada um acessar a própria área em{" "}
+            <span className="font-mono">/assistencia/motorista</span>.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {drivers.map((d) => (
+              <li key={d.name}>
+                <DriverPinField name={d.name} hasPin={d.hasPin} />
+              </li>
+            ))}
+          </ul>
+          <AddSimpleEntryForm kind="driver" />
         </section>
 
         <section

@@ -193,7 +193,14 @@ export type ListRequestsResult = {
 };
 
 export async function listRequests(
-  opts: { status?: RequestStatus; q?: string; page?: number; storeId?: string; assemblerName?: string } = {}
+  opts: {
+    status?: RequestStatus;
+    q?: string;
+    page?: number;
+    storeId?: string;
+    assemblerName?: string;
+    types?: RequestType[];
+  } = {}
 ): Promise<ListRequestsResult> {
   const admin = getSupabaseAdmin();
   const page = Math.max(1, opts.page ?? 1);
@@ -216,6 +223,9 @@ export async function listRequests(
   }
   if (opts.assemblerName) {
     query = query.eq("assembler_name", opts.assemblerName);
+  }
+  if (opts.types && opts.types.length > 0) {
+    query = query.in("type", opts.types);
   }
 
   const q = opts.q?.trim();

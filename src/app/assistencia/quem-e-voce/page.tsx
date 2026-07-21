@@ -23,7 +23,7 @@ export default async function QuemEVocePage({
   const { data: members } = await admin
     .from("profiles")
     .select("id, full_name")
-    .eq("role", "assistencia")
+    .in("role", ["assistencia", "sac"])
     .order("full_name");
 
   return (

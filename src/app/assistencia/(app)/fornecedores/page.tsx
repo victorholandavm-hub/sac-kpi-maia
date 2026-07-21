@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listSupplierReturns, isSupplierReturnStatus, type SupplierReturn } from "@/lib/supplierReturns";
 import { listSuppliers } from "@/lib/partOrders";
 import { SUPPLIER_RETURN_STATUS_LABELS, SUPPLIER_RETURN_STATUS_COLORS } from "@/lib/assistenciaLabels";
@@ -55,6 +56,7 @@ export default async function FornecedoresPage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; supplier?: string }>;
 }) {
+  redirectIfSac(await getProfile());
   const { status, q, supplier } = await searchParams;
   const filterStatus = isSupplierReturnStatus(status) ? status : undefined;
   const [returns, suppliers]: [SupplierReturn[], string[]] = await Promise.all([

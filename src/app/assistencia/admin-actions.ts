@@ -21,7 +21,7 @@ export async function createAssistenciaUser(_state: FormState, formData: FormDat
   if (!fullName) return { error: "Informe o nome." };
   if (!email) return { error: "Informe o e-mail." };
   if (password.length < 6) return { error: "A senha precisa ter pelo menos 6 caracteres." };
-  if (role !== "assistencia" && role !== "admin") return { error: "Papel inválido." };
+  if (role !== "assistencia" && role !== "admin" && role !== "sac") return { error: "Papel inválido." };
 
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.auth.admin.createUser({
@@ -74,6 +74,35 @@ export async function setAssemblerPin(name: string, pin: string): Promise<void> 
   const { error } = await admin.from("assemblers").update({ pin_hash: hashPin(pin) }).eq("name", name);
   if (error) throw new Error(error.message);
   await resetPinAttempts("assemblers", "name", name);
+
+  revalidatePath("/assistencia/admin");
+}
+
+export async function addDriver(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Informe o nome." };
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("drivers").upsert({ name }, { onConflict: "name" });
+  if (error) return { error: error.message };
+
+  revalidatePath("/assistencia/admin");
+  return { success: true };
+}
+
+export async function setDriverPin(name: string, pin: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("drivers").update({ pin_hash: hashPin(pin) }).eq("name", name);
+  if (error) throw new Error(error.message);
+  await resetPinAttempts("drivers", "name", name);
 
   revalidatePath("/assistencia/admin");
 }

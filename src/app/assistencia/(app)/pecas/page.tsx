@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPartOrders, listSuppliers, isPartOrderStatus, type PartOrder } from "@/lib/partOrders";
 import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
@@ -49,6 +50,7 @@ export default async function PecasQueuePage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; supplier?: string }>;
 }) {
+  redirectIfSac(await getProfile());
   const { status, q, supplier } = await searchParams;
   const filterStatus = isPartOrderStatus(status) ? status : undefined;
   const [orders, suppliers]: [PartOrder[], string[]] = await Promise.all([
