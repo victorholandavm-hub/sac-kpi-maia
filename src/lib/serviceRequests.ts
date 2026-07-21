@@ -429,53 +429,30 @@ export type AssemblerRequestView = {
 };
 
 const ASSEMBLER_VIEW_LIMIT = 200;
+const ASSEMBLER_VIEW_COLUMNS =
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, scheduled_date, scheduled_time, shift, created_at, completed_at, stores(name), items:service_request_items(product)";
 
-// Portal do montador (login por nome + PIN, ver src/lib/montadorAuth.ts): só as
-// próprias demandas, com o contato/endereço do cliente que ele precisa pra ir
-// até lá — diferente da visão da loja, que redige esses dados por ser 100%
-// pública sem PIN nenhum.
-export async function listRequestsForAssembler(
-  assemblerName: string,
-  opts: { onlyCompleted?: boolean } = {}
-): Promise<AssemblerRequestView[]> {
-  const admin = getSupabaseAdmin();
-  let query = admin
-    .from("service_requests")
-    .select(
-      "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, scheduled_date, scheduled_time, shift, created_at, completed_at, stores(name), items:service_request_items(product)"
-    )
-    .eq("assembler_name", assemblerName)
-    .limit(ASSEMBLER_VIEW_LIMIT);
+type AssemblerViewRow = {
+  id: string;
+  ticket_number: number;
+  type: RequestType;
+  status: RequestStatus;
+  client_name: string | null;
+  client_phone: string | null;
+  client_address: string | null;
+  client_neighborhood: string | null;
+  reason: string | null;
+  scheduled_date: string | null;
+  scheduled_time: string | null;
+  shift: Shift | null;
+  created_at: string;
+  completed_at: string | null;
+  stores: { name: string } | null;
+  items: { product: string }[] | null;
+};
 
-  if (opts.onlyCompleted) {
-    query = query.eq("status", "concluida").order("completed_at", { ascending: false });
-  } else {
-    query = query.not("status", "in", "(concluida,cancelada)").order("created_at", { ascending: true });
-  }
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  type Row = {
-    id: string;
-    ticket_number: number;
-    type: RequestType;
-    status: RequestStatus;
-    client_name: string | null;
-    client_phone: string | null;
-    client_address: string | null;
-    client_neighborhood: string | null;
-    reason: string | null;
-    scheduled_date: string | null;
-    scheduled_time: string | null;
-    shift: Shift | null;
-    created_at: string;
-    completed_at: string | null;
-    stores: { name: string } | null;
-    items: { product: string }[] | null;
-  };
-
-  return ((data ?? []) as unknown as Row[]).map((row) => ({
+function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
+  return {
     id: row.id,
     ticketNumber: row.ticket_number,
     type: row.type,
@@ -492,7 +469,49 @@ export async function listRequestsForAssembler(
     shift: row.shift,
     createdAt: row.created_at,
     completedAt: row.completed_at,
-  }));
+  };
+}
+
+// Portal do montador (login por nome + PIN, ver src/lib/montadorAuth.ts): só as
+// próprias demandas, com o contato/endereço do cliente que ele precisa pra ir
+// até lá — diferente da visão da loja, que redige esses dados por ser 100%
+// pública sem PIN nenhum.
+export async function listRequestsForAssembler(
+  assemblerName: string,
+  opts: { onlyCompleted?: boolean } = {}
+): Promise<AssemblerRequestView[]> {
+  const admin = getSupabaseAdmin();
+  let query = admin.from("service_requests").select(ASSEMBLER_VIEW_COLUMNS).eq("assembler_name", assemblerName).limit(ASSEMBLER_VIEW_LIMIT);
+
+  if (opts.onlyCompleted) {
+    query = query.eq("status", "concluida").order("completed_at", { ascending: false });
+  } else {
+    query = query.not("status", "in", "(concluida,cancelada)").order("created_at", { ascending: true });
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as unknown as AssemblerViewRow[]).map(toAssemblerView);
+}
+
+// Detalhe de um chamado específico pro montador (tela "Ver chamado") — o
+// filtro por `assembler_name` já garante que ele só acessa demanda própria,
+// sem depender só do que a UI mostra ou esconde.
+export async function getAssemblerRequestDetail(
+  assemblerName: string,
+  requestId: string
+): Promise<AssemblerRequestView | null> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("service_requests")
+    .select(ASSEMBLER_VIEW_COLUMNS)
+    .eq("id", requestId)
+    .eq("assembler_name", assemblerName)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return toAssemblerView(data as unknown as AssemblerViewRow);
 }
 
 const SHIFT_ORDER: Record<Shift, number> = { manha: 0, dia: 1, tarde: 2, urgencia: 3 };
