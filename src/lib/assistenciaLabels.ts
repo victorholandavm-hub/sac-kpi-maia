@@ -5,6 +5,7 @@ export const REQUEST_TYPE_LABELS: Record<string, string> = {
   troca_peca: "Troca de peça",
   vistoria: "Vistoria",
   notificacao_externa: "Notificação externa",
+  troca_produto: "Troca de produto",
 };
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -69,6 +70,7 @@ export const MOVEMENT_TYPE_LABELS: Record<string, string> = {
 export const ROLE_LABELS: Record<string, string> = {
   assistencia: "Assistência",
   admin: "Administrador",
+  sac: "SAC",
 };
 
 export const SUPPLIER_RETURN_STATUS_LABELS: Record<string, string> = {

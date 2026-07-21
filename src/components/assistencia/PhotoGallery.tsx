@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { deleteRequestPhotoAsStaff } from "@/app/assistencia/actions";
 import { montadorDeletePhoto } from "@/app/assistencia/montador-actions";
+import { driverDeletePhoto } from "@/app/assistencia/driver-actions";
 import { useQuickAction } from "./useQuickAction";
 import type { RequestPhoto } from "@/lib/servicePhotos";
 
@@ -12,7 +13,7 @@ export function PhotoGallery({
   currentActor,
 }: {
   photos: RequestPhoto[];
-  deleteMode?: "staff" | "montador";
+  deleteMode?: "staff" | "montador" | "driver";
   currentActor?: string;
 }) {
   const { pending, run } = useQuickAction();
@@ -30,6 +31,8 @@ export function PhotoGallery({
     run(async () => {
       if (deleteMode === "montador") {
         await montadorDeletePhoto(photoId);
+      } else if (deleteMode === "driver") {
+        await driverDeletePhoto(photoId);
       } else {
         await deleteRequestPhotoAsStaff(photoId);
       }

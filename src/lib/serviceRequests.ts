@@ -6,7 +6,8 @@ export type RequestType =
   | "recolhimento"
   | "troca_peca"
   | "vistoria"
-  | "notificacao_externa";
+  | "notificacao_externa"
+  | "troca_produto";
 export type RequestStatus = "aberta" | "em_contato" | "em_andamento" | "remarcar" | "concluida" | "cancelada";
 export type DeadlineStatus = "pendente" | "aprovado" | "recusado";
 export type Shift = "manha" | "tarde" | "dia" | "urgencia";
@@ -81,6 +82,8 @@ export type ServiceRequestSummary = {
   assignedToId: string | null;
   assignedToName: string | null;
   assemblerName: string | null;
+  driverName: string | null;
+  pickupCompleted: boolean;
   scheduledDate: string | null;
   scheduledTime: string | null;
   shift: Shift | null;
@@ -107,6 +110,8 @@ type SummaryRow = {
   deadline_status: DeadlineStatus;
   approved_deadline: string | null;
   assembler_name: string | null;
+  driver_name: string | null;
+  pickup_completed: boolean;
   scheduled_date: string | null;
   scheduled_time: string | null;
   shift: Shift | null;
@@ -127,7 +132,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -159,6 +164,8 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     deadlineStatus: row.deadline_status,
     approvedDeadline: row.approved_deadline,
     assemblerName: row.assembler_name,
+    driverName: row.driver_name,
+    pickupCompleted: row.pickup_completed,
     scheduledDate: row.scheduled_date,
     scheduledTime: row.scheduled_time,
     shift: row.shift,
@@ -293,7 +300,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 export async function getRequestDetail(
   id: string
@@ -525,6 +532,120 @@ export async function getAssemblerRequestDetail(
 
   if (error || !data) return null;
   return toAssemblerView(data as unknown as AssemblerViewRow);
+}
+
+export type DriverRequestView = {
+  id: string;
+  ticketNumber: number;
+  type: RequestType;
+  status: RequestStatus;
+  storeName: string;
+  clientName: string | null;
+  clientPhone: string | null;
+  clientAddress: string | null;
+  clientNeighborhood: string | null;
+  productSummary: string | null;
+  reason: string | null;
+  restrictionNote: string | null;
+  pickupCompleted: boolean;
+  scheduledDate: string | null;
+  scheduledTime: string | null;
+  shift: Shift | null;
+  requestedDeadline: string | null;
+  approvedDeadline: string | null;
+  createdAt: string;
+  completedAt: string | null;
+};
+
+const DRIVER_VIEW_LIMIT = 200;
+const DRIVER_VIEW_COLUMNS =
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, stores(name), items:service_request_items(product)";
+
+type DriverViewRow = {
+  id: string;
+  ticket_number: number;
+  type: RequestType;
+  status: RequestStatus;
+  client_name: string | null;
+  client_phone: string | null;
+  client_address: string | null;
+  client_neighborhood: string | null;
+  reason: string | null;
+  restriction_note: string | null;
+  pickup_completed: boolean;
+  scheduled_date: string | null;
+  scheduled_time: string | null;
+  shift: Shift | null;
+  requested_deadline: string | null;
+  approved_deadline: string | null;
+  created_at: string;
+  completed_at: string | null;
+  stores: { name: string } | null;
+  items: { product: string }[] | null;
+};
+
+function toDriverView(row: DriverViewRow): DriverRequestView {
+  return {
+    id: row.id,
+    ticketNumber: row.ticket_number,
+    type: row.type,
+    status: row.status,
+    storeName: row.stores?.name ?? "—",
+    clientName: row.client_name,
+    clientPhone: row.client_phone,
+    clientAddress: row.client_address,
+    clientNeighborhood: row.client_neighborhood,
+    productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
+    reason: row.reason,
+    restrictionNote: row.restriction_note,
+    pickupCompleted: row.pickup_completed,
+    scheduledDate: row.scheduled_date,
+    scheduledTime: row.scheduled_time,
+    shift: row.shift,
+    requestedDeadline: row.requested_deadline,
+    approvedDeadline: row.approved_deadline,
+    createdAt: row.created_at,
+    completedAt: row.completed_at,
+  };
+}
+
+// Portal do motorista (login por nome + PIN, ver src/lib/driverAuth.ts): só as
+// próprias rotas de troca de produto (recolher o errado/avariado, entregar o
+// correto).
+export async function listRequestsForDriver(
+  driverName: string,
+  opts: { onlyCompleted?: boolean } = {}
+): Promise<DriverRequestView[]> {
+  const admin = getSupabaseAdmin();
+  let query = admin.from("service_requests").select(DRIVER_VIEW_COLUMNS).eq("driver_name", driverName).limit(DRIVER_VIEW_LIMIT);
+
+  if (opts.onlyCompleted) {
+    query = query.eq("status", "concluida").order("completed_at", { ascending: false });
+  } else {
+    query = query
+      .not("status", "in", "(concluida,cancelada)")
+      .order("scheduled_date", { ascending: true, nullsFirst: false })
+      .order("scheduled_time", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true });
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as unknown as DriverViewRow[]).map(toDriverView);
+}
+
+export async function getDriverRequestDetail(driverName: string, requestId: string): Promise<DriverRequestView | null> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("service_requests")
+    .select(DRIVER_VIEW_COLUMNS)
+    .eq("id", requestId)
+    .eq("driver_name", driverName)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return toDriverView(data as unknown as DriverViewRow);
 }
 
 const SHIFT_ORDER: Record<Shift, number> = { manha: 0, dia: 1, tarde: 2, urgencia: 3 };

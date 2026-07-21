@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail } from "@/lib/serviceRequests";
-import { listAssemblers } from "@/lib/payments";
+import { listAssemblers, listDrivers } from "@/lib/payments";
 import {
   REQUEST_TYPE_LABELS,
   STATUS_LABELS,
@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { RequestActions } from "@/components/assistencia/RequestActions";
 import { DeadlineActions } from "@/components/assistencia/DeadlineActions";
 import { AssemblerNameField } from "@/components/assistencia/AssemblerNameField";
+import { DriverNameField } from "@/components/assistencia/DriverNameField";
 import { ScheduleField } from "@/components/assistencia/ScheduleField";
 import { RequestItemsTable } from "@/components/assistencia/RequestItemsTable";
 import { SacCategoryField } from "@/components/assistencia/SacCategoryField";
@@ -90,6 +91,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
   const { request, events } = result;
   const canManage = profile.role === "assistencia" || profile.role === "admin";
   const assemblers = canManage ? await listAssemblers() : [];
+  const drivers = canManage && request.type === "troca_produto" ? await listDrivers() : [];
   const photos = await listRequestPhotos(request.id);
 
   return (
@@ -186,11 +188,20 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         <Row label="Observações" value={request.notes} />
         <Row label="Solicitado por" value={request.requestedByName} />
         <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
-        {canManage ? (
+        {request.type === "troca_produto" ? (
+          canManage ? (
+            <DriverNameField requestId={request.id} value={request.driverName} drivers={drivers} />
+          ) : (
+            <Row label="Nome do motorista" value={request.driverName ?? "Não definido"} />
+          )
+        ) : canManage ? (
           <AssemblerNameField requestId={request.id} value={request.assemblerName} assemblers={assemblers} />
         ) : (
           <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
         )}
+        {request.type === "troca_produto" ? (
+          <Row label="Produto recolhido?" value={request.pickupCompleted ? "Sim" : "Ainda não"} />
+        ) : null}
         {canManage ? (
           <ScheduleField
             requestId={request.id}

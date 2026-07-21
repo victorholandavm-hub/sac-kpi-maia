@@ -16,6 +16,22 @@ export async function listAssemblersWithPinStatus(): Promise<AssemblerWithPinSta
   return (data ?? []).map((a) => ({ name: a.name as string, hasPin: !!a.pin_hash }));
 }
 
+export async function listDrivers(): Promise<string[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("drivers").select("name").order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((d) => d.name as string);
+}
+
+export type DriverWithPinStatus = { name: string; hasPin: boolean };
+
+export async function listDriversWithPinStatus(): Promise<DriverWithPinStatus[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("drivers").select("name, pin_hash").order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((d) => ({ name: d.name as string, hasPin: !!d.pin_hash }));
+}
+
 export type PaymentItem = {
   itemId: string;
   requestId: string;

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSupabaseServer } from "./supabaseServer";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 
-export type Role = "assistencia" | "admin";
+export type Role = "assistencia" | "admin" | "sac";
 
 export type Profile = {
   id: string;

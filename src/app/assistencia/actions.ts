@@ -25,6 +25,7 @@ const REQUEST_TYPES = [
   "troca_peca",
   "vistoria",
   "notificacao_externa",
+  "troca_produto",
 ] as const;
 const STATUSES = ["aberta", "em_contato", "em_andamento", "remarcar", "concluida", "cancelada"] as const;
 const SHIFTS = ["manha", "tarde", "dia", "urgencia"] as const;
@@ -466,6 +467,29 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
     actor_id: profile.id,
     event_type: "note_added",
     note: `Montador definido: ${trimmed}`,
+  });
+
+  revalidatePath("/assistencia/fila");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
+export async function setDriverName(requestId: string, driverName: string) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin", "sac");
+  const trimmed = driverName.trim();
+  if (!trimmed) throw new Error("Informe o nome do motorista.");
+
+  const admin = getSupabaseAdmin();
+  await admin.from("drivers").upsert({ name: trimmed }, { onConflict: "name" });
+
+  const { error } = await admin.from("service_requests").update({ driver_name: trimmed }).eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: `Motorista definido: ${trimmed}`,
   });
 
   revalidatePath("/assistencia/fila");
