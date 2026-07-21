@@ -34,6 +34,19 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
   return str.length > 0 ? str : null;
 }
 
+// redirect() do Next.js funciona lançando um erro especial que precisa
+// continuar se propagando — não é um erro de verdade, então não pode ser
+// engolido por um catch genérico.
+function isNextRedirectError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "digest" in err &&
+    typeof (err as { digest?: unknown }).digest === "string" &&
+    (err as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+  );
+}
+
 export type FormState = { error?: string } | undefined;
 
 export async function signIn(_state: FormState, formData: FormData): Promise<FormState> {
@@ -101,20 +114,33 @@ export async function chooseAssistenciaIdentity(profileId: string) {
     redirect("/assistencia/quem-e-voce?erro=1");
   }
 
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-    type: "magiclink",
-    email: userData.user.email,
-  });
-  if (linkError || !linkData) {
-    redirect("/assistencia/quem-e-voce?erro=1");
-  }
+  try {
+    const supabase = await getSupabaseServer();
 
-  const supabase = await getSupabaseServer();
-  const { error: verifyError } = await supabase.auth.verifyOtp({
-    token_hash: linkData.properties.hashed_token,
-    type: "magiclink",
-  });
-  if (verifyError) {
+    // Encerra qualquer sessão já existente nesse navegador (ex.: alguém
+    // trocando de identidade sem clicar em "Sair" antes) — sem isso o SDK às
+    // vezes tenta renovar um refresh token de uma sessão anterior que já não
+    // é mais válido e lança um erro não tratado em vez de simplesmente trocar.
+    await supabase.auth.signOut();
+
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email: userData.user.email,
+    });
+    if (linkError || !linkData) {
+      redirect("/assistencia/quem-e-voce?erro=1");
+    }
+
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      token_hash: linkData.properties.hashed_token,
+      type: "magiclink",
+    });
+    if (verifyError) {
+      redirect("/assistencia/quem-e-voce?erro=1");
+    }
+  } catch (err) {
+    if (isNextRedirectError(err)) throw err;
+    console.error("Falha ao trocar identidade da equipe assistência:", err);
     redirect("/assistencia/quem-e-voce?erro=1");
   }
 
