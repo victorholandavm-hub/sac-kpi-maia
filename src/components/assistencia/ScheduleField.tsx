@@ -12,18 +12,26 @@ function formatDateOnly(value: string | null): string | null {
   return `${d}/${m}/${y}`;
 }
 
+function formatTimeOnly(value: string | null): string | null {
+  if (!value) return null;
+  return value.slice(0, 5);
+}
+
 export function ScheduleField({
   requestId,
   scheduledDate,
+  scheduledTime,
   shift,
 }: {
   requestId: string;
   scheduledDate: string | null;
+  scheduledTime: string | null;
   shift: Shift | null;
 }) {
   const { pending, run } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [date, setDate] = useState(scheduledDate ?? "");
+  const [time, setTime] = useState(formatTimeOnly(scheduledTime) ?? "");
   const [selectedShift, setSelectedShift] = useState<string>(shift ?? "");
 
   if (!editing) {
@@ -35,7 +43,7 @@ export function ScheduleField({
         <div className="flex items-center gap-2">
           <span className="text-sm" style={{ color: "var(--text-primary)" }}>
             {scheduledDate
-              ? `${formatDateOnly(scheduledDate)}${shift ? ` · ${SHIFT_LABELS[shift]}` : ""}`
+              ? `${formatDateOnly(scheduledDate)}${formatTimeOnly(scheduledTime) ? ` às ${formatTimeOnly(scheduledTime)}` : ""}${shift ? ` · ${SHIFT_LABELS[shift]}` : ""}`
               : "Não agendada"}
           </span>
           <button
@@ -64,6 +72,13 @@ export function ScheduleField({
           style={{ borderColor: "var(--border)" }}
           autoFocus
         />
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className="rounded border px-2 py-1 text-sm"
+          style={{ borderColor: "var(--border)" }}
+        />
         <select
           value={selectedShift}
           onChange={(e) => setSelectedShift(e.target.value)}
@@ -81,7 +96,7 @@ export function ScheduleField({
           disabled={pending}
           onClick={() =>
             run(async () => {
-              await setSchedule(requestId, date, selectedShift);
+              await setSchedule(requestId, date, selectedShift, time);
               setEditing(false);
             }, "Agenda atualizada.")
           }
@@ -93,6 +108,7 @@ export function ScheduleField({
         <button
           onClick={() => {
             setDate(scheduledDate ?? "");
+            setTime(formatTimeOnly(scheduledTime) ?? "");
             setSelectedShift(shift ?? "");
             setEditing(false);
           }}

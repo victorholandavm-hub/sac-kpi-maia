@@ -82,6 +82,7 @@ export type ServiceRequestSummary = {
   assignedToName: string | null;
   assemblerName: string | null;
   scheduledDate: string | null;
+  scheduledTime: string | null;
   shift: Shift | null;
   sellerName: string | null;
   invoiceNumber: string | null;
@@ -107,6 +108,7 @@ type SummaryRow = {
   approved_deadline: string | null;
   assembler_name: string | null;
   scheduled_date: string | null;
+  scheduled_time: string | null;
   shift: Shift | null;
   seller_name: string | null;
   invoice_number: string | null;
@@ -125,7 +127,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -158,6 +160,7 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     approvedDeadline: row.approved_deadline,
     assemblerName: row.assembler_name,
     scheduledDate: row.scheduled_date,
+    scheduledTime: row.scheduled_time,
     shift: row.shift,
     sellerName: row.seller_name,
     invoiceNumber: row.invoice_number,
@@ -290,7 +293,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 export async function getRequestDetail(
   id: string
@@ -419,6 +422,7 @@ export type AssemblerRequestView = {
   productSummary: string | null;
   reason: string | null;
   scheduledDate: string | null;
+  scheduledTime: string | null;
   shift: Shift | null;
   createdAt: string;
   completedAt: string | null;
@@ -438,7 +442,7 @@ export async function listRequestsForAssembler(
   let query = admin
     .from("service_requests")
     .select(
-      "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, scheduled_date, shift, created_at, completed_at, stores(name), items:service_request_items(product)"
+      "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, scheduled_date, scheduled_time, shift, created_at, completed_at, stores(name), items:service_request_items(product)"
     )
     .eq("assembler_name", assemblerName)
     .limit(ASSEMBLER_VIEW_LIMIT);
@@ -463,6 +467,7 @@ export async function listRequestsForAssembler(
     client_neighborhood: string | null;
     reason: string | null;
     scheduled_date: string | null;
+    scheduled_time: string | null;
     shift: Shift | null;
     created_at: string;
     completed_at: string | null;
@@ -483,6 +488,7 @@ export async function listRequestsForAssembler(
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
     reason: row.reason,
     scheduledDate: row.scheduled_date,
+    scheduledTime: row.scheduled_time,
     shift: row.shift,
     createdAt: row.created_at,
     completedAt: row.completed_at,
@@ -529,7 +535,9 @@ export async function listScheduledRequests(
     .sort((a, b) => {
       const dateCompare = (a.scheduledDate ?? "").localeCompare(b.scheduledDate ?? "");
       if (dateCompare !== 0) return dateCompare;
-      return (SHIFT_ORDER[a.shift ?? "dia"] ?? 99) - (SHIFT_ORDER[b.shift ?? "dia"] ?? 99);
+      const shiftCompare = (SHIFT_ORDER[a.shift ?? "dia"] ?? 99) - (SHIFT_ORDER[b.shift ?? "dia"] ?? 99);
+      if (shiftCompare !== 0) return shiftCompare;
+      return (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? "");
     });
 }
 

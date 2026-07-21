@@ -64,9 +64,12 @@ export function QuickCreateRequestForm({ stores, assemblers }: { stores: Store[]
         <textarea name="reason" rows={2} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid sm:grid-cols-4 gap-4">
         <Field label="Data agendada">
           <input name="scheduled_date" type="date" className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+        <Field label="Hora">
+          <input name="scheduled_time" type="time" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
         <Field label="Turno">
           <select name="shift" defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>

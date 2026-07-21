@@ -122,6 +122,14 @@ export default async function AgendaPage({
                                 Atrasada
                               </span>
                             ) : null}
+                            {r.scheduledTime ? (
+                              <span
+                                className="text-xs font-medium px-2 py-0.5 rounded-full"
+                                style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+                              >
+                                {r.scheduledTime.slice(0, 5)}
+                              </span>
+                            ) : null}
                             {r.shift ? (
                               <span
                                 className="text-xs font-medium px-2 py-0.5 rounded-full"

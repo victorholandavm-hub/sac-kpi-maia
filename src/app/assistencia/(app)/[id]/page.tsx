@@ -192,13 +192,18 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
         )}
         {canManage ? (
-          <ScheduleField requestId={request.id} scheduledDate={request.scheduledDate} shift={request.shift} />
+          <ScheduleField
+            requestId={request.id}
+            scheduledDate={request.scheduledDate}
+            scheduledTime={request.scheduledTime}
+            shift={request.shift}
+          />
         ) : (
           <Row
             label="Visita agendada"
             value={
               request.scheduledDate
-                ? `${formatDateOnly(request.scheduledDate)}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}`
+                ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}`
                 : null
             }
           />

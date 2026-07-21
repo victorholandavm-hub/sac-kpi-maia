@@ -108,6 +108,7 @@ export default async function MontadorHomePage({
               {r.scheduledDate ? (
                 <p className="text-sm font-medium" style={{ color: "var(--brand-green)" }}>
                   {formatDateOnly(r.scheduledDate)}
+                  {r.scheduledTime ? ` às ${r.scheduledTime.slice(0, 5)}` : ""}
                   {r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
                 </p>
               ) : null}

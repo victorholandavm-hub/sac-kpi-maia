@@ -69,6 +69,7 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
           <Field label="Tipo" value={REQUEST_TYPE_LABELS[request.type] ?? request.type} />
           {request.shift ? <Field label="Turno" value={SHIFT_LABELS[request.shift]} /> : null}
           {request.scheduledDate ? <Field label="Data agendada" value={request.scheduledDate.split("-").reverse().join("/")} /> : null}
+          {request.scheduledTime ? <Field label="Hora agendada" value={request.scheduledTime.slice(0, 5)} /> : null}
         </div>
 
         {request.items.length > 0 ? (

@@ -370,7 +370,7 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
   revalidatePath(`/assistencia/${requestId}`);
 }
 
-export async function setSchedule(requestId: string, scheduledDate: string, shift: string) {
+export async function setSchedule(requestId: string, scheduledDate: string, shift: string, scheduledTime: string) {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin");
   if (shift && !SHIFTS.includes(shift as (typeof SHIFTS)[number])) {
@@ -380,7 +380,7 @@ export async function setSchedule(requestId: string, scheduledDate: string, shif
   const admin = getSupabaseAdmin();
   const { error } = await admin
     .from("service_requests")
-    .update({ scheduled_date: scheduledDate || null, shift: shift || null })
+    .update({ scheduled_date: scheduledDate || null, shift: shift || null, scheduled_time: scheduledTime || null })
     .eq("id", requestId);
   if (error) throw new Error(error.message);
 
@@ -390,7 +390,7 @@ export async function setSchedule(requestId: string, scheduledDate: string, shif
     actor_id: profile.id,
     event_type: "note_added",
     note: scheduledDate
-      ? `Visita agendada: ${scheduledDate}${shift ? ` (${shiftLabel})` : ""}`
+      ? `Visita agendada: ${scheduledDate}${scheduledTime ? ` às ${scheduledTime}` : ""}${shift ? ` (${shiftLabel})` : ""}`
       : "Agendamento removido.",
   });
 
@@ -556,6 +556,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       client_address: emptyToNull(formData.get("client_address")),
       reason: emptyToNull(formData.get("reason")),
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
+      scheduled_time: emptyToNull(formData.get("scheduled_time")),
       shift: shift || null,
       assembler_name: assemblerName,
       // Criação rápida não coleta prazo pedido pela loja, então não há nada
