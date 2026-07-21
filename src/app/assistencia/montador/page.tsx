@@ -106,7 +106,7 @@ export default async function MontadorHomePage({
                     </p>
                   ) : r.approvedDeadline ?? r.requestedDeadline ? (
                     <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      Prazo: {formatDateOnly(r.approvedDeadline ?? r.requestedDeadline)}
+                      Data da montagem: {formatDateOnly(r.approvedDeadline ?? r.requestedDeadline)}
                     </p>
                   ) : null}
                 </div>
