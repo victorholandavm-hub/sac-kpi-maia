@@ -65,6 +65,10 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
             {request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}
             {request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}
           </p>
+        ) : request.approvedDeadline ?? request.requestedDeadline ? (
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Prazo: {formatDateOnly(request.approvedDeadline ?? request.requestedDeadline)} (sem visita agendada ainda)
+          </p>
         ) : null}
 
         <div

@@ -104,6 +104,10 @@ export default async function MontadorHomePage({
                       {r.scheduledTime ? ` às ${r.scheduledTime.slice(0, 5)}` : ""}
                       {r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
                     </p>
+                  ) : r.approvedDeadline ?? r.requestedDeadline ? (
+                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      Prazo: {formatDateOnly(r.approvedDeadline ?? r.requestedDeadline)}
+                    </p>
                   ) : null}
                 </div>
                 <Link

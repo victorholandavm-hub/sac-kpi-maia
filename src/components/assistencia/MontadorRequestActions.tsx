@@ -4,10 +4,11 @@ import { useState } from "react";
 import { montadorCompleteRequest, montadorAddNote, montadorReportIssue } from "@/app/assistencia/montador-actions";
 import { useQuickAction } from "./useQuickAction";
 
+type Mode = null | "complete" | "issue";
+
 export function MontadorRequestActions({ requestId }: { requestId: string }) {
   const { pending, run, showToast } = useQuickAction();
-  const [confirming, setConfirming] = useState(false);
-  const [reportingIssue, setReportingIssue] = useState(false);
+  const [mode, setMode] = useState<Mode>(null);
   const [issueReason, setIssueReason] = useState("");
   const [note, setNote] = useState("");
 
@@ -19,7 +20,7 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
     run(async () => {
       await montadorReportIssue(requestId, issueReason);
       setIssueReason("");
-      setReportingIssue(false);
+      setMode(null);
     }, "Chamado marcado pra remarcar.");
   }
 
@@ -49,16 +50,28 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
         </button>
       </div>
 
-      {!confirming ? (
-        <button
-          disabled={pending}
-          onClick={() => setConfirming(true)}
-          className="text-sm rounded-lg px-3 py-3 font-medium disabled:opacity-60"
-          style={{ background: "var(--status-good)", color: "#fff" }}
-        >
-          Marcar como concluído
-        </button>
-      ) : (
+      {mode === null ? (
+        <div className="flex flex-col gap-2">
+          <button
+            disabled={pending}
+            onClick={() => setMode("complete")}
+            className="text-sm rounded-lg px-3 py-3 font-medium disabled:opacity-60"
+            style={{ background: "var(--status-good)", color: "#fff" }}
+          >
+            Marcar como concluído
+          </button>
+          <button
+            disabled={pending}
+            onClick={() => setMode("issue")}
+            className="text-sm rounded-lg px-3 py-3 font-medium border disabled:opacity-60"
+            style={{ borderColor: "var(--status-critical)", color: "var(--status-critical)" }}
+          >
+            Não consegui montar
+          </button>
+        </div>
+      ) : null}
+
+      {mode === "complete" ? (
         <div className="flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: "var(--status-good)" }}>
           <span className="text-sm" style={{ color: "var(--text-primary)" }}>
             Confirmar que esse chamado foi concluído?
@@ -69,7 +82,7 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
               onClick={() => {
                 run(async () => {
                   await montadorCompleteRequest(requestId);
-                  setConfirming(false);
+                  setMode(null);
                 }, "Chamado marcado como concluído.");
               }}
               className="text-sm rounded-lg px-3 py-2.5 font-medium disabled:opacity-60 flex-1"
@@ -77,23 +90,14 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
             >
               Sim, concluído
             </button>
-            <button onClick={() => setConfirming(false)} className="text-sm underline px-2" style={{ color: "var(--text-secondary)" }}>
+            <button onClick={() => setMode(null)} className="text-sm underline px-2" style={{ color: "var(--text-secondary)" }}>
               cancelar
             </button>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {!reportingIssue ? (
-        <button
-          disabled={pending}
-          onClick={() => setReportingIssue(true)}
-          className="text-sm rounded-lg px-3 py-3 font-medium border disabled:opacity-60"
-          style={{ borderColor: "var(--status-critical)", color: "var(--status-critical)" }}
-        >
-          Não consegui montar
-        </button>
-      ) : (
+      {mode === "issue" ? (
         <div className="flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
           <span className="text-sm" style={{ color: "var(--text-primary)" }}>
             Qual o motivo?
@@ -118,7 +122,7 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
             </button>
             <button
               onClick={() => {
-                setReportingIssue(false);
+                setMode(null);
                 setIssueReason("");
               }}
               className="text-sm underline px-2"
@@ -128,7 +132,7 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
             </button>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
