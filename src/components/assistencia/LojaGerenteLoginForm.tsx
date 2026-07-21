@@ -2,9 +2,8 @@
 
 import { useActionState } from "react";
 import { lojaGerenteSignIn, type LojaGerenteFormState } from "@/app/assistencia/loja-actions";
-import type { Gerente } from "@/lib/gerentes";
 
-export function LojaGerenteLoginForm({ gerentes }: { gerentes: Gerente[] }) {
+export function LojaGerenteLoginForm() {
   const [state, formAction, pending] = useActionState<LojaGerenteFormState, FormData>(lojaGerenteSignIn, undefined);
 
   return (
@@ -15,14 +14,14 @@ export function LojaGerenteLoginForm({ gerentes }: { gerentes: Gerente[] }) {
     >
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
         Seu nome
-        <select name="name" required className="rounded border px-3 py-2" style={{ borderColor: "var(--border)" }}>
-          <option value="">Selecione…</option>
-          {gerentes.map((g) => (
-            <option key={g.name} value={g.name}>
-              {g.name}
-            </option>
-          ))}
-        </select>
+        <input
+          name="name"
+          type="text"
+          required
+          autoComplete="off"
+          className="rounded border px-3 py-2"
+          style={{ borderColor: "var(--border)" }}
+        />
       </label>
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
         PIN (4 números)

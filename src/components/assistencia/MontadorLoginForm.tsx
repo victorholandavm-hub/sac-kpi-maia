@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { montadorSignIn, type MontadorFormState } from "@/app/assistencia/montador-actions";
 
-export function MontadorLoginForm({ assemblers }: { assemblers: string[] }) {
+export function MontadorLoginForm() {
   const [state, formAction, pending] = useActionState<MontadorFormState, FormData>(montadorSignIn, undefined);
 
   return (
@@ -14,14 +14,14 @@ export function MontadorLoginForm({ assemblers }: { assemblers: string[] }) {
     >
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
         Seu nome
-        <select name="name" required className="rounded border px-3 py-2" style={{ borderColor: "var(--border)" }}>
-          <option value="">Selecione…</option>
-          {assemblers.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
+        <input
+          name="name"
+          type="text"
+          required
+          autoComplete="off"
+          className="rounded border px-3 py-2"
+          style={{ borderColor: "var(--border)" }}
+        />
       </label>
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
         PIN (4 números)

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { listGerentes } from "@/lib/gerentes";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { LojaGerenteLoginForm } from "@/components/assistencia/LojaGerenteLoginForm";
 
@@ -11,8 +10,6 @@ export default async function LojaGerenteLoginPage() {
   if (existingSession) {
     redirect("/assistencia/loja");
   }
-
-  const gerentes = await listGerentes();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -30,7 +27,7 @@ export default async function LojaGerenteLoginPage() {
           </div>
         </div>
 
-        <LojaGerenteLoginForm gerentes={gerentes} />
+        <LojaGerenteLoginForm />
 
         <Link href="/assistencia" className="text-sm underline text-center" style={{ color: "var(--text-secondary)" }}>
           ← Voltar

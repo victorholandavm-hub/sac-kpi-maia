@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { listAssemblers } from "@/lib/payments";
 import { getMontadorSession } from "@/app/assistencia/montador-actions";
 import { MontadorLoginForm } from "@/components/assistencia/MontadorLoginForm";
 
@@ -11,8 +10,6 @@ export default async function MontadorLoginPage() {
   if (existingSession) {
     redirect("/assistencia/montador");
   }
-
-  const assemblers = await listAssemblers();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -30,7 +27,7 @@ export default async function MontadorLoginPage() {
           </div>
         </div>
 
-        <MontadorLoginForm assemblers={assemblers} />
+        <MontadorLoginForm />
 
         <Link href="/assistencia" className="text-sm underline text-center" style={{ color: "var(--text-secondary)" }}>
           ← Voltar
