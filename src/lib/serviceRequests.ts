@@ -578,6 +578,7 @@ export type RequestsOverview = {
   pendingDeadline: number;
   scheduledToday: number;
   needsReschedule: number;
+  completedToday: number;
 };
 
 // Contagens rápidas ("o que precisa de mim agora") pra tela inicial —
@@ -597,12 +598,19 @@ export async function countRequestsOverview(): Promise<RequestsOverview> {
     .select("id", { count: "exact", head: true })
     .eq("scheduled_date", today);
   const remarcarQuery = admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "remarcar");
+  const completedTodayQuery = admin
+    .from("service_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "concluida")
+    .gte("completed_at", `${today}T00:00:00`)
+    .lte("completed_at", `${today}T23:59:59`);
 
-  const [openRes, deadlineRes, todayRes, remarcarRes] = await Promise.all([
+  const [openRes, deadlineRes, todayRes, remarcarRes, completedTodayRes] = await Promise.all([
     openQuery,
     deadlineQuery,
     todayQuery,
     remarcarQuery,
+    completedTodayQuery,
   ]);
 
   return {
@@ -610,6 +618,7 @@ export async function countRequestsOverview(): Promise<RequestsOverview> {
     pendingDeadline: deadlineRes.count ?? 0,
     scheduledToday: todayRes.count ?? 0,
     needsReschedule: remarcarRes.count ?? 0,
+    completedToday: completedTodayRes.count ?? 0,
   };
 }
 

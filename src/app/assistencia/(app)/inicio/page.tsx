@@ -70,6 +70,7 @@ export default async function InicioPage() {
         <Card href="/assistencia/fila" title="Solicitações" description="Montagem, desmontagem, recolhimento, troca de peça, vistoria e notificações.">
           <Stat label="Abertas sem contato" value={requests.openNoContact} tone={requests.openNoContact > 0 ? "var(--status-warning)" : undefined} />
           <Stat label="Aguardando aprovação de prazo" value={requests.pendingDeadline} />
+          <Stat label="Concluídas hoje" value={requests.completedToday} tone={requests.completedToday > 0 ? "var(--status-good)" : undefined} />
         </Card>
 
         <Card href="/assistencia/agenda" title="Agenda" description="Visitas técnicas agendadas na casa do cliente.">
