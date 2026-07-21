@@ -39,3 +39,17 @@ export function HardHatIcon({ color }: { color: string }) {
     </svg>
   );
 }
+
+export function TruckIcon({ color }: { color: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>
+      <path
+        d="M3 6.5h10v10H3v-10ZM13 10.5h4l3 3v3h-7v-6ZM6.5 19a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5ZM16.5 19a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
