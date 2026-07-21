@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { listOpenRequestsForLoja, listStores } from "@/lib/serviceRequests";
+import { listOpenRequestsForLoja, listStores, type OpenRequestForLoja } from "@/lib/serviceRequests";
 import { getLojaStorePreference } from "@/app/assistencia/actions";
 import { getLojaGerenteSession, lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
 import { REQUEST_TYPE_LABELS, STATUS_LABELS } from "@/lib/assistenciaLabels";
@@ -112,46 +112,48 @@ export default async function LojaHomePage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-            {requests.map((r) => (
-              <div key={r.id} className="flex items-center justify-between gap-4 p-4 flex-wrap">
-                <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                      #{r.ticketNumber}
-                    </span>
-                    <StatusBadge status={r.status} />
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                      {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                    </span>
-                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {r.storeName}
-                    </span>
-                  </div>
-                  <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                    {r.clientName ?? "Sem nome de cliente"}
-                    {r.productSummary ? ` · ${r.productSummary}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                    {showCompleted && r.completedAt
-                      ? `Concluída em ${new Date(r.completedAt).toLocaleDateString("pt-BR")}`
-                      : new Date(r.createdAt).toLocaleDateString("pt-BR")}
-                  </span>
-                  {!showCompleted ? (
-                    <LojaDeadlineControl
-                      requestId={r.id}
-                      requestedDeadline={r.requestedDeadline}
-                      deadlineStatus={r.deadlineStatus}
-                      approvedDeadline={r.approvedDeadline}
-                    />
-                  ) : null}
+        <div className="flex flex-col gap-4">
+          {groupByDate(requests, showCompleted).map(([dateLabel, group]) => (
+            <div key={dateLabel} className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                {showCompleted ? `Concluídas em ${dateLabel}` : `Solicitado em ${dateLabel}`}
+              </span>
+              <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+                <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                  {group.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between gap-4 p-4 flex-wrap">
+                      <div className="flex flex-col gap-1 min-w-0 w-0 grow">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                            #{r.ticketNumber}
+                          </span>
+                          <StatusBadge status={r.status} />
+                          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                            {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+                          </span>
+                          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                            {r.storeName}
+                          </span>
+                        </div>
+                        <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
+                          {r.clientName ?? "Sem nome de cliente"}
+                          {r.productSummary ? ` · ${r.productSummary}` : ""}
+                        </p>
+                      </div>
+                      {!showCompleted ? (
+                        <LojaDeadlineControl
+                          requestId={r.id}
+                          requestedDeadline={r.requestedDeadline}
+                          deadlineStatus={r.deadlineStatus}
+                          approvedDeadline={r.approvedDeadline}
+                        />
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -161,4 +163,19 @@ export default async function LojaHomePage({
     </div>
     </ToastProvider>
   );
+}
+
+// Lista já vem ordenada (criação asc pra abertas, conclusão desc pra
+// concluídas) — aqui só clusteriza itens consecutivos do mesmo dia em blocos,
+// preservando a ordem original entre e dentro dos blocos.
+function groupByDate(requests: OpenRequestForLoja[], showCompleted: boolean): [string, OpenRequestForLoja[]][] {
+  const groups = new Map<string, OpenRequestForLoja[]>();
+  for (const r of requests) {
+    const dateField = showCompleted ? (r.completedAt ?? r.createdAt) : r.createdAt;
+    const label = new Date(dateField).toLocaleDateString("pt-BR");
+    const group = groups.get(label);
+    if (group) group.push(r);
+    else groups.set(label, [r]);
+  }
+  return [...groups.entries()];
 }
