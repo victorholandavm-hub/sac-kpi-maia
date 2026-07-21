@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { getPartOrder } from "@/lib/partOrders";
 import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PartOrderActions } from "@/components/assistencia/PartOrderActions";
@@ -32,6 +33,7 @@ function Row({ label, value }: { label: string; value: string | null | undefined
 }
 
 export default async function PartOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  redirectIfSac(await getProfile());
   const { id } = await params;
   const order = await getPartOrder(id);
 

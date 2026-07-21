@@ -6,6 +6,7 @@ import { getProfile, requireRole } from "@/lib/dal";
 import { hashPin } from "@/lib/montadorAuth";
 import { resetPinAttempts } from "@/lib/pinLockout";
 import { setGerenteStores } from "@/lib/gerentes";
+import { resolveDriverName } from "@/lib/payments";
 
 export type FormState = { error?: string; success?: boolean } | undefined;
 
@@ -82,8 +83,9 @@ export async function addDriver(_state: FormState, formData: FormData): Promise<
   const profile = await getProfile();
   requireRole(profile, "admin");
 
-  const name = String(formData.get("name") ?? "").trim();
-  if (!name) return { error: "Informe o nome." };
+  const typedName = String(formData.get("name") ?? "").trim();
+  if (!typedName) return { error: "Informe o nome." };
+  const name = await resolveDriverName(typedName);
 
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("drivers").upsert({ name }, { onConflict: "name" });

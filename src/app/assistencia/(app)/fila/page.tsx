@@ -205,6 +205,7 @@ export default async function AssistenciaQueuePage({
                       ) : null}
                       <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
                       {r.assemblerName ? <span>Montador: {r.assemblerName}</span> : null}
+                      {r.driverName ? <span>Motorista: {r.driverName}</span> : null}
                     </div>
                   </Link>
                 ))}

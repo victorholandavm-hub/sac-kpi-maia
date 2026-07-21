@@ -73,6 +73,11 @@ export const ROLE_LABELS: Record<string, string> = {
   sac: "SAC",
 };
 
+// Únicos tipos de chamado que o papel SAC pode gerenciar (ver dal.ts
+// requireManageAccess) — o resto da fila (montagem, troca_peça etc.)
+// continua exclusivo de assistência/admin.
+export const SAC_MANAGED_TYPES = ["troca_produto", "notificacao_externa"] as const;
+
 export const SUPPLIER_RETURN_STATUS_LABELS: Record<string, string> = {
   aguardando_envio: "Aguardando envio",
   enviado: "Enviado ao fornecedor",

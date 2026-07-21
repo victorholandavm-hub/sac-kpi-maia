@@ -18,12 +18,14 @@ export function RequestActions({
   requestId,
   status,
   isAssignedToMe,
-  hasAssembler,
+  hasAssignee,
+  assigneeLabel = "o montador",
 }: {
   requestId: string;
   status: string;
   isAssignedToMe: boolean;
-  hasAssembler: boolean;
+  hasAssignee: boolean;
+  assigneeLabel?: string;
 }) {
   const { pending, run, showToast } = useQuickAction();
   const [note, setNote] = useState("");
@@ -42,10 +44,10 @@ export function RequestActions({
     }, "Solicitação remarcada.");
   }
 
-  // Sem montador definido não dá pra ir pra "em andamento" (ver updateStatus
-  // no servidor, que é quem realmente barra isso) — some a opção da lista em
-  // vez de deixar clicar e levar um erro.
-  const nextStatuses = (NEXT_STATUSES[status] ?? []).filter((s) => s !== "em_andamento" || hasAssembler);
+  // Sem montador/motorista definido não dá pra ir pra "em andamento" (ver
+  // updateStatus no servidor, que é quem realmente barra isso) — some a
+  // opção da lista em vez de deixar clicar e levar um erro.
+  const nextStatuses = (NEXT_STATUSES[status] ?? []).filter((s) => s !== "em_andamento" || hasAssignee);
 
   return (
     <div
@@ -67,9 +69,9 @@ export function RequestActions({
         </button>
       ) : null}
 
-      {!hasAssembler && (NEXT_STATUSES[status] ?? []).includes("em_andamento") ? (
+      {!hasAssignee && (NEXT_STATUSES[status] ?? []).includes("em_andamento") ? (
         <p className="text-xs" style={{ color: "var(--status-warning)" }}>
-          Defina o montador acima pra poder marcar como Em andamento.
+          Defina {assigneeLabel} acima pra poder marcar como Em andamento.
         </p>
       ) : null}
 

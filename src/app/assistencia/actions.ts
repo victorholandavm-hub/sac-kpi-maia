@@ -5,8 +5,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { getProfile, requireRole } from "@/lib/dal";
+import { getProfile, requireRole, requireManageAccess } from "@/lib/dal";
 import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
+import { resolveDriverName } from "@/lib/payments";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
@@ -328,10 +329,11 @@ export async function claimRequest(requestId: string) {
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("status")
+    .select("status, type")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
 
   const nextStatus = current.status === "aberta" ? "em_contato" : current.status;
 
@@ -377,15 +379,19 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("status, assembler_name")
+    .select("status, type, assembler_name, driver_name")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
 
-  // Só avança pra "em andamento" com um montador de fato definido — sem
-  // isso, fica em "em contato" até alguém assumir a montagem.
-  if (newStatus === "em_andamento" && !current.assembler_name) {
-    throw new Error("Defina o montador antes de marcar como Em andamento.");
+  // Só avança pra "em andamento" com alguém de fato definido — sem isso, fica
+  // em "em contato" até alguém assumir. Chamado de troca de produto usa
+  // motorista em vez de montador.
+  const hasAssignee = current.type === "troca_produto" ? !!current.driver_name : !!current.assembler_name;
+  if (newStatus === "em_andamento" && !hasAssignee) {
+    const who = current.type === "troca_produto" ? "o motorista" : "o montador";
+    throw new Error(`Defina ${who} antes de marcar como Em andamento.`);
   }
 
   const completedAt = newStatus === "concluida" || newStatus === "cancelada" ? new Date().toISOString() : null;
@@ -416,6 +422,14 @@ export async function addNote(requestId: string, note: string) {
   if (!trimmed) throw new Error("Nota vazia.");
 
   const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("type")
+    .eq("id", requestId)
+    .single();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+
   const { error } = await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: profile.id,
@@ -431,6 +445,15 @@ export async function addRequestPhoto(requestId: string, formData: FormData): Pr
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");
 
+  const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("type")
+    .eq("id", requestId)
+    .single();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+
   const file = formData.get("photo");
   if (!(file instanceof File) || file.size === 0) throw new Error("Selecione uma foto.");
   const caption = String(formData.get("caption") ?? "");
@@ -445,6 +468,10 @@ export async function deleteRequestPhotoAsStaff(photoId: string): Promise<void> 
 
   const info = await getPhotoForAuth(photoId);
   if (!info) throw new Error("Foto não encontrada.");
+
+  const admin = getSupabaseAdmin();
+  const { data: current } = await admin.from("service_requests").select("type").eq("id", info.requestId).single();
+  if (current) requireManageAccess(profile, current.type);
 
   await deleteRequestPhoto(photoId);
   revalidatePath(`/assistencia/${info.requestId}`);
@@ -480,16 +507,25 @@ export async function setDriverName(requestId: string, driverName: string) {
   if (!trimmed) throw new Error("Informe o nome do motorista.");
 
   const admin = getSupabaseAdmin();
-  await admin.from("drivers").upsert({ name: trimmed }, { onConflict: "name" });
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("type")
+    .eq("id", requestId)
+    .single();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
 
-  const { error } = await admin.from("service_requests").update({ driver_name: trimmed }).eq("id", requestId);
+  const name = await resolveDriverName(trimmed);
+  await admin.from("drivers").upsert({ name }, { onConflict: "name" });
+
+  const { error } = await admin.from("service_requests").update({ driver_name: name }).eq("id", requestId);
   if (error) throw new Error(error.message);
 
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: profile.id,
     event_type: "note_added",
-    note: `Motorista definido: ${trimmed}`,
+    note: `Motorista definido: ${name}`,
   });
 
   revalidatePath("/assistencia/fila");
@@ -527,12 +563,20 @@ export async function setSchedule(requestId: string, scheduledDate: string, shif
 
 export async function setSacCategory(requestId: string, category: string) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
   if (!SAC_CATEGORIES.includes(category as (typeof SAC_CATEGORIES)[number])) {
     throw new Error("Categoria inválida.");
   }
 
   const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("type")
+    .eq("id", requestId)
+    .single();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+
   const { error } = await admin.from("service_requests").update({ sac_category: category }).eq("id", requestId);
   if (error) throw new Error(error.message);
 
@@ -549,10 +593,18 @@ export async function setSacCategory(requestId: string, category: string) {
 
 export async function setLegalDeadline(requestId: string, newDate: string) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
   if (!newDate) throw new Error("Informe uma data.");
 
   const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("type")
+    .eq("id", requestId)
+    .single();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+
   const { error } = await admin.from("service_requests").update({ legal_deadline: newDate }).eq("id", requestId);
   if (error) throw new Error(error.message);
 
@@ -569,9 +621,17 @@ export async function setLegalDeadline(requestId: string, newDate: string) {
 
 export async function setEscalationRisk(requestId: string, atRisk: boolean) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
 
   const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("type")
+    .eq("id", requestId)
+    .single();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+
   const { error } = await admin.from("service_requests").update({ escalation_risk: atRisk }).eq("id", requestId);
   if (error) throw new Error(error.message);
 
@@ -592,7 +652,7 @@ export async function updateRequestDetails(
   formData: FormData
 ): Promise<FormState> {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
 
   const clientName = String(formData.get("client_name") ?? "").trim();
   if (!clientName) return { error: "Informe o nome do cliente." };
@@ -600,6 +660,10 @@ export async function updateRequestDetails(
   if (!storeId) return { error: "Selecione a loja." };
 
   const admin = getSupabaseAdmin();
+  const { data: currentRequest } = await admin.from("service_requests").select("type").eq("id", requestId).single();
+  if (!currentRequest) return { error: "Solicitação não encontrada." };
+  requireManageAccess(profile, currentRequest.type);
+
   const { error } = await admin
     .from("service_requests")
     .update({
@@ -743,11 +807,13 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const clientName = String(formData.get("client_name") ?? "").trim();
   if (!clientName) return { error: "Informe o nome do cliente." };
 
-  const driverName = emptyToNull(formData.get("driver_name"));
+  const driverNameInput = emptyToNull(formData.get("driver_name"));
   const product = emptyToNull(formData.get("product"));
   const quantity = Math.max(1, parseInt(String(formData.get("quantity") ?? "1"), 10) || 1);
+  const urgent = formData.get("urgent") === "on";
 
   const admin = getSupabaseAdmin();
+  const driverName = driverNameInput ? await resolveDriverName(driverNameInput) : null;
   if (driverName) {
     await admin.from("drivers").upsert({ name: driverName }, { onConflict: "name" });
   }
@@ -765,6 +831,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       reason: emptyToNull(formData.get("reason")),
       restriction_note: emptyToNull(formData.get("restriction_note")),
       driver_name: driverName,
+      shift: urgent ? "urgencia" : null,
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
       // Criado direto pelo SAC, não pela loja — não há prazo pra aprovar.
       deadline_status: "aprovado",

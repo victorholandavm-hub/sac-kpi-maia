@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { ROLE_LABELS } from "@/lib/assistenciaLabels";
 import { signOut } from "@/app/assistencia/actions";
@@ -9,6 +10,7 @@ import { MobileNav } from "@/components/assistencia/MobileNav";
 export default async function AssistenciaAppLayout({ children }: { children: React.ReactNode }) {
   const profile = await getProfile();
   const isAdmin = profile.role === "admin";
+  const isSac = profile.role === "sac";
 
   return (
     <ToastProvider>
@@ -24,15 +26,23 @@ export default async function AssistenciaAppLayout({ children }: { children: Rea
               </button>
             </form>
           </AssistenciaHeader>
-          <div className="hidden sm:block">
-            <AssistenciaNav isAdmin={isAdmin} />
-          </div>
+          {isSac ? (
+            <Link href="/assistencia/sac" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
+              ← Voltar pro SAC
+            </Link>
+          ) : (
+            <div className="hidden sm:block">
+              <AssistenciaNav isAdmin={isAdmin} />
+            </div>
+          )}
         </div>
         {children}
       </div>
-      <div className="print:hidden">
-        <MobileNav isAdmin={isAdmin} />
-      </div>
+      {isSac ? null : (
+        <div className="print:hidden">
+          <MobileNav isAdmin={isAdmin} />
+        </div>
+      )}
     </ToastProvider>
   );
 }

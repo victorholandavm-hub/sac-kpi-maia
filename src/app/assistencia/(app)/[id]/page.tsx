@@ -8,6 +8,7 @@ import {
   DEADLINE_STATUS_LABELS,
   SHIFT_LABELS,
   SAC_CATEGORY_LABELS,
+  SAC_MANAGED_TYPES,
 } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { RequestActions } from "@/components/assistencia/RequestActions";
@@ -89,7 +90,10 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
   }
 
   const { request, events } = result;
-  const canManage = profile.role === "assistencia" || profile.role === "admin" || profile.role === "sac";
+  const canManage =
+    profile.role === "assistencia" ||
+    profile.role === "admin" ||
+    (profile.role === "sac" && (SAC_MANAGED_TYPES as readonly string[]).includes(request.type));
   const assemblers = canManage ? await listAssemblers() : [];
   const drivers = canManage && request.type === "troca_produto" ? await listDrivers() : [];
   const photos = await listRequestPhotos(request.id);
@@ -116,13 +120,15 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
             >
               Editar
             </Link>
-            <Link
-              href={`/assistencia/pecas/nova?service_request_id=${request.id}`}
-              className="text-sm underline"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Solicitar peça para este chamado
-            </Link>
+            {profile.role !== "sac" ? (
+              <Link
+                href={`/assistencia/pecas/nova?service_request_id=${request.id}`}
+                className="text-sm underline"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Solicitar peça para este chamado
+              </Link>
+            ) : null}
             <Link
               href={`/assistencia/${request.id}/despacho`}
               className="text-sm underline"
@@ -257,7 +263,8 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           requestId={request.id}
           status={request.status}
           isAssignedToMe={request.assignedToId === profile.id}
-          hasAssembler={!!request.assemblerName}
+          hasAssignee={request.type === "troca_produto" ? !!request.driverName : !!request.assemblerName}
+          assigneeLabel={request.type === "troca_produto" ? "o motorista" : "o montador"}
         />
       ) : null}
 

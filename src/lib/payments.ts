@@ -32,6 +32,19 @@ export async function listDriversWithPinStatus(): Promise<DriverWithPinStatus[]>
   return (data ?? []).map((d) => ({ name: d.name as string, hasPin: !!d.pin_hash }));
 }
 
+// "name" é a PK exata da tabela — sem isso, digitar "joão" quando o motorista
+// já está cadastrado como "João" cria uma linha duplicada, e o chamado some
+// da rota dele (o login por PIN casa por nome sem diferenciar maiúscula, mas
+// a busca de chamados do motorista usa o nome exato). Sempre resolve pro nome
+// já cadastrado (se existir) antes de gravar.
+export async function resolveDriverName(typedName: string): Promise<string> {
+  const trimmed = typedName.trim();
+  const admin = getSupabaseAdmin();
+  const { data } = await admin.from("drivers").select("name");
+  const existing = (data ?? []).find((d) => (d.name as string).toLowerCase() === trimmed.toLowerCase());
+  return existing?.name ?? trimmed;
+}
+
 export type PaymentItem = {
   itemId: string;
   requestId: string;

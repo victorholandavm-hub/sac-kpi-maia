@@ -68,6 +68,11 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
+      <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+        <input type="checkbox" name="urgent" className="rounded" />
+        Urgente
+      </label>
+
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Telefone">
           <input name="client_phone" className="rounded border px-3 py-2" style={inputStyle} />

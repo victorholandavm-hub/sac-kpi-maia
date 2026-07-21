@@ -1,7 +1,9 @@
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listSuppliers } from "@/lib/partOrders";
 import { NewStockMovementForm } from "@/components/assistencia/NewStockMovementForm";
 
 export default async function NovaMovimentacaoPage() {
+  redirectIfSac(await getProfile());
   const factories = await listSuppliers();
 
   return (

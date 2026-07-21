@@ -1,3 +1,4 @@
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { getSupplierReturn } from "@/lib/supplierReturns";
 import { SUPPLIER_RETURN_STATUS_LABELS, SUPPLIER_RETURN_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { SupplierReturnActions } from "@/components/assistencia/SupplierReturnActions";
@@ -35,6 +36,7 @@ function formatBRL(value: number | null) {
 }
 
 export default async function SupplierReturnDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  redirectIfSac(await getProfile());
   const { id } = await params;
   const supplierReturn = await getSupplierReturn(id);
 

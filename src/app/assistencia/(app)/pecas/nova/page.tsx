@@ -1,4 +1,4 @@
-import { getProfile } from "@/lib/dal";
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listSuppliers } from "@/lib/partOrders";
 import { getRequestDetail } from "@/lib/serviceRequests";
 import { NewPartOrderForm } from "@/components/assistencia/NewPartOrderForm";
@@ -8,7 +8,7 @@ export default async function NovoPedidoPecaPage({
 }: {
   searchParams: Promise<{ service_request_id?: string }>;
 }) {
-  await getProfile();
+  redirectIfSac(await getProfile());
   const { service_request_id } = await searchParams;
   const suppliers = await listSuppliers();
 

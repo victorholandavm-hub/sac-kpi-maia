@@ -1,6 +1,6 @@
-import { getProfile, requireRole } from "@/lib/dal";
+import { getProfile } from "@/lib/dal";
 import { getRequestDetail, type ServiceRequestDetail } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { PrintButton } from "@/components/assistencia/PrintButton";
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
@@ -19,7 +19,6 @@ function Field({ label, value }: { label: string; value: string | null | undefin
 export default async function DespachoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
   const result = await getRequestDetail(id);
 
   if (!result) {
@@ -31,6 +30,19 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
   }
 
   const { request } = result;
+
+  const canView =
+    profile.role === "assistencia" ||
+    profile.role === "admin" ||
+    (profile.role === "sac" && (SAC_MANAGED_TYPES as readonly string[]).includes(request.type));
+  if (!canView) {
+    return (
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        Acesso restrito.
+      </p>
+    );
+  }
+
   const isUrgente = request.shift === "urgencia";
 
   if (request.type === "troca_produto") {

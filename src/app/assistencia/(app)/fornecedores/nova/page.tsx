@@ -1,7 +1,9 @@
+import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listSuppliers } from "@/lib/partOrders";
 import { NewSupplierReturnForm } from "@/components/assistencia/NewSupplierReturnForm";
 
 export default async function NovaRemessaPage() {
+  redirectIfSac(await getProfile());
   const suppliers = await listSuppliers();
 
   return (

@@ -2,6 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getSupabaseServer } from "./supabaseServer";
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { SAC_MANAGED_TYPES } from "./assistenciaLabels";
 
 export type Role = "assistencia" | "admin" | "sac";
 
@@ -55,4 +56,14 @@ export function requireRole(profile: Profile, ...roles: Role[]) {
 // (que o SAC também precisa acessar pros próprios chamados).
 export function redirectIfSac(profile: Profile) {
   if (profile.role === "sac") redirect("/assistencia/sac");
+}
+
+// Igual a requireRole(profile, "assistencia", "admin", "sac"), mas pro SAC só
+// libera se o chamado é de um tipo que ele de fato gerencia (troca_produto /
+// notificacao_externa) — sem isso, uma role check sozinha deixaria o SAC
+// mexer em qualquer chamado da fila normal, bastando saber o id.
+export function requireManageAccess(profile: Profile, requestType: string) {
+  if (profile.role === "assistencia" || profile.role === "admin") return;
+  if (profile.role === "sac" && (SAC_MANAGED_TYPES as readonly string[]).includes(requestType)) return;
+  throw new Error(`Ação não permitida para o papel "${profile.role}" nesse chamado.`);
 }
