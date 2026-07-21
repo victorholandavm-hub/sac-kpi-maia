@@ -1,5 +1,5 @@
 import { getProfile, requireRole } from "@/lib/dal";
-import { getRequestDetail } from "@/lib/serviceRequests";
+import { getRequestDetail, type ServiceRequestDetail } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { PrintButton } from "@/components/assistencia/PrintButton";
 
@@ -32,6 +32,10 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
 
   const { request } = result;
   const isUrgente = request.shift === "urgencia";
+
+  if (request.type === "troca_produto") {
+    return <TrocaProdutoDespacho request={request} isUrgente={isUrgente} />;
+  }
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
@@ -94,6 +98,139 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
 
         <Field label="Instrução / motivo" value={request.reason} />
         {request.restrictionNote ? <Field label="Restrição / observação" value={request.restrictionNote} /> : null}
+      </div>
+    </div>
+  );
+}
+
+function TrocaProdutoDespacho({
+  request,
+  isUrgente,
+}: {
+  request: ServiceRequestDetail;
+  isUrgente: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-6 max-w-2xl">
+      <PrintButton />
+
+      <div
+        className="rounded-lg border overflow-hidden flex flex-col"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      >
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-2" style={{ borderColor: "var(--border)" }}>
+          <span className="text-sm font-mono" style={{ color: "var(--text-muted)" }}>
+            Chamado #{request.ticketNumber}
+          </span>
+          {isUrgente ? (
+            <span className="text-base font-bold" style={{ color: "var(--status-critical)" }}>
+              Urgente!
+            </span>
+          ) : null}
+        </div>
+
+        <table className="w-full text-sm border-collapse">
+          <tbody>
+            <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+              <td className="px-3 py-2 font-semibold w-28 border-r align-top" style={{ borderColor: "var(--border)" }}>
+                Nome
+              </td>
+              <td className="px-3 py-2" style={{ color: "var(--text-primary)" }}>
+                {request.clientName || "—"}
+              </td>
+              <td className="px-3 py-2 border-l align-top w-40" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                Solicitado por: {request.requestedByName ?? "—"}
+              </td>
+            </tr>
+            <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+              <td className="px-3 py-2 font-semibold border-r align-top" style={{ borderColor: "var(--border)" }}>
+                Endereço
+              </td>
+              <td className="px-3 py-2" colSpan={2} style={{ color: "var(--text-primary)" }}>
+                {request.clientAddress || "—"}
+              </td>
+            </tr>
+            <tr>
+              <td className="px-3 py-2 font-semibold border-r align-top" style={{ borderColor: "var(--border)" }}>
+                Bairro
+              </td>
+              <td className="px-3 py-2 border-r" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+                {request.clientNeighborhood || "—"}
+              </td>
+              <td className="px-3 py-2" style={{ color: "var(--text-primary)" }}>
+                Tel: {request.clientPhone || "—"}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table className="w-full text-sm border-collapse border-t" style={{ borderColor: "var(--border)" }}>
+          <thead>
+            <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
+              <th className="px-3 py-2 text-left font-semibold">Descrição</th>
+              <th className="px-3 py-2 text-right font-semibold w-16">Qtd</th>
+            </tr>
+          </thead>
+          <tbody>
+            {request.items.length > 0 ? (
+              request.items.map((item) => (
+                <tr key={item.id} className="border-b" style={{ borderColor: "var(--border)" }}>
+                  <td className="px-3 py-2" style={{ color: "var(--text-primary)" }}>
+                    {item.product}
+                  </td>
+                  <td className="px-3 py-2 text-right" style={{ color: "var(--text-primary)" }}>
+                    {item.quantity}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="px-3 py-2" style={{ color: "var(--text-muted)" }} colSpan={2}>
+                  —
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        <div className="border-t" style={{ borderColor: "var(--border)" }}>
+          <div
+            className="px-3 py-1 text-sm font-semibold uppercase tracking-wide"
+            style={{ background: "var(--text-primary)", color: "var(--surface-1)" }}
+          >
+            Descrição
+          </div>
+          <div className="px-3 py-3 flex flex-col gap-1 items-center text-center">
+            <span className="text-sm font-bold uppercase" style={{ color: "var(--text-primary)" }}>
+              Troca
+            </span>
+            <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+              {request.restrictionNote || request.reason || "—"}
+            </span>
+          </div>
+        </div>
+
+        <div className="border-t" style={{ borderColor: "var(--border)" }}>
+          <div
+            className="px-3 py-1 text-sm font-semibold uppercase tracking-wide"
+            style={{ background: "var(--text-primary)", color: "var(--surface-1)" }}
+          >
+            Relatório Logístico
+          </div>
+          <div className="px-4 py-4 flex flex-col gap-3">
+            <Field label="Motorista" value={request.driverName} />
+            <div className="flex flex-col gap-4 pt-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="border-b" style={{ borderColor: "var(--border)", height: "1.25rem" }} />
+              ))}
+            </div>
+            <div className="flex justify-center pt-6">
+              <div className="border-t w-56 text-center text-xs pt-1" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+                Assinatura do cliente
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
