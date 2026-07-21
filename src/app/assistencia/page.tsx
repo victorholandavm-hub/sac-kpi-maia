@@ -22,7 +22,7 @@ function RoleCard({
   return (
     <Link
       href={href}
-      className="group aspect-square rounded-xl border p-4 flex flex-col items-center justify-center gap-2 text-center transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className="group w-36 h-36 sm:w-40 sm:h-40 rounded-xl border p-4 flex flex-col items-center justify-center gap-2 text-center transition-all hover:-translate-y-0.5 hover:shadow-md"
       style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: `3px solid ${borderColor}` }}
     >
       <div className="rounded-full p-3 shrink-0" style={{ background: iconBg }}>
@@ -43,7 +43,7 @@ function RoleCard({
 export default function AssistenciaHomePage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="max-w-sm w-full flex flex-col gap-8 text-center">
+      <div className="max-w-xl w-full flex flex-col items-center gap-8 text-center">
         <div className="flex flex-col items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Lojas Maia" className="h-20 w-20 object-contain" />
@@ -57,7 +57,7 @@ export default function AssistenciaHomePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-wrap justify-center gap-4">
           <RoleCard
             href="/assistencia/loja/login"
             icon={<StoreIcon color="var(--brand-orange)" />}
