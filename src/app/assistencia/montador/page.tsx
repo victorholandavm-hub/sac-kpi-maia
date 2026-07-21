@@ -93,6 +93,11 @@ export default async function MontadorHomePage({
                   <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
                     {r.clientName ?? "Sem nome de cliente"}
                   </p>
+                  {r.productSummary ? (
+                    <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+                      {r.productSummary}
+                    </p>
+                  ) : null}
                   {r.scheduledDate ? (
                     <p className="text-xs font-medium" style={{ color: "var(--brand-green)" }}>
                       {formatDateOnly(r.scheduledDate)}

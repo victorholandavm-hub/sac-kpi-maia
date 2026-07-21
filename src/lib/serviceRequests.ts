@@ -486,7 +486,14 @@ export async function listRequestsForAssembler(
   if (opts.onlyCompleted) {
     query = query.eq("status", "concluida").order("completed_at", { ascending: false });
   } else {
-    query = query.not("status", "in", "(concluida,cancelada)").order("created_at", { ascending: true });
+    // Ordenado pela data/hora agendada (quem não tem data ainda fica por
+    // último, já que não dá pra saber quando é) — assim o montador vê o
+    // próximo compromisso primeiro, não só quem foi criado primeiro.
+    query = query
+      .not("status", "in", "(concluida,cancelada)")
+      .order("scheduled_date", { ascending: true, nullsFirst: false })
+      .order("scheduled_time", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true });
   }
 
   const { data, error } = await query;
