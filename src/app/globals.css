@@ -59,3 +59,26 @@ body {
      "dançar" pros lados quando o usuário chega no topo/fim do scroll. */
   overscroll-behavior: none;
 }
+
+/* Feedback visual instantâneo ao tocar em qualquer botão/link — sem isso,
+   no celular não dá pra saber se o toque realmente registrou antes da
+   resposta do servidor chegar. Aplica pra tudo de uma vez em vez de mexer
+   botão por botão em cada componente. */
+button,
+a {
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+button:active:not(:disabled),
+a:active {
+  opacity: 0.7;
+  transform: scale(0.97);
+}
+
+@keyframes nav-progress-slide {
+  0% {
+    margin-left: -40%;
+  }
+  100% {
+    margin-left: 100%;
+  }
+}
