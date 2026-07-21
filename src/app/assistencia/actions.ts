@@ -11,6 +11,12 @@ import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/ser
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
+import {
+  ASSISTENCIA_TEAM_COOKIE_NAME,
+  ASSISTENCIA_TEAM_PENDING_MAX_AGE,
+  signAssistenciaTeamPending,
+  verifyAssistenciaTeamPending,
+} from "@/lib/assistenciaTeamAuth";
 
 const REQUEST_TYPES = [
   "montagem",
@@ -37,6 +43,26 @@ export async function signIn(_state: FormState, formData: FormData): Promise<For
     return { error: "Informe e-mail e senha." };
   }
 
+  // Login único da equipe da assistência (várias pessoas, mesma credencial):
+  // em vez de autenticar direto, manda pra tela "Quem é você?" escolher o
+  // nome — só ali a sessão real do Supabase Auth da pessoa escolhida é
+  // criada (ver chooseAssistenciaIdentity), então todo o resto do sistema
+  // (histórico, "assumir chamado" etc.) funciona exatamente como se ela
+  // tivesse logado com a própria conta.
+  const sharedEmail = process.env.ASSISTENCIA_TEAM_LOGIN_EMAIL;
+  const sharedPassword = process.env.ASSISTENCIA_TEAM_LOGIN_PASSWORD;
+  if (sharedEmail && sharedPassword && email === sharedEmail && password === sharedPassword) {
+    const cookieStore = await cookies();
+    cookieStore.set(ASSISTENCIA_TEAM_COOKIE_NAME, signAssistenciaTeamPending(), {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: ASSISTENCIA_TEAM_PENDING_MAX_AGE,
+      path: "/assistencia",
+    });
+    redirect("/assistencia/quem-e-voce");
+  }
+
   const supabase = await getSupabaseServer();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
@@ -50,6 +76,50 @@ export async function signOut() {
   const supabase = await getSupabaseServer();
   await supabase.auth.signOut();
   redirect("/assistencia/login");
+}
+
+// Segunda etapa do login compartilhado da equipe (ver signIn acima): troca a
+// identidade escolhida por uma sessão de verdade do Supabase Auth da conta
+// dela, usando um magic link gerado no servidor (nunca enviado por e-mail,
+// só resgatado aqui mesmo) — assim a sessão resultante é indistinguível de
+// um login normal com e-mail/senha próprios.
+export async function chooseAssistenciaIdentity(profileId: string) {
+  const cookieStore = await cookies();
+  const pending = cookieStore.get(ASSISTENCIA_TEAM_COOKIE_NAME)?.value;
+  if (!verifyAssistenciaTeamPending(pending)) {
+    redirect("/assistencia/login");
+  }
+
+  const admin = getSupabaseAdmin();
+  const { data: profile } = await admin.from("profiles").select("id, role").eq("id", profileId).maybeSingle();
+  if (!profile || profile.role !== "assistencia") {
+    redirect("/assistencia/quem-e-voce?erro=1");
+  }
+
+  const { data: userData, error: userError } = await admin.auth.admin.getUserById(profileId);
+  if (userError || !userData.user?.email) {
+    redirect("/assistencia/quem-e-voce?erro=1");
+  }
+
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email: userData.user.email,
+  });
+  if (linkError || !linkData) {
+    redirect("/assistencia/quem-e-voce?erro=1");
+  }
+
+  const supabase = await getSupabaseServer();
+  const { error: verifyError } = await supabase.auth.verifyOtp({
+    token_hash: linkData.properties.hashed_token,
+    type: "magiclink",
+  });
+  if (verifyError) {
+    redirect("/assistencia/quem-e-voce?erro=1");
+  }
+
+  cookieStore.delete({ name: ASSISTENCIA_TEAM_COOKIE_NAME, path: "/assistencia" });
+  redirect("/assistencia/inicio");
 }
 
 // Sem sessão do Supabase Auth (usa a sessão de gerente de loja por PIN — ver
