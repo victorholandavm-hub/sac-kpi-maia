@@ -175,13 +175,14 @@ export default async function LojaHomePage({
               <div className="divide-y" style={{ background: "var(--surface-1)", borderColor: "var(--gridline)" }}>
                 {group.map((r) => {
                   const isOwnStore = gerenteStoreIds.includes(r.storeId);
+                  const isOwnRequest = r.requestedByName === gerenteName;
                   const position = montagemPosition.get(r.id);
                   return (
                     <div
                       key={r.id}
                       className="flex items-center justify-between gap-4 p-4 flex-wrap"
                       style={
-                        isOwnStore
+                        isOwnRequest
                           ? { background: "var(--brand-green-soft)", borderLeft: "4px solid var(--brand-green)" }
                           : undefined
                       }
@@ -191,7 +192,7 @@ export default async function LojaHomePage({
                           <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
                             #{r.ticketNumber}
                           </span>
-                          <StatusBadge status={r.status} showInfo size={isOwnStore ? "md" : "sm"} />
+                          <StatusBadge status={r.status} showInfo size={isOwnRequest ? "md" : "sm"} />
                           <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                             {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                           </span>
@@ -206,12 +207,12 @@ export default async function LojaHomePage({
                               {position}º na fila
                             </span>
                           ) : null}
-                          {isOwnStore ? (
+                          {isOwnRequest ? (
                             <span
                               className="text-xs font-bold px-2 py-0.5 rounded-full"
                               style={{ color: "var(--brand-green-ink)", background: "var(--brand-green)" }}
                             >
-                              Sua loja
+                              Sua solicitação
                             </span>
                           ) : null}
                         </div>
@@ -238,7 +239,7 @@ export default async function LojaHomePage({
                             requestedDeadline={r.requestedDeadline}
                             deadlineStatus={r.deadlineStatus}
                             approvedDeadline={r.approvedDeadline}
-                            highlight
+                            highlight={isOwnRequest}
                           />
                         ) : (
                           <ReadOnlyDeadline

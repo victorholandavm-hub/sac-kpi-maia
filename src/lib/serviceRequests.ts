@@ -371,6 +371,7 @@ export type OpenRequestForLoja = {
   approvedDeadline: string | null;
   assemblerName: string | null;
   driverName: string | null;
+  requestedByName: string | null;
 };
 
 const OPEN_LOJA_LIMIT = 200;
@@ -386,7 +387,7 @@ export async function listOpenRequestsForLoja(
   let query = admin
     .from("service_requests")
     .select(
-      "id, ticket_number, type, status, store_id, client_name, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, stores(name), items:service_request_items(product)"
+      "id, ticket_number, type, status, store_id, client_name, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, stores(name), items:service_request_items(product)"
     )
     .limit(OPEN_LOJA_LIMIT);
 
@@ -418,6 +419,7 @@ export async function listOpenRequestsForLoja(
     approved_deadline: string | null;
     assembler_name: string | null;
     driver_name: string | null;
+    requested_by_name: string | null;
     stores: { name: string } | null;
     items: { product: string }[] | null;
   };
@@ -438,6 +440,7 @@ export async function listOpenRequestsForLoja(
     completedAt: row.completed_at,
     assemblerName: row.assembler_name,
     driverName: row.driver_name,
+    requestedByName: row.requested_by_name,
   }));
 }
 
