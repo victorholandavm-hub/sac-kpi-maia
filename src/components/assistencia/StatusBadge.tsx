@@ -1,14 +1,23 @@
 import { STATUS_LABELS, STATUS_COLORS, STATUS_DESCRIPTIONS } from "@/lib/assistenciaLabels";
 
-export function StatusBadge({ status, showInfo }: { status: string; showInfo?: boolean }) {
+export function StatusBadge({
+  status,
+  showInfo,
+  size = "sm",
+}: {
+  status: string;
+  showInfo?: boolean;
+  size?: "sm" | "md";
+}) {
   const color = STATUS_COLORS[status] ?? "var(--text-muted)";
   const description = showInfo ? STATUS_DESCRIPTIONS[status] : undefined;
+  const sizeClasses = size === "md" ? "text-sm font-bold px-3 py-1" : "text-xs font-medium px-2 py-0.5";
 
   return (
     <span className="inline-flex items-center gap-1">
       <span
-        className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-        style={{ color, border: `1px solid ${color}` }}
+        className={`inline-flex items-center gap-1.5 ${sizeClasses} rounded-full whitespace-nowrap`}
+        style={{ color, border: `1px solid ${color}`, background: size === "md" ? "var(--surface-1)" : undefined }}
       >
         <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: color }} />
         {STATUS_LABELS[status] ?? status}
