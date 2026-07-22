@@ -54,6 +54,13 @@ body {
 html,
 body {
   overflow-x: hidden;
+  /* `overflow-x: hidden` sozinho já faz o navegador computar overflow-y como
+     "auto" (regra da spec — não dá pra evitar isso escrevendo overflow-y:
+     visible aqui, o navegador ignora). O que importa é o <html>/<body> no
+     layout raiz (src/app/layout.tsx) NÃO terem altura travada (h-full) —
+     só min-height (min-h-screen) — senão o <html> vira sua própria caixa de
+     rolagem interna com altura fixa em 100vh, em vez do documento crescer e
+     rolar normalmente com o conteúdo. */
   /* Trava só o "pull-to-refresh"/bounce do navegador (chaining pro
      documento). `none` nos dois eixos travava a rolagem inteira em alguns
      navegadores embutidos (ex.: o do WhatsApp), então só trava o eixo Y —
