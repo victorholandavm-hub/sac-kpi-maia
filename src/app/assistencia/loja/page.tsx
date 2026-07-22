@@ -139,6 +139,17 @@ export default async function LojaHomePage({
                           {r.clientName ?? "Sem nome de cliente"}
                           {r.productSummary ? ` · ${r.productSummary}` : ""}
                         </p>
+                        {r.type === "troca_produto" ? (
+                          r.driverName ? (
+                            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                              Motorista: {r.driverName}
+                            </p>
+                          ) : null
+                        ) : r.assemblerName ? (
+                          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                            Montador: {r.assemblerName}
+                          </p>
+                        ) : null}
                       </div>
                       {!showCompleted ? (
                         <LojaDeadlineControl
