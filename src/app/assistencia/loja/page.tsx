@@ -196,10 +196,10 @@ export default async function LojaHomePage({
                   return (
                     <div
                       key={r.id}
-                      className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4"
+                      className={isOwnRequest ? "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4 rounded-lg m-2" : "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4"}
                       style={
                         isOwnRequest
-                          ? { background: "var(--brand-green-soft)", borderLeft: "4px solid var(--brand-green)" }
+                          ? { background: "var(--brand-green-soft)", border: "2px solid var(--brand-green)" }
                           : undefined
                       }
                     >
