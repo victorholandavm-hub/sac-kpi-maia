@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
 
 const DEBOUNCE_MS = 500;
+// Reforço por intervalo: o canal do Realtime só entrega eventos pra quem tem
+// sessão de verdade do Supabase Auth (RLS filtra o resto) — gerente de loja
+// e motorista/montador entram por PIN, sem essa sessão, então o canal sozinho
+// nunca dispara pra eles. O polling garante que a tela atualiza de qualquer
+// jeito, mesmo quando o Realtime não entrega nada.
+const POLL_MS = 15000;
 
 export function RealtimeQueueRefresher({ requestId }: { requestId?: string } = {}) {
   const router = useRouter();
@@ -42,8 +48,11 @@ export function RealtimeQueueRefresher({ requestId }: { requestId?: string } = {
       )
       .subscribe();
 
+    const pollInterval = setInterval(() => router.refresh(), POLL_MS);
+
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [router, requestId]);
