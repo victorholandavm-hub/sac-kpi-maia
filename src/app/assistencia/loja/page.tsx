@@ -174,8 +174,8 @@ export default async function LojaHomePage({
             const bannerPosition =
               group.length === 1 && group[0].type === "montagem" ? montagemPosition.get(group[0].id) : undefined;
             return (
-            <div key={dateLabel} className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--brand-green)" }}>
-              <div className="px-4 py-2 flex items-center gap-2 flex-wrap" style={{ background: "var(--brand-green)" }}>
+            <div key={dateLabel} className="rounded-xl border" style={{ borderColor: "var(--brand-green)" }}>
+              <div className="px-4 py-2 flex items-center gap-2 flex-wrap rounded-t-xl" style={{ background: "var(--brand-green)" }}>
                 {bannerPosition ? (
                   <span
                     className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
