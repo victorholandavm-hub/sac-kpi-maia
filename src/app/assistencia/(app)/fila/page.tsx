@@ -146,17 +146,13 @@ export default async function AssistenciaQueuePage({
         </div>
       ) : (
         groups.map((group) => (
-          <div key={group.dateKey} className="flex flex-col gap-2">
-            <h3
-              className="text-xs font-medium uppercase tracking-wide"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {group.label}
-            </h3>
-            <div
-              className="rounded-lg border overflow-hidden"
-              style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-            >
+          <div key={group.dateKey} className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--brand-green)" }}>
+            <div className="px-4 py-2" style={{ background: "var(--brand-green)" }}>
+              <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--brand-green-ink)" }}>
+                {group.label}
+              </span>
+            </div>
+            <div style={{ background: "var(--surface-1)" }}>
               <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
                 {group.items.map((r) => (
                   <Link
