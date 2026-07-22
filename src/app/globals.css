@@ -47,26 +47,13 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-/* Rede de segurança contra overflow horizontal no mobile: elementos com
-   conteúdo largo (texto longo, listas de opções, barras de navegação com
-   scroll próprio) não devem esticar a página inteira — cada um cuida do
-   próprio overflow interno (overflow-x-auto, truncate etc.). */
-html,
-body {
-  overflow-x: hidden;
-  /* `overflow-x: hidden` sozinho já faz o navegador computar overflow-y como
-     "auto" (regra da spec — não dá pra evitar isso escrevendo overflow-y:
-     visible aqui, o navegador ignora). O que importa é o <html>/<body> no
-     layout raiz (src/app/layout.tsx) NÃO terem altura travada (h-full) —
-     só min-height (min-h-screen) — senão o <html> vira sua própria caixa de
-     rolagem interna com altura fixa em 100vh, em vez do documento crescer e
-     rolar normalmente com o conteúdo. */
-  /* Trava só o "pull-to-refresh"/bounce do navegador (chaining pro
-     documento). `none` nos dois eixos travava a rolagem inteira em alguns
-     navegadores embutidos (ex.: o do WhatsApp), então só trava o eixo Y —
-     overflow-x: hidden acima já cuida do eixo X. */
-  overscroll-behavior-y: contain;
-}
+/* Removido de propósito: qualquer regra de overflow/overscroll-behavior
+   custom no <html>/<body> (mesmo só no eixo X ou Y) — reproduzido um bug
+   real onde isso deixava a rolagem por mouse/toque/teclado completamente
+   travada em algumas máquinas (só rolagem via JS continuava funcionando),
+   mesmo com overflow-y computado corretamente. Scroll nativo do navegador,
+   sem nenhuma customização, é mais confiável do que a proteção contra
+   overflow horizontal que essa regra dava. */
 
 /* Feedback visual instantâneo ao tocar em qualquer botão/link — sem isso,
    no celular não dá pra saber se o toque realmente registrou antes da
