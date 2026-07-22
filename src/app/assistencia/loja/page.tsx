@@ -234,7 +234,10 @@ export default async function LojaHomePage({
                             </span>
                           ) : r.requestedByName ? (
                             <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                              · Solicitado por {r.requestedByName}
+                              · Solicitado por{" "}
+                              <span className="font-bold" style={{ color: "var(--text-primary)" }}>
+                                {r.requestedByName}
+                              </span>
                             </span>
                           ) : null}
                         </div>
