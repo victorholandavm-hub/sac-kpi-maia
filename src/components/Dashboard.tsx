@@ -17,6 +17,7 @@ import { Header } from "./Header";
 import { PreviousWeekCard } from "./PreviousWeekCard";
 import { AgentQueue } from "./AgentQueue";
 import { AgentStatsTable } from "./AgentStatsTable";
+import { PerformanceReportButton } from "./PerformanceReportButton";
 import { categoryLabel, storeLabel, productLabel, blockingLabel } from "@/lib/labels";
 
 export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) {
@@ -33,7 +34,10 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
     <div className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
       <div className="flex flex-col gap-3">
         <Header />
-        <RangePicker range={range} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <RangePicker range={range} />
+          <PerformanceReportButton data={data.performanceReport} />
+        </div>
       </div>
 
       <PreviousWeekCard data={data.previousWeek} />

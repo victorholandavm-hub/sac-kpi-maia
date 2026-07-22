@@ -94,6 +94,33 @@ export type AgentQueueGroup = {
   tickets: AttentionRow[];
 };
 
+export type PerformanceMetric = {
+  key: string;
+  label: string;
+  unit: "h" | "min" | "%" | "count";
+  current: number | null;
+  previous: number | null;
+  deltaPct: number | null;
+  direction: "up" | "down" | "flat" | null;
+  improved: boolean | null;
+};
+
+export type PerformanceReport = {
+  windowDays: number;
+  currentFrom: string;
+  currentTo: string;
+  previousFrom: string;
+  previousTo: string;
+  currentSampleSize: number;
+  previousSampleSize: number;
+  metrics: PerformanceMetric[];
+};
+
+export type PerformanceReportSet = {
+  week: PerformanceReport;
+  month: PerformanceReport;
+};
+
 export type AgentStat = {
   agent: string;
   total: number;
@@ -149,6 +176,7 @@ export type KpiData = {
   escalationByStore: EscalationStoreStat[];
   agentQueue: AgentQueueGroup[];
   byAgentStats: AgentStat[];
+  performanceReport: PerformanceReportSet;
 };
 
 function median(values: number[]): number | null {
@@ -193,6 +221,106 @@ function byAgentCounts(rows: TicketRow[]): Count[] {
   return [...counts.entries()]
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count);
+}
+
+function windowStats(rows: TicketRow[]) {
+  const total = rows.length;
+  const resolvedCount = rows.filter((r) => r.resolved_effective).length;
+  const resolutionRatePct = total > 0 ? Math.round((resolvedCount / total) * 100) : null;
+
+  const resolutionHours = rows
+    .filter((r) => r.resolved_by_tag)
+    .map((r) => r.resolution_hours)
+    .filter((h): h is number => h !== null);
+  const avgResolutionHours =
+    resolutionHours.length > 0
+      ? Math.round((resolutionHours.reduce((a, b) => a + b, 0) / resolutionHours.length) * 10) / 10
+      : null;
+
+  const firstResponseRows = rows.filter((r) => r.first_response_minutes !== null);
+  const avgFirstResponseMinutes =
+    firstResponseRows.length > 0
+      ? Math.round(
+          (firstResponseRows.reduce((sum, r) => sum + (r.first_response_minutes ?? 0), 0) /
+            firstResponseRows.length) *
+            10
+        ) / 10
+      : null;
+  const pctWithinSla =
+    firstResponseRows.length > 0
+      ? Math.round((firstResponseRows.filter((r) => r.within_sla).length / firstResponseRows.length) * 100)
+      : null;
+
+  const recurrencePct =
+    total > 0 ? Math.round((rows.filter((r) => r.is_recurrence).length / total) * 100) : null;
+
+  return { total, resolutionRatePct, avgResolutionHours, avgFirstResponseMinutes, pctWithinSla, recurrencePct };
+}
+
+function buildMetric(
+  key: string,
+  label: string,
+  unit: PerformanceMetric["unit"],
+  current: number | null,
+  previous: number | null,
+  higherIsBetter: boolean | null
+): PerformanceMetric {
+  const deltaPct =
+    current !== null && previous !== null && previous !== 0
+      ? Math.round(((current - previous) / previous) * 1000) / 10
+      : null;
+
+  let direction: PerformanceMetric["direction"] = null;
+  let improved: boolean | null = null;
+  if (current !== null && previous !== null) {
+    direction = current === previous ? "flat" : current > previous ? "up" : "down";
+    if (higherIsBetter !== null && direction !== "flat") {
+      improved = higherIsBetter ? current > previous : current < previous;
+    }
+  }
+
+  return { key, label, unit, current, previous, deltaPct, direction, improved };
+}
+
+function buildPerformanceReport(allRows: TicketRow[], now: Date, windowDays: number): PerformanceReport {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const currentTo = now;
+  const currentFrom = new Date(now.getTime() - windowDays * dayMs);
+  const previousTo = currentFrom;
+  const previousFrom = new Date(currentFrom.getTime() - windowDays * dayMs);
+
+  const inWindow = (row: TicketRow, from: Date, to: Date) => {
+    const opened = new Date(row.opened_at).getTime();
+    return opened >= from.getTime() && opened < to.getTime();
+  };
+
+  const cur = windowStats(allRows.filter((r) => inWindow(r, currentFrom, currentTo)));
+  const prev = windowStats(allRows.filter((r) => inWindow(r, previousFrom, previousTo)));
+
+  return {
+    windowDays,
+    currentFrom: currentFrom.toISOString().slice(0, 10),
+    currentTo: currentTo.toISOString().slice(0, 10),
+    previousFrom: previousFrom.toISOString().slice(0, 10),
+    previousTo: previousTo.toISOString().slice(0, 10),
+    currentSampleSize: cur.total,
+    previousSampleSize: prev.total,
+    metrics: [
+      buildMetric("volume", "Chamados abertos", "count", cur.total, prev.total, null),
+      buildMetric("resolutionRate", "Taxa de resolução", "%", cur.resolutionRatePct, prev.resolutionRatePct, true),
+      buildMetric("avgResolutionHours", "Tempo médio de resolução", "h", cur.avgResolutionHours, prev.avgResolutionHours, false),
+      buildMetric("avgFirstResponse", "1ª resposta (média)", "min", cur.avgFirstResponseMinutes, prev.avgFirstResponseMinutes, false),
+      buildMetric("pctWithinSla", "Dentro do SLA", "%", cur.pctWithinSla, prev.pctWithinSla, true),
+      buildMetric("recurrencePct", "Taxa de reincidência", "%", cur.recurrencePct, prev.recurrencePct, false),
+    ],
+  };
+}
+
+function buildPerformanceReportSet(allRows: TicketRow[], now: Date): PerformanceReportSet {
+  return {
+    week: buildPerformanceReport(allRows, now, 7),
+    month: buildPerformanceReport(allRows, now, 30),
+  };
 }
 
 function buildAgentStats(rows: TicketRow[]): AgentStat[] {
@@ -626,5 +754,6 @@ export async function getKpiData(
     escalationByStore: buildEscalationByStore(escalationRows, labelFns.storeLabel),
     agentQueue,
     byAgentStats: buildAgentStats(rows),
+    performanceReport: buildPerformanceReportSet(allRows, new Date()),
   };
 }
