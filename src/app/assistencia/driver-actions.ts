@@ -130,7 +130,17 @@ export async function driverMarkPickupCompleted(requestId: string): Promise<void
   revalidatePath(`/assistencia/${requestId}`);
 }
 
-export async function driverCompleteRequest(requestId: string): Promise<void> {
+function validRating(value: number | null): number | null {
+  if (value === null) return null;
+  if (!Number.isInteger(value) || value < 0 || value > 10) throw new Error("Nota inválida.");
+  return value;
+}
+
+export async function driverCompleteRequest(
+  requestId: string,
+  deliveryRating: number | null = null,
+  resolutionRating: number | null = null
+): Promise<void> {
   const driverName = await getDriverSession();
   if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
 
@@ -149,17 +159,27 @@ export async function driverCompleteRequest(requestId: string): Promise<void> {
 
   const { error: updateError } = await admin
     .from("service_requests")
-    .update({ status: "concluida", completed_at: new Date().toISOString(), pickup_completed: true })
+    .update({
+      status: "concluida",
+      completed_at: new Date().toISOString(),
+      pickup_completed: true,
+      delivery_rating: validRating(deliveryRating),
+      resolution_rating: validRating(resolutionRating),
+    })
     .eq("id", requestId);
   if (updateError) throw new Error(updateError.message);
 
+  const ratingNote =
+    deliveryRating !== null || resolutionRating !== null
+      ? ` Avaliação do cliente — entrega: ${deliveryRating ?? "—"}, resolução: ${resolutionRating ?? "—"}.`
+      : "";
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: null,
     event_type: "status_changed",
     from_status: request.status,
     to_status: "concluida",
-    note: `Concluído pelo motorista ${driverName}.`,
+    note: `Concluído pelo motorista ${driverName}.${ratingNote}`,
   });
 
   revalidatePath("/assistencia/motorista");

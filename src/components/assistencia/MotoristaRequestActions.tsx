@@ -9,13 +9,52 @@ import {
 } from "@/app/assistencia/driver-actions";
 import { useQuickAction } from "./useQuickAction";
 
-type Mode = null | "complete" | "issue";
+type Mode = null | "complete" | "rating" | "issue";
+
+const RATING_VALUES = Array.from({ length: 11 }, (_, i) => i);
+
+function RatingScale({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+        {label}
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        {RATING_VALUES.map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            className="text-sm rounded-lg w-9 h-9 font-medium border shrink-0"
+            style={
+              value === n
+                ? { background: "var(--brand-green)", color: "var(--brand-green-ink)", borderColor: "var(--brand-green)" }
+                : { borderColor: "var(--border)", color: "var(--text-primary)" }
+            }
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function MotoristaRequestActions({ requestId, pickupCompleted }: { requestId: string; pickupCompleted: boolean }) {
   const { pending, run, showToast } = useQuickAction();
   const [mode, setMode] = useState<Mode>(null);
   const [issueReason, setIssueReason] = useState("");
   const [note, setNote] = useState("");
+  const [deliveryRating, setDeliveryRating] = useState<number | null>(null);
+  const [resolutionRating, setResolutionRating] = useState<number | null>(null);
 
   function confirmIssue() {
     if (!issueReason.trim()) {
@@ -27,6 +66,13 @@ export function MotoristaRequestActions({ requestId, pickupCompleted }: { reques
       setIssueReason("");
       setMode(null);
     }, "Chamado marcado pra remarcar.");
+  }
+
+  function finishComplete(withRating: boolean) {
+    run(async () => {
+      await driverCompleteRequest(requestId, withRating ? deliveryRating : null, withRating ? resolutionRating : null);
+      setMode(null);
+    }, "Rota concluída.");
   }
 
   return (
@@ -99,12 +145,7 @@ export function MotoristaRequestActions({ requestId, pickupCompleted }: { reques
           <div className="flex items-center gap-2">
             <button
               disabled={pending}
-              onClick={() => {
-                run(async () => {
-                  await driverCompleteRequest(requestId);
-                  setMode(null);
-                }, "Rota concluída.");
-              }}
+              onClick={() => setMode("rating")}
               className="text-sm rounded-lg px-3 py-2.5 font-medium disabled:opacity-60 flex-1"
               style={{ background: "var(--status-good)", color: "#fff" }}
             >
@@ -114,6 +155,34 @@ export function MotoristaRequestActions({ requestId, pickupCompleted }: { reques
               cancelar
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {mode === "rating" ? (
+        <div className="flex flex-col gap-4 rounded-lg border p-3" style={{ borderColor: "var(--status-good)" }}>
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            Passe o celular pro cliente avaliar (0 a 10):
+          </span>
+          <RatingScale label="Nota pra entrega" value={deliveryRating} onChange={setDeliveryRating} />
+          <RatingScale label="Nota pra resolução do problema" value={resolutionRating} onChange={setResolutionRating} />
+          <div className="flex items-center gap-2">
+            <button
+              disabled={pending || deliveryRating === null || resolutionRating === null}
+              onClick={() => finishComplete(true)}
+              className="text-sm rounded-lg px-3 py-2.5 font-medium disabled:opacity-60 flex-1"
+              style={{ background: "var(--status-good)", color: "#fff" }}
+            >
+              Enviar avaliação e concluir
+            </button>
+          </div>
+          <button
+            disabled={pending}
+            onClick={() => finishComplete(false)}
+            className="text-sm underline self-start disabled:opacity-60"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Cliente não quis avaliar — concluir sem avaliação
+          </button>
         </div>
       ) : null}
 

@@ -83,6 +83,14 @@ export default async function MotoristaHomePage({
                       #{r.ticketNumber}
                     </span>
                     <StatusBadge status={r.status} />
+                    {r.shift === "urgencia" ? (
+                      <span
+                        className="text-xs font-bold px-2 py-0.5 rounded-full"
+                        style={{ color: "#fff", background: "var(--status-critical)" }}
+                      >
+                        Urgente!
+                      </span>
+                    ) : null}
                     {!showCompleted && !r.pickupCompleted ? (
                       <span
                         className="text-xs font-medium px-2 py-0.5 rounded-full"

@@ -208,6 +208,12 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         {request.type === "troca_produto" ? (
           <Row label="Produto recolhido?" value={request.pickupCompleted ? "Sim" : "Ainda não"} />
         ) : null}
+        {request.type === "troca_produto" && request.deliveryRating !== null ? (
+          <Row label="Nota do cliente — entrega" value={`${request.deliveryRating}/10`} />
+        ) : null}
+        {request.type === "troca_produto" && request.resolutionRating !== null ? (
+          <Row label="Nota do cliente — resolução do problema" value={`${request.resolutionRating}/10`} />
+        ) : null}
         {canManage ? (
           <ScheduleField
             requestId={request.id}

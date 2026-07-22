@@ -59,6 +59,14 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
 
         <div className="flex items-center gap-2 flex-wrap">
           <StatusBadge status={request.status} />
+          {request.shift === "urgencia" ? (
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ color: "#fff", background: "var(--status-critical)" }}
+            >
+              Urgente!
+            </span>
+          ) : null}
           {!showCompleted && !request.pickupCompleted ? (
             <span
               className="text-xs font-medium px-2 py-0.5 rounded-full"

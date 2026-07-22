@@ -272,6 +272,8 @@ export type ServiceRequestDetail = ServiceRequestSummary & {
   clientNeighborhood: string | null;
   restrictionNote: string | null;
   notes: string | null;
+  deliveryRating: number | null;
+  resolutionRating: number | null;
 };
 
 export type RequestEvent = {
@@ -297,6 +299,8 @@ type DetailRow = SummaryRow & {
   client_neighborhood: string | null;
   restriction_note: string | null;
   notes: string | null;
+  delivery_rating: number | null;
+  resolution_rating: number | null;
 };
 
 type EventRow = {
@@ -310,7 +314,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 export async function getRequestDetail(
   id: string
@@ -344,6 +348,8 @@ export async function getRequestDetail(
     clientNeighborhood: row.client_neighborhood,
     restrictionNote: row.restriction_note,
     notes: row.notes,
+    deliveryRating: row.delivery_rating,
+    resolutionRating: row.resolution_rating,
   };
 
   return { request, events };
