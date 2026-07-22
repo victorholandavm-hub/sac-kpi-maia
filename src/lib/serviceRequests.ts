@@ -360,6 +360,7 @@ export type OpenRequestForLoja = {
   ticketNumber: number;
   type: RequestType;
   status: RequestStatus;
+  storeId: string;
   storeName: string;
   clientName: string | null;
   productSummary: string | null;
@@ -385,7 +386,7 @@ export async function listOpenRequestsForLoja(
   let query = admin
     .from("service_requests")
     .select(
-      "id, ticket_number, type, status, client_name, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, stores(name), items:service_request_items(product)"
+      "id, ticket_number, type, status, store_id, client_name, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, stores(name), items:service_request_items(product)"
     )
     .limit(OPEN_LOJA_LIMIT);
 
@@ -408,6 +409,7 @@ export async function listOpenRequestsForLoja(
     ticket_number: number;
     type: RequestType;
     status: RequestStatus;
+    store_id: string;
     client_name: string | null;
     created_at: string;
     completed_at: string | null;
@@ -425,6 +427,7 @@ export async function listOpenRequestsForLoja(
     ticketNumber: row.ticket_number,
     type: row.type,
     status: row.status,
+    storeId: row.store_id,
     storeName: row.stores?.name ?? "—",
     requestedDeadline: row.requested_deadline,
     deadlineStatus: row.deadline_status,
@@ -436,6 +439,26 @@ export async function listOpenRequestsForLoja(
     assemblerName: row.assembler_name,
     driverName: row.driver_name,
   }));
+}
+
+// Posição de cada chamado de montagem em aberto na fila geral (todas as
+// lojas), na mesma ordem que o montador vai atender (ver
+// listRequestsForAssembler) — usado pro gerente de loja ver quantas
+// montagens de outras lojas estão na frente da dele.
+export async function listOpenMontagemQueueIds(): Promise<string[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("service_requests")
+    .select("id")
+    .eq("type", "montagem")
+    .not("status", "in", "(concluida,cancelada)")
+    .order("scheduled_date", { ascending: true, nullsFirst: false })
+    .order("scheduled_time", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true })
+    .limit(OPEN_LOJA_LIMIT);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => row.id as string);
 }
 
 export type AssemblerRequestView = {

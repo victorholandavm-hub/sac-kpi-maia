@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { listOpenRequestsForLoja, listStores, type OpenRequestForLoja } from "@/lib/serviceRequests";
+import { listOpenRequestsForLoja, listOpenMontagemQueueIds, listStores, type OpenRequestForLoja } from "@/lib/serviceRequests";
 import { getLojaStorePreference } from "@/app/assistencia/actions";
 import { getLojaGerenteSession, lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
+import { getGerenteStoreIds } from "@/lib/gerentes";
 import { REQUEST_TYPE_LABELS, STATUS_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -29,10 +30,15 @@ export default async function LojaHomePage({
   const storeId = storePref ?? "";
   const showCompleted = view === "concluidas";
 
-  const [requests, stores] = await Promise.all([
+  const [requests, stores, gerenteStoreIds, montagemQueueIds] = await Promise.all([
     listOpenRequestsForLoja({ storeId: storeId || undefined, onlyCompleted: showCompleted }),
     listStores(),
+    getGerenteStoreIds(gerenteName),
+    showCompleted ? Promise.resolve([]) : listOpenMontagemQueueIds(),
   ]);
+
+  const montagemPosition = new Map(montagemQueueIds.map((id, i) => [id, i + 1]));
+  const montagemTotal = montagemQueueIds.length;
 
   const byStatus: Record<string, number> = {};
   for (const r of requests) {
@@ -120,47 +126,72 @@ export default async function LojaHomePage({
               </span>
               <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
                 <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                  {group.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between gap-4 p-4 flex-wrap">
-                      <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                            #{r.ticketNumber}
-                          </span>
-                          <StatusBadge status={r.status} showInfo />
-                          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                            {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                          </span>
-                          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                            {r.storeName}
-                          </span>
-                        </div>
-                        <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                          {r.clientName ?? "Sem nome de cliente"}
-                          {r.productSummary ? ` · ${r.productSummary}` : ""}
-                        </p>
-                        {r.type === "troca_produto" ? (
-                          r.driverName ? (
-                            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                              Motorista: {r.driverName}
-                            </p>
-                          ) : null
-                        ) : r.assemblerName ? (
-                          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                            Montador: {r.assemblerName}
+                  {group.map((r) => {
+                    const isOwnStore = gerenteStoreIds.includes(r.storeId);
+                    const position = montagemPosition.get(r.id);
+                    return (
+                      <div
+                        key={r.id}
+                        className="flex items-center justify-between gap-4 p-4 flex-wrap"
+                        style={
+                          isOwnStore
+                            ? { background: "var(--brand-green-soft)", borderLeft: "3px solid var(--brand-green)" }
+                            : undefined
+                        }
+                      >
+                        <div className="flex flex-col gap-1 min-w-0 w-0 grow">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                              #{r.ticketNumber}
+                            </span>
+                            <StatusBadge status={r.status} showInfo />
+                            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                              {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+                            </span>
+                            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                              {r.storeName}
+                            </span>
+                            {isOwnStore ? (
+                              <span
+                                className="text-xs font-medium px-2 py-0.5 rounded-full"
+                                style={{ color: "var(--brand-green)", border: "1px solid var(--brand-green)" }}
+                              >
+                                Sua loja
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
+                            {r.clientName ?? "Sem nome de cliente"}
+                            {r.productSummary ? ` · ${r.productSummary}` : ""}
                           </p>
+                          {r.type === "troca_produto" ? (
+                            r.driverName ? (
+                              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                                Motorista: {r.driverName}
+                              </p>
+                            ) : null
+                          ) : r.assemblerName ? (
+                            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                              Montador: {r.assemblerName}
+                            </p>
+                          ) : null}
+                          {r.type === "montagem" && position ? (
+                            <p className="text-xs font-medium" style={{ color: "var(--brand-orange)" }}>
+                              {position}ª na fila de montagem (de {montagemTotal})
+                            </p>
+                          ) : null}
+                        </div>
+                        {!showCompleted ? (
+                          <LojaDeadlineControl
+                            requestId={r.id}
+                            requestedDeadline={r.requestedDeadline}
+                            deadlineStatus={r.deadlineStatus}
+                            approvedDeadline={r.approvedDeadline}
+                          />
                         ) : null}
                       </div>
-                      {!showCompleted ? (
-                        <LojaDeadlineControl
-                          requestId={r.id}
-                          requestedDeadline={r.requestedDeadline}
-                          deadlineStatus={r.deadlineStatus}
-                          approvedDeadline={r.approvedDeadline}
-                        />
-                      ) : null}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
