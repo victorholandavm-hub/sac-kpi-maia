@@ -44,7 +44,7 @@ export function LojaDeadlineControl({
   const color = STATUS_COLOR[deadlineStatus] ?? "var(--text-muted)";
 
   return (
-    <div className="flex flex-col gap-1.5 items-end">
+    <div className="flex flex-col gap-1.5 items-start sm:items-end">
       {shownDate ? (
         <span
           className={highlight ? "text-sm font-bold px-2.5 py-1 rounded-lg" : "text-xs font-semibold px-2 py-0.5 rounded-lg"}

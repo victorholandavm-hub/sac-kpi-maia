@@ -180,43 +180,45 @@ export default async function LojaHomePage({
                   return (
                     <div
                       key={r.id}
-                      className="flex items-center justify-between gap-4 p-4 flex-wrap"
+                      className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4"
                       style={
                         isOwnRequest
                           ? { background: "var(--brand-green-soft)", borderLeft: "4px solid var(--brand-green)" }
                           : undefined
                       }
                     >
-                      <div className="flex flex-col gap-1 min-w-0 w-0 grow">
+                      <div className="flex flex-col gap-1.5 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
                             #{r.ticketNumber}
                           </span>
                           <StatusBadge status={r.status} showInfo size={isOwnRequest ? "md" : "sm"} />
-                          <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                            {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                          </span>
-                          <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                            {r.storeName}
-                          </span>
                           {r.type === "montagem" && position ? (
                             <span
-                              className="text-xs font-bold px-2 py-0.5 rounded-full"
+                              className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
                               style={{ color: "#fff", background: "var(--brand-orange)" }}
                             >
                               {position}º na fila
                             </span>
                           ) : null}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                            {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+                          </span>
+                          <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                            · {r.storeName}
+                          </span>
                           {isOwnRequest ? (
                             <span
-                              className="text-xs font-bold px-2 py-0.5 rounded-full"
+                              className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
                               style={{ color: "var(--brand-green-ink)", background: "var(--brand-green)" }}
                             >
                               Sua solicitação
                             </span>
                           ) : null}
                         </div>
-                        <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
+                        <p className="text-sm font-medium break-words" style={{ color: "var(--text-primary)" }}>
                           {r.clientName ?? "Sem nome de cliente"}
                           {r.productSummary ? ` · ${r.productSummary}` : ""}
                         </p>
@@ -233,21 +235,23 @@ export default async function LojaHomePage({
                         ) : null}
                       </div>
                       {!showCompleted ? (
-                        isOwnStore ? (
-                          <LojaDeadlineControl
-                            requestId={r.id}
-                            requestedDeadline={r.requestedDeadline}
-                            deadlineStatus={r.deadlineStatus}
-                            approvedDeadline={r.approvedDeadline}
-                            highlight={isOwnRequest}
-                          />
-                        ) : (
-                          <ReadOnlyDeadline
-                            requestedDeadline={r.requestedDeadline}
-                            deadlineStatus={r.deadlineStatus}
-                            approvedDeadline={r.approvedDeadline}
-                          />
-                        )
+                        <div className="shrink-0">
+                          {isOwnStore ? (
+                            <LojaDeadlineControl
+                              requestId={r.id}
+                              requestedDeadline={r.requestedDeadline}
+                              deadlineStatus={r.deadlineStatus}
+                              approvedDeadline={r.approvedDeadline}
+                              highlight={isOwnRequest}
+                            />
+                          ) : (
+                            <ReadOnlyDeadline
+                              requestedDeadline={r.requestedDeadline}
+                              deadlineStatus={r.deadlineStatus}
+                              approvedDeadline={r.approvedDeadline}
+                            />
+                          )}
+                        </div>
                       ) : null}
                     </div>
                   );

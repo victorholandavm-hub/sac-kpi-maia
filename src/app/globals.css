@@ -54,10 +54,11 @@ body {
 html,
 body {
   overflow-x: hidden;
-  /* Trava o "rubber-band"/bounce elástico ao rolar (visível sobretudo em
-     navegadores embutidos tipo o do WhatsApp) — sem isso a página parece
-     "dançar" pros lados quando o usuário chega no topo/fim do scroll. */
-  overscroll-behavior: none;
+  /* Trava só o "pull-to-refresh"/bounce do navegador (chaining pro
+     documento). `none` nos dois eixos travava a rolagem inteira em alguns
+     navegadores embutidos (ex.: o do WhatsApp), então só trava o eixo Y —
+     overflow-x: hidden acima já cuida do eixo X. */
+  overscroll-behavior-y: contain;
 }
 
 /* Feedback visual instantâneo ao tocar em qualquer botão/link — sem isso,
