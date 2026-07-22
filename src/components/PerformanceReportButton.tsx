@@ -94,8 +94,8 @@ export function PerformanceReportButton({ data }: { data: PerformanceReportSet }
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-sm px-3 py-1.5 rounded-full"
-        style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+        className="text-sm font-medium px-3 py-1.5 rounded-full"
+        style={{ background: "var(--brand-orange)", color: "#fff" }}
       >
         Relatório de desempenho
       </button>
