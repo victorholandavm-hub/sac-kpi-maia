@@ -165,9 +165,23 @@ export default async function LojaHomePage({
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          {groupByDate(requests, showCompleted).map(([dateLabel, group]) => (
+          {groupByDate(requests, showCompleted).map(([dateLabel, group]) => {
+            // Só sobe a posição na fila pro cabeçalho quando não há ambiguidade
+            // (um único chamado de montagem no grupo do dia) — com mais de um,
+            // cada posição continua ao lado do próprio chamado.
+            const bannerPosition =
+              group.length === 1 && group[0].type === "montagem" ? montagemPosition.get(group[0].id) : undefined;
+            return (
             <div key={dateLabel} className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--brand-green)" }}>
-              <div className="px-4 py-2" style={{ background: "var(--brand-green)" }}>
+              <div className="px-4 py-2 flex items-center gap-2 flex-wrap" style={{ background: "var(--brand-green)" }}>
+                {bannerPosition ? (
+                  <span
+                    className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                    style={{ color: "var(--brand-green)", background: "#fff" }}
+                  >
+                    {bannerPosition}º na fila
+                  </span>
+                ) : null}
                 <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--brand-green-ink)" }}>
                   {showCompleted ? `Concluídas em ${dateLabel}` : `Solicitado em ${dateLabel}`}
                 </span>
@@ -176,7 +190,7 @@ export default async function LojaHomePage({
                 {group.map((r) => {
                   const isOwnStore = gerenteStoreIds.includes(r.storeId);
                   const isOwnRequest = r.requestedByName === gerenteName;
-                  const position = montagemPosition.get(r.id);
+                  const position = bannerPosition ? undefined : montagemPosition.get(r.id);
                   return (
                     <div
                       key={r.id}
@@ -235,7 +249,10 @@ export default async function LojaHomePage({
                         ) : null}
                       </div>
                       {!showCompleted ? (
-                        <div className="shrink-0">
+                        <div
+                          className="shrink-0 pt-3 mt-1 border-t sm:pt-0 sm:mt-0 sm:border-t-0 w-full sm:w-auto"
+                          style={{ borderColor: "var(--gridline)" }}
+                        >
                           {isOwnStore ? (
                             <LojaDeadlineControl
                               requestId={r.id}
@@ -258,7 +275,8 @@ export default async function LojaHomePage({
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
