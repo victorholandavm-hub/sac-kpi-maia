@@ -100,7 +100,17 @@ export async function montadorDeletePhoto(photoId: string): Promise<void> {
   revalidatePath("/assistencia/montador");
 }
 
-export async function montadorCompleteRequest(requestId: string): Promise<void> {
+function validRating(value: number | null): number | null {
+  if (value === null) return null;
+  if (!Number.isInteger(value) || value < 0 || value > 10) throw new Error("Nota inválida.");
+  return value;
+}
+
+export async function montadorCompleteRequest(
+  requestId: string,
+  deliveryRating: number | null = null,
+  resolutionRating: number | null = null
+): Promise<void> {
   const assemblerName = await getMontadorSession();
   if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
 
@@ -119,17 +129,26 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
 
   const { error: updateError } = await admin
     .from("service_requests")
-    .update({ status: "concluida", completed_at: new Date().toISOString() })
+    .update({
+      status: "concluida",
+      completed_at: new Date().toISOString(),
+      delivery_rating: validRating(deliveryRating),
+      resolution_rating: validRating(resolutionRating),
+    })
     .eq("id", requestId);
   if (updateError) throw new Error(updateError.message);
 
+  const ratingNote =
+    deliveryRating !== null || resolutionRating !== null
+      ? ` Avaliação do cliente — montagem: ${deliveryRating ?? "—"}, resolução: ${resolutionRating ?? "—"}.`
+      : "";
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: null,
     event_type: "status_changed",
     from_status: request.status,
     to_status: "concluida",
-    note: `Concluído pelo montador ${assemblerName}.`,
+    note: `Concluído pelo montador ${assemblerName}.${ratingNote}`,
   });
 
   revalidatePath("/assistencia/montador");
