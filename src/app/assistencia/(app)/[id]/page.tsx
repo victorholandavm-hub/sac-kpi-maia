@@ -112,27 +112,27 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           </h2>
         </div>
         {canManage ? (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             <Link
               href={`/assistencia/${request.id}/editar`}
-              className="text-sm underline"
-              style={{ color: "var(--text-secondary)" }}
+              className="text-sm font-medium rounded-lg px-3 py-1.5"
+              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
             >
-              Editar
+              Editar e salvar alterações
             </Link>
             {profile.role !== "sac" ? (
               <Link
                 href={`/assistencia/pecas/nova?service_request_id=${request.id}`}
-                className="text-sm underline"
-                style={{ color: "var(--text-secondary)" }}
+                className="text-sm font-medium rounded-lg border px-3 py-1.5"
+                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
               >
-                Solicitar peça para este chamado
+                Solicitar peça
               </Link>
             ) : null}
             <Link
               href={`/assistencia/${request.id}/despacho`}
-              className="text-sm underline"
-              style={{ color: "var(--text-secondary)" }}
+              className="text-sm font-medium rounded-lg border px-3 py-1.5"
+              style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
             >
               Imprimir despacho
             </Link>
@@ -181,6 +181,9 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
         style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
+        <h3 className="text-xs font-semibold uppercase tracking-wide sm:col-span-2" style={{ color: "var(--text-muted)" }}>
+          Pedido e cliente
+        </h3>
         <Row label="Código do pedido/venda" value={request.orderCode} />
         <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
         <Row label="Vendedor(a)" value={request.sellerName} />
@@ -189,6 +192,15 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         <Row label="Telefone" value={request.clientPhone} />
         <Row label="Endereço" value={request.clientAddress} />
         <Row label="Bairro" value={request.clientNeighborhood} />
+      </div>
+
+      <div
+        className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
+        style={{ background: "var(--brand-orange-soft)", borderColor: "var(--brand-orange)", borderLeftWidth: "4px" }}
+      >
+        <h3 className="text-xs font-bold uppercase tracking-wide sm:col-span-2" style={{ color: "var(--brand-orange)" }}>
+          Atendimento — o que a assistência precisa acompanhar
+        </h3>
         <Row label="Motivo" value={request.reason} />
         <Row label="Restrição / observação" value={request.restrictionNote} />
         <Row label="Observações" value={request.notes} />
