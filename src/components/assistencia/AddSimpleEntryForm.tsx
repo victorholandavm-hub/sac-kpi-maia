@@ -1,17 +1,32 @@
 "use client";
 
 import { useActionState } from "react";
-import { addAssembler, addSupplier, addDriver, type FormState } from "@/app/assistencia/admin-actions";
+import { addAssembler, addSupplier, addDriver, addCdOperador, addFabricaOperador, type FormState } from "@/app/assistencia/admin-actions";
 
-export function AddSimpleEntryForm({ kind }: { kind: "assembler" | "supplier" | "driver" }) {
-  const action = kind === "assembler" ? addAssembler : kind === "driver" ? addDriver : addSupplier;
-  const [state, formAction, pending] = useActionState<FormState, FormData>(action, undefined);
+const ACTIONS = {
+  assembler: addAssembler,
+  driver: addDriver,
+  supplier: addSupplier,
+  cd: addCdOperador,
+  fabrica: addFabricaOperador,
+};
+
+const PLACEHOLDERS = {
+  assembler: "Novo montador",
+  driver: "Novo motorista",
+  supplier: "Novo fornecedor",
+  cd: "Novo operador do CD",
+  fabrica: "Novo operador da fábrica",
+};
+
+export function AddSimpleEntryForm({ kind }: { kind: keyof typeof ACTIONS }) {
+  const [state, formAction, pending] = useActionState<FormState, FormData>(ACTIONS[kind], undefined);
 
   return (
     <form action={formAction} className="flex items-center gap-2 mt-2 flex-wrap">
       <input
         name="name"
-        placeholder={kind === "assembler" ? "Novo montador" : kind === "driver" ? "Novo motorista" : "Novo fornecedor"}
+        placeholder={PLACEHOLDERS[kind]}
         required
         className="rounded border px-2 py-1 text-sm"
         style={{ borderColor: "var(--border)" }}

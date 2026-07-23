@@ -67,3 +67,40 @@ export function requireManageAccess(profile: Profile, requestType: string) {
   if (profile.role === "sac" && (SAC_MANAGED_TYPES as readonly string[]).includes(requestType)) return;
   throw new Error(`Ação não permitida para o papel "${profile.role}" nesse chamado.`);
 }
+
+// Regras de transição de status do pedido de encomenda (ver
+// supabase/migrations/0027_pedidos_encomenda.sql / 0028_encomenda_pin_auth.sql):
+// fábrica só avança solicitado -> em_producao -> pronto_para_expedicao; CD só
+// avança daí em diante até entregue. Só admin/assistencia pode cancelar, em
+// qualquer etapa. Aceita `{ role: string }` em vez de `Profile` porque CD e
+// fábrica não são mais contas Supabase Auth — ver EncomendaActor em
+// src/lib/encomendaAuth.ts.
+const FABRICA_TRANSITIONS: Record<string, string[]> = {
+  solicitado: ["em_producao"],
+  em_producao: ["pronto_para_expedicao"],
+};
+
+const CD_TRANSITIONS: Record<string, string[]> = {
+  pronto_para_expedicao: ["em_carga"],
+  em_carga: ["faturado"],
+  faturado: ["entregue"],
+};
+
+export function requireEncomendaAction(actor: { role: string }, fromStatus: string, toStatus: string) {
+  if (actor.role === "assistencia" || actor.role === "admin") return;
+
+  if (toStatus === "cancelado") {
+    throw new Error(`Ação não permitida para o papel "${actor.role}" — só admin/assistência pode cancelar um pedido.`);
+  }
+
+  const allowed =
+    actor.role === "fabrica"
+      ? (FABRICA_TRANSITIONS[fromStatus] ?? [])
+      : actor.role === "cd"
+        ? (CD_TRANSITIONS[fromStatus] ?? [])
+        : [];
+
+  if (!allowed.includes(toStatus)) {
+    throw new Error(`Ação não permitida para o papel "${actor.role}" nesse pedido.`);
+  }
+}

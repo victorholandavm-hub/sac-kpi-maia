@@ -1,0 +1,156 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCaixaSession, caixaSignOut } from "@/app/assistencia/caixa-actions";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { listPedidosByStores, listEventsForPedidos, type PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
+import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
+import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
+import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { StatTile } from "@/components/StatTile";
+import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
+
+// Precisa refletir os pedidos em aberto em tempo real — nunca gerar estático.
+export const dynamic = "force-dynamic";
+
+const OPEN_STATUSES = ["solicitado", "em_producao", "pronto_para_expedicao", "em_carga", "faturado"];
+
+export default async function EncomendasCaixaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const storeId = await getCaixaSession();
+  if (!storeId) {
+    redirect("/assistencia/encomendas/caixa/login");
+  }
+
+  const { view } = await searchParams;
+  const showCompleted = view === "concluidos";
+
+  const admin = getSupabaseAdmin();
+  const [{ data: store }, allPedidos] = await Promise.all([
+    admin.from("stores").select("name").eq("id", storeId).maybeSingle(),
+    listPedidosByStores([storeId]),
+  ]);
+  const pedidos = allPedidos.filter((p) => (showCompleted ? !OPEN_STATUSES.includes(p.status) : OPEN_STATUSES.includes(p.status)));
+
+  const byStatus: Record<string, number> = {};
+  for (const p of allPedidos) {
+    if (OPEN_STATUSES.includes(p.status)) byStatus[p.status] = (byStatus[p.status] ?? 0) + 1;
+  }
+
+  const eventsByPedido = await listEventsForPedidos(pedidos.map((p) => p.id));
+
+  const viewHref = (v: string) => (v === "abertos" ? "/assistencia/encomendas/caixa" : `/assistencia/encomendas/caixa?view=${v}`);
+
+  return (
+    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+      <RealtimeQueueRefresher table="pedidos_encomenda" eventsTable="pedido_encomenda_events" />
+      <AssistenciaHeader
+        title={`Encomendas — ${store?.name ?? "sua loja"}`}
+        subtitle="Acompanhamento em tempo real com o CD e a fábrica"
+      >
+        <div className="flex items-center gap-3">
+          <Link
+            href="/assistencia/encomendas/solicitar"
+            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
+            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          >
+            + Novo pedido
+          </Link>
+          <form action={caixaSignOut}>
+            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              Sair
+            </button>
+          </form>
+        </div>
+      </AssistenciaHeader>
+
+      <div className="flex items-center gap-2">
+        <Link
+          href={viewHref("abertos")}
+          className="text-xs px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: !showCompleted ? "var(--surface-1)" : "transparent",
+            color: !showCompleted ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: !showCompleted ? 600 : 400,
+          }}
+        >
+          Em aberto
+        </Link>
+        <Link
+          href={viewHref("concluidos")}
+          className="text-xs px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: showCompleted ? "var(--surface-1)" : "transparent",
+            color: showCompleted ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: showCompleted ? 600 : 400,
+          }}
+        >
+          Entregues/cancelados
+        </Link>
+      </div>
+
+      {!showCompleted ? (
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatTile label="Em aberto" value={pedidos.length} />
+          <StatTile label="Em produção" value={byStatus.em_producao ?? 0} />
+          <StatTile label="Em carga" value={byStatus.em_carga ?? 0} />
+          <StatTile label="Faturados" value={byStatus.faturado ?? 0} />
+        </section>
+      ) : null}
+
+      {pedidos.length === 0 ? (
+        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            {showCompleted ? "Nenhum pedido entregue/cancelado ainda." : "Nenhum pedido em aberto no momento."}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+            {pedidos.map((p: PedidoEncomendaSummary) => (
+              <details key={p.id} className="p-4">
+                <summary className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 cursor-pointer list-none">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
+                        #{p.pedidoNumber}
+                      </span>
+                      <PedidoEncomendaStatusBadge status={p.status} />
+                    </div>
+                    <p className="text-sm" style={{ color: "var(--text-primary)" }}>
+                      {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
+                    </p>
+                  </div>
+                  <span className="text-xs shrink-0" style={{ color: "var(--text-muted)" }}>
+                    {new Date(p.createdAt).toLocaleDateString("pt-BR")}
+                  </span>
+                </summary>
+                <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid var(--gridline)" }}>
+                  {p.carga ? (
+                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      Carga: {p.carga}
+                    </p>
+                  ) : null}
+                  {p.nfE ? (
+                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      NF-e: {p.nfE}
+                    </p>
+                  ) : null}
+                  <PedidoEncomendaTimeline events={eventsByPedido.get(p.id) ?? []} />
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <Link href="/assistencia/encomendas" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
+        ← Voltar
+      </Link>
+    </div>
+  );
+}

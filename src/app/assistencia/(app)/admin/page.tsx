@@ -3,12 +3,18 @@ import { listStores } from "@/lib/serviceRequests";
 import { listGerentesWithPinStatus } from "@/lib/gerentes";
 import { listAssemblersWithPinStatus, listDriversWithPinStatus } from "@/lib/payments";
 import { listSuppliers } from "@/lib/partOrders";
+import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
+import { listCaixaPinStatus, listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
 import { AddSimpleEntryForm } from "@/components/assistencia/AddSimpleEntryForm";
 import { AddGerenteForm } from "@/components/assistencia/AddGerenteForm";
 import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
 import { DriverPinField } from "@/components/assistencia/DriverPinField";
 import { GerentePinField } from "@/components/assistencia/GerentePinField";
+import { ProdutoEncomendaAdmin } from "@/components/assistencia/ProdutoEncomendaAdmin";
+import { CaixaPinField } from "@/components/assistencia/CaixaPinField";
+import { CdOperadorPinField } from "@/components/assistencia/CdOperadorPinField";
+import { FabricaOperadorPinField } from "@/components/assistencia/FabricaOperadorPinField";
 
 export default async function AdminPage() {
   const profile = await getProfile();
@@ -21,13 +27,18 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, gerentes, assemblers, drivers, suppliers] = await Promise.all([
-    listStores(),
-    listGerentesWithPinStatus(),
-    listAssemblersWithPinStatus(),
-    listDriversWithPinStatus(),
-    listSuppliers(),
-  ]);
+  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixaPins, cdOperadores, fabricaOperadores] =
+    await Promise.all([
+      listStores(),
+      listGerentesWithPinStatus(),
+      listAssemblersWithPinStatus(),
+      listDriversWithPinStatus(),
+      listSuppliers(),
+      listProdutosEncomenda(),
+      listCaixaPinStatus(),
+      listCdOperadoresWithPinStatus(),
+      listFabricaOperadoresWithPinStatus(),
+    ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -127,6 +138,83 @@ export default async function AdminPage() {
         </ul>
         <AddGerenteForm stores={stores} />
       </section>
+
+      <section
+        className="rounded-lg border p-4 flex flex-col gap-2"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      >
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          Catálogo de produtos — Encomendas
+        </h3>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Produtos disponíveis pra caixa escolher em <span className="font-mono">/assistencia/encomendas/solicitar</span>.
+        </p>
+        <ProdutoEncomendaAdmin produtos={produtosEncomenda} />
+      </section>
+
+      <section
+        className="rounded-lg border p-4 flex flex-col gap-2"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      >
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          Caixa das lojas — Encomendas
+        </h3>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          PIN é por loja (não por pessoa) — qualquer caixa da loja usa o mesmo PIN pra lançar
+          pedido em <span className="font-mono">/assistencia/encomendas/caixa/login</span>.
+        </p>
+        <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 max-h-64 overflow-y-auto">
+          {caixaPins.map((c) => (
+            <li key={c.storeId}>
+              <CaixaPinField storeId={c.storeId} storeName={c.storeName} hasPin={c.hasPin} />
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <section
+          className="rounded-lg border p-4 flex flex-col gap-2"
+          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        >
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            Operadores CD — Encomendas
+          </h3>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Defina um PIN de 4 números pra cada um acessar{" "}
+            <span className="font-mono">/assistencia/encomendas/cd/login</span>.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {cdOperadores.map((o) => (
+              <li key={o.name}>
+                <CdOperadorPinField name={o.name} hasPin={o.hasPin} />
+              </li>
+            ))}
+          </ul>
+          <AddSimpleEntryForm kind="cd" />
+        </section>
+
+        <section
+          className="rounded-lg border p-4 flex flex-col gap-2"
+          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        >
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            Operadores Fábrica — Encomendas
+          </h3>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Defina um PIN de 4 números pra cada um acessar{" "}
+            <span className="font-mono">/assistencia/encomendas/fabrica/login</span>.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {fabricaOperadores.map((o) => (
+              <li key={o.name}>
+                <FabricaOperadorPinField name={o.name} hasPin={o.hasPin} />
+              </li>
+            ))}
+          </ul>
+          <AddSimpleEntryForm kind="fabrica" />
+        </section>
+      </div>
     </div>
   );
 }

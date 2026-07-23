@@ -71,6 +71,29 @@ export const ROLE_LABELS: Record<string, string> = {
   assistencia: "Assistência",
   admin: "Administrador",
   sac: "SAC",
+  cd: "CD",
+  fabrica: "Fábrica",
+  loja: "Loja",
+};
+
+export const PEDIDO_ENCOMENDA_STATUS_LABELS: Record<string, string> = {
+  solicitado: "Solicitado",
+  em_producao: "Em produção",
+  pronto_para_expedicao: "Pronto para expedição",
+  em_carga: "Em carga",
+  faturado: "Faturado",
+  entregue: "Entregue",
+  cancelado: "Cancelado",
+};
+
+export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
+  solicitado: "var(--status-warning)",
+  em_producao: "var(--series-5)",
+  pronto_para_expedicao: "var(--brand-orange)",
+  em_carga: "var(--brand-orange)",
+  faturado: "var(--brand-green)",
+  entregue: "var(--status-good)",
+  cancelado: "var(--text-muted)",
 };
 
 // Únicos tipos de chamado que o papel SAC pode gerenciar (ver dal.ts

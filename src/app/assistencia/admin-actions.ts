@@ -7,6 +7,14 @@ import { hashPin } from "@/lib/montadorAuth";
 import { resetPinAttempts } from "@/lib/pinLockout";
 import { setGerenteStores } from "@/lib/gerentes";
 import { resolveDriverName } from "@/lib/payments";
+import { upsertProdutoEncomenda, setProdutoEncomendaAtivo } from "@/lib/pedidosEncomenda";
+import {
+  setCaixaPin as setCaixaPinLib,
+  addCdOperador as addCdOperadorLib,
+  setCdOperadorPin as setCdOperadorPinLib,
+  addFabricaOperador as addFabricaOperadorLib,
+  setFabricaOperadorPin as setFabricaOperadorPinLib,
+} from "@/lib/encomendaAuth";
 
 export type FormState = { error?: string; success?: boolean } | undefined;
 
@@ -160,4 +168,89 @@ export async function addSupplier(_state: FormState, formData: FormData): Promis
 
   revalidatePath("/assistencia/admin");
   return { success: true };
+}
+
+// Cadastra um produto do catálogo de encomendas (colchão, box, baú etc.) —
+// não veio migrado da planilha antiga (descrição lá era texto livre demais
+// pra deduplicar automaticamente), então o catálogo nasce vazio e é
+// preenchido aqui conforme a necessidade real.
+export async function addProdutoEncomenda(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  const descricao = String(formData.get("descricao") ?? "").trim();
+  if (!descricao) return { error: "Informe a descrição do produto." };
+  const categoria = String(formData.get("categoria") ?? "").trim() || null;
+
+  try {
+    await upsertProdutoEncomenda(descricao, categoria);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível salvar o produto." };
+  }
+
+  revalidatePath("/assistencia/admin");
+  return { success: true };
+}
+
+export async function toggleProdutoEncomendaAtivo(id: string, ativo: boolean): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  await setProdutoEncomendaAtivo(id, ativo);
+  revalidatePath("/assistencia/admin");
+}
+
+// PIN da caixa é por loja (não por pessoa) — ver 0028_encomenda_pin_auth.sql.
+export async function setCaixaPin(storeId: string, pin: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  await setCaixaPinLib(storeId, pin);
+  revalidatePath("/assistencia/admin");
+}
+
+export async function addCdOperador(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Informe o nome." };
+
+  try {
+    await addCdOperadorLib(name);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível salvar." };
+  }
+
+  revalidatePath("/assistencia/admin");
+  return { success: true };
+}
+
+export async function setCdOperadorPin(name: string, pin: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  await setCdOperadorPinLib(name, pin);
+  revalidatePath("/assistencia/admin");
+}
+
+export async function addFabricaOperador(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Informe o nome." };
+
+  try {
+    await addFabricaOperadorLib(name);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível salvar." };
+  }
+
+  revalidatePath("/assistencia/admin");
+  return { success: true };
+}
+
+export async function setFabricaOperadorPin(name: string, pin: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  await setFabricaOperadorPinLib(name, pin);
+  revalidatePath("/assistencia/admin");
 }

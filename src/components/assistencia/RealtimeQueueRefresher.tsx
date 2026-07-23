@@ -12,7 +12,19 @@ const DEBOUNCE_MS = 500;
 // jeito, mesmo quando o Realtime não entrega nada.
 const POLL_MS = 15000;
 
-export function RealtimeQueueRefresher({ requestId }: { requestId?: string } = {}) {
+export function RealtimeQueueRefresher({
+  requestId,
+  table = "service_requests",
+  eventsTable = "service_request_events",
+  idColumn = "id",
+  eventsIdColumn = "request_id",
+}: {
+  requestId?: string;
+  table?: string;
+  eventsTable?: string;
+  idColumn?: string;
+  eventsIdColumn?: string;
+} = {}) {
   const router = useRouter();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -25,14 +37,14 @@ export function RealtimeQueueRefresher({ requestId }: { requestId?: string } = {
     }
 
     const channel = supabase
-      .channel(requestId ? `assistencia-request-${requestId}` : "assistencia-service-requests")
+      .channel(requestId ? `assistencia-${table}-${requestId}` : `assistencia-${table}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "service_requests",
-          ...(requestId ? { filter: `id=eq.${requestId}` } : {}),
+          table,
+          ...(requestId ? { filter: `${idColumn}=eq.${requestId}` } : {}),
         },
         scheduleRefresh
       )
@@ -41,8 +53,8 @@ export function RealtimeQueueRefresher({ requestId }: { requestId?: string } = {
         {
           event: "*",
           schema: "public",
-          table: "service_request_events",
-          ...(requestId ? { filter: `request_id=eq.${requestId}` } : {}),
+          table: eventsTable,
+          ...(requestId ? { filter: `${eventsIdColumn}=eq.${requestId}` } : {}),
         },
         scheduleRefresh
       )
@@ -55,7 +67,7 @@ export function RealtimeQueueRefresher({ requestId }: { requestId?: string } = {
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
-  }, [router, requestId]);
+  }, [router, requestId, table, eventsTable, idColumn, eventsIdColumn]);
 
   return null;
 }

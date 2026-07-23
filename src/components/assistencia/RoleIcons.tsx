@@ -54,6 +54,20 @@ export function HeadsetIcon({ color }: { color: string }) {
   );
 }
 
+export function BoxIcon({ color }: { color: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>
+      <path
+        d="M12 3.5 20 8v8l-8 4.5L4 16V8l8-4.5ZM4 8l8 4.5M20 8l-8 4.5M12 12.5V21"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function TruckIcon({ color }: { color: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>
