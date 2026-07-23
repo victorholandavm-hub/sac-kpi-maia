@@ -12,6 +12,7 @@ import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/ser
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
+import { isRota, getRotaWeekdayConfig, getRotaForDate, ROTA_LABELS } from "@/lib/rotas";
 import {
   ASSISTENCIA_TEAM_COOKIE_NAME,
   ASSISTENCIA_TEAM_PENDING_MAX_AGE,
@@ -532,27 +533,53 @@ export async function setDriverName(requestId: string, driverName: string) {
   revalidatePath(`/assistencia/${requestId}`);
 }
 
-export async function setSchedule(requestId: string, scheduledDate: string, shift: string, scheduledTime: string) {
+export async function setSchedule(
+  requestId: string,
+  scheduledDate: string,
+  shift: string,
+  scheduledTime: string,
+  rota?: string,
+  rotaExceptionNote?: string
+) {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin");
   if (shift && !SHIFTS.includes(shift as (typeof SHIFTS)[number])) {
     throw new Error("Turno inválido.");
   }
 
+  let rotaValue: string | null = null;
+  if (scheduledDate && rota) {
+    if (!isRota(rota)) throw new Error("Rota inválida.");
+    const config = await getRotaWeekdayConfig();
+    const expectedRota = getRotaForDate(scheduledDate, config);
+    if (expectedRota !== rota && !rotaExceptionNote?.trim()) {
+      const expectedLabel = expectedRota ? ROTA_LABELS[expectedRota] : "nenhuma rota";
+      throw new Error(`Essa data é de ${expectedLabel}, não de ${ROTA_LABELS[rota]} — informe o motivo do encaixe fora da rota.`);
+    }
+    rotaValue = rota;
+  }
+
   const admin = getSupabaseAdmin();
   const { error } = await admin
     .from("service_requests")
-    .update({ scheduled_date: scheduledDate || null, shift: shift || null, scheduled_time: scheduledTime || null })
+    .update({
+      scheduled_date: scheduledDate || null,
+      shift: shift || null,
+      scheduled_time: scheduledTime || null,
+      rota: rotaValue,
+      rota_exception_note: rotaValue ? rotaExceptionNote?.trim() || null : null,
+    })
     .eq("id", requestId);
   if (error) throw new Error(error.message);
 
   const shiftLabel = SHIFT_LABELS[shift] ?? shift;
+  const rotaNote = rotaValue ? ` · rota ${ROTA_LABELS[rotaValue as keyof typeof ROTA_LABELS]}${rotaExceptionNote?.trim() ? ` (encaixe: ${rotaExceptionNote.trim()})` : ""}` : "";
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: profile.id,
     event_type: "note_added",
     note: scheduledDate
-      ? `Visita agendada: ${scheduledDate}${scheduledTime ? ` às ${scheduledTime}` : ""}${shift ? ` (${shiftLabel})` : ""}`
+      ? `Visita agendada: ${scheduledDate}${scheduledTime ? ` às ${scheduledTime}` : ""}${shift ? ` (${shiftLabel})` : ""}${rotaNote}`
       : "Agendamento removido.",
   });
 
@@ -787,11 +814,14 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   redirect(`/assistencia/${data.id}`);
 }
 
+const SAC_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa"] as const;
+
 // Criação de chamado pelo SAC — troca de produto (recolher o errado/avariado
-// e entregar o correto numa rota só, ver src/lib/driverAuth.ts) ou
-// notificação externa. Mesmo formato do relatório logístico que já existia
-// em planilha: cliente, endereço, telefone, produto e a instrução de
-// recolhimento em texto livre.
+// e entregar o correto numa rota só, ver src/lib/driverAuth.ts), entrega de
+// produto sem recolhimento, envio de peça avulsa (independente do módulo de
+// Peças/fornecedores) ou notificação externa. Mesmo formato do relatório
+// logístico que já existia em planilha: cliente, endereço, telefone, produto
+// e a instrução de recolhimento em texto livre.
 export async function createSacRequest(_state: FormState, formData: FormData): Promise<FormState> {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");
@@ -800,7 +830,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   if (!storeId) return { error: "Selecione a loja." };
 
   const type = String(formData.get("type") ?? "troca_produto");
-  if (type !== "troca_produto" && type !== "notificacao_externa") {
+  if (!(SAC_REQUEST_TYPES as readonly string[]).includes(type)) {
     return { error: "Tipo inválido." };
   }
 
@@ -809,6 +839,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
 
   const driverNameInput = emptyToNull(formData.get("driver_name"));
   const product = emptyToNull(formData.get("product"));
+  const partCode = emptyToNull(formData.get("part_code"));
   const quantity = Math.max(1, parseInt(String(formData.get("quantity") ?? "1"), 10) || 1);
   const urgent = formData.get("urgent") === "on";
 
@@ -847,6 +878,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     const { error: itemError } = await admin.from("service_request_items").insert({
       request_id: data.id,
       product,
+      part_code: partCode,
       quantity,
     });
     if (itemError) {

@@ -103,6 +103,17 @@ export function NovoPedidoEncomendaForm({ storeName, produtos }: { storeName: st
         <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
+      <Field label="Foto do cupom fiscal">
+        <input
+          name="cupom_fiscal"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          capture="environment"
+          className="rounded border px-3 py-2 text-sm"
+          style={inputStyle}
+        />
+      </Field>
+
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>
           {state.error}

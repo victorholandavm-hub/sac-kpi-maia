@@ -15,6 +15,8 @@ import { ProdutoEncomendaAdmin } from "@/components/assistencia/ProdutoEncomenda
 import { CaixaPinField } from "@/components/assistencia/CaixaPinField";
 import { CdOperadorPinField } from "@/components/assistencia/CdOperadorPinField";
 import { FabricaOperadorPinField } from "@/components/assistencia/FabricaOperadorPinField";
+import { RotaWeekdaySelect } from "@/components/assistencia/RotaWeekdaySelect";
+import { getRotaWeekdayConfig } from "@/lib/rotas";
 
 export default async function AdminPage() {
   const profile = await getProfile();
@@ -27,7 +29,7 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixaPins, cdOperadores, fabricaOperadores] =
+  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixaPins, cdOperadores, fabricaOperadores, rotaConfig] =
     await Promise.all([
       listStores(),
       listGerentesWithPinStatus(),
@@ -38,6 +40,7 @@ export default async function AdminPage() {
       listCaixaPinStatus(),
       listCdOperadoresWithPinStatus(),
       listFabricaOperadoresWithPinStatus(),
+      getRotaWeekdayConfig(),
     ]);
 
   return (
@@ -215,6 +218,26 @@ export default async function AdminPage() {
           <AddSimpleEntryForm kind="fabrica" />
         </section>
       </div>
+
+      <section
+        className="rounded-lg border p-4 flex flex-col gap-2"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      >
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          Rotas de entrega
+        </h3>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Rota fixa por dia da semana (padrão: Praia seg/qui, Sul ter/sex, Centro qua/sáb) — usada
+          na agenda pra sugerir as datas certas de cada rota. Domingo não tem rota.
+        </p>
+        <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 max-w-md">
+          {[1, 2, 3, 4, 5, 6].map((weekday) => (
+            <li key={weekday}>
+              <RotaWeekdaySelect weekday={weekday} rota={rotaConfig[weekday] ?? null} />
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

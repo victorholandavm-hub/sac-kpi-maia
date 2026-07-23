@@ -6,6 +6,8 @@ export const REQUEST_TYPE_LABELS: Record<string, string> = {
   vistoria: "Vistoria",
   notificacao_externa: "Notificação externa",
   troca_produto: "Troca de produto",
+  entrega_produto: "Entrega de produto",
+  envio_peca: "Envio de peça",
 };
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -99,7 +101,7 @@ export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
 // Únicos tipos de chamado que o papel SAC pode gerenciar (ver dal.ts
 // requireManageAccess) — o resto da fila (montagem, troca_peça etc.)
 // continua exclusivo de assistência/admin.
-export const SAC_MANAGED_TYPES = ["troca_produto", "notificacao_externa"] as const;
+export const SAC_MANAGED_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa"] as const;
 
 export const SUPPLIER_RETURN_STATUS_LABELS: Record<string, string> = {
   aguardando_envio: "Aguardando envio",

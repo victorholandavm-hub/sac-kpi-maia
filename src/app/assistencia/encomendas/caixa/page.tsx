@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCaixaSession, caixaSignOut } from "@/app/assistencia/caixa-actions";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { listPedidosByStores, listEventsForPedidos, type PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
+import { listEncomendaPhotosForPedidos } from "@/lib/pedidoEncomendaPhotos";
 import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -40,6 +41,7 @@ export default async function EncomendasCaixaPage({
   }
 
   const eventsByPedido = await listEventsForPedidos(pedidos.map((p) => p.id));
+  const photosByPedido = await listEncomendaPhotosForPedidos(pedidos.map((p) => p.id));
 
   const viewHref = (v: string) => (v === "abertos" ? "/assistencia/encomendas/caixa" : `/assistencia/encomendas/caixa?view=${v}`);
 
@@ -139,6 +141,21 @@ export default async function EncomendasCaixaPage({
                     <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       NF-e: {p.nfE}
                     </p>
+                  ) : null}
+                  {(photosByPedido.get(p.id) ?? []).length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {(photosByPedido.get(p.id) ?? []).map((photo) => (
+                        <a key={photo.id} href={photo.url} target="_blank" rel="noopener noreferrer">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.url}
+                            alt="Cupom fiscal"
+                            className="h-20 w-20 object-cover rounded border"
+                            style={{ borderColor: "var(--border)" }}
+                          />
+                        </a>
+                      ))}
+                    </div>
                   ) : null}
                   <PedidoEncomendaTimeline events={eventsByPedido.get(p.id) ?? []} />
                 </div>

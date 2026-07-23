@@ -14,6 +14,7 @@ import {
   isPedidoEncomendaStatus,
   type NewPedidoEncomendaItem,
 } from "@/lib/pedidosEncomenda";
+import { saveEncomendaPhoto } from "@/lib/pedidoEncomendaPhotos";
 
 export type FormState = { error?: string } | undefined;
 
@@ -50,12 +51,26 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
 
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
+  let pedidoId: string;
   let pedidoNumber: number;
   try {
     const result = await createPedidoEncomenda({ storeId, requestedByName: store.name, notes, items });
+    pedidoId = result.id;
     pedidoNumber = result.pedidoNumber;
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível criar o pedido." };
+  }
+
+  const cupomFiscal = formData.get("cupom_fiscal");
+  if (cupomFiscal instanceof File && cupomFiscal.size > 0) {
+    try {
+      await saveEncomendaPhoto({ pedidoId, file: cupomFiscal, uploadedBy: store.name, caption: "Cupom fiscal" });
+    } catch (err) {
+      // Pedido já foi criado — não bloqueia o fluxo por causa da foto, só avisa.
+      return {
+        error: `Pedido #${pedidoNumber} criado, mas a foto não pôde ser salva: ${err instanceof Error ? err.message : "erro desconhecido"}`,
+      };
+    }
   }
 
   revalidatePath("/assistencia/encomendas/caixa");

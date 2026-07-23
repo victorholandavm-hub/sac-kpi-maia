@@ -20,12 +20,14 @@ export function RequestActions({
   isAssignedToMe,
   hasAssignee,
   assigneeLabel = "o montador",
+  hideClaim = false,
 }: {
   requestId: string;
   status: string;
   isAssignedToMe: boolean;
   hasAssignee: boolean;
   assigneeLabel?: string;
+  hideClaim?: boolean;
 }) {
   const { pending, run, showToast } = useQuickAction();
   const [note, setNote] = useState("");
@@ -58,7 +60,7 @@ export function RequestActions({
         Ações
       </h3>
 
-      {!isAssignedToMe ? (
+      {!hideClaim && !isAssignedToMe ? (
         <button
           disabled={pending}
           onClick={() => run(() => claimRequest(requestId), "Solicitação assumida.")}

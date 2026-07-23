@@ -15,6 +15,7 @@ import {
   addFabricaOperador as addFabricaOperadorLib,
   setFabricaOperadorPin as setFabricaOperadorPinLib,
 } from "@/lib/encomendaAuth";
+import { setRotaWeekday as setRotaWeekdayLib, isRota, type Rota } from "@/lib/rotas";
 
 export type FormState = { error?: string; success?: boolean } | undefined;
 
@@ -252,5 +253,14 @@ export async function setFabricaOperadorPin(name: string, pin: string): Promise<
   const profile = await getProfile();
   requireRole(profile, "admin");
   await setFabricaOperadorPinLib(name, pin);
+  revalidatePath("/assistencia/admin");
+}
+
+export async function setRotaWeekday(weekday: number, rota: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  const value: Rota | null = rota === "" ? null : isRota(rota) ? rota : null;
+  if (rota !== "" && !isRota(rota)) throw new Error("Rota inválida.");
+  await setRotaWeekdayLib(weekday, value);
   revalidatePath("/assistencia/admin");
 }

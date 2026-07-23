@@ -3,6 +3,7 @@ import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listScheduledRequests, type ServiceRequestSummary, type AgendaRange } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
+import { ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
 
 function groupByDate(requests: ServiceRequestSummary[]) {
   const groups: { dateKey: string; label: string; items: ServiceRequestSummary[] }[] = [];
@@ -35,14 +36,16 @@ const FILTERS: { label: string; value: AgendaRange | null }[] = [
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; rota?: string }>;
 }) {
   redirectIfSac(await getProfile());
-  const { range } = await searchParams;
+  const { range, rota } = await searchParams;
   const filterRange = (["atrasado", "hoje", "semana"] as const).includes(range as AgendaRange)
     ? (range as AgendaRange)
     : undefined;
-  const requests = await listScheduledRequests({ range: filterRange });
+  const filterRota = isRota(rota) ? rota : undefined;
+  const allRequests = await listScheduledRequests({ range: filterRange });
+  const requests = filterRota ? allRequests.filter((r) => r.rota === filterRota) : allRequests;
   const groups = groupByDate(requests);
   const todayKey = new Date().toISOString().slice(0, 10);
 
@@ -62,21 +65,51 @@ export default async function AgendaPage({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.label}
-            href={f.value ? `/assistencia/agenda?range=${f.value}` : "/assistencia/agenda"}
-            className="text-xs px-3 py-1 rounded-full border"
-            style={{
-              borderColor: "var(--border)",
-              background: (f.value ?? undefined) === filterRange ? "var(--surface-1)" : "transparent",
-              color: (f.value ?? undefined) === filterRange ? "var(--text-primary)" : "var(--text-secondary)",
-              fontWeight: (f.value ?? undefined) === filterRange ? 600 : 400,
-            }}
-          >
-            {f.label}
-          </Link>
-        ))}
+        {FILTERS.map((f) => {
+          const sp = new URLSearchParams();
+          if (f.value) sp.set("range", f.value);
+          if (filterRota) sp.set("rota", filterRota);
+          const qs = sp.toString();
+          return (
+            <Link
+              key={f.label}
+              href={qs ? `/assistencia/agenda?${qs}` : "/assistencia/agenda"}
+              className="text-xs px-3 py-1 rounded-full border"
+              style={{
+                borderColor: "var(--border)",
+                background: (f.value ?? undefined) === filterRange ? "var(--surface-1)" : "transparent",
+                color: (f.value ?? undefined) === filterRange ? "var(--text-primary)" : "var(--text-secondary)",
+                fontWeight: (f.value ?? undefined) === filterRange ? 600 : 400,
+              }}
+            >
+              {f.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        {[{ label: "Todas as rotas", value: undefined }, ...ROTAS.map((r) => ({ label: ROTA_LABELS[r], value: r }))].map((f) => {
+          const sp = new URLSearchParams();
+          if (filterRange) sp.set("range", filterRange);
+          if (f.value) sp.set("rota", f.value);
+          const qs = sp.toString();
+          return (
+            <Link
+              key={f.label}
+              href={qs ? `/assistencia/agenda?${qs}` : "/assistencia/agenda"}
+              className="text-xs px-3 py-1 rounded-full border"
+              style={{
+                borderColor: "var(--border)",
+                background: f.value === filterRota ? "var(--surface-1)" : "transparent",
+                color: f.value === filterRota ? "var(--text-primary)" : "var(--text-secondary)",
+                fontWeight: f.value === filterRota ? 600 : 400,
+              }}
+            >
+              {f.label}
+            </Link>
+          );
+        })}
       </div>
 
       {requests.length === 0 ? (
@@ -136,6 +169,15 @@ export default async function AgendaPage({
                                 style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
                               >
                                 {SHIFT_LABELS[r.shift] ?? r.shift}
+                              </span>
+                            ) : null}
+                            {r.rota ? (
+                              <span
+                                className="text-xs font-medium px-2 py-0.5 rounded-full"
+                                style={{ color: "var(--brand-green)", border: "1px solid var(--brand-green)" }}
+                              >
+                                {ROTA_LABELS[r.rota]}
+                                {r.rotaExceptionNote ? " ⚠" : ""}
                               </span>
                             ) : null}
                             <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>

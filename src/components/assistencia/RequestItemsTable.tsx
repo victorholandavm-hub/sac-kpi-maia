@@ -57,6 +57,7 @@ function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) 
       <span className="text-sm" style={{ color: "var(--text-primary)" }}>
         {item.quantity > 1 ? `${item.quantity}x ` : ""}
         {item.product}
+        {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
       </span>
       <div className="flex items-center gap-3">
         {editing ? (

@@ -114,7 +114,9 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
         <div className="flex flex-col gap-3">
           <PhotoGallery photos={photos} deleteMode="driver" currentActor={driverName} />
           <MotoristaPhotoUpload requestId={request.id} />
-          {!showCompleted ? <MotoristaRequestActions requestId={request.id} pickupCompleted={request.pickupCompleted} /> : null}
+          {!showCompleted ? (
+            <MotoristaRequestActions requestId={request.id} pickupCompleted={request.pickupCompleted} requestType={request.type} />
+          ) : null}
         </div>
       </div>
     </ToastProvider>

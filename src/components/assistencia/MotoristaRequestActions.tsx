@@ -48,7 +48,19 @@ function RatingScale({
   );
 }
 
-export function MotoristaRequestActions({ requestId, pickupCompleted }: { requestId: string; pickupCompleted: boolean }) {
+export function MotoristaRequestActions({
+  requestId,
+  pickupCompleted,
+  requestType,
+}: {
+  requestId: string;
+  pickupCompleted: boolean;
+  requestType: string;
+}) {
+  // Recolhimento só existe pra troca_produto (recolher o errado + entregar o
+  // certo) — entrega_produto/envio_peca são entrega em etapa única, sem nada
+  // pra recolher na casa do cliente.
+  const hasPickup = requestType === "troca_produto";
   const { pending, run, showToast } = useQuickAction();
   const [mode, setMode] = useState<Mode>(null);
   const [issueReason, setIssueReason] = useState("");
@@ -101,20 +113,22 @@ export function MotoristaRequestActions({ requestId, pickupCompleted }: { reques
         </button>
       </div>
 
-      {!pickupCompleted ? (
-        <button
-          disabled={pending}
-          onClick={() => run(() => driverMarkPickupCompleted(requestId), "Recolhimento registrado.")}
-          className="text-sm rounded-lg px-3 py-3 font-medium border disabled:opacity-60"
-          style={{ borderColor: "var(--brand-orange)", color: "var(--brand-orange)" }}
-        >
-          Marcar produto errado/avariado como recolhido
-        </button>
-      ) : (
-        <p className="text-sm" style={{ color: "var(--brand-orange)" }}>
-          ✓ Produto errado/avariado já recolhido
-        </p>
-      )}
+      {hasPickup ? (
+        !pickupCompleted ? (
+          <button
+            disabled={pending}
+            onClick={() => run(() => driverMarkPickupCompleted(requestId), "Recolhimento registrado.")}
+            className="text-sm rounded-lg px-3 py-3 font-medium border disabled:opacity-60"
+            style={{ borderColor: "var(--brand-orange)", color: "var(--brand-orange)" }}
+          >
+            Marcar produto errado/avariado como recolhido
+          </button>
+        ) : (
+          <p className="text-sm" style={{ color: "var(--brand-orange)" }}>
+            ✓ Produto errado/avariado já recolhido
+          </p>
+        )
+      ) : null}
 
       {mode === null ? (
         <div className="flex flex-col gap-2">

@@ -6,6 +6,7 @@ import { PedidoEncomendaActions } from "@/components/assistencia/PedidoEncomenda
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
+import { listEncomendaPhotos } from "@/lib/pedidoEncomendaPhotos";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
   }
 
   const { pedido, events } = result;
+  const photos = await listEncomendaPhotos(pedido.id);
 
   return (
     <ToastProvider>
@@ -85,6 +87,25 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         <Row label="NF-e" value={pedido.nfE} />
         <Row label="Observações" value={pedido.notes} />
       </div>
+
+      {photos.length > 0 ? (
+        <div
+          className="rounded-lg border p-4 flex flex-col gap-2"
+          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        >
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Cupom fiscal
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {photos.map((p) => (
+              <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.url} alt="Cupom fiscal" className="h-32 w-32 object-cover rounded border" style={{ borderColor: "var(--border)" }} />
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <PedidoEncomendaActions pedidoId={pedido.id} status={pedido.status} role={actor.role} />
 

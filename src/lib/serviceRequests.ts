@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import type { Rota } from "./rotas";
 
 export type RequestType =
   | "montagem"
@@ -7,7 +8,9 @@ export type RequestType =
   | "troca_peca"
   | "vistoria"
   | "notificacao_externa"
-  | "troca_produto";
+  | "troca_produto"
+  | "entrega_produto"
+  | "envio_peca";
 export type RequestStatus = "aberta" | "em_contato" | "em_andamento" | "remarcar" | "concluida" | "cancelada";
 export type DeadlineStatus = "pendente" | "aprovado" | "recusado";
 export type Shift = "manha" | "tarde" | "dia" | "urgencia";
@@ -43,6 +46,7 @@ export async function listStores(): Promise<Store[]> {
 export type RequestItem = {
   id: string;
   product: string;
+  partCode: string | null;
   quantity: number;
   unitValue: number | null;
   paymentReleased: boolean;
@@ -53,6 +57,7 @@ export type RequestItem = {
 type ItemRow = {
   id: string;
   product: string;
+  part_code: string | null;
   quantity: number;
   unit_value: number | null;
   payment_released: boolean;
@@ -87,6 +92,8 @@ export type ServiceRequestSummary = {
   scheduledDate: string | null;
   scheduledTime: string | null;
   shift: Shift | null;
+  rota: Rota | null;
+  rotaExceptionNote: string | null;
   sellerName: string | null;
   invoiceNumber: string | null;
   sacCategory: string | null;
@@ -115,6 +122,8 @@ type SummaryRow = {
   scheduled_date: string | null;
   scheduled_time: string | null;
   shift: Shift | null;
+  rota: Rota | null;
+  rota_exception_note: string | null;
   seller_name: string | null;
   invoice_number: string | null;
   sac_category: string | null;
@@ -132,12 +141,13 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
     id: row.id,
     product: row.product,
+    partCode: row.part_code,
     quantity: row.quantity,
     unitValue: row.unit_value,
     paymentReleased: row.payment_released,
@@ -169,6 +179,8 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     scheduledDate: row.scheduled_date,
     scheduledTime: row.scheduled_time,
     shift: row.shift,
+    rota: row.rota,
+    rotaExceptionNote: row.rota_exception_note,
     sellerName: row.seller_name,
     invoiceNumber: row.invoice_number,
     sacCategory: row.sac_category,
@@ -314,7 +326,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 export async function getRequestDetail(
   id: string

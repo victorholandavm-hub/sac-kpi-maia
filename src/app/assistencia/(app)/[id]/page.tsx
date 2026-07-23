@@ -16,6 +16,7 @@ import { DeadlineActions } from "@/components/assistencia/DeadlineActions";
 import { AssemblerNameField } from "@/components/assistencia/AssemblerNameField";
 import { DriverNameField } from "@/components/assistencia/DriverNameField";
 import { ScheduleField } from "@/components/assistencia/ScheduleField";
+import { getRotaWeekdayConfig, getNextRotaDates, ROTAS, ROTA_LABELS, type Rota } from "@/lib/rotas";
 import { RequestItemsTable } from "@/components/assistencia/RequestItemsTable";
 import { SacCategoryField } from "@/components/assistencia/SacCategoryField";
 import { LegalDeadlineField } from "@/components/assistencia/LegalDeadlineField";
@@ -94,9 +95,19 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
     profile.role === "assistencia" ||
     profile.role === "admin" ||
     (profile.role === "sac" && (SAC_MANAGED_TYPES as readonly string[]).includes(request.type));
+  const isSacType = (SAC_MANAGED_TYPES as readonly string[]).includes(request.type);
+  // Troca de produto, entrega de produto e envio de peça são todos entregues
+  // pelo motorista — só notificação externa (e os tipos da assistência
+  // técnica) usam montador.
+  const isDeliveryType = request.type === "troca_produto" || request.type === "entrega_produto" || request.type === "envio_peca";
   const assemblers = canManage ? await listAssemblers() : [];
-  const drivers = canManage && request.type === "troca_produto" ? await listDrivers() : [];
+  const drivers = canManage && isDeliveryType ? await listDrivers() : [];
   const photos = await listRequestPhotos(request.id);
+
+  const rotaConfig = canManage ? await getRotaWeekdayConfig() : null;
+  const nextDatesByRota = rotaConfig
+    ? (Object.fromEntries(ROTAS.map((r) => [r, getNextRotaDates(r, rotaConfig)])) as Record<Rota, string[]>)
+    : ({ praia: [], sul: [], centro: [] } as Record<Rota, string[]>);
 
   return (
     <div className="flex flex-col gap-4">
@@ -155,6 +166,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
               <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
                 {item.quantity > 1 ? `${item.quantity}x ` : ""}
                 {item.product}
+                {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
               </li>
             ))}
           </ul>
@@ -206,7 +218,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         <Row label="Observações" value={request.notes} />
         <Row label="Solicitado por" value={request.requestedByName} />
         <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
-        {request.type === "troca_produto" ? (
+        {isDeliveryType ? (
           canManage ? (
             <DriverNameField requestId={request.id} value={request.driverName} drivers={drivers} />
           ) : (
@@ -235,13 +247,16 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
             scheduledDate={request.scheduledDate}
             scheduledTime={request.scheduledTime}
             shift={request.shift}
+            rota={request.rota}
+            rotaExceptionNote={request.rotaExceptionNote}
+            nextDatesByRota={nextDatesByRota}
           />
         ) : (
           <Row
             label="Visita agendada"
             value={
               request.scheduledDate
-                ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}`
+                ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}${request.rota ? ` · rota ${ROTA_LABELS[request.rota]}` : ""}`
                 : null
             }
           />
@@ -284,8 +299,9 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           requestId={request.id}
           status={request.status}
           isAssignedToMe={request.assignedToId === profile.id}
-          hasAssignee={request.type === "troca_produto" ? !!request.driverName : !!request.assemblerName}
-          assigneeLabel={request.type === "troca_produto" ? "o motorista" : "o montador"}
+          hasAssignee={isDeliveryType ? !!request.driverName : !!request.assemblerName}
+          assigneeLabel={isDeliveryType ? "o motorista" : "o montador"}
+          hideClaim={isSacType}
         />
       ) : null}
 

@@ -3,10 +3,17 @@
 import { useState } from "react";
 import { useActionState } from "react";
 import { createSacRequest, type FormState } from "@/app/assistencia/actions";
-import { SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
+import { SAC_CATEGORIES, SAC_CATEGORY_LABELS, REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import type { Store } from "@/lib/serviceRequests";
 
 const inputStyle = { borderColor: "var(--border)" };
+
+type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "notificacao_externa";
+
+// Tipos que envolvem entrega pelo motorista (produto/peça + quem vai levar).
+// "O que recolher" só se aplica a troca_produto — os outros dois não têm
+// recolhimento nenhum.
+const DELIVERY_TYPES: SacType[] = ["troca_produto", "entrega_produto", "envio_peca"];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -19,7 +26,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; drivers: string[] }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
-  const [type, setType] = useState<"troca_produto" | "notificacao_externa">("troca_produto");
+  const [type, setType] = useState<SacType>("troca_produto");
+  const isDelivery = DELIVERY_TYPES.includes(type);
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -27,11 +35,13 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         <select
           name="type"
           value={type}
-          onChange={(e) => setType(e.target.value as typeof type)}
+          onChange={(e) => setType(e.target.value as SacType)}
           className="rounded border px-3 py-2"
           style={inputStyle}
         >
-          <option value="troca_produto">Troca de produto (recolher + entregar)</option>
+          <option value="troca_produto">{REQUEST_TYPE_LABELS.troca_produto} (recolher + entregar)</option>
+          <option value="entrega_produto">{REQUEST_TYPE_LABELS.entrega_produto} (sem recolhimento)</option>
+          <option value="envio_peca">{REQUEST_TYPE_LABELS.envio_peca}</option>
           <option value="notificacao_externa">Notificação externa (sem troca de produto)</option>
         </select>
       </Field>
@@ -86,10 +96,13 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         <input name="client_neighborhood" className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
-      {type === "troca_produto" ? (
-        <div className="grid sm:grid-cols-2 gap-4">
+      {isDelivery ? (
+        <div className="grid sm:grid-cols-3 gap-4">
           <Field label="Produto a entregar">
             <input name="product" placeholder="Ex: Super Box Confort Mola Ensacada" className="rounded border px-3 py-2" style={inputStyle} />
+          </Field>
+          <Field label="Código do produto">
+            <input name="part_code" placeholder="Ex: SB-3050" className="rounded border px-3 py-2" style={inputStyle} />
           </Field>
           <Field label="Quantidade">
             <input name="quantity" type="number" min={1} defaultValue={1} className="rounded border px-3 py-2" style={inputStyle} />
@@ -113,7 +126,7 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         </Field>
       ) : null}
 
-      {type === "troca_produto" ? (
+      {isDelivery ? (
         <Field label="Motorista">
           <input name="driver_name" list="sac-drivers" className="rounded border px-3 py-2" style={inputStyle} />
           <datalist id="sac-drivers">
