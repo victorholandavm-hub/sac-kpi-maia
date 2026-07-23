@@ -6,6 +6,7 @@ import { getProfile, requireRole } from "@/lib/dal";
 import { hashPin } from "@/lib/montadorAuth";
 import { resetPinAttempts } from "@/lib/pinLockout";
 import { setGerenteStores } from "@/lib/gerentes";
+import { addVendedor as addVendedorLib } from "@/lib/vendedores";
 import { resolveDriverName } from "@/lib/payments";
 import { upsertProdutoEncomenda, setProdutoEncomendaAtivo } from "@/lib/pedidosEncomenda";
 import {
@@ -152,6 +153,43 @@ export async function setGerentePin(name: string, pin: string): Promise<void> {
   const { error } = await admin.from("gerentes").update({ pin_hash: hashPin(pin) }).eq("name", name);
   if (error) throw new Error(error.message);
   await resetPinAttempts("gerentes", "name", name);
+
+  revalidatePath("/assistencia/admin");
+}
+
+// Vendedor é preso a UMA loja só (diferente do gerente, que é N:N) — por
+// isso não reaproveita setGerenteStores, e cadastrar de novo com outra loja
+// dá erro de PK duplicada em vez de silenciosamente trocar a loja (evita
+// mover um vendedor de loja sem querer por um typo no nome).
+export async function addVendedor(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  const name = String(formData.get("name") ?? "").trim();
+  const storeId = String(formData.get("store_id") ?? "").trim();
+  if (!name) return { error: "Informe o nome." };
+  if (!storeId) return { error: "Selecione a loja." };
+
+  try {
+    await addVendedorLib(name, storeId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível salvar." };
+  }
+
+  revalidatePath("/assistencia/admin");
+  return { success: true };
+}
+
+export async function setVendedorPin(name: string, pin: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("vendedores").update({ pin_hash: hashPin(pin) }).eq("name", name);
+  if (error) throw new Error(error.message);
+  await resetPinAttempts("vendedores", "name", name);
 
   revalidatePath("/assistencia/admin");
 }

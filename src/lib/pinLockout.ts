@@ -3,7 +3,14 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutos — PIN de 4 dígitos precisa de limite de tentativas
 
-export type PinTable = "assemblers" | "gerentes" | "drivers" | "cd_operadores" | "fabrica_operadores" | "encomenda_caixa_pins";
+export type PinTable =
+  | "assemblers"
+  | "gerentes"
+  | "drivers"
+  | "cd_operadores"
+  | "fabrica_operadores"
+  | "encomenda_caixa_pins"
+  | "vendedores";
 
 export async function checkPinLockout(
   table: PinTable,

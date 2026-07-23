@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { createPedidoEncomendaAction, type FormState } from "@/app/assistencia/encomendas-actions";
 import type { ProdutoEncomenda } from "@/lib/pedidosEncomenda";
+import type { EncomendaRequester } from "@/lib/encomendaRequester";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -17,10 +18,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 type Item = { produtoId: string; quantidade: number };
 
-// A loja vem fixa da sessão da caixa (PIN por loja — ver
-// src/app/assistencia/encomendas/caixa/login/page.tsx), então não há select
-// de loja nem campo de solicitante aqui.
-export function NovoPedidoEncomendaForm({ storeName, produtos }: { storeName: string; produtos: ProdutoEncomenda[] }) {
+export function NovoPedidoEncomendaForm({
+  requester,
+  fixedStoreName,
+  storeOptions,
+  produtos,
+  vendedorNames,
+}: {
+  requester: EncomendaRequester;
+  fixedStoreName?: string;
+  storeOptions?: { id: string; name: string }[];
+  produtos: ProdutoEncomenda[];
+  vendedorNames: string[];
+}) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPedidoEncomendaAction, undefined);
   const [items, setItems] = useState<Item[]>([{ produtoId: "", quantidade: 1 }]);
 
@@ -36,14 +46,35 @@ export function NovoPedidoEncomendaForm({ storeName, produtos }: { storeName: st
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
-      <Field label="Loja">
-        <input
-          value={storeName}
-          disabled
-          className="rounded border px-3 py-2"
-          style={{ ...inputStyle, background: "var(--surface-1)", color: "var(--text-secondary)" }}
-        />
-      </Field>
+      {storeOptions ? (
+        <Field label="Loja *">
+          <select name="store_id" required defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
+            <option value="" disabled>
+              Selecione…
+            </option>
+            {storeOptions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : (
+        <Field label="Loja">
+          <input
+            value={fixedStoreName}
+            disabled
+            className="rounded border px-3 py-2"
+            style={{ ...inputStyle, background: "var(--surface-1)", color: "var(--text-secondary)" }}
+          />
+        </Field>
+      )}
+
+      {requester.kind === "caixa" ? (
+        <Field label="Seu nome *">
+          <input name="requester_name" required placeholder="Quem está lançando esse pedido" className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+      ) : null}
 
       <div className="flex flex-col gap-2">
         <span className="text-sm" style={{ color: "var(--text-primary)" }}>
@@ -98,6 +129,22 @@ export function NovoPedidoEncomendaForm({ storeName, produtos }: { storeName: st
           </p>
         ) : null}
       </div>
+
+      <Field label="Vendedor responsável (opcional)">
+        <input
+          name="vendedor_name"
+          list="vendedor-names"
+          defaultValue={requester.kind === "vendedor" ? requester.name : ""}
+          placeholder="Pra qual vendedor(a) é essa venda"
+          className="rounded border px-3 py-2"
+          style={inputStyle}
+        />
+        <datalist id="vendedor-names">
+          {vendedorNames.map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
+      </Field>
 
       <Field label="Observações">
         <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />

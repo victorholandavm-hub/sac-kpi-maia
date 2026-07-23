@@ -113,6 +113,13 @@ export default async function LojaHomePage({
           >
             + Nova solicitação
           </Link>
+          <Link
+            href="/assistencia/encomendas/solicitar"
+            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
+            style={{ borderColor: "var(--brand-green)", color: "var(--brand-green)" }}
+          >
+            + Nova encomenda
+          </Link>
           <form action={lojaGerenteSignOut}>
             <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
               Sair

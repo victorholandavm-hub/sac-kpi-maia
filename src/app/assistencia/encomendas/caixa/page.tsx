@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCaixaSession, caixaSignOut } from "@/app/assistencia/caixa-actions";
+import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
+import { caixaSignOut } from "@/app/assistencia/caixa-actions";
+import { vendedorSignOut } from "@/app/assistencia/vendedor-actions";
+import { lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { listPedidosByStores, listEventsForPedidos, type PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
+import {
+  listPedidosByStores,
+  listEventsForPedidos,
+  listOpenPedidoEncomendaQueueIds,
+  OPEN_PEDIDO_ENCOMENDA_STATUSES,
+  type PedidoEncomendaSummary,
+} from "@/lib/pedidosEncomenda";
 import { listEncomendaPhotosForPedidos } from "@/lib/pedidoEncomendaPhotos";
 import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
@@ -13,26 +22,32 @@ import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRe
 // Precisa refletir os pedidos em aberto em tempo real — nunca gerar estático.
 export const dynamic = "force-dynamic";
 
-const OPEN_STATUSES = ["solicitado", "em_producao", "pronto_para_expedicao", "em_carga", "faturado"];
+const OPEN_STATUSES: string[] = OPEN_PEDIDO_ENCOMENDA_STATUSES;
 
 export default async function EncomendasCaixaPage({
   searchParams,
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
-  const storeId = await getCaixaSession();
-  if (!storeId) {
-    redirect("/assistencia/encomendas/caixa/login");
+  const requester = await resolveEncomendaRequester();
+  if (!requester) {
+    redirect("/assistencia/encomendas");
   }
+
+  const storeIds = requester.kind === "gerente" ? requester.storeIds : [requester.storeId];
+  const signOutAction = requester.kind === "caixa" ? caixaSignOut : requester.kind === "vendedor" ? vendedorSignOut : lojaGerenteSignOut;
 
   const { view } = await searchParams;
   const showCompleted = view === "concluidos";
 
   const admin = getSupabaseAdmin();
-  const [{ data: store }, allPedidos] = await Promise.all([
-    admin.from("stores").select("name").eq("id", storeId).maybeSingle(),
-    listPedidosByStores([storeId]),
+  const [{ data: stores }, allPedidos, queueIds] = await Promise.all([
+    admin.from("stores").select("name").in("id", storeIds),
+    listPedidosByStores(storeIds),
+    showCompleted ? Promise.resolve([]) : listOpenPedidoEncomendaQueueIds(),
   ]);
+  const queuePosition = new Map(queueIds.map((id, i) => [id, i + 1]));
+  const storeLabel = (stores ?? []).map((s) => s.name).join(", ") || "sua loja";
   const pedidos = allPedidos.filter((p) => (showCompleted ? !OPEN_STATUSES.includes(p.status) : OPEN_STATUSES.includes(p.status)));
 
   const byStatus: Record<string, number> = {};
@@ -49,7 +64,7 @@ export default async function EncomendasCaixaPage({
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <RealtimeQueueRefresher table="pedidos_encomenda" eventsTable="pedido_encomenda_events" />
       <AssistenciaHeader
-        title={`Encomendas — ${store?.name ?? "sua loja"}`}
+        title={`Encomendas — ${storeLabel}`}
         subtitle="Acompanhamento em tempo real com o CD e a fábrica"
       >
         <div className="flex items-center gap-3">
@@ -60,7 +75,7 @@ export default async function EncomendasCaixaPage({
           >
             + Novo pedido
           </Link>
-          <form action={caixaSignOut}>
+          <form action={signOutAction}>
             <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
               Sair
             </button>
@@ -117,6 +132,14 @@ export default async function EncomendasCaixaPage({
               <details key={p.id} className="p-4">
                 <summary className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 cursor-pointer list-none">
                   <div className="flex flex-col gap-1 min-w-0">
+                    {queuePosition.get(p.id) ? (
+                      <span
+                        className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap self-start"
+                        style={{ color: "#fff", background: "var(--brand-orange)" }}
+                      >
+                        {queuePosition.get(p.id)}º na fila
+                      </span>
+                    ) : null}
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
                         #{p.pedidoNumber}
@@ -132,6 +155,15 @@ export default async function EncomendasCaixaPage({
                   </span>
                 </summary>
                 <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid var(--gridline)" }}>
+                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                    Solicitado por: {p.requestedByName}
+                    {storeIds.length > 1 ? ` (${p.storeName})` : ""}
+                  </p>
+                  {p.vendedorName ? (
+                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      Vendedor: {p.vendedorName}
+                    </p>
+                  ) : null}
                   {p.carga ? (
                     <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       Carga: {p.carga}

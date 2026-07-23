@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireEncomendaActor } from "@/lib/encomendaAuth";
 import { listStores } from "@/lib/serviceRequests";
-import { listAllPedidos, isPedidoEncomendaStatus } from "@/lib/pedidosEncomenda";
+import { listAllPedidos, listOpenPedidoEncomendaQueueIds, isPedidoEncomendaStatus } from "@/lib/pedidosEncomenda";
 import { ROLE_LABELS } from "@/lib/assistenciaLabels";
 import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
@@ -44,10 +44,12 @@ export default async function EncomendasQueuePage({
   const { status, store } = await searchParams;
   const filterStatus = isPedidoEncomendaStatus(status) ? status : undefined;
 
-  const [pedidos, stores] = await Promise.all([
+  const [pedidos, stores, queueIds] = await Promise.all([
     listAllPedidos({ status: filterStatus, storeId: store }),
     listStores(),
+    listOpenPedidoEncomendaQueueIds(),
   ]);
+  const queuePosition = new Map(queueIds.map((id, i) => [id, i + 1]));
 
   const signOutAction = actor.role === "cd" ? cdSignOut : actor.role === "fabrica" ? fabricaSignOut : signOut;
 
@@ -101,6 +103,14 @@ export default async function EncomendasQueuePage({
                 className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
               >
                 <div className="flex flex-col gap-1 min-w-0 w-0 grow">
+                  {queuePosition.get(p.id) ? (
+                    <span
+                      className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap self-start"
+                      style={{ color: "#fff", background: "var(--brand-orange)" }}
+                    >
+                      {queuePosition.get(p.id)}º na fila
+                    </span>
+                  ) : null}
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
                       #{p.pedidoNumber}

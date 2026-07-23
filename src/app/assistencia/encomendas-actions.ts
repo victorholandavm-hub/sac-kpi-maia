@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireEncomendaAction } from "@/lib/dal";
 import { requireEncomendaActor } from "@/lib/encomendaAuth";
-import { getCaixaSession } from "@/app/assistencia/caixa-actions";
+import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 import {
   createPedidoEncomenda,
@@ -18,10 +18,11 @@ import { saveEncomendaPhoto } from "@/lib/pedidoEncomendaPhotos";
 
 export type FormState = { error?: string } | undefined;
 
-// Caixa lança o pedido direto (formulário, sem foto/WhatsApp) — gated por
-// sessão de caixa (PIN por loja, ver src/lib/caixaAuth.ts). A sessão já
-// resolve pra uma loja só (1 PIN por loja), então não há ambiguidade de
-// escolher loja no formulário.
+// Caixa, vendedor ou gerente lançam o pedido direto (formulário, sem
+// foto/WhatsApp) — gated por resolveEncomendaRequester (src/lib/encomendaRequester.ts),
+// que tenta as três sessões em sequência. Caixa/vendedor resolvem pra uma
+// loja só; gerente com mais de uma loja escolhe no formulário (validado
+// contra as lojas dele, nunca confiando cegamente no valor do form).
 export async function createPedidoEncomendaAction(_state: FormState, formData: FormData): Promise<FormState> {
   const ip = await getClientIp();
   const { allowed } = await checkAndRecordPublicSubmission(ip);
@@ -29,12 +30,34 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
     return { error: "Muitas solicitações enviadas em pouco tempo. Aguarde alguns minutos e tente de novo." };
   }
 
-  const storeId = await getCaixaSession();
-  if (!storeId) return { error: "Sessão expirada. Faça login de novo." };
+  const requester = await resolveEncomendaRequester();
+  if (!requester) return { error: "Sessão expirada. Faça login de novo." };
+
+  let storeId: string;
+  let requestedByName: string;
+  if (requester.kind === "caixa") {
+    storeId = requester.storeId;
+    requestedByName = String(formData.get("requester_name") ?? "").trim();
+    if (!requestedByName) return { error: "Informe seu nome." };
+  } else if (requester.kind === "vendedor") {
+    storeId = requester.storeId;
+    requestedByName = requester.name;
+  } else {
+    const chosenStoreId = String(formData.get("store_id") ?? "").trim();
+    if (requester.storeIds.length === 1) {
+      storeId = requester.storeIds[0];
+    } else {
+      if (!requester.storeIds.includes(chosenStoreId)) return { error: "Selecione uma loja válida." };
+      storeId = chosenStoreId;
+    }
+    requestedByName = requester.name;
+  }
 
   const admin = getSupabaseAdmin();
   const { data: store } = await admin.from("stores").select("name").eq("id", storeId).maybeSingle();
   if (!store) return { error: "Loja inválida." };
+
+  const vendedorName = String(formData.get("vendedor_name") ?? "").trim() || null;
 
   const produtoIds = formData.getAll("item_produto_id").map((v) => String(v).trim());
   const quantidades = formData.getAll("item_quantidade").map((v) => {
@@ -54,7 +77,7 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   let pedidoId: string;
   let pedidoNumber: number;
   try {
-    const result = await createPedidoEncomenda({ storeId, requestedByName: store.name, notes, items });
+    const result = await createPedidoEncomenda({ storeId, requestedByName, vendedorName, notes, items });
     pedidoId = result.id;
     pedidoNumber = result.pedidoNumber;
   } catch (err) {
@@ -64,7 +87,7 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   const cupomFiscal = formData.get("cupom_fiscal");
   if (cupomFiscal instanceof File && cupomFiscal.size > 0) {
     try {
-      await saveEncomendaPhoto({ pedidoId, file: cupomFiscal, uploadedBy: store.name, caption: "Cupom fiscal" });
+      await saveEncomendaPhoto({ pedidoId, file: cupomFiscal, uploadedBy: requestedByName, caption: "Cupom fiscal" });
     } catch (err) {
       // Pedido já foi criado — não bloqueia o fluxo por causa da foto, só avisa.
       return {

@@ -5,12 +5,15 @@ import { listAssemblersWithPinStatus, listDriversWithPinStatus } from "@/lib/pay
 import { listSuppliers } from "@/lib/partOrders";
 import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
 import { listCaixaPinStatus, listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
+import { listVendedoresWithPinStatus } from "@/lib/vendedores";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
 import { AddSimpleEntryForm } from "@/components/assistencia/AddSimpleEntryForm";
 import { AddGerenteForm } from "@/components/assistencia/AddGerenteForm";
+import { AddVendedorForm } from "@/components/assistencia/AddVendedorForm";
 import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
 import { DriverPinField } from "@/components/assistencia/DriverPinField";
 import { GerentePinField } from "@/components/assistencia/GerentePinField";
+import { VendedorPinField } from "@/components/assistencia/VendedorPinField";
 import { ProdutoEncomendaAdmin } from "@/components/assistencia/ProdutoEncomendaAdmin";
 import { CaixaPinField } from "@/components/assistencia/CaixaPinField";
 import { CdOperadorPinField } from "@/components/assistencia/CdOperadorPinField";
@@ -29,7 +32,7 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixaPins, cdOperadores, fabricaOperadores, rotaConfig] =
+  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixaPins, vendedores, cdOperadores, fabricaOperadores, rotaConfig] =
     await Promise.all([
       listStores(),
       listGerentesWithPinStatus(),
@@ -38,6 +41,7 @@ export default async function AdminPage() {
       listSuppliers(),
       listProdutosEncomenda(),
       listCaixaPinStatus(),
+      listVendedoresWithPinStatus(),
       listCdOperadoresWithPinStatus(),
       listFabricaOperadoresWithPinStatus(),
       getRotaWeekdayConfig(),
@@ -173,6 +177,27 @@ export default async function AdminPage() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section
+        className="rounded-lg border p-4 flex flex-col gap-2"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      >
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          Vendedores — Encomendas
+        </h3>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Cada vendedor tem seu próprio PIN e uma loja fixa, e entra com nome + PIN em{" "}
+          <span className="font-mono">/assistencia/encomendas/vendedor/login</span>.
+        </p>
+        <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 max-h-64 overflow-y-auto">
+          {vendedores.map((v) => (
+            <li key={v.name}>
+              <VendedorPinField name={v.name} storeName={v.storeName} hasPin={v.hasPin} />
+            </li>
+          ))}
+        </ul>
+        <AddVendedorForm stores={stores} />
       </section>
 
       <div className="grid sm:grid-cols-2 gap-4">

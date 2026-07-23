@@ -23,6 +23,30 @@ export function isPedidoEncomendaStatus(value: string | undefined | null): value
   return !!value && (PEDIDO_ENCOMENDA_STATUSES as string[]).includes(value);
 }
 
+// Pedidos ainda não concluídos/cancelados — usado tanto pra filtrar "em
+// aberto" quanto pra calcular a posição na fila (ver listOpenPedidoEncomendaQueueIds).
+export const OPEN_PEDIDO_ENCOMENDA_STATUSES: PedidoEncomendaStatus[] = [
+  "solicitado",
+  "em_producao",
+  "pronto_para_expedicao",
+  "em_carga",
+  "faturado",
+];
+
+// Ordem real de solicitação entre os pedidos ainda em aberto (mais antigo
+// primeiro) — mesmo padrão de listOpenMontagemQueueIds (src/lib/serviceRequests.ts),
+// usado pra numerar "Nº na fila" na tela da loja e na fila interna de CD/fábrica.
+export async function listOpenPedidoEncomendaQueueIds(): Promise<string[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("pedidos_encomenda")
+    .select("id")
+    .in("status", OPEN_PEDIDO_ENCOMENDA_STATUSES)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => row.id as string);
+}
+
 export type ProdutoEncomenda = {
   id: string;
   descricao: string;
@@ -72,6 +96,7 @@ export type PedidoEncomendaSummary = {
   carga: string | null;
   nfE: string | null;
   requestedByName: string;
+  vendedorName: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -86,6 +111,7 @@ type PedidoRow = {
   carga: string | null;
   nf_e: string | null;
   requested_by_name: string;
+  vendedor_name: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -94,7 +120,7 @@ type PedidoRow = {
 };
 
 const PEDIDO_COLUMNS =
-  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produtos_encomenda(id, descricao))";
+  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produtos_encomenda(id, descricao))";
 
 function toSummary(row: PedidoRow): PedidoEncomendaSummary {
   return {
@@ -106,6 +132,7 @@ function toSummary(row: PedidoRow): PedidoEncomendaSummary {
     carga: row.carga,
     nfE: row.nf_e,
     requestedByName: row.requested_by_name,
+    vendedorName: row.vendedor_name,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -240,6 +267,7 @@ export type NewPedidoEncomendaItem = { produtoId: string; quantidade: number };
 export async function createPedidoEncomenda(input: {
   storeId: string;
   requestedByName: string;
+  vendedorName: string | null;
   notes: string | null;
   items: NewPedidoEncomendaItem[];
 }): Promise<{ id: string; pedidoNumber: number }> {
@@ -250,6 +278,7 @@ export async function createPedidoEncomenda(input: {
     .insert({
       store_id: input.storeId,
       requested_by_name: input.requestedByName,
+      vendedor_name: input.vendedorName,
       notes: input.notes,
     })
     .select("id, pedido_number")

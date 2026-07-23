@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BoxIcon, HardHatIcon, TruckIcon } from "@/components/assistencia/RoleIcons";
+import { BoxIcon, StoreIcon, HardHatIcon, TruckIcon } from "@/components/assistencia/RoleIcons";
 
 // Nunca servir isso de cache estático/CDN — sempre gerar fresco a cada request.
 export const dynamic = "force-dynamic";
@@ -67,6 +67,14 @@ export default function EncomendasHubPage() {
             subtitle="Caixa da loja"
           />
           <RoleCard
+            href="/assistencia/encomendas/vendedor/login"
+            icon={<StoreIcon color="var(--brand-orange)" />}
+            iconBg="var(--brand-orange-soft)"
+            borderColor="var(--brand-orange)"
+            title="Fazer pedido"
+            subtitle="Vendedor"
+          />
+          <RoleCard
             href="/assistencia/encomendas/fabrica/login"
             icon={<HardHatIcon color="var(--brand-green)" />}
             iconBg="var(--brand-green-soft)"
@@ -83,6 +91,14 @@ export default function EncomendasHubPage() {
             subtitle="Expedição"
           />
         </div>
+
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Gerente de loja: use seu login de sempre em{" "}
+          <Link href="/assistencia/loja/login" className="underline">
+            /assistencia/loja
+          </Link>{" "}
+          — não precisa de PIN novo.
+        </p>
 
         <Link href="/assistencia" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
           ← Voltar

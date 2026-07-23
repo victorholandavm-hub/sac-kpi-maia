@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { getCaixaSession } from "@/app/assistencia/caixa-actions";
+import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
 import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
+import { listVendedoresWithPinStatus } from "@/lib/vendedores";
 import { NovoPedidoEncomendaForm } from "@/components/assistencia/NovoPedidoEncomendaForm";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 
@@ -15,16 +16,28 @@ export default async function SolicitarEncomendaPage({
 }) {
   const { enviado, pedido } = await searchParams;
 
-  const storeId = await getCaixaSession();
-  if (!storeId) {
-    redirect("/assistencia/encomendas/caixa/login");
+  const requester = await resolveEncomendaRequester();
+  if (!requester) {
+    redirect("/assistencia/encomendas");
   }
 
   const admin = getSupabaseAdmin();
-  const [{ data: store }, produtos] = await Promise.all([
-    admin.from("stores").select("name").eq("id", storeId).maybeSingle(),
+  const [produtos, vendedores] = await Promise.all([
     listProdutosEncomenda({ onlyActive: true }),
+    listVendedoresWithPinStatus(),
   ]);
+
+  let fixedStoreName: string | undefined;
+  let storeOptions: { id: string; name: string }[] | undefined;
+
+  if (requester.kind === "gerente" && requester.storeIds.length > 1) {
+    const { data } = await admin.from("stores").select("id, name").in("id", requester.storeIds).order("name");
+    storeOptions = data ?? [];
+  } else {
+    const storeId = requester.kind === "gerente" ? requester.storeIds[0] : requester.storeId;
+    const { data: store } = await admin.from("stores").select("name").eq("id", storeId).maybeSingle();
+    fixedStoreName = store?.name ?? storeId;
+  }
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
@@ -56,7 +69,13 @@ export default async function SolicitarEncomendaPage({
         </div>
       ) : null}
 
-      <NovoPedidoEncomendaForm storeName={store?.name ?? storeId} produtos={produtos} />
+      <NovoPedidoEncomendaForm
+        requester={requester}
+        fixedStoreName={fixedStoreName}
+        storeOptions={storeOptions}
+        produtos={produtos}
+        vendedorNames={vendedores.map((v) => v.name)}
+      />
     </div>
   );
 }
