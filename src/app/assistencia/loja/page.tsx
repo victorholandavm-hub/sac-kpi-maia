@@ -168,22 +168,9 @@ export default async function LojaHomePage({
       ) : (
         <div className="flex flex-col gap-5">
           {groupByDate(requests, showCompleted).map(([dateLabel, group]) => {
-            // Só sobe a posição na fila pro cabeçalho quando não há ambiguidade
-            // (um único chamado de montagem no grupo do dia) — com mais de um,
-            // cada posição continua ao lado do próprio chamado.
-            const bannerPosition =
-              group.length === 1 && group[0].type === "montagem" ? montagemPosition.get(group[0].id) : undefined;
             return (
             <div key={dateLabel} className="rounded-xl border" style={{ borderColor: "var(--brand-green)" }}>
               <div className="px-4 py-2 flex items-center gap-2 flex-wrap rounded-t-xl" style={{ background: "var(--brand-green)" }}>
-                {bannerPosition ? (
-                  <span
-                    className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                    style={{ color: "var(--brand-green)", background: "#fff" }}
-                  >
-                    {bannerPosition}º na fila
-                  </span>
-                ) : null}
                 <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--brand-green-ink)" }}>
                   {showCompleted ? `Concluídas em ${dateLabel}` : `Solicitado em ${dateLabel}`}
                 </span>
@@ -192,7 +179,7 @@ export default async function LojaHomePage({
                 {group.map((r) => {
                   const isOwnStore = gerenteStoreIds.includes(r.storeId);
                   const isOwnRequest = r.requestedByName === gerenteName;
-                  const position = bannerPosition ? undefined : montagemPosition.get(r.id);
+                  const position = montagemPosition.get(r.id);
                   return (
                     <div
                       key={r.id}
@@ -204,19 +191,19 @@ export default async function LojaHomePage({
                       }
                     >
                       <div className="flex flex-col gap-1.5 min-w-0">
+                        {r.type === "montagem" && position ? (
+                          <span
+                            className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap self-start"
+                            style={{ color: "#fff", background: "var(--brand-orange)" }}
+                          >
+                            {position}º na fila
+                          </span>
+                        ) : null}
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
                             #{r.ticketNumber}
                           </span>
                           <StatusBadge status={r.status} showInfo size={isOwnRequest ? "md" : "sm"} />
-                          {r.type === "montagem" && position ? (
-                            <span
-                              className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                              style={{ color: "#fff", background: "var(--brand-orange)" }}
-                            >
-                              {position}º na fila
-                            </span>
-                          ) : null}
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
