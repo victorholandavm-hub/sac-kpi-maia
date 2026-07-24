@@ -3,14 +3,17 @@
 import { useActionState } from "react";
 import { caixaSignIn, type CaixaFormState } from "@/app/assistencia/caixa-actions";
 import { PIN_LENGTH } from "@/lib/pinConfig";
+import { usePinAutoSubmit } from "./usePinAutoSubmit";
 
 // Caixa virou individual (nome + PIN próprio) — mesmo padrão de
 // VendedorLoginForm.tsx.
 export function CaixaLoginForm() {
   const [state, formAction, pending] = useActionState<CaixaFormState, FormData>(caixaSignIn, undefined);
+  const { formRef, onPinChange } = usePinAutoSubmit(pending);
 
   return (
     <form
+      ref={formRef}
       action={formAction}
       className="rounded-xl border p-6 flex flex-col gap-4"
       style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
@@ -36,6 +39,7 @@ export function CaixaLoginForm() {
           maxLength={PIN_LENGTH}
           required
           autoComplete="off"
+          onChange={onPinChange}
           className="rounded border px-3 py-2 text-center text-2xl tracking-[0.5em]"
           style={{ borderColor: "var(--border)" }}
         />

@@ -64,7 +64,7 @@ export default function AssistenciaHomePage() {
             iconBg="var(--brand-orange-soft)"
             borderColor="var(--brand-orange)"
             title="Gerente de loja"
-            subtitle="Prazos da sua loja"
+            subtitle="Equipe, encomendas e prazos"
           />
           <RoleCard
             href="/assistencia/encomendas"
@@ -72,7 +72,7 @@ export default function AssistenciaHomePage() {
             iconBg="var(--brand-orange-soft)"
             borderColor="var(--brand-orange)"
             title="Encomendas"
-            subtitle="Caixa, CD e fábrica"
+            subtitle="Caixa, vendedor, CD e fábrica"
           />
           <RoleCard
             href="/assistencia/login"
