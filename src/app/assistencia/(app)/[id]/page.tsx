@@ -91,11 +91,11 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
   }
 
   const { request, events } = result;
-  const canManage =
-    profile.role === "assistencia" ||
-    profile.role === "admin" ||
-    (profile.role === "sac" && (SAC_MANAGED_TYPES as readonly string[]).includes(request.type));
   const isSacType = (SAC_MANAGED_TYPES as readonly string[]).includes(request.type);
+  const canManage =
+    profile.role === "admin" ||
+    (profile.role === "assistencia" && !isSacType) ||
+    (profile.role === "sac" && isSacType);
   // Troca de produto, entrega de produto e envio de peça são todos entregues
   // pelo motorista — só notificação externa (e os tipos da assistência
   // técnica) usam montador.

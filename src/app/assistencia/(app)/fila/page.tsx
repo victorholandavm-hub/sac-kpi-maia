@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, type RequestItem, type ServiceRequestSummary } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
-import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, ASSISTENCIA_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -55,12 +55,17 @@ export default async function AssistenciaQueuePage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; page?: string; store?: string; assembler?: string }>;
 }) {
-  redirectIfSac(await getProfile());
+  const profile = await getProfile();
+  redirectIfSac(profile);
   const { status, q, page: pageParam, store, assembler } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  // Assistência só enxerga o próprio domínio (montagem/desmontagem/troca de
+  // peça/vistoria) — admin continua vendo tudo, inclusive chamados de SAC,
+  // como supervisão.
+  const types = profile.role === "assistencia" ? [...ASSISTENCIA_MANAGED_TYPES] : undefined;
   const [{ items: requests, total, pageSize }, stores, assemblers] = await Promise.all([
-    listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: assembler }),
+    listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: assembler, types }),
     listStores(),
     listAssemblers(),
   ]);

@@ -15,7 +15,7 @@ export default async function SacHomePage({
   searchParams: Promise<{ view?: string }>;
 }) {
   const profile = await getProfile();
-  if (profile.role !== "sac" && profile.role !== "admin" && profile.role !== "assistencia") {
+  if (profile.role !== "sac" && profile.role !== "admin") {
     redirect("/assistencia/inicio");
   }
 

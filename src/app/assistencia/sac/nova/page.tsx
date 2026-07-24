@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SacNovaSolicitacaoPage() {
   const profile = await getProfile();
-  if (profile.role !== "sac" && profile.role !== "admin" && profile.role !== "assistencia") {
+  if (profile.role !== "sac" && profile.role !== "admin") {
     redirect("/assistencia/inicio");
   }
 

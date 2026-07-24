@@ -5,7 +5,8 @@ import { createQuickRequest, type FormState } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { SHIFTS, type Store } from "@/lib/serviceRequests";
 
-const TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
+const ASSISTENCIA_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"] as const;
+const SAC_TYPE = "notificacao_externa" as const;
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -18,8 +19,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function QuickCreateRequestForm({ stores, assemblers }: { stores: Store[]; assemblers: string[] }) {
+export function QuickCreateRequestForm({
+  stores,
+  assemblers,
+  includeSacTypes,
+}: {
+  stores: Store[];
+  assemblers: string[];
+  includeSacTypes: boolean;
+}) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createQuickRequest, undefined);
+  const TYPES = includeSacTypes ? [...ASSISTENCIA_TYPES, SAC_TYPE] : ASSISTENCIA_TYPES;
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">

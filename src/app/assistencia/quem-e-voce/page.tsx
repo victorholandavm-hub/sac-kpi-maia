@@ -15,7 +15,8 @@ export default async function QuemEVocePage({
   const { erro } = await searchParams;
   const cookieStore = await cookies();
   const pending = cookieStore.get(ASSISTENCIA_TEAM_COOKIE_NAME)?.value;
-  if (!verifyAssistenciaTeamPending(pending)) {
+  const team = verifyAssistenciaTeamPending(pending);
+  if (!team) {
     redirect("/assistencia/login");
   }
 
@@ -23,7 +24,7 @@ export default async function QuemEVocePage({
   const { data: members } = await admin
     .from("profiles")
     .select("id, full_name")
-    .in("role", ["assistencia", "sac"])
+    .eq("role", team)
     .order("full_name");
 
   return (

@@ -103,6 +103,10 @@ export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
 // continua exclusivo de assistência/admin.
 export const SAC_MANAGED_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa"] as const;
 
+// Complemento de SAC_MANAGED_TYPES — únicos tipos que o papel "assistencia"
+// gerencia (admin continua com acesso total aos dois grupos, como supervisão).
+export const ASSISTENCIA_MANAGED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"] as const;
+
 export const SUPPLIER_RETURN_STATUS_LABELS: Record<string, string> = {
   aguardando_envio: "Aguardando envio",
   enviado: "Enviado ao fornecedor",

@@ -7,10 +7,17 @@ export const ASSISTENCIA_TEAM_PENDING_MAX_AGE = 60 * 5;
 
 const SECRET_ENV_VAR = "ASSISTENCIA_TEAM_SECRET";
 
-export function signAssistenciaTeamPending(): string {
-  return signPinSession("pending", SECRET_ENV_VAR);
+export type AssistenciaTeam = "assistencia" | "sac";
+
+// O time (assistência ou SAC) vai codificado no próprio token assinado — cada
+// um tem sua credencial compartilhada própria (ver signIn em actions.ts), e
+// "quem é você" só lista gente do time que efetivamente logou, nunca os dois
+// juntos.
+export function signAssistenciaTeamPending(team: AssistenciaTeam): string {
+  return signPinSession(team, SECRET_ENV_VAR);
 }
 
-export function verifyAssistenciaTeamPending(token: string | undefined | null): boolean {
-  return verifyPinSession(token, SECRET_ENV_VAR, ASSISTENCIA_TEAM_PENDING_MAX_AGE * 1000) !== null;
+export function verifyAssistenciaTeamPending(token: string | undefined | null): AssistenciaTeam | null {
+  const sub = verifyPinSession(token, SECRET_ENV_VAR, ASSISTENCIA_TEAM_PENDING_MAX_AGE * 1000);
+  return sub === "assistencia" || sub === "sac" ? sub : null;
 }

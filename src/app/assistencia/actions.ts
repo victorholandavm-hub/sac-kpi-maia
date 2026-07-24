@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole, requireManageAccess } from "@/lib/dal";
-import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
+import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { resolveDriverName } from "@/lib/payments";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
@@ -59,17 +59,21 @@ export async function signIn(_state: FormState, formData: FormData): Promise<For
     return { error: "Informe e-mail e senha." };
   }
 
-  // Login único da equipe da assistência (várias pessoas, mesma credencial):
-  // em vez de autenticar direto, manda pra tela "Quem é você?" escolher o
-  // nome — só ali a sessão real do Supabase Auth da pessoa escolhida é
-  // criada (ver chooseAssistenciaIdentity), então todo o resto do sistema
-  // (histórico, "assumir chamado" etc.) funciona exatamente como se ela
-  // tivesse logado com a própria conta.
-  const sharedEmail = process.env.ASSISTENCIA_TEAM_LOGIN_EMAIL;
-  const sharedPassword = process.env.ASSISTENCIA_TEAM_LOGIN_PASSWORD;
-  if (sharedEmail && sharedPassword && email === sharedEmail && password === sharedPassword) {
+  // Login único por time (assistência e SAC têm cada um sua credencial
+  // compartilhada, várias pessoas usam a mesma): em vez de autenticar direto,
+  // manda pra tela "Quem é você?" escolher o nome — só ali a sessão real do
+  // Supabase Auth da pessoa escolhida é criada (ver chooseAssistenciaIdentity),
+  // então todo o resto do sistema (histórico, "assumir chamado" etc.) funciona
+  // exatamente como se ela tivesse logado com a própria conta. "Quem é você?"
+  // só lista gente do time que bateu aqui, nunca os dois times juntos.
+  const teamCredentials: { team: "assistencia" | "sac"; email?: string; password?: string }[] = [
+    { team: "assistencia", email: process.env.ASSISTENCIA_TEAM_LOGIN_EMAIL, password: process.env.ASSISTENCIA_TEAM_LOGIN_PASSWORD },
+    { team: "sac", email: process.env.SAC_TEAM_LOGIN_EMAIL, password: process.env.SAC_TEAM_LOGIN_PASSWORD },
+  ];
+  const matchedTeam = teamCredentials.find((c) => c.email && c.password && email === c.email && password === c.password);
+  if (matchedTeam) {
     const cookieStore = await cookies();
-    cookieStore.set(ASSISTENCIA_TEAM_COOKIE_NAME, signAssistenciaTeamPending(), {
+    cookieStore.set(ASSISTENCIA_TEAM_COOKIE_NAME, signAssistenciaTeamPending(matchedTeam.team), {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
@@ -102,13 +106,18 @@ export async function signOut() {
 export async function chooseAssistenciaIdentity(profileId: string) {
   const cookieStore = await cookies();
   const pending = cookieStore.get(ASSISTENCIA_TEAM_COOKIE_NAME)?.value;
-  if (!verifyAssistenciaTeamPending(pending)) {
+  const team = verifyAssistenciaTeamPending(pending);
+  if (!team) {
     redirect("/assistencia/login");
   }
 
   const admin = getSupabaseAdmin();
   const { data: profile } = await admin.from("profiles").select("id, role").eq("id", profileId).maybeSingle();
-  if (!profile || (profile.role !== "assistencia" && profile.role !== "sac")) {
+  // Reconfirma o papel contra o time que efetivamente logou na credencial
+  // compartilhada — nunca confia só na lista mostrada na tela (ver
+  // "quem-e-voce/page.tsx"), senão bastaria manipular o profileId enviado
+  // pelo form pra uma pessoa do outro time virar aquela identidade.
+  if (!profile || profile.role !== team) {
     redirect("/assistencia/quem-e-voce?erro=1");
   }
 
@@ -739,6 +748,9 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   if (!REQUEST_TYPES.includes(type as (typeof REQUEST_TYPES)[number])) {
     return { error: "Tipo de solicitação inválido." };
   }
+  if (profile.role === "assistencia" && (SAC_MANAGED_TYPES as readonly string[]).includes(type)) {
+    return { error: "Esse tipo de solicitação é gerenciado pelo SAC." };
+  }
 
   const clientName = String(formData.get("client_name") ?? "").trim();
   if (!clientName) return { error: "Informe o nome do cliente." };
@@ -824,7 +836,7 @@ const SAC_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "no
 // e a instrução de recolhimento em texto livre.
 export async function createSacRequest(_state: FormState, formData: FormData): Promise<FormState> {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin", "sac");
+  requireRole(profile, "admin", "sac");
 
   const storeId = String(formData.get("store_id") ?? "").trim();
   if (!storeId) return { error: "Selecione a loja." };
