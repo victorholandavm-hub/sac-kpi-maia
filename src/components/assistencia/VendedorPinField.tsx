@@ -1,10 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { setVendedorPin } from "@/app/assistencia/admin-actions";
+import { setVendedorPin, toggleVendedorAtivo } from "@/app/assistencia/admin-actions";
 import { useQuickAction } from "./useQuickAction";
+import { PIN_LENGTH } from "@/lib/pinConfig";
 
-export function VendedorPinField({ name, storeName, hasPin }: { name: string; storeName: string; hasPin: boolean }) {
+export function VendedorPinField({
+  name,
+  storeName,
+  hasPin,
+  ativo,
+}: {
+  name: string;
+  storeName: string;
+  hasPin: boolean;
+  ativo: boolean;
+}) {
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [pin, setPin] = useState("");
@@ -12,8 +23,9 @@ export function VendedorPinField({ name, storeName, hasPin }: { name: string; st
   if (!editing) {
     return (
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+        <span className="text-sm" style={{ color: ativo ? "var(--text-secondary)" : "var(--text-muted)" }}>
           {name} <span style={{ color: "var(--text-muted)" }}>— {storeName}</span>
+          {!ativo ? <span style={{ color: "var(--status-critical)" }}> (inativo)</span> : null}
         </span>
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: hasPin ? "var(--status-good)" : "var(--text-muted)" }}>
@@ -21,6 +33,14 @@ export function VendedorPinField({ name, storeName, hasPin }: { name: string; st
           </span>
           <button onClick={() => setEditing(true)} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
             {hasPin ? "redefinir" : "definir"}
+          </button>
+          <button
+            disabled={pending}
+            onClick={() => run(() => toggleVendedorAtivo(name, !ativo), ativo ? "Vendedor inativado." : "Vendedor reativado.")}
+            className="text-xs underline disabled:opacity-60"
+            style={{ color: ativo ? "var(--status-critical)" : "var(--status-good)" }}
+          >
+            {ativo ? "inativar" : "reativar"}
           </button>
         </div>
       </div>
@@ -35,18 +55,18 @@ export function VendedorPinField({ name, storeName, hasPin }: { name: string; st
       <div className="flex items-center gap-2">
         <input
           value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-          placeholder="4 números"
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))}
+          placeholder={`${PIN_LENGTH} números`}
           inputMode="numeric"
-          className="w-20 rounded border px-2 py-1 text-sm text-center"
+          className="w-24 rounded border px-2 py-1 text-sm text-center"
           style={{ borderColor: "var(--border)" }}
           autoFocus
         />
         <button
-          disabled={pending || pin.length !== 4}
+          disabled={pending || pin.length !== PIN_LENGTH}
           onClick={() => {
-            if (pin.length !== 4) {
-              showToast("O PIN precisa ter 4 números.", "error");
+            if (pin.length !== PIN_LENGTH) {
+              showToast(`O PIN precisa ter ${PIN_LENGTH} números.`, "error");
               return;
             }
             run(async () => {

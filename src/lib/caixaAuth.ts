@@ -7,10 +7,12 @@ const SECRET_ENV_VAR = "CAIXA_SESSION_SECRET";
 
 export { hashPin, verifyPin };
 
-// Assunto da sessão é o store_id (PIN é por loja, não por pessoa — ver
-// supabase/migrations/0028_encomenda_pin_auth.sql).
-export function signCaixaSession(storeId: string): string {
-  return signPinSession(storeId, SECRET_ENV_VAR);
+// Assunto da sessão é o NOME da caixa (não mais a loja) — caixa virou
+// individual, mesmo padrão de vendedorAuth.ts. A loja é sempre resolvida
+// fresca do banco via getCaixaStoreId (src/lib/caixas.ts), nunca confiada no
+// cookie.
+export function signCaixaSession(name: string): string {
+  return signPinSession(name, SECRET_ENV_VAR);
 }
 
 export function verifyCaixaSession(token: string | undefined | null): string | null {

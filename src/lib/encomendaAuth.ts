@@ -3,6 +3,7 @@ import { getSupabaseServer } from "./supabaseServer";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { hashPin } from "./pinAuth";
 import { resetPinAttempts } from "./pinLockout";
+import { PIN_LENGTH, isValidPinFormat } from "./pinConfig";
 import { getCdSession } from "@/app/assistencia/cd-actions";
 import { getFabricaSession } from "@/app/assistencia/fabrica-actions";
 
@@ -36,29 +37,6 @@ export async function requireEncomendaActor(): Promise<EncomendaActor> {
   redirect("/assistencia/encomendas");
 }
 
-// --- Admin: caixa das lojas (PIN por loja) -------------------------------------
-
-export type CaixaPinStatus = { storeId: string; storeName: string; hasPin: boolean };
-
-export async function listCaixaPinStatus(): Promise<CaixaPinStatus[]> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("stores").select("id, name, encomenda_caixa_pins(pin_hash)").order("id");
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as { id: string; name: string; encomenda_caixa_pins: { pin_hash: string | null } | null }[]).map(
-    (s) => ({ storeId: s.id, storeName: s.name, hasPin: !!s.encomenda_caixa_pins?.pin_hash })
-  );
-}
-
-export async function setCaixaPin(storeId: string, pin: string): Promise<void> {
-  if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
-  const admin = getSupabaseAdmin();
-  const { error } = await admin
-    .from("encomenda_caixa_pins")
-    .upsert({ store_id: storeId, pin_hash: hashPin(pin) }, { onConflict: "store_id" });
-  if (error) throw new Error(error.message);
-  await resetPinAttempts("encomenda_caixa_pins", "store_id", storeId);
-}
-
 // --- Admin: operadores CD / fábrica ---------------------------------------------
 
 export type OperadorWithPinStatus = { name: string; hasPin: boolean };
@@ -77,7 +55,7 @@ export async function addCdOperador(name: string): Promise<void> {
 }
 
 export async function setCdOperadorPin(name: string, pin: string): Promise<void> {
-  if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
+  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("cd_operadores").update({ pin_hash: hashPin(pin) }).eq("name", name);
   if (error) throw new Error(error.message);
@@ -98,7 +76,7 @@ export async function addFabricaOperador(name: string): Promise<void> {
 }
 
 export async function setFabricaOperadorPin(name: string, pin: string): Promise<void> {
-  if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
+  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("fabrica_operadores").update({ pin_hash: hashPin(pin) }).eq("name", name);
   if (error) throw new Error(error.message);

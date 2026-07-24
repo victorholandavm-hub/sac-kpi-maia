@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutos — PIN de 4 dígitos precisa de limite de tentativas
+const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutos — PIN numérico precisa de limite de tentativas (tamanho definido em src/lib/pinConfig.ts)
 
 export type PinTable =
   | "assemblers"
@@ -10,7 +10,8 @@ export type PinTable =
   | "cd_operadores"
   | "fabrica_operadores"
   | "encomenda_caixa_pins"
-  | "vendedores";
+  | "vendedores"
+  | "caixas";
 
 export async function checkPinLockout(
   table: PinTable,

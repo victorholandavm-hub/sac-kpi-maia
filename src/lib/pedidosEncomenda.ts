@@ -97,6 +97,7 @@ export type PedidoEncomendaSummary = {
   nfE: string | null;
   requestedByName: string;
   vendedorName: string | null;
+  clienteCodigo: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -112,6 +113,7 @@ type PedidoRow = {
   nf_e: string | null;
   requested_by_name: string;
   vendedor_name: string | null;
+  cliente_codigo: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -120,7 +122,7 @@ type PedidoRow = {
 };
 
 const PEDIDO_COLUMNS =
-  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produtos_encomenda(id, descricao))";
+  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produtos_encomenda(id, descricao))";
 
 function toSummary(row: PedidoRow): PedidoEncomendaSummary {
   return {
@@ -133,6 +135,7 @@ function toSummary(row: PedidoRow): PedidoEncomendaSummary {
     nfE: row.nf_e,
     requestedByName: row.requested_by_name,
     vendedorName: row.vendedor_name,
+    clienteCodigo: row.cliente_codigo,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -268,6 +271,7 @@ export async function createPedidoEncomenda(input: {
   storeId: string;
   requestedByName: string;
   vendedorName: string | null;
+  clienteCodigo: string | null;
   notes: string | null;
   items: NewPedidoEncomendaItem[];
 }): Promise<{ id: string; pedidoNumber: number }> {
@@ -279,6 +283,7 @@ export async function createPedidoEncomenda(input: {
       store_id: input.storeId,
       requested_by_name: input.requestedByName,
       vendedor_name: input.vendedorName,
+      cliente_codigo: input.clienteCodigo,
       notes: input.notes,
     })
     .select("id, pedido_number")

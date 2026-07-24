@@ -120,6 +120,13 @@ export default async function LojaHomePage({
           >
             + Nova encomenda
           </Link>
+          <Link
+            href="/assistencia/loja/equipe"
+            className="text-sm underline whitespace-nowrap"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Equipe da loja
+          </Link>
           <form action={lojaGerenteSignOut}>
             <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
               Sair

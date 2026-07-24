@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import {
   LOJA_GERENTE_COOKIE_NAME,
   LOJA_GERENTE_SESSION_MAX_AGE,
@@ -19,7 +20,7 @@ export async function lojaGerenteSignIn(_state: LojaGerenteFormState, formData: 
   const pin = String(formData.get("pin") ?? "").trim();
 
   if (!typedName) return { error: "Informe seu nome." };
-  if (!/^\d{4}$/.test(pin)) return { error: "Digite os 4 números do seu PIN." };
+  if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
   // Nome não diferencia maiúsculas/minúsculas — ver mesma lógica em
   // montadorSignIn (src/app/assistencia/montador-actions.ts).

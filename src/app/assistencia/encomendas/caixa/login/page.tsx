@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCaixaSession } from "@/app/assistencia/caixa-actions";
-import { listStores } from "@/lib/serviceRequests";
 import { CaixaLoginForm } from "@/components/assistencia/CaixaLoginForm";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +10,6 @@ export default async function CaixaLoginPage() {
   if (existingSession) {
     redirect("/assistencia/encomendas/caixa");
   }
-
-  const stores = await listStores();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -25,12 +22,12 @@ export default async function CaixaLoginPage() {
               Fazer pedido — Encomendas
             </h1>
             <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-              Selecione sua loja e digite o PIN da caixa pra lançar um pedido.
+              Digite seu nome e o seu PIN pra lançar um pedido.
             </p>
           </div>
         </div>
 
-        <CaixaLoginForm stores={stores} />
+        <CaixaLoginForm />
 
         <Link href="/assistencia/encomendas" className="text-sm underline text-center" style={{ color: "var(--text-secondary)" }}>
           ← Voltar

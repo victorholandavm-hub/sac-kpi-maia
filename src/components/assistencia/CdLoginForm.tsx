@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { cdSignIn, type CdFormState } from "@/app/assistencia/cd-actions";
+import { PIN_LENGTH } from "@/lib/pinConfig";
 
 export function CdLoginForm() {
   const [state, formAction, pending] = useActionState<CdFormState, FormData>(cdSignIn, undefined);
@@ -24,13 +25,13 @@ export function CdLoginForm() {
         />
       </label>
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
-        PIN (4 números)
+        PIN
         <input
           name="pin"
           type="text"
           inputMode="numeric"
-          pattern="\d{4}"
-          maxLength={4}
+          pattern={`\\d{4,${PIN_LENGTH}}`}
+          maxLength={PIN_LENGTH}
           required
           autoComplete="off"
           className="rounded border px-3 py-2 text-center text-2xl tracking-[0.5em]"

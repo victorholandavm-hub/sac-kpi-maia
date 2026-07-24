@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import { CD_COOKIE_NAME, CD_SESSION_MAX_AGE, signCdSession, verifyCdSession, verifyPin } from "@/lib/cdAuth";
 
 export type CdFormState = { error?: string } | undefined;
@@ -13,7 +14,7 @@ export async function cdSignIn(_state: CdFormState, formData: FormData): Promise
   const pin = String(formData.get("pin") ?? "").trim();
 
   if (!typedName) return { error: "Informe seu nome." };
-  if (!/^\d{4}$/.test(pin)) return { error: "Digite os 4 números do seu PIN." };
+  if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
   const admin = getSupabaseAdmin();
   const { data: operadores } = await admin.from("cd_operadores").select("name, pin_hash");

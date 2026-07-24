@@ -1,11 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { setDriverPin } from "@/app/assistencia/admin-actions";
+import { setVendedorPinComoGerente, toggleVendedorAtivoComoGerente } from "@/app/assistencia/loja-equipe-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PIN_LENGTH } from "@/lib/pinConfig";
 
-export function DriverPinField({ name, hasPin }: { name: string; hasPin: boolean }) {
+// Mesma UI de VendedorPinField.tsx, só que chamando as actions do gerente
+// (loja-equipe-actions.ts), que verificam que a loja é dele antes de agir.
+export function EquipeVendedorPinField({
+  name,
+  storeName,
+  hasPin,
+  ativo,
+}: {
+  name: string;
+  storeName: string;
+  hasPin: boolean;
+  ativo: boolean;
+}) {
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [pin, setPin] = useState("");
@@ -13,8 +25,9 @@ export function DriverPinField({ name, hasPin }: { name: string; hasPin: boolean
   if (!editing) {
     return (
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          {name}
+        <span className="text-sm" style={{ color: ativo ? "var(--text-secondary)" : "var(--text-muted)" }}>
+          {name} <span style={{ color: "var(--text-muted)" }}>— {storeName}</span>
+          {!ativo ? <span style={{ color: "var(--status-critical)" }}> (inativo)</span> : null}
         </span>
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: hasPin ? "var(--status-good)" : "var(--text-muted)" }}>
@@ -22,6 +35,14 @@ export function DriverPinField({ name, hasPin }: { name: string; hasPin: boolean
           </span>
           <button onClick={() => setEditing(true)} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
             {hasPin ? "redefinir" : "definir"}
+          </button>
+          <button
+            disabled={pending}
+            onClick={() => run(() => toggleVendedorAtivoComoGerente(name, !ativo), ativo ? "Vendedor inativado." : "Vendedor reativado.")}
+            className="text-xs underline disabled:opacity-60"
+            style={{ color: ativo ? "var(--status-critical)" : "var(--status-good)" }}
+          >
+            {ativo ? "inativar" : "reativar"}
           </button>
         </div>
       </div>
@@ -51,7 +72,7 @@ export function DriverPinField({ name, hasPin }: { name: string; hasPin: boolean
               return;
             }
             run(async () => {
-              await setDriverPin(name, pin);
+              await setVendedorPinComoGerente(name, pin);
               setEditing(false);
               setPin("");
             }, `PIN de ${name} definido.`);

@@ -4,12 +4,15 @@ import { listGerentesWithPinStatus } from "@/lib/gerentes";
 import { listAssemblersWithPinStatus, listDriversWithPinStatus } from "@/lib/payments";
 import { listSuppliers } from "@/lib/partOrders";
 import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
-import { listCaixaPinStatus, listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
+import { listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
 import { listVendedoresWithPinStatus } from "@/lib/vendedores";
+import { listCaixasWithPinStatus } from "@/lib/caixas";
+import { PIN_LENGTH } from "@/lib/pinConfig";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
 import { AddSimpleEntryForm } from "@/components/assistencia/AddSimpleEntryForm";
 import { AddGerenteForm } from "@/components/assistencia/AddGerenteForm";
 import { AddVendedorForm } from "@/components/assistencia/AddVendedorForm";
+import { AddCaixaForm } from "@/components/assistencia/AddCaixaForm";
 import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
 import { DriverPinField } from "@/components/assistencia/DriverPinField";
 import { GerentePinField } from "@/components/assistencia/GerentePinField";
@@ -32,7 +35,7 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixaPins, vendedores, cdOperadores, fabricaOperadores, rotaConfig] =
+  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixas, vendedores, cdOperadores, fabricaOperadores, rotaConfig] =
     await Promise.all([
       listStores(),
       listGerentesWithPinStatus(),
@@ -40,7 +43,7 @@ export default async function AdminPage() {
       listDriversWithPinStatus(),
       listSuppliers(),
       listProdutosEncomenda(),
-      listCaixaPinStatus(),
+      listCaixasWithPinStatus(),
       listVendedoresWithPinStatus(),
       listCdOperadoresWithPinStatus(),
       listFabricaOperadoresWithPinStatus(),
@@ -72,7 +75,7 @@ export default async function AdminPage() {
             Montadores
           </h3>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Defina um PIN de 4 números pra cada um acessar a própria área em{" "}
+            Defina um PIN de {PIN_LENGTH} números pra cada um acessar a própria área em{" "}
             <span className="font-mono">/assistencia/montador</span>.
           </p>
           <ul className="flex flex-col gap-2">
@@ -93,7 +96,7 @@ export default async function AdminPage() {
             Motoristas
           </h3>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Defina um PIN de 4 números pra cada um acessar a própria área em{" "}
+            Defina um PIN de {PIN_LENGTH} números pra cada um acessar a própria área em{" "}
             <span className="font-mono">/assistencia/motorista</span>.
           </p>
           <ul className="flex flex-col gap-2">
@@ -132,7 +135,7 @@ export default async function AdminPage() {
           Gerentes de loja ({gerentes.length})
         </h3>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Cada gerente entra com o próprio nome + PIN de 4 números em <span className="font-mono">/assistencia/loja</span>{" "}
+          Cada gerente entra com o próprio nome + PIN de {PIN_LENGTH} números em <span className="font-mono">/assistencia/loja</span>{" "}
           e só consegue solicitar/negociar prazo para as lojas vinculadas abaixo (pode ser mais de uma).
           Pra mudar as lojas de um gerente já cadastrado, adicione ele de novo marcando o novo conjunto de lojas.
         </p>
@@ -164,19 +167,20 @@ export default async function AdminPage() {
         style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
         <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Caixa das lojas — Encomendas
+          Caixas — Encomendas
         </h3>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          PIN é por loja (não por pessoa) — qualquer caixa da loja usa o mesmo PIN pra lançar
-          pedido em <span className="font-mono">/assistencia/encomendas/caixa/login</span>.
+          Cada caixa tem seu próprio PIN e uma loja fixa, e entra com nome + PIN em{" "}
+          <span className="font-mono">/assistencia/encomendas/caixa/login</span>.
         </p>
         <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 max-h-64 overflow-y-auto">
-          {caixaPins.map((c) => (
-            <li key={c.storeId}>
-              <CaixaPinField storeId={c.storeId} storeName={c.storeName} hasPin={c.hasPin} />
+          {caixas.map((c) => (
+            <li key={c.name}>
+              <CaixaPinField name={c.name} storeName={c.storeName} hasPin={c.hasPin} ativo={c.ativo} />
             </li>
           ))}
         </ul>
+        <AddCaixaForm stores={stores} />
       </section>
 
       <section
@@ -193,7 +197,7 @@ export default async function AdminPage() {
         <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 max-h-64 overflow-y-auto">
           {vendedores.map((v) => (
             <li key={v.name}>
-              <VendedorPinField name={v.name} storeName={v.storeName} hasPin={v.hasPin} />
+              <VendedorPinField name={v.name} storeName={v.storeName} hasPin={v.hasPin} ativo={v.ativo} />
             </li>
           ))}
         </ul>
@@ -209,7 +213,7 @@ export default async function AdminPage() {
             Operadores CD — Encomendas
           </h3>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Defina um PIN de 4 números pra cada um acessar{" "}
+            Defina um PIN de {PIN_LENGTH} números pra cada um acessar{" "}
             <span className="font-mono">/assistencia/encomendas/cd/login</span>.
           </p>
           <ul className="flex flex-col gap-2">
@@ -230,7 +234,7 @@ export default async function AdminPage() {
             Operadores Fábrica — Encomendas
           </h3>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Defina um PIN de 4 números pra cada um acessar{" "}
+            Defina um PIN de {PIN_LENGTH} números pra cada um acessar{" "}
             <span className="font-mono">/assistencia/encomendas/fabrica/login</span>.
           </p>
           <ul className="flex flex-col gap-2">

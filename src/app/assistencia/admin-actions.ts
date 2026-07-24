@@ -5,12 +5,13 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
 import { hashPin } from "@/lib/montadorAuth";
 import { resetPinAttempts } from "@/lib/pinLockout";
+import { PIN_LENGTH, isValidPinFormat } from "@/lib/pinConfig";
 import { setGerenteStores } from "@/lib/gerentes";
-import { addVendedor as addVendedorLib } from "@/lib/vendedores";
+import { addVendedor as addVendedorLib, setVendedorAtivo as setVendedorAtivoLib } from "@/lib/vendedores";
+import { addCaixa as addCaixaLib, setCaixaAtivo as setCaixaAtivoLib } from "@/lib/caixas";
 import { resolveDriverName } from "@/lib/payments";
 import { upsertProdutoEncomenda, setProdutoEncomendaAtivo } from "@/lib/pedidosEncomenda";
 import {
-  setCaixaPin as setCaixaPinLib,
   addCdOperador as addCdOperadorLib,
   setCdOperadorPin as setCdOperadorPinLib,
   addFabricaOperador as addFabricaOperadorLib,
@@ -79,7 +80,7 @@ export async function setAssemblerPin(name: string, pin: string): Promise<void> 
   const profile = await getProfile();
   requireRole(profile, "admin");
 
-  if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
+  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
 
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("assemblers").update({ pin_hash: hashPin(pin) }).eq("name", name);
@@ -109,7 +110,7 @@ export async function setDriverPin(name: string, pin: string): Promise<void> {
   const profile = await getProfile();
   requireRole(profile, "admin");
 
-  if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
+  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
 
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("drivers").update({ pin_hash: hashPin(pin) }).eq("name", name);
@@ -147,7 +148,7 @@ export async function setGerentePin(name: string, pin: string): Promise<void> {
   const profile = await getProfile();
   requireRole(profile, "admin");
 
-  if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
+  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
 
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("gerentes").update({ pin_hash: hashPin(pin) }).eq("name", name);
@@ -184,7 +185,7 @@ export async function setVendedorPin(name: string, pin: string): Promise<void> {
   const profile = await getProfile();
   requireRole(profile, "admin");
 
-  if (!/^\d{4}$/.test(pin)) throw new Error("O PIN precisa ter exatamente 4 números.");
+  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
 
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("vendedores").update({ pin_hash: hashPin(pin) }).eq("name", name);
@@ -192,6 +193,34 @@ export async function setVendedorPin(name: string, pin: string): Promise<void> {
   await resetPinAttempts("vendedores", "name", name);
 
   revalidatePath("/assistencia/admin");
+}
+
+export async function toggleVendedorAtivo(name: string, ativo: boolean): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  await setVendedorAtivoLib(name, ativo);
+  revalidatePath("/assistencia/admin");
+}
+
+// Caixa virou individual (nome + PIN próprio, 1 loja) — mesmo padrão de
+// addVendedor logo acima.
+export async function addCaixa(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  const name = String(formData.get("name") ?? "").trim();
+  const storeId = String(formData.get("store_id") ?? "").trim();
+  if (!name) return { error: "Informe o nome." };
+  if (!storeId) return { error: "Selecione a loja." };
+
+  try {
+    await addCaixaLib(name, storeId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível salvar." };
+  }
+
+  revalidatePath("/assistencia/admin");
+  return { success: true };
 }
 
 export async function addSupplier(_state: FormState, formData: FormData): Promise<FormState> {
@@ -238,11 +267,25 @@ export async function toggleProdutoEncomendaAtivo(id: string, ativo: boolean): P
   revalidatePath("/assistencia/admin");
 }
 
-// PIN da caixa é por loja (não por pessoa) — ver 0028_encomenda_pin_auth.sql.
-export async function setCaixaPin(storeId: string, pin: string): Promise<void> {
+// Caixa virou individual (nome + PIN próprio) — ver 0031_caixa_individual_e_ativo.sql.
+export async function setCaixaPin(name: string, pin: string): Promise<void> {
   const profile = await getProfile();
   requireRole(profile, "admin");
-  await setCaixaPinLib(storeId, pin);
+
+  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("caixas").update({ pin_hash: hashPin(pin) }).eq("name", name);
+  if (error) throw new Error(error.message);
+  await resetPinAttempts("caixas", "name", name);
+
+  revalidatePath("/assistencia/admin");
+}
+
+export async function toggleCaixaAtivo(name: string, ativo: boolean): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  await setCaixaAtivoLib(name, ativo);
   revalidatePath("/assistencia/admin");
 }
 

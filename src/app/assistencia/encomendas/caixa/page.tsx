@@ -164,6 +164,11 @@ export default async function EncomendasCaixaPage({
                       Vendedor: {p.vendedorName}
                     </p>
                   ) : null}
+                  {p.clienteCodigo ? (
+                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      Código do cliente: {p.clienteCodigo}
+                    </p>
+                  ) : null}
                   {p.carga ? (
                     <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       Carga: {p.carga}

@@ -123,6 +123,11 @@ export default async function EncomendasQueuePage({
                   <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
                     {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
                   </p>
+                  {p.clienteCodigo ? (
+                    <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+                      Cliente: {p.clienteCodigo}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
                   <span>{new Date(p.createdAt).toLocaleString("pt-BR")}</span>

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import {
   VENDEDOR_COOKIE_NAME,
   VENDEDOR_SESSION_MAX_AGE,
@@ -19,11 +20,11 @@ export async function vendedorSignIn(_state: VendedorFormState, formData: FormDa
   const pin = String(formData.get("pin") ?? "").trim();
 
   if (!typedName) return { error: "Informe seu nome." };
-  if (!/^\d{4}$/.test(pin)) return { error: "Digite os 4 números do seu PIN." };
+  if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
   // Nome não diferencia maiúsculas/minúsculas — mesma lógica de lojaGerenteSignIn.
   const admin = getSupabaseAdmin();
-  const { data: vendedores } = await admin.from("vendedores").select("name, pin_hash");
+  const { data: vendedores } = await admin.from("vendedores").select("name, pin_hash, ativo");
   const data = (vendedores ?? []).find((v) => v.name.toLowerCase() === typedName.toLowerCase());
   const name = data?.name ?? typedName;
 
@@ -32,7 +33,9 @@ export async function vendedorSignIn(_state: VendedorFormState, formData: FormDa
     return { error: `Muitas tentativas erradas. Tente de novo em ${lockout.minutesLeft} minuto(s).` };
   }
 
-  if (!data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
+  // Erro genérico (não diferencia "não existe" de "existe mas está inativo")
+  // pra não vazar informação de quem tem cadastro desativado.
+  if (!data || !data.pin_hash || !data.ativo || !verifyPin(pin, data.pin_hash)) {
     await recordFailedPinAttempt("vendedores", "name", name);
     return { error: "Nome ou PIN incorretos." };
   }

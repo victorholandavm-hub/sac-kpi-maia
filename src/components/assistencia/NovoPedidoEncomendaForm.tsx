@@ -70,11 +70,9 @@ export function NovoPedidoEncomendaForm({
         </Field>
       )}
 
-      {requester.kind === "caixa" ? (
-        <Field label="Seu nome *">
-          <input name="requester_name" required placeholder="Quem está lançando esse pedido" className="rounded border px-3 py-2" style={inputStyle} />
-        </Field>
-      ) : null}
+      <Field label="Código do cliente">
+        <input name="cliente_codigo" placeholder="Código do cliente na venda" className="rounded border px-3 py-2" style={inputStyle} />
+      </Field>
 
       <div className="flex flex-col gap-2">
         <span className="text-sm" style={{ color: "var(--text-primary)" }}>

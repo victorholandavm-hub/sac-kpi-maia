@@ -2,11 +2,11 @@
 
 import { useActionState } from "react";
 import { caixaSignIn, type CaixaFormState } from "@/app/assistencia/caixa-actions";
-import type { Store } from "@/lib/serviceRequests";
+import { PIN_LENGTH } from "@/lib/pinConfig";
 
-// PIN é por loja, não por pessoa (ver 0028_encomenda_pin_auth.sql) — por isso
-// a caixa escolhe a loja num select em vez de digitar o próprio nome.
-export function CaixaLoginForm({ stores }: { stores: Store[] }) {
+// Caixa virou individual (nome + PIN próprio) — mesmo padrão de
+// VendedorLoginForm.tsx.
+export function CaixaLoginForm() {
   const [state, formAction, pending] = useActionState<CaixaFormState, FormData>(caixaSignIn, undefined);
 
   return (
@@ -16,26 +16,24 @@ export function CaixaLoginForm({ stores }: { stores: Store[] }) {
       style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
     >
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
-        Sua loja
-        <select name="store_id" required defaultValue="" className="rounded border px-3 py-2" style={{ borderColor: "var(--border)" }}>
-          <option value="" disabled>
-            Selecione…
-          </option>
-          {stores.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        Seu nome
+        <input
+          name="name"
+          type="text"
+          required
+          autoComplete="off"
+          className="rounded border px-3 py-2"
+          style={{ borderColor: "var(--border)" }}
+        />
       </label>
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
-        PIN da loja (4 números)
+        PIN
         <input
           name="pin"
           type="text"
           inputMode="numeric"
-          pattern="\d{4}"
-          maxLength={4}
+          pattern={`\\d{4,${PIN_LENGTH}}`}
+          maxLength={PIN_LENGTH}
           required
           autoComplete="off"
           className="rounded border px-3 py-2 text-center text-2xl tracking-[0.5em]"

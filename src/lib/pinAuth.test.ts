@@ -9,26 +9,26 @@ beforeAll(() => {
 
 describe("hashPin / verifyPin", () => {
   it("verifica o PIN certo como válido", () => {
-    const hash = hashPin("1234");
-    expect(verifyPin("1234", hash)).toBe(true);
+    const hash = hashPin("123456");
+    expect(verifyPin("123456", hash)).toBe(true);
   });
 
   it("rejeita um PIN errado", () => {
-    const hash = hashPin("1234");
-    expect(verifyPin("9999", hash)).toBe(false);
+    const hash = hashPin("123456");
+    expect(verifyPin("999999", hash)).toBe(false);
   });
 
   it("gera um hash no formato salt:hash", () => {
-    const hash = hashPin("1234");
+    const hash = hashPin("123456");
     expect(hash.split(":")).toHaveLength(2);
   });
 
   it("gera hashes diferentes pro mesmo PIN (salt aleatório)", () => {
-    expect(hashPin("1234")).not.toBe(hashPin("1234"));
+    expect(hashPin("123456")).not.toBe(hashPin("123456"));
   });
 
   it("rejeita um valor de hash mal formado", () => {
-    expect(verifyPin("1234", "sem-separador")).toBe(false);
+    expect(verifyPin("123456", "sem-separador")).toBe(false);
   });
 });
 

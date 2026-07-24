@@ -34,15 +34,8 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   if (!requester) return { error: "Sessão expirada. Faça login de novo." };
 
   let storeId: string;
-  let requestedByName: string;
-  if (requester.kind === "caixa") {
-    storeId = requester.storeId;
-    requestedByName = String(formData.get("requester_name") ?? "").trim();
-    if (!requestedByName) return { error: "Informe seu nome." };
-  } else if (requester.kind === "vendedor") {
-    storeId = requester.storeId;
-    requestedByName = requester.name;
-  } else {
+  const requestedByName = requester.name;
+  if (requester.kind === "gerente") {
     const chosenStoreId = String(formData.get("store_id") ?? "").trim();
     if (requester.storeIds.length === 1) {
       storeId = requester.storeIds[0];
@@ -50,7 +43,8 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
       if (!requester.storeIds.includes(chosenStoreId)) return { error: "Selecione uma loja válida." };
       storeId = chosenStoreId;
     }
-    requestedByName = requester.name;
+  } else {
+    storeId = requester.storeId;
   }
 
   const admin = getSupabaseAdmin();
@@ -58,6 +52,7 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   if (!store) return { error: "Loja inválida." };
 
   const vendedorName = String(formData.get("vendedor_name") ?? "").trim() || null;
+  const clienteCodigo = String(formData.get("cliente_codigo") ?? "").trim() || null;
 
   const produtoIds = formData.getAll("item_produto_id").map((v) => String(v).trim());
   const quantidades = formData.getAll("item_quantidade").map((v) => {
@@ -77,7 +72,7 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   let pedidoId: string;
   let pedidoNumber: number;
   try {
-    const result = await createPedidoEncomenda({ storeId, requestedByName, vendedorName, notes, items });
+    const result = await createPedidoEncomenda({ storeId, requestedByName, vendedorName, clienteCodigo, notes, items });
     pedidoId = result.id;
     pedidoNumber = result.pedidoNumber;
   } catch (err) {

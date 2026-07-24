@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import {
   CAIXA_COOKIE_NAME,
   CAIXA_SESSION_MAX_AGE,
@@ -14,31 +15,36 @@ import {
 
 export type CaixaFormState = { error?: string } | undefined;
 
-// PIN é por loja, não por pessoa (ver 0028_encomenda_pin_auth.sql) — a caixa
-// escolhe a própria loja num select em vez de digitar um nome.
+// Caixa virou individual (nome + PIN próprio, 1 loja) — mesmo padrão de
+// vendedorSignIn (src/app/assistencia/vendedor-actions.ts).
 export async function caixaSignIn(_state: CaixaFormState, formData: FormData): Promise<CaixaFormState> {
-  const storeId = String(formData.get("store_id") ?? "").trim();
+  const typedName = String(formData.get("name") ?? "").trim();
   const pin = String(formData.get("pin") ?? "").trim();
 
-  if (!storeId) return { error: "Selecione a loja." };
-  if (!/^\d{4}$/.test(pin)) return { error: "Digite os 4 números do PIN da loja." };
+  if (!typedName) return { error: "Informe seu nome." };
+  if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
+  // Nome não diferencia maiúsculas/minúsculas — mesma lógica de vendedorSignIn.
   const admin = getSupabaseAdmin();
-  const { data } = await admin.from("encomenda_caixa_pins").select("store_id, pin_hash").eq("store_id", storeId).maybeSingle();
+  const { data: caixas } = await admin.from("caixas").select("name, pin_hash, ativo");
+  const data = (caixas ?? []).find((c) => c.name.toLowerCase() === typedName.toLowerCase());
+  const name = data?.name ?? typedName;
 
-  const lockout = await checkPinLockout("encomenda_caixa_pins", "store_id", storeId);
+  const lockout = await checkPinLockout("caixas", "name", name);
   if (lockout.locked) {
     return { error: `Muitas tentativas erradas. Tente de novo em ${lockout.minutesLeft} minuto(s).` };
   }
 
-  if (!data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
-    await recordFailedPinAttempt("encomenda_caixa_pins", "store_id", storeId);
-    return { error: "PIN incorreto." };
+  // Erro genérico (não diferencia "não existe" de "existe mas está inativa")
+  // pra não vazar informação de quem tem cadastro desativado.
+  if (!data || !data.pin_hash || !data.ativo || !verifyPin(pin, data.pin_hash)) {
+    await recordFailedPinAttempt("caixas", "name", name);
+    return { error: "Nome ou PIN incorretos." };
   }
-  await resetPinAttempts("encomenda_caixa_pins", "store_id", storeId);
+  await resetPinAttempts("caixas", "name", name);
 
   const cookieStore = await cookies();
-  cookieStore.set(CAIXA_COOKIE_NAME, signCaixaSession(storeId), {
+  cookieStore.set(CAIXA_COOKIE_NAME, signCaixaSession(data.name), {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
@@ -55,7 +61,8 @@ export async function caixaSignOut() {
   redirect("/assistencia/encomendas/caixa/login");
 }
 
-// Retorna o store_id da sessão (não o nome de ninguém — PIN é por loja).
+// Retorna o NOME da caixa (não mais o store_id) — use getCaixaStoreId (nome)
+// (src/lib/caixas.ts) pra descobrir a loja dela, sempre buscando no banco.
 export async function getCaixaSession(): Promise<string | null> {
   const cookieStore = await cookies();
   return verifyCaixaSession(cookieStore.get(CAIXA_COOKIE_NAME)?.value);

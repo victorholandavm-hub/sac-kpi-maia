@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { setCdOperadorPin } from "@/app/assistencia/admin-actions";
 import { useQuickAction } from "./useQuickAction";
+import { PIN_LENGTH } from "@/lib/pinConfig";
 
 export function CdOperadorPinField({ name, hasPin }: { name: string; hasPin: boolean }) {
   const { pending, run, showToast } = useQuickAction();
@@ -35,18 +36,18 @@ export function CdOperadorPinField({ name, hasPin }: { name: string; hasPin: boo
       <div className="flex items-center gap-2">
         <input
           value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-          placeholder="4 números"
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))}
+          placeholder={`${PIN_LENGTH} números`}
           inputMode="numeric"
-          className="w-20 rounded border px-2 py-1 text-sm text-center"
+          className="w-24 rounded border px-2 py-1 text-sm text-center"
           style={{ borderColor: "var(--border)" }}
           autoFocus
         />
         <button
-          disabled={pending || pin.length !== 4}
+          disabled={pending || pin.length !== PIN_LENGTH}
           onClick={() => {
-            if (pin.length !== 4) {
-              showToast("O PIN precisa ter 4 números.", "error");
+            if (pin.length !== PIN_LENGTH) {
+              showToast(`O PIN precisa ter ${PIN_LENGTH} números.`, "error");
               return;
             }
             run(async () => {

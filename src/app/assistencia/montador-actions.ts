@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import {
   MONTADOR_COOKIE_NAME,
   MONTADOR_SESSION_MAX_AGE,
@@ -21,7 +22,7 @@ export async function montadorSignIn(_state: MontadorFormState, formData: FormDa
   const pin = String(formData.get("pin") ?? "").trim();
 
   if (!typedName) return { error: "Informe seu nome." };
-  if (!/^\d{4}$/.test(pin)) return { error: "Digite os 4 números do seu PIN." };
+  if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
   // Nome não diferencia maiúsculas/minúsculas ("Janailson" == "janailson") —
   // busca todo mundo e compara em minúsculo em vez de usar `ilike` (que trata

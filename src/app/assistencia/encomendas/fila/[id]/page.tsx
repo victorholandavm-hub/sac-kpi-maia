@@ -83,6 +83,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
       >
         <Row label="Solicitado por" value={pedido.requestedByName} />
         <Row label="Vendedor" value={pedido.vendedorName} />
+        <Row label="Código do cliente" value={pedido.clienteCodigo} />
         <Row label="Criado em" value={new Date(pedido.createdAt).toLocaleString("pt-BR")} />
         <Row label="Carga" value={pedido.carga} />
         <Row label="NF-e" value={pedido.nfE} />

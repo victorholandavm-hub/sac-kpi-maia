@@ -1,10 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { setCaixaPin } from "@/app/assistencia/admin-actions";
+import { setCaixaPin, toggleCaixaAtivo } from "@/app/assistencia/admin-actions";
 import { useQuickAction } from "./useQuickAction";
+import { PIN_LENGTH } from "@/lib/pinConfig";
 
-export function CaixaPinField({ storeId, storeName, hasPin }: { storeId: string; storeName: string; hasPin: boolean }) {
+// Caixa virou individual (nome + PIN próprio) — mesmo padrão de
+// VendedorPinField.tsx.
+export function CaixaPinField({
+  name,
+  storeName,
+  hasPin,
+  ativo,
+}: {
+  name: string;
+  storeName: string;
+  hasPin: boolean;
+  ativo: boolean;
+}) {
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [pin, setPin] = useState("");
@@ -12,8 +25,9 @@ export function CaixaPinField({ storeId, storeName, hasPin }: { storeId: string;
   if (!editing) {
     return (
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          {storeName}
+        <span className="text-sm" style={{ color: ativo ? "var(--text-secondary)" : "var(--text-muted)" }}>
+          {name} <span style={{ color: "var(--text-muted)" }}>— {storeName}</span>
+          {!ativo ? <span style={{ color: "var(--status-critical)" }}> (inativo)</span> : null}
         </span>
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: hasPin ? "var(--status-good)" : "var(--text-muted)" }}>
@@ -21,6 +35,14 @@ export function CaixaPinField({ storeId, storeName, hasPin }: { storeId: string;
           </span>
           <button onClick={() => setEditing(true)} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
             {hasPin ? "redefinir" : "definir"}
+          </button>
+          <button
+            disabled={pending}
+            onClick={() => run(() => toggleCaixaAtivo(name, !ativo), ativo ? "Caixa inativada." : "Caixa reativada.")}
+            className="text-xs underline disabled:opacity-60"
+            style={{ color: ativo ? "var(--status-critical)" : "var(--status-good)" }}
+          >
+            {ativo ? "inativar" : "reativar"}
           </button>
         </div>
       </div>
@@ -30,30 +52,30 @@ export function CaixaPinField({ storeId, storeName, hasPin }: { storeId: string;
   return (
     <div className="flex items-center justify-between gap-2 flex-wrap">
       <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        {storeName}
+        {name}
       </span>
       <div className="flex items-center gap-2">
         <input
           value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-          placeholder="4 números"
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))}
+          placeholder={`${PIN_LENGTH} números`}
           inputMode="numeric"
-          className="w-20 rounded border px-2 py-1 text-sm text-center"
+          className="w-24 rounded border px-2 py-1 text-sm text-center"
           style={{ borderColor: "var(--border)" }}
           autoFocus
         />
         <button
-          disabled={pending || pin.length !== 4}
+          disabled={pending || pin.length !== PIN_LENGTH}
           onClick={() => {
-            if (pin.length !== 4) {
-              showToast("O PIN precisa ter 4 números.", "error");
+            if (pin.length !== PIN_LENGTH) {
+              showToast(`O PIN precisa ter ${PIN_LENGTH} números.`, "error");
               return;
             }
             run(async () => {
-              await setCaixaPin(storeId, pin);
+              await setCaixaPin(name, pin);
               setEditing(false);
               setPin("");
-            }, `PIN de ${storeName} definido.`);
+            }, `PIN de ${name} definido.`);
           }}
           className="text-xs rounded px-2 py-1 disabled:opacity-60"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
