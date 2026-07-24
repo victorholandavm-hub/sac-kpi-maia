@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { signOut } from "@/app/assistencia/actions";
 import { listRequests } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, ROLE_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, ROLE_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 
@@ -23,7 +23,7 @@ export default async function SacHomePage({
   const showCompleted = view === "concluidas";
 
   const { items } = await listRequests({
-    types: ["troca_produto", "notificacao_externa"],
+    types: [...SAC_MANAGED_TYPES],
     status: showCompleted ? "concluida" : undefined,
   });
   const requests = showCompleted ? items : items.filter((r) => r.status !== "concluida" && r.status !== "cancelada");
