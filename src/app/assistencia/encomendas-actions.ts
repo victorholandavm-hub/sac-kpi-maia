@@ -55,14 +55,14 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   const vendedorName = String(formData.get("vendedor_name") ?? "").trim() || null;
   const clienteCodigo = String(formData.get("cliente_codigo") ?? "").trim() || null;
 
-  const produtoIds = formData.getAll("item_produto_id").map((v) => String(v).trim());
+  const produtoDescricoes = formData.getAll("item_produto_descricao").map((v) => String(v).trim());
   const quantidades = formData.getAll("item_quantidade").map((v) => {
     const n = parseInt(String(v), 10);
     return Number.isFinite(n) && n > 0 ? n : 1;
   });
-  const items: NewPedidoEncomendaItem[] = produtoIds
-    .map((produtoId, i) => ({ produtoId, quantidade: quantidades[i] ?? 1 }))
-    .filter((item) => item.produtoId.length > 0);
+  const items: NewPedidoEncomendaItem[] = produtoDescricoes
+    .map((produtoDescricao, i) => ({ produtoDescricao, quantidade: quantidades[i] ?? 1 }))
+    .filter((item) => item.produtoDescricao.length > 0);
 
   if (items.length === 0) {
     return { error: "Adicione pelo menos um produto." };

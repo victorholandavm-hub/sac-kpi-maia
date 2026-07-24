@@ -45,9 +45,21 @@ export async function resolveDriverName(typedName: string): Promise<string> {
   return existing?.name ?? trimmed;
 }
 
+// Estágio do pagamento de um item — só vira "pendente" (esperando liberação
+// do gerente) depois que a montagem em si foi concluída; antes disso é só
+// "a_montar", mesmo que o valor já tenha sido definido antecipadamente.
+export type PaymentStage = "a_montar" | "pendente" | "liberado";
+
+export function paymentStage(requestStatus: string, paymentReleased: boolean): PaymentStage {
+  if (paymentReleased) return "liberado";
+  if (requestStatus !== "concluida") return "a_montar";
+  return "pendente";
+}
+
 export type PaymentItem = {
   itemId: string;
   requestId: string;
+  requestStatus: string;
   product: string;
   quantity: number;
   unitValue: number | null;
@@ -70,6 +82,7 @@ type PaymentItemRow = {
   payment_authorized_by: string | null;
   request: {
     id: string;
+    status: string;
     assembler_name: string | null;
     client_name: string | null;
     created_at: string;
@@ -84,7 +97,7 @@ export async function listPaymentItems(
   const { data, error } = await admin
     .from("service_request_items")
     .select(
-      "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, assembler_name, client_name, created_at, stores(name))"
+      "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, status, assembler_name, client_name, created_at, stores(name))"
     )
     .not("unit_value", "is", null)
     .order("created_at", { ascending: false });
@@ -96,6 +109,7 @@ export async function listPaymentItems(
     .map((row) => ({
       itemId: row.id,
       requestId: row.request!.id,
+      requestStatus: row.request!.status,
       product: row.product,
       quantity: row.quantity,
       unitValue: row.unit_value,
@@ -116,13 +130,16 @@ export async function listPaymentItems(
   });
 }
 
+// Só conta como "pendente de liberação" quem já teve a montagem concluída —
+// item com valor definido mas ainda "a montar" não entra nessa conta.
 export async function countPendingPayments(): Promise<number> {
   const admin = getSupabaseAdmin();
   const { count, error } = await admin
     .from("service_request_items")
-    .select("id", { count: "exact", head: true })
+    .select("id, request:service_requests!inner(status)", { count: "exact", head: true })
     .not("unit_value", "is", null)
-    .eq("payment_released", false);
+    .eq("payment_released", false)
+    .eq("request.status", "concluida");
   if (error) throw new Error(error.message);
   return count ?? 0;
 }

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
-import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
 import { listVendedoresWithPinStatus } from "@/lib/vendedores";
 import { NovoPedidoEncomendaForm } from "@/components/assistencia/NovoPedidoEncomendaForm";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -22,10 +21,7 @@ export default async function SolicitarEncomendaPage({
   }
 
   const admin = getSupabaseAdmin();
-  const [produtos, vendedores] = await Promise.all([
-    listProdutosEncomenda({ onlyActive: true }),
-    listVendedoresWithPinStatus(),
-  ]);
+  const vendedores = await listVendedoresWithPinStatus();
 
   let fixedStoreName: string | undefined;
   let storeOptions: { id: string; name: string }[] | undefined;
@@ -73,7 +69,6 @@ export default async function SolicitarEncomendaPage({
         requester={requester}
         fixedStoreName={fixedStoreName}
         storeOptions={storeOptions}
-        produtos={produtos}
         vendedorNames={vendedores.map((v) => v.name)}
       />
     </div>

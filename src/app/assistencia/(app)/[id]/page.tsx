@@ -152,7 +152,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       </div>
 
       {canManage ? (
-        <RequestItemsTable items={request.items} requestId={request.id} />
+        <RequestItemsTable items={request.items} requestId={request.id} requestStatus={request.status} />
       ) : request.items.length > 0 ? (
         <div
           className="rounded-lg border p-4 flex flex-col gap-2"

@@ -914,6 +914,16 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     to_status: "aberta",
   });
 
+  const photo = formData.get("photo");
+  if (photo instanceof File && photo.size > 0) {
+    try {
+      await saveRequestPhoto({ requestId: data.id, file: photo, uploadedBy: profile.fullName });
+    } catch (err) {
+      // Solicitação já foi criada — não bloqueia o fluxo por causa da foto.
+      console.error("Falha ao salvar foto da solicitação de SAC:", err);
+    }
+  }
+
   revalidatePath("/assistencia/sac");
   redirect(`/assistencia/${data.id}`);
 }

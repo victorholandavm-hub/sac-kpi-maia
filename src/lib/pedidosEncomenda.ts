@@ -82,7 +82,6 @@ export async function setProdutoEncomendaAtivo(id: string, ativo: boolean): Prom
 
 export type PedidoEncomendaItem = {
   id: string;
-  produtoId: string;
   produtoDescricao: string;
   quantidade: number;
 };
@@ -120,11 +119,13 @@ type PedidoRow = {
   created_at: string;
   updated_at: string;
   stores: { name: string } | null;
-  pedido_encomenda_itens: { id: string; quantidade: number; produtos_encomenda: { id: string; descricao: string } | null }[] | null;
+  pedido_encomenda_itens:
+    | { id: string; quantidade: number; produto_descricao: string | null; produtos_encomenda: { descricao: string } | null }[]
+    | null;
 };
 
 const PEDIDO_COLUMNS =
-  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, prazo_entrega, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produtos_encomenda(id, descricao))";
+  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, prazo_entrega, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produto_descricao, produtos_encomenda(descricao))";
 
 function toSummary(row: PedidoRow): PedidoEncomendaSummary {
   return {
@@ -144,8 +145,7 @@ function toSummary(row: PedidoRow): PedidoEncomendaSummary {
     updatedAt: row.updated_at,
     items: (row.pedido_encomenda_itens ?? []).map((i) => ({
       id: i.id,
-      produtoId: i.produtos_encomenda?.id ?? "",
-      produtoDescricao: i.produtos_encomenda?.descricao ?? "Produto removido",
+      produtoDescricao: i.produto_descricao ?? i.produtos_encomenda?.descricao ?? "Produto removido",
       quantidade: i.quantidade,
     })),
   };
@@ -263,7 +263,7 @@ export async function getPedidoDetail(
   return { pedido: toSummary(data as unknown as PedidoRow), events };
 }
 
-export type NewPedidoEncomendaItem = { produtoId: string; quantidade: number };
+export type NewPedidoEncomendaItem = { produtoDescricao: string; quantidade: number };
 
 // Cria o pedido + itens + evento "created" numa sequência só. Se a inserção
 // dos itens falhar depois do cabeçalho já ter sido criado, o pedido fica sem
@@ -298,7 +298,7 @@ export async function createPedidoEncomenda(input: {
 
   const { error: itemsError } = await admin
     .from("pedido_encomenda_itens")
-    .insert(input.items.map((item) => ({ pedido_id: data.id, produto_id: item.produtoId, quantidade: item.quantidade })));
+    .insert(input.items.map((item) => ({ pedido_id: data.id, produto_descricao: item.produtoDescricao, quantidade: item.quantidade })));
   if (itemsError) {
     throw new Error(`Pedido criado, mas falhou ao salvar os itens: ${itemsError.message}`);
   }

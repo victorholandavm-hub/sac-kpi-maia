@@ -13,7 +13,8 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString("pt-BR");
 }
 
-function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) {
+function ItemRow({ item, requestId, requestStatus }: { item: RequestItem; requestId: string; requestStatus: string }) {
+  const isConcluded = requestStatus === "concluida";
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(item.unitValue !== null ? String(item.unitValue) : "");
@@ -84,17 +85,27 @@ function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) 
             {total !== null ? formatBRL(total) : "definir valor"}
           </button>
         )}
-        <button
-          onClick={toggleReleased}
-          disabled={pending}
-          className="text-xs font-medium px-2.5 py-1 rounded-full border disabled:opacity-60 whitespace-nowrap"
-          style={{
-            color: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
-            borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
-          }}
-        >
-          {item.paymentReleased ? "✓ Aprovado" : "Aprovar pagamento"}
-        </button>
+        {isConcluded ? (
+          <button
+            onClick={toggleReleased}
+            disabled={pending}
+            className="text-xs font-medium px-2.5 py-1 rounded-full border disabled:opacity-60 whitespace-nowrap"
+            style={{
+              color: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
+              borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
+            }}
+          >
+            {item.paymentReleased ? "✓ Aprovado" : "Aprovar pagamento"}
+          </button>
+        ) : (
+          <span
+            className="text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap"
+            style={{ color: "var(--text-muted)", borderColor: "var(--border)" }}
+            title="Só é possível liberar o pagamento depois que a montagem for concluída."
+          >
+            A montar
+          </span>
+        )}
         {item.paymentReleased && item.paymentReleasedAt ? (
           <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
             em {formatDate(item.paymentReleasedAt)}
@@ -134,7 +145,15 @@ function ItemRow({ item, requestId }: { item: RequestItem; requestId: string }) 
   );
 }
 
-export function RequestItemsTable({ items, requestId }: { items: RequestItem[]; requestId: string }) {
+export function RequestItemsTable({
+  items,
+  requestId,
+  requestStatus,
+}: {
+  items: RequestItem[];
+  requestId: string;
+  requestStatus: string;
+}) {
   if (items.length === 0) return null;
   const total = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
 
@@ -154,7 +173,7 @@ export function RequestItemsTable({ items, requestId }: { items: RequestItem[]; 
         ) : null}
       </div>
       {items.map((item) => (
-        <ItemRow key={item.id} item={item} requestId={requestId} />
+        <ItemRow key={item.id} item={item} requestId={requestId} requestStatus={requestStatus} />
       ))}
     </div>
   );

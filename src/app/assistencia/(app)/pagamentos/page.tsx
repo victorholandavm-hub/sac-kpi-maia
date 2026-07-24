@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
-import { listPaymentItems, listAssemblers, type PaymentItem } from "@/lib/payments";
+import { listPaymentItems, listAssemblers, paymentStage, type PaymentItem } from "@/lib/payments";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
+
+const STAGE_LABELS: Record<string, string> = { a_montar: "A montar", pendente: "Pendente", liberado: "Liberado" };
+const STAGE_COLORS: Record<string, string> = {
+  a_montar: "var(--text-muted)",
+  pendente: "var(--status-warning)",
+  liberado: "var(--status-good)",
+};
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -33,10 +40,12 @@ export default async function PagamentosPage({
   redirectIfSac(await getProfile());
   const { pendentes, assembler } = await searchParams;
   const [allItems, assemblers] = await Promise.all([listPaymentItems({ assemblerName: assembler }), listAssemblers()]);
-  const items = pendentes ? allItems.filter((i) => !i.paymentReleased) : allItems;
+  const items = pendentes ? allItems.filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente") : allItems;
   const groups = groupByAssembler(items);
   const grandTotal = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
-  const pendingTotal = items.filter((i) => !i.paymentReleased).reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
+  const pendingTotal = items
+    .filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente")
+    .reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -110,7 +119,9 @@ export default async function PagamentosPage({
                 </span>
               </div>
               <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {group.items.map((item) => (
+                {group.items.map((item) => {
+                  const stage = paymentStage(item.requestStatus, item.paymentReleased);
+                  return (
                   <Link
                     key={item.itemId}
                     href={`/assistencia/${item.requestId}`}
@@ -132,16 +143,14 @@ export default async function PagamentosPage({
                       ) : null}
                       <span
                         className="px-2 py-0.5 rounded-full"
-                        style={{
-                          color: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
-                          border: `1px solid ${item.paymentReleased ? "var(--status-good)" : "var(--status-warning)"}`,
-                        }}
+                        style={{ color: STAGE_COLORS[stage], border: `1px solid ${STAGE_COLORS[stage]}` }}
                       >
-                        {item.paymentReleased ? "Liberado" : "Pendente"}
+                        {STAGE_LABELS[stage]}
                       </span>
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );

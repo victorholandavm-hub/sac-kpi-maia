@@ -137,6 +137,17 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         </Field>
       ) : null}
 
+      <Field label="Foto (opcional)">
+        <input
+          name="photo"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          capture="environment"
+          className="rounded border px-3 py-2 text-sm"
+          style={inputStyle}
+        />
+      </Field>
+
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>
           {state.error}

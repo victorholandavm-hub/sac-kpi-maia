@@ -52,11 +52,22 @@ export async function setItemPaymentAuthorizedBy(itemId: string, requestId: stri
   revalidatePath("/assistencia/pagamentos");
 }
 
+// Pagamento só pode ser liberado depois que a montagem foi de fato concluída
+// — reverter uma aprovação (released=false) continua liberado a qualquer
+// momento, caso alguém aprove por engano.
 export async function setItemPaymentReleased(itemId: string, requestId: string, released: boolean) {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin");
 
   const admin = getSupabaseAdmin();
+
+  if (released) {
+    const { data: request } = await admin.from("service_requests").select("status").eq("id", requestId).single();
+    if (request?.status !== "concluida") {
+      throw new Error("Só é possível liberar o pagamento depois que a montagem for concluída.");
+    }
+  }
+
   const { data: item } = await admin.from("service_request_items").select("product").eq("id", itemId).single();
 
   const { error } = await admin

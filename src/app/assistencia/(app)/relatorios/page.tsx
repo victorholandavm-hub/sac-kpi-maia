@@ -1,6 +1,6 @@
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { getRequestsReport, getServiceTypeIndicators, type ReportRow } from "@/lib/serviceRequests";
-import { listPaymentItems } from "@/lib/payments";
+import { listPaymentItems, paymentStage } from "@/lib/payments";
 import { getSupplierReconciliation } from "@/lib/supplierReturns";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 
@@ -125,7 +125,7 @@ export default async function RelatoriosPage({
     const value = (item.unitValue ?? 0) * item.quantity;
     entry.total += value;
     entry.itens += 1;
-    if (!item.paymentReleased) entry.pendente += value;
+    if (paymentStage(item.requestStatus, item.paymentReleased) === "pendente") entry.pendente += value;
     byAssembler.set(name, entry);
   }
   const assemblerRows = [...byAssembler.entries()].sort((a, b) => b[1].total - a[1].total);
