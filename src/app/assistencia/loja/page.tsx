@@ -121,6 +121,13 @@ export default async function LojaHomePage({
             + Nova encomenda
           </Link>
           <Link
+            href="/assistencia/encomendas/caixa"
+            className="text-sm underline whitespace-nowrap"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Ver encomendas
+          </Link>
+          <Link
             href="/assistencia/loja/equipe"
             className="text-sm underline whitespace-nowrap"
             style={{ color: "var(--text-secondary)" }}
