@@ -16,6 +16,8 @@ function describeEvent(e: PedidoEncomendaEvent): string {
       return "Item adicionado ao pedido.";
     case "note_added":
       return "Observação adicionada.";
+    case "prazo_definido":
+      return e.note ?? "Previsão de entrega atualizada.";
     default:
       return e.eventType;
   }

@@ -98,6 +98,7 @@ export type PedidoEncomendaSummary = {
   requestedByName: string;
   vendedorName: string | null;
   clienteCodigo: string | null;
+  prazoEntrega: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -114,6 +115,7 @@ type PedidoRow = {
   requested_by_name: string;
   vendedor_name: string | null;
   cliente_codigo: string | null;
+  prazo_entrega: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -122,7 +124,7 @@ type PedidoRow = {
 };
 
 const PEDIDO_COLUMNS =
-  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produtos_encomenda(id, descricao))";
+  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, prazo_entrega, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produtos_encomenda(id, descricao))";
 
 function toSummary(row: PedidoRow): PedidoEncomendaSummary {
   return {
@@ -136,6 +138,7 @@ function toSummary(row: PedidoRow): PedidoEncomendaSummary {
     requestedByName: row.requested_by_name,
     vendedorName: row.vendedor_name,
     clienteCodigo: row.cliente_codigo,
+    prazoEntrega: row.prazo_entrega,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -339,6 +342,26 @@ export async function updatePedidoStatus(
     to_status: toStatus,
     note,
   });
+}
+
+// Previsão de entrega -- independente de status, fábrica/CD podem
+// definir/editar a qualquer momento (nunca obrigatório).
+export async function setPedidoPrazo(id: string, actor: { name: string; role: string }, prazoEntrega: string | null): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("pedidos_encomenda").update({ prazo_entrega: prazoEntrega }).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  const note = prazoEntrega
+    ? `Previsão de entrega: ${new Date(`${prazoEntrega}T00:00:00`).toLocaleDateString("pt-BR")}`
+    : "Previsão de entrega removida.";
+  const { error: eventError } = await admin.from("pedido_encomenda_events").insert({
+    pedido_id: id,
+    actor_name: actor.name,
+    actor_role: actor.role,
+    event_type: "prazo_definido",
+    note,
+  });
+  if (eventError) throw new Error(eventError.message);
 }
 
 export async function addPedidoNote(id: string, actor: { name: string; role: string }, note: string): Promise<void> {

@@ -149,6 +149,11 @@ export default async function EncomendasCaixaPage({
                     <p className="text-sm" style={{ color: "var(--text-primary)" }}>
                       {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
                     </p>
+                    {p.prazoEntrega ? (
+                      <p className="text-xs font-medium" style={{ color: "var(--status-good)" }}>
+                        Previsão de entrega: {new Date(`${p.prazoEntrega}T00:00:00`).toLocaleDateString("pt-BR")}
+                      </p>
+                    ) : null}
                   </div>
                   <span className="text-xs shrink-0" style={{ color: "var(--text-muted)" }}>
                     {new Date(p.createdAt).toLocaleDateString("pt-BR")}

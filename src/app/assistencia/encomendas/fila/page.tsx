@@ -132,6 +132,11 @@ export default async function EncomendasQueuePage({
                 <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
                   <span>{new Date(p.createdAt).toLocaleString("pt-BR")}</span>
                   <span>Pedido por {p.requestedByName}</span>
+                  {p.prazoEntrega ? (
+                    <span style={{ color: "var(--status-good)", fontWeight: 600 }}>
+                      Previsão: {new Date(`${p.prazoEntrega}T00:00:00`).toLocaleDateString("pt-BR")}
+                    </span>
+                  ) : null}
                   {p.carga ? <span>Carga {p.carga}</span> : null}
                   {p.nfE ? <span>NF-e {p.nfE}</span> : null}
                 </div>

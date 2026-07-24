@@ -11,6 +11,7 @@ import {
   createPedidoEncomenda,
   updatePedidoStatus,
   addPedidoNote,
+  setPedidoPrazo,
   isPedidoEncomendaStatus,
   type NewPedidoEncomendaItem,
 } from "@/lib/pedidosEncomenda";
@@ -167,4 +168,15 @@ export async function addPedidoNoteAction(pedidoId: string, note: string): Promi
   const actor = await requireEncomendaActor();
   await addPedidoNote(pedidoId, actor, note);
   revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
+}
+
+// Previsão de entrega — fábrica ou CD (ou admin/assistência) definem/editam
+// a qualquer momento, sempre opcional, sem travar nenhuma transição de
+// status. prazoEntrega vazio remove a previsão já definida.
+export async function setPedidoPrazoAction(pedidoId: string, prazoEntrega: string | null): Promise<void> {
+  const actor = await requireEncomendaActor();
+  await setPedidoPrazo(pedidoId, actor, prazoEntrega);
+  revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
+  revalidatePath("/assistencia/encomendas/fila");
+  revalidatePath("/assistencia/encomendas/caixa");
 }

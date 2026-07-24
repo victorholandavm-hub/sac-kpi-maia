@@ -6,6 +6,7 @@ import { PedidoEncomendaActions } from "@/components/assistencia/PedidoEncomenda
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
+import { PedidoPrazoField } from "@/components/assistencia/PedidoPrazoField";
 import { listEncomendaPhotos } from "@/lib/pedidoEncomendaPhotos";
 
 export const dynamic = "force-dynamic";
@@ -89,6 +90,8 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         <Row label="NF-e" value={pedido.nfE} />
         <Row label="Observações" value={pedido.notes} />
       </div>
+
+      <PedidoPrazoField pedidoId={pedido.id} prazoEntrega={pedido.prazoEntrega} />
 
       {photos.length > 0 ? (
         <div
