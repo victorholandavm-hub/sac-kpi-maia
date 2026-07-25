@@ -6,7 +6,15 @@ import { cookies } from "next/headers";
 import { getSupabaseServer } from "@/lib/supabaseServer";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole, requireManageAccess } from "@/lib/dal";
-import { SHIFT_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import {
+  SHIFT_LABELS,
+  SAC_CATEGORIES,
+  SAC_CATEGORY_LABELS,
+  SAC_MANAGED_TYPES,
+  MANOEL_ONLY_TYPES,
+  MANOEL_ONLY_ASSEMBLER,
+  REQUEST_TYPE_LABELS,
+} from "@/lib/assistenciaLabels";
 import { resolveDriverName } from "@/lib/payments";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
@@ -494,6 +502,12 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
   if (!trimmed) throw new Error("Informe o nome do montador.");
 
   const admin = getSupabaseAdmin();
+
+  const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
+  if (current && (MANOEL_ONLY_TYPES as readonly string[]).includes(current.type) && trimmed !== MANOEL_ONLY_ASSEMBLER) {
+    throw new Error(`Só ${MANOEL_ONLY_ASSEMBLER} pode ser responsável por ${REQUEST_TYPE_LABELS[current.type]?.toLowerCase() ?? current.type}.`);
+  }
+
   await admin.from("assemblers").upsert({ name: trimmed }, { onConflict: "name" });
 
   const { error } = await admin.from("service_requests").update({ assembler_name: trimmed }).eq("id", requestId);
@@ -761,6 +775,9 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   }
 
   const assemblerName = emptyToNull(formData.get("assembler_name"));
+  if (assemblerName && (MANOEL_ONLY_TYPES as readonly string[]).includes(type) && assemblerName !== MANOEL_ONLY_ASSEMBLER) {
+    return { error: `Só ${MANOEL_ONLY_ASSEMBLER} pode ser responsável por ${REQUEST_TYPE_LABELS[type]?.toLowerCase() ?? type}.` };
+  }
   const product = emptyToNull(formData.get("product"));
   const unitValueRaw = String(formData.get("unit_value") ?? "").trim();
   const unitValue = unitValueRaw ? parseFloat(unitValueRaw.replace(",", ".")) : null;

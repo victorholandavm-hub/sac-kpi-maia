@@ -107,6 +107,12 @@ export const SAC_MANAGED_TYPES = ["troca_produto", "entrega_produto", "envio_pec
 // gerencia (admin continua com acesso total aos dois grupos, como supervisão).
 export const ASSISTENCIA_MANAGED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"] as const;
 
+// Vistoria e troca de peça exigem confiança/qualificação que só um
+// funcionário de verdade tem — hoje só o Manoel; os outros montadores são
+// terceirizados só pra montagem/desmontagem/recolhimento.
+export const MANOEL_ONLY_TYPES = ["vistoria", "troca_peca"] as const;
+export const MANOEL_ONLY_ASSEMBLER = "Manoel";
+
 export const SUPPLIER_RETURN_STATUS_LABELS: Record<string, string> = {
   aguardando_envio: "Aguardando envio",
   enviado: "Enviado ao fornecedor",

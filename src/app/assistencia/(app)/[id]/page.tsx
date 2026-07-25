@@ -225,7 +225,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
             <Row label="Nome do motorista" value={request.driverName ?? "Não definido"} />
           )
         ) : canManage ? (
-          <AssemblerNameField requestId={request.id} value={request.assemblerName} assemblers={assemblers} />
+          <AssemblerNameField requestId={request.id} requestType={request.type} value={request.assemblerName} assemblers={assemblers} />
         ) : (
           <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
         )}

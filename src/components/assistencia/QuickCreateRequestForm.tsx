@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createQuickRequest, type FormState } from "@/app/assistencia/actions";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { SHIFTS, type Store } from "@/lib/serviceRequests";
 
 const ASSISTENCIA_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"] as const;
@@ -30,6 +30,8 @@ export function QuickCreateRequestForm({
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createQuickRequest, undefined);
   const TYPES = includeSacTypes ? [...ASSISTENCIA_TYPES, SAC_TYPE] : ASSISTENCIA_TYPES;
+  const [type, setType] = useState<string>("vistoria");
+  const isManoelOnly = (MANOEL_ONLY_TYPES as readonly string[]).includes(type);
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -47,7 +49,13 @@ export function QuickCreateRequestForm({
           </select>
         </Field>
         <Field label="Tipo">
-          <select name="type" defaultValue="vistoria" className="rounded border px-3 py-2" style={inputStyle}>
+          <select
+            name="type"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          >
             {TYPES.map((t) => (
               <option key={t} value={t}>
                 {REQUEST_TYPE_LABELS[t]}
@@ -92,17 +100,24 @@ export function QuickCreateRequestForm({
           </select>
         </Field>
         <Field label="Técnico/montador">
-          <input
-            name="assembler_name"
-            list="quick-assemblers"
-            className="rounded border px-3 py-2"
-            style={inputStyle}
-          />
-          <datalist id="quick-assemblers">
-            {assemblers.map((a) => (
-              <option key={a} value={a} />
-            ))}
-          </datalist>
+          {isManoelOnly ? (
+            <input
+              name="assembler_name"
+              value={MANOEL_ONLY_ASSEMBLER}
+              readOnly
+              className="rounded border px-3 py-2"
+              style={{ ...inputStyle, background: "var(--surface-1)", color: "var(--text-secondary)" }}
+            />
+          ) : (
+            <>
+              <input name="assembler_name" list="quick-assemblers" className="rounded border px-3 py-2" style={inputStyle} />
+              <datalist id="quick-assemblers">
+                {assemblers.map((a) => (
+                  <option key={a} value={a} />
+                ))}
+              </datalist>
+            </>
+          )}
         </Field>
       </div>
 

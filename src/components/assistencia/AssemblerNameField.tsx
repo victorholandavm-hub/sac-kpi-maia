@@ -2,20 +2,24 @@
 
 import { useState } from "react";
 import { setAssemblerName } from "@/app/assistencia/actions";
+import { MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { useQuickAction } from "./useQuickAction";
 
 export function AssemblerNameField({
   requestId,
+  requestType,
   value,
   assemblers,
 }: {
   requestId: string;
+  requestType: string;
   value: string | null;
   assemblers: string[];
 }) {
   const { pending, run } = useQuickAction();
+  const isManoelOnly = (MANOEL_ONLY_TYPES as readonly string[]).includes(requestType);
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(value ?? "");
+  const [name, setName] = useState(value ?? (isManoelOnly ? MANOEL_ONLY_ASSEMBLER : ""));
 
   if (!editing) {
     if (!value) {
@@ -72,19 +76,27 @@ export function AssemblerNameField({
         Nome do montador
       </span>
       <div className="flex items-center gap-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="rounded border px-2 py-1 text-sm"
-          style={{ borderColor: "var(--border)" }}
-          list={`assemblers-${requestId}`}
-          autoFocus
-        />
-        <datalist id={`assemblers-${requestId}`}>
-          {assemblers.map((a) => (
-            <option key={a} value={a} />
-          ))}
-        </datalist>
+        {isManoelOnly ? (
+          <span className="rounded border px-2 py-1 text-sm" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+            {MANOEL_ONLY_ASSEMBLER}
+          </span>
+        ) : (
+          <>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="rounded border px-2 py-1 text-sm"
+              style={{ borderColor: "var(--border)" }}
+              list={`assemblers-${requestId}`}
+              autoFocus
+            />
+            <datalist id={`assemblers-${requestId}`}>
+              {assemblers.map((a) => (
+                <option key={a} value={a} />
+              ))}
+            </datalist>
+          </>
+        )}
         <button
           disabled={pending || !name.trim()}
           onClick={() =>
