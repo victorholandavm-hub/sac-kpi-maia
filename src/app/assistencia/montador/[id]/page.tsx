@@ -59,6 +59,15 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
 
         <StatusBadge status={request.status} />
 
+        {request.comboMontagemDesmontagem ? (
+          <p
+            className="text-sm font-medium rounded-lg px-3 py-2.5"
+            style={{ background: "var(--brand-orange-soft)", color: "var(--brand-orange)" }}
+          >
+            ⚠ Essa visita também precisa de {request.type === "montagem" ? "desmontagem do móvel antigo" : "montagem do móvel novo"}.
+          </p>
+        ) : null}
+
         {request.scheduledDate ? (
           <p className="text-sm font-medium" style={{ color: "var(--brand-green)" }}>
             {formatDateOnly(request.scheduledDate)}

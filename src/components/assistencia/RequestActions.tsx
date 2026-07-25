@@ -14,6 +14,19 @@ const NEXT_STATUSES: Record<string, string[]> = {
   cancelada: [],
 };
 
+// Pra desfazer um clique errado (ex.: marcar "Em andamento" sem querer) —
+// o servidor (updateStatus) já aceita qualquer status válido, só faltava a
+// opção na tela. Fica separado dos botões de avanço, mais discreto de
+// propósito, pra não incentivar uso casual.
+const PREVIOUS_STATUS: Record<string, string | null> = {
+  aberta: null,
+  em_contato: "aberta",
+  em_andamento: "em_contato",
+  remarcar: "em_andamento",
+  concluida: "em_andamento",
+  cancelada: "em_andamento",
+};
+
 export function RequestActions({
   requestId,
   status,
@@ -50,6 +63,7 @@ export function RequestActions({
   // updateStatus no servidor, que é quem realmente barra isso) — some a
   // opção da lista em vez de deixar clicar e levar um erro.
   const nextStatuses = (NEXT_STATUSES[status] ?? []).filter((s) => s !== "em_andamento" || hasAssignee);
+  const previousStatus = PREVIOUS_STATUS[status] ?? null;
 
   return (
     <div
@@ -95,6 +109,22 @@ export function RequestActions({
             </button>
           ))}
         </div>
+      ) : null}
+
+      {previousStatus ? (
+        <button
+          disabled={pending}
+          onClick={() =>
+            run(
+              () => updateStatus(requestId, previousStatus),
+              `Status revertido para ${STATUS_LABELS[previousStatus] ?? previousStatus}.`
+            )
+          }
+          className="text-xs underline self-start disabled:opacity-60"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          ↩ Reverter pra {STATUS_LABELS[previousStatus] ?? previousStatus} (marquei errado)
+        </button>
       ) : null}
 
       {askingRemarcarReason ? (

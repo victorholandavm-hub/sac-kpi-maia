@@ -226,6 +226,10 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     return { error: "Informe pelo menos um produto." };
   }
 
+  // Só faz sentido pra montagem/desmontagem — pedir os dois numa visita só,
+  // sem precisar abrir dois chamados separados pro mesmo cliente.
+  const comboMontagemDesmontagem = (type === "montagem" || type === "desmontagem") && formData.get("combo_montagem_desmontagem") === "on";
+
   const admin = getSupabaseAdmin();
 
   const { data: store } = await admin.from("stores").select("id").eq("id", storeId).single();
@@ -250,6 +254,7 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       seller_name: emptyToNull(formData.get("seller_name")),
       invoice_number: emptyToNull(formData.get("invoice_number")),
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
+      combo_montagem_desmontagem: comboMontagemDesmontagem,
     })
     .select("id, ticket_number")
     .single();
@@ -524,6 +529,35 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
   revalidatePath(`/assistencia/${requestId}`);
 }
 
+// Liga/desliga a necessidade complementar (montagem<->desmontagem) num
+// chamado já criado — a loja pode ter esquecido de marcar, ou a assistência
+// percebe depois que precisa das duas coisas na mesma visita.
+export async function setComboMontagemDesmontagem(requestId: string, value: boolean) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+
+  const admin = getSupabaseAdmin();
+  const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
+  if (!current || (current.type !== "montagem" && current.type !== "desmontagem")) {
+    throw new Error("Isso só se aplica a chamados de montagem ou desmontagem.");
+  }
+  requireManageAccess(profile, current.type);
+
+  const { error } = await admin.from("service_requests").update({ combo_montagem_desmontagem: value }).eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  const complemento = current.type === "montagem" ? "desmontagem" : "montagem";
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: value ? `Também precisa de ${complemento} nessa visita.` : `Removida a necessidade de ${complemento}.`,
+  });
+
+  revalidatePath("/assistencia/fila");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
 export async function setDriverName(requestId: string, driverName: string) {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");
@@ -785,6 +819,10 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     return { error: "Valor inválido." };
   }
 
+  // Só faz sentido pra montagem/desmontagem — pedir os dois numa visita só,
+  // sem precisar abrir dois chamados separados pro mesmo cliente.
+  const comboMontagemDesmontagem = (type === "montagem" || type === "desmontagem") && formData.get("combo_montagem_desmontagem") === "on";
+
   const admin = getSupabaseAdmin();
 
   if (assemblerName) {
@@ -805,6 +843,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       scheduled_time: emptyToNull(formData.get("scheduled_time")),
       shift: shift || null,
       assembler_name: assemblerName,
+      combo_montagem_desmontagem: comboMontagemDesmontagem,
       // Criação rápida não coleta prazo pedido pela loja, então não há nada
       // pra "aprovar" — sem isso, o padrão do banco (pendente) fazia a tela
       // sempre mostrar "prazo pendente de aprovação" sem sentido.

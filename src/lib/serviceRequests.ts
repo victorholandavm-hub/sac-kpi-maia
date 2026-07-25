@@ -100,6 +100,7 @@ export type ServiceRequestSummary = {
   protocolNumber: string | null;
   legalDeadline: string | null;
   escalationRisk: boolean;
+  comboMontagemDesmontagem: boolean;
 };
 
 type SummaryRow = {
@@ -130,6 +131,7 @@ type SummaryRow = {
   protocol_number: string | null;
   legal_deadline: string | null;
   escalation_risk: boolean;
+  combo_montagem_desmontagem: boolean;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -141,7 +143,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -187,6 +189,7 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     protocolNumber: row.protocol_number,
     legalDeadline: row.legal_deadline,
     escalationRisk: row.escalation_risk,
+    comboMontagemDesmontagem: row.combo_montagem_desmontagem,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
@@ -326,7 +329,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
 
 export async function getRequestDetail(
   id: string
@@ -495,11 +498,12 @@ export type AssemblerRequestView = {
   approvedDeadline: string | null;
   createdAt: string;
   completedAt: string | null;
+  comboMontagemDesmontagem: boolean;
 };
 
 const ASSEMBLER_VIEW_LIMIT = 200;
 const ASSEMBLER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, stores(name), items:service_request_items(product)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, stores(name), items:service_request_items(product)";
 
 type AssemblerViewRow = {
   id: string;
@@ -518,6 +522,7 @@ type AssemblerViewRow = {
   approved_deadline: string | null;
   created_at: string;
   completed_at: string | null;
+  combo_montagem_desmontagem: boolean;
   stores: { name: string } | null;
   items: { product: string }[] | null;
 };
@@ -542,6 +547,7 @@ function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
     approvedDeadline: row.approved_deadline,
     createdAt: row.created_at,
     completedAt: row.completed_at,
+    comboMontagemDesmontagem: row.combo_montagem_desmontagem,
   };
 }
 

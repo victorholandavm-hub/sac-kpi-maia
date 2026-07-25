@@ -89,6 +89,14 @@ export default async function MontadorHomePage({
                     <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                       {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                     </span>
+                    {r.comboMontagemDesmontagem ? (
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded-full"
+                        style={{ color: "var(--brand-orange)", border: "1px solid var(--brand-orange)" }}
+                      >
+                        {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
+                      </span>
+                    ) : null}
                   </div>
                   <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
                     {r.clientName ?? "Sem nome de cliente"}

@@ -94,8 +94,7 @@ export default async function AssistenciaQueuePage({
           ))}
         </div>
         <Link
-          href="/assistencia/solicitar"
-          target="_blank"
+          href="/assistencia/nova-rapida"
           className="text-sm px-3 py-2 rounded font-medium"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
         >
@@ -190,6 +189,14 @@ export default async function AssistenciaQueuePage({
                         <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                           {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                         </span>
+                        {r.comboMontagemDesmontagem ? (
+                          <span
+                            className="text-xs font-medium px-2 py-0.5 rounded-full"
+                            style={{ color: "var(--brand-orange)", border: "1px solid var(--brand-orange)" }}
+                          >
+                            {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
+                          </span>
+                        ) : null}
                         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                           {r.storeName}
                         </span>

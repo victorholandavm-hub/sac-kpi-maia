@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { RequestActions } from "@/components/assistencia/RequestActions";
 import { DeadlineActions } from "@/components/assistencia/DeadlineActions";
 import { AssemblerNameField } from "@/components/assistencia/AssemblerNameField";
+import { ComboMontagemDesmontagemField } from "@/components/assistencia/ComboMontagemDesmontagemField";
 import { DriverNameField } from "@/components/assistencia/DriverNameField";
 import { ScheduleField } from "@/components/assistencia/ScheduleField";
 import { getRotaWeekdayConfig, getNextRotaDates, ROTAS, ROTA_LABELS, type Rota } from "@/lib/rotas";
@@ -229,6 +230,12 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         ) : (
           <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
         )}
+        {(request.type === "montagem" || request.type === "desmontagem") && !canManage ? (
+          <Row
+            label={request.type === "montagem" ? "Também precisa desmontar o antigo?" : "Também precisa montar o novo?"}
+            value={request.comboMontagemDesmontagem ? "Sim" : "Não"}
+          />
+        ) : null}
         {request.type === "troca_produto" ? (
           <Row label="Produto recolhido?" value={request.pickupCompleted ? "Sim" : "Ainda não"} />
         ) : null}
@@ -287,6 +294,10 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           <Row label="Encerrada em" value={new Date(request.completedAt).toLocaleString("pt-BR")} />
         ) : null}
       </div>
+
+      {canManage && (request.type === "montagem" || request.type === "desmontagem") ? (
+        <ComboMontagemDesmontagemField requestId={request.id} type={request.type} value={request.comboMontagemDesmontagem} />
+      ) : null}
 
       {canManage && request.type === "notificacao_externa" ? (
         <EscalationRiskToggle requestId={request.id} atRisk={request.escalationRisk} />

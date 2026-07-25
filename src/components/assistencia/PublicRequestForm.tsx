@@ -33,6 +33,7 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
     type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria";
   const showItems = type !== "notificacao_externa";
   const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
+  const showCombo = type === "montagem" || type === "desmontagem";
 
   function updateItem(index: number, patch: Partial<Item>) {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -101,6 +102,13 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
           ))}
         </select>
       </Field>
+
+      {showCombo ? (
+        <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+          <input type="checkbox" name="combo_montagem_desmontagem" className="rounded" />
+          {type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
+        </label>
+      ) : null}
 
       {type === "notificacao_externa" ? (
         <Field label="Categoria da notificação *">

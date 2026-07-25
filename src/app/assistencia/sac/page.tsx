@@ -31,7 +31,7 @@ export default async function SacHomePage({
   return (
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="SAC — Lojas Maia" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Link
             href="/assistencia/sac/nova"
             className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"

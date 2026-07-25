@@ -105,7 +105,7 @@ export default async function LojaHomePage({
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <RealtimeQueueRefresher />
       <AssistenciaHeader title="Gerente de loja" subtitle="Demanda em aberto de todas as lojas">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Link
             href="/assistencia/solicitar"
             className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"

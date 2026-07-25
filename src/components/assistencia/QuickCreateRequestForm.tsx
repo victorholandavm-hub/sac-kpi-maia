@@ -32,6 +32,7 @@ export function QuickCreateRequestForm({
   const TYPES = includeSacTypes ? [...ASSISTENCIA_TYPES, SAC_TYPE] : ASSISTENCIA_TYPES;
   const [type, setType] = useState<string>("vistoria");
   const isManoelOnly = (MANOEL_ONLY_TYPES as readonly string[]).includes(type);
+  const showCombo = type === "montagem" || type === "desmontagem";
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -64,6 +65,13 @@ export function QuickCreateRequestForm({
           </select>
         </Field>
       </div>
+
+      {showCombo ? (
+        <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+          <input type="checkbox" name="combo_montagem_desmontagem" className="rounded" />
+          {type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
+        </label>
+      ) : null}
 
       <Field label="Nome do cliente *">
         <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
