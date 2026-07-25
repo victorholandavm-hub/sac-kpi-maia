@@ -207,7 +207,11 @@ export default async function EncomendasCaixaPage({
         </div>
       )}
 
-      <Link href="/assistencia/encomendas" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
+      <Link
+        href={requester.kind === "gerente" ? "/assistencia/loja" : "/assistencia/encomendas"}
+        className="text-sm underline self-center"
+        style={{ color: "var(--text-secondary)" }}
+      >
         ← Voltar
       </Link>
     </div>
