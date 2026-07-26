@@ -46,6 +46,9 @@ export function AgentStatsTable({ data }: { data: AgentStat[] }) {
                   </td>
                   <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
                     {row.resolvedCount}
+                    {row.total > 0 ? (
+                      <span style={{ color: "var(--text-muted)" }}> ({Math.round((row.resolvedCount / row.total) * 100)}%)</span>
+                    ) : null}
                   </td>
                   <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
                     {row.avgResolutionHours !== null ? `${row.avgResolutionHours}h` : "—"}
