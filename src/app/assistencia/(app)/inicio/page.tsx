@@ -95,6 +95,8 @@ export default async function InicioPage() {
 
         <Card href="/assistencia/estoque" title="Estoque" description="Registrar retiradas, devoluções e reparos no CD." />
 
+        <Card href="/assistencia/encomendas/fila" title="Encomendas" description="Pedido de produto: loja pede, fábrica produz, CD expede." />
+
         {profile.role === "admin" ? (
           <Card href="/assistencia/admin" title="Administração" description="Contas da equipe, montadores e fornecedores." />
         ) : null}
