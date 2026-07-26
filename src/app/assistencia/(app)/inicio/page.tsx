@@ -98,6 +98,21 @@ export default async function InicioPage() {
         {profile.role === "admin" ? (
           <Card href="/assistencia/admin" title="Administração" description="Contas da equipe, montadores e fornecedores." />
         ) : null}
+
+        {profile.role === "admin" ? (
+          <a
+            href="https://sac-kpi-maia.vercel.app"
+            className="rounded-lg border p-5 flex flex-col gap-1 hover:opacity-90"
+            style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
+          >
+            <h3 className="text-base font-semibold" style={{ color: "var(--brand-orange)" }}>
+              KPIs do SAC ↗
+            </h3>
+            <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
+              Painel de indicadores de atendimento (outro sistema, domínio separado).
+            </p>
+          </a>
+        ) : null}
       </div>
     </div>
   );
