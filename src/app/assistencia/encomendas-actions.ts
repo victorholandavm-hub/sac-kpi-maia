@@ -44,6 +44,13 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
       if (!requester.storeIds.includes(chosenStoreId)) return { error: "Selecione uma loja válida." };
       storeId = chosenStoreId;
     }
+  } else if (requester.kind === "cd" || requester.kind === "fabrica") {
+    // CD/fábrica não têm loja fixa — escolhem na hora de lançar o pedido,
+    // dentre todas as lojas (ver solicitar/page.tsx). Validado abaixo contra
+    // a tabela stores, igual já acontece pros outros papéis.
+    const chosenStoreId = String(formData.get("store_id") ?? "").trim();
+    if (!chosenStoreId) return { error: "Selecione a loja do pedido." };
+    storeId = chosenStoreId;
   } else {
     storeId = requester.storeId;
   }
@@ -109,9 +116,10 @@ export async function advancePedidoStatus(
 ): Promise<void> {
   const actor = await requireEncomendaActor();
   if (!isPedidoEncomendaStatus(toStatus)) throw new Error("Status inválido.");
-  // Cancelamento sempre passa por cancelPedido (nota obrigatória) — não por
-  // aqui, senão admin/assistência conseguiriam cancelar sem motivo.
+  // Cancelamento e negação sempre passam por cancelPedido/denyPedido (nota
+  // obrigatória) — não por aqui, senão dava pra pular o motivo.
   if (toStatus === "cancelado") throw new Error("Use a ação de cancelamento.");
+  if (toStatus === "negado") throw new Error("Use a ação de negar pedido.");
 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
@@ -158,6 +166,33 @@ export async function cancelPedido(pedidoId: string, note: string): Promise<void
   if (fetchError || !current) throw new Error("Pedido não encontrado.");
 
   await updatePedidoStatus(pedidoId, actor, current.status, "cancelado", { note: note.trim() });
+
+  revalidatePath("/assistencia/encomendas/fila");
+  revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
+  revalidatePath("/assistencia/encomendas/caixa");
+}
+
+// Negação fica restrita à fábrica (ou admin/assistência, por supervisão) e só
+// vale enquanto o pedido ainda está "solicitado" — depois que entra em
+// produção, qualquer desistência já passa por cancelPedido. Motivo sempre
+// obrigatório, igual ao cancelamento.
+export async function denyPedido(pedidoId: string, reason: string): Promise<void> {
+  const actor = await requireEncomendaActor();
+  if (actor.role !== "fabrica" && actor.role !== "admin" && actor.role !== "assistencia") {
+    throw new Error(`Ação não permitida para o papel "${actor.role}".`);
+  }
+  if (!reason.trim()) throw new Error("Informe o motivo da recusa.");
+
+  const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("pedidos_encomenda")
+    .select("status")
+    .eq("id", pedidoId)
+    .single();
+  if (fetchError || !current) throw new Error("Pedido não encontrado.");
+  if (current.status !== "solicitado") throw new Error("Só é possível negar um pedido que ainda está solicitado.");
+
+  await updatePedidoStatus(pedidoId, actor, current.status, "negado", { note: reason.trim() });
 
   revalidatePath("/assistencia/encomendas/fila");
   revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);

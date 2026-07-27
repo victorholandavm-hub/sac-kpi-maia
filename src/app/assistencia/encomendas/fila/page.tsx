@@ -30,6 +30,7 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Faturado", value: "faturado" },
   { label: "Entregue", value: "entregue" },
   { label: "Cancelado", value: "cancelado" },
+  { label: "Negado", value: "negado" },
 ];
 
 export default async function EncomendasQueuePage({
@@ -58,11 +59,18 @@ export default async function EncomendasQueuePage({
       <RealtimeQueueRefresher table="pedidos_encomenda" eventsTable="pedido_encomenda_events" />
 
       <AssistenciaHeader title="Fila de encomendas" subtitle={`${actor.name} · ${ROLE_LABELS[actor.role] ?? actor.role}`}>
-        <form action={signOutAction}>
-          <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-            Sair
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          {actor.role === "cd" || actor.role === "fabrica" ? (
+            <Link href="/assistencia/encomendas/solicitar" className="text-sm underline" style={{ color: "var(--brand-green)" }}>
+              + Novo pedido
+            </Link>
+          ) : null}
+          <form action={signOutAction}>
+            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              Sair
+            </button>
+          </form>
+        </div>
       </AssistenciaHeader>
 
       <div className="flex items-center gap-2 flex-wrap">

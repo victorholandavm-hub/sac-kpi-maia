@@ -92,6 +92,13 @@ const CD_TRANSITIONS: Record<string, string[]> = {
 export function requireEncomendaAction(actor: { role: string }, fromStatus: string, toStatus: string) {
   if (actor.role === "assistencia" || actor.role === "admin") return;
 
+  if (toStatus === "negado") {
+    if (actor.role !== "fabrica" || fromStatus !== "solicitado") {
+      throw new Error(`Ação não permitida para o papel "${actor.role}" — só a fábrica pode negar um pedido ainda solicitado.`);
+    }
+    return;
+  }
+
   if (toStatus === "cancelado") {
     throw new Error(`Ação não permitida para o papel "${actor.role}" — só admin/assistência pode cancelar um pedido.`);
   }

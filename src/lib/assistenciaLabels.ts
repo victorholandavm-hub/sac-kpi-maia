@@ -86,6 +86,7 @@ export const PEDIDO_ENCOMENDA_STATUS_LABELS: Record<string, string> = {
   faturado: "Faturado",
   entregue: "Entregue",
   cancelado: "Cancelado",
+  negado: "Negado",
 };
 
 export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
@@ -96,6 +97,7 @@ export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
   faturado: "var(--brand-green)",
   entregue: "var(--status-good)",
   cancelado: "var(--text-muted)",
+  negado: "var(--status-critical)",
 };
 
 // Únicos tipos de chamado que o papel SAC pode gerenciar (ver dal.ts

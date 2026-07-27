@@ -33,6 +33,11 @@ export default async function EncomendasCaixaPage({
   if (!requester) {
     redirect("/assistencia/encomendas");
   }
+  // CD/fábrica não têm loja fixa pra acompanhar aqui — a fila interna
+  // (requireEncomendaActor) já mostra os pedidos de todas as lojas pra eles.
+  if (requester.kind === "cd" || requester.kind === "fabrica") {
+    redirect("/assistencia/encomendas/fila");
+  }
 
   const storeIds = requester.kind === "gerente" ? requester.storeIds : [requester.storeId];
   const signOutAction = requester.kind === "caixa" ? caixaSignOut : requester.kind === "vendedor" ? vendedorSignOut : lojaGerenteSignOut;

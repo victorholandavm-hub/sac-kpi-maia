@@ -7,7 +7,8 @@ export type PedidoEncomendaStatus =
   | "em_carga"
   | "faturado"
   | "entregue"
-  | "cancelado";
+  | "cancelado"
+  | "negado";
 
 export const PEDIDO_ENCOMENDA_STATUSES: PedidoEncomendaStatus[] = [
   "solicitado",
@@ -17,6 +18,7 @@ export const PEDIDO_ENCOMENDA_STATUSES: PedidoEncomendaStatus[] = [
   "faturado",
   "entregue",
   "cancelado",
+  "negado",
 ];
 
 export function isPedidoEncomendaStatus(value: string | undefined | null): value is PedidoEncomendaStatus {
@@ -158,7 +160,7 @@ export async function listPedidosByStores(
   if (storeIds.length === 0) return [];
   const admin = getSupabaseAdmin();
   let query = admin.from("pedidos_encomenda").select(PEDIDO_COLUMNS).in("store_id", storeIds);
-  if (opts.onlyOpen) query = query.not("status", "in", "(entregue,cancelado)");
+  if (opts.onlyOpen) query = query.not("status", "in", "(entregue,cancelado,negado)");
   query = query.order("created_at", { ascending: false });
 
   const { data, error } = await query;

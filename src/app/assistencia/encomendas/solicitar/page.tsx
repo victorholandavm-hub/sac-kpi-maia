@@ -23,10 +23,15 @@ export default async function SolicitarEncomendaPage({
   const admin = getSupabaseAdmin();
   const vendedores = await listVendedoresWithPinStatus();
 
+  const isCdOrFabrica = requester.kind === "cd" || requester.kind === "fabrica";
+
   let fixedStoreName: string | undefined;
   let storeOptions: { id: string; name: string }[] | undefined;
 
-  if (requester.kind === "gerente" && requester.storeIds.length > 1) {
+  if (isCdOrFabrica) {
+    const { data } = await admin.from("stores").select("id, name").order("name");
+    storeOptions = data ?? [];
+  } else if (requester.kind === "gerente" && requester.storeIds.length > 1) {
     const { data } = await admin.from("stores").select("id, name").in("id", requester.storeIds).order("name");
     storeOptions = data ?? [];
   } else {
@@ -35,11 +40,13 @@ export default async function SolicitarEncomendaPage({
     fixedStoreName = store?.name ?? storeId;
   }
 
+  const voltarHref = isCdOrFabrica ? "/assistencia/encomendas/fila" : "/assistencia/encomendas/caixa";
+
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="Encomendar produto" subtitle="Pedido direto pro CD/fábrica, sem foto de nota nem WhatsApp." />
 
-      <Link href="/assistencia/encomendas/caixa" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
+      <Link href={voltarHref} className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
         ← Voltar
       </Link>
 
@@ -56,7 +63,7 @@ export default async function SolicitarEncomendaPage({
             formulário abaixo.
           </p>
           <Link
-            href="/assistencia/encomendas/caixa"
+            href={voltarHref}
             className="text-sm underline self-start mt-1"
             style={{ color: "var(--text-secondary)" }}
           >

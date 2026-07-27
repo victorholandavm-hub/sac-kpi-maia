@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { advancePedidoStatus, cancelPedido, addPedidoNoteAction } from "@/app/assistencia/encomendas-actions";
+import { advancePedidoStatus, cancelPedido, denyPedido, addPedidoNoteAction } from "@/app/assistencia/encomendas-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PEDIDO_ENCOMENDA_STATUS_LABELS } from "@/lib/assistenciaLabels";
 
@@ -38,10 +38,13 @@ export function PedidoEncomendaActions({
   const [note, setNote] = useState("");
   const [cancelNote, setCancelNote] = useState("");
   const [showCancel, setShowCancel] = useState(false);
+  const [denyReason, setDenyReason] = useState("");
+  const [showDeny, setShowDeny] = useState(false);
 
   const canManageStatus = role === "assistencia" || role === "admin" || (ROLE_CAN_ADVANCE[role] ?? []).includes(status);
   const nextStep = canManageStatus ? NEXT_STEP[status] : undefined;
   const canCancel = (role === "assistencia" || role === "admin") && status !== "entregue" && status !== "cancelado";
+  const canDeny = (role === "fabrica" || role === "assistencia" || role === "admin") && status === "solicitado";
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
@@ -93,9 +96,53 @@ export function PedidoEncomendaActions({
         </div>
       ) : (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          {status === "entregue" || status === "cancelado" ? "Pedido encerrado." : "Nenhuma ação disponível para o seu papel neste momento."}
+          {status === "entregue" || status === "cancelado" || status === "negado"
+            ? "Pedido encerrado."
+            : "Nenhuma ação disponível para o seu papel neste momento."}
         </p>
       )}
+
+      {canDeny ? (
+        showDeny ? (
+          <div className="flex flex-col gap-2 pt-2" style={{ borderTop: "1px solid var(--gridline)" }}>
+            <textarea
+              value={denyReason}
+              onChange={(e) => setDenyReason(e.target.value)}
+              rows={2}
+              placeholder="Motivo da recusa…"
+              className="rounded border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--status-critical)" }}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                disabled={pending || !denyReason.trim()}
+                onClick={() =>
+                  run(async () => {
+                    await denyPedido(pedidoId, denyReason);
+                    setDenyReason("");
+                    setShowDeny(false);
+                  }, "Pedido negado.")
+                }
+                className="text-sm rounded px-3 py-2 disabled:opacity-60"
+                style={{ background: "var(--status-critical)", color: "#fff" }}
+              >
+                Confirmar recusa
+              </button>
+              <button onClick={() => setShowDeny(false)} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+                Voltar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowDeny(true)}
+            className="text-sm underline self-start pt-2"
+            style={{ color: "var(--status-critical)", borderTop: "1px solid var(--gridline)" }}
+          >
+            Negar pedido
+          </button>
+        )
+      ) : null}
 
       <div className="flex flex-col gap-2">
         <textarea

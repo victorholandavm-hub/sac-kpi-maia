@@ -44,7 +44,7 @@ export function PedidoEncomendaTimeline({ events }: { events: PedidoEncomendaEve
               {e.actorName} ({ROLE_LABELS[e.actorRole] ?? e.actorRole}) · {new Date(e.createdAt).toLocaleString("pt-BR")}
             </span>
           </div>
-          {e.note && e.eventType === "note_added" ? (
+          {e.note && e.eventType !== "prazo_definido" ? (
             <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-secondary)" }}>
               {e.note}
             </p>
