@@ -100,6 +100,18 @@ export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
   negado: "var(--status-critical)",
 };
 
+export const PEDIDO_FORNECEDOR_STATUS_LABELS: Record<string, string> = {
+  pedido_feito: "Pedido feito",
+  recebido: "Recebido",
+  cancelado: "Cancelado",
+};
+
+export const PEDIDO_FORNECEDOR_STATUS_COLORS: Record<string, string> = {
+  pedido_feito: "var(--status-warning)",
+  recebido: "var(--status-good)",
+  cancelado: "var(--text-muted)",
+};
+
 // Únicos tipos de chamado que o papel SAC pode gerenciar (ver dal.ts
 // requireManageAccess) — o resto da fila (montagem, troca_peça etc.)
 // continua exclusivo de assistência/admin.

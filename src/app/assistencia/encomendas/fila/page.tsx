@@ -65,6 +65,11 @@ export default async function EncomendasQueuePage({
               + Novo pedido
             </Link>
           ) : null}
+          {actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia" ? (
+            <Link href="/assistencia/encomendas/fornecedores" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              Pedidos a fornecedores
+            </Link>
+          ) : null}
           <form action={signOutAction}>
             <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
               Sair
