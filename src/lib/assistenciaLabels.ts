@@ -81,7 +81,7 @@ export const ROLE_LABELS: Record<string, string> = {
 export const PEDIDO_ENCOMENDA_STATUS_LABELS: Record<string, string> = {
   solicitado: "Solicitado",
   em_producao: "Em produção",
-  pronto_para_expedicao: "Pronto para expedição",
+  pronto_para_expedicao: "Enviado para o CD",
   em_carga: "Em carga",
   faturado: "Faturado",
   entregue: "Entregue",

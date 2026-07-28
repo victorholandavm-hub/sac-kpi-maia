@@ -3,10 +3,11 @@ import { requireEncomendaActor } from "@/lib/encomendaAuth";
 import { listStores } from "@/lib/serviceRequests";
 import { listAllPedidos, listOpenPedidoEncomendaQueueIds, isPedidoEncomendaStatus } from "@/lib/pedidosEncomenda";
 import { ROLE_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
-import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
+import { PedidoEncomendaFilaList } from "@/components/assistencia/PedidoEncomendaFilaList";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { cdSignOut } from "@/app/assistencia/cd-actions";
 import { fabricaSignOut } from "@/app/assistencia/fabrica-actions";
 import { signOut } from "@/app/assistencia/actions";
@@ -34,7 +35,7 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Todos", value: null },
   { label: "Solicitado", value: "solicitado" },
   { label: "Em produção", value: "em_producao" },
-  { label: "Pronto p/ expedição", value: "pronto_para_expedicao" },
+  { label: "Enviado para o CD", value: "pronto_para_expedicao" },
   { label: "Em carga", value: "em_carga" },
   { label: "Faturado", value: "faturado" },
   { label: "Entregue", value: "entregue" },
@@ -59,12 +60,14 @@ export default async function EncomendasQueuePage({
     listStores(),
     listOpenPedidoEncomendaQueueIds(),
   ]);
-  const queuePosition = new Map(queueIds.map((id, i) => [id, i + 1]));
+  const queuePosition: [string, number][] = queueIds.map((id, i) => [id, i + 1]);
   const actionStatuses = ROLE_ACTION_STATUSES[actor.role] ?? [];
+  const canBulkAdvance = actor.role === "fabrica" || actor.role === "admin" || actor.role === "assistencia";
 
   const signOutAction = actor.role === "cd" ? cdSignOut : actor.role === "fabrica" ? fabricaSignOut : signOut;
 
   return (
+    <ToastProvider>
     <div className="max-w-4xl mx-auto p-6 flex flex-col gap-4 w-full min-w-0">
       <RealtimeQueueRefresher table="pedidos_encomenda" eventsTable="pedido_encomenda_events" />
 
@@ -130,61 +133,14 @@ export default async function EncomendasQueuePage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-            {pedidos.map((p) => {
-              const needsAction = actionStatuses.includes(p.status);
-              return (
-              <Link
-                key={p.id}
-                href={`/assistencia/encomendas/fila/${p.id}`}
-                className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
-                style={needsAction ? { borderLeft: "4px solid var(--status-warning)" } : undefined}
-              >
-                <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                  {queuePosition.get(p.id) ? (
-                    <span
-                      className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap self-start"
-                      style={{ color: "#fff", background: "var(--brand-orange)" }}
-                    >
-                      {queuePosition.get(p.id)}º na fila
-                    </span>
-                  ) : null}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                      #{p.pedidoNumber}
-                    </span>
-                    <PedidoEncomendaStatusBadge status={p.status} />
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                      {p.storeName}
-                    </span>
-                  </div>
-                  <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                    {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
-                  </p>
-                  {p.clienteCodigo ? (
-                    <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-                      Cliente: {p.clienteCodigo}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                  <span>{new Date(p.createdAt).toLocaleString("pt-BR")}</span>
-                  <span>Pedido por {p.requestedByName}</span>
-                  {p.prazoEntrega ? (
-                    <span style={{ color: "var(--status-good)", fontWeight: 600 }}>
-                      Previsão: {new Date(`${p.prazoEntrega}T00:00:00`).toLocaleDateString("pt-BR")}
-                    </span>
-                  ) : null}
-                  {p.carga ? <span>Carga {p.carga}</span> : null}
-                  {p.nfE ? <span>NF-e {p.nfE}</span> : null}
-                </div>
-              </Link>
-              );
-            })}
-          </div>
-        </div>
+        <PedidoEncomendaFilaList
+          pedidos={pedidos}
+          queuePosition={queuePosition}
+          actionStatuses={actionStatuses}
+          canBulkAdvance={canBulkAdvance}
+        />
       )}
     </div>
+    </ToastProvider>
   );
 }

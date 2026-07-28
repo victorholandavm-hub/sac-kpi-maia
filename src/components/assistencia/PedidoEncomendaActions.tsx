@@ -9,7 +9,7 @@ type NextStep = { toStatus: string; label: string; needsCarga?: boolean; needsNf
 
 const NEXT_STEP: Record<string, NextStep | undefined> = {
   solicitado: { toStatus: "em_producao", label: "Marcar em produção" },
-  em_producao: { toStatus: "pronto_para_expedicao", label: "Marcar pronto para expedição" },
+  em_producao: { toStatus: "pronto_para_expedicao", label: "Marcar como enviado para o CD" },
   pronto_para_expedicao: { toStatus: "em_carga", label: "Informar carga e expedir", needsCarga: true },
   em_carga: { toStatus: "faturado", label: "Informar NF-e e faturar", needsNfE: true },
   faturado: { toStatus: "entregue", label: "Marcar entregue" },

@@ -148,6 +148,34 @@ export async function advancePedidoStatus(
   revalidatePath("/assistencia/encomendas/caixa");
 }
 
+// Ação em lote da fábrica (ou admin/assistência) pra marcar vários pedidos
+// "em produção" como "enviado para o CD" de uma vez, evitando abrir um por um
+// -- mesma regra de transição de advancePedidoStatus (requireEncomendaAction),
+// só que validada pra todos os ids ANTES de gravar qualquer um (tudo ou nada,
+// sem aplicar parcial se algum pedido não puder avançar).
+export async function bulkMarkEnviadoParaCD(pedidoIds: string[]): Promise<void> {
+  const actor = await requireEncomendaActor();
+  if (pedidoIds.length === 0) throw new Error("Selecione ao menos um pedido.");
+
+  const admin = getSupabaseAdmin();
+  const { data: rows, error: fetchError } = await admin
+    .from("pedidos_encomenda")
+    .select("id, status")
+    .in("id", pedidoIds);
+  if (fetchError || !rows || rows.length !== pedidoIds.length) {
+    throw new Error("Um ou mais pedidos não foram encontrados.");
+  }
+
+  for (const row of rows) {
+    requireEncomendaAction(actor, row.status, "pronto_para_expedicao");
+  }
+  for (const row of rows) {
+    await updatePedidoStatus(row.id, actor, row.status, "pronto_para_expedicao");
+  }
+
+  revalidatePath("/assistencia/encomendas/fila");
+}
+
 // Cancelamento fica restrito a admin/assistência e sempre exige um motivo,
 // já que reverte o trabalho de loja/fábrica/CD.
 export async function cancelPedido(pedidoId: string, note: string): Promise<void> {
