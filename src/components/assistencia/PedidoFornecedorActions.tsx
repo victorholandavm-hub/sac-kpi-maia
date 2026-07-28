@@ -23,8 +23,8 @@ export function PedidoFornecedorActions({ pedidoId, status }: { pedidoId: string
           <button
             disabled={pending}
             onClick={() => run(() => markPedidoFornecedorRecebido(pedidoId), "Pedido marcado como recebido.")}
-            className="text-sm rounded px-3 py-2 border disabled:opacity-60"
-            style={{ borderColor: "var(--border)" }}
+            className="text-sm rounded px-3 py-2 font-medium disabled:opacity-60"
+            style={{ background: "var(--status-good)", color: "#fff" }}
           >
             Marcar recebido
           </button>

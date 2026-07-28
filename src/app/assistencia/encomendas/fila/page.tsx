@@ -13,6 +13,15 @@ import { signOut } from "@/app/assistencia/actions";
 
 export const dynamic = "force-dynamic";
 
+// Espelha ROLE_CAN_ADVANCE (PedidoEncomendaActions.tsx) -- usado só pra
+// destacar na fila os pedidos que dependem de uma ação do papel logado,
+// sem duplicar a regra de verdade (essa continua em requireEncomendaAction,
+// dal.ts).
+const ROLE_ACTION_STATUSES: Record<string, string[]> = {
+  fabrica: ["solicitado", "em_producao"],
+  cd: ["pronto_para_expedicao", "em_carga", "faturado"],
+};
+
 function buildHref(params: { status?: string; store?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -51,6 +60,7 @@ export default async function EncomendasQueuePage({
     listOpenPedidoEncomendaQueueIds(),
   ]);
   const queuePosition = new Map(queueIds.map((id, i) => [id, i + 1]));
+  const actionStatuses = ROLE_ACTION_STATUSES[actor.role] ?? [];
 
   const signOutAction = actor.role === "cd" ? cdSignOut : actor.role === "fabrica" ? fabricaSignOut : signOut;
 
@@ -109,11 +119,14 @@ export default async function EncomendasQueuePage({
       ) : (
         <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-            {pedidos.map((p) => (
+            {pedidos.map((p) => {
+              const needsAction = actionStatuses.includes(p.status);
+              return (
               <Link
                 key={p.id}
                 href={`/assistencia/encomendas/fila/${p.id}`}
                 className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
+                style={needsAction ? { borderLeft: "4px solid var(--status-warning)" } : undefined}
               >
                 <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                   {queuePosition.get(p.id) ? (
@@ -154,7 +167,8 @@ export default async function EncomendasQueuePage({
                   {p.nfE ? <span>NF-e {p.nfE}</span> : null}
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

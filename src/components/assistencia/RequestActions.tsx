@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { claimRequest, updateStatus, addNote } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
-import { STATUS_LABELS } from "@/lib/assistenciaLabels";
+import { STATUS_LABELS, STATUS_COLORS } from "@/lib/assistenciaLabels";
+
+// Cor de cada botão de avanço reflete o status de destino (mesma cor do
+// badge que a solicitação vai ganhar) — "cancelada" some pro cinza no badge
+// (histórico), mas aqui vira vermelho pra não parecer um botão inerte.
+function buttonColor(status: string): string {
+  if (status === "cancelada") return "var(--status-critical)";
+  return STATUS_COLORS[status] ?? "var(--brand-green)";
+}
 
 const NEXT_STATUSES: Record<string, string[]> = {
   aberta: ["em_contato", "cancelada"],
@@ -102,8 +110,8 @@ export function RequestActions({
                   ? setAskingRemarcarReason(true)
                   : run(() => updateStatus(requestId, s), `Status atualizado para ${STATUS_LABELS[s] ?? s}.`)
               }
-              className="text-sm rounded px-3 py-2 border disabled:opacity-60"
-              style={{ borderColor: "var(--border)" }}
+              className="text-sm rounded px-3 py-2 font-medium disabled:opacity-60"
+              style={{ background: buttonColor(s), color: "#fff" }}
             >
               Marcar como {STATUS_LABELS[s] ?? s}
             </button>

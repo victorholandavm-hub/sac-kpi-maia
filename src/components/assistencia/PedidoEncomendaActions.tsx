@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { advancePedidoStatus, cancelPedido, denyPedido, addPedidoNoteAction } from "@/app/assistencia/encomendas-actions";
 import { useQuickAction } from "./useQuickAction";
-import { PEDIDO_ENCOMENDA_STATUS_LABELS } from "@/lib/assistenciaLabels";
+import { PEDIDO_ENCOMENDA_STATUS_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
 
 type NextStep = { toStatus: string; label: string; needsCarga?: boolean; needsNfE?: boolean };
 
@@ -88,8 +88,8 @@ export function PedidoEncomendaActions({
                 `Status atualizado para ${PEDIDO_ENCOMENDA_STATUS_LABELS[nextStep.toStatus] ?? nextStep.toStatus}.`
               )
             }
-            className="text-sm rounded px-3 py-2 border disabled:opacity-60"
-            style={{ borderColor: "var(--border)" }}
+            className="text-sm rounded px-3 py-2 font-medium disabled:opacity-60"
+            style={{ background: PEDIDO_ENCOMENDA_STATUS_COLORS[nextStep.toStatus] ?? "var(--brand-green)", color: "#fff" }}
           >
             {nextStep.label}
           </button>

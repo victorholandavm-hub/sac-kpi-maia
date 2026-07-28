@@ -158,11 +158,18 @@ export default async function AssistenciaQueuePage({
             </div>
             <div style={{ background: "var(--surface-1)" }}>
               <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {group.items.map((r) => (
+                {group.items.map((r) => {
+                  const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
+                  return (
                   <Link
                     key={r.id}
                     href={`/assistencia/${r.id}`}
                     className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
+                    style={
+                      needsAttention
+                        ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` }
+                        : undefined
+                    }
                   >
                     <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -172,16 +179,16 @@ export default async function AssistenciaQueuePage({
                         <StatusBadge status={r.status} />
                         {r.deadlineStatus === "pendente" ? (
                           <span
-                            className="text-xs font-medium px-2 py-0.5 rounded-full"
-                            style={{ color: "var(--status-warning)", border: "1px solid var(--status-warning)" }}
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                            style={{ color: "var(--status-warning)", background: "color-mix(in srgb, var(--status-warning) 18%, transparent)" }}
                           >
                             Prazo pendente
                           </span>
                         ) : null}
                         {r.escalationRisk ? (
                           <span
-                            className="text-xs font-medium px-2 py-0.5 rounded-full"
-                            style={{ color: "var(--status-critical)", border: "1px solid var(--status-critical)" }}
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                            style={{ color: "var(--status-critical)", background: "color-mix(in srgb, var(--status-critical) 18%, transparent)" }}
                           >
                             ⚠ Risco de escalonamento
                           </span>
@@ -191,8 +198,8 @@ export default async function AssistenciaQueuePage({
                         </span>
                         {r.comboMontagemDesmontagem ? (
                           <span
-                            className="text-xs font-medium px-2 py-0.5 rounded-full"
-                            style={{ color: "var(--brand-orange)", border: "1px solid var(--brand-orange)" }}
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                            style={{ color: "var(--brand-orange)", background: "var(--brand-orange-soft)" }}
                           >
                             {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
                           </span>
@@ -216,7 +223,8 @@ export default async function AssistenciaQueuePage({
                       {r.driverName ? <span>Motorista: {r.driverName}</span> : null}
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

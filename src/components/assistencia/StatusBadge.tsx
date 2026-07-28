@@ -11,13 +11,13 @@ export function StatusBadge({
 }) {
   const color = STATUS_COLORS[status] ?? "var(--text-muted)";
   const description = showInfo ? STATUS_DESCRIPTIONS[status] : undefined;
-  const sizeClasses = size === "md" ? "text-sm font-bold px-3 py-1" : "text-xs font-medium px-2 py-0.5";
+  const sizeClasses = size === "md" ? "text-sm font-bold px-3 py-1" : "text-xs font-semibold px-2 py-0.5";
 
   return (
     <span className="inline-flex items-center gap-1">
       <span
         className={`inline-flex items-center gap-1.5 ${sizeClasses} rounded-full whitespace-nowrap`}
-        style={{ color, border: `1px solid ${color}`, background: size === "md" ? "var(--surface-1)" : undefined }}
+        style={{ color, background: `color-mix(in srgb, ${color} 18%, transparent)` }}
       >
         <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: color }} />
         {STATUS_LABELS[status] ?? status}
