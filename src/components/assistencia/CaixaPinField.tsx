@@ -5,8 +5,8 @@ import { setCaixaPin, toggleCaixaAtivo } from "@/app/assistencia/admin-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PIN_LENGTH } from "@/lib/pinConfig";
 
-// Caixa virou individual (nome + PIN próprio) — mesmo padrão de
-// VendedorPinField.tsx.
+// Caixa é individual (nome + PIN próprio), mesmo padrão de
+// CdOperadorPinField.tsx/FabricaOperadorPinField.tsx.
 export function CaixaPinField({
   name,
   storeName,

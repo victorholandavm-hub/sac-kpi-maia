@@ -19,11 +19,9 @@ type Item = { produtoDescricao: string; quantidade: number };
 export function NovoPedidoEncomendaForm({
   fixedStoreName,
   storeOptions,
-  vendedorNames,
 }: {
   fixedStoreName?: string;
   storeOptions?: { id: string; name: string }[];
-  vendedorNames: string[];
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPedidoEncomendaAction, undefined);
   const [items, setItems] = useState<Item[]>([{ produtoDescricao: "", quantidade: 1 }]);
@@ -113,16 +111,10 @@ export function NovoPedidoEncomendaForm({
       <Field label="Vendedor responsável (opcional)">
         <input
           name="vendedor_name"
-          list="vendedor-names"
           placeholder="Pra qual vendedor(a) é essa venda"
           className="rounded border px-3 py-2"
           style={inputStyle}
         />
-        <datalist id="vendedor-names">
-          {vendedorNames.map((v) => (
-            <option key={v} value={v} />
-          ))}
-        </datalist>
       </Field>
 
       <Field label="Observações">

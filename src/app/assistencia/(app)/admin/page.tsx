@@ -5,18 +5,15 @@ import { listAssemblersWithPinStatus, listDriversWithPinStatus } from "@/lib/pay
 import { listSuppliers } from "@/lib/partOrders";
 import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
 import { listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
-import { listVendedores } from "@/lib/vendedores";
 import { listCaixasWithPinStatus } from "@/lib/caixas";
 import { PIN_LENGTH } from "@/lib/pinConfig";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
 import { AddSimpleEntryForm } from "@/components/assistencia/AddSimpleEntryForm";
 import { AddGerenteForm } from "@/components/assistencia/AddGerenteForm";
-import { AddVendedorForm } from "@/components/assistencia/AddVendedorForm";
 import { AddCaixaForm } from "@/components/assistencia/AddCaixaForm";
 import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
 import { DriverPinField } from "@/components/assistencia/DriverPinField";
 import { GerentePinField } from "@/components/assistencia/GerentePinField";
-import { VendedorRow } from "@/components/assistencia/VendedorRow";
 import { ProdutoEncomendaAdmin } from "@/components/assistencia/ProdutoEncomendaAdmin";
 import { CaixaPinField } from "@/components/assistencia/CaixaPinField";
 import { CdOperadorPinField } from "@/components/assistencia/CdOperadorPinField";
@@ -35,7 +32,7 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixas, vendedores, cdOperadores, fabricaOperadores, rotaConfig] =
+  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixas, cdOperadores, fabricaOperadores, rotaConfig] =
     await Promise.all([
       listStores(),
       listGerentesWithPinStatus(),
@@ -44,7 +41,6 @@ export default async function AdminPage() {
       listSuppliers(),
       listProdutosEncomenda(),
       listCaixasWithPinStatus(),
-      listVendedores(),
       listCdOperadoresWithPinStatus(),
       listFabricaOperadoresWithPinStatus(),
       getRotaWeekdayConfig(),
@@ -181,27 +177,6 @@ export default async function AdminPage() {
           ))}
         </ul>
         <AddCaixaForm stores={stores} />
-      </section>
-
-      <section
-        className="rounded-lg border p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Vendedores — Encomendas
-        </h3>
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Vendedor não loga em lugar nenhum — esse cadastro só preenche o campo &quot;Vendedor
-          responsável&quot; quando caixa/gerente/CD/fábrica lança um pedido de encomenda.
-        </p>
-        <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 max-h-64 overflow-y-auto">
-          {vendedores.map((v) => (
-            <li key={v.name}>
-              <VendedorRow name={v.name} storeName={v.storeName} ativo={v.ativo} />
-            </li>
-          ))}
-        </ul>
-        <AddVendedorForm stores={stores} />
       </section>
 
       <div className="grid sm:grid-cols-2 gap-4">

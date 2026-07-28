@@ -7,7 +7,6 @@ import { hashPin } from "@/lib/montadorAuth";
 import { resetPinAttempts } from "@/lib/pinLockout";
 import { PIN_LENGTH, isValidPinFormat } from "@/lib/pinConfig";
 import { setGerenteStores } from "@/lib/gerentes";
-import { addVendedor as addVendedorLib, setVendedorAtivo as setVendedorAtivoLib } from "@/lib/vendedores";
 import { addCaixa as addCaixaLib, setCaixaAtivo as setCaixaAtivoLib } from "@/lib/caixas";
 import { resolveDriverName } from "@/lib/payments";
 import { upsertProdutoEncomenda, setProdutoEncomendaAtivo } from "@/lib/pedidosEncomenda";
@@ -158,38 +157,10 @@ export async function setGerentePin(name: string, pin: string): Promise<void> {
   revalidatePath("/assistencia/admin");
 }
 
-// Vendedor é preso a UMA loja só (diferente do gerente, que é N:N) — por
-// isso não reaproveita setGerenteStores, e cadastrar de novo com outra loja
-// dá erro de PK duplicada em vez de silenciosamente trocar a loja (evita
-// mover um vendedor de loja sem querer por um typo no nome).
-export async function addVendedor(_state: FormState, formData: FormData): Promise<FormState> {
-  const profile = await getProfile();
-  requireRole(profile, "admin");
-
-  const name = String(formData.get("name") ?? "").trim();
-  const storeId = String(formData.get("store_id") ?? "").trim();
-  if (!name) return { error: "Informe o nome." };
-  if (!storeId) return { error: "Selecione a loja." };
-
-  try {
-    await addVendedorLib(name, storeId);
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Não foi possível salvar." };
-  }
-
-  revalidatePath("/assistencia/admin");
-  return { success: true };
-}
-
-export async function toggleVendedorAtivo(name: string, ativo: boolean): Promise<void> {
-  const profile = await getProfile();
-  requireRole(profile, "admin");
-  await setVendedorAtivoLib(name, ativo);
-  revalidatePath("/assistencia/admin");
-}
-
-// Caixa virou individual (nome + PIN próprio, 1 loja) — mesmo padrão de
-// addVendedor logo acima.
+// Caixa é presa a UMA loja só (diferente do gerente, que é N:N) — por isso
+// não reaproveita setGerenteStores, e cadastrar de novo com outra loja dá
+// erro de PK duplicada em vez de silenciosamente trocar a loja (evita mover
+// uma caixa de loja sem querer por um typo no nome).
 export async function addCaixa(_state: FormState, formData: FormData): Promise<FormState> {
   const profile = await getProfile();
   requireRole(profile, "admin");

@@ -5,8 +5,8 @@ import { caixaSignIn, type CaixaFormState } from "@/app/assistencia/caixa-action
 import { PIN_LENGTH } from "@/lib/pinConfig";
 import { usePinAutoSubmit } from "./usePinAutoSubmit";
 
-// Caixa virou individual (nome + PIN próprio) — mesmo padrão de
-// VendedorLoginForm.tsx.
+// Caixa é individual (nome + PIN próprio), mesmo padrão de login por PIN
+// usado em CdLoginForm.tsx/FabricaLoginForm.tsx.
 export function CaixaLoginForm() {
   const [state, formAction, pending] = useActionState<CaixaFormState, FormData>(caixaSignIn, undefined);
   const { formRef, onPinChange } = usePinAutoSubmit(pending);

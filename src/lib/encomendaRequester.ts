@@ -15,9 +15,9 @@ export type EncomendaRequester =
 // gerente (login que ele já usa em /assistencia/loja, cookie com path
 // /assistencia então já chega aqui sem logar de novo), ou CD/fábrica (que não
 // têm loja fixa — escolhem a loja na hora de lançar o pedido, ver
-// createPedidoEncomendaAction). Vendedor não lança pedido — só é citado como
-// texto livre no campo "Vendedor responsável" (ver listVendedores em
-// vendedores.ts). Tenta cada sessão em sequência, mesmo padrão de
+// createPedidoEncomendaAction). Vendedor não tem acesso nenhum a esse
+// sistema — só é citado como texto livre no campo "Vendedor responsável"
+// pelo requester real. Tenta cada sessão em sequência, mesmo padrão de
 // requireEncomendaActor (src/lib/encomendaAuth.ts) só que pro lado de quem
 // solicita, não de quem processa.
 export async function resolveEncomendaRequester(): Promise<EncomendaRequester | null> {
