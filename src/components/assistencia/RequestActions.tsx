@@ -22,6 +22,17 @@ const NEXT_STATUSES: Record<string, string[]> = {
   cancelada: [],
 };
 
+// Qual das próximas opções é o caminho esperado (some, cancelar sempre fica
+// secundário) — usado só pra decidir qual botão vem sólido/em destaque e
+// quais ficam discretos, não muda o que é permitido (isso continua 100% em
+// NEXT_STATUSES + updateStatus no servidor).
+const PRIMARY_NEXT_STATUS: Record<string, string> = {
+  aberta: "em_contato",
+  em_contato: "em_andamento",
+  em_andamento: "concluida",
+  remarcar: "em_andamento",
+};
+
 // Pra desfazer um clique errado (ex.: marcar "Em andamento" sem querer) —
 // o servidor (updateStatus) já aceita qualquer status válido, só faltava a
 // opção na tela. Fica separado dos botões de avanço, mais discreto de
@@ -95,27 +106,35 @@ export function RequestActions({
 
       {!hasAssignee && (NEXT_STATUSES[status] ?? []).includes("em_andamento") ? (
         <p className="text-xs" style={{ color: "var(--status-warning)" }}>
-          Defina {assigneeLabel} acima pra poder marcar como Em andamento.
+          Defina {assigneeLabel} (mais abaixo, em &quot;Atendimento&quot;) pra poder marcar como Em andamento.
         </p>
       ) : null}
 
       {nextStatuses.length > 0 ? (
         <div className="flex items-center gap-2 flex-wrap">
-          {nextStatuses.map((s) => (
-            <button
-              key={s}
-              disabled={pending}
-              onClick={() =>
-                s === "remarcar"
-                  ? setAskingRemarcarReason(true)
-                  : run(() => updateStatus(requestId, s), `Status atualizado para ${STATUS_LABELS[s] ?? s}.`)
-              }
-              className="text-sm rounded px-3 py-2 font-medium disabled:opacity-60"
-              style={{ background: buttonColor(s), color: "#fff" }}
-            >
-              Marcar como {STATUS_LABELS[s] ?? s}
-            </button>
-          ))}
+          {nextStatuses.map((s) => {
+            const isPrimary = s === PRIMARY_NEXT_STATUS[status];
+            const color = buttonColor(s);
+            return (
+              <button
+                key={s}
+                disabled={pending}
+                onClick={() =>
+                  s === "remarcar"
+                    ? setAskingRemarcarReason(true)
+                    : run(() => updateStatus(requestId, s), `Status atualizado para ${STATUS_LABELS[s] ?? s}.`)
+                }
+                className={`text-sm rounded px-3 py-2 disabled:opacity-60 ${isPrimary ? "font-medium" : ""}`}
+                style={
+                  isPrimary
+                    ? { background: color, color: "#fff" }
+                    : { background: `color-mix(in srgb, ${color} 15%, transparent)`, color }
+                }
+              >
+                Marcar como {STATUS_LABELS[s] ?? s}
+              </button>
+            );
+          })}
         </div>
       ) : null}
 

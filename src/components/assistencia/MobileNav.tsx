@@ -98,11 +98,31 @@ const MORE_TABS = [
   { label: "Relatórios", href: "/assistencia/relatorios" },
 ];
 
-export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
+function NavDot({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className="absolute -top-0.5 -right-1.5 text-[9px] font-bold rounded-full min-w-[1rem] h-[1rem] px-1 flex items-center justify-center"
+      style={{ background: "var(--brand-orange)", color: "#fff" }}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+export function MobileNav({
+  isAdmin,
+  counts,
+}: {
+  isAdmin: boolean;
+  counts?: { solicitacoes?: number; encomendas?: number };
+}) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreTabs = isAdmin ? [...MORE_TABS, { label: "Admin", href: "/assistencia/admin" }] : MORE_TABS;
   const moreActive = moreTabs.some((t) => pathname.startsWith(t.href));
+  const solicitacoesCount = counts?.solicitacoes ?? 0;
+  const encomendasCount = counts?.encomendas ?? 0;
 
   return (
     <>
@@ -120,21 +140,32 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
           className="sm:hidden fixed bottom-16 inset-x-4 z-50 rounded-xl border p-2 flex flex-col gap-1 shadow-lg"
           style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
         >
-          {moreTabs.map((t) => (
-            <Link
-              key={t.href}
-              href={t.href}
-              onClick={() => setMoreOpen(false)}
-              className="text-sm px-3 py-2.5 rounded-lg"
-              style={{
-                background: pathname.startsWith(t.href) ? "var(--brand-green-soft)" : "transparent",
-                color: pathname.startsWith(t.href) ? "var(--brand-green)" : "var(--text-primary)",
-                fontWeight: pathname.startsWith(t.href) ? 600 : 400,
-              }}
-            >
-              {t.label}
-            </Link>
-          ))}
+          {moreTabs.map((t) => {
+            const tabCount = t.label === "Encomendas" ? encomendasCount : 0;
+            return (
+              <Link
+                key={t.href}
+                href={t.href}
+                onClick={() => setMoreOpen(false)}
+                className="text-sm px-3 py-2.5 rounded-lg flex items-center justify-between gap-2"
+                style={{
+                  background: pathname.startsWith(t.href) ? "var(--brand-green-soft)" : "transparent",
+                  color: pathname.startsWith(t.href) ? "var(--brand-green)" : "var(--text-primary)",
+                  fontWeight: pathname.startsWith(t.href) ? 600 : 400,
+                }}
+              >
+                {t.label}
+                {tabCount > 0 ? (
+                  <span
+                    className="text-[10px] font-bold rounded-full min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center"
+                    style={{ background: "var(--brand-orange)", color: "#fff" }}
+                  >
+                    {tabCount > 99 ? "99+" : tabCount}
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
         </div>
       ) : null}
 
@@ -145,6 +176,7 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
         {PRIMARY_TABS.map((tab) => {
           const active = pathname.startsWith(tab.href);
           const Icon = tab.icon;
+          const tabCount = tab.label === "Fila" ? solicitacoesCount : 0;
           return (
             <Link
               key={tab.href}
@@ -152,7 +184,10 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
               className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2"
               style={{ color: active ? "var(--brand-green)" : "var(--text-muted)" }}
             >
-              <Icon />
+              <span className="relative">
+                <Icon />
+                <NavDot count={tabCount} />
+              </span>
               <span className="text-[11px]" style={{ fontWeight: active ? 600 : 400 }}>
                 {tab.label}
               </span>
@@ -164,7 +199,10 @@ export function MobileNav({ isAdmin }: { isAdmin: boolean }) {
           className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2"
           style={{ color: moreOpen || moreActive ? "var(--brand-green)" : "var(--text-muted)" }}
         >
-          <DotsIcon />
+          <span className="relative">
+            <DotsIcon />
+            <NavDot count={encomendasCount} />
+          </span>
           <span className="text-[11px]" style={{ fontWeight: moreOpen || moreActive ? 600 : 400 }}>
             Mais
           </span>

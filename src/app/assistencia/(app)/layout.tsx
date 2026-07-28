@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { ROLE_LABELS } from "@/lib/assistenciaLabels";
 import { signOut } from "@/app/assistencia/actions";
+import { countRequestsOverview } from "@/lib/serviceRequests";
+import { countPedidosEncomendaSolicitados } from "@/lib/pedidosEncomenda";
 import { AssistenciaNav } from "@/components/assistencia/AssistenciaNav";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
@@ -11,6 +13,16 @@ export default async function AssistenciaAppLayout({ children }: { children: Rea
   const profile = await getProfile();
   const isAdmin = profile.role === "admin";
   const isSac = profile.role === "sac";
+
+  // Contagem pra badge nas abas Solicitações/Encomendas -- só quando faz
+  // sentido pro papel (SAC nem mostra essa navegação, ver abaixo).
+  const [requestsOverview, pedidosSolicitados] = isSac
+    ? [null, 0]
+    : await Promise.all([countRequestsOverview(), countPedidosEncomendaSolicitados()]);
+  const counts = {
+    solicitacoes: requestsOverview?.openNoContact ?? 0,
+    encomendas: pedidosSolicitados,
+  };
 
   return (
     <ToastProvider>
@@ -32,7 +44,7 @@ export default async function AssistenciaAppLayout({ children }: { children: Rea
             </Link>
           ) : (
             <div className="hidden sm:block">
-              <AssistenciaNav isAdmin={isAdmin} />
+              <AssistenciaNav isAdmin={isAdmin} counts={counts} />
             </div>
           )}
         </div>
@@ -40,7 +52,7 @@ export default async function AssistenciaAppLayout({ children }: { children: Rea
       </div>
       {isSac ? null : (
         <div className="print:hidden">
-          <MobileNav isAdmin={isAdmin} />
+          <MobileNav isAdmin={isAdmin} counts={counts} />
         </div>
       )}
     </ToastProvider>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireEncomendaActor } from "@/lib/encomendaAuth";
 import { listStores } from "@/lib/serviceRequests";
 import { listAllPedidos, listOpenPedidoEncomendaQueueIds, isPedidoEncomendaStatus } from "@/lib/pedidosEncomenda";
-import { ROLE_LABELS } from "@/lib/assistenciaLabels";
+import { ROLE_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -89,21 +89,34 @@ export default async function EncomendasQueuePage({
       </AssistenciaHeader>
 
       <div className="flex items-center gap-2 flex-wrap">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.label}
-            href={buildHref({ status: f.value ?? undefined, store })}
-            className="text-xs px-3 py-1 rounded-full border"
-            style={{
-              borderColor: "var(--border)",
-              background: (f.value ?? undefined) === filterStatus ? "var(--surface-1)" : "transparent",
-              color: (f.value ?? undefined) === filterStatus ? "var(--text-primary)" : "var(--text-secondary)",
-              fontWeight: (f.value ?? undefined) === filterStatus ? 600 : 400,
-            }}
-          >
-            {f.label}
-          </Link>
-        ))}
+        {FILTERS.map((f) => {
+          const selected = (f.value ?? undefined) === filterStatus;
+          const color = f.value ? PEDIDO_ENCOMENDA_STATUS_COLORS[f.value] ?? "var(--text-secondary)" : "var(--text-secondary)";
+          return (
+            <Link
+              key={f.label}
+              href={buildHref({ status: f.value ?? undefined, store })}
+              className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+              style={
+                f.value
+                  ? {
+                      color,
+                      background: selected ? `color-mix(in srgb, ${color} 18%, transparent)` : "transparent",
+                      fontWeight: selected ? 600 : 400,
+                      border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
+                    }
+                  : {
+                      border: "1px solid var(--border)",
+                      background: selected ? "var(--surface-1)" : "transparent",
+                      color: selected ? "var(--text-primary)" : "var(--text-secondary)",
+                      fontWeight: selected ? 600 : 400,
+                    }
+              }
+            >
+              {f.label}
+            </Link>
+          );
+        })}
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

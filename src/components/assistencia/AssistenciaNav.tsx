@@ -15,9 +15,33 @@ const TABS = [
   { label: "Relatórios", href: "/assistencia/relatorios" },
 ];
 
-export function AssistenciaNav({ isAdmin }: { isAdmin: boolean }) {
+function NavBadge({ count, active }: { count: number; active: boolean }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className="text-[10px] font-bold rounded-full min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center"
+      style={{ background: active ? "var(--brand-green-ink)" : "var(--brand-orange)", color: active ? "var(--brand-green)" : "#fff" }}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+export function AssistenciaNav({
+  isAdmin,
+  counts,
+}: {
+  isAdmin: boolean;
+  counts?: { solicitacoes?: number; encomendas?: number };
+}) {
   const pathname = usePathname();
   const tabs = isAdmin ? [...TABS, { label: "Admin", href: "/assistencia/admin" }] : TABS;
+
+  function badgeCountFor(label: string): number {
+    if (label === "Solicitações") return counts?.solicitacoes ?? 0;
+    if (label === "Encomendas") return counts?.encomendas ?? 0;
+    return 0;
+  }
 
   return (
     <nav className="flex items-center gap-2 overflow-x-auto min-w-0 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
@@ -27,7 +51,7 @@ export function AssistenciaNav({ isAdmin }: { isAdmin: boolean }) {
           <Link
             key={tab.href}
             href={tab.href}
-            className="text-sm px-3 py-1.5 rounded-full shrink-0 whitespace-nowrap"
+            className="text-sm px-3 py-1.5 rounded-full shrink-0 whitespace-nowrap flex items-center gap-1.5"
             style={{
               background: active ? "var(--brand-green)" : "transparent",
               color: active ? "var(--brand-green-ink)" : "var(--text-secondary)",
@@ -35,6 +59,7 @@ export function AssistenciaNav({ isAdmin }: { isAdmin: boolean }) {
             }}
           >
             {tab.label}
+            <NavBadge count={badgeCountFor(tab.label)} active={active} />
           </Link>
         );
       })}

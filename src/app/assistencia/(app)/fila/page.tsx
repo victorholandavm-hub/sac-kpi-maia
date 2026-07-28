@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, type RequestItem, type ServiceRequestSummary } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
-import { REQUEST_TYPE_LABELS, ASSISTENCIA_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, ASSISTENCIA_MANAGED_TYPES, STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -77,21 +77,35 @@ export default async function AssistenciaQueuePage({
       <RealtimeQueueRefresher />
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          {FILTERS.map((f) => (
-            <Link
-              key={f.label}
-              href={buildHref({ status: f.value ?? undefined, q, store, assembler })}
-              className="text-xs px-3 py-1 rounded-full border"
-              style={{
-                borderColor: "var(--border)",
-                background: (f.value ?? undefined) === filterStatus ? "var(--surface-1)" : "transparent",
-                color: (f.value ?? undefined) === filterStatus ? "var(--text-primary)" : "var(--text-secondary)",
-                fontWeight: (f.value ?? undefined) === filterStatus ? 600 : 400,
-              }}
-            >
-              {f.label}
-            </Link>
-          ))}
+          {FILTERS.map((f) => {
+            const selected = (f.value ?? undefined) === filterStatus;
+            const color = f.value ? STATUS_COLORS[f.value] ?? "var(--text-secondary)" : "var(--text-secondary)";
+            return (
+              <Link
+                key={f.label}
+                href={buildHref({ status: f.value ?? undefined, q, store, assembler })}
+                className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+                style={
+                  f.value
+                    ? {
+                        color,
+                        background: selected ? `color-mix(in srgb, ${color} 18%, transparent)` : "transparent",
+                        fontWeight: selected ? 600 : 400,
+                        border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
+                      }
+                    : {
+                        borderColor: "var(--border)",
+                        border: "1px solid var(--border)",
+                        background: selected ? "var(--surface-1)" : "transparent",
+                        color: selected ? "var(--text-primary)" : "var(--text-secondary)",
+                        fontWeight: selected ? 600 : 400,
+                      }
+                }
+              >
+                {f.label}
+              </Link>
+            );
+          })}
         </div>
         <Link
           href="/assistencia/nova-rapida"

@@ -152,6 +152,19 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         ) : null}
       </div>
 
+      {canManage && request.deadlineStatus === "pendente" ? <DeadlineActions requestId={request.id} /> : null}
+
+      {canManage ? (
+        <RequestActions
+          requestId={request.id}
+          status={request.status}
+          isAssignedToMe={request.assignedToId === profile.id}
+          hasAssignee={isDeliveryType ? !!request.driverName : !!request.assemblerName}
+          assigneeLabel={isDeliveryType ? "o motorista" : "o montador"}
+          hideClaim={isSacType}
+        />
+      ) : null}
+
       {canManage ? (
         <RequestItemsTable items={request.items} requestId={request.id} requestStatus={request.status} />
       ) : request.items.length > 0 ? (
@@ -301,19 +314,6 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
       {canManage && request.type === "notificacao_externa" ? (
         <EscalationRiskToggle requestId={request.id} atRisk={request.escalationRisk} />
-      ) : null}
-
-      {canManage && request.deadlineStatus === "pendente" ? <DeadlineActions requestId={request.id} /> : null}
-
-      {canManage ? (
-        <RequestActions
-          requestId={request.id}
-          status={request.status}
-          isAssignedToMe={request.assignedToId === profile.id}
-          hasAssignee={isDeliveryType ? !!request.driverName : !!request.assemblerName}
-          assigneeLabel={isDeliveryType ? "o motorista" : "o montador"}
-          hideClaim={isSacType}
-        />
       ) : null}
 
       <div

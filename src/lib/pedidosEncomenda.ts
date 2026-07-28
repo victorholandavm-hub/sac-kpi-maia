@@ -49,6 +49,19 @@ export async function listOpenPedidoEncomendaQueueIds(): Promise<string[]> {
   return (data ?? []).map((row) => row.id as string);
 }
 
+// Pedidos ainda não iniciados pela fábrica — usado pra badge de contagem na
+// aba "Encomendas" da navegação (mesmo espírito de countRequestsOverview em
+// serviceRequests.ts).
+export async function countPedidosEncomendaSolicitados(): Promise<number> {
+  const admin = getSupabaseAdmin();
+  const { count, error } = await admin
+    .from("pedidos_encomenda")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "solicitado");
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 export type ProdutoEncomenda = {
   id: string;
   descricao: string;
