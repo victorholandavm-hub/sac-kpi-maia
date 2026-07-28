@@ -93,18 +93,6 @@ export async function addVendedorComoGerente(_state: FormState, formData: FormDa
   return { success: true };
 }
 
-export async function setVendedorPinComoGerente(name: string, pin: string): Promise<void> {
-  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
-  await requireOwnEntry("vendedores", name);
-
-  const admin = getSupabaseAdmin();
-  const { error } = await admin.from("vendedores").update({ pin_hash: hashPin(pin) }).eq("name", name);
-  if (error) throw new Error(error.message);
-  await resetPinAttempts("vendedores", "name", name);
-
-  revalidatePath("/assistencia/loja/equipe");
-}
-
 export async function toggleVendedorAtivoComoGerente(name: string, ativo: boolean): Promise<void> {
   await requireOwnEntry("vendedores", name);
   await setVendedorAtivoLib(name, ativo);

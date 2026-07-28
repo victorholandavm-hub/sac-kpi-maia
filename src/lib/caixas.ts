@@ -51,7 +51,7 @@ export async function setCaixaAtivo(name: string, ativo: boolean): Promise<void>
 
 // Usado pelas Server Actions pra descobrir a loja da caixa autenticada sem
 // confiar em nada vindo do cliente além do nome já verificado pela sessão
-// HMAC — mesmo princípio de getVendedorStoreId (src/lib/vendedores.ts). Só
+// HMAC — mesmo princípio de getGerenteStoreIds (src/lib/gerentes.ts). Só
 // retorna a loja se a conta estiver ativa, senão a sessão vira inválida na
 // prática (resolveEncomendaRequester não consegue mais resolver a loja).
 export async function getCaixaStoreId(name: string): Promise<string | null> {

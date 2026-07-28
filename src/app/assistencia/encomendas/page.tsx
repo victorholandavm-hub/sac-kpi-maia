@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BoxIcon, StoreIcon, HardHatIcon, TruckIcon } from "@/components/assistencia/RoleIcons";
+import { BoxIcon, HardHatIcon, TruckIcon } from "@/components/assistencia/RoleIcons";
 
 // Nunca servir isso de cache estático/CDN — sempre gerar fresco a cada request.
 export const dynamic = "force-dynamic";
@@ -65,14 +65,6 @@ export default function EncomendasHubPage() {
             borderColor="var(--brand-orange)"
             title="Fazer pedido"
             subtitle="Caixa da loja"
-          />
-          <RoleCard
-            href="/assistencia/encomendas/vendedor/login"
-            icon={<StoreIcon color="var(--brand-orange)" />}
-            iconBg="var(--brand-orange-soft)"
-            borderColor="var(--brand-orange)"
-            title="Fazer pedido"
-            subtitle="Vendedor"
           />
           <RoleCard
             href="/assistencia/encomendas/fabrica/login"

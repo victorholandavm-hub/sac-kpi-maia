@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
-import { listVendedoresWithPinStatus } from "@/lib/vendedores";
+import { listVendedores } from "@/lib/vendedores";
 import { NovoPedidoEncomendaForm } from "@/components/assistencia/NovoPedidoEncomendaForm";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 
@@ -21,7 +21,7 @@ export default async function SolicitarEncomendaPage({
   }
 
   const admin = getSupabaseAdmin();
-  const vendedores = await listVendedoresWithPinStatus();
+  const vendedores = await listVendedores();
 
   const isCdOrFabrica = requester.kind === "cd" || requester.kind === "fabrica";
 
@@ -73,10 +73,9 @@ export default async function SolicitarEncomendaPage({
       ) : null}
 
       <NovoPedidoEncomendaForm
-        requester={requester}
         fixedStoreName={fixedStoreName}
         storeOptions={storeOptions}
-        vendedorNames={vendedores.map((v) => v.name)}
+        vendedorNames={vendedores.filter((v) => v.ativo).map((v) => v.name)}
       />
     </div>
   );

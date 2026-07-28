@@ -181,20 +181,6 @@ export async function addVendedor(_state: FormState, formData: FormData): Promis
   return { success: true };
 }
 
-export async function setVendedorPin(name: string, pin: string): Promise<void> {
-  const profile = await getProfile();
-  requireRole(profile, "admin");
-
-  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
-
-  const admin = getSupabaseAdmin();
-  const { error } = await admin.from("vendedores").update({ pin_hash: hashPin(pin) }).eq("name", name);
-  if (error) throw new Error(error.message);
-  await resetPinAttempts("vendedores", "name", name);
-
-  revalidatePath("/assistencia/admin");
-}
-
 export async function toggleVendedorAtivo(name: string, ativo: boolean): Promise<void> {
   const profile = await getProfile();
   requireRole(profile, "admin");

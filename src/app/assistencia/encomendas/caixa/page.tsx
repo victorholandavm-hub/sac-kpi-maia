@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
 import { caixaSignOut } from "@/app/assistencia/caixa-actions";
-import { vendedorSignOut } from "@/app/assistencia/vendedor-actions";
 import { lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import {
@@ -40,7 +39,7 @@ export default async function EncomendasCaixaPage({
   }
 
   const storeIds = requester.kind === "gerente" ? requester.storeIds : [requester.storeId];
-  const signOutAction = requester.kind === "caixa" ? caixaSignOut : requester.kind === "vendedor" ? vendedorSignOut : lojaGerenteSignOut;
+  const signOutAction = requester.kind === "caixa" ? caixaSignOut : lojaGerenteSignOut;
 
   const { view } = await searchParams;
   const showCompleted = view === "concluidos";

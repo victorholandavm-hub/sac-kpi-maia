@@ -5,7 +5,7 @@ import { listAssemblersWithPinStatus, listDriversWithPinStatus } from "@/lib/pay
 import { listSuppliers } from "@/lib/partOrders";
 import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
 import { listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
-import { listVendedoresWithPinStatus } from "@/lib/vendedores";
+import { listVendedores } from "@/lib/vendedores";
 import { listCaixasWithPinStatus } from "@/lib/caixas";
 import { PIN_LENGTH } from "@/lib/pinConfig";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
@@ -16,7 +16,7 @@ import { AddCaixaForm } from "@/components/assistencia/AddCaixaForm";
 import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
 import { DriverPinField } from "@/components/assistencia/DriverPinField";
 import { GerentePinField } from "@/components/assistencia/GerentePinField";
-import { VendedorPinField } from "@/components/assistencia/VendedorPinField";
+import { VendedorRow } from "@/components/assistencia/VendedorRow";
 import { ProdutoEncomendaAdmin } from "@/components/assistencia/ProdutoEncomendaAdmin";
 import { CaixaPinField } from "@/components/assistencia/CaixaPinField";
 import { CdOperadorPinField } from "@/components/assistencia/CdOperadorPinField";
@@ -44,7 +44,7 @@ export default async function AdminPage() {
       listSuppliers(),
       listProdutosEncomenda(),
       listCaixasWithPinStatus(),
-      listVendedoresWithPinStatus(),
+      listVendedores(),
       listCdOperadoresWithPinStatus(),
       listFabricaOperadoresWithPinStatus(),
       getRotaWeekdayConfig(),
@@ -191,13 +191,13 @@ export default async function AdminPage() {
           Vendedores — Encomendas
         </h3>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Cada vendedor tem seu próprio PIN e uma loja fixa, e entra com nome + PIN em{" "}
-          <span className="font-mono">/assistencia/encomendas/vendedor/login</span>.
+          Vendedor não loga em lugar nenhum — esse cadastro só preenche o campo &quot;Vendedor
+          responsável&quot; quando caixa/gerente/CD/fábrica lança um pedido de encomenda.
         </p>
         <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-2 max-h-64 overflow-y-auto">
           {vendedores.map((v) => (
             <li key={v.name}>
-              <VendedorPinField name={v.name} storeName={v.storeName} hasPin={v.hasPin} ativo={v.ativo} />
+              <VendedorRow name={v.name} storeName={v.storeName} ativo={v.ativo} />
             </li>
           ))}
         </ul>

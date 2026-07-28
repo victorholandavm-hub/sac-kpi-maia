@@ -2,7 +2,6 @@
 
 import { useActionState, useState } from "react";
 import { createPedidoEncomendaAction, type FormState } from "@/app/assistencia/encomendas-actions";
-import type { EncomendaRequester } from "@/lib/encomendaRequester";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -18,12 +17,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 type Item = { produtoDescricao: string; quantidade: number };
 
 export function NovoPedidoEncomendaForm({
-  requester,
   fixedStoreName,
   storeOptions,
   vendedorNames,
 }: {
-  requester: EncomendaRequester;
   fixedStoreName?: string;
   storeOptions?: { id: string; name: string }[];
   vendedorNames: string[];
@@ -117,7 +114,6 @@ export function NovoPedidoEncomendaForm({
         <input
           name="vendedor_name"
           list="vendedor-names"
-          defaultValue={requester.kind === "vendedor" ? requester.name : ""}
           placeholder="Pra qual vendedor(a) é essa venda"
           className="rounded border px-3 py-2"
           style={inputStyle}

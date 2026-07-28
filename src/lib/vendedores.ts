@@ -1,30 +1,34 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 
-export type VendedorWithPinStatus = { name: string; storeId: string; storeName: string; hasPin: boolean; ativo: boolean };
+// Vendedor não loga em lugar nenhum — esse cadastro existe só pra alimentar o
+// datalist do campo "Vendedor responsável" na criação de um pedido de
+// encomenda (ver NovoPedidoEncomendaForm.tsx), preenchido por quem de fato
+// lança o pedido (caixa/gerente/CD/fábrica). "ativo" controla só se o nome
+// ainda aparece nas sugestões (ex.: vendedor que saiu da empresa).
+export type VendedorInfo = { name: string; storeId: string; storeName: string; ativo: boolean };
 
-type VendedorRow = { name: string; store_id: string; pin_hash: string | null; ativo: boolean; stores: { name: string } | null };
+type VendedorRow = { name: string; store_id: string; ativo: boolean; stores: { name: string } | null };
 
-export async function listVendedoresWithPinStatus(): Promise<VendedorWithPinStatus[]> {
+export async function listVendedores(): Promise<VendedorInfo[]> {
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("vendedores").select("name, store_id, pin_hash, ativo, stores(name)").order("name");
+  const { data, error } = await admin.from("vendedores").select("name, store_id, ativo, stores(name)").order("name");
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as VendedorRow[]).map((v) => ({
     name: v.name,
     storeId: v.store_id,
     storeName: v.stores?.name ?? v.store_id,
-    hasPin: !!v.pin_hash,
     ativo: v.ativo,
   }));
 }
 
 // Usado pela tela de equipe do gerente (src/app/assistencia/loja/equipe/page.tsx),
 // que só pode ver/gerenciar os vendedores das próprias lojas.
-export async function listVendedoresForStores(storeIds: string[]): Promise<VendedorWithPinStatus[]> {
+export async function listVendedoresForStores(storeIds: string[]): Promise<VendedorInfo[]> {
   if (storeIds.length === 0) return [];
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("vendedores")
-    .select("name, store_id, pin_hash, ativo, stores(name)")
+    .select("name, store_id, ativo, stores(name)")
     .in("store_id", storeIds)
     .order("name");
   if (error) throw new Error(error.message);
@@ -32,7 +36,6 @@ export async function listVendedoresForStores(storeIds: string[]): Promise<Vende
     name: v.name,
     storeId: v.store_id,
     storeName: v.stores?.name ?? v.store_id,
-    hasPin: !!v.pin_hash,
     ativo: v.ativo,
   }));
 }
@@ -47,15 +50,4 @@ export async function setVendedorAtivo(name: string, ativo: boolean): Promise<vo
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("vendedores").update({ ativo }).eq("name", name);
   if (error) throw new Error(error.message);
-}
-
-// Usado pelas Server Actions pra descobrir a loja do vendedor autenticado sem
-// confiar em nada vindo do cliente além do nome já verificado pela sessão
-// HMAC — mesmo princípio de getGerenteStoreIds (src/lib/gerentes.ts). Só
-// retorna a loja se a conta estiver ativa.
-export async function getVendedorStoreId(name: string): Promise<string | null> {
-  const admin = getSupabaseAdmin();
-  const { data } = await admin.from("vendedores").select("store_id, ativo").eq("name", name).maybeSingle();
-  if (!data || !data.ativo) return null;
-  return data.store_id as string;
 }

@@ -72,7 +72,7 @@ export default function AssistenciaHomePage() {
             iconBg="var(--brand-orange-soft)"
             borderColor="var(--brand-orange)"
             title="Encomendas"
-            subtitle="Caixa, vendedor, CD e fábrica"
+            subtitle="Caixa, CD e fábrica"
           />
           <RoleCard
             href="/assistencia/login"
