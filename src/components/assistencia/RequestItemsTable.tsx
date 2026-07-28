@@ -13,7 +13,17 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString("pt-BR");
 }
 
-function ItemRow({ item, requestId, requestStatus }: { item: RequestItem; requestId: string; requestStatus: string }) {
+function ItemRow({
+  item,
+  requestId,
+  requestStatus,
+  canEditValues,
+}: {
+  item: RequestItem;
+  requestId: string;
+  requestStatus: string;
+  canEditValues: boolean;
+}) {
   const isConcluded = requestStatus === "concluida";
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
@@ -80,23 +90,39 @@ function ItemRow({ item, requestId, requestStatus }: { item: RequestItem; reques
               Salvar
             </button>
           </>
-        ) : (
+        ) : canEditValues ? (
           <button onClick={() => setEditing(true)} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             {total !== null ? formatBRL(total) : "definir valor"}
           </button>
+        ) : (
+          <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            {total !== null ? formatBRL(total) : "Sem valor definido"}
+          </span>
         )}
         {isConcluded ? (
-          <button
-            onClick={toggleReleased}
-            disabled={pending}
-            className="text-xs font-medium px-2.5 py-1 rounded-full border disabled:opacity-60 whitespace-nowrap"
-            style={{
-              color: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
-              borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
-            }}
-          >
-            {item.paymentReleased ? "✓ Aprovado" : "Aprovar pagamento"}
-          </button>
+          canEditValues ? (
+            <button
+              onClick={toggleReleased}
+              disabled={pending}
+              className="text-xs font-medium px-2.5 py-1 rounded-full border disabled:opacity-60 whitespace-nowrap"
+              style={{
+                color: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
+                borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
+              }}
+            >
+              {item.paymentReleased ? "✓ Aprovado" : "Aprovar pagamento"}
+            </button>
+          ) : (
+            <span
+              className="text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap"
+              style={{
+                color: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
+                borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
+              }}
+            >
+              {item.paymentReleased ? "✓ Aprovado" : "Pendente"}
+            </span>
+          )
         ) : (
           <span
             className="text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap"
@@ -135,10 +161,12 @@ function ItemRow({ item, requestId, requestStatus }: { item: RequestItem; reques
               cancelar
             </button>
           </>
-        ) : (
+        ) : canEditValues ? (
           <button onClick={() => setEditingAuth(true)} className="underline" style={{ color: "var(--text-secondary)" }}>
             {item.paymentAuthorizedBy ?? "definir"}
           </button>
+        ) : (
+          <span>{item.paymentAuthorizedBy ?? "não definido"}</span>
         )}
       </div>
     </div>
@@ -149,10 +177,12 @@ export function RequestItemsTable({
   items,
   requestId,
   requestStatus,
+  canEditValues,
 }: {
   items: RequestItem[];
   requestId: string;
   requestStatus: string;
+  canEditValues: boolean;
 }) {
   if (items.length === 0) return null;
   const total = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
@@ -173,7 +203,7 @@ export function RequestItemsTable({
         ) : null}
       </div>
       {items.map((item) => (
-        <ItemRow key={item.id} item={item} requestId={requestId} requestStatus={requestStatus} />
+        <ItemRow key={item.id} item={item} requestId={requestId} requestStatus={requestStatus} canEditValues={canEditValues} />
       ))}
     </div>
   );

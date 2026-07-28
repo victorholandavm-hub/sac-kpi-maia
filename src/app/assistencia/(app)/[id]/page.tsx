@@ -9,6 +9,7 @@ import {
   SHIFT_LABELS,
   SAC_CATEGORY_LABELS,
   SAC_MANAGED_TYPES,
+  PAYMENTS_CONTROLLER_NAME,
 } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { RequestActions } from "@/components/assistencia/RequestActions";
@@ -166,7 +167,12 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       ) : null}
 
       {canManage ? (
-        <RequestItemsTable items={request.items} requestId={request.id} requestStatus={request.status} />
+        <RequestItemsTable
+          items={request.items}
+          requestId={request.id}
+          requestStatus={request.status}
+          canEditValues={profile.fullName === PAYMENTS_CONTROLLER_NAME}
+        />
       ) : request.items.length > 0 ? (
         <div
           className="rounded-lg border p-4 flex flex-col gap-2"

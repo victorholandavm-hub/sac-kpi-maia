@@ -127,6 +127,11 @@ export const ASSISTENCIA_MANAGED_TYPES = ["montagem", "desmontagem", "recolhimen
 export const MANOEL_ONLY_TYPES = ["vistoria", "troca_peca"] as const;
 export const MANOEL_ONLY_ASSEMBLER = "Manoel";
 
+// Definir valor unitário, autorizar e liberar pagamento de montagem,
+// desmontagem, vistoria e afins é exclusivo dessa pessoa -- nem outro admin
+// consegue, por pedido explícito do Victor (dono do sistema).
+export const PAYMENTS_CONTROLLER_NAME = "Antonio";
+
 export const SUPPLIER_RETURN_STATUS_LABELS: Record<string, string> = {
   aguardando_envio: "Aguardando envio",
   enviado: "Enviado ao fornecedor",

@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listScheduledRequests, type ServiceRequestSummary, type AgendaRange } from "@/lib/serviceRequests";
+import { listAssemblers } from "@/lib/payments";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
+import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
 
 function groupByDate(requests: ServiceRequestSummary[]) {
@@ -36,16 +38,18 @@ const FILTERS: { label: string; value: AgendaRange | null }[] = [
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; rota?: string }>;
+  searchParams: Promise<{ range?: string; rota?: string; assembler?: string }>;
 }) {
   redirectIfSac(await getProfile());
-  const { range, rota } = await searchParams;
+  const { range, rota, assembler } = await searchParams;
   const filterRange = (["atrasado", "hoje", "semana"] as const).includes(range as AgendaRange)
     ? (range as AgendaRange)
     : undefined;
   const filterRota = isRota(rota) ? rota : undefined;
-  const allRequests = await listScheduledRequests({ range: filterRange });
-  const requests = filterRota ? allRequests.filter((r) => r.rota === filterRota) : allRequests;
+  const [allRequests, assemblers] = await Promise.all([listScheduledRequests({ range: filterRange }), listAssemblers()]);
+  const requests = allRequests
+    .filter((r) => !filterRota || r.rota === filterRota)
+    .filter((r) => !assembler || r.assemblerName === assembler);
   const groups = groupByDate(requests);
   const todayKey = new Date().toISOString().slice(0, 10);
 
@@ -69,6 +73,7 @@ export default async function AgendaPage({
           const sp = new URLSearchParams();
           if (f.value) sp.set("range", f.value);
           if (filterRota) sp.set("rota", filterRota);
+          if (assembler) sp.set("assembler", assembler);
           const qs = sp.toString();
           return (
             <Link
@@ -93,6 +98,7 @@ export default async function AgendaPage({
           const sp = new URLSearchParams();
           if (filterRange) sp.set("range", filterRange);
           if (f.value) sp.set("rota", f.value);
+          if (assembler) sp.set("assembler", assembler);
           const qs = sp.toString();
           return (
             <Link
@@ -110,6 +116,10 @@ export default async function AgendaPage({
             </Link>
           );
         })}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterSelect name="assembler" placeholder="Todos os montadores" options={assemblers} />
       </div>
 
       {requests.length === 0 ? (

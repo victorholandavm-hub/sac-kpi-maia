@@ -2,11 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { getProfile, requireRole } from "@/lib/dal";
+import { getProfile, requireRole, type Profile } from "@/lib/dal";
+import { PAYMENTS_CONTROLLER_NAME } from "@/lib/assistenciaLabels";
+
+function requirePaymentsController(profile: Profile) {
+  requireRole(profile, "assistencia", "admin");
+  if (profile.fullName !== PAYMENTS_CONTROLLER_NAME) {
+    throw new Error(`Só ${PAYMENTS_CONTROLLER_NAME} pode definir valor ou mexer em pagamento.`);
+  }
+}
 
 export async function setItemUnitValue(itemId: string, requestId: string, unitValue: number) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requirePaymentsController(profile);
   if (!Number.isFinite(unitValue) || unitValue < 0) throw new Error("Valor inválido.");
 
   const admin = getSupabaseAdmin();
@@ -28,7 +36,7 @@ export async function setItemUnitValue(itemId: string, requestId: string, unitVa
 
 export async function setItemPaymentAuthorizedBy(itemId: string, requestId: string, managerName: string) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requirePaymentsController(profile);
   const trimmed = managerName.trim();
   if (!trimmed) throw new Error("Informe o nome do gerente.");
 
@@ -57,7 +65,7 @@ export async function setItemPaymentAuthorizedBy(itemId: string, requestId: stri
 // momento, caso alguém aprove por engano.
 export async function setItemPaymentReleased(itemId: string, requestId: string, released: boolean) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requirePaymentsController(profile);
 
   const admin = getSupabaseAdmin();
 
