@@ -112,7 +112,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         </div>
       ) : null}
 
-      <PedidoEncomendaActions pedidoId={pedido.id} status={pedido.status} role={actor.role} />
+      <PedidoEncomendaActions pedidoId={pedido.id} status={pedido.status} role={actor.role} storeId={pedido.storeId} />
 
       <div
         className="rounded-lg border p-4 flex flex-col gap-3"

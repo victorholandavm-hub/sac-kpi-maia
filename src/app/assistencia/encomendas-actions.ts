@@ -16,8 +16,16 @@ import {
   type NewPedidoEncomendaItem,
 } from "@/lib/pedidosEncomenda";
 import { saveEncomendaPhoto } from "@/lib/pedidoEncomendaPhotos";
+import { searchTotvsOrdersByInvoice, type TotvsOrderSuggestion } from "@/lib/totvsLookup";
 
 export type FormState = { error?: string } | undefined;
+
+// Sugestão de NF-e ao informar faturamento da encomenda -- não valida, só
+// ajuda a achar a NF certa (ver PedidoEncomendaActions.tsx).
+export async function searchNfSuggestions(query: string, storeId: string): Promise<TotvsOrderSuggestion[]> {
+  await requireEncomendaActor();
+  return searchTotvsOrdersByInvoice(query, storeId);
+}
 
 // Caixa, vendedor ou gerente lançam o pedido direto (formulário, sem
 // foto/WhatsApp) — gated por resolveEncomendaRequester (src/lib/encomendaRequester.ts),

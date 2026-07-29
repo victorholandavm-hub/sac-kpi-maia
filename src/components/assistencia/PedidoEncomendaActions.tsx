@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { advancePedidoStatus, cancelPedido, denyPedido, addPedidoNoteAction } from "@/app/assistencia/encomendas-actions";
+import { useEffect, useState } from "react";
+import {
+  advancePedidoStatus,
+  cancelPedido,
+  denyPedido,
+  addPedidoNoteAction,
+  searchNfSuggestions,
+} from "@/app/assistencia/encomendas-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PEDIDO_ENCOMENDA_STATUS_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
+import type { TotvsOrderSuggestion } from "@/lib/totvsLookup";
 
 type NextStep = { toStatus: string; label: string; needsCarga?: boolean; needsNfE?: boolean };
 
@@ -27,19 +34,35 @@ export function PedidoEncomendaActions({
   pedidoId,
   status,
   role,
+  storeId,
 }: {
   pedidoId: string;
   status: string;
   role: string;
+  storeId: string;
 }) {
   const { pending, run } = useQuickAction();
   const [carga, setCarga] = useState("");
   const [nfE, setNfE] = useState("");
+  const [nfSuggestions, setNfSuggestions] = useState<TotvsOrderSuggestion[]>([]);
   const [note, setNote] = useState("");
   const [cancelNote, setCancelNote] = useState("");
   const [showCancel, setShowCancel] = useState(false);
   const [denyReason, setDenyReason] = useState("");
   const [showDeny, setShowDeny] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (nfE.trim().length < 2) {
+        setNfSuggestions([]);
+        return;
+      }
+      searchNfSuggestions(nfE, storeId)
+        .then(setNfSuggestions)
+        .catch(() => setNfSuggestions([]));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [nfE, storeId]);
 
   const canManageStatus = role === "assistencia" || role === "admin" || (ROLE_CAN_ADVANCE[role] ?? []).includes(status);
   const nextStep = canManageStatus ? NEXT_STEP[status] : undefined;
@@ -71,9 +94,18 @@ export function PedidoEncomendaActions({
               <input
                 value={nfE}
                 onChange={(e) => setNfE(e.target.value)}
+                list={`nf-suggestions-${pedidoId}`}
+                autoComplete="off"
                 className="rounded border px-3 py-2 text-sm"
                 style={{ borderColor: "var(--border)" }}
               />
+              <datalist id={`nf-suggestions-${pedidoId}`}>
+                {nfSuggestions.map((s) => (
+                  <option key={s.invoice} value={s.invoice}>
+                    {[s.clientName, s.invoiceTotal ? `R$ ${s.invoiceTotal.toFixed(2)}` : null].filter(Boolean).join(" — ")}
+                  </option>
+                ))}
+              </datalist>
             </label>
           ) : null}
           <button
