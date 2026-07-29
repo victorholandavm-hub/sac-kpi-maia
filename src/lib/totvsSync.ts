@@ -35,6 +35,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
 
+type TotvsClientAddress = {
+  street?: string;
+  number?: string | number;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  cep?: string;
+  state?: string;
+};
+
 type TotvsClient = {
   id: string;
   cpf_cnpj: string;
@@ -42,6 +52,11 @@ type TotvsClient = {
   status: "nunca comprou" | "ativo" | "inativo";
   lastPurchase?: string;
   daysWithoutBuying?: number;
+  phone1?: string;
+  phone2?: string;
+  email?: string;
+  contactName?: string;
+  address?: TotvsClientAddress;
 };
 
 type TotvsClientListResponse = {
@@ -180,6 +195,17 @@ async function syncClients(supabase: SupabaseAdmin): Promise<SyncResult> {
           status: c.status,
           last_purchase_date: ddmmyyyyToIso(c.lastPurchase),
           days_without_buying: c.daysWithoutBuying ?? null,
+          phone1: c.phone1 || null,
+          phone2: c.phone2 || null,
+          email: c.email || null,
+          contact_name: c.contactName || null,
+          address_street: c.address?.street || null,
+          address_number: c.address?.number != null ? String(c.address.number) : null,
+          address_complement: c.address?.complement || null,
+          address_neighborhood: c.address?.neighborhood || null,
+          address_city: c.address?.city || null,
+          address_cep: c.address?.cep || null,
+          address_state: c.address?.state || null,
           synced_at: new Date().toISOString(),
         },
         { onConflict: "protheus_code" }

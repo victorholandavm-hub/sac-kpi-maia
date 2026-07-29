@@ -32,3 +32,47 @@ export async function searchTotvsOrdersByInvoice(query: string, branch: string):
     invoiceTotal: r.invoice_total,
   }));
 }
+
+export type TotvsClientMatch = {
+  protheusCode: string;
+  name: string;
+  cpfCnpj: string;
+  phone1: string | null;
+  addressStreet: string | null;
+  addressNumber: string | null;
+  addressComplement: string | null;
+  addressNeighborhood: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+};
+
+// Busca exata por código do cliente -- autopreenche nome/CPF/telefone
+// (dado confiável, vem do cadastro) e sugere endereço (editável, porque o
+// cliente pode ter mudado desde a última sincronização).
+export async function findTotvsClientByCode(code: string): Promise<TotvsClientMatch | null> {
+  const trimmed = code.trim();
+  if (!trimmed) return null;
+
+  const admin = getSupabaseAdmin();
+  const { data } = await admin
+    .from("totvs_clientes")
+    .select(
+      "protheus_code, name, cpf_cnpj, phone1, address_street, address_number, address_complement, address_neighborhood, address_city, address_state"
+    )
+    .eq("protheus_code", trimmed)
+    .maybeSingle();
+
+  if (!data) return null;
+  return {
+    protheusCode: data.protheus_code,
+    name: data.name,
+    cpfCnpj: data.cpf_cnpj,
+    phone1: data.phone1,
+    addressStreet: data.address_street,
+    addressNumber: data.address_number,
+    addressComplement: data.address_complement,
+    addressNeighborhood: data.address_neighborhood,
+    addressCity: data.address_city,
+    addressState: data.address_state,
+  };
+}

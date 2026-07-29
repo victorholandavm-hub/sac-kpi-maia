@@ -21,6 +21,7 @@ import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 import { isRota, getRotaWeekdayConfig, getRotaForDate, ROTA_LABELS } from "@/lib/rotas";
+import { findTotvsClientByCode, type TotvsClientMatch } from "@/lib/totvsLookup";
 import {
   ASSISTENCIA_TEAM_COOKIE_NAME,
   ASSISTENCIA_TEAM_PENDING_MAX_AGE,
@@ -168,6 +169,15 @@ export async function chooseAssistenciaIdentity(profileId: string) {
   redirect("/assistencia/inicio");
 }
 
+// Autopreenche nome/CPF/telefone/endereço a partir do código do cliente
+// (PublicRequestForm.tsx) -- só sugestão, não trava o envio se não achar ou
+// se a pessoa preferir digitar diferente do que veio do Protheus.
+export async function lookupTotvsClient(code: string): Promise<TotvsClientMatch | null> {
+  const gerenteName = await getLojaGerenteSession();
+  if (!gerenteName) return null;
+  return findTotvsClientByCode(code);
+}
+
 // Sem sessão do Supabase Auth (usa a sessão de gerente de loja por PIN — ver
 // src/lib/gerentes.ts) — /assistencia/solicitar exige login de gerente antes
 // de mostrar o formulário, então chegar aqui sem sessão válida é só alguém
@@ -213,6 +223,36 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     return { error: "Informe o nome do cliente." };
   }
 
+  const orderCode = String(formData.get("order_code") ?? "").trim();
+  if (!orderCode) return { error: "Informe o código do pedido/venda." };
+
+  const invoiceNumber = String(formData.get("invoice_number") ?? "").trim();
+  if (!invoiceNumber) return { error: "Informe o número da nota fiscal." };
+
+  const sellerName = String(formData.get("seller_name") ?? "").trim();
+  if (!sellerName) return { error: "Informe o vendedor(a)." };
+
+  const clientCpf = String(formData.get("client_cpf") ?? "").trim();
+  if (!clientCpf) return { error: "Informe o CPF do cliente." };
+
+  const clientPhone = String(formData.get("client_phone") ?? "").trim();
+  if (!clientPhone) return { error: "Informe o telefone de contato." };
+
+  // Só os tipos que envolvem visita física exigem endereço -- os outros nem
+  // mostram esse campo no formulário (ver showAddress em PublicRequestForm).
+  const ADDRESS_REQUIRED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"];
+  let clientAddress = "";
+  let clientNeighborhood = "";
+  if (ADDRESS_REQUIRED_TYPES.includes(type)) {
+    clientAddress = String(formData.get("client_address") ?? "").trim();
+    if (!clientAddress) return { error: "Informe o endereço." };
+    clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
+    if (!clientNeighborhood) return { error: "Informe o bairro." };
+  }
+
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { error: "Informe o motivo." };
+
   const itemProducts = formData.getAll("item_product").map((v) => String(v).trim());
   const itemQuantities = formData.getAll("item_quantity").map((v) => {
     const n = parseInt(String(v), 10);
@@ -242,17 +282,18 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       store_id: storeId,
       requested_by_name: requestedByName,
       requested_deadline: requestedDeadline,
-      order_code: emptyToNull(formData.get("order_code")),
+      order_code: orderCode,
+      client_protheus_code: emptyToNull(formData.get("client_protheus_code")),
       client_name: clientName,
-      client_cpf: emptyToNull(formData.get("client_cpf")),
-      client_phone: emptyToNull(formData.get("client_phone")),
-      client_address: emptyToNull(formData.get("client_address")),
-      client_neighborhood: emptyToNull(formData.get("client_neighborhood")),
-      reason: emptyToNull(formData.get("reason")),
+      client_cpf: clientCpf,
+      client_phone: clientPhone,
+      client_address: emptyToNull(clientAddress),
+      client_neighborhood: emptyToNull(clientNeighborhood),
+      reason: reason,
       restriction_note: emptyToNull(formData.get("restriction_note")),
       notes: emptyToNull(formData.get("notes")),
-      seller_name: emptyToNull(formData.get("seller_name")),
-      invoice_number: emptyToNull(formData.get("invoice_number")),
+      seller_name: sellerName,
+      invoice_number: invoiceNumber,
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
     })
@@ -803,6 +844,15 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   const clientName = String(formData.get("client_name") ?? "").trim();
   if (!clientName) return { error: "Informe o nome do cliente." };
 
+  const clientPhone = String(formData.get("client_phone") ?? "").trim();
+  if (!clientPhone) return { error: "Informe o telefone." };
+
+  const clientAddress = String(formData.get("client_address") ?? "").trim();
+  if (!clientAddress) return { error: "Informe o endereço." };
+
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { error: "Informe o que precisa ser feito." };
+
   const shift = String(formData.get("shift") ?? "").trim();
   if (shift && !SHIFTS.includes(shift as (typeof SHIFTS)[number])) {
     return { error: "Turno inválido." };
@@ -836,9 +886,9 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       store_id: storeId,
       requested_by: profile.id,
       client_name: clientName,
-      client_phone: emptyToNull(formData.get("client_phone")),
-      client_address: emptyToNull(formData.get("client_address")),
-      reason: emptyToNull(formData.get("reason")),
+      client_phone: clientPhone,
+      client_address: clientAddress,
+      reason: reason,
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
       scheduled_time: emptyToNull(formData.get("scheduled_time")),
       shift: shift || null,
@@ -905,6 +955,18 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const clientName = String(formData.get("client_name") ?? "").trim();
   if (!clientName) return { error: "Informe o nome do cliente." };
 
+  const clientPhone = String(formData.get("client_phone") ?? "").trim();
+  if (!clientPhone) return { error: "Informe o telefone." };
+
+  const clientAddress = String(formData.get("client_address") ?? "").trim();
+  if (!clientAddress) return { error: "Informe o endereço." };
+
+  const clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
+  if (!clientNeighborhood) return { error: "Informe o bairro." };
+
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { error: "Informe o motivo." };
+
   const driverNameInput = emptyToNull(formData.get("driver_name"));
   const product = emptyToNull(formData.get("product"));
   const partCode = emptyToNull(formData.get("part_code"));
@@ -924,10 +986,10 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       store_id: storeId,
       requested_by: profile.id,
       client_name: clientName,
-      client_phone: emptyToNull(formData.get("client_phone")),
-      client_address: emptyToNull(formData.get("client_address")),
-      client_neighborhood: emptyToNull(formData.get("client_neighborhood")),
-      reason: emptyToNull(formData.get("reason")),
+      client_phone: clientPhone,
+      client_address: clientAddress,
+      client_neighborhood: clientNeighborhood,
+      reason: reason,
       restriction_note: emptyToNull(formData.get("restriction_note")),
       driver_name: driverName,
       shift: urgent ? "urgencia" : null,

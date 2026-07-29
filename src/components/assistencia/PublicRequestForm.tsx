@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { createPublicRequest, type FormState } from "@/app/assistencia/actions";
+import { useActionState, useEffect, useState } from "react";
+import { createPublicRequest, lookupTotvsClient, type FormState } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 import type { Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
@@ -29,6 +29,43 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPublicRequest, undefined);
   const [type, setType] = useState<(typeof TYPES)[number]>("montagem");
   const [items, setItems] = useState<Item[]>([{ product: "", quantity: 1 }]);
+
+  const [clientCode, setClientCode] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientCpf, setClientCpf] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [clientAddress, setClientAddress] = useState("");
+  const [clientNeighborhood, setClientNeighborhood] = useState("");
+  const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  // Busca o cliente pelo código pra autopreencher nome/CPF/telefone (dado
+  // confiável) e sugerir endereço (editável -- o cliente pode ter mudado).
+  // Não trava nada: se não achar, a pessoa preenche tudo à mão como já era.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!clientCode.trim()) {
+        setLookupStatus("idle");
+        return;
+      }
+      setLookupStatus("loading");
+      lookupTotvsClient(clientCode)
+        .then((match) => {
+          if (!match) {
+            setLookupStatus("not_found");
+            return;
+          }
+          setClientName(match.name);
+          setClientCpf(match.cpfCnpj);
+          if (match.phone1) setClientPhone(match.phone1);
+          const addressParts = [match.addressStreet, match.addressNumber].filter(Boolean).join(", ");
+          if (addressParts) setClientAddress(match.addressComplement ? `${addressParts} — ${match.addressComplement}` : addressParts);
+          if (match.addressNeighborhood) setClientNeighborhood(match.addressNeighborhood);
+          setLookupStatus("found");
+        })
+        .catch(() => setLookupStatus("not_found"));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [clientCode]);
 
   const showAddress =
     type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria";
@@ -130,42 +167,104 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
         ) : null}
       </FormSection>
 
-      <FormSection title="Referência da venda" number={3} hint="Ajuda a localizar a compra depois — preencha o que tiver à mão.">
+      <FormSection title="Referência da venda" number={3} hint="Ajuda a localizar a compra depois.">
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Código do pedido/venda">
-            <input name="order_code" className="rounded border px-3 py-2" style={inputStyle} />
+          <Field label="Código do pedido/venda *">
+            <input name="order_code" required className="rounded border px-3 py-2" style={inputStyle} />
           </Field>
-          <Field label="Nº da nota fiscal">
-            <input name="invoice_number" className="rounded border px-3 py-2" style={inputStyle} />
+          <Field label="Nº da nota fiscal *">
+            <input name="invoice_number" required className="rounded border px-3 py-2" style={inputStyle} />
           </Field>
         </div>
 
-        <Field label="Vendedor(a)">
-          <input name="seller_name" className="rounded border px-3 py-2" style={inputStyle} />
+        <Field label="Vendedor(a) *">
+          <input name="seller_name" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
       </FormSection>
 
-      <FormSection title="Dados do cliente" number={4} hint="Só o nome é obrigatório.">
+      <FormSection
+        title="Dados do cliente"
+        number={4}
+        hint="Digite o código do cliente pra preencher o resto automaticamente (se souber)."
+      >
+        <Field label="Código do cliente">
+          <input
+            name="client_protheus_code"
+            value={clientCode}
+            onChange={(e) => setClientCode(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+          {lookupStatus === "loading" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Buscando…
+            </span>
+          ) : lookupStatus === "found" ? (
+            <span className="text-xs" style={{ color: "var(--status-good)" }}>
+              Cliente encontrado — confira os dados abaixo.
+            </span>
+          ) : lookupStatus === "not_found" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Código não encontrado — preencha os dados abaixo à mão.
+            </span>
+          ) : null}
+        </Field>
+
         <Field label="Nome do cliente *">
-          <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
+          <input
+            name="client_name"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            required
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
         </Field>
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="CPF do cliente">
-            <input name="client_cpf" className="rounded border px-3 py-2" style={inputStyle} />
+          <Field label="CPF do cliente *">
+            <input
+              name="client_cpf"
+              value={clientCpf}
+              onChange={(e) => setClientCpf(e.target.value)}
+              required
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
           </Field>
-          <Field label="Telefone de contato">
-            <input name="client_phone" className="rounded border px-3 py-2" style={inputStyle} />
+          <Field label="Telefone de contato *">
+            <input
+              name="client_phone"
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              required
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
           </Field>
         </div>
 
         {showAddress ? (
           <div className="grid sm:grid-cols-2 gap-4">
-            <Field label="Endereço">
-              <input name="client_address" className="rounded border px-3 py-2" style={inputStyle} />
+            <Field label="Endereço *">
+              <input
+                name="client_address"
+                value={clientAddress}
+                onChange={(e) => setClientAddress(e.target.value)}
+                required
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
             </Field>
-            <Field label="Bairro">
-              <input name="client_neighborhood" className="rounded border px-3 py-2" style={inputStyle} />
+            <Field label="Bairro *">
+              <input
+                name="client_neighborhood"
+                value={clientNeighborhood}
+                onChange={(e) => setClientNeighborhood(e.target.value)}
+                required
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
             </Field>
           </div>
         ) : null}
@@ -180,6 +279,7 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
                   name="item_product"
                   value={item.product}
                   onChange={(e) => updateItem(i, { product: e.target.value })}
+                  required
                   placeholder="Ex: Roupeiro Giardino"
                   className="flex-1 rounded border px-3 py-2"
                   style={inputStyle}
@@ -218,8 +318,8 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
       ) : null}
 
       <FormSection title="Motivo e observações" number={6} hint="Conte o que precisa ser feito, com o máximo de detalhe que puder.">
-        <Field label="Motivo">
-          <textarea name="reason" rows={2} className="rounded border px-3 py-2" style={inputStyle} />
+        <Field label="Motivo *">
+          <textarea name="reason" rows={2} required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
 
         {showRestriction ? (

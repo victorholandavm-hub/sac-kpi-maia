@@ -89,16 +89,16 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         </Field>
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Telefone">
-            <input name="client_phone" className="rounded border px-3 py-2" style={inputStyle} />
+          <Field label="Telefone *">
+            <input name="client_phone" required className="rounded border px-3 py-2" style={inputStyle} />
           </Field>
-          <Field label="Endereço">
-            <input name="client_address" className="rounded border px-3 py-2" style={inputStyle} />
+          <Field label="Endereço *">
+            <input name="client_address" required className="rounded border px-3 py-2" style={inputStyle} />
           </Field>
         </div>
 
-        <Field label="Bairro">
-          <input name="client_neighborhood" className="rounded border px-3 py-2" style={inputStyle} />
+        <Field label="Bairro *">
+          <input name="client_neighborhood" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
       </FormSection>
 
@@ -128,8 +128,8 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
       ) : null}
 
       <FormSection title="Detalhes" number={4} hint="Conte o que aconteceu, com o máximo de detalhe que puder.">
-        <Field label="Motivo">
-          <textarea name="reason" rows={2} placeholder="Ex: produto entregue com avaria" className="rounded border px-3 py-2" style={inputStyle} />
+        <Field label="Motivo *">
+          <textarea name="reason" rows={2} required placeholder="Ex: produto entregue com avaria" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
 
         {type === "troca_produto" ? (
