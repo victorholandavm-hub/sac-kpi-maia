@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail } from "@/lib/serviceRequests";
-import { listAssemblers, listDrivers } from "@/lib/payments";
+import { listAssemblersForStores, listDrivers } from "@/lib/payments";
 import {
   REQUEST_TYPE_LABELS,
   STATUS_LABELS,
@@ -102,7 +102,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
   // pelo motorista — só notificação externa (e os tipos da assistência
   // técnica) usam montador.
   const isDeliveryType = request.type === "troca_produto" || request.type === "entrega_produto" || request.type === "envio_peca";
-  const assemblers = canManage ? await listAssemblers() : [];
+  const assemblers = canManage ? await listAssemblersForStores([request.storeId]) : [];
   const drivers = canManage && isDeliveryType ? await listDrivers() : [];
   const photos = await listRequestPhotos(request.id);
 

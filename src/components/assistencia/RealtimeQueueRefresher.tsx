@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
+import { useToast } from "./ToastProvider";
 
 const DEBOUNCE_MS = 500;
 // Reforço por intervalo: o canal do Realtime só entrega eventos pra quem tem
@@ -18,15 +19,21 @@ export function RealtimeQueueRefresher({
   eventsTable = "service_request_events",
   idColumn = "id",
   eventsIdColumn = "request_id",
+  notifyOnInsert,
 }: {
   requestId?: string;
   table?: string;
   eventsTable?: string;
   idColumn?: string;
   eventsIdColumn?: string;
+  // Mostra um toast quando chega uma linha NOVA na tabela principal (não na
+  // de eventos) -- só usado nas telas de fila (ver fila/page.tsx), o resto
+  // dos usos continua em silêncio (só refresh).
+  notifyOnInsert?: string;
 } = {}) {
   const router = useRouter();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
@@ -46,7 +53,10 @@ export function RealtimeQueueRefresher({
           table,
           ...(requestId ? { filter: `${idColumn}=eq.${requestId}` } : {}),
         },
-        scheduleRefresh
+        (payload) => {
+          if (notifyOnInsert && payload.eventType === "INSERT") showToast(notifyOnInsert, "info");
+          scheduleRefresh();
+        }
       )
       .on(
         "postgres_changes",
@@ -67,7 +77,7 @@ export function RealtimeQueueRefresher({
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
-  }, [router, requestId, table, eventsTable, idColumn, eventsIdColumn]);
+  }, [router, requestId, table, eventsTable, idColumn, eventsIdColumn, notifyOnInsert, showToast]);
 
   return null;
 }

@@ -18,6 +18,20 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div
+      className="rounded-lg border p-4 flex flex-col gap-4"
+      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+    >
+      <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
 type Item = { product: string; quantity: number };
 
 // `stores` já vem restrito às lojas do gerente autenticado (um gerente pode
@@ -47,185 +61,195 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Solicitante">
-          <input
-            value={requesterName}
-            disabled
-            className="rounded border px-3 py-2"
-            style={{ ...inputStyle, background: "var(--surface-1)", color: "var(--text-secondary)" }}
-          />
-          <input type="hidden" name="requested_by_name" value={requesterName} />
-        </Field>
-        <Field label="Loja solicitante *">
-          {stores.length === 1 ? (
-            <>
-              <input
-                value={stores[0].name}
-                disabled
-                className="rounded border px-3 py-2"
-                style={{ ...inputStyle, background: "var(--surface-1)", color: "var(--text-secondary)" }}
-              />
-              <input type="hidden" name="store_id" value={stores[0].id} />
-            </>
-          ) : (
-            <select name="store_id" required className="rounded border px-3 py-2" style={inputStyle} defaultValue="">
-              <option value="" disabled>
-                Selecione…
-              </option>
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
+      <Section title="Loja e prazo">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Solicitante">
+            <input
+              value={requesterName}
+              disabled
+              className="rounded border px-3 py-2"
+              style={{ ...inputStyle, background: "var(--gridline)", color: "var(--text-secondary)" }}
+            />
+            <input type="hidden" name="requested_by_name" value={requesterName} />
+          </Field>
+          <Field label="Loja solicitante *">
+            {stores.length === 1 ? (
+              <>
+                <input
+                  value={stores[0].name}
+                  disabled
+                  className="rounded border px-3 py-2"
+                  style={{ ...inputStyle, background: "var(--gridline)", color: "var(--text-secondary)" }}
+                />
+                <input type="hidden" name="store_id" value={stores[0].id} />
+              </>
+            ) : (
+              <select name="store_id" required className="rounded border px-3 py-2" style={inputStyle} defaultValue="">
+                <option value="" disabled>
+                  Selecione…
                 </option>
-              ))}
-            </select>
-          )}
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+        </div>
+
+        <Field label="Prazo desejado *">
+          <input name="requested_deadline" type="date" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
-      </div>
+      </Section>
 
-      <Field label="Prazo desejado *">
-        <input name="requested_deadline" type="date" required className="rounded border px-3 py-2" style={inputStyle} />
-      </Field>
-
-      <Field label="Tipo de solicitação">
-        <select
-          name="type"
-          value={type}
-          onChange={(e) => setType(e.target.value as (typeof TYPES)[number])}
-          className="rounded border px-3 py-2"
-          style={inputStyle}
-        >
-          {TYPES.map((t) => (
-            <option key={t} value={t}>
-              {REQUEST_TYPE_LABELS[t]}
-            </option>
-          ))}
-        </select>
-      </Field>
-
-      {showCombo ? (
-        <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
-          <input type="checkbox" name="combo_montagem_desmontagem" className="rounded" />
-          {type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
-        </label>
-      ) : null}
-
-      {type === "notificacao_externa" ? (
-        <Field label="Categoria da notificação *">
-          <select name="sac_category" required defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
-            <option value="" disabled>
-              Selecione…
-            </option>
-            {SAC_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {SAC_CATEGORY_LABELS[c]}
+      <Section title="Tipo de solicitação">
+        <Field label="Tipo de solicitação">
+          <select
+            name="type"
+            value={type}
+            onChange={(e) => setType(e.target.value as (typeof TYPES)[number])}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          >
+            {TYPES.map((t) => (
+              <option key={t} value={t}>
+                {REQUEST_TYPE_LABELS[t]}
               </option>
             ))}
           </select>
         </Field>
-      ) : null}
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Código do pedido/venda">
-          <input name="order_code" className="rounded border px-3 py-2" style={inputStyle} />
-        </Field>
-        <Field label="Nº da nota fiscal">
-          <input name="invoice_number" className="rounded border px-3 py-2" style={inputStyle} />
-        </Field>
-      </div>
+        {showCombo ? (
+          <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+            <input type="checkbox" name="combo_montagem_desmontagem" className="rounded" />
+            {type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
+          </label>
+        ) : null}
 
-      <Field label="Vendedor(a)">
-        <input name="seller_name" className="rounded border px-3 py-2" style={inputStyle} />
-      </Field>
-
-      <Field label="Nome do cliente *">
-        <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
-      </Field>
-
-      <Field label="CPF do cliente">
-        <input name="client_cpf" className="rounded border px-3 py-2" style={inputStyle} />
-      </Field>
-
-      <Field label="Telefone de contato">
-        <input name="client_phone" className="rounded border px-3 py-2" style={inputStyle} />
-      </Field>
-
-      {showAddress ? (
-        <>
-          <Field label="Endereço">
-            <input name="client_address" className="rounded border px-3 py-2" style={inputStyle} />
+        {type === "notificacao_externa" ? (
+          <Field label="Categoria da notificação *">
+            <select name="sac_category" required defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
+              <option value="" disabled>
+                Selecione…
+              </option>
+              {SAC_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {SAC_CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
           </Field>
-          <Field label="Bairro">
-            <input name="client_neighborhood" className="rounded border px-3 py-2" style={inputStyle} />
+        ) : null}
+      </Section>
+
+      <Section title="Referência da venda">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Código do pedido/venda">
+            <input name="order_code" className="rounded border px-3 py-2" style={inputStyle} />
           </Field>
-        </>
-      ) : null}
+          <Field label="Nº da nota fiscal">
+            <input name="invoice_number" className="rounded border px-3 py-2" style={inputStyle} />
+          </Field>
+        </div>
+
+        <Field label="Vendedor(a)">
+          <input name="seller_name" className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+      </Section>
+
+      <Section title="Dados do cliente">
+        <Field label="Nome do cliente *">
+          <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="CPF do cliente">
+            <input name="client_cpf" className="rounded border px-3 py-2" style={inputStyle} />
+          </Field>
+          <Field label="Telefone de contato">
+            <input name="client_phone" className="rounded border px-3 py-2" style={inputStyle} />
+          </Field>
+        </div>
+
+        {showAddress ? (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Endereço">
+              <input name="client_address" className="rounded border px-3 py-2" style={inputStyle} />
+            </Field>
+            <Field label="Bairro">
+              <input name="client_neighborhood" className="rounded border px-3 py-2" style={inputStyle} />
+            </Field>
+          </div>
+        ) : null}
+      </Section>
 
       {showItems ? (
-        <div className="flex flex-col gap-2">
-          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-            Produtos *
-          </span>
-          {items.map((item, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                name="item_product"
-                value={item.product}
-                onChange={(e) => updateItem(i, { product: e.target.value })}
-                placeholder="Ex: Roupeiro Giardino"
-                className="flex-1 rounded border px-3 py-2"
-                style={inputStyle}
-              />
-              <input
-                name="item_quantity"
-                type="number"
-                min={1}
-                value={item.quantity}
-                onChange={(e) => updateItem(i, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                className="w-20 rounded border px-3 py-2"
-                style={inputStyle}
-              />
-              <button
-                type="button"
-                onClick={() => removeItem(i)}
-                disabled={items.length === 1}
-                className="text-sm px-2 py-2 disabled:opacity-40"
-                style={{ color: "var(--status-critical)" }}
-                aria-label="Remover item"
-              >
-                remover
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addItem}
-            className="text-sm self-start underline"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            + adicionar produto
-          </button>
-        </div>
+        <Section title="Produtos">
+          <div className="flex flex-col gap-2">
+            {items.map((item, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  name="item_product"
+                  value={item.product}
+                  onChange={(e) => updateItem(i, { product: e.target.value })}
+                  placeholder="Ex: Roupeiro Giardino"
+                  className="flex-1 rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+                <input
+                  name="item_quantity"
+                  type="number"
+                  min={1}
+                  value={item.quantity}
+                  onChange={(e) => updateItem(i, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                  className="w-20 rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeItem(i)}
+                  disabled={items.length === 1}
+                  className="text-sm px-2 py-2 disabled:opacity-40"
+                  style={{ color: "var(--status-critical)" }}
+                  aria-label="Remover item"
+                >
+                  remover
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addItem}
+              className="text-sm self-start underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              + adicionar produto
+            </button>
+          </div>
+        </Section>
       ) : null}
 
-      <Field label="Motivo">
-        <textarea name="reason" rows={2} className="rounded border px-3 py-2" style={inputStyle} />
-      </Field>
-
-      {showRestriction ? (
-        <Field label="Restrição de horário / observação de recolhimento">
-          <input
-            name="restriction_note"
-            placeholder="Ex: restrição após 15h, cliente já remarcada 2 vezes…"
-            className="rounded border px-3 py-2"
-            style={inputStyle}
-          />
+      <Section title="Motivo e observações">
+        <Field label="Motivo">
+          <textarea name="reason" rows={2} className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
-      ) : null}
 
-      <Field label="Observações">
-        <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
-      </Field>
+        {showRestriction ? (
+          <Field label="Restrição de horário / observação de recolhimento">
+            <input
+              name="restriction_note"
+              placeholder="Ex: restrição após 15h, cliente já remarcada 2 vezes…"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+          </Field>
+        ) : null}
+
+        <Field label="Observações">
+          <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+      </Section>
 
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>

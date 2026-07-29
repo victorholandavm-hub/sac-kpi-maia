@@ -9,6 +9,7 @@ import { PIN_LENGTH, isValidPinFormat } from "@/lib/pinConfig";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { addCaixa as addCaixaLib, setCaixaAtivo as setCaixaAtivoLib } from "@/lib/caixas";
+import { addAssemblerForStore } from "@/lib/payments";
 
 export type FormState = { error?: string; success?: boolean } | undefined;
 
@@ -71,4 +72,28 @@ export async function toggleCaixaAtivoComoGerente(name: string, ativo: boolean):
   await requireOwnEntry("caixas", name);
   await setCaixaAtivoLib(name, ativo);
   revalidatePath("/assistencia/loja/equipe");
+}
+
+// --- Montador ---------------------------------------------------------------
+
+// Diferente de addCaixaComoGerente: o gerente já define o PIN aqui mesmo
+// (um passo só), porque é ele quem repassa a senha pro montador na hora.
+export async function addAssemblerComoGerente(_state: FormState, formData: FormData): Promise<FormState> {
+  const name = String(formData.get("name") ?? "").trim();
+  const storeId = String(formData.get("store_id") ?? "").trim();
+  const pin = String(formData.get("pin") ?? "").trim();
+  if (!name) return { error: "Informe o nome." };
+  if (!storeId) return { error: "Selecione a loja." };
+  if (!isValidPinFormat(pin)) return { error: `O PIN precisa ter exatamente ${PIN_LENGTH} números.` };
+
+  try {
+    await requireOwnStore(storeId);
+    await addAssemblerForStore(name, storeId, pin);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Não foi possível salvar.";
+    return { error: message.includes("duplicate key") ? "Já existe um montador com esse nome — tente um nome diferenciado." : message };
+  }
+
+  revalidatePath("/assistencia/loja/equipe");
+  return { success: true };
 }

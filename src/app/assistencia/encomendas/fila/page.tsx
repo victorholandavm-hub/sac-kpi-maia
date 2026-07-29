@@ -69,7 +69,11 @@ export default async function EncomendasQueuePage({
   return (
     <ToastProvider>
     <div className="max-w-4xl mx-auto p-6 flex flex-col gap-4 w-full min-w-0">
-      <RealtimeQueueRefresher table="pedidos_encomenda" eventsTable="pedido_encomenda_events" />
+      <RealtimeQueueRefresher
+        table="pedidos_encomenda"
+        eventsTable="pedido_encomenda_events"
+        notifyOnInsert="Novo pedido de encomenda recebido!"
+      />
 
       <AssistenciaHeader title="Fila de encomendas" subtitle={`${actor.name} · ${ROLE_LABELS[actor.role] ?? actor.role}`}>
         <div className="flex items-center gap-4">

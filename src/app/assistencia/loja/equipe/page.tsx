@@ -4,9 +4,11 @@ import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { listCaixasForStores } from "@/lib/caixas";
+import { listAssemblersForStoresWithStoreName } from "@/lib/payments";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { EquipeCaixaPinField } from "@/components/assistencia/EquipeCaixaPinField";
 import { AddEquipeCaixaForm } from "@/components/assistencia/AddEquipeCaixaForm";
+import { AddEquipeMontadorForm } from "@/components/assistencia/AddEquipeMontadorForm";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +24,10 @@ export default async function LojaEquipePage() {
 
   const storeIds = await getGerenteStoreIds(gerenteName);
   const admin = getSupabaseAdmin();
-  const [{ data: storesData }, caixas] = await Promise.all([
+  const [{ data: storesData }, caixas, assemblers] = await Promise.all([
     admin.from("stores").select("id, name").in("id", storeIds).order("name"),
     listCaixasForStores(storeIds),
+    listAssemblersForStoresWithStoreName(storeIds),
   ]);
   const stores = storesData ?? [];
 
@@ -61,6 +64,35 @@ export default async function LojaEquipePage() {
           ) : null}
         </ul>
         <AddEquipeCaixaForm stores={stores} />
+      </section>
+
+      <section
+        className="rounded-lg border p-4 flex flex-col gap-2"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      >
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          Montadores
+        </h3>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Cadastre o montador da sua loja com PIN — ele entra com nome + PIN em{" "}
+          <span className="font-mono">/assistencia/montador/login</span>.
+        </p>
+        <ul className="flex flex-col gap-2">
+          {assemblers.map((a) => (
+            <li key={a.name} className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              {a.name}{" "}
+              <span style={{ color: "var(--text-muted)" }}>
+                — {a.storeName ?? "disponível em todas as lojas"}
+              </span>
+            </li>
+          ))}
+          {assemblers.length === 0 ? (
+            <li className="text-sm" style={{ color: "var(--text-muted)" }}>
+              Nenhum montador cadastrado ainda.
+            </li>
+          ) : null}
+        </ul>
+        <AddEquipeMontadorForm stores={stores} />
       </section>
     </div>
     </ToastProvider>

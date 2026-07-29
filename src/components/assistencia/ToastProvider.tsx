@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 
-type ToastKind = "success" | "error";
+type ToastKind = "success" | "error" | "info";
 
 type Toast = {
   id: number;
@@ -47,7 +47,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             key={t.id}
             className="rounded-lg border px-4 py-3 text-sm font-medium shadow-lg max-w-sm w-full sm:w-auto transition-all duration-200"
             style={{
-              background: t.kind === "success" ? "var(--status-good)" : "var(--status-critical)",
+              background:
+                t.kind === "success" ? "var(--status-good)" : t.kind === "info" ? "var(--series-5)" : "var(--status-critical)",
               color: "#fff",
               borderColor: "transparent",
               opacity: t.leaving ? 0 : 1,
@@ -62,8 +63,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const NOOP_TOAST: ToastContextValue = { showToast: () => {} };
+
+// Vira no-op (em vez de lançar erro) quando não há provider por perto --
+// destrava usar useToast em componentes renderizados em muitos lugares
+// (ex: RealtimeQueueRefresher) sem garantir que todos estejam dentro de um
+// ToastProvider.
 export function useToast(): ToastContextValue {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error("useToast precisa estar dentro de um ToastProvider.");
-  return ctx;
+  return ctx ?? NOOP_TOAST;
 }

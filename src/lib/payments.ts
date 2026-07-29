@@ -1,10 +1,68 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { hashPin } from "./montadorAuth";
 
 export async function listAssemblers(): Promise<string[]> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.from("assemblers").select("name").order("name");
   if (error) throw new Error(error.message);
   return (data ?? []).map((a) => a.name as string);
+}
+
+// Montadores da(s) loja(s) informada(s) + os globais/legado (store_id nulo)
+// -- usado pra sugerir montador na criação de solicitação de uma loja
+// específica (src/app/assistencia/(app)/[id]/page.tsx, nova-rapida).
+export async function listAssemblersForStores(storeIds: string[]): Promise<string[]> {
+  if (storeIds.length === 0) return [];
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("assemblers")
+    .select("name")
+    .or(`store_id.in.(${storeIds.join(",")}),store_id.is.null`)
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((a) => a.name as string);
+}
+
+// Cadastro em um passo só: gerente já define o PIN na hora e repassa pro
+// montador (diferente do fluxo admin em admin-actions.ts, que separa criar
+// de definir PIN em duas ações).
+export async function addAssemblerForStore(name: string, storeId: string, pin: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("assemblers").insert({ name, store_id: storeId, pin_hash: hashPin(pin) });
+  if (error) throw new Error(error.message);
+}
+
+export type AssemblerWithStoreId = { name: string; storeId: string | null };
+
+// Todos os montadores (qualquer loja + globais), com o store_id de cada um
+// -- usado em telas onde a loja só é escolhida depois, no próprio
+// formulário (nova-rapida), então o filtro por loja acontece no cliente.
+export async function listAllAssemblersWithStoreId(): Promise<AssemblerWithStoreId[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("assemblers").select("name, store_id").order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((a) => ({ name: a.name as string, storeId: a.store_id as string | null }));
+}
+
+export type AssemblerForStoreDisplay = { name: string; storeId: string | null; storeName: string | null };
+
+// Pra tela "Equipe da loja" do gerente: mostra os montadores da(s) loja(s)
+// dele + os globais/legado, com o nome da loja pra diferenciar visualmente
+// os dois grupos.
+export async function listAssemblersForStoresWithStoreName(storeIds: string[]): Promise<AssemblerForStoreDisplay[]> {
+  if (storeIds.length === 0) return [];
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("assemblers")
+    .select("name, store_id, stores(name)")
+    .or(`store_id.in.(${storeIds.join(",")}),store_id.is.null`)
+    .order("name");
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as { name: string; store_id: string | null; stores: { name: string } | null }[]).map((a) => ({
+    name: a.name,
+    storeId: a.store_id,
+    storeName: a.stores?.name ?? null,
+  }));
 }
 
 export type AssemblerWithPinStatus = { name: string; hasPin: boolean };

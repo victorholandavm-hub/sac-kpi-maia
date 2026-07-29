@@ -5,6 +5,7 @@ import { useState } from "react";
 import { bulkMarkEnviadoParaCD } from "@/app/assistencia/encomendas-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PedidoEncomendaStatusBadge } from "./PedidoEncomendaStatusBadge";
+import { NewSinceBadge } from "./NewSinceBadge";
 import { PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import type { PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
 
@@ -91,6 +92,7 @@ export function PedidoEncomendaFilaList({
                         #{p.pedidoNumber}
                       </span>
                       <PedidoEncomendaStatusBadge status={p.status} />
+                      <NewSinceBadge createdAt={p.createdAt} storageKey="fila-encomendas-last-seen" />
                       <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                         {p.storeName}
                       </span>

@@ -6,6 +6,7 @@ import { REQUEST_TYPE_LABELS, ASSISTENCIA_MANAGED_TYPES, STATUS_COLORS } from "@
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
+import { NewSinceBadge } from "@/components/assistencia/NewSinceBadge";
 
 function itemsSummary(items: RequestItem[]): string | null {
   if (items.length === 0) return null;
@@ -74,7 +75,7 @@ export default async function AssistenciaQueuePage({
 
   return (
     <div className="flex flex-col gap-4">
-      <RealtimeQueueRefresher />
+      <RealtimeQueueRefresher notifyOnInsert="Nova solicitação recebida!" />
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           {FILTERS.map((f) => {
@@ -191,6 +192,7 @@ export default async function AssistenciaQueuePage({
                           #{r.ticketNumber}
                         </span>
                         <StatusBadge status={r.status} />
+                        <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
                         {r.deadlineStatus === "pendente" ? (
                           <span
                             className="text-xs font-semibold px-2 py-0.5 rounded-full"

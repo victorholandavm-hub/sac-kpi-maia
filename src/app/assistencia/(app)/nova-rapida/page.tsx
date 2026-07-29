@@ -1,12 +1,12 @@
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listStores } from "@/lib/serviceRequests";
-import { listAssemblers } from "@/lib/payments";
+import { listAllAssemblersWithStoreId } from "@/lib/payments";
 import { QuickCreateRequestForm } from "@/components/assistencia/QuickCreateRequestForm";
 
 export default async function NovaRapidaPage() {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const [stores, assemblers] = await Promise.all([listStores(), listAssemblers()]);
+  const [stores, assemblers] = await Promise.all([listStores(), listAllAssemblersWithStoreId()]);
 
   return (
     <div className="flex flex-col gap-4">
