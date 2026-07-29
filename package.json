@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "totvs-sync": "node --env-file=.env.totvs-script scripts/totvs-sync.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.66.0",

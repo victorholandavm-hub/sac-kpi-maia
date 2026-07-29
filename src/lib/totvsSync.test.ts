@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ddmmyyyyToIso, isoDate, totvsHeaders } from "./route";
+import { ddmmyyyyToIso, isoDate, totvsHeaders } from "./totvsSync";
 
 describe("ddmmyyyyToIso", () => {
   it("converte DD/MM/YYYY pra YYYY-MM-DD", () => {
