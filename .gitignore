@@ -52,5 +52,8 @@ next-env.d.ts
 /api-3.yaml
 /openapi-wsclient.yaml
 
+# log do sync do TOTVS rodando via Agendador de Tarefas
+/logs
+
 .vercel
 .env*
