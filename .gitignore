@@ -46,5 +46,11 @@ next-env.d.ts
 # claude code local config (pode conter segredos no allowlist de comandos)
 .claude/
 
+# docs de referência das APIs do Protheus (contêm a ApiKey em texto puro)
+/totvs*.md
+/api-totvs*.yaml
+/api-3.yaml
+/openapi-wsclient.yaml
+
 .vercel
 .env*
