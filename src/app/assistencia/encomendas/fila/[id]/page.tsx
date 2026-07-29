@@ -8,6 +8,7 @@ import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRe
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { PedidoPrazoField } from "@/components/assistencia/PedidoPrazoField";
 import { listEncomendaPhotos } from "@/lib/pedidoEncomendaPhotos";
+import { FormSection } from "@/components/assistencia/FormSection";
 
 export const dynamic = "force-dynamic";
 
@@ -62,13 +63,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         </h2>
       </div>
 
-      <div
-        className="rounded-lg border p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Produtos
-        </span>
+      <FormSection title="Produtos">
         <ul className="flex flex-col gap-1">
           {pedido.items.map((item) => (
             <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
@@ -76,31 +71,24 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
             </li>
           ))}
         </ul>
-      </div>
+      </FormSection>
 
-      <div
-        className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <Row label="Solicitado por" value={pedido.requestedByName} />
-        <Row label="Vendedor" value={pedido.vendedorName} />
-        <Row label="Código do cliente" value={pedido.clienteCodigo} />
-        <Row label="Criado em" value={new Date(pedido.createdAt).toLocaleString("pt-BR")} />
-        <Row label="Carga" value={pedido.carga} />
-        <Row label="NF-e" value={pedido.nfE} />
-        <Row label="Observações" value={pedido.notes} />
-      </div>
+      <FormSection title="Detalhes do pedido">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Row label="Solicitado por" value={pedido.requestedByName} />
+          <Row label="Vendedor" value={pedido.vendedorName} />
+          <Row label="Código do cliente" value={pedido.clienteCodigo} />
+          <Row label="Criado em" value={new Date(pedido.createdAt).toLocaleString("pt-BR")} />
+          <Row label="Carga" value={pedido.carga} />
+          <Row label="NF-e" value={pedido.nfE} />
+          <Row label="Observações" value={pedido.notes} />
+        </div>
+      </FormSection>
 
       <PedidoPrazoField pedidoId={pedido.id} prazoEntrega={pedido.prazoEntrega} />
 
       {photos.length > 0 ? (
-        <div
-          className="rounded-lg border p-4 flex flex-col gap-2"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-        >
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Cupom fiscal
-          </span>
+        <FormSection title="Cupom fiscal">
           <div className="flex flex-wrap gap-2">
             {photos.map((p) => (
               <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer">
@@ -109,20 +97,14 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
               </a>
             ))}
           </div>
-        </div>
+        </FormSection>
       ) : null}
 
       <PedidoEncomendaActions pedidoId={pedido.id} status={pedido.status} role={actor.role} storeId={pedido.storeId} />
 
-      <div
-        className="rounded-lg border p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Histórico
-        </h3>
+      <FormSection title="Histórico">
         <PedidoEncomendaTimeline events={events} />
-      </div>
+      </FormSection>
     </div>
     </ToastProvider>
   );

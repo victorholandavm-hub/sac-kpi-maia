@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { createQuickRequest, type FormState } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { SHIFTS, type Store } from "@/lib/serviceRequests";
+import { FormSection } from "./FormSection";
 
 const ASSISTENCIA_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"] as const;
 const SAC_TYPE = "notificacao_externa" as const;
@@ -19,19 +20,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div
-      className="rounded-lg border p-4 flex flex-col gap-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-    >
-      <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-}
 
 export function QuickCreateRequestForm({
   stores,
@@ -54,7 +42,7 @@ export function QuickCreateRequestForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
-      <Section title="Loja e tipo">
+      <FormSection title="Loja e tipo" number={1}>
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Loja *">
             <select
@@ -98,9 +86,9 @@ export function QuickCreateRequestForm({
             {type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
           </label>
         ) : null}
-      </Section>
+      </FormSection>
 
-      <Section title="Dados do cliente">
+      <FormSection title="Dados do cliente" number={2} hint="Só o nome é obrigatório.">
         <Field label="Nome do cliente *">
           <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
@@ -117,9 +105,9 @@ export function QuickCreateRequestForm({
         <Field label="O que precisa ser feito">
           <textarea name="reason" rows={2} className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
-      </Section>
+      </FormSection>
 
-      <Section title="Agendamento e responsável">
+      <FormSection title="Agendamento e responsável" number={3}>
         <div className="grid sm:grid-cols-4 gap-4">
           <Field label="Data agendada">
             <input name="scheduled_date" type="date" className="rounded border px-3 py-2" style={inputStyle} />
@@ -158,9 +146,9 @@ export function QuickCreateRequestForm({
             )}
           </Field>
         </div>
-      </Section>
+      </FormSection>
 
-      <Section title="Pagamento">
+      <FormSection title="Pagamento" number={4}>
         <div className="grid sm:grid-cols-3 gap-4">
           <Field label="Produto/serviço (pagamento)">
             <input name="product" placeholder="Ex: Trocar porta" className="rounded border px-3 py-2" style={inputStyle} />
@@ -172,7 +160,7 @@ export function QuickCreateRequestForm({
             <input name="unit_value" type="number" min={0} step="0.01" className="rounded border px-3 py-2" style={inputStyle} />
           </Field>
         </div>
-      </Section>
+      </FormSection>
 
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>

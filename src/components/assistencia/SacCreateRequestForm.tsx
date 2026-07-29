@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { createSacRequest, type FormState } from "@/app/assistencia/actions";
 import { SAC_CATEGORIES, SAC_CATEGORY_LABELS, REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import type { Store } from "@/lib/serviceRequests";
+import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -24,19 +25,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div
-      className="rounded-lg border p-4 flex flex-col gap-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-    >
-      <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-}
 
 export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; drivers: string[] }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
@@ -45,7 +33,7 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
-      <Section title="Tipo e loja">
+      <FormSection title="Tipo e loja" number={1}>
         <Field label="Tipo">
           <select
             name="type"
@@ -93,9 +81,9 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
           <input type="checkbox" name="urgent" className="rounded" />
           Urgente
         </label>
-      </Section>
+      </FormSection>
 
-      <Section title="Dados do cliente">
+      <FormSection title="Dados do cliente" number={2} hint="Só o nome é obrigatório.">
         <Field label="Nome do cliente *">
           <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
@@ -112,10 +100,10 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         <Field label="Bairro">
           <input name="client_neighborhood" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
-      </Section>
+      </FormSection>
 
       {isDelivery ? (
-        <Section title="Produto e entrega">
+        <FormSection title="Produto e entrega" number={3}>
           <div className="grid sm:grid-cols-3 gap-4">
             <Field label="Produto a entregar">
               <input name="product" placeholder="Ex: Super Box Confort Mola Ensacada" className="rounded border px-3 py-2" style={inputStyle} />
@@ -136,10 +124,10 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
               ))}
             </datalist>
           </Field>
-        </Section>
+        </FormSection>
       ) : null}
 
-      <Section title="Detalhes">
+      <FormSection title="Detalhes" number={4} hint="Conte o que aconteceu, com o máximo de detalhe que puder.">
         <Field label="Motivo">
           <textarea name="reason" rows={2} placeholder="Ex: produto entregue com avaria" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
@@ -166,7 +154,7 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
             style={inputStyle}
           />
         </Field>
-      </Section>
+      </FormSection>
 
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>

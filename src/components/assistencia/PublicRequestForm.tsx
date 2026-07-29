@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { createPublicRequest, type FormState } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 import type { Store } from "@/lib/serviceRequests";
+import { FormSection } from "./FormSection";
 
 const TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
 
@@ -15,20 +16,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {label}
       {children}
     </label>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div
-      className="rounded-lg border p-4 flex flex-col gap-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-    >
-      <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-        {title}
-      </h3>
-      {children}
-    </div>
   );
 }
 
@@ -61,7 +48,7 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
-      <Section title="Loja e prazo">
+      <FormSection title="Loja e prazo" number={1} hint="Quando você precisa que isso seja resolvido?">
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Solicitante">
             <input
@@ -101,9 +88,9 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
         <Field label="Prazo desejado *">
           <input name="requested_deadline" type="date" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
-      </Section>
+      </FormSection>
 
-      <Section title="Tipo de solicitação">
+      <FormSection title="Tipo de solicitação" number={2} hint="O tipo muda quais campos aparecem a seguir.">
         <Field label="Tipo de solicitação">
           <select
             name="type"
@@ -141,9 +128,9 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
             </select>
           </Field>
         ) : null}
-      </Section>
+      </FormSection>
 
-      <Section title="Referência da venda">
+      <FormSection title="Referência da venda" number={3} hint="Ajuda a localizar a compra depois — preencha o que tiver à mão.">
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Código do pedido/venda">
             <input name="order_code" className="rounded border px-3 py-2" style={inputStyle} />
@@ -156,9 +143,9 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
         <Field label="Vendedor(a)">
           <input name="seller_name" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
-      </Section>
+      </FormSection>
 
-      <Section title="Dados do cliente">
+      <FormSection title="Dados do cliente" number={4} hint="Só o nome é obrigatório.">
         <Field label="Nome do cliente *">
           <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
@@ -182,10 +169,10 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
             </Field>
           </div>
         ) : null}
-      </Section>
+      </FormSection>
 
       {showItems ? (
-        <Section title="Produtos">
+        <FormSection title="Produtos" number={5}>
           <div className="flex flex-col gap-2">
             {items.map((item, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -227,10 +214,10 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
               + adicionar produto
             </button>
           </div>
-        </Section>
+        </FormSection>
       ) : null}
 
-      <Section title="Motivo e observações">
+      <FormSection title="Motivo e observações" number={6} hint="Conte o que precisa ser feito, com o máximo de detalhe que puder.">
         <Field label="Motivo">
           <textarea name="reason" rows={2} className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
@@ -249,7 +236,7 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
         <Field label="Observações">
           <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
-      </Section>
+      </FormSection>
 
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>

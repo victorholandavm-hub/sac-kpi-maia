@@ -11,6 +11,7 @@ import {
 import { useQuickAction } from "./useQuickAction";
 import { PEDIDO_ENCOMENDA_STATUS_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import type { TotvsOrderSuggestion } from "@/lib/totvsLookup";
+import { FormSection } from "./FormSection";
 
 type NextStep = { toStatus: string; label: string; needsCarga?: boolean; needsNfE?: boolean };
 
@@ -70,11 +71,7 @@ export function PedidoEncomendaActions({
   const canDeny = (role === "fabrica" || role === "assistencia" || role === "admin") && status === "solicitado";
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-      <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-        Ações
-      </h3>
-
+    <FormSection title="Ações">
       {nextStep ? (
         <div className="flex items-end gap-2 flex-wrap">
           {nextStep.needsCarga ? (
@@ -241,6 +238,6 @@ export function PedidoEncomendaActions({
           </button>
         )
       ) : null}
-    </div>
+    </FormSection>
   );
 }

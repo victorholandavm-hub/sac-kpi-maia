@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createPedidoEncomendaAction, type FormState } from "@/app/assistencia/encomendas-actions";
+import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -38,99 +39,102 @@ export function NovoPedidoEncomendaForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
-      {storeOptions ? (
-        <Field label="Loja *">
-          <select name="store_id" required defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
-            <option value="" disabled>
-              Selecione…
-            </option>
-            {storeOptions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
+      <FormSection title="Loja e cliente" number={1}>
+        {storeOptions ? (
+          <Field label="Loja *">
+            <select name="store_id" required defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
+              <option value="" disabled>
+                Selecione…
               </option>
-            ))}
-          </select>
+              {storeOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : (
+          <Field label="Loja">
+            <input
+              value={fixedStoreName}
+              disabled
+              className="rounded border px-3 py-2"
+              style={{ ...inputStyle, background: "var(--gridline)", color: "var(--text-secondary)" }}
+            />
+          </Field>
+        )}
+
+        <Field label="Código do cliente">
+          <input name="cliente_codigo" placeholder="Código do cliente na venda" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
-      ) : (
-        <Field label="Loja">
+      </FormSection>
+
+      <FormSection title="Produtos" number={2}>
+        <div className="flex flex-col gap-2">
+          {items.map((item, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                name="item_produto_descricao"
+                type="text"
+                value={item.produtoDescricao}
+                onChange={(e) => updateItem(i, { produtoDescricao: e.target.value })}
+                required
+                placeholder="Nome do produto"
+                className="flex-1 rounded border px-3 py-2"
+                style={inputStyle}
+              />
+              <input
+                name="item_quantidade"
+                type="number"
+                min={1}
+                value={item.quantidade}
+                onChange={(e) => updateItem(i, { quantidade: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                className="w-20 rounded border px-3 py-2"
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                onClick={() => removeItem(i)}
+                disabled={items.length === 1}
+                className="text-sm px-2 py-2 disabled:opacity-40"
+                style={{ color: "var(--status-critical)" }}
+                aria-label="Remover item"
+              >
+                remover
+              </button>
+            </div>
+          ))}
+          <button type="button" onClick={addItem} className="text-sm self-start underline" style={{ color: "var(--text-secondary)" }}>
+            + adicionar produto
+          </button>
+        </div>
+      </FormSection>
+
+      <FormSection title="Detalhes" number={3}>
+        <Field label="Vendedor responsável (opcional)">
           <input
-            value={fixedStoreName}
-            disabled
+            name="vendedor_name"
+            placeholder="Pra qual vendedor(a) é essa venda"
             className="rounded border px-3 py-2"
-            style={{ ...inputStyle, background: "var(--surface-1)", color: "var(--text-secondary)" }}
+            style={inputStyle}
           />
         </Field>
-      )}
 
-      <Field label="Código do cliente">
-        <input name="cliente_codigo" placeholder="Código do cliente na venda" className="rounded border px-3 py-2" style={inputStyle} />
-      </Field>
+        <Field label="Observações">
+          <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
 
-      <div className="flex flex-col gap-2">
-        <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-          Produtos *
-        </span>
-        {items.map((item, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <input
-              name="item_produto_descricao"
-              type="text"
-              value={item.produtoDescricao}
-              onChange={(e) => updateItem(i, { produtoDescricao: e.target.value })}
-              required
-              placeholder="Nome do produto"
-              className="flex-1 rounded border px-3 py-2"
-              style={inputStyle}
-            />
-            <input
-              name="item_quantidade"
-              type="number"
-              min={1}
-              value={item.quantidade}
-              onChange={(e) => updateItem(i, { quantidade: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-              className="w-20 rounded border px-3 py-2"
-              style={inputStyle}
-            />
-            <button
-              type="button"
-              onClick={() => removeItem(i)}
-              disabled={items.length === 1}
-              className="text-sm px-2 py-2 disabled:opacity-40"
-              style={{ color: "var(--status-critical)" }}
-              aria-label="Remover item"
-            >
-              remover
-            </button>
-          </div>
-        ))}
-        <button type="button" onClick={addItem} className="text-sm self-start underline" style={{ color: "var(--text-secondary)" }}>
-          + adicionar produto
-        </button>
-      </div>
-
-      <Field label="Vendedor responsável (opcional)">
-        <input
-          name="vendedor_name"
-          placeholder="Pra qual vendedor(a) é essa venda"
-          className="rounded border px-3 py-2"
-          style={inputStyle}
-        />
-      </Field>
-
-      <Field label="Observações">
-        <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
-      </Field>
-
-      <Field label="Foto do cupom fiscal">
-        <input
-          name="cupom_fiscal"
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-          capture="environment"
-          className="rounded border px-3 py-2 text-sm"
-          style={inputStyle}
-        />
-      </Field>
+        <Field label="Foto do cupom fiscal">
+          <input
+            name="cupom_fiscal"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+            capture="environment"
+            className="rounded border px-3 py-2 text-sm"
+            style={inputStyle}
+          />
+        </Field>
+      </FormSection>
 
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>
