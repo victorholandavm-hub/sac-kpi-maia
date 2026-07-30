@@ -148,6 +148,16 @@ export const SUPPLIER_RETURN_STATUS_COLORS: Record<string, string> = {
   finalizado: "var(--text-muted)",
 };
 
+export const ENTREGA_RISCO_NIVEL_LABELS: Record<string, string> = {
+  alerta: "Alerta",
+  acompanhamento: "Acompanhamento",
+};
+
+export const ENTREGA_RISCO_NIVEL_COLORS: Record<string, string> = {
+  alerta: "var(--status-critical)",
+  acompanhamento: "var(--status-warning)",
+};
+
 export const SAC_CATEGORIES = [
   "atraso_entrega",
   "entrega_parcial",

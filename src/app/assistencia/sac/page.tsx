@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { signOut } from "@/app/assistencia/actions";
 import { listRequests } from "@/lib/serviceRequests";
+import { countEntregasEmRiscoOverview } from "@/lib/entregasRisco";
 import { REQUEST_TYPE_LABELS, ROLE_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -22,16 +23,30 @@ export default async function SacHomePage({
   const { view } = await searchParams;
   const showCompleted = view === "concluidas";
 
-  const { items } = await listRequests({
-    types: [...SAC_MANAGED_TYPES],
-    status: showCompleted ? "concluida" : undefined,
-  });
+  const [{ items }, riscos] = await Promise.all([
+    listRequests({
+      types: [...SAC_MANAGED_TYPES],
+      status: showCompleted ? "concluida" : undefined,
+    }),
+    countEntregasEmRiscoOverview(),
+  ]);
   const requests = showCompleted ? items : items.filter((r) => r.status !== "concluida" && r.status !== "cancelada");
 
   return (
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="SAC — Lojas Maia" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`}>
         <div className="flex items-center gap-3 flex-wrap">
+          <Link
+            href="/assistencia/sac/entregas-risco"
+            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
+            style={{
+              background: riscos.alerta > 0 ? "var(--status-critical)" : "var(--surface-1)",
+              color: riscos.alerta > 0 ? "#fff" : "var(--text-primary)",
+              borderColor: "var(--border)",
+            }}
+          >
+            Entregas em risco{riscos.alerta > 0 ? ` (${riscos.alerta})` : ""}
+          </Link>
           <Link
             href="/assistencia/sac/nova"
             className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"

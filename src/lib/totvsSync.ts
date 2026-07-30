@@ -33,6 +33,25 @@ const ORDERS_TIME_BUDGET_MS = 300_000;
 const INITIAL_ORDERS_LOOKBACK_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// /ai/deliveries não tem nota de custo por período medida em produção (ao
+// contrário de /orders, ver comentário acima) -- por enquanto sem janela de
+// data, full-scan contínuo por página (mesmo desenho de syncClients),
+// orçamento de tempo + teto de páginas como corte de segurança. Deliberado
+// não filtrar por deliveryDateFrom/deliveryDateTo: isso arriscaria excluir
+// pedidos sem nenhuma carga ainda (cargas: []), que são exatamente o caso
+// mais crítico da regra de negócio (pedido nunca ganhou carga até o prazo).
+const DELIVERY_PAGE_SIZE = 100;
+const DELIVERY_PAGE_CAP = 40;
+const DELIVERIES_TIME_BUDGET_MS = 120_000;
+
+// NÃO VALIDADO CONTRA A API REAL AINDA (rede do Protheus é bloqueada daqui) --
+// api-totvs.yaml declara um "servers.url" por-path pra esse endpoint que já
+// inclui o path inteiro (.../rest/ai/deliveries), diferente do resto do
+// arquivo (base .../rest/<recurso>). Montamos a URL seguindo o mesmo padrão
+// de /rest/client e /rest/orders (mais provável, dado o resto do arquivo),
+// mas confirmar na primeira execução real de `npm run totvs-sync` dentro da
+// rede liberada -- se vier 404, tentar sem o prefixo "/rest".
+
 export type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
 
 type TotvsClientAddress = {
@@ -98,6 +117,60 @@ type TotvsOrderListResponse = {
   currentPage: number;
   totalPages: number;
   data: TotvsOrder[];
+};
+
+type TotvsDeliveryClient = {
+  codigo?: string;
+  loja?: string;
+  nome?: string;
+  documento?: string;
+  bairro?: string;
+  municipio?: string;
+  uf?: string;
+};
+
+type TotvsDeliveryMotorista = { codigo?: string; nome?: string };
+
+type TotvsDeliveryOcorrencia = { codigo?: string; descricao?: string; categoria?: string; nivel?: string };
+
+// itens[] existe no payload real mas é ignorado -- fora do escopo do MVP, a
+// regra de negócio é a nível de pedido/carga, não de item.
+type TotvsDeliveryCarga = {
+  carga: string;
+  dtPrevisao?: string; // YYYY-MM-DD
+  tentativa?: number;
+  tipoEntrega?: "Entrega" | "Retirada" | "Express";
+  statusCarga?: string;
+  statusCargaCodigo?: string;
+  statusEntrega?: string;
+  statusEntregaCodigo?: string;
+  statusOrigem?: "CARGA" | "ENTREGA";
+  motorista?: TotvsDeliveryMotorista;
+  transportadora?: string;
+  veiculo?: string;
+  regiao?: string;
+  notaFiscal?: string;
+  serie?: string;
+  dtRetorno?: string;
+  hrRetorno?: string;
+  ocorrencia?: TotvsDeliveryOcorrencia;
+};
+
+type TotvsDeliveryOrder = {
+  pedido: string;
+  filialVenda: string;
+  loja?: string;
+  cliente?: TotvsDeliveryClient;
+  statusAtual?: string;
+  statusAtualCodigo?: string;
+  totalCargas?: number;
+  cargas?: TotvsDeliveryCarga[];
+};
+
+type TotvsDeliveryListResponse = {
+  currentPage: number;
+  totalPages: number;
+  data: TotvsDeliveryOrder[];
 };
 
 export function totvsHeaders() {
@@ -327,10 +400,191 @@ async function syncOrders(supabase: SupabaseAdmin): Promise<SyncResult> {
   return { checked, upserted, errors };
 }
 
+type ExistingDeliveryCarga = { carga: string; tentativa: number | null; status_entrega: string | null };
+
+export type DeliveryRiskTrigger = { reason: string } | null;
+
+// Compara o snapshot anterior de cargas de um pedido (o que já estava no
+// banco antes deste sync) com o payload novo pra detectar que uma carga que
+// já estava agendada foi cancelada, ou que o pedido foi "tirado" dela --
+// gatilho que sempre sobrepõe uma classificação manual em snooze (ver
+// listEntregasEmRisco em src/lib/entregasRisco.ts). Comparação por rótulo
+// texto (não por código), ver nota em entregasRisco.ts sobre a ambiguidade
+// dos códigos numéricos entre os namespaces CARGA/ENTREGA.
+export function detectDeliveryRiskTrigger(
+  existingCargas: ExistingDeliveryCarga[],
+  incomingCargas: TotvsDeliveryCarga[]
+): DeliveryRiskTrigger {
+  const existingByCode = new Map(existingCargas.map((c) => [c.carga, c]));
+  const incomingCodes = new Set(incomingCargas.map((c) => c.carga));
+
+  for (const c of incomingCargas) {
+    const prev = existingByCode.get(c.carga);
+    if (c.statusEntrega === "Cancelada" && prev?.status_entrega !== "Cancelada") {
+      return { reason: `Carga ${c.carga} foi cancelada.` };
+    }
+    if (!prev) {
+      const precedidaPorTentativaRuim = existingCargas.some(
+        (e) =>
+          (e.tentativa ?? 0) < (c.tentativa ?? 0) &&
+          (e.status_entrega === "Cancelada" || e.status_entrega === "Não Entregue")
+      );
+      if (precedidaPorTentativaRuim) {
+        return { reason: `Nova tentativa (carga ${c.carga}) após tentativa anterior cancelada/não entregue.` };
+      }
+    }
+  }
+
+  for (const e of existingCargas) {
+    if (!incomingCodes.has(e.carga)) {
+      return { reason: `Carga ${e.carga} não aparece mais no pedido (pedido retirado da carga).` };
+    }
+  }
+
+  return null;
+}
+
+async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, errors: string[]): Promise<boolean> {
+  const { data: existingDelivery } = await supabase
+    .from("totvs_deliveries")
+    .select("id")
+    .eq("pedido", d.pedido)
+    .eq("filial_venda", d.filialVenda)
+    .maybeSingle();
+
+  let existingCargas: ExistingDeliveryCarga[] = [];
+  if (existingDelivery) {
+    const { data } = await supabase
+      .from("totvs_delivery_cargas")
+      .select("carga, tentativa, status_entrega")
+      .eq("delivery_id", existingDelivery.id);
+    existingCargas = data ?? [];
+  }
+
+  const { data: deliveryRow, error } = await supabase
+    .from("totvs_deliveries")
+    .upsert(
+      {
+        pedido: d.pedido,
+        filial_venda: d.filialVenda,
+        loja: d.loja || null,
+        client_id: d.cliente?.codigo || null,
+        client_loja: d.cliente?.loja || null,
+        client_name: d.cliente?.nome || null,
+        client_cpf_cnpj: d.cliente?.documento || null,
+        client_neighborhood: d.cliente?.bairro || null,
+        client_city: d.cliente?.municipio || null,
+        client_state: d.cliente?.uf || null,
+        status_atual: d.statusAtual || null,
+        status_atual_codigo: d.statusAtualCodigo || null,
+        total_cargas: d.totalCargas ?? (d.cargas?.length ?? 0),
+        synced_at: new Date().toISOString(),
+      },
+      { onConflict: "pedido,filial_venda" }
+    )
+    .select("id")
+    .single();
+  if (error || !deliveryRow) {
+    errors.push(`delivery ${d.pedido}: ${error?.message ?? "sem id retornado"}`);
+    return false;
+  }
+
+  const trigger = detectDeliveryRiskTrigger(existingCargas, d.cargas ?? []);
+
+  for (const c of d.cargas ?? []) {
+    const { error: cargaError } = await supabase.from("totvs_delivery_cargas").upsert(
+      {
+        delivery_id: deliveryRow.id,
+        carga: c.carga,
+        dt_previsao: c.dtPrevisao || null,
+        tentativa: c.tentativa ?? null,
+        tipo_entrega: c.tipoEntrega || null,
+        status_carga: c.statusCarga || null,
+        status_carga_codigo: c.statusCargaCodigo || null,
+        status_entrega: c.statusEntrega || null,
+        status_entrega_codigo: c.statusEntregaCodigo || null,
+        status_origem: c.statusOrigem || null,
+        motorista_codigo: c.motorista?.codigo || null,
+        motorista_nome: c.motorista?.nome || null,
+        transportadora: c.transportadora || null,
+        veiculo: c.veiculo || null,
+        regiao: c.regiao || null,
+        nota_fiscal: c.notaFiscal || null,
+        serie: c.serie || null,
+        dt_retorno: c.dtRetorno || null,
+        hr_retorno: c.hrRetorno || null,
+        ocorrencia_codigo: c.ocorrencia?.codigo || null,
+        ocorrencia_descricao: c.ocorrencia?.descricao || null,
+        ocorrencia_categoria: c.ocorrencia?.categoria || null,
+        ocorrencia_nivel: c.ocorrencia?.nivel || null,
+      },
+      { onConflict: "delivery_id,carga" }
+    );
+    if (cargaError) errors.push(`delivery ${d.pedido} carga ${c.carga}: ${cargaError.message}`);
+  }
+
+  if (trigger) {
+    await supabase
+      .from("totvs_deliveries")
+      .update({ risk_trigger_at: new Date().toISOString(), risk_trigger_reason: trigger.reason })
+      .eq("id", deliveryRow.id);
+    await supabase.from("entrega_risco_events").insert({
+      pedido: d.pedido,
+      filial_venda: d.filialVenda,
+      actor_name: "Sincronização TOTVS",
+      actor_role: "sistema",
+      event_type: "reaberto_por_cancelamento",
+      note: trigger.reason,
+    });
+  }
+
+  return true;
+}
+
+async function syncDeliveries(supabase: SupabaseAdmin): Promise<SyncResult> {
+  const started = Date.now();
+  let page = Number(await getSyncState(supabase, "totvs_deliveries_next_page")) || 1;
+  let checked = 0;
+  let upserted = 0;
+  const errors: string[] = [];
+
+  for (let i = 0; i < DELIVERY_PAGE_CAP; i++) {
+    if (Date.now() - started > DELIVERIES_TIME_BUDGET_MS) break;
+
+    let json: TotvsDeliveryListResponse;
+    try {
+      json = await fetchTotvs<TotvsDeliveryListResponse>(
+        // Endpoint documentado com params em minúsculo (page/size), diferente
+        // de /rest/client e /rest/orders (Page/Size) -- ver api-totvs.yaml.
+        `${BASE_URL}/rest/ai/deliveries?page=${page}&size=${DELIVERY_PAGE_SIZE}`
+      );
+    } catch (err) {
+      errors.push(`deliveries page ${page}: ${(err as Error).message}`);
+      break;
+    }
+    const rows = json.data ?? [];
+    checked += rows.length;
+
+    for (const d of rows) {
+      if (await upsertDelivery(supabase, d, errors)) upserted++;
+    }
+
+    if (rows.length === 0 || page >= (json.totalPages ?? page)) {
+      page = 1;
+      break;
+    }
+    page += 1;
+  }
+
+  await setSyncState(supabase, "totvs_deliveries_next_page", String(page));
+  return { checked, upserted, errors };
+}
+
 export type TotvsSyncSummary = {
   ok: boolean;
   clients: { checked: number; upserted: number };
   orders: { checked: number; upserted: number };
+  deliveries: { checked: number; upserted: number };
   errors: string[];
 };
 
@@ -341,11 +595,13 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
 
   const clients = await syncClients(supabase);
   const orders = await syncOrders(supabase);
+  const deliveries = await syncDeliveries(supabase);
 
   return {
-    ok: clients.errors.length === 0 && orders.errors.length === 0,
+    ok: clients.errors.length === 0 && orders.errors.length === 0 && deliveries.errors.length === 0,
     clients: { checked: clients.checked, upserted: clients.upserted },
     orders: { checked: orders.checked, upserted: orders.upserted },
-    errors: [...clients.errors, ...orders.errors],
+    deliveries: { checked: deliveries.checked, upserted: deliveries.upserted },
+    errors: [...clients.errors, ...orders.errors, ...deliveries.errors],
   };
 }
