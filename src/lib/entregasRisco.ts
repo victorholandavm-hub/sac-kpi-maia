@@ -35,6 +35,8 @@ export type EntregaRiscoClassificacao = {
   updatedAt: string;
 };
 
+export type EntregaRiscoAssignedTo = { id: string; name: string };
+
 export type EntregaRiscoItem = {
   pedido: string;
   filialVenda: string;
@@ -50,6 +52,7 @@ export type EntregaRiscoItem = {
   baselineOrigem: "nota_fiscal" | "primeiro_sync";
   cargaAtual: EntregaRiscoCarga | null;
   classificacao: EntregaRiscoClassificacao | null;
+  assignedTo: EntregaRiscoAssignedTo | null;
 };
 
 // Regras 1-3 do plano da feature: compara rótulos de status contra o prazo
@@ -142,10 +145,20 @@ type ClassificacaoRow = {
   filial_venda: string;
   note: string | null;
   reavaliar_em: string | null;
-  classified_by_name: string;
-  classified_by_role: string;
+  classified_by_name: string | null;
+  classified_by_role: string | null;
+  assigned_to_id: string | null;
+  assigned_to_name: string | null;
   updated_at: string;
 };
+
+// Uma linha de entrega_risco_status pode existir só por causa de uma
+// atribuição de atendente, sem nunca ter sido classificada (nota +
+// reavaliar_em) -- ver 0045_entrega_risco_atribuicao.sql. `classificacao` só
+// deve aparecer na UI quando de fato houve uma classificação.
+function hasClassificacao(row: ClassificacaoRow): boolean {
+  return !!(row.note || row.reavaliar_em || row.classified_by_name);
+}
 
 const DELIVERY_COLUMNS =
   "pedido, filial_venda, loja, client_name, client_cpf_cnpj, client_neighborhood, client_city, client_state, status_atual, first_seen_at, risk_trigger_at, risk_trigger_reason, " +
@@ -238,15 +251,20 @@ export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
       baselineData: baseline.data,
       baselineOrigem: baseline.origem,
       cargaAtual: proximaCarga,
-      classificacao: classificacaoRow
-        ? {
-            note: classificacaoRow.note,
-            reavaliarEm: classificacaoRow.reavaliar_em,
-            classifiedByName: classificacaoRow.classified_by_name,
-            classifiedByRole: classificacaoRow.classified_by_role,
-            updatedAt: classificacaoRow.updated_at,
-          }
-        : null,
+      classificacao:
+        classificacaoRow && hasClassificacao(classificacaoRow)
+          ? {
+              note: classificacaoRow.note,
+              reavaliarEm: classificacaoRow.reavaliar_em,
+              classifiedByName: classificacaoRow.classified_by_name ?? "",
+              classifiedByRole: classificacaoRow.classified_by_role ?? "",
+              updatedAt: classificacaoRow.updated_at,
+            }
+          : null,
+      assignedTo:
+        classificacaoRow?.assigned_to_id && classificacaoRow.assigned_to_name
+          ? { id: classificacaoRow.assigned_to_id, name: classificacaoRow.assigned_to_name }
+          : null,
     });
   }
 
@@ -281,6 +299,49 @@ export async function classifyEntregaRisco(
     event_type: "classificado",
     note: input.note?.trim() || null,
     reavaliar_em: input.reavaliarEm,
+  });
+  if (eventError) throw new Error(eventError.message);
+}
+
+export type EntregaRiscoAtendente = { id: string; fullName: string };
+
+export async function listAtendentes(): Promise<EntregaRiscoAtendente[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("profiles")
+    .select("id, full_name")
+    .in("role", ["sac", "admin"])
+    .order("full_name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((p) => ({ id: p.id, fullName: p.full_name }));
+}
+
+export async function assignEntregaRisco(
+  pedido: string,
+  filialVenda: string,
+  actor: { name: string; role: string },
+  assignedTo: EntregaRiscoAssignedTo | null
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("entrega_risco_status").upsert(
+    {
+      pedido,
+      filial_venda: filialVenda,
+      assigned_to_id: assignedTo?.id ?? null,
+      assigned_to_name: assignedTo?.name ?? null,
+      assigned_at: assignedTo ? new Date().toISOString() : null,
+    },
+    { onConflict: "pedido,filial_venda" }
+  );
+  if (error) throw new Error(error.message);
+
+  const { error: eventError } = await admin.from("entrega_risco_events").insert({
+    pedido,
+    filial_venda: filialVenda,
+    actor_name: actor.name,
+    actor_role: actor.role,
+    event_type: "atribuido",
+    note: assignedTo ? `Atribuído a ${assignedTo.name}.` : "Atribuição removida.",
   });
   if (eventError) throw new Error(eventError.message);
 }

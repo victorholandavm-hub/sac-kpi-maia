@@ -38,7 +38,7 @@ export default async function SacHomePage({
         <div className="flex items-center gap-3 flex-wrap">
           <Link
             href="/assistencia/sac/entregas-risco"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
+            className={`text-sm px-4 py-2 rounded font-medium whitespace-nowrap border ${riscos.alerta > 0 ? "animate-pulse" : ""}`}
             style={{
               background: riscos.alerta > 0 ? "var(--status-critical)" : "var(--surface-1)",
               color: riscos.alerta > 0 ? "#fff" : "var(--text-primary)",

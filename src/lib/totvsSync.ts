@@ -44,13 +44,10 @@ const DELIVERY_PAGE_SIZE = 100;
 const DELIVERY_PAGE_CAP = 40;
 const DELIVERIES_TIME_BUDGET_MS = 120_000;
 
-// NÃO VALIDADO CONTRA A API REAL AINDA (rede do Protheus é bloqueada daqui) --
-// api-totvs.yaml declara um "servers.url" por-path pra esse endpoint que já
-// inclui o path inteiro (.../rest/ai/deliveries), diferente do resto do
-// arquivo (base .../rest/<recurso>). Montamos a URL seguindo o mesmo padrão
-// de /rest/client e /rest/orders (mais provável, dado o resto do arquivo),
-// mas confirmar na primeira execução real de `npm run totvs-sync` dentro da
-// rede liberada -- se vier 404, tentar sem o prefixo "/rest".
+// URL e paginação (page/size minúsculo) confirmados contra a API real em
+// 2026-07-30 -- api-totvs.yaml também errava os nomes de alguns campos do
+// payload (ver TotvsDeliveryOrder/TotvsDeliveryCarga abaixo: "order"/"branch"
+// em vez de "pedido"/"filialVenda", "invoice" em vez de "notaFiscal").
 
 export type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
 
@@ -135,6 +132,10 @@ type TotvsDeliveryOcorrencia = { codigo?: string; descricao?: string; categoria?
 
 // itens[] existe no payload real mas é ignorado -- fora do escopo do MVP, a
 // regra de negócio é a nível de pedido/carga, não de item.
+//
+// CAMPOS RENOMEADOS EM RELAÇÃO A api-totvs.yaml: a resposta real (inspecionada
+// em 2026-07-30 via GET /rest/ai/deliveries) usa "invoice" onde a doc chama de
+// "notaFiscal" -- resto da carga bate com o documentado.
 type TotvsDeliveryCarga = {
   carga: string;
   dtPrevisao?: string; // YYYY-MM-DD
@@ -149,16 +150,20 @@ type TotvsDeliveryCarga = {
   transportadora?: string;
   veiculo?: string;
   regiao?: string;
-  notaFiscal?: string;
+  invoice?: string;
   serie?: string;
   dtRetorno?: string;
   hrRetorno?: string;
   ocorrencia?: TotvsDeliveryOcorrencia;
 };
 
+// CAMPOS RENOMEADOS EM RELAÇÃO A api-totvs.yaml: a doc chama de "pedido" e
+// "filialVenda", mas a resposta real usa "order" e "branch" (mesmo nome que
+// WSOrders usa pra filial) -- ver nota acima. Confirmado com uma chamada real
+// em 2026-07-30, trazendo 98 pedidos reais.
 type TotvsDeliveryOrder = {
-  pedido: string;
-  filialVenda: string;
+  order: string;
+  branch: string;
   loja?: string;
   cliente?: TotvsDeliveryClient;
   statusAtual?: string;
@@ -448,8 +453,8 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
   const { data: existingDelivery } = await supabase
     .from("totvs_deliveries")
     .select("id")
-    .eq("pedido", d.pedido)
-    .eq("filial_venda", d.filialVenda)
+    .eq("pedido", d.order)
+    .eq("filial_venda", d.branch)
     .maybeSingle();
 
   let existingCargas: ExistingDeliveryCarga[] = [];
@@ -465,8 +470,8 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
     .from("totvs_deliveries")
     .upsert(
       {
-        pedido: d.pedido,
-        filial_venda: d.filialVenda,
+        pedido: d.order,
+        filial_venda: d.branch,
         loja: d.loja || null,
         client_id: d.cliente?.codigo || null,
         client_loja: d.cliente?.loja || null,
@@ -485,7 +490,7 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
     .select("id")
     .single();
   if (error || !deliveryRow) {
-    errors.push(`delivery ${d.pedido}: ${error?.message ?? "sem id retornado"}`);
+    errors.push(`delivery ${d.order}: ${error?.message ?? "sem id retornado"}`);
     return false;
   }
 
@@ -509,7 +514,7 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
         transportadora: c.transportadora || null,
         veiculo: c.veiculo || null,
         regiao: c.regiao || null,
-        nota_fiscal: c.notaFiscal || null,
+        nota_fiscal: c.invoice || null,
         serie: c.serie || null,
         dt_retorno: c.dtRetorno || null,
         hr_retorno: c.hrRetorno || null,
@@ -520,7 +525,7 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
       },
       { onConflict: "delivery_id,carga" }
     );
-    if (cargaError) errors.push(`delivery ${d.pedido} carga ${c.carga}: ${cargaError.message}`);
+    if (cargaError) errors.push(`delivery ${d.order} carga ${c.carga}: ${cargaError.message}`);
   }
 
   if (trigger) {
@@ -529,8 +534,8 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
       .update({ risk_trigger_at: new Date().toISOString(), risk_trigger_reason: trigger.reason })
       .eq("id", deliveryRow.id);
     await supabase.from("entrega_risco_events").insert({
-      pedido: d.pedido,
-      filial_venda: d.filialVenda,
+      pedido: d.order,
+      filial_venda: d.branch,
       actor_name: "Sincronização TOTVS",
       actor_role: "sistema",
       event_type: "reaberto_por_cancelamento",

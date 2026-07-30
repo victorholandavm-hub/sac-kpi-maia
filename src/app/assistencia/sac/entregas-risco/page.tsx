@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
-import { listEntregasEmRisco, type EntregaRiscoItem } from "@/lib/entregasRisco";
+import { listEntregasEmRisco, listAtendentes, type EntregaRiscoItem, type EntregaRiscoAtendente } from "@/lib/entregasRisco";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { EntregaRiscoNivelBadge } from "@/components/assistencia/EntregaRiscoNivelBadge";
 import { EntregaRiscoClassificarField } from "@/components/assistencia/EntregaRiscoClassificarField";
+import { EntregaRiscoAssignField } from "@/components/assistencia/EntregaRiscoAssignField";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ function formatDate(value: string): string {
   return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
 }
 
-function EntregaRiscoCard({ item }: { item: EntregaRiscoItem }) {
+function EntregaRiscoCard({ item, atendentes }: { item: EntregaRiscoItem; atendentes: EntregaRiscoAtendente[] }) {
   return (
     <div className="flex flex-col gap-3 p-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -51,12 +52,23 @@ function EntregaRiscoCard({ item }: { item: EntregaRiscoItem }) {
         {item.baselineOrigem === "nota_fiscal" ? `Venda em ${formatDate(item.baselineData)} (nota fiscal)` : `Visto pela 1ª vez em ${formatDate(item.baselineData)} (estimado)`}
       </p>
 
+      <EntregaRiscoAssignField pedido={item.pedido} filialVenda={item.filialVenda} assignedTo={item.assignedTo} atendentes={atendentes} />
       <EntregaRiscoClassificarField pedido={item.pedido} filialVenda={item.filialVenda} classificacao={item.classificacao} />
     </div>
   );
 }
 
-function Section({ title, items, emptyMessage }: { title: string; items: EntregaRiscoItem[]; emptyMessage: string }) {
+function Section({
+  title,
+  items,
+  atendentes,
+  emptyMessage,
+}: {
+  title: string;
+  items: EntregaRiscoItem[];
+  atendentes: EntregaRiscoAtendente[];
+  emptyMessage: string;
+}) {
   return (
     <div className="flex flex-col gap-2">
       <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
@@ -72,7 +84,7 @@ function Section({ title, items, emptyMessage }: { title: string; items: Entrega
         <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
             {items.map((item) => (
-              <EntregaRiscoCard key={`${item.pedido}-${item.filialVenda}`} item={item} />
+              <EntregaRiscoCard key={`${item.pedido}-${item.filialVenda}`} item={item} atendentes={atendentes} />
             ))}
           </div>
         </div>
@@ -85,7 +97,7 @@ export default async function EntregasRiscoPage() {
   const profile = await getProfile();
   if (profile.role !== "sac" && profile.role !== "admin") redirect("/assistencia/inicio");
 
-  const items = await listEntregasEmRisco();
+  const [items, atendentes] = await Promise.all([listEntregasEmRisco(), listAtendentes()]);
   const alertas = items.filter((i) => i.nivel === "alerta");
   const acompanhamentos = items.filter((i) => i.nivel === "acompanhamento");
 
@@ -93,8 +105,8 @@ export default async function EntregasRiscoPage() {
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="Entregas em risco" subtitle="Pedidos que podem atrasar — verifique a situação e avise o cliente antes do prazo." />
 
-      <Section title="Alerta" items={alertas} emptyMessage="Nenhum pedido em alerta no momento." />
-      <Section title="Acompanhamento" items={acompanhamentos} emptyMessage="Nenhum pedido em acompanhamento no momento." />
+      <Section title="Alerta" items={alertas} atendentes={atendentes} emptyMessage="Nenhum pedido em alerta no momento." />
+      <Section title="Acompanhamento" items={acompanhamentos} atendentes={atendentes} emptyMessage="Nenhum pedido em acompanhamento no momento." />
 
       <Link href="/assistencia/sac" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
         ← Voltar
