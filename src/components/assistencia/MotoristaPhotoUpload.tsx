@@ -26,6 +26,10 @@ export function MotoristaPhotoUpload({ requestId }: { requestId: string }) {
       <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
         Foto
       </span>
+      {/* Sem `capture`: em navegadores embutidos (ex.: o do WhatsApp) forçar a
+          câmera direto costuma travar sem abrir nada — deixando livre, o
+          sistema abre o seletor nativo (câmera OU galeria), que funciona em
+          muito mais lugares. Um botão só: escolher já envia, sem passo extra. */}
       <input
         key={inputKey}
         ref={inputRef}

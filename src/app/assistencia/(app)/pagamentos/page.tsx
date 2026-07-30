@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPaymentItems, listAssemblers, paymentStage, type PaymentItem } from "@/lib/payments";
+import { PAYMENTS_CONTROLLER_NAME } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
+import { PaymentsExportButton } from "@/components/assistencia/PaymentsExportButton";
 
 const STAGE_LABELS: Record<string, string> = { a_montar: "A montar", pendente: "Pendente", liberado: "Liberado" };
 const STAGE_COLORS: Record<string, string> = {
@@ -37,7 +39,9 @@ export default async function PagamentosPage({
 }: {
   searchParams: Promise<{ pendentes?: string; assembler?: string }>;
 }) {
-  redirectIfSac(await getProfile());
+  const profile = await getProfile();
+  redirectIfSac(profile);
+  const canExport = profile.fullName === PAYMENTS_CONTROLLER_NAME;
   const { pendentes, assembler } = await searchParams;
   const [allItems, assemblers] = await Promise.all([listPaymentItems({ assemblerName: assembler }), listAssemblers()]);
   const items = pendentes ? allItems.filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente") : allItems;
@@ -82,6 +86,7 @@ export default async function PagamentosPage({
             Total: <strong>{formatBRL(grandTotal)}</strong> · Pendente:{" "}
             <strong style={{ color: "var(--status-warning)" }}>{formatBRL(pendingTotal)}</strong>
           </div>
+          {canExport ? <PaymentsExportButton items={items} /> : null}
           <Link
             href="/assistencia/nova-rapida"
             className="text-sm px-3 py-2 rounded font-medium whitespace-nowrap"

@@ -51,12 +51,10 @@ function ReportTable({
   labelFor?: (key: string) => string;
 }) {
   return (
-    <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-      <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--gridline)" }}>
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          {title}
-        </h3>
-      </div>
+    <details className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+      <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--brand-green)", borderBottom: "1px solid var(--gridline)" }}>
+        {title} ({rows.length})
+      </summary>
       {rows.length === 0 ? (
         <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
           {emptyMessage}
@@ -93,7 +91,7 @@ function ReportTable({
           </table>
         </div>
       )}
-    </div>
+    </details>
   );
 }
 
@@ -134,6 +132,10 @@ export default async function RelatoriosPage({
 
   return (
     <div className="flex flex-col gap-4">
+      <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+        Relatórios
+      </h1>
+
       <form action="/assistencia/relatorios" method="GET" className="flex items-center gap-2 flex-wrap">
         <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
           De
@@ -348,12 +350,10 @@ export default async function RelatoriosPage({
         emptyMessage="Nenhuma solicitação com vendedor(a) preenchido nesse período — campo novo, só passa a existir dado a partir de agora."
       />
 
-      <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-        <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--gridline)" }}>
-          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            Pagamento por montador
-          </h3>
-        </div>
+      <details className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--brand-green)", borderBottom: "1px solid var(--gridline)" }}>
+          Pagamento por montador ({assemblerRows.length})
+        </summary>
         {assemblerRows.length === 0 ? (
           <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
             Nenhum pagamento no período.
@@ -390,14 +390,12 @@ export default async function RelatoriosPage({
             </table>
           </div>
         )}
-      </div>
+      </details>
 
-      <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-        <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--gridline)" }}>
-          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            Reconciliação com fornecedor (acumulado, todas as remessas)
-          </h3>
-        </div>
+      <details className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--brand-green)", borderBottom: "1px solid var(--gridline)" }}>
+          Reconciliação com fornecedor ({supplierReconciliation.length}) — acumulado, todas as remessas
+        </summary>
         {supplierReconciliation.length === 0 ? (
           <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
             Nenhuma remessa registrada ainda.
@@ -438,7 +436,7 @@ export default async function RelatoriosPage({
             </table>
           </div>
         )}
-      </div>
+      </details>
     </div>
   );
 }

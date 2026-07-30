@@ -47,6 +47,8 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
 
   const photos = await listRequestPhotos(request.id);
   const showCompleted = request.status === "concluida" || request.status === "cancelada";
+  const deadline = request.approvedDeadline ?? request.requestedDeadline;
+  const mapsQuery = [request.clientAddress, request.clientNeighborhood].filter(Boolean).join(", ");
 
   return (
     <ToastProvider>
@@ -74,9 +76,9 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
             {request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}
             {request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}
           </p>
-        ) : request.approvedDeadline ?? request.requestedDeadline ? (
+        ) : deadline ? (
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Data da montagem: {formatDateOnly(request.approvedDeadline ?? request.requestedDeadline)} (sem visita agendada ainda)
+            Data da montagem: {formatDateOnly(deadline)} (sem visita agendada ainda)
           </p>
         ) : null}
 
@@ -91,15 +93,28 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           <Row label="Motivo" value={request.reason} />
         </div>
 
-        {request.clientPhone ? (
-          <a
-            href={`tel:${request.clientPhone.replace(/\D/g, "")}`}
-            className="text-sm font-medium rounded-lg px-3 py-2.5 self-start"
-            style={{ background: "rgba(22, 163, 74, 0.1)", color: "var(--brand-green)" }}
-          >
-            📞 {request.clientPhone}
-          </a>
-        ) : null}
+        <div className="flex items-center gap-2 flex-wrap">
+          {request.clientPhone ? (
+            <a
+              href={`tel:${request.clientPhone.replace(/\D/g, "")}`}
+              className="text-sm font-medium rounded-lg px-3 py-2.5"
+              style={{ background: "color-mix(in srgb, var(--brand-green) 12%, transparent)", color: "var(--brand-green)" }}
+            >
+              📞 {request.clientPhone}
+            </a>
+          ) : null}
+          {mapsQuery ? (
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium rounded-lg px-3 py-2.5"
+              style={{ background: "color-mix(in srgb, var(--brand-green) 12%, transparent)", color: "var(--brand-green)" }}
+            >
+              🗺️ Ver no mapa
+            </a>
+          ) : null}
+        </div>
 
         <div className="flex flex-col gap-3">
           <PhotoGallery photos={photos} deleteMode="montador" currentActor={assemblerName} />

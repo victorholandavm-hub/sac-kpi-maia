@@ -69,6 +69,10 @@ export default async function SacHomePage({
         </div>
       </AssistenciaHeader>
 
+      <h2 className="text-xl font-bold" style={{ color: "var(--brand-orange)" }}>
+        Solicitações
+      </h2>
+
       <div className="flex items-center gap-2">
         <Link
           href="/assistencia/sac"
@@ -129,7 +133,7 @@ export default async function SacHomePage({
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
+                  <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
                     {r.clientName ?? "Sem nome de cliente"}
                   </p>
                   <p className="text-xs" style={{ color: "var(--text-muted)" }}>

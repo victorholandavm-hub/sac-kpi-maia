@@ -21,6 +21,18 @@ import { FabricaOperadorPinField } from "@/components/assistencia/FabricaOperado
 import { RotaWeekdaySelect } from "@/components/assistencia/RotaWeekdaySelect";
 import { getRotaWeekdayConfig } from "@/lib/rotas";
 
+function AdminSection({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
+  return (
+    <details className="rounded-lg border" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+      <summary className="text-base font-bold cursor-pointer p-4" style={{ color: "var(--brand-green)" }}>
+        {title}
+        {count !== undefined ? ` (${count})` : ""}
+      </summary>
+      <div className="flex flex-col gap-2 px-4 pb-4">{children}</div>
+    </details>
+  );
+}
+
 export default async function AdminPage() {
   const profile = await getProfile();
 
@@ -47,29 +59,17 @@ export default async function AdminPage() {
     ]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+    <div className="flex flex-col gap-4">
+      <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
         Administração
       </h2>
 
-      <section
-        className="rounded-lg border p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Criar conta de assistência
-        </h3>
+      <AdminSection title="Criar conta de assistência">
         <CreateUserForm />
-      </section>
+      </AdminSection>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <section
-          className="rounded-lg border p-4 flex flex-col gap-2"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-        >
-          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            Montadores
-          </h3>
+        <AdminSection title="Montadores" count={assemblers.length}>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Defina um PIN de {PIN_LENGTH} números pra cada um acessar a própria área em{" "}
             <span className="font-mono">/assistencia/montador</span>.
@@ -82,15 +82,9 @@ export default async function AdminPage() {
             ))}
           </ul>
           <AddSimpleEntryForm kind="assembler" />
-        </section>
+        </AdminSection>
 
-        <section
-          className="rounded-lg border p-4 flex flex-col gap-2"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-        >
-          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            Motoristas
-          </h3>
+        <AdminSection title="Motoristas" count={drivers.length}>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Defina um PIN de {PIN_LENGTH} números pra cada um acessar a própria área em{" "}
             <span className="font-mono">/assistencia/motorista</span>.
@@ -103,15 +97,9 @@ export default async function AdminPage() {
             ))}
           </ul>
           <AddSimpleEntryForm kind="driver" />
-        </section>
+        </AdminSection>
 
-        <section
-          className="rounded-lg border p-4 flex flex-col gap-2"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-        >
-          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            Fornecedores
-          </h3>
+        <AdminSection title="Fornecedores" count={suppliers.length}>
           <ul className="flex flex-col gap-1 max-h-48 overflow-y-auto">
             {suppliers.map((s) => (
               <li key={s} className="text-sm" style={{ color: "var(--text-secondary)" }}>
@@ -120,16 +108,10 @@ export default async function AdminPage() {
             ))}
           </ul>
           <AddSimpleEntryForm kind="supplier" />
-        </section>
+        </AdminSection>
       </div>
 
-      <section
-        className="rounded-lg border p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Gerentes de loja ({gerentes.length})
-        </h3>
+      <AdminSection title="Gerentes de loja" count={gerentes.length}>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           Cada gerente entra com o próprio nome + PIN de {PIN_LENGTH} números em <span className="font-mono">/assistencia/loja</span>{" "}
           e só consegue solicitar/negociar prazo para as lojas vinculadas abaixo (pode ser mais de uma).
@@ -143,28 +125,16 @@ export default async function AdminPage() {
           ))}
         </ul>
         <AddGerenteForm stores={stores} />
-      </section>
+      </AdminSection>
 
-      <section
-        className="rounded-lg border p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Catálogo de produtos — Encomendas
-        </h3>
+      <AdminSection title="Catálogo de produtos — Encomendas" count={produtosEncomenda.length}>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           Produtos disponíveis pra caixa escolher em <span className="font-mono">/assistencia/encomendas/solicitar</span>.
         </p>
         <ProdutoEncomendaAdmin produtos={produtosEncomenda} />
-      </section>
+      </AdminSection>
 
-      <section
-        className="rounded-lg border p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Caixas — Encomendas
-        </h3>
+      <AdminSection title="Caixas — Encomendas" count={caixas.length}>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           Cada caixa tem seu próprio PIN e uma loja fixa, e entra com nome + PIN em{" "}
           <span className="font-mono">/assistencia/encomendas/caixa/login</span>.
@@ -177,16 +147,10 @@ export default async function AdminPage() {
           ))}
         </ul>
         <AddCaixaForm stores={stores} />
-      </section>
+      </AdminSection>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <section
-          className="rounded-lg border p-4 flex flex-col gap-2"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-        >
-          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            Operadores CD — Encomendas
-          </h3>
+        <AdminSection title="Operadores CD — Encomendas" count={cdOperadores.length}>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Defina um PIN de {PIN_LENGTH} números pra cada um acessar{" "}
             <span className="font-mono">/assistencia/encomendas/cd/login</span>.
@@ -199,15 +163,9 @@ export default async function AdminPage() {
             ))}
           </ul>
           <AddSimpleEntryForm kind="cd" />
-        </section>
+        </AdminSection>
 
-        <section
-          className="rounded-lg border p-4 flex flex-col gap-2"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-        >
-          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            Operadores Fábrica — Encomendas
-          </h3>
+        <AdminSection title="Operadores Fábrica — Encomendas" count={fabricaOperadores.length}>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Defina um PIN de {PIN_LENGTH} números pra cada um acessar{" "}
             <span className="font-mono">/assistencia/encomendas/fabrica/login</span>.
@@ -220,16 +178,10 @@ export default async function AdminPage() {
             ))}
           </ul>
           <AddSimpleEntryForm kind="fabrica" />
-        </section>
+        </AdminSection>
       </div>
 
-      <section
-        className="rounded-lg border p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Rotas de entrega
-        </h3>
+      <AdminSection title="Rotas de entrega">
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
           Rota fixa por dia da semana (padrão: Praia seg/qui, Sul ter/sex, Centro qua/sáb) — usada
           na agenda pra sugerir as datas certas de cada rota. Domingo não tem rota.
@@ -241,7 +193,7 @@ export default async function AdminPage() {
             </li>
           ))}
         </ul>
-      </section>
+      </AdminSection>
     </div>
   );
 }
