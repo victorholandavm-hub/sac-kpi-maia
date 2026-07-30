@@ -84,7 +84,7 @@ const ENTRIES: SeedEntry[] = [
     category: "contatos_internos",
     title: "Escalação de casos graves (PROCON, Reclame Aqui, Serasa, risco jurídico)",
     body:
-      "Acionar: Victor — contato a preencher. Usar sempre que o cliente ameaçar ou já tiver aberto reclamação em " +
+      "Acionar: Victor — (81) 98129-5361. Usar sempre que o cliente ameaçar ou já tiver aberto reclamação em " +
       "PROCON/Reclame Aqui, mencionar Serasa/negativação, ou o caso tiver risco jurídico claro.",
     keywords: "procon, reclame aqui, serasa, negativacao, risco juridico, escalar, vitor, escalação",
   },
@@ -137,7 +137,9 @@ const ENTRIES: SeedEntry[] = [
     category: "fornecedores",
     title: "Conceito Estofados (fábrica própria — sofás)",
     body:
-      "Produção interna de sofás/estofados. Contato: João Maia — (83) 9896-0039.\n" +
+      "Produção interna de sofás/estofados.\n" +
+      "Contato: João Maia — (83) 9896-0039.\n" +
+      "Contato alternativo (representante Conceito): (83) 99104-6250.\n" +
       "Ocorrências comuns em devolução: barulho na madeira do assento, encaixe macho/fêmea, retrátil travando. " +
       "Ver também categoria Garantias, seção Sofás.",
     keywords: "conceito estofados, sofa, fabrica propria, joao maia, retratil, barulho, encaixe",
@@ -171,29 +173,30 @@ const ENTRIES: SeedEntry[] = [
     title: "Nesher (móveis/cozinhas)",
     body:
       "Fornecedor externo atual — móveis/cozinhas.\n" +
-      "Contato interno: a preencher.\n" +
+      "Contato interno (representante): Helder — (83) 99152-9292. O mesmo Helder também atende ACP, Demobile, " +
+      "Rio Doce e Coemmun.\n" +
       "SAC público (backup): Tel/WhatsApp (27) 3047-0040 · moveisnesher.com.br/contato · atendimento seg-sex " +
       "07h-11h e 12h-16h30.",
-    keywords: "nesher, movel, cozinha, fornecedor externo, sac publico",
+    keywords: "nesher, movel, cozinha, fornecedor externo, sac publico, helder",
   },
   {
     category: "fornecedores",
     title: "Kappesberg (móveis)",
     body:
       "Fornecedor externo atual — móveis.\n" +
-      "Contato interno: a preencher.\n" +
+      "Contato interno (representante): Jilson — (83) 98835-0604.\n" +
       "SAC público (backup): Tel (51) 3635-8800 · e-mail sac@kappesberg.com.br · kappesberg.com.br",
-    keywords: "kappesberg, movel, fornecedor externo, sac publico",
+    keywords: "kappesberg, movel, fornecedor externo, sac publico, jilson",
   },
   {
     category: "fornecedores",
     title: "Tuboarte (móveis — Jaguaribe/CE)",
     body:
       "Fornecedor externo atual — móveis. Fábrica em Jaguaribe-CE.\n" +
-      "Contato interno: a preencher.\n" +
+      "Contato interno (representante): Elias — (88) 99713-3427.\n" +
       "SAC público (backup): página de representantes por estado em tuboarte.com.br/Representantes — pedir o " +
       "contato do representante Nordeste.",
-    keywords: "tuboarte, movel, jaguaribe, ceara, fornecedor externo, representante",
+    keywords: "tuboarte, movel, jaguaribe, ceara, fornecedor externo, representante, elias",
   },
   {
     category: "fornecedores",
@@ -209,9 +212,9 @@ const ENTRIES: SeedEntry[] = [
     title: "Valdemóveis",
     body:
       "Fornecedor externo atual.\n" +
-      "Contato interno: a preencher.\n" +
+      "Contato interno (representante): Fábio — (83) 99904-0341. O mesmo Fábio também atende TCIL.\n" +
       "SAC público: não localizado com confiança — recomenda-se usar apenas o contato interno.",
-    keywords: "valdemoveis, fornecedor externo, mesa de jantar",
+    keywords: "valdemoveis, fornecedor externo, mesa de jantar, fabio",
   },
 
   // ---- Fornecedores e fabricantes: citados em devoluções históricas -------
@@ -283,10 +286,171 @@ const ENTRIES: SeedEntry[] = [
     title: "Bertolini (móveis de madeira e vidro)",
     body:
       "Fabricante citado em devoluções históricas de móveis.\n" +
-      "Contato interno: a preencher.\n" +
+      "Contato interno (representante): Rogério — (81) 98155-6677. O mesmo Rogério também atende Cimol, Europa, " +
+      "Madmarcs e Artely.\n" +
       "SAC público: não localizado com confiança — recomenda-se usar apenas o contato interno.\n" +
       "Garantia: 1 ano.",
-    keywords: "bertolini, movel, madeira, vidro, garantia, fabricante",
+    keywords: "bertolini, movel, madeira, vidro, garantia, fabricante, rogerio",
+  },
+
+  // ---- Fornecedores e fabricantes: representantes (lista de contatos) -----
+  {
+    category: "fornecedores",
+    title: "Salleto",
+    body: "Contato interno (representante): Alexandre — (83) 98169-8459.",
+    keywords: "salleto, representante, alexandre",
+  },
+  {
+    category: "fornecedores",
+    title: "Kits Paraná",
+    body: "Contato interno (representante): Alisson — (83) 99801-3063.",
+    keywords: "kits parana, kitsparana, representante, alisson",
+  },
+  {
+    category: "fornecedores",
+    title: "Bechara",
+    body:
+      "Contato interno (representante): Bechara — (32) 98432-6255.\n" +
+      "Contato alternativo: Rayza — (81) 98883-7311 (atende também Rufato, Móvel Bento, CHF, Colibri, Gelius e Tozeto).",
+    keywords: "bechara, representante, rayza",
+  },
+  {
+    category: "fornecedores",
+    title: "MGM",
+    body: "Contato interno (representante): Bruno — (83) 99985-4508.",
+    keywords: "mgm, representante, bruno",
+  },
+  {
+    category: "fornecedores",
+    title: "CHF",
+    body:
+      "Contato interno (representante): CHF — (32) 99942-7165.\n" +
+      "Contato alternativo: Rayza — (81) 98883-7311.",
+    keywords: "chf, representante, rayza",
+  },
+  {
+    category: "fornecedores",
+    title: "Capri",
+    body: "Contato interno (representantes): Eduarda / Patrícia — (32) 98432-6255.",
+    keywords: "capri, representante, eduarda, patricia",
+  },
+  {
+    category: "fornecedores",
+    title: "Móveis Teixeira",
+    body: "Contato interno (representante): Emerson — (32) 3528-0163.",
+    keywords: "moveis teixeira, representante, emerson",
+  },
+  {
+    category: "fornecedores",
+    title: "Itatiaia",
+    body:
+      "Contato interno (representante): Emily — (83) 9901-9399.\n" +
+      "Número informado com 10 dígitos (um a menos que o padrão de celular) — conferir com a Emily antes de divulgar.",
+    keywords: "itatiaia, representante, emily",
+  },
+  {
+    category: "fornecedores",
+    title: "MX Móveis",
+    body: "Contato interno (representante): Emmanuelle — (83) 99917-0858.",
+    keywords: "mx moveis, representante, emmanuelle",
+  },
+  {
+    category: "fornecedores",
+    title: "Gelius",
+    body:
+      "Contato interno (representante): Gelius — (17) 99792-5167.\n" +
+      "Contato alternativo: Rayza — (81) 98883-7311.",
+    keywords: "gelius, representante, rayza",
+  },
+  {
+    category: "fornecedores",
+    title: "ACP",
+    body: "Contato interno (representante): Helder — (83) 99152-9292. O mesmo Helder atende Nesher, Demobile, Rio Doce e Coemmun.",
+    keywords: "acp, representante, helder",
+  },
+  {
+    category: "fornecedores",
+    title: "Demobile",
+    body: "Contato interno (representante): Helder — (83) 99152-9292. O mesmo Helder atende Nesher, ACP, Rio Doce e Coemmun.",
+    keywords: "demobile, representante, helder",
+  },
+  {
+    category: "fornecedores",
+    title: "Rio Doce",
+    body: "Contato interno (representante): Helder — (83) 99152-9292. O mesmo Helder atende Nesher, ACP, Demobile e Coemmun.",
+    keywords: "rio doce, representante, helder",
+  },
+  {
+    category: "fornecedores",
+    title: "Coemmun",
+    body: "Contato interno (representante): Helder — (83) 99152-9292. O mesmo Helder atende Nesher, ACP, Demobile e Rio Doce.",
+    keywords: "coemmun, representante, helder",
+  },
+  {
+    category: "fornecedores",
+    title: "Henn",
+    body: "Contato interno (representante): Helder Felipe — (83) 99613-2467.",
+    keywords: "henn, representante, helder felipe",
+  },
+  {
+    category: "fornecedores",
+    title: "Cel Móveis",
+    body: "Contato interno (representante): Josenaide — (83) 98650-7374.",
+    keywords: "cel moveis, representante, josenaide",
+  },
+  {
+    category: "fornecedores",
+    title: "Conquista",
+    body: "Contato interno (representante): Natália — (32) 98432-6255.",
+    keywords: "conquista, representante, natalia",
+  },
+  {
+    category: "fornecedores",
+    title: "Rufato",
+    body: "Contato interno (representante): Rayza — (81) 98883-7311.",
+    keywords: "rufato, representante, rayza",
+  },
+  {
+    category: "fornecedores",
+    title: "Móvel Bento",
+    body: "Contato interno (representante): Rayza — (81) 98883-7311.",
+    keywords: "movel bento, representante, rayza",
+  },
+  {
+    category: "fornecedores",
+    title: "Colibri",
+    body: "Contato interno (representante): Rayza — (81) 98883-7311.",
+    keywords: "colibri, representante, rayza",
+  },
+  {
+    category: "fornecedores",
+    title: "Tozeto",
+    body: "Contato interno (representante): Rayza — (81) 98883-7311.",
+    keywords: "tozeto, representante, rayza",
+  },
+  {
+    category: "fornecedores",
+    title: "Cimol",
+    body: "Contato interno (representante): Rogério — (81) 98155-6677. O mesmo Rogério atende Bertolini, Europa, Madmarcs e Artely.",
+    keywords: "cimol, representante, rogerio",
+  },
+  {
+    category: "fornecedores",
+    title: "Europa",
+    body: "Contato interno (representante): Rogério — (81) 98155-6677. O mesmo Rogério atende Bertolini, Cimol, Madmarcs e Artely.",
+    keywords: "europa, representante, rogerio",
+  },
+  {
+    category: "fornecedores",
+    title: "Madmarcs",
+    body: "Contato interno (representante): Rogério — (81) 98155-6677. O mesmo Rogério atende Bertolini, Cimol, Europa e Artely.",
+    keywords: "madmarcs, representante, rogerio",
+  },
+  {
+    category: "fornecedores",
+    title: "Artely",
+    body: "Contato interno (representante): Rogério — (81) 98155-6677. O mesmo Rogério atende Bertolini, Cimol, Europa e Madmarcs.",
+    keywords: "artely, representante, rogerio",
   },
 
   // ---- Processos de atendimento --------------------------------------------

@@ -22,9 +22,16 @@ export function ArsenalEntryCard({ entry, canEdit }: { entry: ArsenalEntry; canE
     : [];
 
   return (
-    <div className="rounded-lg border p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+    <div
+      className="rounded-lg border p-4 flex flex-col gap-2"
+      style={{
+        background: "var(--surface-1)",
+        borderColor: "var(--border)",
+        borderLeft: `3px solid ${entry.active ? "color-mix(in srgb, var(--brand-green) 45%, transparent)" : "var(--border)"}`,
+      }}
+    >
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-base font-bold leading-snug" style={{ color: entry.active ? "var(--text-primary)" : "var(--text-muted)" }}>
+        <h3 className="text-base font-bold leading-snug" style={{ color: entry.active ? "var(--brand-green)" : "var(--text-muted)" }}>
           {entry.title}
           {!entry.active ? (
             <span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>

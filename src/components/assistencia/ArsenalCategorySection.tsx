@@ -21,9 +21,13 @@ export function ArsenalCategorySection({
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2.5 rounded-lg px-4 py-3 w-full text-left border"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        style={{
+          background: "color-mix(in srgb, var(--brand-green) 8%, var(--surface-1))",
+          borderColor: "var(--border)",
+          borderLeft: "4px solid var(--brand-green)",
+        }}
       >
-        <h2 className="text-base font-bold flex-1" style={{ color: "var(--text-primary)" }}>
+        <h2 className="text-base font-bold flex-1" style={{ color: "var(--brand-green)" }}>
           {label}
         </h2>
         <span
