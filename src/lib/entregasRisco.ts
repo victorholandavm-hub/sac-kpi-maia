@@ -41,6 +41,7 @@ export type EntregaRiscoItem = {
   pedido: string;
   filialVenda: string;
   loja: string | null;
+  clienteCodigo: string | null;
   clienteNome: string | null;
   clienteDocumento: string | null;
   clienteBairro: string | null;
@@ -128,6 +129,7 @@ type DeliveryRow = {
   pedido: string;
   filial_venda: string;
   loja: string | null;
+  client_id: string | null;
   client_name: string | null;
   client_cpf_cnpj: string | null;
   client_neighborhood: string | null;
@@ -161,7 +163,7 @@ function hasClassificacao(row: ClassificacaoRow): boolean {
 }
 
 const DELIVERY_COLUMNS =
-  "pedido, filial_venda, loja, client_name, client_cpf_cnpj, client_neighborhood, client_city, client_state, status_atual, first_seen_at, risk_trigger_at, risk_trigger_reason, " +
+  "pedido, filial_venda, loja, client_id, client_name, client_cpf_cnpj, client_neighborhood, client_city, client_state, status_atual, first_seen_at, risk_trigger_at, risk_trigger_reason, " +
   "totvs_delivery_cargas(carga, dt_previsao, tentativa, tipo_entrega, status_carga, status_entrega, motorista_nome, transportadora, nota_fiscal, serie)";
 
 function toEntregaRiscoCarga(row: DeliveryCargaRow): EntregaRiscoCarga {
@@ -241,6 +243,7 @@ export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
       pedido: d.pedido,
       filialVenda: d.filial_venda,
       loja: d.loja,
+      clienteCodigo: d.client_id,
       clienteNome: d.client_name,
       clienteDocumento: d.client_cpf_cnpj,
       clienteBairro: d.client_neighborhood,

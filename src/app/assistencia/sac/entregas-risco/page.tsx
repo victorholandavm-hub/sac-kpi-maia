@@ -26,6 +26,12 @@ function EntregaRiscoCard({ item, atendentes }: { item: EntregaRiscoItem; atende
           </div>
           <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
             {item.clienteNome ?? "Cliente não identificado"}
+            {item.clienteCodigo ? (
+              <span className="text-xs font-mono font-normal" style={{ color: "var(--text-muted)" }}>
+                {" "}
+                #{item.clienteCodigo}
+              </span>
+            ) : null}
           </span>
           <span className="text-xs" style={{ color: "var(--text-muted)" }}>
             {item.clienteDocumento ?? "—"}
