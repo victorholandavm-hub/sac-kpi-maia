@@ -1,17 +1,36 @@
-import { getKpiData } from "@/lib/kpi";
-import { resolveRange } from "@/lib/dateRange";
-import { categoryLabel, storeLabel } from "@/lib/labels";
-import { Dashboard } from "@/components/Dashboard";
+import Link from "next/link";
+import { AppHeader } from "@/components/AppHeader";
 
-export const revalidate = 60;
-
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
-}) {
-  const params = await searchParams;
-  const range = resolveRange(params);
-  const data = await getKpiData(range, { categoryLabel, storeLabel });
-  return <Dashboard data={data} range={range} />;
+export default function Home() {
+  return (
+    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6">
+      <AppHeader />
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Link
+          href="/kpis"
+          className="rounded-xl border p-6 flex flex-col gap-2"
+          style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
+        >
+          <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+            KPIs
+          </h2>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Indicadores de atendimento do SAC.
+          </p>
+        </Link>
+        <Link
+          href="/clientes"
+          className="rounded-xl border p-6 flex flex-col gap-2"
+          style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
+        >
+          <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+            Perfil do Cliente
+          </h2>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Padrões de compra por cliente e por bairro.
+          </p>
+        </Link>
+      </div>
+    </div>
+  );
 }

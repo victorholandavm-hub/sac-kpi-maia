@@ -13,7 +13,6 @@ import { EscalationBreakdown } from "./EscalationBreakdown";
 import { EscalationByStoreTable } from "./EscalationByStoreTable";
 import { EscalationPendingTable } from "./EscalationPendingTable";
 import { RangePicker } from "./RangePicker";
-import { Header } from "./Header";
 import { PreviousWeekCard } from "./PreviousWeekCard";
 import { AgentQueue } from "./AgentQueue";
 import { AgentStatsTable } from "./AgentStatsTable";
@@ -33,7 +32,6 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
   return (
     <div className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <Header />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <RangePicker range={range} />
           <PerformanceReportButton data={data.performanceReport} />

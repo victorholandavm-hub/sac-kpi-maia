@@ -2,10 +2,10 @@ import Link from "next/link";
 import type { DateRange } from "@/lib/dateRange";
 
 const PRESETS: { key: DateRange["preset"]; label: string; href: string }[] = [
-  { key: "7d", label: "7 dias", href: "/?range=7d" },
-  { key: "month", label: "Este mês", href: "/?range=month" },
-  { key: "year", label: "Este ano", href: "/?range=year" },
-  { key: "all", label: "Tudo", href: "/?range=all" },
+  { key: "7d", label: "7 dias", href: "/kpis?range=7d" },
+  { key: "month", label: "Este mês", href: "/kpis?range=month" },
+  { key: "year", label: "Este ano", href: "/kpis?range=year" },
+  { key: "all", label: "Tudo", href: "/kpis?range=all" },
 ];
 
 function pillStyle(active: boolean) {

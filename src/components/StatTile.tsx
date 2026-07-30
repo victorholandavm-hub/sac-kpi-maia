@@ -2,10 +2,12 @@ export function StatTile({
   label,
   value,
   suffix,
+  accent = "var(--brand-green)",
 }: {
   label: string;
   value: string | number;
   suffix?: string;
+  accent?: string;
 }) {
   return (
     <div
@@ -13,7 +15,7 @@ export function StatTile({
       style={{
         background: "var(--surface-1)",
         borderColor: "var(--border)",
-        borderTop: "3px solid var(--brand-green)",
+        borderTop: `3px solid ${accent}`,
       }}
     >
       <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
