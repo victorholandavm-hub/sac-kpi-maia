@@ -38,8 +38,8 @@ export default async function SacHomePage({
         <div className="flex items-center gap-3 flex-wrap">
           <Link
             href="/assistencia/sac/arsenal"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
-            style={{ background: "var(--surface-1)", color: "var(--text-primary)", borderColor: "var(--border)" }}
+            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
+            style={{ background: "var(--brand-orange)", color: "#fff" }}
           >
             Arsenal do SAC
           </Link>

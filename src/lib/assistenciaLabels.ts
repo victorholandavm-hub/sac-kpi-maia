@@ -166,16 +166,6 @@ export const ARSENAL_CATEGORY_LABELS: Record<string, string> = {
   cdc: "Código de Defesa do Consumidor",
 };
 
-// Só decorativo (badge por categoria) -- sem semântica de severidade, ao
-// contrário de ENTREGA_RISCO_NIVEL_COLORS.
-export const ARSENAL_CATEGORY_COLORS: Record<string, string> = {
-  contatos_internos: "var(--brand-green)",
-  fornecedores: "var(--brand-orange)",
-  processos: "var(--status-good)",
-  garantias: "var(--status-warning)",
-  cdc: "var(--status-serious)",
-};
-
 export const SAC_CATEGORIES = [
   "atraso_entrega",
   "entrega_parcial",

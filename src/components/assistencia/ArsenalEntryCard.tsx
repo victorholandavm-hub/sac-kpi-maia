@@ -14,10 +14,17 @@ export function ArsenalEntryCard({ entry, canEdit }: { entry: ArsenalEntry; canE
     return <ArsenalEntryForm entry={entry} onCancel={() => setEditing(false)} />;
   }
 
+  const keywordList = entry.keywords
+    ? entry.keywords
+        .split(",")
+        .map((k) => k.trim())
+        .filter(Boolean)
+    : [];
+
   return (
     <div className="rounded-lg border p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold" style={{ color: entry.active ? "var(--text-primary)" : "var(--text-muted)" }}>
+        <h3 className="text-base font-bold leading-snug" style={{ color: entry.active ? "var(--text-primary)" : "var(--text-muted)" }}>
           {entry.title}
           {!entry.active ? (
             <span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>
@@ -47,13 +54,21 @@ export function ArsenalEntryCard({ entry, canEdit }: { entry: ArsenalEntry; canE
           </div>
         ) : null}
       </div>
-      <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>
+      <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: "var(--text-secondary)" }}>
         {entry.body}
       </p>
-      {entry.keywords ? (
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Palavras-chave: {entry.keywords}
-        </p>
+      {keywordList.length > 0 ? (
+        <div className="flex items-center gap-1.5 flex-wrap pt-1">
+          {keywordList.map((k) => (
+            <span
+              key={k}
+              className="text-xs px-2 py-0.5 rounded-full"
+              style={{ background: "var(--background)", color: "var(--text-muted)" }}
+            >
+              {k}
+            </span>
+          ))}
+        </div>
       ) : null}
     </div>
   );
