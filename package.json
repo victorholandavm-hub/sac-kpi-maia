@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "totvs-sync": "node --env-file=.env.totvs-script scripts/totvs-sync.ts"
+    "totvs-sync": "node --env-file=.env.totvs-script scripts/totvs-sync.ts",
+    "seed-arsenal": "node --env-file=.env.local scripts/seed-arsenal.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.66.0",
