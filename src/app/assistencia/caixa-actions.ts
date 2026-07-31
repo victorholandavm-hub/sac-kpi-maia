@@ -12,6 +12,9 @@ import {
   verifyCaixaSession,
   verifyPin,
 } from "@/lib/caixaAuth";
+import { CD_COOKIE_NAME } from "@/lib/cdAuth";
+import { FABRICA_COOKIE_NAME } from "@/lib/fabricaAuth";
+import { LOJA_GERENTE_COOKIE_NAME } from "@/lib/lojaAuth";
 
 export type CaixaFormState = { error?: string } | undefined;
 
@@ -44,6 +47,14 @@ export async function caixaSignIn(_state: CaixaFormState, formData: FormData): P
   await resetPinAttempts("caixas", "name", name);
 
   const cookieStore = await cookies();
+  // Limpa outras sessões de papel de encomenda que possam estar ativas no
+  // mesmo navegador -- sem isso, um cookie antigo de CD/fábrica/gerente ainda
+  // válido "sequestra" a identidade em resolveEncomendaRequester /
+  // requireEncomendaActor, mesmo com esse login de caixa tendo dado certo.
+  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: FABRICA_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia" });
+
   cookieStore.set(CAIXA_COOKIE_NAME, signCaixaSession(data.name), {
     httpOnly: true,
     secure: true,

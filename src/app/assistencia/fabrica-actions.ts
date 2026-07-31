@@ -12,6 +12,9 @@ import {
   verifyFabricaSession,
   verifyPin,
 } from "@/lib/fabricaAuth";
+import { CD_COOKIE_NAME } from "@/lib/cdAuth";
+import { CAIXA_COOKIE_NAME } from "@/lib/caixaAuth";
+import { LOJA_GERENTE_COOKIE_NAME } from "@/lib/lojaAuth";
 
 export type FabricaFormState = { error?: string } | undefined;
 
@@ -39,6 +42,14 @@ export async function fabricaSignIn(_state: FabricaFormState, formData: FormData
   await resetPinAttempts("fabrica_operadores", "name", name);
 
   const cookieStore = await cookies();
+  // Limpa outras sessões de papel de encomenda que possam estar ativas no
+  // mesmo navegador -- sem isso, um cookie antigo de CD/caixa/gerente ainda
+  // válido "sequestra" a identidade em resolveEncomendaRequester /
+  // requireEncomendaActor, mesmo com esse login de fábrica tendo dado certo.
+  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia" });
+
   cookieStore.set(FABRICA_COOKIE_NAME, signFabricaSession(data.name), {
     httpOnly: true,
     secure: true,

@@ -6,6 +6,9 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import { CD_COOKIE_NAME, CD_SESSION_MAX_AGE, signCdSession, verifyCdSession, verifyPin } from "@/lib/cdAuth";
+import { FABRICA_COOKIE_NAME } from "@/lib/fabricaAuth";
+import { CAIXA_COOKIE_NAME } from "@/lib/caixaAuth";
+import { LOJA_GERENTE_COOKIE_NAME } from "@/lib/lojaAuth";
 
 export type CdFormState = { error?: string } | undefined;
 
@@ -33,6 +36,14 @@ export async function cdSignIn(_state: CdFormState, formData: FormData): Promise
   await resetPinAttempts("cd_operadores", "name", name);
 
   const cookieStore = await cookies();
+  // Limpa outras sessões de papel de encomenda que possam estar ativas no
+  // mesmo navegador -- sem isso, um cookie antigo de fábrica/caixa/gerente
+  // ainda válido "sequestra" a identidade em resolveEncomendaRequester /
+  // requireEncomendaActor, mesmo com esse login de CD tendo dado certo.
+  cookieStore.delete({ name: FABRICA_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia" });
+
   cookieStore.set(CD_COOKIE_NAME, signCdSession(data.name), {
     httpOnly: true,
     secure: true,

@@ -12,6 +12,9 @@ import {
   verifyLojaGerenteSession,
   verifyPin,
 } from "@/lib/lojaAuth";
+import { CD_COOKIE_NAME } from "@/lib/cdAuth";
+import { FABRICA_COOKIE_NAME } from "@/lib/fabricaAuth";
+import { CAIXA_COOKIE_NAME } from "@/lib/caixaAuth";
 
 export type LojaGerenteFormState = { error?: string } | undefined;
 
@@ -44,6 +47,15 @@ export async function lojaGerenteSignIn(_state: LojaGerenteFormState, formData: 
   // também precisa ler essa sessão, pra travar a loja da solicitação à(s) loja(s)
   // do gerente — ver createPublicRequest em src/app/assistencia/actions.ts.
   const cookieStore = await cookies();
+  // Limpa outras sessões de papel de encomenda que possam estar ativas no
+  // mesmo navegador -- sem isso, um cookie antigo de CD/fábrica/caixa ainda
+  // válido pode confundir telas que leem essas sessões (mesmo com a
+  // prioridade de gerente em resolveEncomendaRequester, mais robusto já
+  // não deixar nenhuma outra sessão pendurada).
+  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: FABRICA_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia/encomendas" });
+
   cookieStore.set(LOJA_GERENTE_COOKIE_NAME, signLojaGerenteSession(data.name), {
     httpOnly: true,
     secure: true,
