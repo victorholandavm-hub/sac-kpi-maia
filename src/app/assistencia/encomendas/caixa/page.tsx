@@ -190,6 +190,9 @@ export default async function EncomendasCaixaPage({
                 </summary>
                 <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid var(--gridline)" }}>
                   <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                    Fornecedor: {p.fornecedorTipo === "fabrica_externa" ? `Externo: ${p.fornecedorExterno}` : p.fabricaNome}
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                     Solicitado por: {p.requestedByName}
                     {storeIds.length > 1 ? ` (${p.storeName})` : ""}
                   </p>

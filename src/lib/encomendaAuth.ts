@@ -7,7 +7,7 @@ import { PIN_LENGTH, isValidPinFormat } from "./pinConfig";
 import { getCdSession } from "@/app/assistencia/cd-actions";
 import { getFabricaSession } from "@/app/assistencia/fabrica-actions";
 
-export type EncomendaActor = { name: string; role: "cd" | "fabrica" | "admin" | "assistencia" };
+export type EncomendaActor = { name: string; role: "cd" | "fabrica" | "admin" | "assistencia"; fabricaId?: string | null };
 
 // Resolve quem está vendo a fila interna de encomendas: sessão PIN de CD, ou
 // de fábrica, ou (por último, sem redirecionar pro login de nenhum dos dois)
@@ -19,7 +19,11 @@ export async function requireEncomendaActor(): Promise<EncomendaActor> {
   if (cdName) return { name: cdName, role: "cd" };
 
   const fabricaName = await getFabricaSession();
-  if (fabricaName) return { name: fabricaName, role: "fabrica" };
+  if (fabricaName) {
+    const admin = getSupabaseAdmin();
+    const { data } = await admin.from("fabrica_operadores").select("fabrica_id").eq("name", fabricaName).maybeSingle();
+    return { name: fabricaName, role: "fabrica", fabricaId: data?.fabrica_id ?? null };
+  }
 
   const supabase = await getSupabaseServer();
   const {
@@ -62,16 +66,18 @@ export async function setCdOperadorPin(name: string, pin: string): Promise<void>
   await resetPinAttempts("cd_operadores", "name", name);
 }
 
-export async function listFabricaOperadoresWithPinStatus(): Promise<OperadorWithPinStatus[]> {
+export type FabricaOperadorWithPinStatus = OperadorWithPinStatus & { fabricaId: string };
+
+export async function listFabricaOperadoresWithPinStatus(): Promise<FabricaOperadorWithPinStatus[]> {
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("fabrica_operadores").select("name, pin_hash").order("name");
+  const { data, error } = await admin.from("fabrica_operadores").select("name, pin_hash, fabrica_id").order("name");
   if (error) throw new Error(error.message);
-  return (data ?? []).map((o) => ({ name: o.name, hasPin: !!o.pin_hash }));
+  return (data ?? []).map((o) => ({ name: o.name, hasPin: !!o.pin_hash, fabricaId: o.fabrica_id }));
 }
 
-export async function addFabricaOperador(name: string): Promise<void> {
+export async function addFabricaOperador(name: string, fabricaId: string): Promise<void> {
   const admin = getSupabaseAdmin();
-  const { error } = await admin.from("fabrica_operadores").upsert({ name }, { onConflict: "name" });
+  const { error } = await admin.from("fabrica_operadores").upsert({ name, fabrica_id: fabricaId }, { onConflict: "name" });
   if (error) throw new Error(error.message);
 }
 

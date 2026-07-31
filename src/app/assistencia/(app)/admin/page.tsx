@@ -5,6 +5,7 @@ import { listAssemblersWithPinStatus, listDriversWithPinStatus } from "@/lib/pay
 import { listSuppliers } from "@/lib/partOrders";
 import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
 import { listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
+import { findInternalFabrica } from "@/lib/fabricas";
 import { listCaixasWithPinStatus } from "@/lib/caixas";
 import { PIN_LENGTH } from "@/lib/pinConfig";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
@@ -173,7 +174,7 @@ export default async function AdminPage() {
           <ul className="flex flex-col gap-2">
             {fabricaOperadores.map((o) => (
               <li key={o.name}>
-                <FabricaOperadorPinField name={o.name} hasPin={o.hasPin} />
+                <FabricaOperadorPinField name={o.name} hasPin={o.hasPin} fabricaNome={findInternalFabrica(o.fabricaId)?.nome ?? o.fabricaId} />
               </li>
             ))}
           </ul>

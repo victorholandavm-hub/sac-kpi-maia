@@ -17,6 +17,7 @@ import {
   setFabricaOperadorPin as setFabricaOperadorPinLib,
 } from "@/lib/encomendaAuth";
 import { setRotaWeekday as setRotaWeekdayLib, isRota, type Rota } from "@/lib/rotas";
+import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 
 export type FormState = { error?: string; success?: boolean } | undefined;
 
@@ -277,8 +278,11 @@ export async function addFabricaOperador(_state: FormState, formData: FormData):
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Informe o nome." };
 
+  const fabricaId = String(formData.get("fabrica_id") ?? "");
+  if (!INTERNAL_FABRICAS.some((f) => f.id === fabricaId)) return { error: "Selecione a fábrica." };
+
   try {
-    await addFabricaOperadorLib(name);
+    await addFabricaOperadorLib(name, fabricaId);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível salvar." };
   }

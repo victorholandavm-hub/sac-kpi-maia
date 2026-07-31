@@ -119,6 +119,10 @@ export type PedidoEncomendaSummary = {
   createdAt: string;
   updatedAt: string;
   items: PedidoEncomendaItem[];
+  fornecedorTipo: "fabrica_interna" | "fabrica_externa";
+  fabricaId: string | null;
+  fabricaNome: string | null;
+  fornecedorExterno: string | null;
 };
 
 type PedidoRow = {
@@ -137,6 +141,10 @@ type PedidoRow = {
   created_at: string;
   updated_at: string;
   stores: { name: string } | null;
+  fornecedor_tipo: "fabrica_interna" | "fabrica_externa";
+  fabrica_id: string | null;
+  fornecedor_externo: string | null;
+  fabricas: { nome: string } | null;
   pedido_encomenda_itens:
     | {
         id: string;
@@ -149,7 +157,7 @@ type PedidoRow = {
 };
 
 const PEDIDO_COLUMNS =
-  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, prazo_fabrica_cd, prazo_cd_loja, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produto_descricao, produto_codigo, produtos_encomenda(descricao))";
+  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, prazo_fabrica_cd, prazo_cd_loja, notes, created_at, updated_at, stores(name), fornecedor_tipo, fabrica_id, fornecedor_externo, fabricas(nome), pedido_encomenda_itens(id, quantidade, produto_descricao, produto_codigo, produtos_encomenda(descricao))";
 
 function toSummary(row: PedidoRow): PedidoEncomendaSummary {
   return {
@@ -174,6 +182,10 @@ function toSummary(row: PedidoRow): PedidoEncomendaSummary {
       produtoCodigo: i.produto_codigo,
       quantidade: i.quantidade,
     })),
+    fornecedorTipo: row.fornecedor_tipo,
+    fabricaId: row.fabrica_id,
+    fabricaNome: row.fabricas?.nome ?? null,
+    fornecedorExterno: row.fornecedor_externo,
   };
 }
 
@@ -193,12 +205,16 @@ export async function listPedidosByStores(
 }
 
 export async function listAllPedidos(
-  opts: { status?: PedidoEncomendaStatus; storeId?: string } = {}
+  opts: { status?: PedidoEncomendaStatus; storeId?: string; fabricaId?: string; fornecedorTipo?: "fabrica_interna" | "fabrica_externa" } = {}
 ): Promise<PedidoEncomendaSummary[]> {
   const admin = getSupabaseAdmin();
   let query = admin.from("pedidos_encomenda").select(PEDIDO_COLUMNS);
   if (opts.status) query = query.eq("status", opts.status);
   if (opts.storeId) query = query.eq("store_id", opts.storeId);
+  // Operador de fábrica só enxerga pedidos da própria fábrica -- nunca
+  // externos, nunca da outra fábrica interna (ver fila/page.tsx).
+  if (opts.fabricaId) query = query.eq("fabrica_id", opts.fabricaId);
+  if (opts.fornecedorTipo) query = query.eq("fornecedor_tipo", opts.fornecedorTipo);
   // Ascendente (mais antigo primeiro) -- é literalmente a fila (FIFO), e o
   // número "Nº na fila" (ver listOpenPedidoEncomendaQueueIds) já segue essa
   // ordem. Com ordem descendente aqui, a lista mostrava o 2º antes do 1º.
@@ -306,6 +322,9 @@ export async function createPedidoEncomenda(input: {
   clienteCodigo: string | null;
   notes: string | null;
   items: NewPedidoEncomendaItem[];
+  fornecedorTipo: "fabrica_interna" | "fabrica_externa";
+  fabricaId: string | null;
+  fornecedorExterno: string | null;
 }): Promise<{ id: string; pedidoNumber: number }> {
   const admin = getSupabaseAdmin();
 
@@ -317,6 +336,9 @@ export async function createPedidoEncomenda(input: {
       vendedor_name: input.vendedorName,
       cliente_codigo: input.clienteCodigo,
       notes: input.notes,
+      fornecedor_tipo: input.fornecedorTipo,
+      fabrica_id: input.fabricaId,
+      fornecedor_externo: input.fornecedorExterno,
     })
     .select("id, pedido_number")
     .single();

@@ -43,6 +43,9 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
 
   const { pedido, events } = result;
   const photos = await listEncomendaPhotos(pedido.id);
+  const externo = pedido.fornecedorTipo === "fabrica_externa";
+  const matchesFabrica = actor.role !== "fabrica" || (!!actor.fabricaId && actor.fabricaId === pedido.fabricaId);
+  const fornecedorLabel = externo ? `Externo: ${pedido.fornecedorExterno}` : pedido.fabricaNome;
 
   return (
     <ToastProvider>
@@ -75,6 +78,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
 
       <FormSection title="Detalhes do pedido">
         <div className="grid sm:grid-cols-2 gap-4">
+          <Row label="Fornecedor" value={fornecedorLabel} />
           <Row label="Solicitado por" value={pedido.requestedByName} />
           <Row label="Vendedor" value={pedido.vendedorName} />
           <Row label="Código do cliente" value={pedido.clienteCodigo} />
@@ -91,7 +95,11 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
           field="fabrica_cd"
           label="Prazo fábrica → CD"
           value={pedido.prazoFabricaCd}
-          canEdit={actor.role === "fabrica" || actor.role === "admin" || actor.role === "assistencia"}
+          canEdit={
+            actor.role === "admin" ||
+            actor.role === "assistencia" ||
+            (externo ? actor.role === "cd" : actor.role === "fabrica" && matchesFabrica)
+          }
         />
         <PedidoPrazoField
           pedidoId={pedido.id}
@@ -122,6 +130,8 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         storeId={pedido.storeId}
         prazoFabricaCd={pedido.prazoFabricaCd}
         prazoCdLoja={pedido.prazoCdLoja}
+        fornecedorTipo={pedido.fornecedorTipo}
+        matchesFabrica={matchesFabrica}
       />
 
       <FormSection title="Histórico">

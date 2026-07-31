@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { addAssembler, addSupplier, addDriver, addCdOperador, addFabricaOperador, type FormState } from "@/app/assistencia/admin-actions";
+import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 
 const ACTIONS = {
   assembler: addAssembler,
@@ -31,6 +32,18 @@ export function AddSimpleEntryForm({ kind }: { kind: keyof typeof ACTIONS }) {
         className="rounded border px-2 py-1 text-sm"
         style={{ borderColor: "var(--border)" }}
       />
+      {kind === "fabrica" ? (
+        <select name="fabrica_id" required defaultValue="" className="rounded border px-2 py-1 text-sm" style={{ borderColor: "var(--border)" }}>
+          <option value="" disabled>
+            Fábrica…
+          </option>
+          {INTERNAL_FABRICAS.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.nome}
+            </option>
+          ))}
+        </select>
+      ) : null}
       <button
         type="submit"
         disabled={pending}

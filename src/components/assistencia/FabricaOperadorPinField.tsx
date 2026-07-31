@@ -5,7 +5,7 @@ import { setFabricaOperadorPin } from "@/app/assistencia/admin-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PIN_LENGTH } from "@/lib/pinConfig";
 
-export function FabricaOperadorPinField({ name, hasPin }: { name: string; hasPin: boolean }) {
+export function FabricaOperadorPinField({ name, hasPin, fabricaNome }: { name: string; hasPin: boolean; fabricaNome: string }) {
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [pin, setPin] = useState("");
@@ -14,7 +14,7 @@ export function FabricaOperadorPinField({ name, hasPin }: { name: string; hasPin
     return (
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          {name}
+          {name} <span style={{ color: "var(--text-muted)" }}>· {fabricaNome}</span>
         </span>
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: hasPin ? "var(--status-good)" : "var(--text-muted)" }}>

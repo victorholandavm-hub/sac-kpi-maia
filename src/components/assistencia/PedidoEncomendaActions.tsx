@@ -23,19 +23,34 @@ type NextStep = {
 };
 
 const NEXT_STEP: Record<string, NextStep | undefined> = {
-  solicitado: { toStatus: "em_producao", label: "Marcar em produção", needsPrazoFabricaCd: true },
   em_producao: { toStatus: "pronto_para_expedicao", label: "Marcar como enviado para o CD" },
   pronto_para_expedicao: { toStatus: "em_carga", label: "Informar carga e expedir", needsCarga: true, needsPrazoCdLoja: true },
   em_carga: { toStatus: "faturado", label: "Informar NF-e e faturar", needsNfE: true },
   faturado: { toStatus: "entregue", label: "Marcar entregue" },
 };
 
+// "Solicitado" é o único passo que muda de dono conforme o fornecedor:
+// fábrica própria aceita e produz; fornecedor externo não tem etapa de
+// produção pra acompanhar, então o CD assume direto (ver requireEncomendaAction,
+// src/lib/dal.ts).
+function getNextStep(status: string, fornecedorTipo: "fabrica_interna" | "fabrica_externa"): NextStep | undefined {
+  if (status === "solicitado") {
+    return fornecedorTipo === "fabrica_externa"
+      ? { toStatus: "pronto_para_expedicao", label: "Marcar como enviado para o CD", needsPrazoFabricaCd: true }
+      : { toStatus: "em_producao", label: "Marcar em produção", needsPrazoFabricaCd: true };
+  }
+  return NEXT_STEP[status];
+}
+
 // Cada papel só vê o próximo passo se ele de fato pode executá-lo — o
 // servidor (requireEncomendaAction em src/lib/dal.ts) já barra o resto, isso
 // aqui é só pra não mostrar um botão que vai dar erro.
-const ROLE_CAN_ADVANCE: Record<string, string[]> = {
+const ROLE_CAN_ADVANCE_INTERNA: Record<string, string[]> = {
   fabrica: ["solicitado", "em_producao"],
   cd: ["pronto_para_expedicao", "em_carga", "faturado"],
+};
+const ROLE_CAN_ADVANCE_EXTERNA: Record<string, string[]> = {
+  cd: ["solicitado", "pronto_para_expedicao", "em_carga", "faturado"],
 };
 
 export function PedidoEncomendaActions({
@@ -45,6 +60,8 @@ export function PedidoEncomendaActions({
   storeId,
   prazoFabricaCd,
   prazoCdLoja,
+  fornecedorTipo,
+  matchesFabrica,
 }: {
   pedidoId: string;
   status: string;
@@ -52,6 +69,8 @@ export function PedidoEncomendaActions({
   storeId: string;
   prazoFabricaCd: string | null;
   prazoCdLoja: string | null;
+  fornecedorTipo: "fabrica_interna" | "fabrica_externa";
+  matchesFabrica: boolean;
 }) {
   const { pending, run } = useQuickAction();
   const [carga, setCarga] = useState("");
@@ -76,10 +95,17 @@ export function PedidoEncomendaActions({
     return () => clearTimeout(timer);
   }, [nfE, storeId]);
 
-  const canManageStatus = role === "assistencia" || role === "admin" || (ROLE_CAN_ADVANCE[role] ?? []).includes(status);
-  const nextStep = canManageStatus ? NEXT_STEP[status] : undefined;
+  const externo = fornecedorTipo === "fabrica_externa";
+  const roleCanAdvanceTable = externo ? ROLE_CAN_ADVANCE_EXTERNA : ROLE_CAN_ADVANCE_INTERNA;
+  const canManageStatus =
+    role === "assistencia" ||
+    role === "admin" ||
+    ((roleCanAdvanceTable[role] ?? []).includes(status) && (role !== "fabrica" || matchesFabrica));
+  const nextStep = canManageStatus ? getNextStep(status, fornecedorTipo) : undefined;
   const canCancel = (role === "assistencia" || role === "admin") && status !== "entregue" && status !== "cancelado";
-  const canDeny = (role === "fabrica" || role === "assistencia" || role === "admin") && status === "solicitado";
+  const canDeny =
+    (role === "assistencia" || role === "admin" || (role === "fabrica" && !externo && matchesFabrica) || (role === "cd" && externo)) &&
+    status === "solicitado";
 
   return (
     <FormSection title="Ações">

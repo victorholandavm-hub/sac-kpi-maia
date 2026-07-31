@@ -70,7 +70,11 @@ export default async function SolicitarEncomendaPage({
         </div>
       ) : null}
 
-      <NovoPedidoEncomendaForm fixedStoreName={fixedStoreName} storeOptions={storeOptions} />
+      <NovoPedidoEncomendaForm
+        fixedStoreName={fixedStoreName}
+        storeOptions={storeOptions}
+        showFornecedorPicker={requester.kind !== "fabrica"}
+      />
     </div>
   );
 }

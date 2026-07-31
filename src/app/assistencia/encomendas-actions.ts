@@ -7,6 +7,7 @@ import { requireEncomendaAction } from "@/lib/dal";
 import { requireEncomendaActor } from "@/lib/encomendaAuth";
 import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
+import { INTERNAL_FABRICAS, EXTERNAL_FABRICAS } from "@/lib/fabricas";
 import {
   createPedidoEncomenda,
   updatePedidoStatus,
@@ -91,6 +92,33 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   const { data: store } = await admin.from("stores").select("name").eq("id", storeId).maybeSingle();
   if (!store) return { error: "Loja inválida." };
 
+  // Fornecedor: quem já é operador de fábrica só lança pedido pra própria
+  // fábrica (não escolhe no formulário — ver campo fixo em
+  // NovoPedidoEncomendaForm.tsx). Os demais (gerente/caixa/CD) escolhem
+  // entre as duas fábricas próprias ou um fornecedor externo, sempre
+  // validado contra as listas fixas, nunca confiando cegamente no formData.
+  let fornecedorTipo: "fabrica_interna" | "fabrica_externa";
+  let fabricaId: string | null = null;
+  let fornecedorExterno: string | null = null;
+  if (requester.kind === "fabrica") {
+    fornecedorTipo = "fabrica_interna";
+    fabricaId = requester.fabricaId;
+    if (!fabricaId) return { error: "Fábrica do operador não configurada." };
+  } else {
+    const rawTipo = String(formData.get("fornecedor_tipo") ?? "");
+    if (rawTipo === "fabrica_externa") {
+      const rawExterno = String(formData.get("fornecedor_externo") ?? "").trim();
+      if (!EXTERNAL_FABRICAS.includes(rawExterno)) return { error: "Selecione um fornecedor externo válido." };
+      fornecedorTipo = "fabrica_externa";
+      fornecedorExterno = rawExterno;
+    } else {
+      const rawFabricaId = String(formData.get("fabrica_id") ?? "");
+      if (!INTERNAL_FABRICAS.some((f) => f.id === rawFabricaId)) return { error: "Selecione a fábrica do pedido." };
+      fornecedorTipo = "fabrica_interna";
+      fabricaId = rawFabricaId;
+    }
+  }
+
   const vendedorName = String(formData.get("vendedor_name") ?? "").trim() || null;
   const clienteCodigo = String(formData.get("cliente_codigo") ?? "").trim() || null;
 
@@ -113,7 +141,17 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   let pedidoId: string;
   let pedidoNumber: number;
   try {
-    const result = await createPedidoEncomenda({ storeId, requestedByName, vendedorName, clienteCodigo, notes, items });
+    const result = await createPedidoEncomenda({
+      storeId,
+      requestedByName,
+      vendedorName,
+      clienteCodigo,
+      notes,
+      items,
+      fornecedorTipo,
+      fabricaId,
+      fornecedorExterno,
+    });
     pedidoId = result.id;
     pedidoNumber = result.pedidoNumber;
   } catch (err) {
@@ -157,19 +195,24 @@ export async function advancePedidoStatus(
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("pedidos_encomenda")
-    .select("status, prazo_fabrica_cd, prazo_cd_loja")
+    .select("status, prazo_fabrica_cd, prazo_cd_loja, fornecedor_tipo, fabrica_id")
     .eq("id", pedidoId)
     .single();
   if (fetchError || !current) throw new Error("Pedido não encontrado.");
 
-  requireEncomendaAction(actor, current.status, toStatus);
+  requireEncomendaAction(actor, { status: current.status, fornecedorTipo: current.fornecedor_tipo, fabricaId: current.fabrica_id }, toStatus);
 
   // Prazo prometido de cada etapa -- obrigatório no momento em que quem é
   // dono da etapa aceita o pedido (fábrica: solicitado -> em_producao; CD:
-  // pronto_para_expedicao -> em_carga). É definido separadamente via
-  // PedidoPrazoField (setPedidoPrazoFabricaCdAction/CdLoja), não nesse
-  // clique -- aqui só confere que já foi salvo antes de deixar avançar.
-  if (toStatus === "em_producao" && !current.prazo_fabrica_cd) {
+  // pronto_para_expedicao -> em_carga; ou, se o fornecedor é externo, o
+  // próprio CD assume as duas etapas e essa checagem vale já no
+  // solicitado -> pronto_para_expedicao, que é o "aceitar" equivalente
+  // nesse fluxo). É definido separadamente via PedidoPrazoField
+  // (setPedidoPrazoFabricaCdAction/CdLoja), não nesse clique -- aqui só
+  // confere que já foi salvo antes de deixar avançar.
+  const externo = current.fornecedor_tipo === "fabrica_externa";
+  const aceitandoPedido = externo ? toStatus === "pronto_para_expedicao" && current.status === "solicitado" : toStatus === "em_producao";
+  if (aceitandoPedido && !current.prazo_fabrica_cd) {
     throw new Error('Defina o "Prazo fábrica → CD" antes de avançar.');
   }
   if (toStatus === "em_carga" && !opts.carga?.trim()) {
@@ -204,14 +247,14 @@ export async function bulkMarkEnviadoParaCD(pedidoIds: string[]): Promise<void> 
   const admin = getSupabaseAdmin();
   const { data: rows, error: fetchError } = await admin
     .from("pedidos_encomenda")
-    .select("id, status")
+    .select("id, status, fornecedor_tipo, fabrica_id")
     .in("id", pedidoIds);
   if (fetchError || !rows || rows.length !== pedidoIds.length) {
     throw new Error("Um ou mais pedidos não foram encontrados.");
   }
 
   for (const row of rows) {
-    requireEncomendaAction(actor, row.status, "pronto_para_expedicao");
+    requireEncomendaAction(actor, { status: row.status, fornecedorTipo: row.fornecedor_tipo, fabricaId: row.fabrica_id }, "pronto_para_expedicao");
   }
   for (const row of rows) {
     await updatePedidoStatus(row.id, actor, row.status, "pronto_para_expedicao");
@@ -244,25 +287,25 @@ export async function cancelPedido(pedidoId: string, note: string): Promise<void
   revalidatePath("/assistencia/encomendas/caixa");
 }
 
-// Negação fica restrita à fábrica (ou admin/assistência, por supervisão) e só
-// vale enquanto o pedido ainda está "solicitado" — depois que entra em
-// produção, qualquer desistência já passa por cancelPedido. Motivo sempre
-// obrigatório, igual ao cancelamento.
+// Negação fica restrita a quem cuida do pedido nessa etapa -- fábrica pra
+// pedido interno, CD pra pedido externo (ou admin/assistência, por
+// supervisão) -- e só vale enquanto o pedido ainda está "solicitado":
+// depois que entra em produção/expedição, qualquer desistência já passa por
+// cancelPedido. Motivo sempre obrigatório, igual ao cancelamento.
 export async function denyPedido(pedidoId: string, reason: string): Promise<void> {
   const actor = await requireEncomendaActor();
-  if (actor.role !== "fabrica" && actor.role !== "admin" && actor.role !== "assistencia") {
-    throw new Error(`Ação não permitida para o papel "${actor.role}".`);
-  }
   if (!reason.trim()) throw new Error("Informe o motivo da recusa.");
 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("pedidos_encomenda")
-    .select("status")
+    .select("status, fornecedor_tipo, fabrica_id")
     .eq("id", pedidoId)
     .single();
   if (fetchError || !current) throw new Error("Pedido não encontrado.");
   if (current.status !== "solicitado") throw new Error("Só é possível negar um pedido que ainda está solicitado.");
+
+  requireEncomendaAction(actor, { status: current.status, fornecedorTipo: current.fornecedor_tipo, fabricaId: current.fabrica_id }, "negado");
 
   await updatePedidoStatus(pedidoId, actor, current.status, "negado", { note: reason.trim() });
 
@@ -279,13 +322,22 @@ export async function addPedidoNoteAction(pedidoId: string, note: string): Promi
 
 // Prazo fábrica -> CD: obrigatório em advancePedidoStatus na primeira vez
 // (transição solicitado -> em_producao), mas continua editável depois disso
-// -- só quem é dono dessa etapa (fábrica) ou admin/assistência.
+// -- só quem é dono dessa etapa (fábrica, ou o CD quando o fornecedor é
+// externo -- não existe fábrica pra definir nesse caso, ver dal.ts) ou
+// admin/assistência.
 export async function setPedidoPrazoFabricaCdAction(pedidoId: string, value: string): Promise<void> {
   const actor = await requireEncomendaActor();
-  if (actor.role !== "fabrica" && actor.role !== "admin" && actor.role !== "assistencia") {
-    throw new Error("Só a fábrica pode definir esse prazo.");
-  }
   if (!value.trim()) throw new Error("Informe uma data.");
+
+  if (actor.role !== "admin" && actor.role !== "assistencia") {
+    const admin = getSupabaseAdmin();
+    const { data: pedido } = await admin.from("pedidos_encomenda").select("fornecedor_tipo").eq("id", pedidoId).maybeSingle();
+    const externo = pedido?.fornecedor_tipo === "fabrica_externa";
+    const podeDefinir = (actor.role === "fabrica" && !externo) || (actor.role === "cd" && externo);
+    if (!podeDefinir) {
+      throw new Error(externo ? "Só o CD pode definir esse prazo (fornecedor externo)." : "Só a fábrica pode definir esse prazo.");
+    }
+  }
   await setPedidoPrazoEtapa(pedidoId, actor, "prazo_fabrica_cd", value.trim());
   revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
   revalidatePath("/assistencia/encomendas/fila");

@@ -4,12 +4,13 @@ import { getCdSession } from "@/app/assistencia/cd-actions";
 import { getFabricaSession } from "@/app/assistencia/fabrica-actions";
 import { getCaixaStoreId } from "./caixas";
 import { getGerenteStoreIds } from "./gerentes";
+import { getSupabaseAdmin } from "./supabaseAdmin";
 
 export type EncomendaRequester =
   | { kind: "caixa"; storeId: string; name: string }
   | { kind: "gerente"; storeIds: string[]; name: string }
   | { kind: "cd"; name: string }
-  | { kind: "fabrica"; name: string };
+  | { kind: "fabrica"; name: string; fabricaId: string | null };
 
 // Quem pode lançar/ver encomenda de uma loja: caixa (PIN por pessoa, 1 loja),
 // gerente (login que ele já usa em /assistencia/loja, cookie com path
@@ -43,7 +44,11 @@ export async function resolveEncomendaRequester(): Promise<EncomendaRequester | 
   if (cdName) return { kind: "cd", name: cdName };
 
   const fabricaName = await getFabricaSession();
-  if (fabricaName) return { kind: "fabrica", name: fabricaName };
+  if (fabricaName) {
+    const admin = getSupabaseAdmin();
+    const { data } = await admin.from("fabrica_operadores").select("fabrica_id").eq("name", fabricaName).maybeSingle();
+    return { kind: "fabrica", name: fabricaName, fabricaId: data?.fabrica_id ?? null };
+  }
 
   return null;
 }

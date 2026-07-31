@@ -17,12 +17,12 @@ const BULK_ELIGIBLE_STATUS = "em_producao";
 export function PedidoEncomendaFilaList({
   pedidos,
   queuePosition,
-  actionStatuses,
+  actionNeededIds,
   canBulkAdvance,
 }: {
   pedidos: PedidoEncomendaSummary[];
   queuePosition: [string, number][];
-  actionStatuses: string[];
+  actionNeededIds: Set<string>;
   canBulkAdvance: boolean;
 }) {
   const positionMap = new Map(queuePosition);
@@ -52,7 +52,8 @@ export function PedidoEncomendaFilaList({
       <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
         <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
           {pedidos.map((p) => {
-            const needsAction = actionStatuses.includes(p.status);
+            const needsAction = actionNeededIds.has(p.id);
+            const fornecedorLabel = p.fornecedorTipo === "fabrica_externa" ? `Externo: ${p.fornecedorExterno}` : p.fabricaNome;
             const eligible = canBulkAdvance && p.status === BULK_ELIGIBLE_STATUS;
             const position = positionMap.get(p.id);
             return (
@@ -101,6 +102,14 @@ export function PedidoEncomendaFilaList({
                       <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                         {p.storeName}
                       </span>
+                      {fornecedorLabel ? (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
+                          style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+                        >
+                          {fornecedorLabel}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
                       {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
