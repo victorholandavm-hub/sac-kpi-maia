@@ -20,17 +20,23 @@ export type EncomendaRequester =
 // pelo requester real. Tenta cada sessão em sequência, mesmo padrão de
 // requireEncomendaActor (src/lib/encomendaAuth.ts) só que pro lado de quem
 // solicita, não de quem processa.
+//
+// Gerente vem antes de caixa: os cookies têm paths diferentes (gerente em
+// /assistencia, caixa só em /assistencia/encomendas) e podem coexistir no
+// mesmo navegador -- por exemplo, se essa pessoa também testou/usou o login
+// de caixa antes. Nesse caso a identidade de gerente (mais ampla) deve
+// prevalecer, senão a loja errada (a do caixa antigo) aparece pro gerente.
 export async function resolveEncomendaRequester(): Promise<EncomendaRequester | null> {
-  const caixaName = await getCaixaSession();
-  if (caixaName) {
-    const storeId = await getCaixaStoreId(caixaName);
-    if (storeId) return { kind: "caixa", storeId, name: caixaName };
-  }
-
   const gerenteName = await getLojaGerenteSession();
   if (gerenteName) {
     const storeIds = await getGerenteStoreIds(gerenteName);
     if (storeIds.length > 0) return { kind: "gerente", storeIds, name: gerenteName };
+  }
+
+  const caixaName = await getCaixaSession();
+  if (caixaName) {
+    const storeId = await getCaixaStoreId(caixaName);
+    if (storeId) return { kind: "caixa", storeId, name: caixaName };
   }
 
   const cdName = await getCdSession();

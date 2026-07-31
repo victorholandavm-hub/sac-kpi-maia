@@ -1,7 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { createPedidoEncomendaAction, lookupTotvsClientForEncomenda, type FormState } from "@/app/assistencia/encomendas-actions";
+import {
+  createPedidoEncomendaAction,
+  lookupTotvsClientForEncomenda,
+  lookupTotvsProductForEncomenda,
+  type FormState,
+} from "@/app/assistencia/encomendas-actions";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -15,7 +20,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-type Item = { produtoDescricao: string; quantidade: number };
+type Item = { produtoDescricao: string; produtoCodigo: string; quantidade: number };
+type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
 
 export function NovoPedidoEncomendaForm({
   fixedStoreName,
@@ -25,7 +31,28 @@ export function NovoPedidoEncomendaForm({
   storeOptions?: { id: string; name: string }[];
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPedidoEncomendaAction, undefined);
-  const [items, setItems] = useState<Item[]>([{ produtoDescricao: "", quantidade: 1 }]);
+  const [items, setItems] = useState<Item[]>([{ produtoDescricao: "", produtoCodigo: "", quantidade: 1 }]);
+  const [productLookupStatus, setProductLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
+
+  // Busca ao sair do campo (não debounced) -- pega o código do produto e
+  // preenche a descrição, mesma ideia do código de cliente acima.
+  function lookupItemProduct(index: number, code: string) {
+    if (!code.trim()) {
+      setProductLookupStatus((prev) => ({ ...prev, [index]: "idle" }));
+      return;
+    }
+    setProductLookupStatus((prev) => ({ ...prev, [index]: "loading" }));
+    lookupTotvsProductForEncomenda(code)
+      .then((match) => {
+        if (!match || !match.description) {
+          setProductLookupStatus((prev) => ({ ...prev, [index]: "not_found" }));
+          return;
+        }
+        updateItem(index, { produtoDescricao: match.description! });
+        setProductLookupStatus((prev) => ({ ...prev, [index]: "found" }));
+      })
+      .catch(() => setProductLookupStatus((prev) => ({ ...prev, [index]: "not_found" })));
+  }
 
   const [clienteCodigo, setClienteCodigo] = useState("");
   const [clienteNome, setClienteNome] = useState<string | null>(null);
@@ -60,7 +87,7 @@ export function NovoPedidoEncomendaForm({
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   }
   function addItem() {
-    setItems((prev) => [...prev, { produtoDescricao: "", quantidade: 1 }]);
+    setItems((prev) => [...prev, { produtoDescricao: "", produtoCodigo: "", quantidade: 1 }]);
   }
   function removeItem(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index));
@@ -118,39 +145,59 @@ export function NovoPedidoEncomendaForm({
         </Field>
       </FormSection>
 
-      <FormSection title="Produtos" number={2}>
+      <FormSection title="Produtos" number={2} hint="Digite o código do produto pra preencher o nome automaticamente (se souber).">
         <div className="flex flex-col gap-2">
           {items.map((item, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                name="item_produto_descricao"
-                type="text"
-                value={item.produtoDescricao}
-                onChange={(e) => updateItem(i, { produtoDescricao: e.target.value })}
-                required
-                placeholder="Nome do produto"
-                className="flex-1 rounded border px-3 py-2"
-                style={inputStyle}
-              />
-              <input
-                name="item_quantidade"
-                type="number"
-                min={1}
-                value={item.quantidade}
-                onChange={(e) => updateItem(i, { quantidade: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                className="w-20 rounded border px-3 py-2"
-                style={inputStyle}
-              />
-              <button
-                type="button"
-                onClick={() => removeItem(i)}
-                disabled={items.length === 1}
-                className="text-sm px-2 py-2 disabled:opacity-40"
-                style={{ color: "var(--status-critical)" }}
-                aria-label="Remover item"
-              >
-                remover
-              </button>
+            <div key={i} className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <input
+                  name="item_produto_codigo"
+                  value={item.produtoCodigo}
+                  onChange={(e) => updateItem(i, { produtoCodigo: e.target.value })}
+                  onBlur={(e) => lookupItemProduct(i, e.target.value)}
+                  placeholder="Código"
+                  className="w-28 rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+                <input
+                  name="item_produto_descricao"
+                  type="text"
+                  value={item.produtoDescricao}
+                  onChange={(e) => updateItem(i, { produtoDescricao: e.target.value })}
+                  required
+                  placeholder="Nome do produto"
+                  className="flex-1 rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+                <input
+                  name="item_quantidade"
+                  type="number"
+                  min={1}
+                  value={item.quantidade}
+                  onChange={(e) => updateItem(i, { quantidade: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                  className="w-20 rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeItem(i)}
+                  disabled={items.length === 1}
+                  className="text-sm px-2 py-2 disabled:opacity-40"
+                  style={{ color: "var(--status-critical)" }}
+                  aria-label="Remover item"
+                >
+                  remover
+                </button>
+              </div>
+              {productLookupStatus[i] === "loading" ? (
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Buscando…
+                </span>
+              ) : productLookupStatus[i] === "not_found" ? (
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Código não encontrado.
+                </span>
+              ) : null}
             </div>
           ))}
           <button type="button" onClick={addItem} className="text-sm self-start underline" style={{ color: "var(--text-secondary)" }}>

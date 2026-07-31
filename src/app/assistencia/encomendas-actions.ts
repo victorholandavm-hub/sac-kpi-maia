@@ -16,7 +16,14 @@ import {
   type NewPedidoEncomendaItem,
 } from "@/lib/pedidosEncomenda";
 import { saveEncomendaPhoto } from "@/lib/pedidoEncomendaPhotos";
-import { searchTotvsOrdersByInvoice, findTotvsClientByCode, type TotvsOrderSuggestion, type TotvsClientMatch } from "@/lib/totvsLookup";
+import {
+  searchTotvsOrdersByInvoice,
+  findTotvsClientByCode,
+  findTotvsProductByCode,
+  type TotvsOrderSuggestion,
+  type TotvsClientMatch,
+  type TotvsProductMatch,
+} from "@/lib/totvsLookup";
 
 export type FormState = { error?: string } | undefined;
 
@@ -34,6 +41,14 @@ export async function lookupTotvsClientForEncomenda(code: string): Promise<Totvs
   const requester = await resolveEncomendaRequester();
   if (!requester) return null;
   return findTotvsClientByCode(code);
+}
+
+// Mesma ideia, pro código do produto de cada item do pedido -- autopreenche
+// a descrição (ver ProductItemsFields em NovoPedidoEncomendaForm.tsx).
+export async function lookupTotvsProductForEncomenda(code: string): Promise<TotvsProductMatch | null> {
+  const requester = await resolveEncomendaRequester();
+  if (!requester) return null;
+  return findTotvsProductByCode(code);
 }
 
 // Caixa, vendedor ou gerente lançam o pedido direto (formulário, sem
@@ -80,12 +95,13 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   const clienteCodigo = String(formData.get("cliente_codigo") ?? "").trim() || null;
 
   const produtoDescricoes = formData.getAll("item_produto_descricao").map((v) => String(v).trim());
+  const produtoCodigos = formData.getAll("item_produto_codigo").map((v) => String(v).trim() || null);
   const quantidades = formData.getAll("item_quantidade").map((v) => {
     const n = parseInt(String(v), 10);
     return Number.isFinite(n) && n > 0 ? n : 1;
   });
   const items: NewPedidoEncomendaItem[] = produtoDescricoes
-    .map((produtoDescricao, i) => ({ produtoDescricao, quantidade: quantidades[i] ?? 1 }))
+    .map((produtoDescricao, i) => ({ produtoDescricao, produtoCodigo: produtoCodigos[i] ?? null, quantidade: quantidades[i] ?? 1 }))
     .filter((item) => item.produtoDescricao.length > 0);
 
   if (items.length === 0) {

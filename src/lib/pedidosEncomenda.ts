@@ -98,6 +98,7 @@ export async function setProdutoEncomendaAtivo(id: string, ativo: boolean): Prom
 export type PedidoEncomendaItem = {
   id: string;
   produtoDescricao: string;
+  produtoCodigo: string | null;
   quantidade: number;
 };
 
@@ -135,12 +136,18 @@ type PedidoRow = {
   updated_at: string;
   stores: { name: string } | null;
   pedido_encomenda_itens:
-    | { id: string; quantidade: number; produto_descricao: string | null; produtos_encomenda: { descricao: string } | null }[]
+    | {
+        id: string;
+        quantidade: number;
+        produto_descricao: string | null;
+        produto_codigo: string | null;
+        produtos_encomenda: { descricao: string } | null;
+      }[]
     | null;
 };
 
 const PEDIDO_COLUMNS =
-  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, prazo_entrega, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produto_descricao, produtos_encomenda(descricao))";
+  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, prazo_entrega, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produto_descricao, produto_codigo, produtos_encomenda(descricao))";
 
 function toSummary(row: PedidoRow): PedidoEncomendaSummary {
   return {
@@ -161,6 +168,7 @@ function toSummary(row: PedidoRow): PedidoEncomendaSummary {
     items: (row.pedido_encomenda_itens ?? []).map((i) => ({
       id: i.id,
       produtoDescricao: i.produto_descricao ?? i.produtos_encomenda?.descricao ?? "Produto removido",
+      produtoCodigo: i.produto_codigo,
       quantidade: i.quantidade,
     })),
   };
@@ -188,7 +196,10 @@ export async function listAllPedidos(
   let query = admin.from("pedidos_encomenda").select(PEDIDO_COLUMNS);
   if (opts.status) query = query.eq("status", opts.status);
   if (opts.storeId) query = query.eq("store_id", opts.storeId);
-  query = query.order("created_at", { ascending: false });
+  // Ascendente (mais antigo primeiro) -- é literalmente a fila (FIFO), e o
+  // número "Nº na fila" (ver listOpenPedidoEncomendaQueueIds) já segue essa
+  // ordem. Com ordem descendente aqui, a lista mostrava o 2º antes do 1º.
+  query = query.order("created_at", { ascending: true });
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -278,7 +289,7 @@ export async function getPedidoDetail(
   return { pedido: toSummary(data as unknown as PedidoRow), events };
 }
 
-export type NewPedidoEncomendaItem = { produtoDescricao: string; quantidade: number };
+export type NewPedidoEncomendaItem = { produtoDescricao: string; produtoCodigo: string | null; quantidade: number };
 
 // Cria o pedido + itens + evento "created" numa sequência só. Se a inserção
 // dos itens falhar depois do cabeçalho já ter sido criado, o pedido fica sem
@@ -313,7 +324,14 @@ export async function createPedidoEncomenda(input: {
 
   const { error: itemsError } = await admin
     .from("pedido_encomenda_itens")
-    .insert(input.items.map((item) => ({ pedido_id: data.id, produto_descricao: item.produtoDescricao, quantidade: item.quantidade })));
+    .insert(
+      input.items.map((item) => ({
+        pedido_id: data.id,
+        produto_descricao: item.produtoDescricao,
+        produto_codigo: item.produtoCodigo,
+        quantidade: item.quantidade,
+      }))
+    );
   if (itemsError) {
     throw new Error(`Pedido criado, mas falhou ao salvar os itens: ${itemsError.message}`);
   }

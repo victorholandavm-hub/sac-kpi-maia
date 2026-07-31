@@ -198,7 +198,7 @@ export default async function LojaHomePage({
                   {showCompleted ? `Concluídas em ${dateLabel}` : `Solicitado em ${dateLabel}`}
                 </span>
               </div>
-              <div className="divide-y" style={{ background: "var(--surface-1)", borderColor: "var(--gridline)" }}>
+              <div className="divide-y" style={{ background: "var(--surface-1)", borderColor: "var(--brand-green)" }}>
                 {group.map((r) => {
                   const isOwnStore = gerenteStoreIds.includes(r.storeId);
                   const isOwnRequest = r.requestedByName === gerenteName;
@@ -206,22 +206,28 @@ export default async function LojaHomePage({
                   return (
                     <div
                       key={r.id}
-                      className={isOwnRequest ? "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4 rounded-lg m-2" : "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4"}
+                      className={isOwnRequest ? "flex items-start gap-3 p-4 rounded-lg m-2" : "flex items-start gap-3 p-4"}
                       style={
                         isOwnRequest
                           ? { background: "var(--brand-green-soft)", border: "2px solid var(--brand-green)" }
                           : undefined
                       }
                     >
-                      <div className="flex flex-col gap-1.5 min-w-0">
+                      {/* Selo compacto e fixo à esquerda -- mesma pista visual da posição
+                          na fila usada nas telas de encomenda. */}
+                      <div className="flex items-center justify-center w-9 shrink-0 pt-0.5">
                         {r.type === "montagem" && position ? (
-                          <span
-                            className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap self-start"
-                            style={{ color: "#fff", background: "var(--brand-orange)" }}
+                          <div
+                            className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none"
+                            style={{ background: "var(--brand-green)", color: "#fff" }}
                           >
-                            {position}º na fila
-                          </span>
+                            <span className="text-sm font-bold">{position}º</span>
+                            <span className="text-[7px] font-semibold uppercase tracking-wide">na fila</span>
+                          </div>
                         ) : null}
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 flex-1 min-w-0">
+                      <div className="flex flex-col gap-1.5 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
                             #{r.ticketNumber}
@@ -283,6 +289,7 @@ export default async function LojaHomePage({
                           )}
                         </div>
                       ) : null}
+                      </div>
                     </div>
                   );
                 })}

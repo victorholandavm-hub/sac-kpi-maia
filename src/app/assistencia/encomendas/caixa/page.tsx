@@ -53,7 +53,16 @@ export default async function EncomendasCaixaPage({
   ]);
   const queuePosition = new Map(queueIds.map((id, i) => [id, i + 1]));
   const storeLabel = (stores ?? []).map((s) => s.name).join(", ") || "sua loja";
-  const pedidos = allPedidos.filter((p) => (showCompleted ? !OPEN_STATUSES.includes(p.status) : OPEN_STATUSES.includes(p.status)));
+  const pedidos = allPedidos
+    .filter((p) => (showCompleted ? !OPEN_STATUSES.includes(p.status) : OPEN_STATUSES.includes(p.status)))
+    // Em aberto: mais antigo primeiro, igual ao "Nº na fila" (senão o 2º
+    // aparecia antes do 1º). Entregues/cancelados: mais recente primeiro,
+    // como já era.
+    .sort((a, b) =>
+      showCompleted
+        ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
 
   const byStatus: Record<string, number> = {};
   for (const p of allPedidos) {
@@ -133,20 +142,26 @@ export default async function EncomendasCaixaPage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+          <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
             {pedidos.map((p: PedidoEncomendaSummary) => (
               <details key={p.id} className="p-4">
-                <summary className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 cursor-pointer list-none">
-                  <div className="flex flex-col gap-1 min-w-0">
+                <summary className="flex items-start gap-2 cursor-pointer list-none">
+                  {/* Selo compacto e fixo à esquerda -- pista visual imediata da ordem
+                      da fila, sem depender de ler o resto do texto. */}
+                  <div className="flex items-center justify-center w-9 shrink-0 pt-0.5">
                     {queuePosition.get(p.id) ? (
-                      <span
-                        className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap self-start"
-                        style={{ color: "#fff", background: "var(--brand-orange)" }}
+                      <div
+                        className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none"
+                        style={{ background: "var(--brand-green)", color: "#fff" }}
                       >
-                        {queuePosition.get(p.id)}º na fila
-                      </span>
+                        <span className="text-sm font-bold">{queuePosition.get(p.id)}º</span>
+                        <span className="text-[7px] font-semibold uppercase tracking-wide">na fila</span>
+                      </div>
                     ) : null}
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-1 min-w-0">
+                  <div className="flex flex-col gap-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
                         #{p.pedidoNumber}
@@ -165,6 +180,7 @@ export default async function EncomendasCaixaPage({
                   <span className="text-xs shrink-0" style={{ color: "var(--text-muted)" }}>
                     {new Date(p.createdAt).toLocaleDateString("pt-BR")}
                   </span>
+                  </div>
                 </summary>
                 <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid var(--gridline)" }}>
                   <p className="text-xs" style={{ color: "var(--text-secondary)" }}>

@@ -169,7 +169,7 @@ export default async function LojaTrocasPage({
         </div>
       )}
 
-      <Link href="/assistencia" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
+      <Link href="/assistencia/loja" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
         ← Voltar
       </Link>
     </div>

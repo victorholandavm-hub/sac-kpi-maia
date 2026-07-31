@@ -49,8 +49,8 @@ export function PedidoEncomendaFilaList({
 
   return (
     <>
-      <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-        <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+      <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+        <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
           {pedidos.map((p) => {
             const needsAction = actionStatuses.includes(p.status);
             const eligible = canBulkAdvance && p.status === BULK_ELIGIBLE_STATUS;
@@ -74,19 +74,24 @@ export function PedidoEncomendaFilaList({
                     ) : null}
                   </div>
                 ) : null}
+                {/* Selo compacto e fixo à esquerda -- pista visual imediata da ordem da
+                    fila, sem depender de ler o resto do texto. */}
+                <div className="flex items-center justify-center w-9 shrink-0">
+                  {position ? (
+                    <div
+                      className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none"
+                      style={{ background: "var(--brand-green)", color: "#fff" }}
+                    >
+                      <span className="text-sm font-bold">{position}º</span>
+                      <span className="text-[7px] font-semibold uppercase tracking-wide">na fila</span>
+                    </div>
+                  ) : null}
+                </div>
                 <Link
                   href={`/assistencia/encomendas/fila/${p.id}`}
                   className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80 flex-1 min-w-0"
                 >
                   <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                    {position ? (
-                      <span
-                        className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap self-start"
-                        style={{ color: "#fff", background: "var(--brand-orange)" }}
-                      >
-                        {position}º na fila
-                      </span>
-                    ) : null}
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
                         #{p.pedidoNumber}
