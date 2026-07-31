@@ -240,62 +240,101 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     return { error: "Tipo de solicitação inválido." };
   }
 
-  const clientName = String(formData.get("client_name") ?? "").trim();
-  if (!clientName) {
-    return { error: "Informe o nome do cliente." };
-  }
+  // Montagem/desmontagem pode ser pra um cliente (o normal) ou pra móvel de
+  // mostruário da própria loja -- nesse segundo caso não existe venda,
+  // cliente, CPF nem endereço pra pedir (ver showClientFields em
+  // PublicRequestForm.tsx). Só vale pra esses dois tipos: os outros sempre
+  // envolvem um cliente de verdade.
+  const requestTarget = String(formData.get("request_target") ?? "cliente");
+  const isStoreTarget = requestTarget === "loja" && (type === "montagem" || type === "desmontagem");
 
-  const orderCode = String(formData.get("order_code") ?? "").trim();
-  if (!orderCode) return { error: "Informe o código do pedido/venda." };
-
-  const invoiceNumber = String(formData.get("invoice_number") ?? "").trim();
-  if (!invoiceNumber) return { error: "Informe o número da nota fiscal." };
-
-  const sellerName = String(formData.get("seller_name") ?? "").trim();
-  if (!sellerName) return { error: "Informe o vendedor(a)." };
-
-  const clientCpf = String(formData.get("client_cpf") ?? "").trim();
-  if (!clientCpf) return { error: "Informe o CPF do cliente." };
-
-  const clientPhone = String(formData.get("client_phone") ?? "").trim();
-  if (!clientPhone) return { error: "Informe o telefone de contato." };
-
-  // Só os tipos que envolvem visita física exigem endereço -- os outros nem
-  // mostram esse campo no formulário (ver showAddress em PublicRequestForm).
-  const ADDRESS_REQUIRED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"];
+  let clientName = "";
+  let orderCode = "";
+  let invoiceNumber = "";
+  let sellerName = "";
+  let clientCpf = "";
+  let clientPhone = "";
   let clientAddress = "";
   let clientNeighborhood = "";
-  if (ADDRESS_REQUIRED_TYPES.includes(type)) {
-    clientAddress = String(formData.get("client_address") ?? "").trim();
-    if (!clientAddress) return { error: "Informe o endereço." };
-    clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
-    if (!clientNeighborhood) return { error: "Informe o bairro." };
+
+  if (!isStoreTarget) {
+    clientName = String(formData.get("client_name") ?? "").trim();
+    if (!clientName) {
+      return { error: "Informe o nome do cliente." };
+    }
+
+    orderCode = String(formData.get("order_code") ?? "").trim();
+    if (!orderCode) return { error: "Informe o código do pedido/venda." };
+
+    invoiceNumber = String(formData.get("invoice_number") ?? "").trim();
+    if (!invoiceNumber) return { error: "Informe o número da nota fiscal." };
+
+    sellerName = String(formData.get("seller_name") ?? "").trim();
+    if (!sellerName) return { error: "Informe o vendedor(a)." };
+
+    clientCpf = String(formData.get("client_cpf") ?? "").trim();
+    if (!clientCpf) return { error: "Informe o CPF do cliente." };
+
+    clientPhone = String(formData.get("client_phone") ?? "").trim();
+    if (!clientPhone) return { error: "Informe o telefone de contato." };
+
+    // Só os tipos que envolvem visita física exigem endereço -- os outros nem
+    // mostram esse campo no formulário (ver showAddress em PublicRequestForm).
+    const ADDRESS_REQUIRED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"];
+    if (ADDRESS_REQUIRED_TYPES.includes(type)) {
+      clientAddress = String(formData.get("client_address") ?? "").trim();
+      if (!clientAddress) return { error: "Informe o endereço." };
+      clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
+      if (!clientNeighborhood) return { error: "Informe o bairro." };
+    }
   }
 
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) return { error: "Informe o motivo." };
 
-  const itemProducts = formData.getAll("item_product").map((v) => String(v).trim());
-  const itemQuantities = formData.getAll("item_quantity").map((v) => {
-    const n = parseInt(String(v), 10);
-    return Number.isFinite(n) && n > 0 ? n : 1;
-  });
-  const itemCodes = formData.getAll("item_code").map((v) => String(v).trim() || null);
-  const items = itemProducts
-    .map((product, i) => ({ product, quantity: itemQuantities[i] ?? 1, partCode: itemCodes[i] ?? null }))
-    .filter((item) => item.product.length > 0);
-
-  if (type !== "notificacao_externa" && items.length === 0) {
-    return { error: "Informe pelo menos um produto." };
-  }
-
   // Só faz sentido pra montagem/desmontagem — pedir os dois numa visita só,
   // sem precisar abrir dois chamados separados pro mesmo cliente.
   const comboMontagemDesmontagem = (type === "montagem" || type === "desmontagem") && formData.get("combo_montagem_desmontagem") === "on";
 
+  function parseItems(prefix: string): { product: string; quantity: number; partCode: string | null }[] {
+    const products = formData.getAll(prefix + "_product").map((v) => String(v).trim());
+    const quantities = formData.getAll(prefix + "_quantity").map((v) => {
+      const n = parseInt(String(v), 10);
+      return Number.isFinite(n) && n > 0 ? n : 1;
+    });
+    const codes = formData.getAll(prefix + "_code").map((v) => String(v).trim() || null);
+    return products
+      .map((product, i) => ({ product, quantity: quantities[i] ?? 1, partCode: codes[i] ?? null }))
+      .filter((item) => item.product.length > 0);
+  }
+
+  // Sem combo, "item" é a lista única de sempre (a ação já é o type do
+  // chamado). Com combo, "item" continua sendo os produtos do type principal
+  // e "item_secondary" os da ação oposta -- ver PublicRequestForm.tsx.
+  const primaryAction: "montar" | "desmontar" = type === "montagem" ? "montar" : "desmontar";
+  const secondaryAction: "montar" | "desmontar" = primaryAction === "montar" ? "desmontar" : "montar";
+
+  const primaryItems = parseItems("item").map((item) => ({
+    ...item,
+    action: comboMontagemDesmontagem ? primaryAction : null,
+  }));
+  const secondaryItems = comboMontagemDesmontagem
+    ? parseItems("item_secondary").map((item) => ({ ...item, action: secondaryAction }))
+    : [];
+  const items = [...primaryItems, ...secondaryItems];
+
+  if (type !== "notificacao_externa" && items.length === 0) {
+    return { error: "Informe pelo menos um produto." };
+  }
+  if (comboMontagemDesmontagem && secondaryItems.length === 0) {
+    return {
+      error: `Informe pelo menos um produto pra ${secondaryAction === "montar" ? "montar" : "desmontar"} (a outra ação da visita combo).`,
+    };
+  }
+
   const admin = getSupabaseAdmin();
 
-  const { data: store } = await admin.from("stores").select("id").eq("id", storeId).single();
+  const { data: store } = await admin.from("stores").select("id, name").eq("id", storeId).single();
   if (!store) return { error: "Loja inválida." };
 
   const { data, error } = await admin
@@ -305,18 +344,18 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       store_id: storeId,
       requested_by_name: requestedByName,
       requested_deadline: requestedDeadline,
-      order_code: orderCode,
-      client_protheus_code: emptyToNull(formData.get("client_protheus_code")),
-      client_name: clientName,
-      client_cpf: clientCpf,
-      client_phone: clientPhone,
+      order_code: emptyToNull(orderCode),
+      client_protheus_code: isStoreTarget ? null : emptyToNull(formData.get("client_protheus_code")),
+      client_name: isStoreTarget ? `Mostruário — ${store.name}` : clientName,
+      client_cpf: emptyToNull(clientCpf),
+      client_phone: emptyToNull(clientPhone),
       client_address: emptyToNull(clientAddress),
       client_neighborhood: emptyToNull(clientNeighborhood),
       reason: reason,
       restriction_note: emptyToNull(formData.get("restriction_note")),
       notes: emptyToNull(formData.get("notes")),
-      seller_name: sellerName,
-      invoice_number: invoiceNumber,
+      seller_name: emptyToNull(sellerName),
+      invoice_number: emptyToNull(invoiceNumber),
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
     })
@@ -330,7 +369,15 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
   if (items.length > 0) {
     const { error: itemsError } = await admin
       .from("service_request_items")
-      .insert(items.map((item) => ({ request_id: data.id, product: item.product, part_code: item.partCode, quantity: item.quantity })));
+      .insert(
+        items.map((item) => ({
+          request_id: data.id,
+          product: item.product,
+          part_code: item.partCode,
+          quantity: item.quantity,
+          item_action: item.action,
+        }))
+      );
     if (itemsError) {
       return { error: `Solicitação criada, mas falhou ao salvar os itens: ${itemsError.message}` };
     }

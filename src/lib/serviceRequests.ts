@@ -43,6 +43,8 @@ export async function listStores(): Promise<Store[]> {
   return data ?? [];
 }
 
+export type ItemAction = "montar" | "desmontar";
+
 export type RequestItem = {
   id: string;
   product: string;
@@ -52,6 +54,7 @@ export type RequestItem = {
   paymentReleased: boolean;
   paymentReleasedAt: string | null;
   paymentAuthorizedBy: string | null;
+  action: ItemAction | null;
 };
 
 type ItemRow = {
@@ -63,6 +66,7 @@ type ItemRow = {
   payment_released: boolean;
   payment_released_at: string | null;
   payment_authorized_by: string | null;
+  item_action: string | null;
 };
 
 export type ServiceRequestSummary = {
@@ -143,7 +147,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -155,6 +159,7 @@ function toItem(row: ItemRow): RequestItem {
     paymentReleased: row.payment_released,
     paymentReleasedAt: row.payment_released_at,
     paymentAuthorizedBy: row.payment_authorized_by,
+    action: row.item_action === "montar" || row.item_action === "desmontar" ? row.item_action : null,
   };
 }
 
@@ -329,7 +334,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action)";
 
 export async function getRequestDetail(
   id: string
@@ -504,6 +509,8 @@ export async function listOpenMontagemQueueIds(): Promise<string[]> {
   return (data ?? []).map((row) => row.id as string);
 }
 
+export type AssemblerRequestItem = { product: string; quantity: number; action: ItemAction | null };
+
 export type AssemblerRequestView = {
   id: string;
   ticketNumber: number;
@@ -515,6 +522,7 @@ export type AssemblerRequestView = {
   clientAddress: string | null;
   clientNeighborhood: string | null;
   productSummary: string | null;
+  items: AssemblerRequestItem[];
   reason: string | null;
   scheduledDate: string | null;
   scheduledTime: string | null;
@@ -528,7 +536,7 @@ export type AssemblerRequestView = {
 
 const ASSEMBLER_VIEW_LIMIT = 200;
 const ASSEMBLER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, stores(name), items:service_request_items(product)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, stores(name), items:service_request_items(product, quantity, item_action)";
 
 type AssemblerViewRow = {
   id: string;
@@ -549,7 +557,7 @@ type AssemblerViewRow = {
   completed_at: string | null;
   combo_montagem_desmontagem: boolean;
   stores: { name: string } | null;
-  items: { product: string }[] | null;
+  items: { product: string; quantity: number; item_action: string | null }[] | null;
 };
 
 function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
@@ -564,6 +572,11 @@ function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
     clientAddress: row.client_address,
     clientNeighborhood: row.client_neighborhood,
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
+    items: (row.items ?? []).map((i) => ({
+      product: i.product,
+      quantity: i.quantity,
+      action: i.item_action === "montar" || i.item_action === "desmontar" ? i.item_action : null,
+    })),
     reason: row.reason,
     scheduledDate: row.scheduled_date,
     scheduledTime: row.scheduled_time,

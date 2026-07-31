@@ -87,7 +87,35 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
         >
           <Row label="Cliente" value={request.clientName} />
-          <Row label="Produto" value={request.productSummary} />
+          {request.comboMontagemDesmontagem ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Produtos
+              </span>
+              {(["montar", "desmontar"] as const).map((action) => {
+                const list = request.items.filter((i) => i.action === action);
+                if (list.length === 0) return null;
+                return (
+                  <div key={action} className="flex flex-col gap-0.5">
+                    <span
+                      className="text-xs font-bold w-fit px-1.5 py-0.5 rounded"
+                      style={{
+                        color: action === "montar" ? "var(--brand-green-ink)" : "var(--brand-orange)",
+                        background: action === "montar" ? "var(--brand-green)" : "var(--brand-orange-soft)",
+                      }}
+                    >
+                      {action === "montar" ? "Montar" : "Desmontar"}
+                    </span>
+                    <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+                      {list.map((i) => `${i.quantity > 1 ? `${i.quantity}x ` : ""}${i.product}`).join(", ")}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <Row label="Produto" value={request.productSummary} />
+          )}
           <Row label="Endereço" value={request.clientAddress} />
           <Row label="Bairro" value={request.clientNeighborhood} />
           <Row label="Motivo" value={request.reason} />

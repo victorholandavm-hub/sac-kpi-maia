@@ -22,6 +22,86 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 type Item = { product: string; quantity: number; code: string };
 type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
 
+// Compartilhado entre a lista de produtos normal e as duas listas (montar/
+// desmontar) de uma solicitação combo -- mesma UI, fonte de dados diferente.
+function ProductItemsFields({
+  items,
+  lookupStatus,
+  onUpdate,
+  onAdd,
+  onRemove,
+  onLookup,
+  namePrefix,
+}: {
+  items: Item[];
+  lookupStatus: Record<number, ProductLookupStatus>;
+  onUpdate: (index: number, patch: Partial<Item>) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  onLookup: (index: number, code: string) => void;
+  namePrefix: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((item, i) => (
+        <div key={i} className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <input
+              name={`${namePrefix}_code`}
+              value={item.code}
+              onChange={(e) => onUpdate(i, { code: e.target.value })}
+              onBlur={(e) => onLookup(i, e.target.value)}
+              placeholder="Código"
+              className="w-28 rounded border px-3 py-2"
+              style={inputStyle}
+            />
+            <input
+              name={`${namePrefix}_product`}
+              value={item.product}
+              onChange={(e) => onUpdate(i, { product: e.target.value })}
+              required
+              placeholder="Ex: Roupeiro Giardino"
+              className="flex-1 rounded border px-3 py-2"
+              style={inputStyle}
+            />
+            <input
+              name={`${namePrefix}_quantity`}
+              type="number"
+              min={1}
+              value={item.quantity}
+              onChange={(e) => onUpdate(i, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+              className="w-20 rounded border px-3 py-2"
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              onClick={() => onRemove(i)}
+              disabled={items.length === 1}
+              className="text-sm px-2 py-2 disabled:opacity-40"
+              style={{ color: "var(--status-critical)" }}
+              aria-label="Remover item"
+            >
+              remover
+            </button>
+          </div>
+          {lookupStatus[i] === "loading" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Buscando…
+            </span>
+          ) : lookupStatus[i] === "not_found" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Código não encontrado.
+            </span>
+          ) : null}
+        </div>
+      ))}
+      <button type="button" onClick={onAdd} className="text-sm self-start underline" style={{ color: "var(--text-secondary)" }}>
+        + adicionar produto
+      </button>
+    </div>
+  );
+}
+
 // `stores` já vem restrito às lojas do gerente autenticado (um gerente pode
 // cuidar de mais de uma — ver src/lib/gerentes.ts e src/app/assistencia/solicitar/page.tsx,
 // que exige sessão antes de renderizar este formulário). `requesterName` vem
@@ -29,29 +109,60 @@ type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
 export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; requesterName: string }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPublicRequest, undefined);
   const [type, setType] = useState<(typeof TYPES)[number]>("montagem");
+  // Montagem/desmontagem de móvel de mostruário da própria loja não tem
+  // cliente, venda nem endereço pra pedir -- só faz sentido pra esses dois
+  // tipos (ver isStoreTarget em createPublicRequest).
+  const [target, setTarget] = useState<"cliente" | "loja">("cliente");
+  const showTargetPicker = type === "montagem" || type === "desmontagem";
+  const isStoreTarget = showTargetPicker && target === "loja";
   const [items, setItems] = useState<Item[]>([{ product: "", quantity: 1, code: "" }]);
   const [productLookupStatus, setProductLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
+  // Combo (montagem + desmontagem na mesma visita) precisa de duas listas de
+  // produto separadas -- essa aqui é só a da ação oposta ao type escolhido
+  // (ver primaryAction/secondaryAction em createPublicRequest).
+  const [combo, setCombo] = useState(false);
+  const [secondaryItems, setSecondaryItems] = useState<Item[]>([{ product: "", quantity: 1, code: "" }]);
+  const [secondaryProductLookupStatus, setSecondaryProductLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
 
   // Busca ao sair do campo (não debounced feito o do cliente) -- são vários
   // itens, um timer por linha complicaria mais do que ajuda; digitar o
-  // código e sair do campo já é rápido o suficiente.
-  function lookupItemProduct(index: number, code: string) {
-    if (!code.trim()) {
-      setProductLookupStatus((prev) => ({ ...prev, [index]: "idle" }));
-      return;
+  // código e sair do campo já é rápido o suficiente. Uma função de fábrica
+  // porque a mesma lógica serve pra lista normal e pra lista secundária do combo.
+  function makeItemHandlers(
+    setList: React.Dispatch<React.SetStateAction<Item[]>>,
+    setStatus: React.Dispatch<React.SetStateAction<Record<number, ProductLookupStatus>>>
+  ) {
+    function update(index: number, patch: Partial<Item>) {
+      setList((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
     }
-    setProductLookupStatus((prev) => ({ ...prev, [index]: "loading" }));
-    lookupTotvsProduct(code)
-      .then((match) => {
-        if (!match || !match.description) {
-          setProductLookupStatus((prev) => ({ ...prev, [index]: "not_found" }));
-          return;
-        }
-        updateItem(index, { product: match.description! });
-        setProductLookupStatus((prev) => ({ ...prev, [index]: "found" }));
-      })
-      .catch(() => setProductLookupStatus((prev) => ({ ...prev, [index]: "not_found" })));
+    function add() {
+      setList((prev) => [...prev, { product: "", quantity: 1, code: "" }]);
+    }
+    function remove(index: number) {
+      setList((prev) => prev.filter((_, i) => i !== index));
+    }
+    function lookup(index: number, code: string) {
+      if (!code.trim()) {
+        setStatus((prev) => ({ ...prev, [index]: "idle" }));
+        return;
+      }
+      setStatus((prev) => ({ ...prev, [index]: "loading" }));
+      lookupTotvsProduct(code)
+        .then((match) => {
+          if (!match || !match.description) {
+            setStatus((prev) => ({ ...prev, [index]: "not_found" }));
+            return;
+          }
+          update(index, { product: match.description! });
+          setStatus((prev) => ({ ...prev, [index]: "found" }));
+        })
+        .catch(() => setStatus((prev) => ({ ...prev, [index]: "not_found" })));
+    }
+    return { update, add, remove, lookup };
   }
+
+  const primaryHandlers = makeItemHandlers(setItems, setProductLookupStatus);
+  const secondaryHandlers = makeItemHandlers(setSecondaryItems, setSecondaryProductLookupStatus);
 
   const [clientCode, setClientCode] = useState("");
   const [clientName, setClientName] = useState("");
@@ -91,20 +202,11 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
   }, [clientCode]);
 
   const showAddress =
-    type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria";
+    !isStoreTarget &&
+    (type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria");
   const showItems = type !== "notificacao_externa";
   const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
   const showCombo = type === "montagem" || type === "desmontagem";
-
-  function updateItem(index: number, patch: Partial<Item>) {
-    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
-  }
-  function addItem() {
-    setItems((prev) => [...prev, { product: "", quantity: 1, code: "" }]);
-  }
-  function removeItem(index: number) {
-    setItems((prev) => prev.filter((_, i) => i !== index));
-  }
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -169,9 +271,30 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
 
         {showCombo ? (
           <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
-            <input type="checkbox" name="combo_montagem_desmontagem" className="rounded" />
+            <input
+              type="checkbox"
+              name="combo_montagem_desmontagem"
+              checked={combo}
+              onChange={(e) => setCombo(e.target.checked)}
+              className="rounded"
+            />
             {type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
           </label>
+        ) : null}
+
+        {showTargetPicker ? (
+          <Field label="Para quem é?">
+            <select
+              name="request_target"
+              value={target}
+              onChange={(e) => setTarget(e.target.value as "cliente" | "loja")}
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            >
+              <option value="cliente">Cliente</option>
+              <option value="loja">Mostruário da própria loja</option>
+            </select>
+          </Field>
         ) : null}
 
         {type === "notificacao_externa" ? (
@@ -190,21 +313,30 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
         ) : null}
       </FormSection>
 
-      <FormSection title="Referência da venda" number={3} hint="Ajuda a localizar a compra depois.">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Código do pedido/venda *">
-            <input name="order_code" required className="rounded border px-3 py-2" style={inputStyle} />
-          </Field>
-          <Field label="Nº da nota fiscal *">
-            <input name="invoice_number" required className="rounded border px-3 py-2" style={inputStyle} />
-          </Field>
-        </div>
+      {!isStoreTarget ? (
+        <FormSection title="Referência da venda" number={3} hint="Ajuda a localizar a compra depois.">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Código do pedido/venda *">
+              <input name="order_code" required className="rounded border px-3 py-2" style={inputStyle} />
+            </Field>
+            <Field label="Nº da nota fiscal *">
+              <input name="invoice_number" required className="rounded border px-3 py-2" style={inputStyle} />
+            </Field>
+          </div>
 
-        <Field label="Vendedor(a) *">
-          <input name="seller_name" required className="rounded border px-3 py-2" style={inputStyle} />
-        </Field>
-      </FormSection>
+          <Field label="Vendedor(a) *">
+            <input name="seller_name" required className="rounded border px-3 py-2" style={inputStyle} />
+          </Field>
+        </FormSection>
+      ) : null}
 
+      {isStoreTarget ? (
+        <FormSection title="Dados do cliente" number={4}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Sem cliente nessa solicitação — é montagem/desmontagem de móvel de mostruário da própria loja.
+          </p>
+        </FormSection>
+      ) : (
       <FormSection
         title="Dados do cliente"
         number={4}
@@ -292,75 +424,41 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
           </div>
         ) : null}
       </FormSection>
+      )}
 
       {showItems ? (
-        <FormSection title="Produtos" number={5} hint="Digite o código do produto pra preencher o nome automaticamente (se souber).">
-          <div className="flex flex-col gap-2">
-            {items.map((item, i) => (
-              <div key={i} className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <input
-                    name="item_code"
-                    value={item.code}
-                    onChange={(e) => updateItem(i, { code: e.target.value })}
-                    onBlur={(e) => lookupItemProduct(i, e.target.value)}
-                    placeholder="Código"
-                    className="w-28 rounded border px-3 py-2"
-                    style={inputStyle}
-                  />
-                  <input
-                    name="item_product"
-                    value={item.product}
-                    onChange={(e) => updateItem(i, { product: e.target.value })}
-                    required
-                    placeholder="Ex: Roupeiro Giardino"
-                    className="flex-1 rounded border px-3 py-2"
-                    style={inputStyle}
-                  />
-                  <input
-                    name="item_quantity"
-                    type="number"
-                    min={1}
-                    value={item.quantity}
-                    onChange={(e) => updateItem(i, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                    className="w-20 rounded border px-3 py-2"
-                    style={inputStyle}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeItem(i)}
-                    disabled={items.length === 1}
-                    className="text-sm px-2 py-2 disabled:opacity-40"
-                    style={{ color: "var(--status-critical)" }}
-                    aria-label="Remover item"
-                  >
-                    remover
-                  </button>
-                </div>
-                {productLookupStatus[i] === "loading" ? (
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    Buscando…
-                  </span>
-                ) : productLookupStatus[i] === "not_found" ? (
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    Código não encontrado.
-                  </span>
-                ) : null}
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addItem}
-              className="text-sm self-start underline"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              + adicionar produto
-            </button>
-          </div>
+        <FormSection
+          title={combo ? `Produtos a ${type === "montagem" ? "montar" : "desmontar"}` : "Produtos"}
+          number={5}
+          hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
+        >
+          <ProductItemsFields
+            items={items}
+            lookupStatus={productLookupStatus}
+            onUpdate={primaryHandlers.update}
+            onAdd={primaryHandlers.add}
+            onRemove={primaryHandlers.remove}
+            onLookup={primaryHandlers.lookup}
+            namePrefix="item"
+          />
         </FormSection>
       ) : null}
 
-      <FormSection title="Motivo e observações" number={6} hint="Conte o que precisa ser feito, com o máximo de detalhe que puder.">
+      {showItems && combo ? (
+        <FormSection title={`Produtos a ${type === "montagem" ? "desmontar" : "montar"}`} number={6}>
+          <ProductItemsFields
+            items={secondaryItems}
+            lookupStatus={secondaryProductLookupStatus}
+            onUpdate={secondaryHandlers.update}
+            onAdd={secondaryHandlers.add}
+            onRemove={secondaryHandlers.remove}
+            onLookup={secondaryHandlers.lookup}
+            namePrefix="item_secondary"
+          />
+        </FormSection>
+      ) : null}
+
+      <FormSection title="Motivo e observações" number={7} hint="Conte o que precisa ser feito, com o máximo de detalhe que puder.">
         <Field label="Motivo *">
           <textarea name="reason" rows={2} required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>

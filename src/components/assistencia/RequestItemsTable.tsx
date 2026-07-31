@@ -66,6 +66,17 @@ function ItemRow({
   return (
     <div className="flex items-center justify-between gap-3 py-2 flex-wrap" style={{ borderTop: "1px solid var(--gridline)" }}>
       <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+        {item.action ? (
+          <span
+            className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
+            style={{
+              color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--brand-orange)",
+              background: item.action === "montar" ? "var(--brand-green)" : "var(--brand-orange-soft)",
+            }}
+          >
+            {item.action === "montar" ? "Montar" : "Desmontar"}
+          </span>
+        ) : null}
         {item.quantity > 1 ? `${item.quantity}x ` : ""}
         {item.product}
         {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}

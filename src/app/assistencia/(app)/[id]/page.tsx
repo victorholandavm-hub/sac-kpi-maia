@@ -184,6 +184,17 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           <ul className="flex flex-col gap-1">
             {request.items.map((item) => (
               <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
+                {item.action ? (
+                  <span
+                    className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
+                    style={{
+                      color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--brand-orange)",
+                      background: item.action === "montar" ? "var(--brand-green)" : "var(--brand-orange-soft)",
+                    }}
+                  >
+                    {item.action === "montar" ? "Montar" : "Desmontar"}
+                  </span>
+                ) : null}
                 {item.quantity > 1 ? `${item.quantity}x ` : ""}
                 {item.product}
                 {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
