@@ -88,6 +88,7 @@ export async function montadorUploadPhoto(requestId: string, formData: FormData)
 
   await saveRequestPhoto({ requestId, file, uploadedBy: assemblerName, caption });
   revalidatePath("/assistencia/montador");
+  revalidatePath(`/assistencia/montador/${requestId}`);
 }
 
 export async function montadorDeletePhoto(photoId: string): Promise<void> {
@@ -99,6 +100,7 @@ export async function montadorDeletePhoto(photoId: string): Promise<void> {
 
   await deleteRequestPhoto(photoId);
   revalidatePath("/assistencia/montador");
+  revalidatePath(`/assistencia/montador/${info.requestId}`);
 }
 
 function validRating(value: number | null): number | null {
@@ -153,6 +155,7 @@ export async function montadorCompleteRequest(
   });
 
   revalidatePath("/assistencia/montador");
+  revalidatePath(`/assistencia/montador/${requestId}`);
   revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
 }
@@ -192,6 +195,7 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
   });
 
   revalidatePath("/assistencia/montador");
+  revalidatePath(`/assistencia/montador/${requestId}`);
   revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
 }
@@ -221,5 +225,6 @@ export async function montadorAddNote(requestId: string, note: string): Promise<
   if (insertError) throw new Error(insertError.message);
 
   revalidatePath("/assistencia/montador");
+  revalidatePath(`/assistencia/montador/${requestId}`);
   revalidatePath(`/assistencia/${requestId}`);
 }

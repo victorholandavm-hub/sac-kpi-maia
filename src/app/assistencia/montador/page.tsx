@@ -135,8 +135,8 @@ export default async function MontadorHomePage({
             <summary className="text-base font-bold cursor-pointer py-1" style={{ color: "var(--brand-green)" }}>
               {DATE_BUCKET_LABELS[key]} ({buckets.get(key)!.length})
             </summary>
-            <div className="rounded-lg border overflow-hidden mt-2" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-              <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+            <div className="rounded-lg overflow-hidden mt-2" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+              <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
                 {buckets.get(key)!.map((r) => (
                   <RequestRow key={r.id} r={r} />
                 ))}
@@ -145,8 +145,8 @@ export default async function MontadorHomePage({
           </details>
         ))
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+          <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
             {requests.map((r) => (
               <RequestRow key={r.id} r={r} />
             ))}

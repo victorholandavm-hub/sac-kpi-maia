@@ -59,16 +59,17 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           </Link>
         </AssistenciaHeader>
 
-        <StatusBadge status={request.status} />
-
-        {request.comboMontagemDesmontagem ? (
-          <p
-            className="text-sm font-medium rounded-lg px-3 py-2.5"
-            style={{ background: "var(--brand-orange-soft)", color: "var(--brand-orange)" }}
-          >
-            ⚠ Essa visita também precisa de {request.type === "montagem" ? "desmontagem do móvel antigo" : "montagem do móvel novo"}.
-          </p>
-        ) : null}
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatusBadge status={request.status} />
+          {request.comboMontagemDesmontagem ? (
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+              style={{ color: "var(--brand-orange)", border: "1px solid var(--brand-orange)" }}
+            >
+              Visita combo — ver produtos abaixo
+            </span>
+          ) : null}
+        </div>
 
         {request.scheduledDate ? (
           <p className="text-sm font-medium" style={{ color: "var(--brand-green)" }}>
