@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { createPublicRequest, lookupTotvsClient, type FormState } from "@/app/assistencia/actions";
+import { createPublicRequest, lookupTotvsClient, lookupTotvsProduct, type FormState } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 import type { Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
@@ -19,7 +19,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-type Item = { product: string; quantity: number };
+type Item = { product: string; quantity: number; code: string };
+type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
 
 // `stores` já vem restrito às lojas do gerente autenticado (um gerente pode
 // cuidar de mais de uma — ver src/lib/gerentes.ts e src/app/assistencia/solicitar/page.tsx,
@@ -28,7 +29,29 @@ type Item = { product: string; quantity: number };
 export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; requesterName: string }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPublicRequest, undefined);
   const [type, setType] = useState<(typeof TYPES)[number]>("montagem");
-  const [items, setItems] = useState<Item[]>([{ product: "", quantity: 1 }]);
+  const [items, setItems] = useState<Item[]>([{ product: "", quantity: 1, code: "" }]);
+  const [productLookupStatus, setProductLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
+
+  // Busca ao sair do campo (não debounced feito o do cliente) -- são vários
+  // itens, um timer por linha complicaria mais do que ajuda; digitar o
+  // código e sair do campo já é rápido o suficiente.
+  function lookupItemProduct(index: number, code: string) {
+    if (!code.trim()) {
+      setProductLookupStatus((prev) => ({ ...prev, [index]: "idle" }));
+      return;
+    }
+    setProductLookupStatus((prev) => ({ ...prev, [index]: "loading" }));
+    lookupTotvsProduct(code)
+      .then((match) => {
+        if (!match || !match.description) {
+          setProductLookupStatus((prev) => ({ ...prev, [index]: "not_found" }));
+          return;
+        }
+        updateItem(index, { product: match.description! });
+        setProductLookupStatus((prev) => ({ ...prev, [index]: "found" }));
+      })
+      .catch(() => setProductLookupStatus((prev) => ({ ...prev, [index]: "not_found" })));
+  }
 
   const [clientCode, setClientCode] = useState("");
   const [clientName, setClientName] = useState("");
@@ -77,7 +100,7 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   }
   function addItem() {
-    setItems((prev) => [...prev, { product: "", quantity: 1 }]);
+    setItems((prev) => [...prev, { product: "", quantity: 1, code: "" }]);
   }
   function removeItem(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index));
@@ -271,38 +294,58 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
       </FormSection>
 
       {showItems ? (
-        <FormSection title="Produtos" number={5}>
+        <FormSection title="Produtos" number={5} hint="Digite o código do produto pra preencher o nome automaticamente (se souber).">
           <div className="flex flex-col gap-2">
             {items.map((item, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  name="item_product"
-                  value={item.product}
-                  onChange={(e) => updateItem(i, { product: e.target.value })}
-                  required
-                  placeholder="Ex: Roupeiro Giardino"
-                  className="flex-1 rounded border px-3 py-2"
-                  style={inputStyle}
-                />
-                <input
-                  name="item_quantity"
-                  type="number"
-                  min={1}
-                  value={item.quantity}
-                  onChange={(e) => updateItem(i, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                  className="w-20 rounded border px-3 py-2"
-                  style={inputStyle}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeItem(i)}
-                  disabled={items.length === 1}
-                  className="text-sm px-2 py-2 disabled:opacity-40"
-                  style={{ color: "var(--status-critical)" }}
-                  aria-label="Remover item"
-                >
-                  remover
-                </button>
+              <div key={i} className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    name="item_code"
+                    value={item.code}
+                    onChange={(e) => updateItem(i, { code: e.target.value })}
+                    onBlur={(e) => lookupItemProduct(i, e.target.value)}
+                    placeholder="Código"
+                    className="w-28 rounded border px-3 py-2"
+                    style={inputStyle}
+                  />
+                  <input
+                    name="item_product"
+                    value={item.product}
+                    onChange={(e) => updateItem(i, { product: e.target.value })}
+                    required
+                    placeholder="Ex: Roupeiro Giardino"
+                    className="flex-1 rounded border px-3 py-2"
+                    style={inputStyle}
+                  />
+                  <input
+                    name="item_quantity"
+                    type="number"
+                    min={1}
+                    value={item.quantity}
+                    onChange={(e) => updateItem(i, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                    className="w-20 rounded border px-3 py-2"
+                    style={inputStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeItem(i)}
+                    disabled={items.length === 1}
+                    className="text-sm px-2 py-2 disabled:opacity-40"
+                    style={{ color: "var(--status-critical)" }}
+                    aria-label="Remover item"
+                  >
+                    remover
+                  </button>
+                </div>
+                {productLookupStatus[i] === "loading" ? (
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    Buscando…
+                  </span>
+                ) : productLookupStatus[i] === "not_found" ? (
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    Código não encontrado.
+                  </span>
+                ) : null}
               </div>
             ))}
             <button

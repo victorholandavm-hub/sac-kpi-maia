@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useActionState } from "react";
-import { createSacRequest, type FormState } from "@/app/assistencia/actions";
+import { createSacRequest, lookupTotvsClientForTeam, lookupTotvsProductForTeam, type FormState } from "@/app/assistencia/actions";
 import { SAC_CATEGORIES, SAC_CATEGORY_LABELS, REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import type { Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
@@ -30,6 +30,65 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
   const [type, setType] = useState<SacType>("troca_produto");
   const isDelivery = DELIVERY_TYPES.includes(type);
+
+  const [clientCode, setClientCode] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [clientAddress, setClientAddress] = useState("");
+  const [clientNeighborhood, setClientNeighborhood] = useState("");
+  const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  const [productCode, setProductCode] = useState("");
+  const [product, setProduct] = useState("");
+  const [productLookupStatus, setProductLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  // Mesma ideia de PublicRequestForm.tsx: código é só atalho, não trava nada
+  // se não achar -- a pessoa preenche à mão como já era.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!clientCode.trim()) {
+        setClientLookupStatus("idle");
+        return;
+      }
+      setClientLookupStatus("loading");
+      lookupTotvsClientForTeam(clientCode)
+        .then((match) => {
+          if (!match) {
+            setClientLookupStatus("not_found");
+            return;
+          }
+          setClientName(match.name);
+          if (match.phone1) setClientPhone(match.phone1);
+          const addressParts = [match.addressStreet, match.addressNumber].filter(Boolean).join(", ");
+          if (addressParts) setClientAddress(match.addressComplement ? `${addressParts} — ${match.addressComplement}` : addressParts);
+          if (match.addressNeighborhood) setClientNeighborhood(match.addressNeighborhood);
+          setClientLookupStatus("found");
+        })
+        .catch(() => setClientLookupStatus("not_found"));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [clientCode]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!productCode.trim()) {
+        setProductLookupStatus("idle");
+        return;
+      }
+      setProductLookupStatus("loading");
+      lookupTotvsProductForTeam(productCode)
+        .then((match) => {
+          if (!match || !match.description) {
+            setProductLookupStatus("not_found");
+            return;
+          }
+          setProduct(match.description);
+          setProductLookupStatus("found");
+        })
+        .catch(() => setProductLookupStatus("not_found"));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [productCode]);
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -83,33 +142,115 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         </label>
       </FormSection>
 
-      <FormSection title="Dados do cliente" number={2} hint="Só o nome é obrigatório.">
+      <FormSection
+        title="Dados do cliente"
+        number={2}
+        hint="Digite o código do cliente pra preencher o resto automaticamente (se souber). Só o nome é obrigatório."
+      >
+        <Field label="Código do cliente">
+          <input
+            name="client_protheus_code"
+            value={clientCode}
+            onChange={(e) => setClientCode(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+          {clientLookupStatus === "loading" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Buscando…
+            </span>
+          ) : clientLookupStatus === "found" ? (
+            <span className="text-xs" style={{ color: "var(--status-good)" }}>
+              Cliente encontrado — confira os dados abaixo.
+            </span>
+          ) : clientLookupStatus === "not_found" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Código não encontrado — preencha os dados abaixo à mão.
+            </span>
+          ) : null}
+        </Field>
+
         <Field label="Nome do cliente *">
-          <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
+          <input
+            name="client_name"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            required
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
         </Field>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Telefone *">
-            <input name="client_phone" required className="rounded border px-3 py-2" style={inputStyle} />
+            <input
+              name="client_phone"
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              required
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
           </Field>
           <Field label="Endereço *">
-            <input name="client_address" required className="rounded border px-3 py-2" style={inputStyle} />
+            <input
+              name="client_address"
+              value={clientAddress}
+              onChange={(e) => setClientAddress(e.target.value)}
+              required
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
           </Field>
         </div>
 
         <Field label="Bairro *">
-          <input name="client_neighborhood" required className="rounded border px-3 py-2" style={inputStyle} />
+          <input
+            name="client_neighborhood"
+            value={clientNeighborhood}
+            onChange={(e) => setClientNeighborhood(e.target.value)}
+            required
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
         </Field>
       </FormSection>
 
       {isDelivery ? (
-        <FormSection title="Produto e entrega" number={3}>
+        <FormSection title="Produto e entrega" number={3} hint="Digite o código do produto pra preencher o nome automaticamente (se souber).">
           <div className="grid sm:grid-cols-3 gap-4">
-            <Field label="Produto a entregar">
-              <input name="product" placeholder="Ex: Super Box Confort Mola Ensacada" className="rounded border px-3 py-2" style={inputStyle} />
-            </Field>
             <Field label="Código do produto">
-              <input name="part_code" placeholder="Ex: SB-3050" className="rounded border px-3 py-2" style={inputStyle} />
+              <input
+                name="part_code"
+                value={productCode}
+                onChange={(e) => setProductCode(e.target.value)}
+                placeholder="Ex: SB-3050"
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+              {productLookupStatus === "loading" ? (
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Buscando…
+                </span>
+              ) : productLookupStatus === "found" ? (
+                <span className="text-xs" style={{ color: "var(--status-good)" }}>
+                  Produto encontrado.
+                </span>
+              ) : productLookupStatus === "not_found" ? (
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Código não encontrado.
+                </span>
+              ) : null}
+            </Field>
+            <Field label="Produto a entregar">
+              <input
+                name="product"
+                value={product}
+                onChange={(e) => setProduct(e.target.value)}
+                placeholder="Ex: Super Box Confort Mola Ensacada"
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
             </Field>
             <Field label="Quantidade">
               <input name="quantity" type="number" min={1} defaultValue={1} className="rounded border px-3 py-2" style={inputStyle} />

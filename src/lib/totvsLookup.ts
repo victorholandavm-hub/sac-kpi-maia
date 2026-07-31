@@ -76,3 +76,33 @@ export async function findTotvsClientByCode(code: string): Promise<TotvsClientMa
     addressState: data.address_state,
   };
 }
+
+export type TotvsProductMatch = {
+  productCode: string;
+  description: string | null;
+  manufacturer: string | null;
+};
+
+// Busca exata por código do produto nos itens de venda já sincronizados do
+// TOTVS -- não existe um catálogo de produtos separado, então usamos o
+// histórico de vendas como fonte (um código de produto tem descrição estável,
+// então qualquer venda passada serve pra autopreencher).
+export async function findTotvsProductByCode(code: string): Promise<TotvsProductMatch | null> {
+  const trimmed = code.trim();
+  if (!trimmed) return null;
+
+  const admin = getSupabaseAdmin();
+  const { data } = await admin
+    .from("totvs_order_items")
+    .select("product, description, manufacturer")
+    .eq("product", trimmed)
+    .limit(1)
+    .maybeSingle();
+
+  if (!data) return null;
+  return {
+    productCode: data.product ?? trimmed,
+    description: data.description,
+    manufacturer: data.manufacturer,
+  };
+}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { createQuickRequest, type FormState } from "@/app/assistencia/actions";
+import { useActionState, useEffect, useState } from "react";
+import { createQuickRequest, lookupTotvsClientForTeam, type FormState } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { SHIFTS, type Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
@@ -39,6 +39,38 @@ export function QuickCreateRequestForm({
   // Montador da loja escolhida + globais/legado (store_id nulo) -- a loja só
   // é escolhida aqui no formulário, então o filtro é no cliente.
   const visibleAssemblers = assemblers.filter((a) => a.storeId === null || a.storeId === storeId);
+
+  const [clientCode, setClientCode] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [clientAddress, setClientAddress] = useState("");
+  const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  // Mesma ideia de PublicRequestForm.tsx: código é só atalho, não trava nada
+  // se não achar -- a pessoa preenche à mão como já era.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!clientCode.trim()) {
+        setClientLookupStatus("idle");
+        return;
+      }
+      setClientLookupStatus("loading");
+      lookupTotvsClientForTeam(clientCode)
+        .then((match) => {
+          if (!match) {
+            setClientLookupStatus("not_found");
+            return;
+          }
+          setClientName(match.name);
+          if (match.phone1) setClientPhone(match.phone1);
+          const addressParts = [match.addressStreet, match.addressNumber].filter(Boolean).join(", ");
+          if (addressParts) setClientAddress(match.addressComplement ? `${addressParts} — ${match.addressComplement}` : addressParts);
+          setClientLookupStatus("found");
+        })
+        .catch(() => setClientLookupStatus("not_found"));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [clientCode]);
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -88,17 +120,65 @@ export function QuickCreateRequestForm({
         ) : null}
       </FormSection>
 
-      <FormSection title="Dados do cliente" number={2} hint="Só o nome é obrigatório.">
+      <FormSection
+        title="Dados do cliente"
+        number={2}
+        hint="Digite o código do cliente pra preencher o resto automaticamente (se souber). Só o nome é obrigatório."
+      >
+        <Field label="Código do cliente">
+          <input
+            name="client_protheus_code"
+            value={clientCode}
+            onChange={(e) => setClientCode(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+          {clientLookupStatus === "loading" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Buscando…
+            </span>
+          ) : clientLookupStatus === "found" ? (
+            <span className="text-xs" style={{ color: "var(--status-good)" }}>
+              Cliente encontrado — confira os dados abaixo.
+            </span>
+          ) : clientLookupStatus === "not_found" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Código não encontrado — preencha os dados abaixo à mão.
+            </span>
+          ) : null}
+        </Field>
+
         <Field label="Nome do cliente *">
-          <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
+          <input
+            name="client_name"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
+            required
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
         </Field>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Telefone *">
-            <input name="client_phone" required className="rounded border px-3 py-2" style={inputStyle} />
+            <input
+              name="client_phone"
+              value={clientPhone}
+              onChange={(e) => setClientPhone(e.target.value)}
+              required
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
           </Field>
           <Field label="Endereço *">
-            <input name="client_address" required className="rounded border px-3 py-2" style={inputStyle} />
+            <input
+              name="client_address"
+              value={clientAddress}
+              onChange={(e) => setClientAddress(e.target.value)}
+              required
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
           </Field>
         </div>
 

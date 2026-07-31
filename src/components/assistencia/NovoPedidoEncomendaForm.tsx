@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { createPedidoEncomendaAction, type FormState } from "@/app/assistencia/encomendas-actions";
+import { useActionState, useEffect, useState } from "react";
+import { createPedidoEncomendaAction, lookupTotvsClientForEncomenda, type FormState } from "@/app/assistencia/encomendas-actions";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -26,6 +26,35 @@ export function NovoPedidoEncomendaForm({
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPedidoEncomendaAction, undefined);
   const [items, setItems] = useState<Item[]>([{ produtoDescricao: "", quantidade: 1 }]);
+
+  const [clienteCodigo, setClienteCodigo] = useState("");
+  const [clienteNome, setClienteNome] = useState<string | null>(null);
+  const [clienteLookupStatus, setClienteLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  // Não existe campo de nome do cliente nesse pedido (só o código é
+  // guardado) -- a busca aqui é só pra mostrar de quem é o código antes de
+  // enviar, pra pegar erro de digitação. Não preenche nada.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!clienteCodigo.trim()) {
+        setClienteLookupStatus("idle");
+        return;
+      }
+      setClienteLookupStatus("loading");
+      lookupTotvsClientForEncomenda(clienteCodigo)
+        .then((match) => {
+          if (!match) {
+            setClienteNome(null);
+            setClienteLookupStatus("not_found");
+            return;
+          }
+          setClienteNome(match.name);
+          setClienteLookupStatus("found");
+        })
+        .catch(() => setClienteLookupStatus("not_found"));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [clienteCodigo]);
 
   function updateItem(index: number, patch: Partial<Item>) {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -65,7 +94,27 @@ export function NovoPedidoEncomendaForm({
         )}
 
         <Field label="Código do cliente">
-          <input name="cliente_codigo" placeholder="Código do cliente na venda" className="rounded border px-3 py-2" style={inputStyle} />
+          <input
+            name="cliente_codigo"
+            value={clienteCodigo}
+            onChange={(e) => setClienteCodigo(e.target.value)}
+            placeholder="Código do cliente na venda"
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+          {clienteLookupStatus === "loading" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Buscando…
+            </span>
+          ) : clienteLookupStatus === "found" ? (
+            <span className="text-xs" style={{ color: "var(--status-good)" }}>
+              Cliente encontrado: {clienteNome}
+            </span>
+          ) : clienteLookupStatus === "not_found" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Código não encontrado — pode enviar assim mesmo.
+            </span>
+          ) : null}
         </Field>
       </FormSection>
 

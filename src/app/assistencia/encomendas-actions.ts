@@ -16,7 +16,7 @@ import {
   type NewPedidoEncomendaItem,
 } from "@/lib/pedidosEncomenda";
 import { saveEncomendaPhoto } from "@/lib/pedidoEncomendaPhotos";
-import { searchTotvsOrdersByInvoice, type TotvsOrderSuggestion } from "@/lib/totvsLookup";
+import { searchTotvsOrdersByInvoice, findTotvsClientByCode, type TotvsOrderSuggestion, type TotvsClientMatch } from "@/lib/totvsLookup";
 
 export type FormState = { error?: string } | undefined;
 
@@ -25,6 +25,15 @@ export type FormState = { error?: string } | undefined;
 export async function searchNfSuggestions(query: string, storeId: string): Promise<TotvsOrderSuggestion[]> {
   await requireEncomendaActor();
   return searchTotvsOrdersByInvoice(query, storeId);
+}
+
+// Não existe campo de nome nessa tabela (só guarda o código digitado) -- isso
+// é só pra mostrar de quem é o código antes de enviar, pra pegar erro de
+// digitação, sem travar o envio se não achar.
+export async function lookupTotvsClientForEncomenda(code: string): Promise<TotvsClientMatch | null> {
+  const requester = await resolveEncomendaRequester();
+  if (!requester) return null;
+  return findTotvsClientByCode(code);
 }
 
 // Caixa, vendedor ou gerente lançam o pedido direto (formulário, sem

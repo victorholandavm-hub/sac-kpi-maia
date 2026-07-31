@@ -21,7 +21,7 @@ import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 import { isRota, getRotaWeekdayConfig, getRotaForDate, ROTA_LABELS } from "@/lib/rotas";
-import { findTotvsClientByCode, type TotvsClientMatch } from "@/lib/totvsLookup";
+import { findTotvsClientByCode, findTotvsProductByCode, type TotvsClientMatch, type TotvsProductMatch } from "@/lib/totvsLookup";
 import {
   ASSISTENCIA_TEAM_COOKIE_NAME,
   ASSISTENCIA_TEAM_PENDING_MAX_AGE,
@@ -178,6 +178,28 @@ export async function lookupTotvsClient(code: string): Promise<TotvsClientMatch 
   return findTotvsClientByCode(code);
 }
 
+// Mesma ideia de lookupTotvsClient, mas pro código do produto (PublicRequestForm.tsx,
+// seção "Produtos") -- busca no histórico de vendas do TOTVS (não existe
+// catálogo de produtos separado).
+export async function lookupTotvsProduct(code: string): Promise<TotvsProductMatch | null> {
+  const gerenteName = await getLojaGerenteSession();
+  if (!gerenteName) return null;
+  return findTotvsProductByCode(code);
+}
+
+// Versões de lookupTotvsClient/lookupTotvsProduct pra quem usa sessão da
+// equipe interna (Supabase Auth: assistência/admin/sac) em vez de sessão de
+// gerente de loja -- usadas em SacCreateRequestForm.tsx e QuickCreateRequestForm.tsx.
+export async function lookupTotvsClientForTeam(code: string): Promise<TotvsClientMatch | null> {
+  await getProfile();
+  return findTotvsClientByCode(code);
+}
+
+export async function lookupTotvsProductForTeam(code: string): Promise<TotvsProductMatch | null> {
+  await getProfile();
+  return findTotvsProductByCode(code);
+}
+
 // Sem sessão do Supabase Auth (usa a sessão de gerente de loja por PIN — ver
 // src/lib/gerentes.ts) — /assistencia/solicitar exige login de gerente antes
 // de mostrar o formulário, então chegar aqui sem sessão válida é só alguém
@@ -258,8 +280,9 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     const n = parseInt(String(v), 10);
     return Number.isFinite(n) && n > 0 ? n : 1;
   });
+  const itemCodes = formData.getAll("item_code").map((v) => String(v).trim() || null);
   const items = itemProducts
-    .map((product, i) => ({ product, quantity: itemQuantities[i] ?? 1 }))
+    .map((product, i) => ({ product, quantity: itemQuantities[i] ?? 1, partCode: itemCodes[i] ?? null }))
     .filter((item) => item.product.length > 0);
 
   if (type !== "notificacao_externa" && items.length === 0) {
@@ -307,7 +330,7 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
   if (items.length > 0) {
     const { error: itemsError } = await admin
       .from("service_request_items")
-      .insert(items.map((item) => ({ request_id: data.id, product: item.product, quantity: item.quantity })));
+      .insert(items.map((item) => ({ request_id: data.id, product: item.product, part_code: item.partCode, quantity: item.quantity })));
     if (itemsError) {
       return { error: `Solicitação criada, mas falhou ao salvar os itens: ${itemsError.message}` };
     }
@@ -888,6 +911,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       client_name: clientName,
       client_phone: clientPhone,
       client_address: clientAddress,
+      client_protheus_code: emptyToNull(formData.get("client_protheus_code")),
       reason: reason,
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
       scheduled_time: emptyToNull(formData.get("scheduled_time")),
@@ -989,6 +1013,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       client_phone: clientPhone,
       client_address: clientAddress,
       client_neighborhood: clientNeighborhood,
+      client_protheus_code: emptyToNull(formData.get("client_protheus_code")),
       reason: reason,
       restriction_note: emptyToNull(formData.get("restriction_note")),
       driver_name: driverName,
