@@ -396,7 +396,7 @@ const OPEN_LOJA_LIMIT = 200;
 // do cliente — só o necessário pra dar noção de volume (e o prazo definido
 // pela assistência, pra loja acompanhar/renegociar).
 export async function listOpenRequestsForLoja(
-  opts: { storeId?: string; onlyCompleted?: boolean } = {}
+  opts: { storeId?: string; storeIds?: string[]; types?: readonly RequestType[]; onlyCompleted?: boolean } = {}
 ): Promise<OpenRequestForLoja[]> {
   const admin = getSupabaseAdmin();
   let query = admin
@@ -412,8 +412,14 @@ export async function listOpenRequestsForLoja(
     query = query.not("status", "in", "(concluida,cancelada)").order("created_at", { ascending: true });
   }
 
-  if (opts.storeId) {
+  if (opts.storeIds) {
+    query = query.in("store_id", opts.storeIds);
+  } else if (opts.storeId) {
     query = query.eq("store_id", opts.storeId);
+  }
+
+  if (opts.types) {
+    query = query.in("type", opts.types as string[]);
   }
 
   const { data, error } = await query;
@@ -457,6 +463,25 @@ export async function listOpenRequestsForLoja(
     driverName: row.driver_name,
     requestedByName: row.requested_by_name,
   }));
+}
+
+// Lista já vem ordenada (criação asc pra abertas, conclusão desc pra
+// concluídas) — aqui só clusteriza itens consecutivos do mesmo dia em blocos,
+// preservando a ordem original entre e dentro dos blocos. Compartilhada pelas
+// telas de loja (montagens e trocas), que têm a mesma necessidade.
+export function groupRequestsByDate(
+  requests: OpenRequestForLoja[],
+  showCompleted: boolean
+): [string, OpenRequestForLoja[]][] {
+  const groups = new Map<string, OpenRequestForLoja[]>();
+  for (const r of requests) {
+    const dateField = showCompleted ? (r.completedAt ?? r.createdAt) : r.createdAt;
+    const label = new Date(dateField).toLocaleDateString("pt-BR");
+    const group = groups.get(label);
+    if (group) group.push(r);
+    else groups.set(label, [r]);
+  }
+  return [...groups.entries()];
 }
 
 // Posição de cada chamado de montagem em aberto na fila geral (todas as

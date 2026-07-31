@@ -1,14 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { listOpenRequestsForLoja, listOpenMontagemQueueIds, listStores, type OpenRequestForLoja, type DeadlineStatus } from "@/lib/serviceRequests";
+import {
+  listOpenRequestsForLoja,
+  listOpenMontagemQueueIds,
+  listStores,
+  groupRequestsByDate,
+  type DeadlineStatus,
+} from "@/lib/serviceRequests";
 import { getLojaStorePreference } from "@/app/assistencia/actions";
 import { getLojaGerenteSession, lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
-import { REQUEST_TYPE_LABELS, STATUS_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, STATUS_LABELS, ASSISTENCIA_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
 import { LojaStoreFilter } from "@/components/assistencia/LojaStoreFilter";
+import { LojaTabs } from "@/components/assistencia/LojaTabs";
 import { LojaDeadlineControl } from "@/components/assistencia/LojaDeadlineControl";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -79,7 +86,7 @@ export default async function LojaHomePage({
   const showCompleted = view === "concluidas";
 
   const [requests, stores, gerenteStoreIds, montagemQueueIds] = await Promise.all([
-    listOpenRequestsForLoja({ storeId: storeId || undefined, onlyCompleted: showCompleted }),
+    listOpenRequestsForLoja({ storeId: storeId || undefined, types: ASSISTENCIA_MANAGED_TYPES, onlyCompleted: showCompleted }),
     listStores(),
     getGerenteStoreIds(gerenteName),
     showCompleted ? Promise.resolve([]) : listOpenMontagemQueueIds(),
@@ -104,7 +111,7 @@ export default async function LojaHomePage({
     <ToastProvider>
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <RealtimeQueueRefresher />
-      <AssistenciaHeader title="Gerente de loja" subtitle="Demanda em aberto de todas as lojas">
+      <AssistenciaHeader title="Gerente de loja" subtitle="Montagem, desmontagem, recolhimento e vistoria — todas as lojas">
         <div className="flex items-center gap-3 flex-wrap">
           <Link
             href="/assistencia/solicitar"
@@ -121,13 +128,6 @@ export default async function LojaHomePage({
             + Nova encomenda
           </Link>
           <Link
-            href="/assistencia/encomendas/caixa"
-            className="text-sm underline whitespace-nowrap"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Ver encomendas
-          </Link>
-          <Link
             href="/assistencia/loja/equipe"
             className="text-sm underline whitespace-nowrap"
             style={{ color: "var(--text-secondary)" }}
@@ -141,6 +141,8 @@ export default async function LojaHomePage({
           </form>
         </div>
       </AssistenciaHeader>
+
+      <LojaTabs />
 
       <LojaStoreFilter stores={stores} selectedStoreId={storeId} />
 
@@ -188,7 +190,7 @@ export default async function LojaHomePage({
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          {groupByDate(requests, showCompleted).map(([dateLabel, group]) => {
+          {groupRequestsByDate(requests, showCompleted).map(([dateLabel, group]) => {
             return (
             <div key={dateLabel} className="rounded-xl border" style={{ borderColor: "var(--brand-green)" }}>
               <div className="px-4 py-2 flex items-center gap-2 flex-wrap rounded-t-xl" style={{ background: "var(--brand-green)" }}>
@@ -253,13 +255,7 @@ export default async function LojaHomePage({
                           {r.clientName ?? "Sem nome de cliente"}
                           {r.productSummary ? ` · ${r.productSummary}` : ""}
                         </p>
-                        {r.type === "troca_produto" ? (
-                          r.driverName ? (
-                            <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                              Motorista: {r.driverName}
-                            </p>
-                          ) : null
-                        ) : r.assemblerName ? (
+                        {r.assemblerName ? (
                           <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                             Montador: {r.assemblerName}
                           </p>
@@ -303,19 +299,4 @@ export default async function LojaHomePage({
     </div>
     </ToastProvider>
   );
-}
-
-// Lista já vem ordenada (criação asc pra abertas, conclusão desc pra
-// concluídas) — aqui só clusteriza itens consecutivos do mesmo dia em blocos,
-// preservando a ordem original entre e dentro dos blocos.
-function groupByDate(requests: OpenRequestForLoja[], showCompleted: boolean): [string, OpenRequestForLoja[]][] {
-  const groups = new Map<string, OpenRequestForLoja[]>();
-  for (const r of requests) {
-    const dateField = showCompleted ? (r.completedAt ?? r.createdAt) : r.createdAt;
-    const label = new Date(dateField).toLocaleDateString("pt-BR");
-    const group = groups.get(label);
-    if (group) group.push(r);
-    else groups.set(label, [r]);
-  }
-  return [...groups.entries()];
 }

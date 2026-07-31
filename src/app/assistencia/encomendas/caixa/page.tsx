@@ -16,6 +16,7 @@ import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncom
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
+import { LojaTabs } from "@/components/assistencia/LojaTabs";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 
 // Precisa refletir os pedidos em aberto em tempo real — nunca gerar estático.
@@ -86,6 +87,8 @@ export default async function EncomendasCaixaPage({
           </form>
         </div>
       </AssistenciaHeader>
+
+      {requester.kind === "gerente" ? <LojaTabs /> : null}
 
       <div className="flex items-center gap-2">
         <Link
