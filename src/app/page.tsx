@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import { requireDashboardAuth } from "@/lib/dashboardSession";
 
-export default function Home() {
+export default async function Home() {
+  await requireDashboardAuth();
   return (
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6">
       <AppHeader />

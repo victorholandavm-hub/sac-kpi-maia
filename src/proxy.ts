@@ -17,7 +17,9 @@ export async function proxy(req: NextRequest) {
   // um link digitado sem o caminho completo, etc.) cairia na checagem de senha do
   // painel do SAC logo abaixo — que nem existe aqui — confundindo quem acessa.
   if (!pathname.startsWith("/assistencia") && process.env.ASSISTENCIA_ONLY_PROJECT) {
-    return NextResponse.redirect(new URL("/assistencia", req.url), 307);
+    const assistenciaUrl = req.nextUrl.clone();
+    assistenciaUrl.pathname = "/assistencia";
+    return NextResponse.redirect(assistenciaUrl, 307);
   }
 
   // Todo o módulo de assistência (tela inicial, área da loja, formulário de
@@ -42,7 +44,9 @@ export async function proxy(req: NextRequest) {
   if (expectedToken && sessionCookie === expectedToken) {
     return NextResponse.next();
   }
-  return NextResponse.redirect(new URL("/login", req.url));
+  const loginUrl = req.nextUrl.clone();
+  loginUrl.pathname = "/login";
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
