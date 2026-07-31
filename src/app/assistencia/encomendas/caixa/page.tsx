@@ -177,7 +177,7 @@ export default async function EncomendasCaixaPage({
                       </p>
                     ) : null}
                   </div>
-                  <span className="text-xs shrink-0" style={{ color: "var(--text-muted)" }}>
+                  <span className="text-xs font-bold shrink-0" style={{ color: "var(--text-secondary)" }}>
                     {new Date(p.createdAt).toLocaleDateString("pt-BR")}
                   </span>
                   </div>

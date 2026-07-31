@@ -112,7 +112,9 @@ export function PedidoEncomendaFilaList({
                     ) : null}
                   </div>
                   <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                    <span>{new Date(p.createdAt).toLocaleString("pt-BR")}</span>
+                    <span className="font-bold" style={{ color: "var(--text-secondary)" }}>
+                      {new Date(p.createdAt).toLocaleString("pt-BR")}
+                    </span>
                     <span>Pedido por {p.requestedByName}</span>
                     {p.prazoEntrega ? (
                       <span style={{ color: "var(--status-good)", fontWeight: 600 }}>

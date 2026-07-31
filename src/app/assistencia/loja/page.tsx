@@ -4,7 +4,6 @@ import {
   listOpenRequestsForLoja,
   listOpenMontagemQueueIds,
   listStores,
-  groupRequestsByDate,
   type DeadlineStatus,
 } from "@/lib/serviceRequests";
 import { getLojaStorePreference } from "@/app/assistencia/actions";
@@ -189,114 +188,104 @@ export default async function LojaHomePage({
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-5">
-          {groupRequestsByDate(requests, showCompleted).map(([dateLabel, group]) => {
-            return (
-            <div key={dateLabel} className="rounded-xl border" style={{ borderColor: "var(--brand-green)" }}>
-              <div className="px-4 py-2 flex items-center gap-2 flex-wrap rounded-t-xl" style={{ background: "var(--brand-green)" }}>
-                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--brand-green-ink)" }}>
-                  {showCompleted ? `Concluídas em ${dateLabel}` : `Solicitado em ${dateLabel}`}
-                </span>
-              </div>
-              <div className="divide-y" style={{ background: "var(--surface-1)", borderColor: "var(--brand-green)" }}>
-                {group.map((r) => {
-                  const isOwnStore = gerenteStoreIds.includes(r.storeId);
-                  const isOwnRequest = r.requestedByName === gerenteName;
-                  const position = montagemPosition.get(r.id);
-                  return (
-                    <div
-                      key={r.id}
-                      className={isOwnRequest ? "flex items-start gap-3 p-4 rounded-lg m-2" : "flex items-start gap-3 p-4"}
-                      style={
-                        isOwnRequest
-                          ? { background: "var(--brand-green-soft)", border: "2px solid var(--brand-green)" }
-                          : undefined
-                      }
-                    >
-                      {/* Selo compacto e fixo à esquerda -- mesma pista visual da posição
-                          na fila usada nas telas de encomenda. */}
-                      <div className="flex items-center justify-center w-9 shrink-0 pt-0.5">
-                        {r.type === "montagem" && position ? (
-                          <div
-                            className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none"
-                            style={{ background: "var(--brand-green)", color: "#fff" }}
-                          >
-                            <span className="text-sm font-bold">{position}º</span>
-                            <span className="text-[7px] font-semibold uppercase tracking-wide">na fila</span>
-                          </div>
-                        ) : null}
+        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+          <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
+            {requests.map((r) => {
+              const isOwnStore = gerenteStoreIds.includes(r.storeId);
+              const isOwnRequest = r.requestedByName === gerenteName;
+              const position = montagemPosition.get(r.id);
+              const dateLabel = new Date(showCompleted ? (r.completedAt ?? r.createdAt) : r.createdAt).toLocaleDateString("pt-BR");
+              return (
+                <div
+                  key={r.id}
+                  className={isOwnRequest ? "flex items-start gap-3 p-4 rounded-lg m-2" : "flex items-start gap-3 p-4"}
+                  style={
+                    isOwnRequest
+                      ? { background: "var(--brand-green-soft)", border: "2px solid var(--brand-green)" }
+                      : undefined
+                  }
+                >
+                  {/* Selo compacto e fixo à esquerda -- mesma pista visual da posição
+                      na fila usada nas telas de encomenda. */}
+                  <div className="flex items-center justify-center w-9 shrink-0 pt-0.5">
+                    {r.type === "montagem" && position ? (
+                      <div
+                        className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none"
+                        style={{ background: "var(--brand-green)", color: "#fff" }}
+                      >
+                        <span className="text-sm font-bold">{position}º</span>
+                        <span className="text-[7px] font-semibold uppercase tracking-wide">na fila</span>
                       </div>
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 flex-1 min-w-0">
-                      <div className="flex flex-col gap-1.5 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
-                            #{r.ticketNumber}
-                          </span>
-                          <StatusBadge status={r.status} showInfo size={isOwnRequest ? "md" : "sm"} />
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                            {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                          </span>
-                          <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                            · {r.storeName}
-                          </span>
-                          {isOwnRequest ? (
-                            <span
-                              className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                              style={{ color: "var(--brand-green-ink)", background: "var(--brand-green)" }}
-                            >
-                              Sua solicitação
-                            </span>
-                          ) : r.requestedByName ? (
-                            <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                              · Solicitado por{" "}
-                              <span className="font-bold" style={{ color: "var(--text-primary)" }}>
-                                {r.requestedByName}
-                              </span>
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="text-sm font-medium break-words" style={{ color: "var(--text-primary)" }}>
-                          {r.clientName ?? "Sem nome de cliente"}
-                          {r.productSummary ? ` · ${r.productSummary}` : ""}
-                        </p>
-                        {r.assemblerName ? (
-                          <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                            Montador: {r.assemblerName}
-                          </p>
-                        ) : null}
-                      </div>
-                      {!showCompleted ? (
-                        <div
-                          className="shrink-0 pt-3 mt-1 border-t sm:pt-0 sm:mt-0 sm:border-t-0 w-full sm:w-auto"
-                          style={{ borderColor: "var(--gridline)" }}
-                        >
-                          {isOwnStore ? (
-                            <LojaDeadlineControl
-                              requestId={r.id}
-                              requestedDeadline={r.requestedDeadline}
-                              deadlineStatus={r.deadlineStatus}
-                              approvedDeadline={r.approvedDeadline}
-                              highlight={isOwnRequest}
-                            />
-                          ) : (
-                            <ReadOnlyDeadline
-                              requestedDeadline={r.requestedDeadline}
-                              deadlineStatus={r.deadlineStatus}
-                              approvedDeadline={r.approvedDeadline}
-                            />
-                          )}
-                        </div>
-                      ) : null}
-                      </div>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 flex-1 min-w-0">
+                  <div className="flex flex-col gap-1.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
+                        #{r.ticketNumber}
+                      </span>
+                      <StatusBadge status={r.status} showInfo size={isOwnRequest ? "md" : "sm"} />
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-            );
-          })}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+                      </span>
+                      <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                        · {r.storeName}
+                      </span>
+                      {isOwnRequest ? (
+                        <span
+                          className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                          style={{ color: "var(--brand-green-ink)", background: "var(--brand-green)" }}
+                        >
+                          Sua solicitação
+                        </span>
+                      ) : r.requestedByName ? (
+                        <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                          · Solicitado por{" "}
+                          <span className="font-bold" style={{ color: "var(--text-primary)" }}>
+                            {r.requestedByName}
+                          </span>
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-sm font-medium break-words" style={{ color: "var(--text-primary)" }}>
+                      {r.clientName ?? "Sem nome de cliente"}
+                      {r.productSummary ? ` · ${r.productSummary}` : ""}
+                    </p>
+                    {r.assemblerName ? (
+                      <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                        Montador: {r.assemblerName}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0 pt-3 mt-1 border-t sm:pt-0 sm:mt-0 sm:border-t-0 w-full sm:w-auto justify-between sm:justify-start" style={{ borderColor: "var(--gridline)" }}>
+                    <span className="text-xs font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {dateLabel}
+                    </span>
+                    {!showCompleted ? (
+                      isOwnStore ? (
+                        <LojaDeadlineControl
+                          requestId={r.id}
+                          requestedDeadline={r.requestedDeadline}
+                          deadlineStatus={r.deadlineStatus}
+                          approvedDeadline={r.approvedDeadline}
+                          highlight={isOwnRequest}
+                        />
+                      ) : (
+                        <ReadOnlyDeadline
+                          requestedDeadline={r.requestedDeadline}
+                          deadlineStatus={r.deadlineStatus}
+                          approvedDeadline={r.approvedDeadline}
+                        />
+                      )
+                    ) : null}
+                  </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
