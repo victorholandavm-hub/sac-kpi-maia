@@ -13,12 +13,19 @@ import { PEDIDO_ENCOMENDA_STATUS_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "
 import type { TotvsOrderSuggestion } from "@/lib/totvsLookup";
 import { FormSection } from "./FormSection";
 
-type NextStep = { toStatus: string; label: string; needsCarga?: boolean; needsNfE?: boolean };
+type NextStep = {
+  toStatus: string;
+  label: string;
+  needsCarga?: boolean;
+  needsNfE?: boolean;
+  needsPrazoFabricaCd?: boolean;
+  needsPrazoCdLoja?: boolean;
+};
 
 const NEXT_STEP: Record<string, NextStep | undefined> = {
-  solicitado: { toStatus: "em_producao", label: "Marcar em produção" },
+  solicitado: { toStatus: "em_producao", label: "Marcar em produção", needsPrazoFabricaCd: true },
   em_producao: { toStatus: "pronto_para_expedicao", label: "Marcar como enviado para o CD" },
-  pronto_para_expedicao: { toStatus: "em_carga", label: "Informar carga e expedir", needsCarga: true },
+  pronto_para_expedicao: { toStatus: "em_carga", label: "Informar carga e expedir", needsCarga: true, needsPrazoCdLoja: true },
   em_carga: { toStatus: "faturado", label: "Informar NF-e e faturar", needsNfE: true },
   faturado: { toStatus: "entregue", label: "Marcar entregue" },
 };
@@ -36,11 +43,15 @@ export function PedidoEncomendaActions({
   status,
   role,
   storeId,
+  prazoFabricaCd,
+  prazoCdLoja,
 }: {
   pedidoId: string;
   status: string;
   role: string;
   storeId: string;
+  prazoFabricaCd: string | null;
+  prazoCdLoja: string | null;
 }) {
   const { pending, run } = useQuickAction();
   const [carga, setCarga] = useState("");
@@ -72,6 +83,17 @@ export function PedidoEncomendaActions({
 
   return (
     <FormSection title="Ações">
+      {nextStep && nextStep.needsPrazoFabricaCd && !prazoFabricaCd ? (
+        <p className="text-xs font-medium" style={{ color: "var(--status-warning)" }}>
+          Defina o &ldquo;Prazo fábrica → CD&rdquo; acima antes de avançar.
+        </p>
+      ) : null}
+      {nextStep && nextStep.needsPrazoCdLoja && !prazoCdLoja ? (
+        <p className="text-xs font-medium" style={{ color: "var(--status-warning)" }}>
+          Defina o &ldquo;Prazo CD → loja&rdquo; acima antes de avançar.
+        </p>
+      ) : null}
+
       {nextStep ? (
         <div className="flex items-end gap-2 flex-wrap">
           {nextStep.needsCarga ? (
@@ -106,7 +128,13 @@ export function PedidoEncomendaActions({
             </label>
           ) : null}
           <button
-            disabled={pending || (nextStep.needsCarga && !carga.trim()) || (nextStep.needsNfE && !nfE.trim())}
+            disabled={
+              pending ||
+              (nextStep.needsCarga && !carga.trim()) ||
+              (nextStep.needsNfE && !nfE.trim()) ||
+              (nextStep.needsPrazoFabricaCd && !prazoFabricaCd) ||
+              (nextStep.needsPrazoCdLoja && !prazoCdLoja)
+            }
             onClick={() =>
               run(
                 () =>

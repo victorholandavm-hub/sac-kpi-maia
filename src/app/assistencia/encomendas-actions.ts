@@ -11,7 +11,7 @@ import {
   createPedidoEncomenda,
   updatePedidoStatus,
   addPedidoNote,
-  setPedidoPrazo,
+  setPedidoPrazoEtapa,
   isPedidoEncomendaStatus,
   type NewPedidoEncomendaItem,
 } from "@/lib/pedidosEncomenda";
@@ -157,15 +157,26 @@ export async function advancePedidoStatus(
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("pedidos_encomenda")
-    .select("status")
+    .select("status, prazo_fabrica_cd, prazo_cd_loja")
     .eq("id", pedidoId)
     .single();
   if (fetchError || !current) throw new Error("Pedido não encontrado.");
 
   requireEncomendaAction(actor, current.status, toStatus);
 
+  // Prazo prometido de cada etapa -- obrigatório no momento em que quem é
+  // dono da etapa aceita o pedido (fábrica: solicitado -> em_producao; CD:
+  // pronto_para_expedicao -> em_carga). É definido separadamente via
+  // PedidoPrazoField (setPedidoPrazoFabricaCdAction/CdLoja), não nesse
+  // clique -- aqui só confere que já foi salvo antes de deixar avançar.
+  if (toStatus === "em_producao" && !current.prazo_fabrica_cd) {
+    throw new Error('Defina o "Prazo fábrica → CD" antes de avançar.');
+  }
   if (toStatus === "em_carga" && !opts.carga?.trim()) {
     throw new Error("Informe o número da carga.");
+  }
+  if (toStatus === "em_carga" && !current.prazo_cd_loja) {
+    throw new Error('Defina o "Prazo CD → loja" antes de avançar.');
   }
   if (toStatus === "faturado" && !opts.nfE?.trim()) {
     throw new Error("Informe o número da NF-e.");
@@ -266,12 +277,31 @@ export async function addPedidoNoteAction(pedidoId: string, note: string): Promi
   revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
 }
 
-// Previsão de entrega — fábrica ou CD (ou admin/assistência) definem/editam
-// a qualquer momento, sempre opcional, sem travar nenhuma transição de
-// status. prazoEntrega vazio remove a previsão já definida.
-export async function setPedidoPrazoAction(pedidoId: string, prazoEntrega: string | null): Promise<void> {
+// Prazo fábrica -> CD: obrigatório em advancePedidoStatus na primeira vez
+// (transição solicitado -> em_producao), mas continua editável depois disso
+// -- só quem é dono dessa etapa (fábrica) ou admin/assistência.
+export async function setPedidoPrazoFabricaCdAction(pedidoId: string, value: string): Promise<void> {
   const actor = await requireEncomendaActor();
-  await setPedidoPrazo(pedidoId, actor, prazoEntrega);
+  if (actor.role !== "fabrica" && actor.role !== "admin" && actor.role !== "assistencia") {
+    throw new Error("Só a fábrica pode definir esse prazo.");
+  }
+  if (!value.trim()) throw new Error("Informe uma data.");
+  await setPedidoPrazoEtapa(pedidoId, actor, "prazo_fabrica_cd", value.trim());
+  revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
+  revalidatePath("/assistencia/encomendas/fila");
+  revalidatePath("/assistencia/encomendas/caixa");
+}
+
+// Prazo CD -> loja: mesma ideia, obrigatório na transição
+// pronto_para_expedicao -> em_carga, editável depois só por quem é dono
+// dessa etapa (CD) ou admin/assistência.
+export async function setPedidoPrazoCdLojaAction(pedidoId: string, value: string): Promise<void> {
+  const actor = await requireEncomendaActor();
+  if (actor.role !== "cd" && actor.role !== "admin" && actor.role !== "assistencia") {
+    throw new Error("Só o CD pode definir esse prazo.");
+  }
+  if (!value.trim()) throw new Error("Informe uma data.");
+  await setPedidoPrazoEtapa(pedidoId, actor, "prazo_cd_loja", value.trim());
   revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
   revalidatePath("/assistencia/encomendas/fila");
   revalidatePath("/assistencia/encomendas/caixa");

@@ -116,9 +116,14 @@ export function PedidoEncomendaFilaList({
                       {new Date(p.createdAt).toLocaleString("pt-BR")}
                     </span>
                     <span>Pedido por {p.requestedByName}</span>
-                    {p.prazoEntrega ? (
+                    {p.prazoFabricaCd ? (
                       <span style={{ color: "var(--status-good)", fontWeight: 600 }}>
-                        Previsão: {new Date(`${p.prazoEntrega}T00:00:00`).toLocaleDateString("pt-BR")}
+                        Prazo p/ CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
+                      </span>
+                    ) : null}
+                    {p.prazoCdLoja ? (
+                      <span style={{ color: "var(--status-good)", fontWeight: 600 }}>
+                        Prazo p/ loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : null}
                     {p.carga ? <span>Carga {p.carga}</span> : null}

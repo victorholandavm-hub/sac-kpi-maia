@@ -113,7 +113,8 @@ export type PedidoEncomendaSummary = {
   requestedByName: string;
   vendedorName: string | null;
   clienteCodigo: string | null;
-  prazoEntrega: string | null;
+  prazoFabricaCd: string | null;
+  prazoCdLoja: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -130,7 +131,8 @@ type PedidoRow = {
   requested_by_name: string;
   vendedor_name: string | null;
   cliente_codigo: string | null;
-  prazo_entrega: string | null;
+  prazo_fabrica_cd: string | null;
+  prazo_cd_loja: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -147,7 +149,7 @@ type PedidoRow = {
 };
 
 const PEDIDO_COLUMNS =
-  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, prazo_entrega, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produto_descricao, produto_codigo, produtos_encomenda(descricao))";
+  "id, pedido_number, store_id, status, carga, nf_e, requested_by_name, vendedor_name, cliente_codigo, prazo_fabrica_cd, prazo_cd_loja, notes, created_at, updated_at, stores(name), pedido_encomenda_itens(id, quantidade, produto_descricao, produto_codigo, produtos_encomenda(descricao))";
 
 function toSummary(row: PedidoRow): PedidoEncomendaSummary {
   return {
@@ -161,7 +163,8 @@ function toSummary(row: PedidoRow): PedidoEncomendaSummary {
     requestedByName: row.requested_by_name,
     vendedorName: row.vendedor_name,
     clienteCodigo: row.cliente_codigo,
-    prazoEntrega: row.prazo_entrega,
+    prazoFabricaCd: row.prazo_fabrica_cd,
+    prazoCdLoja: row.prazo_cd_loja,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -364,7 +367,10 @@ export async function updatePedidoStatus(
   if (error) throw new Error(error.message);
 
   const eventType = opts.carga ? "carga_informada" : opts.nfE ? "nf_e_informada" : "status_changed";
-  const note = opts.carga ? `Carga: ${opts.carga}` : opts.nfE ? `NF-e: ${opts.nfE}` : (opts.note?.trim() || null);
+  const noteParts: string[] = [];
+  if (opts.carga) noteParts.push(`Carga: ${opts.carga}`);
+  if (opts.nfE) noteParts.push(`NF-e: ${opts.nfE}`);
+  const note = noteParts.length > 0 ? noteParts.join(" · ") : opts.note?.trim() || null;
 
   await admin.from("pedido_encomenda_events").insert({
     pedido_id: id,
@@ -377,16 +383,24 @@ export async function updatePedidoStatus(
   });
 }
 
-// Previsão de entrega -- independente de status, fábrica/CD podem
-// definir/editar a qualquer momento (nunca obrigatório).
-export async function setPedidoPrazo(id: string, actor: { name: string; role: string }, prazoEntrega: string | null): Promise<void> {
+// Prazo por etapa -- obrigatório na transição em que é definido pela primeira
+// vez (ver advancePedidoStatus), mas continua editável depois disso (só quem
+// é dono daquela etapa, ou admin/assistência, ver as actions).
+export async function setPedidoPrazoEtapa(
+  id: string,
+  actor: { name: string; role: string },
+  field: "prazo_fabrica_cd" | "prazo_cd_loja",
+  value: string
+): Promise<void> {
   const admin = getSupabaseAdmin();
-  const { error } = await admin.from("pedidos_encomenda").update({ prazo_entrega: prazoEntrega }).eq("id", id);
+  const { error } = await admin
+    .from("pedidos_encomenda")
+    .update({ [field]: value })
+    .eq("id", id);
   if (error) throw new Error(error.message);
 
-  const note = prazoEntrega
-    ? `Previsão de entrega: ${new Date(`${prazoEntrega}T00:00:00`).toLocaleDateString("pt-BR")}`
-    : "Previsão de entrega removida.";
+  const label = field === "prazo_fabrica_cd" ? "Prazo fábrica → CD" : "Prazo CD → loja";
+  const note = `${label}: ${new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR")}`;
   const { error: eventError } = await admin.from("pedido_encomenda_events").insert({
     pedido_id: id,
     actor_name: actor.name,

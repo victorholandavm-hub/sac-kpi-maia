@@ -85,7 +85,22 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         </div>
       </FormSection>
 
-      <PedidoPrazoField pedidoId={pedido.id} prazoEntrega={pedido.prazoEntrega} />
+      <div className="grid sm:grid-cols-2 gap-4">
+        <PedidoPrazoField
+          pedidoId={pedido.id}
+          field="fabrica_cd"
+          label="Prazo fábrica → CD"
+          value={pedido.prazoFabricaCd}
+          canEdit={actor.role === "fabrica" || actor.role === "admin" || actor.role === "assistencia"}
+        />
+        <PedidoPrazoField
+          pedidoId={pedido.id}
+          field="cd_loja"
+          label="Prazo CD → loja"
+          value={pedido.prazoCdLoja}
+          canEdit={actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia"}
+        />
+      </div>
 
       {photos.length > 0 ? (
         <FormSection title="Cupom fiscal">
@@ -100,7 +115,14 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         </FormSection>
       ) : null}
 
-      <PedidoEncomendaActions pedidoId={pedido.id} status={pedido.status} role={actor.role} storeId={pedido.storeId} />
+      <PedidoEncomendaActions
+        pedidoId={pedido.id}
+        status={pedido.status}
+        role={actor.role}
+        storeId={pedido.storeId}
+        prazoFabricaCd={pedido.prazoFabricaCd}
+        prazoCdLoja={pedido.prazoCdLoja}
+      />
 
       <FormSection title="Histórico">
         <PedidoEncomendaTimeline events={events} />

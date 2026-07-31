@@ -171,15 +171,21 @@ export default async function EncomendasCaixaPage({
                     <p className="text-sm" style={{ color: "var(--text-primary)" }}>
                       {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
                     </p>
-                    {p.prazoEntrega ? (
-                      <p className="text-xs font-medium" style={{ color: "var(--status-good)" }}>
-                        Previsão de entrega: {new Date(`${p.prazoEntrega}T00:00:00`).toLocaleDateString("pt-BR")}
-                      </p>
+                  </div>
+                  <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
+                    <span className="text-xs font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {new Date(p.createdAt).toLocaleDateString("pt-BR")}
+                    </span>
+                    {p.prazoCdLoja ? (
+                      <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--status-good)" }}>
+                        Na loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
+                      </span>
+                    ) : p.prazoFabricaCd ? (
+                      <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                        No CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
+                      </span>
                     ) : null}
                   </div>
-                  <span className="text-xs font-bold shrink-0" style={{ color: "var(--text-secondary)" }}>
-                    {new Date(p.createdAt).toLocaleDateString("pt-BR")}
-                  </span>
                   </div>
                 </summary>
                 <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid var(--gridline)" }}>
