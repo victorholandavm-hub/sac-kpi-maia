@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { createPublicRequest, lookupTotvsClient, lookupTotvsProduct, type FormState } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
 import type { Store } from "@/lib/serviceRequests";
@@ -17,6 +17,26 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </label>
   );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  if (!value) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+        {label}
+      </span>
+      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function formatDateBr(iso: string): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
 }
 
 type Item = { product: string; quantity: number; code: string };
@@ -102,12 +122,27 @@ function ProductItemsFields({
   );
 }
 
+type Snapshot = {
+  storeName: string;
+  requestedDeadline: string;
+  orderCode: string;
+  invoiceNumber: string;
+  sellerName: string;
+  sacCategory: string;
+  reason: string;
+  restrictionNote: string;
+  notes: string;
+};
+
 // `stores` já vem restrito às lojas do gerente autenticado (um gerente pode
 // cuidar de mais de uma — ver src/lib/gerentes.ts e src/app/assistencia/solicitar/page.tsx,
 // que exige sessão antes de renderizar este formulário). `requesterName` vem
 // da mesma sessão (nome+PIN) — não pedimos de novo no formulário.
 export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; requesterName: string }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPublicRequest, undefined);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [type, setType] = useState<(typeof TYPES)[number]>("montagem");
   // Montagem/desmontagem de móvel de mostruário da própria loja não tem
   // cliente, venda nem endereço pra pedir -- só faz sentido pra esses dois
@@ -208,8 +243,37 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
   const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
   const showCombo = type === "montagem" || type === "desmontagem";
 
+  // Não envia nada ainda -- só valida (mesma validação nativa do navegador
+  // que rodaria no submit, só que sem submeter) e monta o resumo a partir do
+  // form de verdade, pra não duplicar lógica dos campos não controlados
+  // (prazo, pedido/NF/vendedor, motivo, observações etc.).
+  function handleRevisar() {
+    const form = formRef.current;
+    if (!form) return;
+    if (!form.reportValidity()) return;
+
+    const fd = new FormData(form);
+    const storeId = String(fd.get("store_id") ?? "");
+    const storeName = stores.length === 1 ? stores[0].name : (stores.find((s) => s.id === storeId)?.name ?? storeId);
+    const sacCategoryValue = String(fd.get("sac_category") ?? "");
+
+    setSnapshot({
+      storeName,
+      requestedDeadline: formatDateBr(String(fd.get("requested_deadline") ?? "")),
+      orderCode: String(fd.get("order_code") ?? "").trim(),
+      invoiceNumber: String(fd.get("invoice_number") ?? "").trim(),
+      sellerName: String(fd.get("seller_name") ?? "").trim(),
+      sacCategory: sacCategoryValue ? (SAC_CATEGORY_LABELS[sacCategoryValue] ?? sacCategoryValue) : "",
+      reason: String(fd.get("reason") ?? "").trim(),
+      restrictionNote: String(fd.get("restriction_note") ?? "").trim(),
+      notes: String(fd.get("notes") ?? "").trim(),
+    });
+    setReviewing(true);
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-4 max-w-xl">
+    <form ref={formRef} action={formAction} className="flex flex-col gap-4 max-w-xl">
+      <div style={{ display: reviewing ? "none" : undefined }} className="flex flex-col gap-4">
       <FormSection title="Loja e prazo" number={1} hint="Quando você precisa que isso seja resolvido?">
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Solicitante">
@@ -486,13 +550,110 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
       ) : null}
 
       <button
-        type="submit"
-        disabled={pending}
-        className="rounded px-4 py-2 font-medium self-start disabled:opacity-60"
+        type="button"
+        onClick={handleRevisar}
+        className="rounded px-4 py-2 font-medium self-start"
         style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
       >
-        {pending ? "Enviando…" : "Enviar solicitação"}
+        Revisar solicitação
       </button>
+      </div>
+
+      {reviewing && snapshot ? (
+        <FormSection
+          title="Confira antes de enviar"
+          hint="Se algo estiver errado, volte e corrija — depois de enviado, dá pra editar até a assistência entrar em contato."
+        >
+          <div className="flex flex-col gap-3">
+            <SummaryRow label="Loja" value={snapshot.storeName} />
+            <SummaryRow label="Tipo de solicitação" value={REQUEST_TYPE_LABELS[type]} />
+            {combo ? (
+              <SummaryRow
+                label="Combo"
+                value={type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
+              />
+            ) : null}
+            <SummaryRow label="Prazo desejado" value={snapshot.requestedDeadline} />
+            {isStoreTarget ? (
+              <SummaryRow label="Cliente" value="Mostruário da própria loja (sem cliente)" />
+            ) : (
+              <>
+                <SummaryRow label="Cliente" value={clientName} />
+                <SummaryRow label="CPF" value={clientCpf} />
+                <SummaryRow label="Telefone" value={clientPhone} />
+                {showAddress ? <SummaryRow label="Endereço" value={[clientAddress, clientNeighborhood].filter(Boolean).join(" — ")} /> : null}
+                <SummaryRow label="Pedido/venda" value={snapshot.orderCode} />
+                <SummaryRow label="Nota fiscal" value={snapshot.invoiceNumber} />
+                <SummaryRow label="Vendedor(a)" value={snapshot.sellerName} />
+              </>
+            )}
+            <SummaryRow label="Categoria da notificação" value={snapshot.sacCategory} />
+            {showItems ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Produtos{combo ? ` a ${type === "montagem" ? "montar" : "desmontar"}` : ""}
+                </span>
+                <ul className="text-sm flex flex-col gap-0.5" style={{ color: "var(--text-primary)" }}>
+                  {items
+                    .filter((i) => i.product.trim())
+                    .map((i, idx) => (
+                      <li key={idx}>
+                        {i.quantity}x {i.product}
+                        {i.code ? ` (${i.code})` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+            {showItems && combo ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Produtos a {type === "montagem" ? "desmontar" : "montar"}
+                </span>
+                <ul className="text-sm flex flex-col gap-0.5" style={{ color: "var(--text-primary)" }}>
+                  {secondaryItems
+                    .filter((i) => i.product.trim())
+                    .map((i, idx) => (
+                      <li key={idx}>
+                        {i.quantity}x {i.product}
+                        {i.code ? ` (${i.code})` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+            <SummaryRow label="Motivo" value={snapshot.reason} />
+            <SummaryRow label="Restrição" value={snapshot.restrictionNote} />
+            <SummaryRow label="Observações" value={snapshot.notes} />
+          </div>
+
+          {state?.error ? (
+            <p className="text-sm" style={{ color: "var(--status-critical)" }}>
+              {state.error}
+            </p>
+          ) : null}
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded px-4 py-2 font-medium disabled:opacity-60"
+              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            >
+              {pending ? "Enviando…" : "Confirmar e enviar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setReviewing(false)}
+              disabled={pending}
+              className="text-sm underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Voltar e editar
+            </button>
+          </div>
+        </FormSection>
+      ) : null}
     </form>
   );
 }
