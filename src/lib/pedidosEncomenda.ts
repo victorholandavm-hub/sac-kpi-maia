@@ -220,11 +220,25 @@ export async function listPedidosByRequester(requestedByName: string): Promise<P
 }
 
 export async function listAllPedidos(
-  opts: { status?: PedidoEncomendaStatus; storeId?: string; fabricaId?: string; fornecedorTipo?: "fabrica_interna" | "fabrica_externa" } = {}
+  opts: {
+    status?: PedidoEncomendaStatus;
+    // Fila principal (fila/page.tsx): por padrão só mostra os pedidos ainda
+    // em andamento, senão entregue/cancelado/negado antigo (bem mais
+    // numeroso com o tempo) enche a tela e empurra pra baixo o que
+    // realmente precisa de ação -- ignorado se `status` também for passado.
+    onlyOpen?: boolean;
+    storeId?: string;
+    fabricaId?: string;
+    fornecedorTipo?: "fabrica_interna" | "fabrica_externa";
+  } = {}
 ): Promise<PedidoEncomendaSummary[]> {
   const admin = getSupabaseAdmin();
   let query = admin.from("pedidos_encomenda").select(PEDIDO_COLUMNS);
-  if (opts.status) query = query.eq("status", opts.status);
+  if (opts.status) {
+    query = query.eq("status", opts.status);
+  } else if (opts.onlyOpen) {
+    query = query.in("status", OPEN_PEDIDO_ENCOMENDA_STATUSES);
+  }
   if (opts.storeId) query = query.eq("store_id", opts.storeId);
   // Operador de fábrica só enxerga pedidos da própria fábrica -- nunca
   // externos, nunca da outra fábrica interna (ver fila/page.tsx).
@@ -386,6 +400,56 @@ export async function createPedidoEncomenda(input: {
   });
 
   return { id: data.id, pedidoNumber: data.pedido_number };
+}
+
+// Solicitante corrige o próprio pedido (produto errado, esqueceu o código do
+// cliente etc.) em vez de criar um novo do zero -- é exatamente esse
+// segundo caminho que gerava pedido duplicado. Só faz sentido enquanto
+// ninguém do outro lado (fábrica/CD) mexeu ainda -- a autorização de quem
+// pode chamar isso e até que status fica em requireEncomendaEdit (dal.ts),
+// aqui só executa a troca. Não mexe em loja/fornecedor -- pedido errado
+// nesses campos é pra cancelar e lançar de novo, não editar.
+export async function updatePedidoEncomendaContent(
+  id: string,
+  input: {
+    vendedorName: string | null;
+    clienteCodigo: string | null;
+    notes: string | null;
+    items: NewPedidoEncomendaItem[];
+  },
+  actor: { name: string; role: string }
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  const { error: updateError } = await admin
+    .from("pedidos_encomenda")
+    .update({
+      vendedor_name: input.vendedorName,
+      cliente_codigo: input.clienteCodigo,
+      notes: input.notes,
+    })
+    .eq("id", id);
+  if (updateError) throw new Error(updateError.message);
+
+  const { error: deleteError } = await admin.from("pedido_encomenda_itens").delete().eq("pedido_id", id);
+  if (deleteError) throw new Error(deleteError.message);
+
+  const { error: itemsError } = await admin.from("pedido_encomenda_itens").insert(
+    input.items.map((item) => ({
+      pedido_id: id,
+      produto_descricao: item.produtoDescricao,
+      produto_codigo: item.produtoCodigo,
+      quantidade: item.quantidade,
+    }))
+  );
+  if (itemsError) throw new Error(`Itens não foram salvos: ${itemsError.message}`);
+
+  await admin.from("pedido_encomenda_events").insert({
+    pedido_id: id,
+    actor_name: actor.name,
+    actor_role: actor.role,
+    event_type: "edited",
+  });
 }
 
 export async function updatePedidoStatus(

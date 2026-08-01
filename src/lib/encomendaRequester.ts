@@ -68,3 +68,20 @@ export async function resolveEncomendaRequester(): Promise<EncomendaRequester | 
 
   return null;
 }
+
+// Solicitante só edita o próprio pedido, e só enquanto ninguém do outro
+// lado (fábrica/CD) tiver feito nada ainda -- depois que sai de
+// "solicitado" a correção passa a ser assunto de quem está processando, não
+// mais de quem pediu. Caixa/gerente têm acesso por loja (igual já enxergam
+// juntos os pedidos da própria loja); CD/fábrica/SAC não têm loja fixa, só
+// editam o que o próprio nome lançou (mesmo escopo que já usam pra
+// acompanhar, ver encomendas/sac/page.tsx).
+export function canEditPedido(
+  requester: EncomendaRequester,
+  pedido: { status: string; storeId: string; requestedByName: string }
+): boolean {
+  if (pedido.status !== "solicitado") return false;
+  if (requester.kind === "gerente") return requester.storeIds.includes(pedido.storeId);
+  if (requester.kind === "caixa") return requester.storeId === pedido.storeId;
+  return requester.name === pedido.requestedByName;
+}

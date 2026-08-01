@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
+import { resolveEncomendaRequester, canEditPedido } from "@/lib/encomendaRequester";
 import { caixaSignOut } from "@/app/assistencia/caixa-actions";
 import { lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
@@ -203,6 +203,15 @@ export default async function EncomendasCaixaPage({
                     Solicitado por: {p.requestedByName}
                     {storeIds.length > 1 ? ` (${p.storeName})` : ""}
                   </p>
+                  {canEditPedido(requester, p) ? (
+                    <Link
+                      href={`/assistencia/encomendas/${p.id}/editar`}
+                      className="text-xs underline self-start"
+                      style={{ color: "var(--brand-green)" }}
+                    >
+                      Editar pedido
+                    </Link>
+                  ) : null}
                   {p.vendedorName ? (
                     <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       Vendedor: {p.vendedorName}

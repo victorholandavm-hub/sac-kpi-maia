@@ -5,12 +5,13 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireEncomendaAction } from "@/lib/dal";
 import { requireEncomendaActor } from "@/lib/encomendaAuth";
-import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
+import { resolveEncomendaRequester, canEditPedido } from "@/lib/encomendaRequester";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 import { INTERNAL_FABRICAS, EXTERNAL_FABRICAS } from "@/lib/fabricas";
 import {
   createPedidoEncomenda,
   updatePedidoStatus,
+  updatePedidoEncomendaContent,
   addPedidoNote,
   setPedidoPrazoEtapa,
   isPedidoEncomendaStatus,
@@ -183,6 +184,58 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   revalidatePath("/assistencia/encomendas/caixa");
   revalidatePath("/assistencia/encomendas/fila");
   redirect(`/assistencia/encomendas/solicitar?enviado=1&pedido=${pedidoNumber}`);
+}
+
+// Solicitante corrige o próprio pedido (produto errado, esqueceu o código
+// do cliente etc.) em vez de lançar um novo do zero -- era exatamente essa
+// falta que gerava pedido duplicado. Só produtos/vendedor/código do
+// cliente/observações são editáveis aqui -- loja e fornecedor definem pra
+// onde o pedido roteia, e mudar isso depois é confuso; nesse caso o certo é
+// negar/cancelar e lançar de novo. canEditPedido (encomendaRequester.ts) já
+// garante que só quem pode ver esse pedido como solicitante mexe nele, e só
+// enquanto ainda está "solicitado".
+export async function editPedidoEncomendaAction(pedidoId: string, _state: FormState, formData: FormData): Promise<FormState> {
+  const requester = await resolveEncomendaRequester();
+  if (!requester) return { error: "Sessão expirada. Faça login de novo." };
+
+  const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("pedidos_encomenda")
+    .select("status, store_id, requested_by_name")
+    .eq("id", pedidoId)
+    .single();
+  if (fetchError || !current) return { error: "Pedido não encontrado." };
+
+  if (!canEditPedido(requester, { status: current.status, storeId: current.store_id, requestedByName: current.requested_by_name })) {
+    return { error: "Esse pedido não pode mais ser editado — ou já saiu de \"solicitado\", ou não é seu." };
+  }
+
+  const vendedorName = String(formData.get("vendedor_name") ?? "").trim() || null;
+  const clienteCodigo = String(formData.get("cliente_codigo") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  const produtoDescricoes = formData.getAll("item_produto_descricao").map((v) => String(v).trim());
+  const produtoCodigos = formData.getAll("item_produto_codigo").map((v) => String(v).trim() || null);
+  const quantidades = formData.getAll("item_quantidade").map((v) => {
+    const n = parseInt(String(v), 10);
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  });
+  const items: NewPedidoEncomendaItem[] = produtoDescricoes
+    .map((produtoDescricao, i) => ({ produtoDescricao, produtoCodigo: produtoCodigos[i] ?? null, quantidade: quantidades[i] ?? 1 }))
+    .filter((item) => item.produtoDescricao.length > 0);
+  if (items.length === 0) return { error: "Adicione pelo menos um produto." };
+
+  try {
+    await updatePedidoEncomendaContent(pedidoId, { vendedorName, clienteCodigo, notes, items }, { name: requester.name, role: requester.kind });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível salvar as alterações." };
+  }
+
+  revalidatePath("/assistencia/encomendas/caixa");
+  revalidatePath("/assistencia/encomendas/sac");
+  revalidatePath("/assistencia/encomendas/fila");
+  revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
+  redirect(`/assistencia/encomendas/${pedidoId}/editar?salvo=1`);
 }
 
 // Avanço de status pela fila interna (fábrica/CD/admin/assistência) — mesmo

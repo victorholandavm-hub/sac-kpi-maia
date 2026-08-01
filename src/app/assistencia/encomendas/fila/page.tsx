@@ -31,8 +31,15 @@ const FORNECEDOR_FILTERS: { label: string; value: string | null }[] = [
   { label: "Externo", value: "externa" },
 ];
 
+// "Em andamento" (value null, padrão -- nem aparece na URL) é a fila de
+// verdade: só o que ainda não chegou em entregue/cancelado/negado. "Todos"
+// é filtro explícito (?status=todos), pra quem quer ver o histórico
+// completo -- sem essa distinção, pedido antigo já concluído (bem mais
+// numeroso com o tempo) enchia a tela padrão e empurrava pra baixo o que
+// precisa de ação agora.
 const FILTERS: { label: string; value: string | null }[] = [
-  { label: "Todos", value: null },
+  { label: "Em andamento", value: null },
+  { label: "Todos", value: "todos" },
   { label: "Solicitado", value: "solicitado" },
   { label: "Em produção", value: "em_producao" },
   { label: "Enviado para o CD", value: "pronto_para_expedicao" },
@@ -54,6 +61,7 @@ export default async function EncomendasQueuePage({
   const actor = await requireEncomendaActor();
   const { status, store, fornecedor } = await searchParams;
   const filterStatus = isPedidoEncomendaStatus(status) ? status : undefined;
+  const showAllStatuses = status === "todos";
 
   // Fábrica nunca enxerga pedido externo -- só o(s) da(s) fábrica(s)
   // própria(s) que é dela (a maioria tem uma só; fabricaId nulo, caso do
@@ -71,7 +79,13 @@ export default async function EncomendasQueuePage({
         : undefined;
 
   const [pedidos, stores, queueIds] = await Promise.all([
-    listAllPedidos({ status: filterStatus, storeId: store, fabricaId: fabricaIdFilter, fornecedorTipo: fornecedorTipoFilter }),
+    listAllPedidos({
+      status: filterStatus,
+      onlyOpen: !filterStatus && !showAllStatuses,
+      storeId: store,
+      fabricaId: fabricaIdFilter,
+      fornecedorTipo: fornecedorTipoFilter,
+    }),
     listStores(),
     listOpenPedidoEncomendaQueueIds(),
   ]);
@@ -117,15 +131,17 @@ export default async function EncomendasQueuePage({
 
       <div className="flex items-center gap-2 flex-wrap">
         {FILTERS.map((f) => {
-          const selected = (f.value ?? undefined) === filterStatus;
-          const color = f.value ? PEDIDO_ENCOMENDA_STATUS_COLORS[f.value] ?? "var(--text-secondary)" : "var(--text-secondary)";
+          const activeValue = showAllStatuses ? "todos" : (filterStatus ?? null);
+          const selected = (f.value ?? null) === activeValue;
+          const isStatusPill = !!f.value && f.value !== "todos";
+          const color = isStatusPill ? PEDIDO_ENCOMENDA_STATUS_COLORS[f.value as string] ?? "var(--text-secondary)" : "var(--text-secondary)";
           return (
             <Link
               key={f.label}
               href={buildHref({ status: f.value ?? undefined, store, fornecedor })}
               className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
               style={
-                f.value
+                isStatusPill
                   ? {
                       color,
                       background: selected ? `color-mix(in srgb, ${color} 18%, transparent)` : "transparent",

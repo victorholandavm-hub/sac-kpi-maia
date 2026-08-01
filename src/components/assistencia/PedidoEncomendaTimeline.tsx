@@ -7,6 +7,8 @@ function describeEvent(e: PedidoEncomendaEvent): string {
   switch (e.eventType) {
     case "created":
       return "Pedido criado.";
+    case "edited":
+      return "Pedido editado pelo solicitante.";
     case "status_changed":
       return toLabel ? `Status alterado para "${toLabel}".` : "Status alterado.";
     case "carga_informada":

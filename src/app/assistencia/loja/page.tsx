@@ -280,6 +280,15 @@ export default async function LojaHomePage({
                         />
                       )
                     ) : null}
+                    {!showCompleted && isOwnStore && r.status === "aberta" ? (
+                      <Link
+                        href={`/assistencia/loja/${r.id}/editar`}
+                        className="text-xs underline whitespace-nowrap"
+                        style={{ color: "var(--brand-green)" }}
+                      >
+                        Editar
+                      </Link>
+                    ) : null}
                   </div>
                   </div>
                 </div>

@@ -439,6 +439,162 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
   redirect(`/assistencia/solicitar?enviado=1&chamado=${data.ticket_number}`);
 }
 
+// Gerente corrige a própria solicitação (produto errado, telefone errado
+// etc.) em vez de abrir outra do zero -- mesma lógica por trás da edição de
+// pedido de encomenda (ver editPedidoEncomendaAction em encomendas-actions.ts).
+// Só enquanto a solicitação ainda está "aberta": depois que a assistência
+// entra em contato, a correção passa a ser assunto de quem está atendendo,
+// não mais de quem abriu. Tipo e "pra quem é" (cliente x mostruário) não
+// mudam aqui -- errar isso é caso de cancelar e abrir de novo, não editar.
+export async function editServiceRequestByGerente(requestId: string, _state: FormState, formData: FormData): Promise<FormState> {
+  const gerenteName = await getLojaGerenteSession();
+  if (!gerenteName) return { error: "Sessão expirada. Faça login de novo." };
+
+  const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("type, status, store_id, client_name, order_code")
+    .eq("id", requestId)
+    .single();
+  if (fetchError || !current) return { error: "Solicitação não encontrada." };
+
+  const gerenteStoreIds = await getGerenteStoreIds(gerenteName);
+  if (!gerenteStoreIds.includes(current.store_id)) return { error: "Essa solicitação não é de uma loja sua." };
+  if (current.status !== "aberta") {
+    return { error: "Essa solicitação não pode mais ser editada — a assistência já começou a atender." };
+  }
+
+  const type = current.type as (typeof REQUEST_TYPES)[number];
+  // Mesma detecção usada só pra decidir quais campos aparecem/validar --
+  // não existe coluna própria pra isso (ver isStoreTarget em createPublicRequest).
+  const isStoreTarget = !current.order_code && (current.client_name ?? "").startsWith("Mostruário — ");
+
+  const requestedDeadline = String(formData.get("requested_deadline") ?? "").trim();
+  if (!requestedDeadline) return { error: "Informe o prazo desejado." };
+
+  const comboMontagemDesmontagem =
+    (type === "montagem" || type === "desmontagem") && formData.get("combo_montagem_desmontagem") === "on";
+
+  let clientName = current.client_name ?? "";
+  let orderCode = "";
+  let invoiceNumber = "";
+  let sellerName = "";
+  let clientCpf = "";
+  let clientPhone = "";
+  let clientAddress = "";
+  let clientNeighborhood = "";
+
+  if (!isStoreTarget) {
+    clientName = String(formData.get("client_name") ?? "").trim();
+    if (!clientName) return { error: "Informe o nome do cliente." };
+
+    orderCode = String(formData.get("order_code") ?? "").trim();
+    if (!orderCode) return { error: "Informe o código do pedido/venda." };
+
+    invoiceNumber = String(formData.get("invoice_number") ?? "").trim();
+    if (!invoiceNumber) return { error: "Informe o número da nota fiscal." };
+
+    sellerName = String(formData.get("seller_name") ?? "").trim();
+    if (!sellerName) return { error: "Informe o vendedor(a)." };
+
+    clientCpf = String(formData.get("client_cpf") ?? "").trim();
+    if (!clientCpf) return { error: "Informe o CPF do cliente." };
+
+    clientPhone = String(formData.get("client_phone") ?? "").trim();
+    if (!clientPhone) return { error: "Informe o telefone de contato." };
+
+    const ADDRESS_REQUIRED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"];
+    if (ADDRESS_REQUIRED_TYPES.includes(type)) {
+      clientAddress = String(formData.get("client_address") ?? "").trim();
+      if (!clientAddress) return { error: "Informe o endereço." };
+      clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
+      if (!clientNeighborhood) return { error: "Informe o bairro." };
+    }
+  }
+
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { error: "Informe o motivo." };
+
+  function parseItems(prefix: string): { product: string; quantity: number; partCode: string | null }[] {
+    const products = formData.getAll(prefix + "_product").map((v) => String(v).trim());
+    const quantities = formData.getAll(prefix + "_quantity").map((v) => {
+      const n = parseInt(String(v), 10);
+      return Number.isFinite(n) && n > 0 ? n : 1;
+    });
+    const codes = formData.getAll(prefix + "_code").map((v) => String(v).trim() || null);
+    return products
+      .map((product, i) => ({ product, quantity: quantities[i] ?? 1, partCode: codes[i] ?? null }))
+      .filter((item) => item.product.length > 0);
+  }
+
+  const primaryAction: "montar" | "desmontar" = type === "montagem" ? "montar" : "desmontar";
+  const secondaryAction: "montar" | "desmontar" = primaryAction === "montar" ? "desmontar" : "montar";
+
+  const primaryItems = parseItems("item").map((item) => ({
+    ...item,
+    action: comboMontagemDesmontagem ? primaryAction : null,
+  }));
+  const secondaryItems = comboMontagemDesmontagem
+    ? parseItems("item_secondary").map((item) => ({ ...item, action: secondaryAction }))
+    : [];
+  const items = [...primaryItems, ...secondaryItems];
+
+  if (type !== "notificacao_externa" && items.length === 0) {
+    return { error: "Informe pelo menos um produto." };
+  }
+  if (comboMontagemDesmontagem && secondaryItems.length === 0) {
+    return {
+      error: `Informe pelo menos um produto pra ${secondaryAction === "montar" ? "montar" : "desmontar"} (a outra ação da visita combo).`,
+    };
+  }
+
+  const { error: updateError } = await admin
+    .from("service_requests")
+    .update({
+      requested_deadline: requestedDeadline,
+      order_code: emptyToNull(orderCode),
+      client_name: clientName,
+      client_cpf: emptyToNull(clientCpf),
+      client_phone: emptyToNull(clientPhone),
+      client_address: emptyToNull(clientAddress),
+      client_neighborhood: emptyToNull(clientNeighborhood),
+      reason,
+      restriction_note: emptyToNull(formData.get("restriction_note")),
+      notes: emptyToNull(formData.get("notes")),
+      seller_name: emptyToNull(sellerName),
+      invoice_number: emptyToNull(invoiceNumber),
+      combo_montagem_desmontagem: comboMontagemDesmontagem,
+    })
+    .eq("id", requestId);
+  if (updateError) return { error: `Não foi possível salvar: ${updateError.message}` };
+
+  const { error: deleteItemsError } = await admin.from("service_request_items").delete().eq("request_id", requestId);
+  if (deleteItemsError) return { error: `Itens não foram salvos: ${deleteItemsError.message}` };
+
+  if (items.length > 0) {
+    const { error: itemsError } = await admin.from("service_request_items").insert(
+      items.map((item) => ({
+        request_id: requestId,
+        product: item.product,
+        part_code: item.partCode,
+        quantity: item.quantity,
+        item_action: item.action,
+      }))
+    );
+    if (itemsError) return { error: `Itens não foram salvos: ${itemsError.message}` };
+  }
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: null,
+    event_type: "edited",
+  });
+
+  revalidatePath("/assistencia/loja");
+  revalidatePath(`/assistencia/loja/${requestId}/editar`);
+  redirect(`/assistencia/loja/${requestId}/editar?salvo=1`);
+}
+
 export async function approveDeadline(requestId: string) {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin");
