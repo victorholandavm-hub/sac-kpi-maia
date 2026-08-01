@@ -39,7 +39,7 @@ const STORE_LABELS: Record<string, string> = {
   "208": "GL",
   "209": "Pluma",
   "210": "Maia Cabedelo",
-  "211": "Maia Barão do T.",
+  "211": "Maia Barão",
   "212": "Maia Shopping M",
   "213": "Maia CD",
   "214": "Maia Mamanguape",
