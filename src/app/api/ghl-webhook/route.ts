@@ -14,7 +14,7 @@ function parseTags(raw: unknown): string[] {
 
 export async function POST(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret") ?? req.headers.get("x-webhook-secret");
-  if (secret !== process.env.GHL_WEBHOOK_SECRET) {
+  if (!process.env.GHL_WEBHOOK_SECRET || secret !== process.env.GHL_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

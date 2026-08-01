@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { sanitizeOrFilterValue } from "./searchFilter";
 
 export type PartOrderStatus = "aguardando_peca" | "peca_recebida" | "enviada_ao_cliente" | "encerrado";
 
@@ -115,13 +116,14 @@ export async function listPartOrders(
 
   const q = opts.q?.trim();
   if (q) {
+    const qSafe = sanitizeOrFilterValue(q);
     query = query.or(
       [
-        `client_name.ilike.%${q}%`,
-        `client_cpf.ilike.%${q}%`,
-        `product.ilike.%${q}%`,
-        `part_name.ilike.%${q}%`,
-        `part_code.ilike.%${q}%`,
+        `client_name.ilike.%${qSafe}%`,
+        `client_cpf.ilike.%${qSafe}%`,
+        `product.ilike.%${qSafe}%`,
+        `part_name.ilike.%${qSafe}%`,
+        `part_code.ilike.%${qSafe}%`,
       ].join(",")
     );
   }

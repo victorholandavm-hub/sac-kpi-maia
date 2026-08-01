@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { sanitizeOrFilterValue } from "./searchFilter";
 
 export type MovementType = "retirado" | "devolvido" | "reparado";
 
@@ -70,7 +71,8 @@ export async function listStockMovements(
 
   const q = opts.q?.trim();
   if (q) {
-    query = query.or([`product.ilike.%${q}%`, `code.ilike.%${q}%`, `client_name.ilike.%${q}%`].join(","));
+    const qSafe = sanitizeOrFilterValue(q);
+    query = query.or([`product.ilike.%${qSafe}%`, `code.ilike.%${qSafe}%`, `client_name.ilike.%${qSafe}%`].join(","));
   }
 
   const { data, error } = await query;

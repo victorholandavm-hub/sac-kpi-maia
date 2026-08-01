@@ -85,7 +85,10 @@ async function firstResponseMinutes(ghlConversationId: string): Promise<number |
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Comparação direta com `Bearer ${process.env.CRON_SECRET}` deixava a
+  // rota aberta pra quem mandasse literalmente "Bearer undefined" caso a
+  // variável de ambiente sumisse num deploy -- falha aberta, não fechada.
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

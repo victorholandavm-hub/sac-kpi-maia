@@ -602,10 +602,11 @@ export async function approveDeadline(requestId: string) {
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("requested_deadline")
+    .select("requested_deadline, type")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
 
   const { error } = await admin
     .from("service_requests")
@@ -630,6 +631,14 @@ export async function rejectDeadline(requestId: string, newDate: string) {
   if (!newDate) throw new Error("Informe a nova data proposta.");
 
   const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("type")
+    .eq("id", requestId)
+    .single();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+
   const { error } = await admin
     .from("service_requests")
     .update({ deadline_status: "recusado", approved_deadline: newDate })
@@ -811,7 +820,9 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
   const admin = getSupabaseAdmin();
 
   const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
-  if (current && (MANOEL_ONLY_TYPES as readonly string[]).includes(current.type) && trimmed !== MANOEL_ONLY_ASSEMBLER) {
+  if (!current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+  if ((MANOEL_ONLY_TYPES as readonly string[]).includes(current.type) && trimmed !== MANOEL_ONLY_ASSEMBLER) {
     throw new Error(`Só ${MANOEL_ONLY_ASSEMBLER} pode ser responsável por ${REQUEST_TYPE_LABELS[current.type]?.toLowerCase() ?? current.type}.`);
   }
 
@@ -906,6 +917,11 @@ export async function setSchedule(
     throw new Error("Turno inválido.");
   }
 
+  const admin = getSupabaseAdmin();
+  const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
+  if (!current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+
   let rotaValue: string | null = null;
   if (scheduledDate && rota) {
     if (!isRota(rota)) throw new Error("Rota inválida.");
@@ -918,7 +934,6 @@ export async function setSchedule(
     rotaValue = rota;
   }
 
-  const admin = getSupabaseAdmin();
   const { error } = await admin
     .from("service_requests")
     .update({

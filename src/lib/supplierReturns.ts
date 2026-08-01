@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { sanitizeOrFilterValue } from "./searchFilter";
 
 export type SupplierReturnStatus = "aguardando_envio" | "enviado" | "recebido" | "reembolsado" | "finalizado";
 
@@ -86,7 +87,8 @@ export async function listSupplierReturns(
   if (opts.supplier) query = query.eq("supplier", opts.supplier);
   const q = opts.q?.trim();
   if (q) {
-    query = query.or([`part_name.ilike.%${q}%`, `product.ilike.%${q}%`, `invoice_number.ilike.%${q}%`].join(","));
+    const qSafe = sanitizeOrFilterValue(q);
+    query = query.or([`part_name.ilike.%${qSafe}%`, `product.ilike.%${qSafe}%`, `invoice_number.ilike.%${qSafe}%`].join(","));
   }
 
   const { data, error } = await query;

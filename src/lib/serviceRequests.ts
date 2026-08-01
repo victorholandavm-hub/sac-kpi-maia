@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
 
 export type RequestType =
@@ -253,11 +254,12 @@ export async function listRequests(
     const { data: itemMatches } = await admin.from("service_request_items").select("request_id").ilike("product", `%${q}%`);
     const matchingIds = [...new Set((itemMatches ?? []).map((r) => r.request_id as string))];
 
+    const qSafe = sanitizeOrFilterValue(q);
     const orParts = [
-      `client_name.ilike.%${q}%`,
-      `client_cpf.ilike.%${q}%`,
-      `client_phone.ilike.%${q}%`,
-      `order_code.ilike.%${q}%`,
+      `client_name.ilike.%${qSafe}%`,
+      `client_cpf.ilike.%${qSafe}%`,
+      `client_phone.ilike.%${qSafe}%`,
+      `order_code.ilike.%${qSafe}%`,
     ];
     if (matchingIds.length > 0) {
       orParts.push(`id.in.(${matchingIds.join(",")})`);

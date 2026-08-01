@@ -395,11 +395,15 @@ export async function setPedidoPrazoFabricaCdAction(pedidoId: string, value: str
 
   if (actor.role !== "admin" && actor.role !== "assistencia") {
     const admin = getSupabaseAdmin();
-    const { data: pedido } = await admin.from("pedidos_encomenda").select("fornecedor_tipo").eq("id", pedidoId).maybeSingle();
+    const { data: pedido } = await admin.from("pedidos_encomenda").select("fornecedor_tipo, fabrica_id").eq("id", pedidoId).maybeSingle();
     const externo = pedido?.fornecedor_tipo === "fabrica_externa";
-    const podeDefinir = (actor.role === "fabrica" && !externo) || (actor.role === "cd" && externo);
+    // Mesma regra de fabricaId de requireEncomendaAction (dal.ts) -- sem
+    // isso, operador da Fábrica A definia prazo em pedido da Fábrica B só
+    // sabendo o id.
+    const matchesFabrica = !actor.fabricaId || !pedido?.fabrica_id || actor.fabricaId === pedido.fabrica_id;
+    const podeDefinir = (actor.role === "fabrica" && !externo && matchesFabrica) || (actor.role === "cd" && externo);
     if (!podeDefinir) {
-      throw new Error(externo ? "Só o CD pode definir esse prazo (fornecedor externo)." : "Só a fábrica pode definir esse prazo.");
+      throw new Error(externo ? "Só o CD pode definir esse prazo (fornecedor externo)." : "Só a fábrica desse pedido pode definir esse prazo.");
     }
   }
   await setPedidoPrazoEtapa(pedidoId, actor, "prazo_fabrica_cd", value.trim());
