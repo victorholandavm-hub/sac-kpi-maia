@@ -146,6 +146,11 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
     return { error: "Adicione pelo menos um produto." };
   }
 
+  const cupomFiscal = formData.get("cupom_fiscal");
+  if (!(cupomFiscal instanceof File) || cupomFiscal.size === 0) {
+    return { error: "Anexe a foto do cupom fiscal." };
+  }
+
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
   let pedidoId: string;
@@ -169,16 +174,13 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
     return { error: err instanceof Error ? err.message : "Não foi possível criar o pedido." };
   }
 
-  const cupomFiscal = formData.get("cupom_fiscal");
-  if (cupomFiscal instanceof File && cupomFiscal.size > 0) {
-    try {
-      await saveEncomendaPhoto({ pedidoId, file: cupomFiscal, uploadedBy: requestedByName, caption: "Cupom fiscal" });
-    } catch (err) {
-      // Pedido já foi criado — não bloqueia o fluxo por causa da foto, só avisa.
-      return {
-        error: `Pedido #${pedidoNumber} criado, mas a foto não pôde ser salva: ${err instanceof Error ? err.message : "erro desconhecido"}`,
-      };
-    }
+  try {
+    await saveEncomendaPhoto({ pedidoId, file: cupomFiscal, uploadedBy: requestedByName, caption: "Cupom fiscal" });
+  } catch (err) {
+    // Pedido já foi criado — não bloqueia o fluxo por causa da foto, só avisa.
+    return {
+      error: `Pedido #${pedidoNumber} criado, mas a foto não pôde ser salva: ${err instanceof Error ? err.message : "erro desconhecido"}`,
+    };
   }
 
   revalidatePath("/assistencia/encomendas/caixa");
@@ -236,6 +238,35 @@ export async function editPedidoEncomendaAction(pedidoId: string, _state: FormSt
   revalidatePath("/assistencia/encomendas/fila");
   revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
   redirect(`/assistencia/encomendas/${pedidoId}/editar?salvo=1`);
+}
+
+// Solicitante desiste do próprio pedido -- mesma janela e mesma checagem de
+// canEditPedido usadas pra editar: só enquanto ninguém do outro lado
+// (fábrica/CD) mexeu ainda. Depois disso quem cancela é admin/assistência
+// (cancelPedido), por já estar em produção/expedição.
+export async function cancelPedidoAsRequester(pedidoId: string, note: string): Promise<void> {
+  const requester = await resolveEncomendaRequester();
+  if (!requester) throw new Error("Sessão expirada. Faça login de novo.");
+  if (!note.trim()) throw new Error("Informe o motivo do cancelamento.");
+
+  const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("pedidos_encomenda")
+    .select("status, store_id, requested_by_name")
+    .eq("id", pedidoId)
+    .single();
+  if (fetchError || !current) throw new Error("Pedido não encontrado.");
+
+  if (!canEditPedido(requester, { status: current.status, storeId: current.store_id, requestedByName: current.requested_by_name })) {
+    throw new Error('Esse pedido não pode mais ser cancelado por aqui — ou já saiu de "solicitado", ou não é seu.');
+  }
+
+  await updatePedidoStatus(pedidoId, { name: requester.name, role: requester.kind }, current.status, "cancelado", { note: note.trim() });
+
+  revalidatePath("/assistencia/encomendas/caixa");
+  revalidatePath("/assistencia/encomendas/sac");
+  revalidatePath("/assistencia/encomendas/fila");
+  revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
 }
 
 // Avanço de status pela fila interna (fábrica/CD/admin/assistência) — mesmo

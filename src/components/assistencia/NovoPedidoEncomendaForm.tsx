@@ -277,10 +277,11 @@ export function NovoPedidoEncomendaForm({
           <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
 
-        <Field label="Foto do cupom fiscal">
+        <Field label="Foto do cupom fiscal *">
           <input
             name="cupom_fiscal"
             type="file"
+            required
             accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
             capture="environment"
             className="rounded border px-3 py-2 text-sm"

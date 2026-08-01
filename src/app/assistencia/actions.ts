@@ -595,6 +595,47 @@ export async function editServiceRequestByGerente(requestId: string, _state: For
   redirect(`/assistencia/loja/${requestId}/editar?salvo=1`);
 }
 
+// Gerente desiste do próprio chamado -- mesma janela/checagem de
+// editServiceRequestByGerente: só enquanto ainda está "aberta", antes da
+// assistência entrar em contato. Depois disso quem cancela é a equipe
+// interna (updateStatus), por já estar em atendimento.
+export async function cancelServiceRequestByGerente(requestId: string, note: string): Promise<void> {
+  const gerenteName = await getLojaGerenteSession();
+  if (!gerenteName) throw new Error("Sessão expirada. Faça login de novo.");
+  if (!note.trim()) throw new Error("Informe o motivo do cancelamento.");
+
+  const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("status, store_id")
+    .eq("id", requestId)
+    .single();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+
+  const gerenteStoreIds = await getGerenteStoreIds(gerenteName);
+  if (!gerenteStoreIds.includes(current.store_id)) throw new Error("Essa solicitação não é de uma loja sua.");
+  if (current.status !== "aberta") {
+    throw new Error("Essa solicitação não pode mais ser cancelada por aqui — a assistência já começou a atender.");
+  }
+
+  const { error } = await admin
+    .from("service_requests")
+    .update({ status: "cancelada", completed_at: new Date().toISOString() })
+    .eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: null,
+    event_type: "status_changed",
+    from_status: "aberta",
+    to_status: "cancelada",
+    note: note.trim(),
+  });
+
+  revalidatePath("/assistencia/loja");
+}
+
 export async function approveDeadline(requestId: string) {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin");

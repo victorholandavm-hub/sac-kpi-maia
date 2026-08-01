@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { resolveEncomendaRequester, canEditPedido } from "@/lib/encomendaRequester";
 import { getPedidoDetail } from "@/lib/pedidosEncomenda";
 import { EditPedidoEncomendaForm } from "@/components/assistencia/EditPedidoEncomendaForm";
+import { CancelPedidoEncomendaButton } from "@/components/assistencia/CancelPedidoEncomendaButton";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { ToastProvider } from "@/components/assistencia/ToastProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -55,20 +57,24 @@ export default async function EditarPedidoEncomendaPage({
   }
 
   return (
-    <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-      <AssistenciaHeader title={`Editar pedido #${pedido.pedidoNumber}`} subtitle={pedido.storeName} />
+    <ToastProvider>
+      <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+        <AssistenciaHeader title={`Editar pedido #${pedido.pedidoNumber}`} subtitle={pedido.storeName} />
 
-      <Link href={voltarHref} className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
-        ← Voltar
-      </Link>
+        <Link href={voltarHref} className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
+          ← Voltar
+        </Link>
 
-      {salvo ? (
-        <p className="text-sm font-medium" style={{ color: "var(--status-good)" }}>
-          Alterações salvas.
-        </p>
-      ) : null}
+        {salvo ? (
+          <p className="text-sm font-medium" style={{ color: "var(--status-good)" }}>
+            Alterações salvas.
+          </p>
+        ) : null}
 
-      <EditPedidoEncomendaForm pedido={pedido} />
-    </div>
+        <EditPedidoEncomendaForm pedido={pedido} />
+
+        <CancelPedidoEncomendaButton pedidoId={pedido.id} voltarHref={voltarHref} />
+      </div>
+    </ToastProvider>
   );
 }
