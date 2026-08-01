@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
 import { isSupplierReturnStatus } from "@/lib/supplierReturns";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const str = String(value ?? "").trim();
@@ -87,7 +88,7 @@ export async function addSupplierReturnNote(id: string, note: string) {
   const { data: current, error: fetchError } = await admin.from("supplier_returns").select("notes").eq("id", id).single();
   if (fetchError || !current) throw new Error("Remessa não encontrada.");
 
-  const stamp = new Date().toLocaleString("pt-BR");
+  const stamp = formatDateTimeBr(new Date().toISOString());
   const appended = current.notes ? `${current.notes}\n[${stamp}] ${trimmed}` : `[${stamp}] ${trimmed}`;
 
   const { error } = await admin.from("supplier_returns").update({ notes: appended }).eq("id", id);

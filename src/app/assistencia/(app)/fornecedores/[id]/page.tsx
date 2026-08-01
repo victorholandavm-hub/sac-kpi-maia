@@ -2,6 +2,7 @@ import { getProfile, redirectIfSac } from "@/lib/dal";
 import { getSupplierReturn } from "@/lib/supplierReturns";
 import { SUPPLIER_RETURN_STATUS_LABELS, SUPPLIER_RETURN_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { SupplierReturnActions } from "@/components/assistencia/SupplierReturnActions";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 
 function StatusBadge({ status }: { status: string }) {
   const color = SUPPLIER_RETURN_STATUS_COLORS[status] ?? "var(--text-muted)";
@@ -76,7 +77,7 @@ export default async function SupplierReturnDetailPage({ params }: { params: Pro
         />
         <Row label="Recebido em" value={supplierReturn.receivedAt ? new Date(supplierReturn.receivedAt).toLocaleDateString("pt-BR") : null} />
         <Row label="Registrado por" value={supplierReturn.requestedBy} />
-        <Row label="Criado em" value={new Date(supplierReturn.createdAt).toLocaleString("pt-BR")} />
+        <Row label="Criado em" value={formatDateTimeBr(supplierReturn.createdAt)} />
       </div>
 
       <SupplierReturnActions returnId={supplierReturn.id} status={supplierReturn.status} />

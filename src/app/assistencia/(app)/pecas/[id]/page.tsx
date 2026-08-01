@@ -4,6 +4,7 @@ import { getPartOrder } from "@/lib/partOrders";
 import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PartOrderActions } from "@/components/assistencia/PartOrderActions";
 import { ExpectedAtField } from "@/components/assistencia/ExpectedAtField";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 
 function StatusBadge({ status }: { status: string }) {
   const color = PART_ORDER_STATUS_COLORS[status] ?? "var(--text-muted)";
@@ -71,7 +72,7 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
         <Row label="Telefone" value={order.clientPhone} />
         <Row label="E-mail" value={order.clientEmail} />
         <Row label="Pedido por" value={order.requestedBy} />
-        <Row label="Criado em" value={new Date(order.createdAt).toLocaleString("pt-BR")} />
+        <Row label="Criado em" value={formatDateTimeBr(order.createdAt)} />
         <ExpectedAtField orderId={order.id} expectedAt={order.expectedAt} />
         {order.partArrivedAt ? (
           <Row label="Peça chegou em" value={new Date(order.partArrivedAt).toLocaleDateString("pt-BR")} />

@@ -27,6 +27,7 @@ import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRe
 import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
 import { RequestPhotoUpload } from "@/components/assistencia/RequestPhotoUpload";
 import { listRequestPhotos } from "@/lib/servicePhotos";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -319,9 +320,9 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
             )}
           </>
         ) : null}
-        <Row label="Criada em" value={new Date(request.createdAt).toLocaleString("pt-BR")} />
+        <Row label="Criada em" value={formatDateTimeBr(request.createdAt)} />
         {request.completedAt ? (
-          <Row label="Encerrada em" value={new Date(request.completedAt).toLocaleString("pt-BR")} />
+          <Row label="Encerrada em" value={formatDateTimeBr(request.completedAt)} />
         ) : null}
       </div>
 
@@ -353,7 +354,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
                     {eventDescription(event)}
                   </span>
                   <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                    {new Date(event.createdAt).toLocaleString("pt-BR")}
+                    {formatDateTimeBr(event.createdAt)}
                   </span>
                 </div>
                 {event.note ? (

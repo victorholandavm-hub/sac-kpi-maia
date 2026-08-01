@@ -7,6 +7,7 @@ import { PedidoFornecedorTimeline } from "@/components/assistencia/PedidoFornece
 import { PedidoFornecedorPrazoField } from "@/components/assistencia/PedidoFornecedorPrazoField";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +76,7 @@ export default async function PedidoFornecedorDetailPage({ params }: { params: P
 
         <div className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <Row label="Pedido feito por" value={pedido.requestedByName} />
-          <Row label="Criado em" value={new Date(pedido.createdAt).toLocaleString("pt-BR")} />
+          <Row label="Criado em" value={formatDateTimeBr(pedido.createdAt)} />
           <Row label="Observações" value={pedido.notes} />
         </div>
 

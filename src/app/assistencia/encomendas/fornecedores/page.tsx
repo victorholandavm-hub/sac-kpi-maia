@@ -7,6 +7,7 @@ import { PedidoFornecedorStatusBadge } from "@/components/assistencia/PedidoForn
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +131,7 @@ export default async function PedidosFornecedorPage({
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                    <span>{new Date(p.createdAt).toLocaleString("pt-BR")}</span>
+                    <span>{formatDateTimeBr(p.createdAt)}</span>
                     <span>Pedido por {p.requestedByName}</span>
                     {p.expectedAt ? (
                       <span style={{ color: atrasado ? "var(--status-critical)" : "var(--status-good)", fontWeight: 600 }}>

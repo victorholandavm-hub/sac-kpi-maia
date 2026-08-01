@@ -1,4 +1,5 @@
 import { ROLE_LABELS, PEDIDO_FORNECEDOR_STATUS_LABELS } from "@/lib/assistenciaLabels";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 import type { PedidoFornecedorEvent } from "@/lib/pedidosFornecedor";
 
 function describeEvent(e: PedidoFornecedorEvent): string {
@@ -35,7 +36,7 @@ export function PedidoFornecedorTimeline({ events }: { events: PedidoFornecedorE
               {describeEvent(e)}
             </span>
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {e.actorName} ({ROLE_LABELS[e.actorRole] ?? e.actorRole}) · {new Date(e.createdAt).toLocaleString("pt-BR")}
+              {e.actorName} ({ROLE_LABELS[e.actorRole] ?? e.actorRole}) · {formatDateTimeBr(e.createdAt)}
             </span>
           </div>
           {e.note && e.eventType !== "expected_at_changed" ? (

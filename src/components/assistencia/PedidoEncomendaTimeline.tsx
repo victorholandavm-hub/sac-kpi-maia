@@ -1,4 +1,5 @@
 import { ROLE_LABELS, PEDIDO_ENCOMENDA_STATUS_LABELS } from "@/lib/assistenciaLabels";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 import type { PedidoEncomendaEvent } from "@/lib/pedidosEncomenda";
 
 function describeEvent(e: PedidoEncomendaEvent): string {
@@ -41,7 +42,7 @@ export function PedidoEncomendaTimeline({ events }: { events: PedidoEncomendaEve
               {describeEvent(e)}
             </span>
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {e.actorName} ({ROLE_LABELS[e.actorRole] ?? e.actorRole}) · {new Date(e.createdAt).toLocaleString("pt-BR")}
+              {e.actorName} ({ROLE_LABELS[e.actorRole] ?? e.actorRole}) · {formatDateTimeBr(e.createdAt)}
             </span>
           </div>
           {e.note && e.eventType !== "prazo_definido" ? (

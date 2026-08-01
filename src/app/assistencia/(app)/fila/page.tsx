@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { NewSinceBadge } from "@/components/assistencia/NewSinceBadge";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 
 function itemsSummary(items: RequestItem[]): string | null {
   if (items.length === 0) return null;
@@ -232,7 +233,7 @@ export default async function AssistenciaQueuePage({
                     <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
                       <span>Aberta às {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
                       {r.completedAt ? (
-                        <span>Concluída em {new Date(r.completedAt).toLocaleString("pt-BR")}</span>
+                        <span>Concluída em {formatDateTimeBr(r.completedAt)}</span>
                       ) : null}
                       <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
                       {r.assemblerName ? <span>Montador: {r.assemblerName}</span> : null}

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
 import { isPartOrderStatus } from "@/lib/partOrders";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const str = String(value ?? "").trim();
@@ -105,7 +106,7 @@ export async function addPartOrderNote(id: string, note: string) {
   const { data: current, error: fetchError } = await admin.from("part_orders").select("notes").eq("id", id).single();
   if (fetchError || !current) throw new Error("Pedido de peça não encontrado.");
 
-  const stamp = new Date().toLocaleString("pt-BR");
+  const stamp = formatDateTimeBr(new Date().toISOString());
   const appended = current.notes ? `${current.notes}\n[${stamp}] ${trimmed}` : `[${stamp}] ${trimmed}`;
 
   const { error } = await admin.from("part_orders").update({ notes: appended }).eq("id", id);
