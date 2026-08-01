@@ -13,6 +13,7 @@ import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { cdSignOut } from "@/app/assistencia/cd-actions";
 import { fabricaSignOut } from "@/app/assistencia/fabrica-actions";
 import { signOut } from "@/app/assistencia/actions";
+import { switchRafaelToFabrica, switchRafaelToCd } from "@/app/assistencia/rafael-switch-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,7 @@ export default async function EncomendasQueuePage({
   const showFornecedorFilter = actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia";
 
   const signOutAction = actor.role === "cd" ? cdSignOut : actor.role === "fabrica" ? fabricaSignOut : signOut;
+  const isRafael = actor.name.toLowerCase() === "rafael";
 
   return (
     <ToastProvider>
@@ -120,6 +122,20 @@ export default async function EncomendasQueuePage({
             <Link href="/assistencia/encomendas/fornecedores" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
               Pedidos a fornecedores
             </Link>
+          ) : null}
+          {isRafael && actor.role === "cd" ? (
+            <form action={switchRafaelToFabrica}>
+              <button type="submit" className="text-sm underline" style={{ color: "var(--brand-green)" }}>
+                Trocar pra Fábrica
+              </button>
+            </form>
+          ) : null}
+          {isRafael && actor.role === "fabrica" ? (
+            <form action={switchRafaelToCd}>
+              <button type="submit" className="text-sm underline" style={{ color: "var(--brand-green)" }}>
+                Trocar pra CD
+              </button>
+            </form>
           ) : null}
           <form action={signOutAction}>
             <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
