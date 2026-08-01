@@ -44,7 +44,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
   const { pedido, events } = result;
   const photos = await listEncomendaPhotos(pedido.id);
   const externo = pedido.fornecedorTipo === "fabrica_externa";
-  const matchesFabrica = actor.role !== "fabrica" || (!!actor.fabricaId && actor.fabricaId === pedido.fabricaId);
+  const matchesFabrica = actor.role !== "fabrica" || actor.fabricaId == null || actor.fabricaId === pedido.fabricaId;
   const fornecedorLabel = externo ? `Externo: ${pedido.fornecedorExterno}` : pedido.fabricaNome;
 
   return (

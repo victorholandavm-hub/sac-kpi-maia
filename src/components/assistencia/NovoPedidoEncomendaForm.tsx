@@ -28,10 +28,16 @@ export function NovoPedidoEncomendaForm({
   fixedStoreName,
   storeOptions,
   showFornecedorPicker = true,
+  allowExternal = true,
 }: {
   fixedStoreName?: string;
   storeOptions?: { id: string; name: string }[];
   showFornecedorPicker?: boolean;
+  // Operador de fábrica nunca lança pedido de fornecedor externo, mesmo
+  // quando enxerga as duas fábricas próprias (ver comentário em
+  // encomendas-actions.ts) -- então o picker, quando aparece pra esse
+  // papel, mostra só as fábricas, sem a opção externa.
+  allowExternal?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPedidoEncomendaAction, undefined);
   const [items, setItems] = useState<Item[]>([{ produtoDescricao: "", produtoCodigo: "", quantidade: 1 }]);
@@ -167,15 +173,17 @@ export function NovoPedidoEncomendaForm({
                 {f.nome}
               </label>
             ))}
-            <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
-              <input
-                type="radio"
-                name="fornecedor_tipo_radio"
-                checked={fornecedorTipo === "fabrica_externa"}
-                onChange={() => setFornecedorTipo("fabrica_externa")}
-              />
-              Fornecedor externo
-            </label>
+            {allowExternal ? (
+              <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+                <input
+                  type="radio"
+                  name="fornecedor_tipo_radio"
+                  checked={fornecedorTipo === "fabrica_externa"}
+                  onChange={() => setFornecedorTipo("fabrica_externa")}
+                />
+                Fornecedor externo
+              </label>
+            ) : null}
             <input type="hidden" name="fornecedor_tipo" value={fornecedorTipo} />
             {fornecedorTipo === "fabrica_interna" ? <input type="hidden" name="fabrica_id" value={fabricaId} /> : null}
             {fornecedorTipo === "fabrica_externa" ? (

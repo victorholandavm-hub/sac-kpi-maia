@@ -66,7 +66,7 @@ export async function setCdOperadorPin(name: string, pin: string): Promise<void>
   await resetPinAttempts("cd_operadores", "name", name);
 }
 
-export type FabricaOperadorWithPinStatus = OperadorWithPinStatus & { fabricaId: string };
+export type FabricaOperadorWithPinStatus = OperadorWithPinStatus & { fabricaId: string | null };
 
 export async function listFabricaOperadoresWithPinStatus(): Promise<FabricaOperadorWithPinStatus[]> {
   const admin = getSupabaseAdmin();
@@ -75,7 +75,9 @@ export async function listFabricaOperadoresWithPinStatus(): Promise<FabricaOpera
   return (data ?? []).map((o) => ({ name: o.name, hasPin: !!o.pin_hash, fabricaId: o.fabrica_id }));
 }
 
-export async function addFabricaOperador(name: string, fabricaId: string): Promise<void> {
+// fabricaId nulo = acesso às duas fábricas próprias (ver requireEncomendaAction
+// em dal.ts, que já trata fabricaId nulo do actor como "sem restrição").
+export async function addFabricaOperador(name: string, fabricaId: string | null): Promise<void> {
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("fabrica_operadores").upsert({ name, fabrica_id: fabricaId }, { onConflict: "name" });
   if (error) throw new Error(error.message);

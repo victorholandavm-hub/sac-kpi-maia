@@ -55,13 +55,20 @@ export default async function EncomendasQueuePage({
   const { status, store, fornecedor } = await searchParams;
   const filterStatus = isPedidoEncomendaStatus(status) ? status : undefined;
 
-  // Fábrica só enxerga pedidos da própria fábrica (nunca externos, nunca da
-  // outra fábrica interna) -- não depende do filtro escolhido na tela, que
-  // nem aparece pra esse papel (ver FORNECEDOR_FILTERS abaixo). Pra
+  // Fábrica nunca enxerga pedido externo -- só o(s) da(s) fábrica(s)
+  // própria(s) que é dela (a maioria tem uma só; fabricaId nulo, caso do
+  // Rafael, dá acesso às duas -- ver EncomendaActor.fabricaId em
+  // encomendaAuth.ts). Não depende do filtro escolhido na tela, que nem
+  // aparece pra esse papel (ver FORNECEDOR_FILTERS abaixo). Pra
   // CD/admin/assistência, o filtro vem da query string.
   const fabricaIdFilter =
     actor.role === "fabrica" ? (actor.fabricaId ?? undefined) : fornecedor && fornecedor !== "externa" ? fornecedor : undefined;
-  const fornecedorTipoFilter = actor.role !== "fabrica" && fornecedor === "externa" ? ("fabrica_externa" as const) : undefined;
+  const fornecedorTipoFilter =
+    actor.role === "fabrica"
+      ? ("fabrica_interna" as const)
+      : fornecedor === "externa"
+        ? ("fabrica_externa" as const)
+        : undefined;
 
   const [pedidos, stores, queueIds] = await Promise.all([
     listAllPedidos({ status: filterStatus, storeId: store, fabricaId: fabricaIdFilter, fornecedorTipo: fornecedorTipoFilter }),

@@ -278,8 +278,11 @@ export async function addFabricaOperador(_state: FormState, formData: FormData):
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Informe o nome." };
 
-  const fabricaId = String(formData.get("fabrica_id") ?? "");
-  if (!INTERNAL_FABRICAS.some((f) => f.id === fabricaId)) return { error: "Selecione a fábrica." };
+  const fabricaIdRaw = String(formData.get("fabrica_id") ?? "");
+  if (fabricaIdRaw !== "__todas__" && !INTERNAL_FABRICAS.some((f) => f.id === fabricaIdRaw)) {
+    return { error: "Selecione a fábrica." };
+  }
+  const fabricaId = fabricaIdRaw === "__todas__" ? null : fabricaIdRaw;
 
   try {
     await addFabricaOperadorLib(name, fabricaId);

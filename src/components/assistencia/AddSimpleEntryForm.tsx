@@ -42,6 +42,7 @@ export function AddSimpleEntryForm({ kind }: { kind: keyof typeof ACTIONS }) {
               {f.nome}
             </option>
           ))}
+          <option value="__todas__">Todas as fábricas</option>
         </select>
       ) : null}
       <button

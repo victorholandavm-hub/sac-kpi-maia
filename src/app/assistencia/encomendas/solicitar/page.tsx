@@ -73,7 +73,8 @@ export default async function SolicitarEncomendaPage({
       <NovoPedidoEncomendaForm
         fixedStoreName={fixedStoreName}
         storeOptions={storeOptions}
-        showFornecedorPicker={requester.kind !== "fabrica"}
+        showFornecedorPicker={requester.kind !== "fabrica" || requester.fabricaId === null}
+        allowExternal={requester.kind !== "fabrica"}
       />
     </div>
   );

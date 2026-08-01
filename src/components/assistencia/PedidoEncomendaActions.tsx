@@ -104,7 +104,7 @@ export function PedidoEncomendaActions({
   const nextStep = canManageStatus ? getNextStep(status, fornecedorTipo) : undefined;
   const canCancel = (role === "assistencia" || role === "admin") && status !== "entregue" && status !== "cancelado";
   const canDeny =
-    (role === "assistencia" || role === "admin" || (role === "fabrica" && !externo && matchesFabrica) || (role === "cd" && externo)) &&
+    (role === "assistencia" || role === "admin" || (role === "fabrica" && !externo && matchesFabrica) || role === "cd") &&
     status === "solicitado";
 
   return (

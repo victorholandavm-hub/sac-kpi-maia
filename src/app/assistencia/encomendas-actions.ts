@@ -92,18 +92,27 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
   const { data: store } = await admin.from("stores").select("name").eq("id", storeId).maybeSingle();
   if (!store) return { error: "Loja inválida." };
 
-  // Fornecedor: quem já é operador de fábrica só lança pedido pra própria
-  // fábrica (não escolhe no formulário — ver campo fixo em
-  // NovoPedidoEncomendaForm.tsx). Os demais (gerente/caixa/CD) escolhem
-  // entre as duas fábricas próprias ou um fornecedor externo, sempre
-  // validado contra as listas fixas, nunca confiando cegamente no formData.
+  // Fornecedor: quem já é operador de fábrica de uma fábrica só lança
+  // pedido pra ela mesma (não escolhe no formulário — ver campo fixo em
+  // NovoPedidoEncomendaForm.tsx); nunca fornecedor externo, mesmo quando
+  // (como o Rafael) enxerga as duas fábricas próprias -- nesse caso ele
+  // escolhe qual das duas no formulário, mas a opção externa nem aparece
+  // (allowExternal=false em solicitar/page.tsx). Os demais (gerente/caixa/CD)
+  // escolhem entre as duas fábricas próprias ou um fornecedor externo,
+  // sempre validado contra as listas fixas, nunca confiando cegamente no
+  // formData.
   let fornecedorTipo: "fabrica_interna" | "fabrica_externa";
   let fabricaId: string | null = null;
   let fornecedorExterno: string | null = null;
   if (requester.kind === "fabrica") {
     fornecedorTipo = "fabrica_interna";
-    fabricaId = requester.fabricaId;
-    if (!fabricaId) return { error: "Fábrica do operador não configurada." };
+    if (requester.fabricaId) {
+      fabricaId = requester.fabricaId;
+    } else {
+      const rawFabricaId = String(formData.get("fabrica_id") ?? "");
+      if (!INTERNAL_FABRICAS.some((f) => f.id === rawFabricaId)) return { error: "Selecione a fábrica do pedido." };
+      fabricaId = rawFabricaId;
+    }
   } else {
     const rawTipo = String(formData.get("fornecedor_tipo") ?? "");
     if (rawTipo === "fabrica_externa") {
@@ -287,11 +296,12 @@ export async function cancelPedido(pedidoId: string, note: string): Promise<void
   revalidatePath("/assistencia/encomendas/caixa");
 }
 
-// Negação fica restrita a quem cuida do pedido nessa etapa -- fábrica pra
-// pedido interno, CD pra pedido externo (ou admin/assistência, por
-// supervisão) -- e só vale enquanto o pedido ainda está "solicitado":
-// depois que entra em produção/expedição, qualquer desistência já passa por
-// cancelPedido. Motivo sempre obrigatório, igual ao cancelamento.
+// Negação fica restrita a quem cuida do pedido nessa etapa -- fábrica (só da
+// fábrica que é dela) ou CD (qualquer pedido, interno ou externo -- CD tem
+// visão de tudo), ou admin/assistência por supervisão -- e só vale enquanto o
+// pedido ainda está "solicitado": depois que entra em produção/expedição,
+// qualquer desistência já passa por cancelPedido. Motivo sempre obrigatório,
+// igual ao cancelamento.
 export async function denyPedido(pedidoId: string, reason: string): Promise<void> {
   const actor = await requireEncomendaActor();
   if (!reason.trim()) throw new Error("Informe o motivo da recusa.");

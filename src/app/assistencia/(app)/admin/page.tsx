@@ -177,7 +177,11 @@ export default async function AdminPage() {
           <ul className="flex flex-col gap-2">
             {fabricaOperadores.map((o) => (
               <li key={o.name}>
-                <FabricaOperadorPinField name={o.name} hasPin={o.hasPin} fabricaNome={findInternalFabrica(o.fabricaId)?.nome ?? o.fabricaId} />
+                <FabricaOperadorPinField
+                  name={o.name}
+                  hasPin={o.hasPin}
+                  fabricaNome={o.fabricaId ? (findInternalFabrica(o.fabricaId)?.nome ?? o.fabricaId) : "Todas as fábricas"}
+                />
               </li>
             ))}
           </ul>

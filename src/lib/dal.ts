@@ -118,7 +118,7 @@ export function requireEncomendaAction(
   if (toStatus === "negado") {
     const podeNegar =
       (actor.role === "fabrica" && !externo && fromStatus === "solicitado") ||
-      (actor.role === "cd" && externo && fromStatus === "solicitado");
+      (actor.role === "cd" && fromStatus === "solicitado");
     if (!podeNegar) {
       throw new Error(`Ação não permitida para o papel "${actor.role}" — só quem cuida do pedido pode negá-lo enquanto ele está solicitado.`);
     }
