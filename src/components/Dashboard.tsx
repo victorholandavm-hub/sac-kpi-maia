@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { KpiData } from "@/lib/kpi";
 import type { DateRange } from "@/lib/dateRange";
 import { StatTile } from "./StatTile";
@@ -34,7 +35,16 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <RangePicker range={range} />
-          <PerformanceReportButton data={data.performanceReport} />
+          <div className="flex items-center gap-2">
+            <Link
+              href="/em-andamento"
+              className="text-sm font-medium px-3 py-1.5 rounded-full"
+              style={{ background: "var(--brand-green)", color: "#fff" }}
+            >
+              Atendimentos em andamento
+            </Link>
+            <PerformanceReportButton data={data.performanceReport} />
+          </div>
         </div>
       </div>
 

@@ -7,7 +7,6 @@ import { signOutDashboard } from "@/app/login/actions";
 const TABS = [
   { key: "home", label: "Início", href: "/" },
   { key: "kpis", label: "KPIs", href: "/kpis" },
-  { key: "clientes", label: "Perfil do Cliente", href: "/clientes" },
 ];
 
 export function AppHeader() {
