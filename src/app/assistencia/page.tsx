@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { StoreIcon, WrenchIcon, HeadsetIcon, HardHatIcon, TruckIcon, BoxIcon } from "@/components/assistencia/RoleIcons";
+import { StoreIcon, WrenchIcon, HeadsetIcon, HardHatIcon, TruckIcon, BoxIcon, ShieldIcon } from "@/components/assistencia/RoleIcons";
 
 // Nunca servir isso de cache estático/CDN — sempre gerar fresco a cada request.
 export const dynamic = "force-dynamic";
@@ -83,7 +83,7 @@ export default function AssistenciaHomePage() {
             subtitle="Fila e chamados"
           />
           <RoleCard
-            href="/assistencia/login"
+            href="/assistencia/sac/login"
             icon={<HeadsetIcon color="var(--brand-green)" />}
             iconBg="var(--brand-green-soft)"
             borderColor="var(--brand-green)"
@@ -105,6 +105,14 @@ export default function AssistenciaHomePage() {
             borderColor="var(--brand-green)"
             title="Motorista"
             subtitle="Minhas rotas"
+          />
+          <RoleCard
+            href="/assistencia/login"
+            icon={<ShieldIcon color="var(--brand-orange)" />}
+            iconBg="var(--brand-orange-soft)"
+            borderColor="var(--brand-orange)"
+            title="Admin"
+            subtitle="E-mail e senha"
           />
         </div>
       </div>

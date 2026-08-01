@@ -68,6 +68,20 @@ export function BoxIcon({ color }: { color: string }) {
   );
 }
 
+export function ShieldIcon({ color }: { color: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>
+      <path
+        d="M12 3.5 19 6.5v5c0 5-3 8.2-7 9.5-4-1.3-7-4.5-7-9.5v-5L12 3.5ZM9 12l2 2 4-4.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function TruckIcon({ color }: { color: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>

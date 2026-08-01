@@ -7,6 +7,7 @@ import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
 import { listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
 import { findInternalFabrica } from "@/lib/fabricas";
 import { listCaixasWithPinStatus } from "@/lib/caixas";
+import { listSacProfilesWithPinStatus } from "@/app/assistencia/admin-actions";
 import { PIN_LENGTH } from "@/lib/pinConfig";
 import { CreateUserForm } from "@/components/assistencia/CreateUserForm";
 import { AddSimpleEntryForm } from "@/components/assistencia/AddSimpleEntryForm";
@@ -19,6 +20,7 @@ import { ProdutoEncomendaAdmin } from "@/components/assistencia/ProdutoEncomenda
 import { CaixaPinField } from "@/components/assistencia/CaixaPinField";
 import { CdOperadorPinField } from "@/components/assistencia/CdOperadorPinField";
 import { FabricaOperadorPinField } from "@/components/assistencia/FabricaOperadorPinField";
+import { SacPinField } from "@/components/assistencia/SacPinField";
 import { RotaWeekdaySelect } from "@/components/assistencia/RotaWeekdaySelect";
 import { getRotaWeekdayConfig } from "@/lib/rotas";
 
@@ -45,7 +47,7 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixas, cdOperadores, fabricaOperadores, rotaConfig] =
+  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixas, cdOperadores, fabricaOperadores, sacProfiles, rotaConfig] =
     await Promise.all([
       listStores(),
       listGerentesWithPinStatus(),
@@ -56,6 +58,7 @@ export default async function AdminPage() {
       listCaixasWithPinStatus(),
       listCdOperadoresWithPinStatus(),
       listFabricaOperadoresWithPinStatus(),
+      listSacProfilesWithPinStatus(),
       getRotaWeekdayConfig(),
     ]);
 
@@ -181,6 +184,21 @@ export default async function AdminPage() {
           <AddSimpleEntryForm kind="fabrica" />
         </AdminSection>
       </div>
+
+      <AdminSection title="Equipe SAC — PIN" count={sacProfiles.length}>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Defina um PIN de {PIN_LENGTH} números pra cada um acessar{" "}
+          <span className="font-mono">/assistencia/sac/login</span> direto pelo nome (pessoa nova entra
+          primeiro pelo cadastro de usuário acima, com papel &ldquo;SAC&rdquo;, e o PIN é definido aqui depois).
+        </p>
+        <ul className="flex flex-col gap-2">
+          {sacProfiles.map((p) => (
+            <li key={p.id}>
+              <SacPinField id={p.id} fullName={p.fullName} hasPin={p.hasPin} />
+            </li>
+          ))}
+        </ul>
+      </AdminSection>
 
       <AdminSection title="Rotas de entrega">
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>

@@ -298,6 +298,33 @@ export async function setFabricaOperadorPin(name: string, pin: string): Promise<
   revalidatePath("/assistencia/admin");
 }
 
+// SAC loga por nome+PIN direto contra profiles (ver sacPinSignIn em
+// actions.ts) -- sem tabela de operador separada, é a mesma conta que já
+// existe (criada via CreateUserForm), só ganha um PIN a mais.
+export type SacProfileWithPinStatus = { id: string; fullName: string; hasPin: boolean };
+
+export async function listSacProfilesWithPinStatus(): Promise<SacProfileWithPinStatus[]> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("profiles").select("id, full_name, pin_hash").eq("role", "sac").order("full_name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((p) => ({ id: p.id, fullName: p.full_name, hasPin: !!p.pin_hash }));
+}
+
+export async function setSacProfilePin(id: string, pin: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("profiles").update({ pin_hash: hashPin(pin) }).eq("id", id).eq("role", "sac");
+  if (error) throw new Error(error.message);
+  await resetPinAttempts("profiles", "id", id);
+  revalidatePath("/assistencia/admin");
+}
+
 export async function setRotaWeekday(weekday: number, rota: string): Promise<void> {
   const profile = await getProfile();
   requireRole(profile, "admin");

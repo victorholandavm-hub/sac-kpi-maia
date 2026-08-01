@@ -28,6 +28,9 @@ import {
   signAssistenciaTeamPending,
   verifyAssistenciaTeamPending,
 } from "@/lib/assistenciaTeamAuth";
+import { verifyPin } from "@/lib/pinAuth";
+import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { isValidLoginPinFormat } from "@/lib/pinConfig";
 
 const REQUEST_TYPES = [
   "montagem",
@@ -46,19 +49,6 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
   return str.length > 0 ? str : null;
 }
 
-// redirect() do Next.js funciona lançando um erro especial que precisa
-// continuar se propagando — não é um erro de verdade, então não pode ser
-// engolido por um catch genérico.
-function isNextRedirectError(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "digest" in err &&
-    typeof (err as { digest?: unknown }).digest === "string" &&
-    (err as { digest: string }).digest.startsWith("NEXT_REDIRECT")
-  );
-}
-
 export type FormState = { error?: string } | undefined;
 
 export async function signIn(_state: FormState, formData: FormData): Promise<FormState> {
@@ -68,16 +58,16 @@ export async function signIn(_state: FormState, formData: FormData): Promise<For
     return { error: "Informe e-mail e senha." };
   }
 
-  // Login único por time (assistência e SAC têm cada um sua credencial
-  // compartilhada, várias pessoas usam a mesma): em vez de autenticar direto,
-  // manda pra tela "Quem é você?" escolher o nome — só ali a sessão real do
-  // Supabase Auth da pessoa escolhida é criada (ver chooseAssistenciaIdentity),
+  // Login único por time (várias pessoas da assistência usam a mesma
+  // credencial): em vez de autenticar direto, manda pra tela "Quem é você?"
+  // escolher o nome — só ali a sessão real do Supabase Auth da pessoa
+  // escolhida é criada (ver chooseAssistenciaIdentity/establishAssistenciaIdentitySession),
   // então todo o resto do sistema (histórico, "assumir chamado" etc.) funciona
-  // exatamente como se ela tivesse logado com a própria conta. "Quem é você?"
-  // só lista gente do time que bateu aqui, nunca os dois times juntos.
-  const teamCredentials: { team: "assistencia" | "sac"; email?: string; password?: string }[] = [
+  // exatamente como se ela tivesse logado com a própria conta. SAC saiu desse
+  // fluxo -- agora loga direto por nome+PIN em /assistencia/sac/login (ver
+  // sacPinSignIn), sem credencial compartilhada nenhuma.
+  const teamCredentials: { team: "assistencia"; email?: string; password?: string }[] = [
     { team: "assistencia", email: process.env.ASSISTENCIA_TEAM_LOGIN_EMAIL, password: process.env.ASSISTENCIA_TEAM_LOGIN_PASSWORD },
-    { team: "sac", email: process.env.SAC_TEAM_LOGIN_EMAIL, password: process.env.SAC_TEAM_LOGIN_PASSWORD },
   ];
   const matchedTeam = teamCredentials.find((c) => c.email && c.password && email === c.email && password === c.password);
   if (matchedTeam) {
@@ -107,11 +97,48 @@ export async function signOut() {
   redirect("/assistencia/login");
 }
 
-// Segunda etapa do login compartilhado da equipe (ver signIn acima): troca a
-// identidade escolhida por uma sessão de verdade do Supabase Auth da conta
+// Troca um profileId por uma sessão de verdade do Supabase Auth da conta
 // dela, usando um magic link gerado no servidor (nunca enviado por e-mail,
 // só resgatado aqui mesmo) — assim a sessão resultante é indistinguível de
-// um login normal com e-mail/senha próprios.
+// um login normal com e-mail/senha próprios. Reaproveitada tanto pelo login
+// compartilhado da equipe (chooseAssistenciaIdentity, abaixo) quanto pelo
+// login por PIN do SAC (sacPinSignIn) -- os dois só diferem em COMO chegam
+// no profileId certo, essa troca de sessão é idêntica pros dois.
+async function establishAssistenciaIdentitySession(profileId: string): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+  const { data: userData, error: userError } = await admin.auth.admin.getUserById(profileId);
+  if (userError || !userData.user?.email) return false;
+
+  try {
+    const supabase = await getSupabaseServer();
+
+    // Encerra qualquer sessão já existente nesse navegador (ex.: alguém
+    // trocando de identidade sem clicar em "Sair" antes) — sem isso o SDK às
+    // vezes tenta renovar um refresh token de uma sessão anterior que já não
+    // é mais válido e lança um erro não tratado em vez de simplesmente trocar.
+    await supabase.auth.signOut();
+
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email: userData.user.email,
+    });
+    if (linkError || !linkData) return false;
+
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      token_hash: linkData.properties.hashed_token,
+      type: "magiclink",
+    });
+    if (verifyError) return false;
+  } catch (err) {
+    console.error("Falha ao estabelecer sessão de identidade:", err);
+    return false;
+  }
+
+  return true;
+}
+
+// Segunda etapa do login compartilhado da equipe (ver signIn acima): troca a
+// identidade escolhida por uma sessão de verdade via establishAssistenciaIdentitySession.
 export async function chooseAssistenciaIdentity(profileId: string) {
   const cookieStore = await cookies();
   const pending = cookieStore.get(ASSISTENCIA_TEAM_COOKIE_NAME)?.value;
@@ -130,42 +157,50 @@ export async function chooseAssistenciaIdentity(profileId: string) {
     redirect("/assistencia/quem-e-voce?erro=1");
   }
 
-  const { data: userData, error: userError } = await admin.auth.admin.getUserById(profileId);
-  if (userError || !userData.user?.email) {
-    redirect("/assistencia/quem-e-voce?erro=1");
-  }
-
-  try {
-    const supabase = await getSupabaseServer();
-
-    // Encerra qualquer sessão já existente nesse navegador (ex.: alguém
-    // trocando de identidade sem clicar em "Sair" antes) — sem isso o SDK às
-    // vezes tenta renovar um refresh token de uma sessão anterior que já não
-    // é mais válido e lança um erro não tratado em vez de simplesmente trocar.
-    await supabase.auth.signOut();
-
-    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-      type: "magiclink",
-      email: userData.user.email,
-    });
-    if (linkError || !linkData) {
-      redirect("/assistencia/quem-e-voce?erro=1");
-    }
-
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      token_hash: linkData.properties.hashed_token,
-      type: "magiclink",
-    });
-    if (verifyError) {
-      redirect("/assistencia/quem-e-voce?erro=1");
-    }
-  } catch (err) {
-    if (isNextRedirectError(err)) throw err;
-    console.error("Falha ao trocar identidade da equipe assistência:", err);
+  const ok = await establishAssistenciaIdentitySession(profileId);
+  if (!ok) {
     redirect("/assistencia/quem-e-voce?erro=1");
   }
 
   cookieStore.delete({ name: ASSISTENCIA_TEAM_COOKIE_NAME, path: "/assistencia" });
+  redirect("/assistencia/inicio");
+}
+
+export type SacFormState = { error?: string } | undefined;
+
+// Login do SAC: nome + PIN, verificado direto contra profiles (role='sac') --
+// sem credencial de time compartilhada nem tela de escolher nome (ver
+// contexto em supabase/migrations/0053_sac_profile_pin.sql). Erro genérico
+// tanto pra nome não encontrado quanto PIN errado, mesmo padrão
+// anti-enumeração já usado nos outros logins por PIN (fabrica-actions.ts,
+// cd-actions.ts).
+export async function sacPinSignIn(_state: SacFormState, formData: FormData): Promise<SacFormState> {
+  const typedName = String(formData.get("name") ?? "").trim();
+  const pin = String(formData.get("pin") ?? "").trim();
+
+  if (!typedName) return { error: "Informe seu nome." };
+  if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
+
+  const admin = getSupabaseAdmin();
+  const { data: sacProfiles } = await admin.from("profiles").select("id, full_name, pin_hash").eq("role", "sac");
+  const match = (sacProfiles ?? []).find((p) => p.full_name.toLowerCase() === typedName.toLowerCase());
+
+  if (!match) return { error: "Nome ou PIN incorretos." };
+
+  const lockout = await checkPinLockout("profiles", "id", match.id);
+  if (lockout.locked) {
+    return { error: `Muitas tentativas erradas. Tente de novo em ${lockout.minutesLeft} minuto(s).` };
+  }
+
+  if (!match.pin_hash || !verifyPin(pin, match.pin_hash)) {
+    await recordFailedPinAttempt("profiles", "id", match.id);
+    return { error: "Nome ou PIN incorretos." };
+  }
+  await resetPinAttempts("profiles", "id", match.id);
+
+  const ok = await establishAssistenciaIdentitySession(match.id);
+  if (!ok) return { error: "Não foi possível entrar. Tente de novo." };
+
   redirect("/assistencia/inicio");
 }
 

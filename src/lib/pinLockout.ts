@@ -11,7 +11,8 @@ export type PinTable =
   | "fabrica_operadores"
   | "encomenda_caixa_pins"
   | "vendedores"
-  | "caixas";
+  | "caixas"
+  | "profiles";
 
 export async function checkPinLockout(
   table: PinTable,
