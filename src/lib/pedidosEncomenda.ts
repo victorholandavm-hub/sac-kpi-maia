@@ -204,6 +204,21 @@ export async function listPedidosByStores(
   return ((data ?? []) as unknown as PedidoRow[]).map(toSummary);
 }
 
+// SAC não tem loja fixa (ver EncomendaRequester em encomendaRequester.ts) --
+// acompanha os pedidos que ele mesmo lançou, não por loja como caixa/gerente
+// (ver listPedidosByStores acima). Mesmo padrão de uso: tela sem sessão
+// Supabase Auth própria pra fila interna, então busca tudo de uma vez.
+export async function listPedidosByRequester(requestedByName: string): Promise<PedidoEncomendaSummary[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("pedidos_encomenda")
+    .select(PEDIDO_COLUMNS)
+    .eq("requested_by_name", requestedByName)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as PedidoRow[]).map(toSummary);
+}
+
 export async function listAllPedidos(
   opts: { status?: PedidoEncomendaStatus; storeId?: string; fabricaId?: string; fornecedorTipo?: "fabrica_interna" | "fabrica_externa" } = {}
 ): Promise<PedidoEncomendaSummary[]> {
@@ -318,6 +333,7 @@ export type NewPedidoEncomendaItem = { produtoDescricao: string; produtoCodigo: 
 export async function createPedidoEncomenda(input: {
   storeId: string;
   requestedByName: string;
+  requesterRole: string;
   vendedorName: string | null;
   clienteCodigo: string | null;
   notes: string | null;
@@ -364,7 +380,7 @@ export async function createPedidoEncomenda(input: {
   await admin.from("pedido_encomenda_events").insert({
     pedido_id: data.id,
     actor_name: input.requestedByName,
-    actor_role: "loja",
+    actor_role: input.requesterRole,
     event_type: "created",
     to_status: "solicitado",
   });

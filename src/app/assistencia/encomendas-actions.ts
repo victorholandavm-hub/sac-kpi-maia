@@ -77,10 +77,10 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
       if (!requester.storeIds.includes(chosenStoreId)) return { error: "Selecione uma loja válida." };
       storeId = chosenStoreId;
     }
-  } else if (requester.kind === "cd" || requester.kind === "fabrica") {
-    // CD/fábrica não têm loja fixa — escolhem na hora de lançar o pedido,
-    // dentre todas as lojas (ver solicitar/page.tsx). Validado abaixo contra
-    // a tabela stores, igual já acontece pros outros papéis.
+  } else if (requester.kind === "cd" || requester.kind === "fabrica" || requester.kind === "sac") {
+    // CD/fábrica/SAC não têm loja fixa — escolhem na hora de lançar o
+    // pedido, dentre todas as lojas (ver solicitar/page.tsx). Validado
+    // abaixo contra a tabela stores, igual já acontece pros outros papéis.
     const chosenStoreId = String(formData.get("store_id") ?? "").trim();
     if (!chosenStoreId) return { error: "Selecione a loja do pedido." };
     storeId = chosenStoreId;
@@ -153,6 +153,7 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
     const result = await createPedidoEncomenda({
       storeId,
       requestedByName,
+      requesterRole: requester.kind,
       vendedorName,
       clienteCodigo,
       notes,

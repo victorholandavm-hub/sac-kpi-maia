@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
-import { caixaSignOut } from "@/app/assistencia/caixa-actions";
-import { lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { signOut } from "@/app/assistencia/actions";
 import {
-  listPedidosByStores,
+  listPedidosByRequester,
   listEventsForPedidos,
   listOpenPedidoEncomendaQueueIds,
   OPEN_PEDIDO_ENCOMENDA_STATUSES,
@@ -16,7 +14,6 @@ import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncom
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
-import { LojaTabs } from "@/components/assistencia/LojaTabs";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 
 // Precisa refletir os pedidos em aberto em tempo real — nunca gerar estático.
@@ -24,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 const OPEN_STATUSES: string[] = OPEN_PEDIDO_ENCOMENDA_STATUSES;
 
-export default async function EncomendasCaixaPage({
+export default async function EncomendasSacPage({
   searchParams,
 }: {
   searchParams: Promise<{ view?: string }>;
@@ -33,38 +30,23 @@ export default async function EncomendasCaixaPage({
   if (!requester) {
     redirect("/assistencia/encomendas");
   }
-  // CD/fábrica não têm loja fixa pra acompanhar aqui — a fila interna
-  // (requireEncomendaActor) já mostra os pedidos de todas as lojas pra eles.
-  if (requester.kind === "cd" || requester.kind === "fabrica") {
-    redirect("/assistencia/encomendas/fila");
+  // Essa tela é só do SAC acompanhando o que ele mesmo lançou -- os outros
+  // papéis têm a própria tela (caixa/gerente por loja, CD/fábrica na fila
+  // interna, ver caixa/page.tsx e fila/page.tsx).
+  if (requester.kind !== "sac") {
+    redirect("/assistencia/encomendas");
   }
-  // SAC também não tem loja fixa, mas não tem acesso à fila interna (essa é
-  // só de quem processa o pedido -- CD/fábrica/admin/assistência, ver
-  // requireEncomendaActor) -- tem a própria tela, por pedido lançado por ele
-  // em vez de por loja (ver encomendas/sac/page.tsx).
-  if (requester.kind === "sac") {
-    redirect("/assistencia/encomendas/sac");
-  }
-
-  const storeIds = requester.kind === "gerente" ? requester.storeIds : [requester.storeId];
-  const signOutAction = requester.kind === "caixa" ? caixaSignOut : lojaGerenteSignOut;
 
   const { view } = await searchParams;
   const showCompleted = view === "concluidos";
 
-  const admin = getSupabaseAdmin();
-  const [{ data: stores }, allPedidos, queueIds] = await Promise.all([
-    admin.from("stores").select("name").in("id", storeIds),
-    listPedidosByStores(storeIds),
+  const [allPedidos, queueIds] = await Promise.all([
+    listPedidosByRequester(requester.name),
     showCompleted ? Promise.resolve([]) : listOpenPedidoEncomendaQueueIds(),
   ]);
   const queuePosition = new Map(queueIds.map((id, i) => [id, i + 1]));
-  const storeLabel = (stores ?? []).map((s) => s.name).join(", ") || "sua loja";
   const pedidos = allPedidos
     .filter((p) => (showCompleted ? !OPEN_STATUSES.includes(p.status) : OPEN_STATUSES.includes(p.status)))
-    // Em aberto: mais antigo primeiro, igual ao "Nº na fila" (senão o 2º
-    // aparecia antes do 1º). Entregues/cancelados: mais recente primeiro,
-    // como já era.
     .sort((a, b) =>
       showCompleted
         ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -79,32 +61,27 @@ export default async function EncomendasCaixaPage({
   const eventsByPedido = await listEventsForPedidos(pedidos.map((p) => p.id));
   const photosByPedido = await listEncomendaPhotosForPedidos(pedidos.map((p) => p.id));
 
-  const viewHref = (v: string) => (v === "abertos" ? "/assistencia/encomendas/caixa" : `/assistencia/encomendas/caixa?view=${v}`);
+  const viewHref = (v: string) => (v === "abertos" ? "/assistencia/encomendas/sac" : `/assistencia/encomendas/sac?view=${v}`);
 
   return (
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <RealtimeQueueRefresher table="pedidos_encomenda" eventsTable="pedido_encomenda_events" />
-      <AssistenciaHeader
-        title={`Encomendas — ${storeLabel}`}
-        subtitle="Acompanhamento em tempo real com o CD e a fábrica"
-      >
+      <AssistenciaHeader title="Minhas encomendas" subtitle="Acompanhamento em tempo real com o CD e a fábrica">
         <div className="flex items-center gap-3">
           <Link
             href="/assistencia/encomendas/solicitar"
             className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
             style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
           >
-            + Novo pedido
+            + Nova encomenda
           </Link>
-          <form action={signOutAction}>
+          <form action={signOut}>
             <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
               Sair
             </button>
           </form>
         </div>
       </AssistenciaHeader>
-
-      {requester.kind === "gerente" ? <LojaTabs /> : null}
 
       <div className="flex items-center gap-2">
         <Link
@@ -154,8 +131,6 @@ export default async function EncomendasCaixaPage({
             {pedidos.map((p: PedidoEncomendaSummary) => (
               <details key={p.id} className="p-4">
                 <summary className="flex items-start gap-2 cursor-pointer list-none">
-                  {/* Selo compacto e fixo à esquerda -- pista visual imediata da ordem
-                      da fila, sem depender de ler o resto do texto. */}
                   <div className="flex items-center justify-center w-9 shrink-0 pt-0.5">
                     {queuePosition.get(p.id) ? (
                       <div
@@ -168,40 +143,39 @@ export default async function EncomendasCaixaPage({
                     ) : null}
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-1 min-w-0">
-                  <div className="flex flex-col gap-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
-                        #{p.pedidoNumber}
-                      </span>
-                      <PedidoEncomendaStatusBadge status={p.status} />
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
+                          #{p.pedidoNumber}
+                        </span>
+                        <PedidoEncomendaStatusBadge status={p.status} />
+                        <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                          {p.storeName}
+                        </span>
+                      </div>
+                      <p className="text-sm" style={{ color: "var(--text-primary)" }}>
+                        {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
+                      </p>
                     </div>
-                    <p className="text-sm" style={{ color: "var(--text-primary)" }}>
-                      {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
-                    </p>
-                  </div>
-                  <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
-                    <span className="text-xs font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {new Date(p.createdAt).toLocaleDateString("pt-BR")}
-                    </span>
-                    {p.prazoCdLoja ? (
-                      <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--status-good)" }}>
-                        Na loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
+                      <span className="text-xs font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                        {new Date(p.createdAt).toLocaleDateString("pt-BR")}
                       </span>
-                    ) : p.prazoFabricaCd ? (
-                      <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                        No CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
-                      </span>
-                    ) : null}
-                  </div>
+                      {p.prazoCdLoja ? (
+                        <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--status-good)" }}>
+                          Na loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
+                        </span>
+                      ) : p.prazoFabricaCd ? (
+                        <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                          No CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </summary>
                 <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid var(--gridline)" }}>
                   <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                     Fornecedor: {p.fornecedorTipo === "fabrica_externa" ? `Externo: ${p.fornecedorExterno}` : p.fabricaNome}
-                  </p>
-                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                    Solicitado por: {p.requestedByName}
-                    {storeIds.length > 1 ? ` (${p.storeName})` : ""}
                   </p>
                   {p.vendedorName ? (
                     <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
@@ -246,11 +220,7 @@ export default async function EncomendasCaixaPage({
         </div>
       )}
 
-      <Link
-        href={requester.kind === "gerente" ? "/assistencia/loja" : "/assistencia/encomendas"}
-        className="text-sm underline self-center"
-        style={{ color: "var(--text-secondary)" }}
-      >
+      <Link href="/assistencia/sac" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
         ← Voltar
       </Link>
     </div>

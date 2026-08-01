@@ -61,6 +61,20 @@ export default async function SacHomePage({
           >
             + Nova solicitação
           </Link>
+          <Link
+            href="/assistencia/encomendas/solicitar"
+            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
+            style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+          >
+            + Nova encomenda
+          </Link>
+          <Link
+            href="/assistencia/encomendas/sac"
+            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
+            style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+          >
+            Minhas encomendas
+          </Link>
           <form action={signOut}>
             <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
               Sair

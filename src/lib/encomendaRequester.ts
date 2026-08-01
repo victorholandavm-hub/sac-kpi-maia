@@ -5,22 +5,26 @@ import { getFabricaSession } from "@/app/assistencia/fabrica-actions";
 import { getCaixaStoreId } from "./caixas";
 import { getGerenteStoreIds } from "./gerentes";
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { getSupabaseServer } from "./supabaseServer";
 
 export type EncomendaRequester =
   | { kind: "caixa"; storeId: string; name: string }
   | { kind: "gerente"; storeIds: string[]; name: string }
   | { kind: "cd"; name: string }
-  | { kind: "fabrica"; name: string; fabricaId: string | null };
+  | { kind: "fabrica"; name: string; fabricaId: string | null }
+  | { kind: "sac"; name: string };
 
 // Quem pode lançar/ver encomenda de uma loja: caixa (PIN por pessoa, 1 loja),
 // gerente (login que ele já usa em /assistencia/loja, cookie com path
-// /assistencia então já chega aqui sem logar de novo), ou CD/fábrica (que não
+// /assistencia então já chega aqui sem logar de novo), CD/fábrica (que não
 // têm loja fixa — escolhem a loja na hora de lançar o pedido, ver
-// createPedidoEncomendaAction). Vendedor não tem acesso nenhum a esse
-// sistema — só é citado como texto livre no campo "Vendedor responsável"
-// pelo requester real. Tenta cada sessão em sequência, mesmo padrão de
-// requireEncomendaActor (src/lib/encomendaAuth.ts) só que pro lado de quem
-// solicita, não de quem processa.
+// createPedidoEncomendaAction), ou SAC (sessão Supabase Auth de verdade,
+// mesmo login por PIN de src/app/assistencia/actions.ts -- também sem loja
+// fixa, escolhe na hora igual CD/fábrica). Vendedor não tem acesso nenhum a
+// esse sistema — só é citado como texto livre no campo "Vendedor
+// responsável" pelo requester real. Tenta cada sessão em sequência, mesmo
+// padrão de requireEncomendaActor (src/lib/encomendaAuth.ts) só que pro lado
+// de quem solicita, não de quem processa.
 //
 // Gerente vem antes de caixa: os cookies têm paths diferentes (gerente em
 // /assistencia, caixa só em /assistencia/encomendas) e podem coexistir no
@@ -48,6 +52,18 @@ export async function resolveEncomendaRequester(): Promise<EncomendaRequester | 
     const admin = getSupabaseAdmin();
     const { data } = await admin.from("fabrica_operadores").select("fabrica_id").eq("name", fabricaName).maybeSingle();
     return { kind: "fabrica", name: fabricaName, fabricaId: data?.fabrica_id ?? null };
+  }
+
+  const supabase = await getSupabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    const admin = getSupabaseAdmin();
+    const { data } = await admin.from("profiles").select("full_name, role").eq("id", user.id).maybeSingle();
+    if (data && data.role === "sac") {
+      return { kind: "sac", name: data.full_name };
+    }
   }
 
   return null;

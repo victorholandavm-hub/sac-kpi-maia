@@ -21,12 +21,12 @@ export default async function SolicitarEncomendaPage({
 
   const admin = getSupabaseAdmin();
 
-  const isCdOrFabrica = requester.kind === "cd" || requester.kind === "fabrica";
+  const noFixedStore = requester.kind === "cd" || requester.kind === "fabrica" || requester.kind === "sac";
 
   let fixedStoreName: string | undefined;
   let storeOptions: { id: string; name: string }[] | undefined;
 
-  if (isCdOrFabrica) {
+  if (noFixedStore) {
     const { data } = await admin.from("stores").select("id, name").order("name");
     storeOptions = data ?? [];
   } else if (requester.kind === "gerente" && requester.storeIds.length > 1) {
@@ -38,7 +38,12 @@ export default async function SolicitarEncomendaPage({
     fixedStoreName = store?.name ?? storeId;
   }
 
-  const voltarHref = isCdOrFabrica ? "/assistencia/encomendas/fila" : "/assistencia/encomendas/caixa";
+  const voltarHref =
+    requester.kind === "cd" || requester.kind === "fabrica"
+      ? "/assistencia/encomendas/fila"
+      : requester.kind === "sac"
+        ? "/assistencia/encomendas/sac"
+        : "/assistencia/encomendas/caixa";
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">

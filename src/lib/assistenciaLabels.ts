@@ -76,6 +76,8 @@ export const ROLE_LABELS: Record<string, string> = {
   cd: "CD",
   fabrica: "Fábrica",
   loja: "Loja",
+  caixa: "Caixa",
+  gerente: "Gerente",
 };
 
 export const PEDIDO_ENCOMENDA_STATUS_LABELS: Record<string, string> = {
