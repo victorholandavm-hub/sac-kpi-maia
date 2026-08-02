@@ -53,8 +53,13 @@ export function NotificationBell({
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const data = await fetchAction();
-      if (!cancelled) setNotifications(data);
+      try {
+        const data = await fetchAction();
+        if (!cancelled) setNotifications(data);
+      } catch {
+        // Falha de rede/sessão num poll de fundo não deve gerar warning nem
+        // travar nada -- só tenta de novo no próximo intervalo.
+      }
     }
     load();
     const interval = setInterval(load, POLL_MS);
