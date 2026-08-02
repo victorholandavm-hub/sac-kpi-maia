@@ -39,16 +39,24 @@ function ghlHeaders() {
   };
 }
 
-async function fetchRecentConversations(sinceMs: number): Promise<GhlConversation[]> {
+async function fetchRecentConversations(sinceMs: number): Promise<{ conversations: GhlConversation[]; error: string | null }> {
   const conversations: GhlConversation[] = [];
   let startAfterDate: number | undefined;
+  let error: string | null = null;
 
   for (let page = 0; page < 30; page++) {
     const params = new URLSearchParams({ locationId: process.env.GHL_LOCATION_ID!, limit: "100" });
     if (startAfterDate) params.set("startAfterDate", String(startAfterDate));
 
     const res = await fetch(`${BASE_URL}/conversations/search?${params}`, { headers: ghlHeaders() });
-    if (!res.ok) break;
+    if (!res.ok) {
+      // Antes isso só dava `break` silencioso -- a rota terminava e ainda
+      // respondia `ok: true`, como se tivesse sincronizado tudo. Sem
+      // registrar o erro, uma falha no meio da paginação (token vencido,
+      // GHL fora do ar) passava despercebida indefinidamente.
+      error = `conversations/search página ${page}: ${res.status} ${await res.text().catch(() => "")}`.slice(0, 300);
+      break;
+    }
     const data = await res.json();
     const batch: GhlConversation[] = data.conversations ?? [];
     if (batch.length === 0) break;
@@ -62,7 +70,7 @@ async function fetchRecentConversations(sinceMs: number): Promise<GhlConversatio
     startAfterDate = Math.min(...sortValues);
   }
 
-  return conversations.filter((c) => (c.dateUpdated ?? 0) >= sinceMs);
+  return { conversations: conversations.filter((c) => (c.dateUpdated ?? 0) >= sinceMs), error };
 }
 
 async function firstResponseMinutes(ghlConversationId: string): Promise<number | null> {
@@ -94,7 +102,8 @@ export async function GET(req: NextRequest) {
 
   const supabase = getSupabaseAdmin();
   const sinceMs = Date.now() - 48 * 60 * 60 * 1000;
-  const conversations = await fetchRecentConversations(sinceMs);
+  const { conversations, error: fetchError } = await fetchRecentConversations(sinceMs);
+  const errors: string[] = fetchError ? [fetchError] : [];
 
   let conversationsUpserted = 0;
   for (const conv of conversations) {
@@ -130,6 +139,7 @@ export async function GET(req: NextRequest) {
       { onConflict: "ghl_conversation_id" }
     );
     if (!error) conversationsUpserted++;
+    else errors.push(`conversation ${conv.id}: ${error.message}`);
   }
 
   const { data: windowRow } = await supabase
@@ -157,9 +167,10 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    ok: true,
+    ok: errors.length === 0,
     conversationsChecked: conversations.length,
     conversationsUpserted,
     responsesComputed,
+    errors,
   });
 }

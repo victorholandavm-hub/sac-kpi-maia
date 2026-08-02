@@ -465,8 +465,21 @@ export async function updatePedidoStatus(
   if (opts.carga) patch.carga = opts.carga;
   if (opts.nfE) patch.nf_e = opts.nfE;
 
-  const { error } = await admin.from("pedidos_encomenda").update(patch).eq("id", id);
+  // Trava pelo status que a tela viu (fromStatus) -- sem isso, duas pessoas
+  // agindo quase ao mesmo tempo no mesmo pedido (ex: CD avança pra "em_carga"
+  // enquanto admin cancela) gravam por cima uma da outra silenciosamente,
+  // sem erro nem aviso pra quem perdeu a corrida.
+  const { data, error } = await admin
+    .from("pedidos_encomenda")
+    .update(patch)
+    .eq("id", id)
+    .eq("status", fromStatus)
+    .select("id")
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) {
+    throw new Error("Esse pedido já foi atualizado por outra pessoa. Recarregue a página e tente de novo.");
+  }
 
   const eventType = opts.carga ? "carga_informada" : opts.nfE ? "nf_e_informada" : "status_changed";
   const noteParts: string[] = [];
