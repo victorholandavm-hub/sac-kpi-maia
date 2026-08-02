@@ -114,7 +114,7 @@ export function NotificationBell({
 
       {open ? (
         <div
-          className="absolute right-0 mt-2 w-80 max-w-[90vw] max-h-96 overflow-y-auto rounded-lg border shadow-lg z-50"
+          className="absolute left-0 mt-2 w-80 max-w-[90vw] max-h-96 overflow-y-auto rounded-lg border shadow-lg z-50"
           style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
         >
           {notifications.length === 0 ? (
