@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { businessMinutesBetween } from "@/lib/businessHours";
+import { recordSyncRun } from "@/lib/syncRuns";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -100,6 +101,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  try {
+    return await runSync();
+  } catch (err) {
+    const message = (err as Error).message;
+    await recordSyncRun("ghl", false, {}, [message]);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+async function runSync() {
   const supabase = getSupabaseAdmin();
   const sinceMs = Date.now() - 48 * 60 * 60 * 1000;
   const { conversations, error: fetchError } = await fetchRecentConversations(sinceMs);
@@ -166,8 +177,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const ok = errors.length === 0;
+  await recordSyncRun("ghl", ok, { conversationsChecked: conversations.length, conversationsUpserted, responsesComputed }, errors);
+
   return NextResponse.json({
-    ok: errors.length === 0,
+    ok,
     conversationsChecked: conversations.length,
     conversationsUpserted,
     responsesComputed,

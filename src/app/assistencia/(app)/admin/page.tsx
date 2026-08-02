@@ -23,6 +23,24 @@ import { FabricaOperadorPinField } from "@/components/assistencia/FabricaOperado
 import { SacPinField } from "@/components/assistencia/SacPinField";
 import { RotaWeekdaySelect } from "@/components/assistencia/RotaWeekdaySelect";
 import { getRotaWeekdayConfig } from "@/lib/rotas";
+import { listLatestSyncRuns, type SyncJob } from "@/lib/syncRuns";
+
+const SYNC_JOB_LABELS: Record<SyncJob, string> = {
+  totvs: "TOTVS (clientes, pedidos, entregas)",
+  ghl: "GoHighLevel (conversas)",
+  backup: "Backup diário do Supabase",
+};
+
+// Sem casa decimal nem "há 0h" logo depois de rodar -- minuto é preciso o
+// suficiente pra essa tela (é só um sinal de "tá vivo ou não").
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) return `há ${minutes}min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `há ${hours}h`;
+  return `há ${Math.floor(hours / 24)}d`;
+}
 
 function AdminSection({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
@@ -47,26 +65,65 @@ export default async function AdminPage() {
     );
   }
 
-  const [stores, gerentes, assemblers, drivers, suppliers, produtosEncomenda, caixas, cdOperadores, fabricaOperadores, sacProfiles, rotaConfig] =
-    await Promise.all([
-      listStores(),
-      listGerentesWithPinStatus(),
-      listAssemblersWithPinStatus(),
-      listDriversWithPinStatus(),
-      listSuppliers(),
-      listProdutosEncomenda(),
-      listCaixasWithPinStatus(),
-      listCdOperadoresWithPinStatus(),
-      listFabricaOperadoresWithPinStatus(),
-      listSacProfilesWithPinStatus(),
-      getRotaWeekdayConfig(),
-    ]);
+  const [
+    stores,
+    gerentes,
+    assemblers,
+    drivers,
+    suppliers,
+    produtosEncomenda,
+    caixas,
+    cdOperadores,
+    fabricaOperadores,
+    sacProfiles,
+    rotaConfig,
+    syncRuns,
+  ] = await Promise.all([
+    listStores(),
+    listGerentesWithPinStatus(),
+    listAssemblersWithPinStatus(),
+    listDriversWithPinStatus(),
+    listSuppliers(),
+    listProdutosEncomenda(),
+    listCaixasWithPinStatus(),
+    listCdOperadoresWithPinStatus(),
+    listFabricaOperadoresWithPinStatus(),
+    listSacProfilesWithPinStatus(),
+    getRotaWeekdayConfig(),
+    listLatestSyncRuns(),
+  ]);
+  const syncByJob = new Map(syncRuns.map((r) => [r.job, r]));
 
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
         Administração
       </h2>
+
+      <AdminSection title="Sincronizações" count={syncRuns.length}>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Última rodada de cada job agendado. Se algum ficar muito tempo sem atualizar ou aparecer em
+          vermelho, é sinal de que parou de rodar.
+        </p>
+        <ul className="flex flex-col gap-2">
+          {(Object.keys(SYNC_JOB_LABELS) as SyncJob[]).map((job) => {
+            const run = syncByJob.get(job);
+            const color = !run ? "var(--text-muted)" : run.ok ? "var(--status-good)" : "var(--status-critical)";
+            return (
+              <li key={job} className="flex items-center justify-between gap-2 text-sm flex-wrap">
+                <span style={{ color: "var(--text-primary)" }}>{SYNC_JOB_LABELS[job]}</span>
+                {run ? (
+                  <span style={{ color }} title={run.errors.join(" · ") || undefined}>
+                    {run.ok ? "ok" : "erro"} · {timeAgo(run.ranAt)}
+                  </span>
+                ) : (
+                  <span style={{ color }}>nunca rodou</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </AdminSection>
 
       <AdminSection title="Criar conta de assistência">
         <CreateUserForm />

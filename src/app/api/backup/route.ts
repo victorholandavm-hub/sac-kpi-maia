@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { recordSyncRun } from "@/lib/syncRuns";
 
 const BUCKET = "system-backups";
 const KEEP_DAYS = 14;
@@ -47,35 +48,40 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const admin = getSupabaseAdmin();
-  const dump: Record<string, unknown[]> = {};
-  for (const table of TABLES) {
-    dump[table] = await dumpTable(table);
+  try {
+    const admin = getSupabaseAdmin();
+    const dump: Record<string, unknown[]> = {};
+    for (const table of TABLES) {
+      dump[table] = await dumpTable(table);
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const path = `${today}.json`;
+    const body = JSON.stringify({ createdAt: new Date().toISOString(), tables: dump });
+
+    const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, body, {
+      contentType: "application/json",
+      upsert: true,
+    });
+    if (uploadError) {
+      await recordSyncRun("backup", false, {}, [uploadError.message]);
+      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    }
+
+    const { data: files } = await admin.storage.from(BUCKET).list("");
+    const cutoff = new Date(Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const toRemove = (files ?? []).map((f) => f.name).filter((name) => name.endsWith(".json") && name.slice(0, 10) < cutoff);
+    if (toRemove.length > 0) {
+      await admin.storage.from(BUCKET).remove(toRemove);
+    }
+
+    const rowCounts = Object.fromEntries(Object.entries(dump).map(([t, rows]) => [t, rows.length]));
+    await recordSyncRun("backup", true, { path, rowCounts, removedOldBackups: toRemove });
+
+    return NextResponse.json({ ok: true, path, rowCounts, removedOldBackups: toRemove });
+  } catch (err) {
+    const message = (err as Error).message;
+    await recordSyncRun("backup", false, {}, [message]);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const today = new Date().toISOString().slice(0, 10);
-  const path = `${today}.json`;
-  const body = JSON.stringify({ createdAt: new Date().toISOString(), tables: dump });
-
-  const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, body, {
-    contentType: "application/json",
-    upsert: true,
-  });
-  if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 500 });
-  }
-
-  const { data: files } = await admin.storage.from(BUCKET).list("");
-  const cutoff = new Date(Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const toRemove = (files ?? []).map((f) => f.name).filter((name) => name.endsWith(".json") && name.slice(0, 10) < cutoff);
-  if (toRemove.length > 0) {
-    await admin.storage.from(BUCKET).remove(toRemove);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    path,
-    rowCounts: Object.fromEntries(Object.entries(dump).map(([t, rows]) => [t, rows.length])),
-    removedOldBackups: toRemove,
-  });
 }

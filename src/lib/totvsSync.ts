@@ -1,5 +1,6 @@
 import https from "node:https";
 import { getSupabaseAdmin } from "./supabaseAdmin.ts";
+import { recordSyncRun } from "./syncRuns.ts";
 
 // O certificado de protheus.lojasmaia.com.br é autoassinado por uma CA
 // interna da própria TOTVS (não uma CA pública) -- fetch() rejeitaria com
@@ -602,11 +603,20 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
   const orders = await syncOrders(supabase);
   const deliveries = await syncDeliveries(supabase);
 
-  return {
+  const summary: TotvsSyncSummary = {
     ok: clients.errors.length === 0 && orders.errors.length === 0 && deliveries.errors.length === 0,
     clients: { checked: clients.checked, upserted: clients.upserted },
     orders: { checked: orders.checked, upserted: orders.upserted },
     deliveries: { checked: deliveries.checked, upserted: deliveries.upserted },
     errors: [...clients.errors, ...orders.errors, ...deliveries.errors],
   };
+
+  await recordSyncRun(
+    "totvs",
+    summary.ok,
+    { clients: summary.clients, orders: summary.orders, deliveries: summary.deliveries },
+    summary.errors
+  );
+
+  return summary;
 }

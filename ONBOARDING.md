@@ -69,6 +69,16 @@ falha de infraestrutura do Supabase). Rotas de cron precisam estar excluídas do
 - Cookie de sessão com `path` estreito demais (`/assistencia/loja`) não chega em rotas irmãs
   (`/assistencia/solicitar`) que também precisam ler a mesma sessão — sempre considerar o
   path mínimo comum entre todas as páginas que vão ler aquele cookie.
+- A senha do usuário de API do Protheus (`TOTVS_BASIC_AUTH_USER`, hoje `maia-api`) pode vencer
+  por política do próprio sistema (aconteceu em 2026-08-01, junto com uma atualização por causa
+  da reforma tributária que forçou troca de senha de todo mundo, inclusive contas de API). O
+  sintoma é `scripts/totvs-sync.ts` falhando nas três sincronizações (clientes/pedidos/entregas)
+  com `302 ... "É necessário que o usuário efetue a troca de senha"`. Não tem como resetar pelo
+  app — precisa de alguém com acesso ao Configurador do Protheus (SIGACFG → Cadastro de Usuários)
+  pra trocar a senha do `maia-api` (idealmente sem exigir troca no próximo acesso, já que é uma
+  conta sem interface) e atualizar `TOTVS_BASIC_AUTH_PASSWORD` em `.env.totvs-script` na máquina
+  que roda o sync agendado. Dá pra ver o status de cada sincronização (TOTVS/GHL/backup) na tela
+  `/assistencia/admin`, seção "Sincronizações" — não precisa mais achar isso por acaso.
 
 ## Estado atual / pendências
 
