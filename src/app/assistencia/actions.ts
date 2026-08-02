@@ -20,6 +20,7 @@ import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/ser
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
+import { checkIpRateLimit, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isRota, getRotaWeekdayConfig, getRotaForDate, ROTA_LABELS } from "@/lib/rotas";
 import { findTotvsClientByCode, findTotvsProductByCode, type TotvsClientMatch, type TotvsProductMatch } from "@/lib/totvsLookup";
 import {
@@ -58,6 +59,12 @@ export async function signIn(_state: FormState, formData: FormData): Promise<For
     return { error: "Informe e-mail e senha." };
   }
 
+  const ip = await getClientIp();
+  const ipLimit = await checkIpRateLimit(ip);
+  if (ipLimit.locked) {
+    return { error: `Muitas tentativas deste local. Tente de novo em ${ipLimit.minutesLeft} minuto(s).` };
+  }
+
   // Login único por time (várias pessoas da assistência usam a mesma
   // credencial): em vez de autenticar direto, manda pra tela "Quem é você?"
   // escolher o nome — só ali a sessão real do Supabase Auth da pessoa
@@ -85,6 +92,7 @@ export async function signIn(_state: FormState, formData: FormData): Promise<For
   const supabase = await getSupabaseServer();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
+    await recordFailedIpAttempt(ip);
     return { error: "E-mail ou senha inválidos." };
   }
 
@@ -181,11 +189,20 @@ export async function sacPinSignIn(_state: SacFormState, formData: FormData): Pr
   if (!typedName) return { error: "Informe seu nome." };
   if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
+  const ip = await getClientIp();
+  const ipLimit = await checkIpRateLimit(ip);
+  if (ipLimit.locked) {
+    return { error: `Muitas tentativas deste local. Tente de novo em ${ipLimit.minutesLeft} minuto(s).` };
+  }
+
   const admin = getSupabaseAdmin();
   const { data: sacProfiles } = await admin.from("profiles").select("id, full_name, pin_hash").eq("role", "sac");
   const match = (sacProfiles ?? []).find((p) => p.full_name.toLowerCase() === typedName.toLowerCase());
 
-  if (!match) return { error: "Nome ou PIN incorretos." };
+  if (!match) {
+    await recordFailedIpAttempt(ip);
+    return { error: "Nome ou PIN incorretos." };
+  }
 
   const lockout = await checkPinLockout("profiles", "id", match.id);
   if (lockout.locked) {
@@ -194,6 +211,7 @@ export async function sacPinSignIn(_state: SacFormState, formData: FormData): Pr
 
   if (!match.pin_hash || !verifyPin(pin, match.pin_hash)) {
     await recordFailedPinAttempt("profiles", "id", match.id);
+    await recordFailedIpAttempt(ip);
     return { error: "Nome ou PIN incorretos." };
   }
   await resetPinAttempts("profiles", "id", match.id);

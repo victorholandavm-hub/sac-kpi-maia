@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import {
   DRIVER_COOKIE_NAME,
@@ -24,6 +25,12 @@ export async function driverSignIn(_state: DriverFormState, formData: FormData):
   if (!typedName) return { error: "Informe seu nome." };
   if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
+  const ip = await getClientIp();
+  const ipLimit = await checkIpRateLimit(ip);
+  if (ipLimit.locked) {
+    return { error: `Muitas tentativas deste local. Tente de novo em ${ipLimit.minutesLeft} minuto(s).` };
+  }
+
   // Mesma lógica de montadorSignIn (src/app/assistencia/montador-actions.ts):
   // nome não diferencia maiúsculas/minúsculas, e usa o nome como está no
   // banco (não o digitado) daqui pra frente.
@@ -39,6 +46,7 @@ export async function driverSignIn(_state: DriverFormState, formData: FormData):
 
   if (!data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
     await recordFailedPinAttempt("drivers", "name", name);
+    await recordFailedIpAttempt(ip);
     return { error: "Nome ou PIN incorretos." };
   }
   await resetPinAttempts("drivers", "name", name);

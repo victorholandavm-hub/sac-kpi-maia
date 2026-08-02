@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import {
   CAIXA_COOKIE_NAME,
@@ -27,6 +28,12 @@ export async function caixaSignIn(_state: CaixaFormState, formData: FormData): P
   if (!typedName) return { error: "Informe seu nome." };
   if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
+  const ip = await getClientIp();
+  const ipLimit = await checkIpRateLimit(ip);
+  if (ipLimit.locked) {
+    return { error: `Muitas tentativas deste local. Tente de novo em ${ipLimit.minutesLeft} minuto(s).` };
+  }
+
   // Nome não diferencia maiúsculas/minúsculas — mesma lógica de vendedorSignIn.
   const admin = getSupabaseAdmin();
   const { data: caixas } = await admin.from("caixas").select("name, pin_hash, ativo");
@@ -42,6 +49,7 @@ export async function caixaSignIn(_state: CaixaFormState, formData: FormData): P
   // pra não vazar informação de quem tem cadastro desativado.
   if (!data || !data.pin_hash || !data.ativo || !verifyPin(pin, data.pin_hash)) {
     await recordFailedPinAttempt("caixas", "name", name);
+    await recordFailedIpAttempt(ip);
     return { error: "Nome ou PIN incorretos." };
   }
   await resetPinAttempts("caixas", "name", name);

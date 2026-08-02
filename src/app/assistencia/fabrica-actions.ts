@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import {
   FABRICA_COOKIE_NAME,
@@ -25,6 +26,12 @@ export async function fabricaSignIn(_state: FabricaFormState, formData: FormData
   if (!typedName) return { error: "Informe seu nome." };
   if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
+  const ip = await getClientIp();
+  const ipLimit = await checkIpRateLimit(ip);
+  if (ipLimit.locked) {
+    return { error: `Muitas tentativas deste local. Tente de novo em ${ipLimit.minutesLeft} minuto(s).` };
+  }
+
   const admin = getSupabaseAdmin();
   const { data: operadores } = await admin.from("fabrica_operadores").select("name, pin_hash");
   const data = (operadores ?? []).find((o) => o.name.toLowerCase() === typedName.toLowerCase());
@@ -37,6 +44,7 @@ export async function fabricaSignIn(_state: FabricaFormState, formData: FormData
 
   if (!data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
     await recordFailedPinAttempt("fabrica_operadores", "name", name);
+    await recordFailedIpAttempt(ip);
     return { error: "Nome ou PIN incorretos." };
   }
   await resetPinAttempts("fabrica_operadores", "name", name);

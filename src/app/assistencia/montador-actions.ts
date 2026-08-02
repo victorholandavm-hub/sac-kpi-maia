@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import {
   MONTADOR_COOKIE_NAME,
@@ -24,6 +25,12 @@ export async function montadorSignIn(_state: MontadorFormState, formData: FormDa
   if (!typedName) return { error: "Informe seu nome." };
   if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
+  const ip = await getClientIp();
+  const ipLimit = await checkIpRateLimit(ip);
+  if (ipLimit.locked) {
+    return { error: `Muitas tentativas deste local. Tente de novo em ${ipLimit.minutesLeft} minuto(s).` };
+  }
+
   // Nome não diferencia maiúsculas/minúsculas ("Janailson" == "janailson") —
   // busca todo mundo e compara em minúsculo em vez de usar `ilike` (que trata
   // % e _ como curinga, o que um nome digitado não deveria acionar). Usa o
@@ -41,6 +48,7 @@ export async function montadorSignIn(_state: MontadorFormState, formData: FormDa
 
   if (!data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
     await recordFailedPinAttempt("assemblers", "name", name);
+    await recordFailedIpAttempt(ip);
     return { error: "Nome ou PIN incorretos." };
   }
   await resetPinAttempts("assemblers", "name", name);
