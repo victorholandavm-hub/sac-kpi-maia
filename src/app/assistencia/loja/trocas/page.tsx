@@ -11,6 +11,8 @@ import { LojaTabs } from "@/components/assistencia/LojaTabs";
 import { LojaDeadlineControl } from "@/components/assistencia/LojaDeadlineControl";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
+import { NotificationBell } from "@/components/assistencia/NotificationBell";
+import { listLojaNotificationsAction } from "@/app/assistencia/notifications-actions";
 
 // Precisa refletir a demanda em aberto em tempo real — nunca gerar estático.
 export const dynamic = "force-dynamic";
@@ -49,6 +51,7 @@ export default async function LojaTrocasPage({
       <RealtimeQueueRefresher />
       <AssistenciaHeader title="Gerente de loja" subtitle="Trocas, entregas e notificações do SAC — só da sua loja">
         <div className="flex items-center gap-3 flex-wrap">
+          <NotificationBell fetchAction={listLojaNotificationsAction} storageKey="loja" />
           <Link
             href="/assistencia/loja/equipe"
             className="text-sm underline whitespace-nowrap"

@@ -1,4 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { notifyLoja, notifyFabrica, notifyCd } from "./notifications";
+import { PEDIDO_ENCOMENDA_STATUS_LABELS } from "./assistenciaLabels";
 
 export type PedidoEncomendaStatus =
   | "solicitado"
@@ -399,6 +401,17 @@ export async function createPedidoEncomenda(input: {
     to_status: "solicitado",
   });
 
+  const title = `Novo pedido #${data.pedido_number} pra produzir`;
+  const message = `${input.items.length} ite${input.items.length === 1 ? "m" : "ns"} · pedido por ${input.requestedByName}`;
+  const link = `/assistencia/encomendas/fila/${data.id}`;
+  // CD acompanha a fila inteira (interna + externa, ver encomendas/fila/page.tsx
+  // sem filtro por padrão) -- recebe notificação de todo pedido novo, não só
+  // dos externos que ele mesmo trata diretamente.
+  await notifyCd({ type: "novo_pedido", title, message, link });
+  if (input.fornecedorTipo === "fabrica_interna" && input.fabricaId) {
+    await notifyFabrica(input.fabricaId, { type: "novo_pedido", title, message, link });
+  }
+
   return { id: data.id, pedidoNumber: data.pedido_number };
 }
 
@@ -474,7 +487,7 @@ export async function updatePedidoStatus(
     .update(patch)
     .eq("id", id)
     .eq("status", fromStatus)
-    .select("id")
+    .select("id, pedido_number, store_id, fabrica_id, fornecedor_tipo")
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) {
@@ -496,6 +509,14 @@ export async function updatePedidoStatus(
     to_status: toStatus,
     note,
   });
+
+  const link = `/assistencia/encomendas/fila/${id}`;
+  const statusLabel = PEDIDO_ENCOMENDA_STATUS_LABELS[toStatus] ?? toStatus;
+  const title = `Pedido #${data.pedido_number}: ${statusLabel}`;
+  await notifyLoja(data.store_id, { type: "status_changed", title, message: note, link });
+  if (data.fornecedor_tipo === "fabrica_interna" && data.fabrica_id) {
+    await notifyFabrica(data.fabrica_id, { type: "status_changed", title, message: note, link });
+  }
 }
 
 // Prazo por etapa -- obrigatório na transição em que é definido pela primeira
@@ -508,10 +529,12 @@ export async function setPedidoPrazoEtapa(
   value: string
 ): Promise<void> {
   const admin = getSupabaseAdmin();
-  const { error } = await admin
+  const { data, error } = await admin
     .from("pedidos_encomenda")
     .update({ [field]: value })
-    .eq("id", id);
+    .eq("id", id)
+    .select("pedido_number, store_id")
+    .single();
   if (error) throw new Error(error.message);
 
   const label = field === "prazo_fabrica_cd" ? "Prazo fábrica → CD" : "Prazo CD → loja";
@@ -524,6 +547,13 @@ export async function setPedidoPrazoEtapa(
     note,
   });
   if (eventError) throw new Error(eventError.message);
+
+  await notifyLoja(data.store_id, {
+    type: "prazo_changed",
+    title: `Pedido #${data.pedido_number}: novo prazo`,
+    message: note,
+    link: `/assistencia/encomendas/fila/${id}`,
+  });
 }
 
 export async function addPedidoNote(id: string, actor: { name: string; role: string }, note: string): Promise<void> {

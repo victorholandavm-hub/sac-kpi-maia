@@ -8,6 +8,8 @@ import { AssistenciaNav } from "@/components/assistencia/AssistenciaNav";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { MobileNav } from "@/components/assistencia/MobileNav";
+import { NotificationBell } from "@/components/assistencia/NotificationBell";
+import { listAdminNotificationsAction } from "@/app/assistencia/notifications-actions";
 
 export default async function AssistenciaAppLayout({ children }: { children: React.ReactNode }) {
   const profile = await getProfile();
@@ -32,11 +34,14 @@ export default async function AssistenciaAppLayout({ children }: { children: Rea
             title="Assistência — Lojas Maia"
             subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}${profile.storeId ? ` · Loja ${profile.storeId}` : ""}`}
           >
-            <form action={signOut}>
-              <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-                Sair
-              </button>
-            </form>
+            <div className="flex items-center gap-3">
+              {isAdmin ? <NotificationBell fetchAction={listAdminNotificationsAction} storageKey="admin" /> : null}
+              <form action={signOut}>
+                <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+                  Sair
+                </button>
+              </form>
+            </div>
           </AssistenciaHeader>
           {isSac ? (
             <Link href="/assistencia/sac" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>

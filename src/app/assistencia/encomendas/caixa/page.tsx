@@ -18,6 +18,8 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
 import { LojaTabs } from "@/components/assistencia/LojaTabs";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
+import { NotificationBell } from "@/components/assistencia/NotificationBell";
+import { listLojaNotificationsAction } from "@/app/assistencia/notifications-actions";
 
 // Precisa refletir os pedidos em aberto em tempo real — nunca gerar estático.
 export const dynamic = "force-dynamic";
@@ -89,6 +91,7 @@ export default async function EncomendasCaixaPage({
         subtitle="Acompanhamento em tempo real com o CD e a fábrica"
       >
         <div className="flex items-center gap-3">
+          <NotificationBell fetchAction={listLojaNotificationsAction} storageKey="loja" />
           <Link
             href="/assistencia/encomendas/solicitar"
             className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"

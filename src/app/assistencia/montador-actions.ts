@@ -8,6 +8,7 @@ import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/ser
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
+import { notifyLoja } from "@/lib/notifications";
 import {
   MONTADOR_COOKIE_NAME,
   MONTADOR_SESSION_MAX_AGE,
@@ -128,7 +129,7 @@ export async function montadorCompleteRequest(
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status")
+    .select("assembler_name, status, store_id")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -162,6 +163,13 @@ export async function montadorCompleteRequest(
     note: `Concluído pelo montador ${assemblerName}.${ratingNote}`,
   });
 
+  await notifyLoja(request.store_id, {
+    type: "status_changed",
+    title: "Solicitação: Concluída",
+    message: `Concluído pelo montador ${assemblerName}.`,
+    link: `/assistencia/${requestId}`,
+  });
+
   revalidatePath("/assistencia/montador");
   revalidatePath(`/assistencia/montador/${requestId}`);
   revalidatePath("/assistencia/fila");
@@ -180,7 +188,7 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status")
+    .select("assembler_name, status, store_id")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -193,14 +201,17 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
   const { error: updateError } = await admin.from("service_requests").update({ status: "remarcar" }).eq("id", requestId);
   if (updateError) throw new Error(updateError.message);
 
+  const note = `${assemblerName} (montador) não conseguiu montar: ${trimmed}`;
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: null,
     event_type: "status_changed",
     from_status: request.status,
     to_status: "remarcar",
-    note: `${assemblerName} (montador) não conseguiu montar: ${trimmed}`,
+    note,
   });
+
+  await notifyLoja(request.store_id, { type: "status_changed", title: "Solicitação: Remarcar", message: note, link: `/assistencia/${requestId}` });
 
   revalidatePath("/assistencia/montador");
   revalidatePath(`/assistencia/montador/${requestId}`);

@@ -8,6 +8,7 @@ import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/ser
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
+import { notifyLoja } from "@/lib/notifications";
 import {
   DRIVER_COOKIE_NAME,
   DRIVER_SESSION_MAX_AGE,
@@ -156,7 +157,7 @@ export async function driverCompleteRequest(
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("driver_name, status")
+    .select("driver_name, status, store_id")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.driver_name !== driverName) {
@@ -191,6 +192,13 @@ export async function driverCompleteRequest(
     note: `Concluído pelo motorista ${driverName}.${ratingNote}`,
   });
 
+  await notifyLoja(request.store_id, {
+    type: "status_changed",
+    title: "Solicitação: Concluída",
+    message: `Concluído pelo motorista ${driverName}.`,
+    link: `/assistencia/${requestId}`,
+  });
+
   revalidatePath("/assistencia/motorista");
   revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
@@ -207,7 +215,7 @@ export async function driverReportIssue(requestId: string, reason: string): Prom
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("driver_name, status")
+    .select("driver_name, status, store_id")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.driver_name !== driverName) {
@@ -220,14 +228,17 @@ export async function driverReportIssue(requestId: string, reason: string): Prom
   const { error: updateError } = await admin.from("service_requests").update({ status: "remarcar" }).eq("id", requestId);
   if (updateError) throw new Error(updateError.message);
 
+  const note = `${driverName} (motorista) não conseguiu concluir a rota: ${trimmed}`;
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: null,
     event_type: "status_changed",
     from_status: request.status,
     to_status: "remarcar",
-    note: `${driverName} (motorista) não conseguiu concluir a rota: ${trimmed}`,
+    note,
   });
+
+  await notifyLoja(request.store_id, { type: "status_changed", title: "Solicitação: Remarcar", message: note, link: `/assistencia/${requestId}` });
 
   revalidatePath("/assistencia/motorista");
   revalidatePath("/assistencia/fila");

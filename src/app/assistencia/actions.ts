@@ -14,7 +14,9 @@ import {
   MANOEL_ONLY_TYPES,
   MANOEL_ONLY_ASSEMBLER,
   REQUEST_TYPE_LABELS,
+  STATUS_LABELS,
 } from "@/lib/assistenciaLabels";
+import { notifyLoja } from "@/lib/notifications";
 import { resolveDriverName } from "@/lib/payments";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
@@ -651,6 +653,13 @@ export async function cancelServiceRequestByGerente(requestId: string, note: str
     note: note.trim(),
   });
 
+  await notifyLoja(current.store_id, {
+    type: "status_changed",
+    title: "Solicitação cancelada",
+    message: note.trim(),
+    link: `/assistencia/${requestId}`,
+  });
+
   revalidatePath("/assistencia/loja");
 }
 
@@ -661,7 +670,7 @@ export async function approveDeadline(requestId: string) {
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("requested_deadline, type")
+    .select("requested_deadline, type, store_id")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
@@ -673,11 +682,19 @@ export async function approveDeadline(requestId: string) {
     .eq("id", requestId);
   if (error) throw new Error(error.message);
 
+  const note = current.requested_deadline ? `Prazo aprovado: ${current.requested_deadline}` : null;
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: profile.id,
     event_type: "deadline_approved",
-    note: current.requested_deadline ? `Prazo aprovado: ${current.requested_deadline}` : null,
+    note,
+  });
+
+  await notifyLoja(current.store_id, {
+    type: "prazo_changed",
+    title: "Prazo aprovado",
+    message: note,
+    link: `/assistencia/${requestId}`,
   });
 
   revalidatePath("/assistencia/fila");
@@ -692,7 +709,7 @@ export async function rejectDeadline(requestId: string, newDate: string) {
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("type")
+    .select("type, store_id")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
@@ -704,11 +721,19 @@ export async function rejectDeadline(requestId: string, newDate: string) {
     .eq("id", requestId);
   if (error) throw new Error(error.message);
 
+  const note = `Nova data proposta: ${newDate}`;
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: profile.id,
     event_type: "deadline_rejected",
-    note: `Nova data proposta: ${newDate}`,
+    note,
+  });
+
+  await notifyLoja(current.store_id, {
+    type: "prazo_changed",
+    title: "Nova data de prazo proposta",
+    message: note,
+    link: `/assistencia/${requestId}`,
   });
 
   revalidatePath("/assistencia/fila");
@@ -772,7 +797,7 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("status, type, assembler_name, driver_name")
+    .select("status, type, assembler_name, driver_name, store_id")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
@@ -802,6 +827,13 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
     from_status: current.status,
     to_status: newStatus,
     note: note?.trim() || null,
+  });
+
+  await notifyLoja(current.store_id, {
+    type: "status_changed",
+    title: `Solicitação: ${STATUS_LABELS[newStatus] ?? newStatus}`,
+    message: note?.trim() || null,
+    link: `/assistencia/${requestId}`,
   });
 
   revalidatePath("/assistencia/fila");

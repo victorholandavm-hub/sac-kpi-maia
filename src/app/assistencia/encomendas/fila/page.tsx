@@ -8,6 +8,8 @@ import { ROLE_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLa
 import { PedidoEncomendaFilaList } from "@/components/assistencia/PedidoEncomendaFilaList";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
+import { NotificationBell } from "@/components/assistencia/NotificationBell";
+import { listFabricaOuCdNotificationsAction } from "@/app/assistencia/notifications-actions";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { cdSignOut } from "@/app/assistencia/cd-actions";
@@ -113,6 +115,9 @@ export default async function EncomendasQueuePage({
 
       <AssistenciaHeader title="Fila de encomendas" subtitle={`${actor.name} · ${ROLE_LABELS[actor.role] ?? actor.role}`}>
         <div className="flex items-center gap-4">
+          {actor.role === "cd" || actor.role === "fabrica" ? (
+            <NotificationBell fetchAction={listFabricaOuCdNotificationsAction} storageKey={`${actor.role}-${actor.fabricaId ?? ""}`} />
+          ) : null}
           {actor.role === "cd" || actor.role === "fabrica" ? (
             <Link href="/assistencia/encomendas/solicitar" className="text-sm underline" style={{ color: "var(--brand-green)" }}>
               + Novo pedido
