@@ -167,7 +167,7 @@ export async function driverCompleteRequest(
     throw new Error("Esse chamado já foi encerrado.");
   }
 
-  const { error: updateError } = await admin
+  const { data: updated, error: updateError } = await admin
     .from("service_requests")
     .update({
       status: "concluida",
@@ -176,8 +176,12 @@ export async function driverCompleteRequest(
       delivery_rating: validRating(deliveryRating),
       resolution_rating: validRating(resolutionRating),
     })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("status", request.status)
+    .select("id")
+    .maybeSingle();
   if (updateError) throw new Error(updateError.message);
+  if (!updated) throw new Error("Esse chamado já foi atualizado por outra pessoa. Recarregue a página e tente de novo.");
 
   const ratingNote =
     deliveryRating !== null || resolutionRating !== null
@@ -225,8 +229,15 @@ export async function driverReportIssue(requestId: string, reason: string): Prom
     throw new Error("Esse chamado já foi encerrado.");
   }
 
-  const { error: updateError } = await admin.from("service_requests").update({ status: "remarcar" }).eq("id", requestId);
+  const { data: updated, error: updateError } = await admin
+    .from("service_requests")
+    .update({ status: "remarcar" })
+    .eq("id", requestId)
+    .eq("status", request.status)
+    .select("id")
+    .maybeSingle();
   if (updateError) throw new Error(updateError.message);
+  if (!updated) throw new Error("Esse chamado já foi atualizado por outra pessoa. Recarregue a página e tente de novo.");
 
   const note = `${driverName} (motorista) não conseguiu concluir a rota: ${trimmed}`;
   await admin.from("service_request_events").insert({

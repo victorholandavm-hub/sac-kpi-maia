@@ -26,12 +26,17 @@ export const DATE_BUCKET_DEFAULT_OPEN: Record<DateBucketKey, boolean> = {
   sem_data: false,
 };
 
+// América/Fortaleza (João Pessoa), UTC-3, sem horário de verão -- mesmo fuso
+// de kpi.ts/formatDateTime.ts. Sem isso, "hoje" era calculado no fuso do
+// processo Node (a VPS roda em UTC, ver formatDateTime.ts), adiantando a
+// virada do dia em 3h: das 21h às 23h59 em Brasília, chamados de hoje
+// apareciam em "Atrasado" porque pro processo já era o dia seguinte.
+const BUSINESS_TZ_OFFSET_MS = -3 * 60 * 60 * 1000;
+
 export function bucketByScheduledDate(dateStr: string | null | undefined): DateBucketKey {
   if (!dateStr) return "sem_data";
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(`${dateStr}T00:00:00`);
-  const diffDays = Math.round((target.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  const todayStr = new Date(Date.now() + BUSINESS_TZ_OFFSET_MS).toISOString().slice(0, 10);
+  const diffDays = Math.round((Date.parse(`${dateStr}T00:00:00Z`) - Date.parse(`${todayStr}T00:00:00Z`)) / (24 * 60 * 60 * 1000));
   if (diffDays < 0) return "atrasado";
   if (diffDays === 0) return "hoje";
   if (diffDays === 1) return "amanha";

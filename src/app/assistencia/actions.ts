@@ -638,11 +638,15 @@ export async function cancelServiceRequestByGerente(requestId: string, note: str
     throw new Error("Essa solicitação não pode mais ser cancelada por aqui — a assistência já começou a atender.");
   }
 
-  const { error } = await admin
+  const { data: updated, error } = await admin
     .from("service_requests")
     .update({ status: "cancelada", completed_at: new Date().toISOString() })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("status", "aberta")
+    .select("id")
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!updated) throw new Error("Essa solicitação já foi atualizada por outra pessoa. Recarregue a página e tente de novo.");
 
   await admin.from("service_request_events").insert({
     request_id: requestId,
@@ -670,17 +674,21 @@ export async function approveDeadline(requestId: string) {
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("requested_deadline, type, store_id")
+    .select("requested_deadline, type, store_id, deadline_status")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
   requireManageAccess(profile, current.type);
 
-  const { error } = await admin
+  const { data: updated, error } = await admin
     .from("service_requests")
     .update({ deadline_status: "aprovado", approved_deadline: current.requested_deadline })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("deadline_status", current.deadline_status)
+    .select("id")
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!updated) throw new Error("O prazo dessa solicitação já foi decidido por outra pessoa. Recarregue a página e tente de novo.");
 
   const note = current.requested_deadline ? `Prazo aprovado: ${current.requested_deadline}` : null;
   await admin.from("service_request_events").insert({
@@ -709,17 +717,21 @@ export async function rejectDeadline(requestId: string, newDate: string) {
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("type, store_id")
+    .select("type, store_id, deadline_status")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
   requireManageAccess(profile, current.type);
 
-  const { error } = await admin
+  const { data: updated, error } = await admin
     .from("service_requests")
     .update({ deadline_status: "recusado", approved_deadline: newDate })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("deadline_status", current.deadline_status)
+    .select("id")
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!updated) throw new Error("O prazo dessa solicitação já foi decidido por outra pessoa. Recarregue a página e tente de novo.");
 
   const note = `Nova data proposta: ${newDate}`;
   await admin.from("service_request_events").insert({
@@ -755,11 +767,15 @@ export async function claimRequest(requestId: string) {
 
   const nextStatus = current.status === "aberta" ? "em_contato" : current.status;
 
-  const { error } = await admin
+  const { data: updated, error } = await admin
     .from("service_requests")
     .update({ assigned_to: profile.id, status: nextStatus })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("status", current.status)
+    .select("id")
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!updated) throw new Error("Essa solicitação já foi atualizada por outra pessoa. Recarregue a página e tente de novo.");
 
   type RequestEvent = {
     request_id: string;
@@ -814,11 +830,15 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
 
   const completedAt = newStatus === "concluida" || newStatus === "cancelada" ? new Date().toISOString() : null;
 
-  const { error } = await admin
+  const { data: updated, error } = await admin
     .from("service_requests")
     .update({ status: newStatus, completed_at: completedAt })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("status", current.status)
+    .select("id")
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!updated) throw new Error("Essa solicitação já foi atualizada por outra pessoa. Recarregue a página e tente de novo.");
 
   await admin.from("service_request_events").insert({
     request_id: requestId,
