@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireEncomendaActor } from "@/lib/encomendaAuth";
-import { getPedidoDetail } from "@/lib/pedidosEncomenda";
+import { getPedidoDetail, PEDIDO_UNDO_WINDOW_MS, type PedidoEncomendaEvent } from "@/lib/pedidosEncomenda";
 import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
 import { PedidoEncomendaActions } from "@/components/assistencia/PedidoEncomendaActions";
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
@@ -12,6 +12,25 @@ import { FormSection } from "@/components/assistencia/FormSection";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 
 export const dynamic = "force-dynamic";
+
+// Só oferece "desfazer" quando a última mudança do pedido ainda é a atual
+// (ninguém mexeu depois), foi uma troca de status pura (não carga/NF-e) e
+// dentro da janela de tempo -- mesma checagem que o servidor refaz de
+// verdade em undoLastPedidoStatusChange, isso aqui só evita mostrar um
+// botão que vai dar erro. Função à parte (não direto no componente) porque
+// Date.now() é impuro -- mesmo padrão de timeAgo em admin/page.tsx.
+function undoTargetFor(
+  lastEvent: PedidoEncomendaEvent | null,
+  currentStatus: string,
+  actorRole: string
+): string | null {
+  if (!lastEvent || lastEvent.eventType !== "status_changed" || !lastEvent.fromStatus) return null;
+  if (lastEvent.toStatus !== currentStatus) return null;
+  if (Date.now() - new Date(lastEvent.createdAt).getTime() > PEDIDO_UNDO_WINDOW_MS) return null;
+  const isSupervisor = actorRole === "admin" || actorRole === "assistencia";
+  if (!isSupervisor && lastEvent.actorRole !== actorRole) return null;
+  return lastEvent.fromStatus;
+}
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -47,6 +66,9 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
   const externo = pedido.fornecedorTipo === "fabrica_externa";
   const matchesFabrica = actor.role !== "fabrica" || actor.fabricaId == null || actor.fabricaId === pedido.fabricaId;
   const fornecedorLabel = externo ? `Externo: ${pedido.fornecedorExterno}` : pedido.fabricaNome;
+
+  const lastEvent = events.length > 0 ? events[events.length - 1] : null;
+  const undoTarget = undoTargetFor(lastEvent, pedido.status, actor.role);
 
   return (
     <ToastProvider>
@@ -90,27 +112,6 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         </div>
       </FormSection>
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <PedidoPrazoField
-          pedidoId={pedido.id}
-          field="fabrica_cd"
-          label="Prazo fábrica → CD"
-          value={pedido.prazoFabricaCd}
-          canEdit={
-            actor.role === "admin" ||
-            actor.role === "assistencia" ||
-            (externo ? actor.role === "cd" : actor.role === "fabrica" && matchesFabrica)
-          }
-        />
-        <PedidoPrazoField
-          pedidoId={pedido.id}
-          field="cd_loja"
-          label="Prazo CD → loja"
-          value={pedido.prazoCdLoja}
-          canEdit={actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia"}
-        />
-      </div>
-
       {photos.length > 0 ? (
         <FormSection title="Cupom fiscal">
           <div className="flex flex-wrap gap-2">
@@ -135,7 +136,29 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         fabricaId={pedido.fabricaId}
         fornecedorExterno={pedido.fornecedorExterno}
         matchesFabrica={matchesFabrica}
-      />
+        undoTarget={undoTarget}
+      >
+        <div className="grid sm:grid-cols-2 gap-4">
+          <PedidoPrazoField
+            pedidoId={pedido.id}
+            field="fabrica_cd"
+            label="Prazo fábrica → CD"
+            value={pedido.prazoFabricaCd}
+            canEdit={
+              actor.role === "admin" ||
+              actor.role === "assistencia" ||
+              (externo ? actor.role === "cd" : actor.role === "fabrica" && matchesFabrica)
+            }
+          />
+          <PedidoPrazoField
+            pedidoId={pedido.id}
+            field="cd_loja"
+            label="Prazo CD → loja"
+            value={pedido.prazoCdLoja}
+            canEdit={actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia"}
+          />
+        </div>
+      </PedidoEncomendaActions>
 
       <FormSection title="Histórico">
         <PedidoEncomendaTimeline events={events} />

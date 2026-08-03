@@ -520,6 +520,12 @@ export async function updatePedidoStatus(
   }
 }
 
+// Janela pra desfazer a última mudança de status por engano (ver
+// undoLastPedidoStatusChange) -- curta de propósito: depois disso, outra
+// etapa do fluxo pode já ter reagido à mudança (CD viu o pedido pronto,
+// definiu prazo etc.), e desfazer vira mais confuso que ajuda.
+export const PEDIDO_UNDO_WINDOW_MS = 10 * 60 * 1000;
+
 // Correção de fornecedor errado (ex.: pedido lançado pra Beds/Aiam Estofados
 // quando devia ser Colchões, ou fábrica própria quando devia ser fornecedor
 // externo) -- só enquanto "solicitado", antes de qualquer fábrica começar a
@@ -588,6 +594,77 @@ export async function updatePedidoFornecedor(
       message: note,
       link,
     });
+  }
+}
+
+// Desfaz a última mudança de status por engano (ex.: fábrica clicou "Marcar
+// em produção" sem querer). Só a MUDANÇA MAIS RECENTE do pedido, e só se:
+// (1) foi uma troca de status "pura" (event_type "status_changed" -- carga
+// informada / NF-e informada ficam de fora porque desfazer precisaria
+// limpar esses campos também, mais risco que valor); (2) ninguém mais mexeu
+// no pedido depois (o status atual ainda é o "to_status" desse evento); (3)
+// dentro da janela de PEDIDO_UNDO_WINDOW_MS; (4) quem está desfazendo é do
+// mesmo papel de quem fez a mudança (fábrica desfaz fábrica, CD desfaz CD),
+// ou admin/assistência por supervisão. Quem pode chamar isso é decidido em
+// undoLastPedidoStatusChangeAction (encomendas-actions.ts) -- aqui só executa.
+export async function undoLastPedidoStatusChange(id: string, actor: { name: string; role: string }): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  const { data: pedido, error: fetchError } = await admin
+    .from("pedidos_encomenda")
+    .select("status, pedido_number, store_id, fornecedor_tipo, fabrica_id")
+    .eq("id", id)
+    .single();
+  if (fetchError || !pedido) throw new Error("Pedido não encontrado.");
+
+  const { data: lastEvent, error: eventError } = await admin
+    .from("pedido_encomenda_events")
+    .select("event_type, actor_role, from_status, to_status, created_at")
+    .eq("pedido_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (eventError || !lastEvent) throw new Error("Nada pra desfazer nesse pedido.");
+
+  const isSupervisor = actor.role === "admin" || actor.role === "assistencia";
+  if (lastEvent.event_type !== "status_changed" || (!isSupervisor && lastEvent.actor_role !== actor.role)) {
+    throw new Error("Só dá pra desfazer a última mudança de status, e só quem fez ela (ou admin/assistência).");
+  }
+  if (!lastEvent.from_status || lastEvent.to_status !== pedido.status) {
+    throw new Error("Esse pedido já mudou de novo depois dessa etapa -- não dá mais pra desfazer.");
+  }
+  if (Date.now() - new Date(lastEvent.created_at).getTime() > PEDIDO_UNDO_WINDOW_MS) {
+    throw new Error(`Já passou o tempo de desfazer essa mudança (${PEDIDO_UNDO_WINDOW_MS / 60000} minutos).`);
+  }
+
+  const { data, error } = await admin
+    .from("pedidos_encomenda")
+    .update({ status: lastEvent.from_status })
+    .eq("id", id)
+    .eq("status", pedido.status)
+    .select("id, pedido_number, store_id, fabrica_id, fornecedor_tipo")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) {
+    throw new Error("Esse pedido já foi atualizado por outra pessoa. Recarregue a página e tente de novo.");
+  }
+
+  await admin.from("pedido_encomenda_events").insert({
+    pedido_id: id,
+    actor_name: actor.name,
+    actor_role: actor.role,
+    event_type: "status_changed",
+    from_status: pedido.status,
+    to_status: lastEvent.from_status,
+    note: "Desfeito: mudança de status revertida por engano.",
+  });
+
+  const link = `/assistencia/encomendas/fila/${id}`;
+  const statusLabel = PEDIDO_ENCOMENDA_STATUS_LABELS[lastEvent.from_status as PedidoEncomendaStatus] ?? lastEvent.from_status;
+  const title = `Pedido #${data.pedido_number}: voltou pra "${statusLabel}"`;
+  await notifyLoja(data.store_id, { type: "status_changed", title, link });
+  if (data.fornecedor_tipo === "fabrica_interna" && data.fabrica_id) {
+    await notifyFabrica(data.fabrica_id, { type: "status_changed", title, link });
   }
 }
 

@@ -8,6 +8,7 @@ import {
   addPedidoNoteAction,
   searchNfSuggestions,
   updatePedidoFornecedorAction,
+  undoLastPedidoStatusChangeAction,
 } from "@/app/assistencia/encomendas-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PEDIDO_ENCOMENDA_STATUS_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
@@ -66,6 +67,8 @@ export function PedidoEncomendaActions({
   fabricaId,
   fornecedorExterno,
   matchesFabrica,
+  undoTarget,
+  children,
 }: {
   pedidoId: string;
   status: string;
@@ -77,6 +80,11 @@ export function PedidoEncomendaActions({
   fabricaId: string | null;
   fornecedorExterno: string | null;
   matchesFabrica: boolean;
+  // Status pra onde volta se desfizer a última mudança -- já vem calculado
+  // do servidor (checou papel, janela de tempo e se ninguém mexeu depois,
+  // ver undoLastPedidoStatusChange). null = não tem o que desfazer agora.
+  undoTarget: string | null;
+  children?: React.ReactNode;
 }) {
   const { pending, run } = useQuickAction();
   const [carga, setCarga] = useState("");
@@ -123,6 +131,8 @@ export function PedidoEncomendaActions({
 
   return (
     <FormSection title="Ações">
+      {children}
+
       {nextStep && nextStep.needsPrazoFabricaCd && !prazoFabricaCd ? (
         <p className="text-xs font-medium" style={{ color: "var(--status-warning)" }}>
           Defina o &ldquo;Prazo fábrica → CD&rdquo; acima antes de avançar.
@@ -198,6 +208,22 @@ export function PedidoEncomendaActions({
             : "Nenhuma ação disponível para o seu papel neste momento."}
         </p>
       )}
+
+      {undoTarget ? (
+        <button
+          disabled={pending}
+          onClick={() =>
+            run(
+              () => undoLastPedidoStatusChangeAction(pedidoId),
+              `Desfeito — voltou pra "${PEDIDO_ENCOMENDA_STATUS_LABELS[undoTarget] ?? undoTarget}".`
+            )
+          }
+          className="text-xs rounded px-2 py-1 self-start border disabled:opacity-60"
+          style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+        >
+          ↺ Desfazer (voltar pra &ldquo;{PEDIDO_ENCOMENDA_STATUS_LABELS[undoTarget] ?? undoTarget}&rdquo;)
+        </button>
+      ) : null}
 
       {canDeny ? (
         showDeny ? (

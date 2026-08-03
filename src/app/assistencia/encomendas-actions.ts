@@ -13,6 +13,7 @@ import {
   updatePedidoStatus,
   updatePedidoEncomendaContent,
   updatePedidoFornecedor,
+  undoLastPedidoStatusChange,
   addPedidoNote,
   setPedidoPrazoEtapa,
   isPedidoEncomendaStatus,
@@ -440,6 +441,19 @@ export async function updatePedidoFornecedorAction(
   }
 
   await updatePedidoFornecedor(pedidoId, actor, { fornecedorTipo, fabricaId, fornecedorExterno });
+
+  revalidatePath("/assistencia/encomendas/fila");
+  revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
+  revalidatePath("/assistencia/encomendas/caixa");
+}
+
+// Desfaz a última mudança de status por engano -- quem pode chamar (mesmo
+// papel de quem fez a mudança, ou admin/assistência) e a janela de tempo já
+// são validados em undoLastPedidoStatusChange (pedidosEncomenda.ts); aqui só
+// resolve o actor e revalida as telas.
+export async function undoLastPedidoStatusChangeAction(pedidoId: string): Promise<void> {
+  const actor = await requireEncomendaActor();
+  await undoLastPedidoStatusChange(pedidoId, actor);
 
   revalidatePath("/assistencia/encomendas/fila");
   revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
