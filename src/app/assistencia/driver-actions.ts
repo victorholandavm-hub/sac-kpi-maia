@@ -104,6 +104,32 @@ export async function driverDeletePhoto(photoId: string): Promise<void> {
   revalidatePath("/assistencia/motorista");
 }
 
+// Motorista organiza a própria lista do dia na ordem que quiser (ex.: seguir
+// por bairro) -- recebe a lista já reordenada (o cliente reordena local,
+// otimista) e só grava um driver_order sequencial pra cada id, na ordem
+// recebida. Confere que todo id é realmente do motorista logado antes de
+// gravar, senão daria pra um motorista mexer na ordem de chamado alheio.
+export async function setDriverOrderAction(requestIds: string[]): Promise<void> {
+  const driverName = await getDriverSession();
+  if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
+  if (requestIds.length === 0) return;
+
+  const admin = getSupabaseAdmin();
+  const { data: owned, error } = await admin.from("service_requests").select("id").in("id", requestIds).eq("driver_name", driverName);
+  if (error) throw new Error(error.message);
+  if (!owned || owned.length !== requestIds.length) {
+    throw new Error("Um ou mais chamados não são seus.");
+  }
+
+  const results = await Promise.all(
+    requestIds.map((id, index) => admin.from("service_requests").update({ driver_order: index + 1 }).eq("id", id))
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(failed.error.message);
+
+  revalidatePath("/assistencia/motorista");
+}
+
 // Recolhimento e entrega são pernas independentes da mesma rota — marcar uma
 // não conclui a outra. Só quando as duas estão feitas o motorista consegue
 // (ou o sistema deveria) considerar o chamado encerrado.

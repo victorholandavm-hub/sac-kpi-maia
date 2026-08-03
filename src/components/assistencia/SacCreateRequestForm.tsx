@@ -285,12 +285,12 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
           </Field>
         ) : null}
 
-        <Field label="Foto (opcional)">
+        <Field label="Foto ou PDF da notificação *">
           <input
             name="photo"
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-            capture="environment"
+            required
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
             className="rounded border px-3 py-2 text-sm"
             style={inputStyle}
           />

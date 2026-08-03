@@ -45,13 +45,23 @@ export function PhotoGallery({
       {photos.map((p) => (
         <div key={p.id} className="flex flex-col items-center gap-1" style={{ width: "5rem" }}>
           <a href={p.url} target="_blank" rel="noopener noreferrer" title={p.uploadedBy ?? undefined}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={p.url}
-              alt={p.caption || (p.uploadedBy ? `Foto de ${p.uploadedBy}` : "Foto do chamado")}
-              className="w-20 h-20 object-cover rounded border"
-              style={{ borderColor: "var(--border)" }}
-            />
+            {p.isPdf ? (
+              <div
+                className="w-20 h-20 rounded border flex flex-col items-center justify-center gap-1 text-xs font-semibold"
+                style={{ borderColor: "var(--border)", color: "var(--status-critical)", background: "var(--surface-1)" }}
+              >
+                <span className="text-2xl">📄</span>
+                PDF
+              </div>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={p.url}
+                alt={p.caption || (p.uploadedBy ? `Foto de ${p.uploadedBy}` : "Foto do chamado")}
+                className="w-20 h-20 object-cover rounded border"
+                style={{ borderColor: "var(--border)" }}
+              />
+            )}
           </a>
           {p.caption ? (
             <span className="text-[10px] text-center truncate w-full" style={{ color: "var(--text-muted)" }} title={p.caption}>

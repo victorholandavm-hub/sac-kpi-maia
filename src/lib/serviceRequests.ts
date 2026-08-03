@@ -662,11 +662,13 @@ export type DriverRequestView = {
   createdAt: string;
   completedAt: string | null;
   rota: Rota | null;
+  rotaExceptionNote: string | null;
+  driverOrder: number | null;
 };
 
 const DRIVER_VIEW_LIMIT = 200;
 const DRIVER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, stores(name), items:service_request_items(product)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, stores(name), items:service_request_items(product)";
 
 type DriverViewRow = {
   id: string;
@@ -688,6 +690,8 @@ type DriverViewRow = {
   created_at: string;
   completed_at: string | null;
   rota: Rota | null;
+  rota_exception_note: string | null;
+  driver_order: number | null;
   stores: { name: string } | null;
   items: { product: string }[] | null;
 };
@@ -715,6 +719,8 @@ function toDriverView(row: DriverViewRow): DriverRequestView {
     createdAt: row.created_at,
     completedAt: row.completed_at,
     rota: row.rota,
+    rotaExceptionNote: row.rota_exception_note,
+    driverOrder: row.driver_order,
   };
 }
 
@@ -731,8 +737,12 @@ export async function listRequestsForDriver(
   if (opts.onlyCompleted) {
     query = query.eq("status", "concluida").order("completed_at", { ascending: false });
   } else {
+    // driver_order primeiro -- o motorista pode reorganizar a própria lista
+    // (ver setDriverOrderAction, driver-actions.ts); quem ainda não foi
+    // reorganizado (null) cai pro final e usa a ordem padrão por horário.
     query = query
       .not("status", "in", "(concluida,cancelada)")
+      .order("driver_order", { ascending: true, nullsFirst: false })
       .order("scheduled_date", { ascending: true, nullsFirst: false })
       .order("scheduled_time", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true });

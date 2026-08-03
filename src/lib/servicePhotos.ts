@@ -13,11 +13,13 @@ const ALLOWED_TYPES: Record<string, string> = {
   "image/webp": "webp",
   "image/heic": "heic",
   "image/heif": "heif",
+  "application/pdf": "pdf",
 };
 
 export type RequestPhoto = {
   id: string;
   url: string;
+  isPdf: boolean;
   uploadedBy: string | null;
   caption: string | null;
   createdAt: string;
@@ -39,6 +41,7 @@ export async function listRequestPhotos(requestId: string): Promise<RequestPhoto
       return {
         id: row.id as string,
         url: signed?.signedUrl ?? "",
+        isPdf: (row.storage_path as string).toLowerCase().endsWith(".pdf"),
         uploadedBy: row.uploaded_by as string | null,
         caption: row.caption as string | null,
         createdAt: row.created_at as string,
@@ -55,7 +58,7 @@ export async function saveRequestPhoto(opts: {
 }): Promise<void> {
   const ext = ALLOWED_TYPES[opts.file.type];
   if (!ext) {
-    throw new Error("Formato de imagem não suportado. Envie uma foto em JPEG, PNG, WEBP ou HEIC.");
+    throw new Error("Formato não suportado. Envie uma foto (JPEG, PNG, WEBP ou HEIC) ou um PDF.");
   }
   if (opts.file.size > MAX_FILE_SIZE_BYTES) {
     throw new Error("A foto é grande demais (máximo 10 MB).");

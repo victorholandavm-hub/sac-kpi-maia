@@ -1355,6 +1355,11 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) return { error: "Informe o motivo." };
 
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) {
+    return { error: "Anexe uma foto ou PDF da notificação." };
+  }
+
   const driverNameInput = emptyToNull(formData.get("driver_name"));
   const product = emptyToNull(formData.get("product"));
   const partCode = emptyToNull(formData.get("part_code"));
@@ -1386,7 +1391,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       // Criado direto pelo SAC, não pela loja — não há prazo pra aprovar.
       deadline_status: "aprovado",
     })
-    .select("id")
+    .select("id, ticket_number")
     .single();
 
   if (error || !data) {
@@ -1401,7 +1406,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       quantity,
     });
     if (itemError) {
-      return { error: `Solicitação criada, mas falhou ao salvar o item: ${itemError.message}` };
+      return { error: `Solicitação #${data.ticket_number} criada, mas falhou ao salvar o item: ${itemError.message}` };
     }
   }
 
@@ -1421,14 +1426,15 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     to_status: "aberta",
   });
 
-  const photo = formData.get("photo");
-  if (photo instanceof File && photo.size > 0) {
-    try {
-      await saveRequestPhoto({ requestId: data.id, file: photo, uploadedBy: profile.fullName });
-    } catch (err) {
-      // Solicitação já foi criada — não bloqueia o fluxo por causa da foto.
-      console.error("Falha ao salvar foto da solicitação de SAC:", err);
-    }
+  try {
+    await saveRequestPhoto({ requestId: data.id, file: photo, uploadedBy: profile.fullName });
+  } catch (err) {
+    // Solicitação já foi criada -- não dá pra desfazer por causa do anexo,
+    // mas como agora é obrigatório, avisa claramente em vez de sumir com o
+    // erro (era só console.error antes, quando o anexo era opcional).
+    return {
+      error: `Solicitação #${data.ticket_number} criada, mas o anexo não pôde ser salvo: ${err instanceof Error ? err.message : "erro desconhecido"}. Abra a solicitação e anexe de novo.`,
+    };
   }
 
   revalidatePath("/assistencia/sac");

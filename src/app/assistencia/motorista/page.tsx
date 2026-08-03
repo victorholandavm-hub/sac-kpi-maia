@@ -2,9 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDriverSession, driverSignOut } from "@/app/assistencia/driver-actions";
 import { listRequestsForDriver, type DriverRequestView } from "@/lib/serviceRequests";
-import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
-import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { DriverRouteGroup } from "@/components/assistencia/DriverRouteGroup";
 import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, DATE_BUCKET_DEFAULT_OPEN, groupByDateBucket } from "@/lib/dateBuckets";
 import { ROTAS, ROTA_LABELS, type Rota } from "@/lib/rotas";
 
@@ -28,66 +27,6 @@ function groupByRota(items: DriverRequestView[]): Map<RotaGroupKey, DriverReques
 }
 
 export const dynamic = "force-dynamic";
-
-function formatDateOnly(value: string | null): string | null {
-  if (!value) return null;
-  const [y, m, d] = value.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-function RequestRow({ r, showCompleted }: { r: DriverRequestView; showCompleted: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-3 p-4 flex-wrap">
-      <div className="flex flex-col gap-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-            #{r.ticketNumber}
-          </span>
-          <StatusBadge status={r.status} />
-          {r.shift === "urgencia" ? (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ color: "#fff", background: "var(--status-critical)" }}>
-              Urgente!
-            </span>
-          ) : null}
-          {!showCompleted && !r.pickupCompleted ? (
-            <span
-              className="text-xs font-medium px-2 py-0.5 rounded-full"
-              style={{ color: "var(--brand-orange)", border: "1px solid var(--brand-orange)" }}
-            >
-              Recolher produto
-            </span>
-          ) : null}
-        </div>
-        <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
-          {r.clientName ?? "Sem nome de cliente"}
-        </p>
-        {r.productSummary ? (
-          <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-            {r.productSummary}
-          </p>
-        ) : null}
-        {r.scheduledDate ? (
-          <p className="text-xs font-medium" style={{ color: "var(--brand-green)" }}>
-            {formatDateOnly(r.scheduledDate)}
-            {r.scheduledTime ? ` às ${r.scheduledTime.slice(0, 5)}` : ""}
-            {r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
-          </p>
-        ) : (r.approvedDeadline ?? r.requestedDeadline) ? (
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Prazo: {formatDateOnly(r.approvedDeadline ?? r.requestedDeadline)}
-          </p>
-        ) : null}
-      </div>
-      <Link
-        href={`/assistencia/motorista/${r.id}`}
-        className="text-sm rounded-lg px-3 py-2 font-medium shrink-0"
-        style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-      >
-        Ver rota
-      </Link>
-    </div>
-  );
-}
 
 export default async function MotoristaHomePage({
   searchParams,
@@ -166,13 +105,7 @@ export default async function MotoristaHomePage({
                         Rota: {ROTA_GROUP_LABELS[rotaKey]} ({rotaGroups.get(rotaKey)!.length})
                       </p>
                     ) : null}
-                    <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-                      <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                        {rotaGroups.get(rotaKey)!.map((r) => (
-                          <RequestRow key={r.id} r={r} showCompleted={showCompleted} />
-                        ))}
-                      </div>
-                    </div>
+                    <DriverRouteGroup items={rotaGroups.get(rotaKey)!} showCompleted={showCompleted} reorderable />
                   </div>
                 ))}
               </div>
@@ -180,13 +113,7 @@ export default async function MotoristaHomePage({
           );
         })
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-            {requests.map((r) => (
-              <RequestRow key={r.id} r={r} showCompleted={showCompleted} />
-            ))}
-          </div>
-        </div>
+        <DriverRouteGroup items={requests} showCompleted={showCompleted} reorderable={false} />
       )}
     </div>
   );
