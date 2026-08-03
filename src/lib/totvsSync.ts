@@ -206,16 +206,34 @@ function getTotvs(url: string): Promise<{ status: number; body: string }> {
   });
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// 503 no /rest/orders é quase sempre disputa da licença única da API do
+// Protheus (confirmado com a TI em 2026-08-03: só existe 1 licença, e várias
+// pessoas usando o Protheus ao mesmo tempo derrubam a nossa chamada) --
+// retry imediato batia direto na mesma disputa. Backoff crescente (5s, 10s)
+// em vez de tentar de novo na hora, dando tempo da licença liberar.
+const RETRY_DELAYS_MS = [5_000, 10_000];
+const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
+
 async function fetchTotvs<T>(url: string, attempt = 1): Promise<T> {
   let res: { status: number; body: string };
   try {
     res = await getTotvs(url);
   } catch (err) {
-    if (attempt < 2) return fetchTotvs<T>(url, attempt + 1);
+    if (attempt < MAX_ATTEMPTS) {
+      await delay(RETRY_DELAYS_MS[attempt - 1]);
+      return fetchTotvs<T>(url, attempt + 1);
+    }
     throw err;
   }
   if (res.status < 200 || res.status >= 300) {
-    if (res.status >= 500 && attempt < 2) return fetchTotvs<T>(url, attempt + 1);
+    if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
+      await delay(RETRY_DELAYS_MS[attempt - 1]);
+      return fetchTotvs<T>(url, attempt + 1);
+    }
     throw new Error(`${res.status} ${url}: ${res.body.slice(0, 200)}`);
   }
   return JSON.parse(res.body) as T;
