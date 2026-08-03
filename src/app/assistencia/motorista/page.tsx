@@ -6,6 +6,26 @@ import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, DATE_BUCKET_DEFAULT_OPEN, groupByDateBucket } from "@/lib/dateBuckets";
+import { ROTAS, ROTA_LABELS, type Rota } from "@/lib/rotas";
+
+// Dentro de cada dia, sub-agrupa por rota -- pedido do usuário depois de
+// perceber que várias entregas do mesmo dia/rota apareciam soltas, uma
+// embaixo da outra, sem nada juntando visualmente quem é do mesmo trajeto.
+const NO_ROTA = "sem_rota" as const;
+type RotaGroupKey = Rota | typeof NO_ROTA;
+const ROTA_GROUP_ORDER: RotaGroupKey[] = [...ROTAS, NO_ROTA];
+const ROTA_GROUP_LABELS: Record<RotaGroupKey, string> = { ...ROTA_LABELS, [NO_ROTA]: "Sem rota definida" };
+
+function groupByRota(items: DriverRequestView[]): Map<RotaGroupKey, DriverRequestView[]> {
+  const groups = new Map<RotaGroupKey, DriverRequestView[]>();
+  for (const item of items) {
+    const key = item.rota ?? NO_ROTA;
+    const list = groups.get(key) ?? [];
+    list.push(item);
+    groups.set(key, list);
+  }
+  return groups;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -129,20 +149,36 @@ export default async function MotoristaHomePage({
           </p>
         </div>
       ) : buckets ? (
-        DATE_BUCKET_ORDER.filter((key) => (buckets.get(key)?.length ?? 0) > 0).map((key) => (
-          <details key={key} open={DATE_BUCKET_DEFAULT_OPEN[key]}>
-            <summary className="text-base font-bold cursor-pointer py-1" style={{ color: "var(--brand-green)" }}>
-              {DATE_BUCKET_LABELS[key]} ({buckets.get(key)!.length})
-            </summary>
-            <div className="rounded-lg border overflow-hidden mt-2" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-              <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {buckets.get(key)!.map((r) => (
-                  <RequestRow key={r.id} r={r} showCompleted={showCompleted} />
+        DATE_BUCKET_ORDER.filter((key) => (buckets.get(key)?.length ?? 0) > 0).map((key) => {
+          const rotaGroups = groupByRota(buckets.get(key)!);
+          return (
+            <details key={key} open={DATE_BUCKET_DEFAULT_OPEN[key]}>
+              <summary className="text-base font-bold cursor-pointer py-1" style={{ color: "var(--brand-green)" }}>
+                {DATE_BUCKET_LABELS[key]} ({buckets.get(key)!.length})
+              </summary>
+              <div className="flex flex-col gap-3 mt-2">
+                {ROTA_GROUP_ORDER.filter((rotaKey) => (rotaGroups.get(rotaKey)?.length ?? 0) > 0).map((rotaKey) => (
+                  <div key={rotaKey}>
+                    {/* Só vale a pena rotular quando dá pra diferenciar de outro grupo no mesmo dia -- uma rota
+                        sozinha no dia não precisa de rótulo repetindo o óbvio. */}
+                    {rotaGroups.size > 1 ? (
+                      <p className="text-xs font-semibold uppercase tracking-wide px-1 pb-1" style={{ color: "var(--text-secondary)" }}>
+                        Rota: {ROTA_GROUP_LABELS[rotaKey]} ({rotaGroups.get(rotaKey)!.length})
+                      </p>
+                    ) : null}
+                    <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+                      <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                        {rotaGroups.get(rotaKey)!.map((r) => (
+                          <RequestRow key={r.id} r={r} showCompleted={showCompleted} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-          </details>
-        ))
+            </details>
+          );
+        })
       ) : (
         <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>

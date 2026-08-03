@@ -78,7 +78,10 @@ falha de infraestrutura do Supabase). Rotas de cron precisam estar excluídas do
   pra trocar a senha do `maia-api` (idealmente sem exigir troca no próximo acesso, já que é uma
   conta sem interface) e atualizar `TOTVS_BASIC_AUTH_PASSWORD` em `.env.totvs-script` na máquina
   que roda o sync agendado. Dá pra ver o status de cada sincronização (TOTVS/GHL/backup) na tela
-  `/assistencia/admin`, seção "Sincronizações" — não precisa mais achar isso por acaso.
+  `/assistencia/admin`, seção "Sincronizações" — não precisa mais achar isso por acaso. TI
+  confirmou em 2026-08-03 que dá pra configurar a conta `maia-api` pra não expirar
+  periodicamente — foi um evento único (ligado à mudança da reforma tributária), não uma
+  política recorrente de X em X meses.
 
 ## Estado atual / pendências
 
