@@ -70,9 +70,21 @@ export function NovoPedidoEncomendaForm({
   const [productLookupStatus, setProductLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
   const [fornecedorTipo, setFornecedorTipo] = useState<"fabrica_interna" | "fabrica_externa">("fabrica_interna");
   const [fabricaId, setFabricaId] = useState<string>(INTERNAL_FABRICAS[0].id);
+  const [fornecedorExterno, setFornecedorExterno] = useState("");
+  // Enquanto a pessoa não mexe manualmente no fornecedor, a detecção
+  // automática (abaixo) pode ajustar sozinha -- assim que ela escolhe algo
+  // com a própria mão, para de sobrescrever (senão um segundo item com
+  // fabricante diferente troca o fornecedor de novo sem avisar direito).
+  const [fornecedorTouched, setFornecedorTouched] = useState(false);
+  const [autoDetectedNote, setAutoDetectedNote] = useState<string | null>(null);
 
   // Busca ao sair do campo (não debounced) -- pega o código do produto e
-  // preenche a descrição, mesma ideia do código de cliente acima.
+  // preenche a descrição, mesma ideia do código de cliente acima. Também
+  // aproveita o fabricante que já vem nessa busca (match.manufacturer,
+  // puxado do histórico de vendas do TOTVS) pra evitar o erro mais comum
+  // nessa tela: caixa deixa marcado "fábrica interna" (valor padrão) sem
+  // perceber que o produto é de um fornecedor externo conhecido (Tekshine,
+  // Probel etc, ver EXTERNAL_FABRICAS) -- se bater, troca sozinho e avisa.
   function lookupItemProduct(index: number, code: string) {
     if (!code.trim()) {
       setProductLookupStatus((prev) => ({ ...prev, [index]: "idle" }));
@@ -87,8 +99,24 @@ export function NovoPedidoEncomendaForm({
         }
         updateItem(index, { produtoDescricao: match.description! });
         setProductLookupStatus((prev) => ({ ...prev, [index]: "found" }));
+
+        if (match.manufacturer && allowExternal && !fornecedorTouched) {
+          const detected = EXTERNAL_FABRICAS.find((f) => f.toLowerCase() === match.manufacturer!.trim().toLowerCase());
+          if (detected) {
+            setFornecedorTipo("fabrica_externa");
+            setFornecedorExterno(detected);
+            setAutoDetectedNote(
+              `Esse produto é da ${detected} (fornecedor externo) -- ajustamos o fornecedor automaticamente. Confira antes de enviar.`
+            );
+          }
+        }
       })
       .catch(() => setProductLookupStatus((prev) => ({ ...prev, [index]: "not_found" })));
+  }
+
+  function touchFornecedor() {
+    setFornecedorTouched(true);
+    setAutoDetectedNote(null);
   }
 
   const [clienteCodigo, setClienteCodigo] = useState("");
@@ -215,6 +243,14 @@ export function NovoPedidoEncomendaForm({
         {showFornecedorPicker ? (
           <FormSection title="Fornecedor" number={2}>
             <div className="flex flex-col gap-2">
+              {autoDetectedNote ? (
+                <p
+                  className="text-xs rounded px-2 py-1.5"
+                  style={{ background: "var(--brand-orange-soft)", color: "var(--brand-orange)" }}
+                >
+                  {autoDetectedNote}
+                </p>
+              ) : null}
               {INTERNAL_FABRICAS.map((f) => (
                 <label key={f.id} className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
                   <input
@@ -222,6 +258,7 @@ export function NovoPedidoEncomendaForm({
                     name="fornecedor_tipo_radio"
                     checked={fornecedorTipo === "fabrica_interna" && fabricaId === f.id}
                     onChange={() => {
+                      touchFornecedor();
                       setFornecedorTipo("fabrica_interna");
                       setFabricaId(f.id);
                     }}
@@ -235,7 +272,10 @@ export function NovoPedidoEncomendaForm({
                     type="radio"
                     name="fornecedor_tipo_radio"
                     checked={fornecedorTipo === "fabrica_externa"}
-                    onChange={() => setFornecedorTipo("fabrica_externa")}
+                    onChange={() => {
+                      touchFornecedor();
+                      setFornecedorTipo("fabrica_externa");
+                    }}
                   />
                   Fornecedor externo
                 </label>
@@ -243,7 +283,17 @@ export function NovoPedidoEncomendaForm({
               <input type="hidden" name="fornecedor_tipo" value={fornecedorTipo} />
               {fornecedorTipo === "fabrica_interna" ? <input type="hidden" name="fabrica_id" value={fabricaId} /> : null}
               {fornecedorTipo === "fabrica_externa" ? (
-                <select name="fornecedor_externo" required defaultValue="" className="rounded border px-3 py-2 ml-6" style={inputStyle}>
+                <select
+                  name="fornecedor_externo"
+                  required
+                  value={fornecedorExterno}
+                  onChange={(e) => {
+                    touchFornecedor();
+                    setFornecedorExterno(e.target.value);
+                  }}
+                  className="rounded border px-3 py-2 ml-6"
+                  style={inputStyle}
+                >
                   <option value="" disabled>
                     Selecione…
                   </option>
