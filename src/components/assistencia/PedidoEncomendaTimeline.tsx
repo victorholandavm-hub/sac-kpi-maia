@@ -21,6 +21,8 @@ function describeEvent(e: PedidoEncomendaEvent): string {
       return "Observação adicionada.";
     case "prazo_definido":
       return e.note ?? "Previsão de entrega atualizada.";
+    case "fornecedor_changed":
+      return "Fornecedor corrigido.";
     default:
       return e.eventType;
   }

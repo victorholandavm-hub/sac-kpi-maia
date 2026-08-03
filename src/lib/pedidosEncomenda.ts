@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { notifyLoja, notifyFabrica, notifyCd } from "./notifications";
 import { PEDIDO_ENCOMENDA_STATUS_LABELS } from "./assistenciaLabels";
+import { findInternalFabrica } from "./fabricas";
 
 export type PedidoEncomendaStatus =
   | "solicitado"
@@ -516,6 +517,77 @@ export async function updatePedidoStatus(
   await notifyLoja(data.store_id, { type: "status_changed", title, message: note, link });
   if (data.fornecedor_tipo === "fabrica_interna" && data.fabrica_id) {
     await notifyFabrica(data.fabrica_id, { type: "status_changed", title, message: note, link });
+  }
+}
+
+// Correção de fornecedor errado (ex.: pedido lançado pra Beds/Aiam Estofados
+// quando devia ser Colchões, ou fábrica própria quando devia ser fornecedor
+// externo) -- só enquanto "solicitado", antes de qualquer fábrica começar a
+// produzir (mesma janela de updatePedidoEncomendaContent). Existe pra evitar
+// o caminho de negar o pedido + loja relançar do zero reanexando cupom
+// fiscal etc. Quem pode chamar isso é decidido em updatePedidoFornecedorAction
+// (encomendas-actions.ts) -- aqui só executa a troca.
+export async function updatePedidoFornecedor(
+  id: string,
+  actor: { name: string; role: string },
+  input: { fornecedorTipo: "fabrica_interna" | "fabrica_externa"; fabricaId: string | null; fornecedorExterno: string | null }
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+
+  const { data: current, error: fetchError } = await admin
+    .from("pedidos_encomenda")
+    .select("status, fornecedor_tipo, fabrica_id, fornecedor_externo")
+    .eq("id", id)
+    .single();
+  if (fetchError || !current) throw new Error("Pedido não encontrado.");
+  if (current.status !== "solicitado") {
+    throw new Error('Só é possível corrigir o fornecedor enquanto o pedido está "solicitado".');
+  }
+  if (
+    current.fornecedor_tipo === input.fornecedorTipo &&
+    current.fabrica_id === input.fabricaId &&
+    current.fornecedor_externo === input.fornecedorExterno
+  ) {
+    throw new Error("Selecione um fornecedor diferente do atual.");
+  }
+
+  // Trava pelo status "solicitado" -- mesma razão do guard em
+  // updatePedidoStatus: se a fábrica/CD começar a mexer no pedido bem nesse
+  // instante, a correção não deve gravar por cima silenciosamente.
+  const { data, error } = await admin
+    .from("pedidos_encomenda")
+    .update({ fornecedor_tipo: input.fornecedorTipo, fabrica_id: input.fabricaId, fornecedor_externo: input.fornecedorExterno })
+    .eq("id", id)
+    .eq("status", "solicitado")
+    .select("id, pedido_number, store_id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) {
+    throw new Error("Esse pedido já foi atualizado por outra pessoa. Recarregue a página e tente de novo.");
+  }
+
+  const fromLabel = current.fornecedor_tipo === "fabrica_externa" ? current.fornecedor_externo : findInternalFabrica(current.fabrica_id)?.nome;
+  const toLabel = input.fornecedorTipo === "fabrica_externa" ? input.fornecedorExterno : findInternalFabrica(input.fabricaId)?.nome;
+  const note = `${fromLabel ?? "?"} → ${toLabel ?? "?"}`;
+
+  await admin.from("pedido_encomenda_events").insert({
+    pedido_id: id,
+    actor_name: actor.name,
+    actor_role: actor.role,
+    event_type: "fornecedor_changed",
+    note,
+  });
+
+  const link = `/assistencia/encomendas/fila/${id}`;
+  const title = `Pedido #${data.pedido_number}: fornecedor corrigido`;
+  await notifyLoja(data.store_id, { type: "fornecedor_changed", title, message: note, link });
+  if (input.fornecedorTipo === "fabrica_interna" && input.fabricaId) {
+    await notifyFabrica(input.fabricaId, {
+      type: "novo_pedido",
+      title: `Pedido #${data.pedido_number} pra produzir`,
+      message: note,
+      link,
+    });
   }
 }
 

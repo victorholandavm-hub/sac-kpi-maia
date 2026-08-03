@@ -12,6 +12,7 @@ import {
   createPedidoEncomenda,
   updatePedidoStatus,
   updatePedidoEncomendaContent,
+  updatePedidoFornecedor,
   addPedidoNote,
   setPedidoPrazoEtapa,
   isPedidoEncomendaStatus,
@@ -403,6 +404,42 @@ export async function denyPedido(pedidoId: string, reason: string): Promise<void
   requireEncomendaAction(actor, { status: current.status, fornecedorTipo: current.fornecedor_tipo, fabricaId: current.fabrica_id }, "negado");
 
   await updatePedidoStatus(pedidoId, actor, current.status, "negado", { note: reason.trim() });
+
+  revalidatePath("/assistencia/encomendas/fila");
+  revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
+  revalidatePath("/assistencia/encomendas/caixa");
+}
+
+// Correção de fábrica/fornecedor errado (ex.: pedido lançado pra Beds/Aiam
+// Estofados quando devia ser Colchões) sem precisar negar o pedido e a loja
+// relançar do zero reanexando cupom fiscal etc. Restrito a quem tem visão do
+// fluxo inteiro (CD vê a fila toda; admin/assistência por supervisão) --
+// nunca a fábrica/loja, que são justamente quem erra o destino. Só vale
+// enquanto "solicitado" (updatePedidoFornecedor garante isso de novo, com
+// trava de corrida).
+export async function updatePedidoFornecedorAction(
+  pedidoId: string,
+  input: { fornecedorTipo: "fabrica_interna" | "fabrica_externa"; fabricaId: string | null; fornecedorExterno: string | null }
+): Promise<void> {
+  const actor = await requireEncomendaActor();
+  if (actor.role !== "admin" && actor.role !== "assistencia" && actor.role !== "cd") {
+    throw new Error(`Ação não permitida para o papel "${actor.role}".`);
+  }
+
+  let fornecedorTipo: "fabrica_interna" | "fabrica_externa";
+  let fabricaId: string | null = null;
+  let fornecedorExterno: string | null = null;
+  if (input.fornecedorTipo === "fabrica_externa") {
+    if (!EXTERNAL_FABRICAS.includes(input.fornecedorExterno ?? "")) throw new Error("Selecione um fornecedor externo válido.");
+    fornecedorTipo = "fabrica_externa";
+    fornecedorExterno = input.fornecedorExterno;
+  } else {
+    if (!INTERNAL_FABRICAS.some((f) => f.id === input.fabricaId)) throw new Error("Selecione a fábrica do pedido.");
+    fornecedorTipo = "fabrica_interna";
+    fabricaId = input.fabricaId;
+  }
+
+  await updatePedidoFornecedor(pedidoId, actor, { fornecedorTipo, fabricaId, fornecedorExterno });
 
   revalidatePath("/assistencia/encomendas/fila");
   revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);

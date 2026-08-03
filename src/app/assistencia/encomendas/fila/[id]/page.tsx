@@ -132,6 +132,8 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         prazoFabricaCd={pedido.prazoFabricaCd}
         prazoCdLoja={pedido.prazoCdLoja}
         fornecedorTipo={pedido.fornecedorTipo}
+        fabricaId={pedido.fabricaId}
+        fornecedorExterno={pedido.fornecedorExterno}
         matchesFabrica={matchesFabrica}
       />
 

@@ -7,10 +7,12 @@ import {
   denyPedido,
   addPedidoNoteAction,
   searchNfSuggestions,
+  updatePedidoFornecedorAction,
 } from "@/app/assistencia/encomendas-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PEDIDO_ENCOMENDA_STATUS_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import type { TotvsOrderSuggestion } from "@/lib/totvsLookup";
+import { INTERNAL_FABRICAS, EXTERNAL_FABRICAS } from "@/lib/fabricas";
 import { FormSection } from "./FormSection";
 
 type NextStep = {
@@ -61,6 +63,8 @@ export function PedidoEncomendaActions({
   prazoFabricaCd,
   prazoCdLoja,
   fornecedorTipo,
+  fabricaId,
+  fornecedorExterno,
   matchesFabrica,
 }: {
   pedidoId: string;
@@ -70,6 +74,8 @@ export function PedidoEncomendaActions({
   prazoFabricaCd: string | null;
   prazoCdLoja: string | null;
   fornecedorTipo: "fabrica_interna" | "fabrica_externa";
+  fabricaId: string | null;
+  fornecedorExterno: string | null;
   matchesFabrica: boolean;
 }) {
   const { pending, run } = useQuickAction();
@@ -81,6 +87,10 @@ export function PedidoEncomendaActions({
   const [showCancel, setShowCancel] = useState(false);
   const [denyReason, setDenyReason] = useState("");
   const [showDeny, setShowDeny] = useState(false);
+  const [showFornecedor, setShowFornecedor] = useState(false);
+  const [novoFornecedorTipo, setNovoFornecedorTipo] = useState<"fabrica_interna" | "fabrica_externa">(fornecedorTipo);
+  const [novaFabricaId, setNovaFabricaId] = useState(fabricaId ?? INTERNAL_FABRICAS[0].id);
+  const [novoFornecedorExterno, setNovoFornecedorExterno] = useState(fornecedorExterno ?? EXTERNAL_FABRICAS[0]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -106,6 +116,10 @@ export function PedidoEncomendaActions({
   const canDeny =
     (role === "assistencia" || role === "admin" || (role === "fabrica" && !externo && matchesFabrica) || role === "cd") &&
     status === "solicitado";
+  // Só quem enxerga o fluxo inteiro corrige o destino do pedido -- nunca
+  // fábrica/loja, que são justamente quem erra o destino (ver
+  // updatePedidoFornecedorAction).
+  const canCorrectFornecedor = (role === "assistencia" || role === "admin" || role === "cd") && status === "solicitado";
 
   return (
     <FormSection title="Ações">
@@ -223,6 +237,92 @@ export function PedidoEncomendaActions({
             style={{ color: "var(--status-critical)", borderTop: "1px solid var(--gridline)" }}
           >
             Negar pedido
+          </button>
+        )
+      ) : null}
+
+      {canCorrectFornecedor ? (
+        showFornecedor ? (
+          <div className="flex flex-col gap-2 pt-2" style={{ borderTop: "1px solid var(--gridline)" }}>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Corrige o destino do pedido (fábrica própria ou fornecedor externo). Não avisa quem já foi notificado do
+              destino errado — só quem passa a ver o pedido a partir de agora.
+            </p>
+            <div className="flex items-center gap-3 text-sm" style={{ color: "var(--text-primary)" }}>
+              <label className="flex items-center gap-1">
+                <input
+                  type="radio"
+                  checked={novoFornecedorTipo === "fabrica_interna"}
+                  onChange={() => setNovoFornecedorTipo("fabrica_interna")}
+                />
+                Fábrica própria
+              </label>
+              <label className="flex items-center gap-1">
+                <input
+                  type="radio"
+                  checked={novoFornecedorTipo === "fabrica_externa"}
+                  onChange={() => setNovoFornecedorTipo("fabrica_externa")}
+                />
+                Fornecedor externo
+              </label>
+            </div>
+            {novoFornecedorTipo === "fabrica_interna" ? (
+              <select
+                value={novaFabricaId}
+                onChange={(e) => setNovaFabricaId(e.target.value)}
+                className="rounded border px-3 py-2 text-sm"
+                style={{ borderColor: "var(--border)" }}
+              >
+                {INTERNAL_FABRICAS.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select
+                value={novoFornecedorExterno}
+                onChange={(e) => setNovoFornecedorExterno(e.target.value)}
+                className="rounded border px-3 py-2 text-sm"
+                style={{ borderColor: "var(--border)" }}
+              >
+                {EXTERNAL_FABRICAS.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                disabled={pending}
+                onClick={() =>
+                  run(async () => {
+                    await updatePedidoFornecedorAction(pedidoId, {
+                      fornecedorTipo: novoFornecedorTipo,
+                      fabricaId: novoFornecedorTipo === "fabrica_interna" ? novaFabricaId : null,
+                      fornecedorExterno: novoFornecedorTipo === "fabrica_externa" ? novoFornecedorExterno : null,
+                    });
+                    setShowFornecedor(false);
+                  }, "Fornecedor corrigido.")
+                }
+                className="text-sm rounded px-3 py-2 disabled:opacity-60"
+                style={{ background: "var(--brand-orange)", color: "#fff" }}
+              >
+                Confirmar correção
+              </button>
+              <button onClick={() => setShowFornecedor(false)} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+                Voltar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowFornecedor(true)}
+            className="text-sm underline self-start pt-2"
+            style={{ color: "var(--brand-orange)", borderTop: "1px solid var(--gridline)" }}
+          >
+            Corrigir fábrica/fornecedor
           </button>
         )
       ) : null}
