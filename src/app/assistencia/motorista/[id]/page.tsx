@@ -93,7 +93,7 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
 
         <div
           className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-          style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
         >
           <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
             Detalhes
@@ -131,7 +131,7 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
 
         <div
           className="rounded-lg p-4 flex flex-col gap-3"
-          style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
         >
           <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Fotos
@@ -143,7 +143,7 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
         {!showCompleted ? (
           <div
             className="rounded-lg p-4 flex flex-col gap-3"
-            style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
           >
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               Ações

@@ -27,10 +27,10 @@ export function DeadlineActions({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-lg border p-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--status-warning)" }}
+      className="flex flex-col gap-3 rounded-lg p-4"
+      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
     >
-      <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+      <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
         {isRecusado ? "Nova data proposta pela assistência" : "Prazo pendente de aprovação"}
       </h3>
 

@@ -81,7 +81,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
 
         <div
           className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-          style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
         >
           <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
             Detalhes
@@ -100,8 +100,8 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
                     <span
                       className="text-xs font-bold w-fit px-1.5 py-0.5 rounded"
                       style={{
-                        color: action === "montar" ? "var(--brand-green-ink)" : "var(--brand-orange)",
-                        background: action === "montar" ? "var(--brand-green)" : "var(--brand-orange-soft)",
+                        color: action === "montar" ? "var(--brand-green-ink)" : "var(--text-primary)",
+                        background: action === "montar" ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))",
                       }}
                     >
                       {action === "montar" ? "Montar" : "Desmontar"}
@@ -145,7 +145,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
 
         <div
           className="rounded-lg p-4 flex flex-col gap-3"
-          style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
         >
           <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Fotos
@@ -157,7 +157,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
         {!showCompleted ? (
           <div
             className="rounded-lg p-4 flex flex-col gap-3"
-            style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
           >
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               Ações

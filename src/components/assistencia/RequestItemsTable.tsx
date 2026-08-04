@@ -78,8 +78,8 @@ function ItemRow({
           <span
             className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
             style={{
-              color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--brand-orange)",
-              background: item.action === "montar" ? "var(--brand-green)" : "var(--brand-orange-soft)",
+              color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--text-primary)",
+              background: item.action === "montar" ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))",
             }}
           >
             {item.action === "montar" ? "Montar" : "Desmontar"}
@@ -301,7 +301,7 @@ export function RequestItemsTable({
   return (
     <div
       className="rounded-lg p-4 flex flex-col gap-1"
-      style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>

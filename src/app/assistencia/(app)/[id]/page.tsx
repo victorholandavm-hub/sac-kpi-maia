@@ -156,7 +156,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
       <div
         className="rounded-lg p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
         <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Responsável pelo atendimento
@@ -196,7 +196,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
       <div
         className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
         <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
           Pedido e cliente
@@ -223,7 +223,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       ) : request.items.length > 0 ? (
         <div
           className="rounded-lg p-4 flex flex-col gap-2"
-          style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
         >
           <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Produtos
@@ -235,8 +235,8 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
                   <span
                     className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
                     style={{
-                      color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--brand-orange)",
-                      background: item.action === "montar" ? "var(--brand-green)" : "var(--brand-orange-soft)",
+                      color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--text-primary)",
+                      background: item.action === "montar" ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))",
                     }}
                   >
                     {item.action === "montar" ? "Montar" : "Desmontar"}
@@ -252,8 +252,8 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       ) : null}
 
       <div
-        className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderLeft: "4px solid var(--brand-orange)" }}
+        className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
         <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
           Atendimento — o que a assistência precisa acompanhar
@@ -338,7 +338,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
       <div
         className="rounded-lg p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
         <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Histórico
@@ -372,7 +372,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
       <div
         className="rounded-lg p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
         <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Fotos
