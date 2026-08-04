@@ -90,7 +90,7 @@ export default async function AssistenciaQueuePage({
                 style={
                   f.value
                     ? {
-                        color: selected ? "var(--text-primary)" : color,
+                        color: "var(--text-primary)",
                         background: selected ? `color-mix(in srgb, ${color} 35%, var(--surface-1))` : "transparent",
                         fontWeight: selected ? 600 : 400,
                         border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
