@@ -90,8 +90,8 @@ export default async function AssistenciaQueuePage({
                 style={
                   f.value
                     ? {
-                        color,
-                        background: selected ? `color-mix(in srgb, ${color} 18%, transparent)` : "transparent",
+                        color: selected ? "var(--text-primary)" : color,
+                        background: selected ? `color-mix(in srgb, ${color} 35%, var(--surface-1))` : "transparent",
                         fontWeight: selected ? 600 : 400,
                         border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
                       }
@@ -197,7 +197,7 @@ export default async function AssistenciaQueuePage({
                         {r.deadlineStatus === "pendente" ? (
                           <span
                             className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                            style={{ color: "var(--status-warning)", background: "color-mix(in srgb, var(--status-warning) 18%, transparent)" }}
+                            style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
                           >
                             Prazo pendente
                           </span>
@@ -205,7 +205,7 @@ export default async function AssistenciaQueuePage({
                         {r.escalationRisk ? (
                           <span
                             className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                            style={{ color: "var(--status-critical)", background: "color-mix(in srgb, var(--status-critical) 18%, transparent)" }}
+                            style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
                           >
                             ⚠ Risco de escalonamento
                           </span>
@@ -216,7 +216,7 @@ export default async function AssistenciaQueuePage({
                         {r.comboMontagemDesmontagem ? (
                           <span
                             className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                            style={{ color: "var(--brand-orange)", background: "var(--brand-orange-soft)" }}
+                            style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
                           >
                             {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
                           </span>

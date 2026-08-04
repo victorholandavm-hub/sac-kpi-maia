@@ -128,7 +128,7 @@ export function RequestActions({
                 style={
                   isPrimary
                     ? { background: color, color: "#fff" }
-                    : { background: `color-mix(in srgb, ${color} 15%, transparent)`, color }
+                    : { background: `color-mix(in srgb, ${color} 35%, var(--surface-1))`, color: "var(--text-primary)" }
                 }
               >
                 Marcar como {STATUS_LABELS[s] ?? s}
