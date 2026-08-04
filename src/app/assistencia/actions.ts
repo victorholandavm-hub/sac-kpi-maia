@@ -18,7 +18,15 @@ import {
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
 import { resolveDriverName } from "@/lib/payments";
-import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
+import {
+  saveRequestPhoto,
+  getPhotoForAuth,
+  deleteRequestPhoto,
+  uploadPendingRequestPhoto,
+  attachPendingRequestPhoto,
+  discardPendingRequestPhoto,
+} from "@/lib/servicePhotos";
+import { randomUUID } from "crypto";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
@@ -1034,15 +1042,22 @@ export async function setSchedule(
   requireManageAccess(profile, current.type);
 
   let rotaValue: string | null = null;
+  let exceptionNote: string | null = null;
   if (scheduledDate && rota) {
     if (!isRota(rota)) throw new Error("Rota inválida.");
     const config = await getRotaWeekdayConfig();
     const expectedRota = getRotaForDate(scheduledDate, config);
-    if (expectedRota !== rota && !rotaExceptionNote?.trim()) {
+    const isException = expectedRota !== rota;
+    if (isException && !rotaExceptionNote?.trim()) {
       const expectedLabel = expectedRota ? ROTA_LABELS[expectedRota] : "nenhuma rota";
       throw new Error(`Essa data é de ${expectedLabel}, não de ${ROTA_LABELS[rota]} — informe o motivo do encaixe fora da rota.`);
     }
     rotaValue = rota;
+    // Só grava a nota quando a data realmente diverge da rota esperada --
+    // senão uma nota antiga "gruda" mesmo depois do chamado ser reagendado
+    // pra um dia normal da rota, e o motorista continua vendo o aviso de
+    // exceção sem mais fazer sentido.
+    exceptionNote = isException ? rotaExceptionNote?.trim() || null : null;
   }
 
   const { error } = await admin
@@ -1052,13 +1067,13 @@ export async function setSchedule(
       shift: shift || null,
       scheduled_time: scheduledTime || null,
       rota: rotaValue,
-      rota_exception_note: rotaValue ? rotaExceptionNote?.trim() || null : null,
+      rota_exception_note: exceptionNote,
     })
     .eq("id", requestId);
   if (error) throw new Error(error.message);
 
   const shiftLabel = SHIFT_LABELS[shift] ?? shift;
-  const rotaNote = rotaValue ? ` · rota ${ROTA_LABELS[rotaValue as keyof typeof ROTA_LABELS]}${rotaExceptionNote?.trim() ? ` (encaixe: ${rotaExceptionNote.trim()})` : ""}` : "";
+  const rotaNote = rotaValue ? ` · rota ${ROTA_LABELS[rotaValue as keyof typeof ROTA_LABELS]}${exceptionNote ? ` (encaixe: ${exceptionNote})` : ""}` : "";
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: profile.id,
@@ -1372,9 +1387,23 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     await admin.from("drivers").upsert({ name: driverName }, { onConflict: "name" });
   }
 
+  // Anexo é obrigatório -- sobe o arquivo ANTES de criar o ticket (o path só
+  // depende do id, gerado aqui antecipadamente, não da linha existir de
+  // fato). Se o upload falhar, nenhum ticket chega a ser criado, então não
+  // sobra chamado "válido" sem anexo por causa de uma falha no meio do
+  // caminho.
+  const requestId = randomUUID();
+  let photoPath: string;
+  try {
+    photoPath = await uploadPendingRequestPhoto(requestId, photo);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível enviar o anexo." };
+  }
+
   const { data, error } = await admin
     .from("service_requests")
     .insert({
+      id: requestId,
       type,
       store_id: storeId,
       requested_by: profile.id,
@@ -1395,6 +1424,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     .single();
 
   if (error || !data) {
+    await discardPendingRequestPhoto(photoPath);
     return { error: `Não foi possível criar: ${error?.message ?? "erro desconhecido"}` };
   }
 
@@ -1427,14 +1457,14 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   });
 
   try {
-    await saveRequestPhoto({ requestId: data.id, file: photo, uploadedBy: profile.fullName });
-  } catch (err) {
-    // Solicitação já foi criada -- não dá pra desfazer por causa do anexo,
-    // mas como agora é obrigatório, avisa claramente em vez de sumir com o
-    // erro (era só console.error antes, quando o anexo era opcional).
-    return {
-      error: `Solicitação #${data.ticket_number} criada, mas o anexo não pôde ser salvo: ${err instanceof Error ? err.message : "erro desconhecido"}. Abra a solicitação e anexe de novo.`,
-    };
+    await attachPendingRequestPhoto({ requestId: data.id, path: photoPath, uploadedBy: profile.fullName });
+  } catch {
+    // O arquivo já subiu, mas não deu pra associar ao ticket -- como o
+    // anexo é obrigatório, desfaz o ticket inteiro (cascade cuida de
+    // item/evento já criados) em vez de deixar um chamado "válido" sem
+    // anexo. O usuário só precisa tentar de novo.
+    await admin.from("service_requests").delete().eq("id", data.id);
+    return { error: "Não foi possível concluir o anexo da solicitação. Tente de novo." };
   }
 
   revalidatePath("/assistencia/sac");

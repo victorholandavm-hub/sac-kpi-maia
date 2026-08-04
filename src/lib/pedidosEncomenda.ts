@@ -607,7 +607,10 @@ export async function updatePedidoFornecedor(
 // mesmo papel de quem fez a mudança (fábrica desfaz fábrica, CD desfaz CD),
 // ou admin/assistência por supervisão. Quem pode chamar isso é decidido em
 // undoLastPedidoStatusChangeAction (encomendas-actions.ts) -- aqui só executa.
-export async function undoLastPedidoStatusChange(id: string, actor: { name: string; role: string }): Promise<void> {
+export async function undoLastPedidoStatusChange(
+  id: string,
+  actor: { name: string; role: string; fabricaId?: string | null }
+): Promise<void> {
   const admin = getSupabaseAdmin();
 
   const { data: pedido, error: fetchError } = await admin
@@ -629,6 +632,13 @@ export async function undoLastPedidoStatusChange(id: string, actor: { name: stri
   const isSupervisor = actor.role === "admin" || actor.role === "assistencia";
   if (lastEvent.event_type !== "status_changed" || (!isSupervisor && lastEvent.actor_role !== actor.role)) {
     throw new Error("Só dá pra desfazer a última mudança de status, e só quem fez ela (ou admin/assistência).");
+  }
+  // Mesma checagem por recurso que requireEncomendaAction já faz pras outras
+  // mutações (dal.ts) -- sem isso, um operador da fábrica A que soubesse o
+  // UUID de um pedido da fábrica B (mesmo cargo, evento anterior também de
+  // "fabrica") conseguiria desfazer o status de um pedido que não é dele.
+  if (!isSupervisor && actor.role === "fabrica" && actor.fabricaId && pedido.fabrica_id && actor.fabricaId !== pedido.fabrica_id) {
+    throw new Error("Ação não permitida — esse pedido é de outra fábrica.");
   }
   if (!lastEvent.from_status || lastEvent.to_status !== pedido.status) {
     throw new Error("Esse pedido já mudou de novo depois dessa etapa -- não dá mais pra desfazer.");
@@ -653,7 +663,10 @@ export async function undoLastPedidoStatusChange(id: string, actor: { name: stri
     pedido_id: id,
     actor_name: actor.name,
     actor_role: actor.role,
-    event_type: "status_changed",
+    // event_type dedicado (não "status_changed") -- assim esse evento não
+    // conta como "última mudança de status" pra fins de undoLastPedidoStatusChange,
+    // e não dá pra desfazer o próprio desfazer.
+    event_type: "status_reverted",
     from_status: pedido.status,
     to_status: lastEvent.from_status,
     note: "Desfeito: mudança de status revertida por engano.",

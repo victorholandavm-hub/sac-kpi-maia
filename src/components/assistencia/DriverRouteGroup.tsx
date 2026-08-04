@@ -28,18 +28,43 @@ export function DriverRouteGroup({
   reorderable: boolean;
 }) {
   const [order, setOrder] = useState(items);
+  const [saving, setSaving] = useState(false);
+  const [syncedItems, setSyncedItems] = useState(items);
 
-  function move(index: number, direction: -1 | 1) {
+  // A tela usa polling (RealtimeQueueRefresher, a cada 15s) pra trazer
+  // chamado novo/status mudado -- sem isso, a lista congelava até o
+  // motorista dar F5, porque o componente cliente não remonta quando o
+  // Server Component pai recebe dados novos. Ajusta o estado durante a
+  // renderização (padrão oficial do React pra isso, evita o ciclo extra de
+  // um useEffect) sempre que o prop `items` mudar de fato -- e só quando não
+  // há reordenação em voo, senão o poll pisaria na ordem otimista antes
+  // dela ser persistida.
+  if (items !== syncedItems && !saving) {
+    setSyncedItems(items);
+    setOrder(items);
+  }
+
+  async function move(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= order.length) return;
+    const previous = order;
     const next = [...order];
     [next[index], next[target]] = [next[target], next[index]];
     setOrder(next);
-    setDriverOrderAction(next.map((r) => r.id)).catch(() => {
-      // Reverte a ordem local se não conseguiu gravar -- evita a tela
-      // mostrar uma ordem que na próxima visita some porque não salvou.
-      setOrder(items);
-    });
+    setSaving(true);
+    try {
+      await setDriverOrderAction(next.map((r) => ({ id: r.id, expectedOrder: r.driverOrder })));
+      // Reflete localmente o driver_order que acabou de ser gravado, senão o
+      // próximo clique manda um "expectedOrder" desatualizado pro servidor.
+      setOrder(next.map((r, i) => ({ ...r, driverOrder: i + 1 })));
+    } catch {
+      // Reverte pra ordem de antes deste clique (não pro snapshot do
+      // carregamento da página) -- assim um clique que falhou não apaga uma
+      // reordenação anterior que já tinha sido salva com sucesso.
+      setOrder(previous);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -51,7 +76,7 @@ export function DriverRouteGroup({
               <div className="flex flex-col shrink-0">
                 <button
                   onClick={() => move(i, -1)}
-                  disabled={i === 0}
+                  disabled={i === 0 || saving}
                   aria-label="Mover pra cima"
                   className="text-sm leading-none px-1 disabled:opacity-25"
                   style={{ color: "var(--text-secondary)" }}
@@ -60,7 +85,7 @@ export function DriverRouteGroup({
                 </button>
                 <button
                   onClick={() => move(i, 1)}
-                  disabled={i === order.length - 1}
+                  disabled={i === order.length - 1 || saving}
                   aria-label="Mover pra baixo"
                   className="text-sm leading-none px-1 disabled:opacity-25"
                   style={{ color: "var(--text-secondary)" }}

@@ -23,6 +23,8 @@ function describeEvent(e: PedidoEncomendaEvent): string {
       return e.note ?? "Previsão de entrega atualizada.";
     case "fornecedor_changed":
       return "Fornecedor corrigido.";
+    case "status_reverted":
+      return toLabel ? `Mudança de status desfeita — voltou para "${toLabel}".` : "Mudança de status desfeita.";
     default:
       return e.eventType;
   }

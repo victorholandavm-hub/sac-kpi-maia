@@ -41,7 +41,10 @@ export function ScheduleField({
   const [time, setTime] = useState(formatTimeOnly(scheduledTime) ?? "");
   const [selectedShift, setSelectedShift] = useState<string>(shift ?? "");
   const [selectedRota, setSelectedRota] = useState<string>(rota ?? "");
-  const [exception, setException] = useState(false);
+  // Começa marcado quando já existe uma nota de exceção -- senão o textarea
+  // fica escondido e dá pra reabrir a edição sem nem ver que tem uma nota
+  // antiga ali (e sem conseguir limpá-la).
+  const [exception, setException] = useState(!!rotaExceptionNote);
   const [exceptionNote, setExceptionNote] = useState(rotaExceptionNote ?? "");
 
   if (!editing) {
@@ -190,7 +193,7 @@ export function ScheduleField({
             setTime(formatTimeOnly(scheduledTime) ?? "");
             setSelectedShift(shift ?? "");
             setSelectedRota(rota ?? "");
-            setException(false);
+            setException(!!rotaExceptionNote);
             setExceptionNote(rotaExceptionNote ?? "");
             setEditing(false);
           }}

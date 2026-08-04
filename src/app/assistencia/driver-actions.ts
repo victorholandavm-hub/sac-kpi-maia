@@ -109,23 +109,36 @@ export async function driverDeletePhoto(photoId: string): Promise<void> {
 // otimista) e só grava um driver_order sequencial pra cada id, na ordem
 // recebida. Confere que todo id é realmente do motorista logado antes de
 // gravar, senão daria pra um motorista mexer na ordem de chamado alheio.
-export async function setDriverOrderAction(requestIds: string[]): Promise<void> {
+// Cada update leva o driver_order que o cliente acreditava ser o atual como
+// trava de corrida (mesmo padrão usado nas outras mutações desta sessão) --
+// se outra sessão/aba já mudou a ordem por baixo, a gravação não "vence"
+// silenciosamente por cima, e o motorista recebe aviso pra recarregar.
+export async function setDriverOrderAction(items: { id: string; expectedOrder: number | null }[]): Promise<void> {
   const driverName = await getDriverSession();
   if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
-  if (requestIds.length === 0) return;
+  if (items.length === 0) return;
 
   const admin = getSupabaseAdmin();
-  const { data: owned, error } = await admin.from("service_requests").select("id").in("id", requestIds).eq("driver_name", driverName);
+  const ids = items.map((i) => i.id);
+  const { data: owned, error } = await admin.from("service_requests").select("id").in("id", ids).eq("driver_name", driverName);
   if (error) throw new Error(error.message);
-  if (!owned || owned.length !== requestIds.length) {
+  if (!owned || owned.length !== ids.length) {
     throw new Error("Um ou mais chamados não são seus.");
   }
 
   const results = await Promise.all(
-    requestIds.map((id, index) => admin.from("service_requests").update({ driver_order: index + 1 }).eq("id", id))
+    items.map((item, index) => {
+      const query = admin.from("service_requests").update({ driver_order: index + 1 }).eq("id", item.id);
+      return (item.expectedOrder === null ? query.is("driver_order", null) : query.eq("driver_order", item.expectedOrder))
+        .select("id")
+        .maybeSingle();
+    })
   );
   const failed = results.find((r) => r.error);
   if (failed?.error) throw new Error(failed.error.message);
+  if (results.some((r) => !r.data)) {
+    throw new Error("A ordem mudou em outra sessão. Recarregue a página e tente de novo.");
+  }
 
   revalidatePath("/assistencia/motorista");
 }
