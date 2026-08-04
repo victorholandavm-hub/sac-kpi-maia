@@ -60,7 +60,7 @@ export function StatusBadge({
     <span className="inline-flex items-center gap-1">
       <span
         className={`inline-flex items-center gap-1.5 ${sizeClasses} rounded-full whitespace-nowrap`}
-        style={{ color, background: `color-mix(in srgb, ${color} 18%, transparent)` }}
+        style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
       >
         <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: color }} />
         {STATUS_LABELS[status] ?? status}

@@ -156,7 +156,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
       <div
         className="rounded-lg p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+        style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
       >
         <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Responsável pelo atendimento
@@ -196,7 +196,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
       <div
         className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+        style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
       >
         <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
           Pedido e cliente
@@ -223,7 +223,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       ) : request.items.length > 0 ? (
         <div
           className="rounded-lg p-4 flex flex-col gap-2"
-          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
         >
           <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Produtos
@@ -253,9 +253,9 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
       <div
         className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--brand-orange-soft)", borderColor: "var(--brand-orange)", borderLeftWidth: "4px" }}
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderLeft: "4px solid var(--brand-orange)" }}
       >
-        <h3 className="text-xs font-bold uppercase tracking-wide sm:col-span-2" style={{ color: "var(--brand-orange)" }}>
+        <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
           Atendimento — o que a assistência precisa acompanhar
         </h3>
         <Row label="Motivo" value={request.reason} />
@@ -338,7 +338,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
       <div
         className="rounded-lg p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+        style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
       >
         <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Histórico
@@ -372,7 +372,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
 
       <div
         className="rounded-lg p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+        style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
       >
         <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Fotos

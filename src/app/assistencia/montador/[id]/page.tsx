@@ -81,7 +81,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
 
         <div
           className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
         >
           <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
             Detalhes
@@ -145,7 +145,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
 
         <div
           className="rounded-lg p-4 flex flex-col gap-3"
-          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
         >
           <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Fotos
@@ -157,7 +157,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
         {!showCompleted ? (
           <div
             className="rounded-lg p-4 flex flex-col gap-3"
-            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+            style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
           >
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               Ações

@@ -87,7 +87,7 @@ export function RequestActions({
   return (
     <div
       className="flex flex-col gap-3 rounded-lg p-4"
-      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+      style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
     >
       <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
         Ações

@@ -301,7 +301,7 @@ export function RequestItemsTable({
   return (
     <div
       className="rounded-lg p-4 flex flex-col gap-1"
-      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+      style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
