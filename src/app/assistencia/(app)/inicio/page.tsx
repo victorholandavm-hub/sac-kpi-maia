@@ -103,7 +103,7 @@ export default async function InicioPage() {
 
         {profile.role === "admin" ? (
           <a
-            href="https://sac-kpi-maia.vercel.app"
+            href="https://sac.lojasmaia.com.br"
             className="rounded-lg border p-5 flex flex-col gap-1 hover:opacity-90"
             style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
           >
