@@ -133,7 +133,7 @@ export default async function MontadorHomePage({
       ) : groups ? (
         groups.map((g) => (
           <details key={g.key} open={g.defaultOpen}>
-            <summary className="text-base font-bold cursor-pointer py-1" style={{ color: "var(--brand-green)" }}>
+            <summary className="text-base font-bold cursor-pointer py-1" style={{ color: "var(--text-primary)" }}>
               {g.label} ({g.items.length})
             </summary>
             <div className="rounded-lg overflow-hidden mt-2" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
