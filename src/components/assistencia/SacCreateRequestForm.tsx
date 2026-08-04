@@ -9,12 +9,17 @@ import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
 
-type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "notificacao_externa";
+type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "notificacao_externa" | "montagem";
 
 // Tipos que envolvem entrega pelo motorista (produto/peça + quem vai levar).
 // "O que recolher" só se aplica a troca_produto — os outros dois não têm
 // recolhimento nenhum.
 const DELIVERY_TYPES: SacType[] = ["troca_produto", "entrega_produto", "envio_peca"];
+
+// Montagem também tem produto (o móvel a montar), mas sem motorista -- quem
+// vai até o cliente é um montador, atribuído depois por assistência/admin
+// (o SAC só faz o intake, ver createSacRequest).
+const PRODUCT_TYPES: SacType[] = [...DELIVERY_TYPES, "montagem"];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -30,6 +35,7 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
   const [type, setType] = useState<SacType>("troca_produto");
   const isDelivery = DELIVERY_TYPES.includes(type);
+  const showProduct = PRODUCT_TYPES.includes(type);
 
   const [clientCode, setClientCode] = useState("");
   const [clientName, setClientName] = useState("");
@@ -105,6 +111,7 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
             <option value="entrega_produto">{REQUEST_TYPE_LABELS.entrega_produto} (sem recolhimento)</option>
             <option value="envio_peca">{REQUEST_TYPE_LABELS.envio_peca}</option>
             <option value="notificacao_externa">Notificação externa (sem troca de produto)</option>
+            <option value="montagem">{REQUEST_TYPE_LABELS.montagem}</option>
           </select>
         </Field>
 
@@ -216,8 +223,12 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         </Field>
       </FormSection>
 
-      {isDelivery ? (
-        <FormSection title="Produto e entrega" number={3} hint="Digite o código do produto pra preencher o nome automaticamente (se souber).">
+      {showProduct ? (
+        <FormSection
+          title={type === "montagem" ? "Móvel a montar" : "Produto e entrega"}
+          number={3}
+          hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
+        >
           <div className="grid sm:grid-cols-3 gap-4">
             <Field label="Código do produto">
               <input
@@ -242,7 +253,7 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
                 </span>
               ) : null}
             </Field>
-            <Field label="Produto a entregar">
+            <Field label={type === "montagem" ? "Móvel a montar" : "Produto a entregar"}>
               <input
                 name="product"
                 value={product}
@@ -257,14 +268,23 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
             </Field>
           </div>
 
-          <Field label="Motorista">
-            <input name="driver_name" list="sac-drivers" className="rounded border px-3 py-2" style={inputStyle} />
-            <datalist id="sac-drivers">
-              {drivers.map((d) => (
-                <option key={d} value={d} />
-              ))}
-            </datalist>
-          </Field>
+          {type === "montagem" ? (
+            <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+              <input type="checkbox" name="combo_montagem_desmontagem" className="rounded" />
+              Também precisa desmontar o móvel antigo
+            </label>
+          ) : null}
+
+          {isDelivery ? (
+            <Field label="Motorista">
+              <input name="driver_name" list="sac-drivers" className="rounded border px-3 py-2" style={inputStyle} />
+              <datalist id="sac-drivers">
+                {drivers.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
+            </Field>
+          ) : null}
         </FormSection>
       ) : null}
 

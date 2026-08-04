@@ -89,11 +89,16 @@ export default async function MontadorHomePage({
         title={`Olá, ${assemblerName}`}
         subtitle="Seus chamados de montagem, desmontagem, recolhimento e vistoria."
       >
-        <form action={montadorSignOut}>
-          <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-            Sair
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/assistencia" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            ← Voltar
+          </Link>
+          <form action={montadorSignOut}>
+            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              Sair
+            </button>
+          </form>
+        </div>
       </AssistenciaHeader>
 
       <div className="flex items-center gap-2">

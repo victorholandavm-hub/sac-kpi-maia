@@ -115,6 +115,11 @@ export default async function EncomendasQueuePage({
 
       <AssistenciaHeader title="Fila de encomendas" subtitle={`${actor.name} · ${ROLE_LABELS[actor.role] ?? actor.role}`}>
         <div className="flex items-center gap-4">
+          {actor.role === "admin" || actor.role === "assistencia" ? (
+            <Link href="/assistencia/inicio" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              ← Voltar
+            </Link>
+          ) : null}
           {actor.role === "cd" || actor.role === "fabrica" ? (
             <NotificationBell fetchAction={listFabricaOuCdNotificationsAction} storageKey={`${actor.role}-${actor.fabricaId ?? ""}`} />
           ) : null}

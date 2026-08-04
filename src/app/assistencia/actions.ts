@@ -1335,12 +1335,15 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   redirect(`/assistencia/${data.id}`);
 }
 
-const SAC_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa"] as const;
+const SAC_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa", "montagem"] as const;
 
 // Criação de chamado pelo SAC — troca de produto (recolher o errado/avariado
 // e entregar o correto numa rota só, ver src/lib/driverAuth.ts), entrega de
 // produto sem recolhimento, envio de peça avulsa (independente do módulo de
-// Peças/fornecedores) ou notificação externa. Mesmo formato do relatório
+// Peças/fornecedores), notificação externa, ou montagem (SAC só faz o
+// intake -- gerenciar daí pra frente, agendar e atribuir montador continua
+// exclusivo de assistência/admin, mesma regra de ASSISTENCIA_MANAGED_TYPES
+// que já vale pra montagem criada pela loja). Mesmo formato do relatório
 // logístico que já existia em planilha: cliente, endereço, telefone, produto
 // e a instrução de recolhimento em texto livre.
 export async function createSacRequest(_state: FormState, formData: FormData): Promise<FormState> {
@@ -1380,6 +1383,9 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const partCode = emptyToNull(formData.get("part_code"));
   const quantity = Math.max(1, parseInt(String(formData.get("quantity") ?? "1"), 10) || 1);
   const urgent = formData.get("urgent") === "on";
+  // Só faz sentido pra montagem -- mesma ideia de createQuickRequest, pedir
+  // pra desmontar o móvel velho na mesma visita sem abrir um segundo chamado.
+  const comboMontagemDesmontagem = type === "montagem" && formData.get("combo_montagem_desmontagem") === "on";
 
   const admin = getSupabaseAdmin();
   const driverName = driverNameInput ? await resolveDriverName(driverNameInput) : null;
@@ -1417,6 +1423,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       driver_name: driverName,
       shift: urgent ? "urgencia" : null,
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
+      combo_montagem_desmontagem: comboMontagemDesmontagem,
       // Criado direto pelo SAC, não pela loja — não há prazo pra aprovar.
       deadline_status: "aprovado",
     })

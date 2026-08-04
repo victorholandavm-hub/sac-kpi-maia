@@ -261,9 +261,21 @@ async function setSyncState(supabase: SupabaseAdmin, key: string, value: string)
 
 type SyncResult = { checked: number; upserted: number; errors: string[] };
 
+// Depois de falhar 3 execuções seguidas NA MESMA página (cada uma já com os
+// 3 retries de fetchTotvs esgotados), pula ela em vez de tentar pra sempre
+// -- descoberto em 2026-08-04: a página 30 ficou travada em 503 (mesma
+// disputa de licença dos pedidos) e, como o cursor só avança em caso de
+// sucesso, o sync inteiro parou de progredir a partir dali (clientes
+// cadastrados depois da página 30 nunca chegavam na cópia local). Pular
+// não perde o cliente pra sempre: quando o cursor completa um ciclo e volta
+// pra página 1 (ver "page = 1" abaixo), a página pulada é tentada de novo.
+const CLIENT_PAGE_FAIL_LIMIT = 3;
+
 async function syncClients(supabase: SupabaseAdmin): Promise<SyncResult> {
   const started = Date.now();
   let page = Number(await getSyncState(supabase, "totvs_clients_next_page")) || 1;
+  const [failPageRaw, failCountRaw] = ((await getSyncState(supabase, "totvs_clients_page_fail")) ?? "").split(":");
+  let failCount = Number(failPageRaw) === page ? Number(failCountRaw) || 0 : 0;
   let checked = 0;
   let upserted = 0;
   const errors: string[] = [];
@@ -277,9 +289,23 @@ async function syncClients(supabase: SupabaseAdmin): Promise<SyncResult> {
         `${BASE_URL}/rest/client?Page=${page}&Size=${CLIENT_PAGE_SIZE}`
       );
     } catch (err) {
+      failCount += 1;
+      if (failCount >= CLIENT_PAGE_FAIL_LIMIT) {
+        errors.push(`clients page ${page}: ${(err as Error).message} (pulada após ${failCount} falhas seguidas)`);
+        await setSyncState(supabase, "totvs_clients_page_fail", "");
+        page += 1;
+        failCount = 0;
+        continue;
+      }
       errors.push(`clients page ${page}: ${(err as Error).message}`);
+      await setSyncState(supabase, "totvs_clients_page_fail", `${page}:${failCount}`);
       break;
     }
+    if (failCount > 0) {
+      await setSyncState(supabase, "totvs_clients_page_fail", "");
+      failCount = 0;
+    }
+
     const rows = json.data ?? [];
     checked += rows.length;
 

@@ -47,11 +47,16 @@ export default async function MotoristaHomePage({
   return (
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title={`Olá, ${driverName}`} subtitle="Suas rotas de troca de produto e recolhimento.">
-        <form action={driverSignOut}>
-          <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-            Sair
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/assistencia" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            ← Voltar
+          </Link>
+          <form action={driverSignOut}>
+            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              Sair
+            </button>
+          </form>
+        </div>
       </AssistenciaHeader>
 
       <div className="flex items-center gap-2">
