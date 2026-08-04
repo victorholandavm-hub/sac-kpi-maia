@@ -155,10 +155,10 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       </div>
 
       <div
-        className="rounded-lg border p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        className="rounded-lg p-4 flex flex-col gap-2"
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
-        <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Responsável pelo atendimento
         </h3>
         {isDeliveryType ? (
@@ -195,10 +195,10 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       ) : null}
 
       <div
-        className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
-        <h3 className="text-xs font-semibold uppercase tracking-wide sm:col-span-2" style={{ color: "var(--text-muted)" }}>
+        <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
           Pedido e cliente
         </h3>
         <Row label="Código do pedido/venda" value={request.orderCode} />
@@ -222,10 +222,10 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         />
       ) : request.items.length > 0 ? (
         <div
-          className="rounded-lg border p-4 flex flex-col gap-2"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+          className="rounded-lg p-4 flex flex-col gap-2"
+          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
         >
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Produtos
           </span>
           <ul className="flex flex-col gap-1">
@@ -337,10 +337,10 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       ) : null}
 
       <div
-        className="rounded-lg border p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        className="rounded-lg p-4 flex flex-col gap-3"
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Histórico
         </h3>
         {events.length === 0 ? (
@@ -371,10 +371,10 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       </div>
 
       <div
-        className="rounded-lg border p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        className="rounded-lg p-4 flex flex-col gap-3"
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Fotos
         </h3>
         <PhotoGallery photos={photos} deleteMode={canManage ? "staff" : undefined} />

@@ -300,11 +300,11 @@ export function RequestItemsTable({
 
   return (
     <div
-      className="rounded-lg border p-4 flex flex-col gap-1"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      className="rounded-lg p-4 flex flex-col gap-1"
+      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
     >
       <div className="flex items-center justify-between">
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+        <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Produtos
         </span>
         {total > 0 ? (

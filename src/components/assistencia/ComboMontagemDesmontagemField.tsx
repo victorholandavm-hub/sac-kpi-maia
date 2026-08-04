@@ -22,8 +22,8 @@ export function ComboMontagemDesmontagemField({
 
   return (
     <div
-      className="flex items-center justify-between gap-2 rounded-lg border p-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      className="flex items-center justify-between gap-2 rounded-lg p-4"
+      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
     >
       <span className="text-sm" style={{ color: "var(--text-primary)" }}>
         Também precisa de {complemento} nessa visita:{" "}
