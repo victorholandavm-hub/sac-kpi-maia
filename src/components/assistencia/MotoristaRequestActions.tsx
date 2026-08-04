@@ -137,10 +137,15 @@ export function MotoristaRequestActions({
       ) : null}
 
       {mode === "rating" ? (
-        <div className="flex flex-col gap-4 rounded-lg border p-3" style={{ borderColor: "var(--status-good)" }}>
-          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            Passe o celular pro cliente avaliar (0 a 10):
-          </span>
+        <div
+          className="flex flex-col gap-4 rounded-lg p-4"
+          style={{ border: "2px solid var(--status-good)", background: "color-mix(in srgb, var(--status-good) 8%, var(--surface-1))" }}
+        >
+          <div className="rounded-lg py-3 px-2 text-center" style={{ background: "var(--status-good)" }}>
+            <p className="text-lg font-bold" style={{ color: "#fff" }}>
+              📱 Vire o celular pro cliente avaliar!
+            </p>
+          </div>
           <RatingScale label="Nota pra entrega" value={deliveryRating} onChange={setDeliveryRating} />
           <RatingScale label="Nota pra resolução do problema" value={resolutionRating} onChange={setResolutionRating} />
           <div className="flex items-center gap-2">

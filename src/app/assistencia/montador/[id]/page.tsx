@@ -80,9 +80,12 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
         ) : null}
 
         <div
-          className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+          className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
+          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
         >
+          <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
+            Detalhes
+          </h3>
           <Row label="Cliente" value={request.clientName} />
           {request.comboMontagemDesmontagem ? (
             <div className="flex flex-col gap-2">
@@ -140,11 +143,28 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div
+          className="rounded-lg p-4 flex flex-col gap-3"
+          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+        >
+          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+            Fotos
+          </h3>
           <PhotoGallery photos={photos} deleteMode="montador" currentActor={assemblerName} />
           <MontadorPhotoUpload requestId={request.id} />
-          {!showCompleted ? <MontadorRequestActions requestId={request.id} /> : null}
         </div>
+
+        {!showCompleted ? (
+          <div
+            className="rounded-lg p-4 flex flex-col gap-3"
+            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          >
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              Ações
+            </h3>
+            <MontadorRequestActions requestId={request.id} />
+          </div>
+        ) : null}
       </div>
     </ToastProvider>
   );

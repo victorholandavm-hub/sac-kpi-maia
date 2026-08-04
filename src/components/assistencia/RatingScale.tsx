@@ -12,17 +12,17 @@ export function RatingScale({
   onChange: (value: number) => void;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+    <div className="flex flex-col gap-2">
+      <span className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
         {label}
       </span>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {RATING_VALUES.map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => onChange(n)}
-            className="text-sm rounded-lg w-9 h-9 font-medium border shrink-0"
+            className="text-lg rounded-lg w-12 h-12 font-bold border-2 shrink-0"
             style={
               value === n
                 ? { background: "var(--brand-green)", color: "var(--brand-green-ink)", borderColor: "var(--brand-green)" }

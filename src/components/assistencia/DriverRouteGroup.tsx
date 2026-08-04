@@ -68,7 +68,7 @@ export function DriverRouteGroup({
   }
 
   return (
-    <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+    <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
       <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
         {order.map((r, i) => (
           <div key={r.id} className="flex items-center gap-2 p-4 flex-wrap">

@@ -92,9 +92,12 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
         ) : null}
 
         <div
-          className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+          className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
+          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
         >
+          <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
+            Detalhes
+          </h3>
           <Row label="Cliente" value={request.clientName} />
           <Row label="Produto a entregar" value={request.productSummary} />
           <Row label="Endereço" value={request.clientAddress} />
@@ -126,13 +129,28 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div
+          className="rounded-lg p-4 flex flex-col gap-3"
+          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+        >
+          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+            Fotos
+          </h3>
           <PhotoGallery photos={photos} deleteMode="driver" currentActor={driverName} />
           <MotoristaPhotoUpload requestId={request.id} />
-          {!showCompleted ? (
-            <MotoristaRequestActions requestId={request.id} pickupCompleted={request.pickupCompleted} requestType={request.type} />
-          ) : null}
         </div>
+
+        {!showCompleted ? (
+          <div
+            className="rounded-lg p-4 flex flex-col gap-3"
+            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          >
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              Ações
+            </h3>
+            <MotoristaRequestActions requestId={request.id} pickupCompleted={request.pickupCompleted} requestType={request.type} />
+          </div>
+        ) : null}
       </div>
     </ToastProvider>
   );

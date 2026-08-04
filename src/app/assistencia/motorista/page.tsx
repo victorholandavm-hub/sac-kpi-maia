@@ -97,7 +97,7 @@ export default async function MotoristaHomePage({
           const rotaGroups = groupByRota(buckets.get(key)!);
           return (
             <details key={key} open={DATE_BUCKET_DEFAULT_OPEN[key]}>
-              <summary className="text-base font-bold cursor-pointer py-1" style={{ color: "var(--brand-green)" }}>
+              <summary className="text-base font-bold cursor-pointer py-1" style={{ color: "var(--text-primary)" }}>
                 {DATE_BUCKET_LABELS[key]} ({buckets.get(key)!.length})
               </summary>
               <div className="flex flex-col gap-3 mt-2">
