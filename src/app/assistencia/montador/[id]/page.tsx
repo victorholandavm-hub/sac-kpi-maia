@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getMontadorSession } from "@/app/assistencia/montador-actions";
-import { getAssemblerRequestDetail } from "@/lib/serviceRequests";
+import { getAssemblerRequestDetail, montadorEffectiveDate } from "@/lib/serviceRequests";
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
@@ -47,7 +47,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
 
   const photos = await listRequestPhotos(request.id);
   const showCompleted = request.status === "concluida" || request.status === "cancelada";
-  const deadline = request.approvedDeadline ?? request.requestedDeadline;
+  const montadorDate = montadorEffectiveDate(request);
   const mapsQuery = [request.clientAddress, request.clientNeighborhood].filter(Boolean).join(", ");
 
   return (
@@ -71,15 +71,11 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           ) : null}
         </div>
 
-        {request.scheduledDate ? (
+        {montadorDate ? (
           <p className="text-sm font-medium" style={{ color: "var(--brand-green)" }}>
-            {formatDateOnly(request.scheduledDate)}
+            Data da montagem: {formatDateOnly(montadorDate)}
             {request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}
             {request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}
-          </p>
-        ) : deadline ? (
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Data da montagem: {formatDateOnly(deadline)} (sem visita agendada ainda)
           </p>
         ) : null}
 
@@ -119,7 +115,6 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           )}
           <Row label="Endereço" value={request.clientAddress} />
           <Row label="Bairro" value={request.clientNeighborhood} />
-          <Row label="Motivo" value={request.reason} />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

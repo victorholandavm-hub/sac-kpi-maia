@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getMontadorSession, montadorSignOut } from "@/app/assistencia/montador-actions";
-import { listRequestsForAssembler, type AssemblerRequestView } from "@/lib/serviceRequests";
+import { listRequestsForAssembler, montadorEffectiveDate, type AssemblerRequestView } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
-import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, DATE_BUCKET_DEFAULT_OPEN, groupByDateBucket } from "@/lib/dateBuckets";
+import { groupByDateDetailed } from "@/lib/dateBuckets";
 
 export const dynamic = "force-dynamic";
 
@@ -44,15 +44,11 @@ function RequestRow({ r }: { r: AssemblerRequestView }) {
             {r.productSummary}
           </p>
         ) : null}
-        {r.scheduledDate ? (
+        {montadorEffectiveDate(r) ? (
           <p className="text-xs font-medium" style={{ color: "var(--brand-green)" }}>
-            {formatDateOnly(r.scheduledDate)}
+            Data da montagem: {formatDateOnly(montadorEffectiveDate(r))}
             {r.scheduledTime ? ` às ${r.scheduledTime.slice(0, 5)}` : ""}
             {r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
-          </p>
-        ) : (r.approvedDeadline ?? r.requestedDeadline) ? (
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Data da montagem: {formatDateOnly(r.approvedDeadline ?? r.requestedDeadline)}
           </p>
         ) : null}
       </div>
@@ -81,7 +77,7 @@ export default async function MontadorHomePage({
   const showCompleted = view === "concluidas";
 
   const requests = await listRequestsForAssembler(assemblerName, { onlyCompleted: showCompleted });
-  const buckets = !showCompleted ? groupByDateBucket(requests, (r) => r.scheduledDate) : null;
+  const groups = !showCompleted ? groupByDateDetailed(requests, montadorEffectiveDate) : null;
 
   return (
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
@@ -134,15 +130,15 @@ export default async function MontadorHomePage({
             {showCompleted ? "Nenhum chamado concluído ainda." : "Nenhum chamado em aberto no momento."}
           </p>
         </div>
-      ) : buckets ? (
-        DATE_BUCKET_ORDER.filter((key) => (buckets.get(key)?.length ?? 0) > 0).map((key) => (
-          <details key={key} open={DATE_BUCKET_DEFAULT_OPEN[key]}>
+      ) : groups ? (
+        groups.map((g) => (
+          <details key={g.key} open={g.defaultOpen}>
             <summary className="text-base font-bold cursor-pointer py-1" style={{ color: "var(--brand-green)" }}>
-              {DATE_BUCKET_LABELS[key]} ({buckets.get(key)!.length})
+              {g.label} ({g.items.length})
             </summary>
             <div className="rounded-lg overflow-hidden mt-2" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
               <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
-                {buckets.get(key)!.map((r) => (
+                {g.items.map((r) => (
                   <RequestRow key={r.id} r={r} />
                 ))}
               </div>

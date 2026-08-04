@@ -525,7 +525,6 @@ export type AssemblerRequestView = {
   clientNeighborhood: string | null;
   productSummary: string | null;
   items: AssemblerRequestItem[];
-  reason: string | null;
   scheduledDate: string | null;
   scheduledTime: string | null;
   shift: Shift | null;
@@ -536,9 +535,26 @@ export type AssemblerRequestView = {
   comboMontagemDesmontagem: boolean;
 };
 
+// Montagem/desmontagem raramente passa pelo "agendar" (ScheduleField) --
+// na prática a assistência só negocia o prazo com a loja (approveDeadline/
+// rejectDeadline) e isso vira a data que vale pro montador. Sem esse
+// fallback, um chamado sem visita agendada explícita sumia do agrupamento
+// por dia da tela do motorista/montador e caía sempre em "Sem data
+// agendada", mesmo já tendo uma data combinada. Usado tanto pra ordenar
+// (listRequestsForAssembler) quanto pra agrupar/exibir (montador/page.tsx,
+// montador/[id]/page.tsx).
+export function montadorEffectiveDate(
+  r: Pick<AssemblerRequestView, "scheduledDate" | "approvedDeadline" | "requestedDeadline">
+): string | null {
+  return r.scheduledDate ?? r.approvedDeadline ?? r.requestedDeadline;
+}
+
 const ASSEMBLER_VIEW_LIMIT = 200;
+// Sem "reason" (Motivo) de propósito -- pode conter detalhe sensível (ex.:
+// valor já pago pelo cliente, ver #4578) que o montador não deveria ver.
+// Fora da lista de colunas, não só escondido na tela, pra nem trafegar.
 const ASSEMBLER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, stores(name), items:service_request_items(product, quantity, item_action)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, stores(name), items:service_request_items(product, quantity, item_action)";
 
 type AssemblerViewRow = {
   id: string;
@@ -549,7 +565,6 @@ type AssemblerViewRow = {
   client_phone: string | null;
   client_address: string | null;
   client_neighborhood: string | null;
-  reason: string | null;
   scheduled_date: string | null;
   scheduled_time: string | null;
   shift: Shift | null;
@@ -579,7 +594,6 @@ function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
       quantity: i.quantity,
       action: i.item_action === "montar" || i.item_action === "desmontar" ? i.item_action : null,
     })),
-    reason: row.reason,
     scheduledDate: row.scheduled_date,
     scheduledTime: row.scheduled_time,
     shift: row.shift,
@@ -605,20 +619,35 @@ export async function listRequestsForAssembler(
   if (opts.onlyCompleted) {
     query = query.eq("status", "concluida").order("completed_at", { ascending: false });
   } else {
-    // Ordenado pela data/hora agendada (quem não tem data ainda fica por
-    // último, já que não dá pra saber quando é) — assim o montador vê o
-    // próximo compromisso primeiro, não só quem foi criado primeiro.
-    query = query
-      .not("status", "in", "(concluida,cancelada)")
-      .order("scheduled_date", { ascending: true, nullsFirst: false })
-      .order("scheduled_time", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: true });
+    query = query.not("status", "in", "(concluida,cancelada)");
   }
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  return ((data ?? []) as unknown as AssemblerViewRow[]).map(toAssemblerView);
+  const items = ((data ?? []) as unknown as AssemblerViewRow[]).map(toAssemblerView);
+
+  if (!opts.onlyCompleted) {
+    // Ordenado pela data efetiva (visita agendada, ou -- sem agendamento --
+    // o prazo combinado com a loja, ver montadorEffectiveDate acima; quem
+    // não tem data nenhuma fica por último) -- feito em JS porque o
+    // fallback entre 3 colunas não dá pra expressar num .order() do
+    // Supabase sem SQL bruto.
+    items.sort((a, b) => {
+      const dateA = montadorEffectiveDate(a);
+      const dateB = montadorEffectiveDate(b);
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+      const timeA = a.scheduledTime ?? "";
+      const timeB = b.scheduledTime ?? "";
+      if (timeA !== timeB) return timeA < timeB ? -1 : 1;
+      return a.createdAt < b.createdAt ? -1 : 1;
+    });
+  }
+
+  return items;
 }
 
 // Detalhe de um chamado específico pro montador (tela "Ver chamado") — o

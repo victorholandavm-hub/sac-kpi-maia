@@ -53,3 +53,63 @@ export function groupByDateBucket<T>(items: T[], getDate: (item: T) => string | 
   }
   return groups;
 }
+
+const WEEKDAY_LABELS = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+
+function formatDDMM(dateStr: string): string {
+  const [, m, d] = dateStr.split("-");
+  return `${d}/${m}`;
+}
+
+function formatWeekdayDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${WEEKDAY_LABELS[weekday]}, ${formatDDMM(dateStr)}`;
+}
+
+export type DetailedDateGroup<T> = { key: string; label: string; defaultOpen: boolean; items: T[] };
+
+// Variante pro montador: em vez de amontoar tudo que não é hoje/amanhã num
+// "Depois" genérico (jeito que a lista do motorista usa, onde faz sentido
+// porque ele lida com muitos dias de rota ao mesmo tempo), cada dia depois
+// de amanhã vira o próprio grupo com a data de verdade -- montador olha
+// dia a dia, não a rota inteira de uma vez.
+export function groupByDateDetailed<T>(items: T[], getDate: (item: T) => string | null | undefined): DetailedDateGroup<T>[] {
+  const todayStr = new Date(Date.now() + BUSINESS_TZ_OFFSET_MS).toISOString().slice(0, 10);
+  const tomorrowStr = new Date(Date.parse(`${todayStr}T00:00:00Z`) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const buckets = new Map<string, T[]>();
+  for (const item of items) {
+    const dateStr = getDate(item);
+    let key: string;
+    if (!dateStr) key = "sem_data";
+    else {
+      const bucket = bucketByScheduledDate(dateStr);
+      key = bucket === "depois" ? dateStr : bucket;
+    }
+    const list = buckets.get(key) ?? [];
+    list.push(item);
+    buckets.set(key, list);
+  }
+
+  const result: DetailedDateGroup<T>[] = [];
+  if (buckets.has("atrasado")) {
+    result.push({ key: "atrasado", label: "Atrasado", defaultOpen: true, items: buckets.get("atrasado")! });
+  }
+  if (buckets.has("hoje")) {
+    result.push({ key: "hoje", label: `Hoje · ${formatDDMM(todayStr)}`, defaultOpen: true, items: buckets.get("hoje")! });
+  }
+  if (buckets.has("amanha")) {
+    result.push({ key: "amanha", label: `Amanhã · ${formatDDMM(tomorrowStr)}`, defaultOpen: false, items: buckets.get("amanha")! });
+  }
+  const futureDates = [...buckets.keys()]
+    .filter((k) => k !== "atrasado" && k !== "hoje" && k !== "amanha" && k !== "sem_data")
+    .sort();
+  for (const dateStr of futureDates) {
+    result.push({ key: dateStr, label: formatWeekdayDate(dateStr), defaultOpen: false, items: buckets.get(dateStr)! });
+  }
+  if (buckets.has("sem_data")) {
+    result.push({ key: "sem_data", label: "Sem data agendada", defaultOpen: false, items: buckets.get("sem_data")! });
+  }
+  return result;
+}
