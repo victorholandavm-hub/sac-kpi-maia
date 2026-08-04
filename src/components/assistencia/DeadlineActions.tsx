@@ -4,9 +4,26 @@ import { useState } from "react";
 import { approveDeadline, rejectDeadline } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
 
-export function DeadlineActions({ requestId }: { requestId: string }) {
+function formatDateOnly(value: string | null): string | null {
+  if (!value) return null;
+  const [y, m, d] = value.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+export function DeadlineActions({
+  requestId,
+  requestedDeadline,
+  deadlineStatus,
+  approvedDeadline,
+}: {
+  requestId: string;
+  requestedDeadline: string | null;
+  deadlineStatus: "pendente" | "recusado";
+  approvedDeadline: string | null;
+}) {
   const { pending, run } = useQuickAction();
   const [proposedDate, setProposedDate] = useState("");
+  const isRecusado = deadlineStatus === "recusado";
 
   return (
     <div
@@ -14,8 +31,17 @@ export function DeadlineActions({ requestId }: { requestId: string }) {
       style={{ background: "var(--surface-1)", borderColor: "var(--status-warning)" }}
     >
       <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-        Prazo pendente de aprovação
+        {isRecusado ? "Nova data proposta pela assistência" : "Prazo pendente de aprovação"}
       </h3>
+
+      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+        Prazo pedido pelo gerente: <strong>{formatDateOnly(requestedDeadline) ?? "—"}</strong>
+      </p>
+      {isRecusado ? (
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          Data proposta atualmente: <strong>{formatDateOnly(approvedDeadline) ?? "—"}</strong>
+        </p>
+      ) : null}
 
       <button
         disabled={pending}
@@ -28,7 +54,7 @@ export function DeadlineActions({ requestId }: { requestId: string }) {
 
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Ou propor outra data:
+          {isRecusado ? "Alterar a data proposta:" : "Ou propor outra data:"}
         </span>
         <input
           type="date"
@@ -43,7 +69,7 @@ export function DeadlineActions({ requestId }: { requestId: string }) {
           className="text-sm rounded px-3 py-2 border disabled:opacity-60"
           style={{ borderColor: "var(--border)" }}
         >
-          Recusar e propor
+          {isRecusado ? "Atualizar data proposta" : "Recusar e propor"}
         </button>
       </div>
     </div>

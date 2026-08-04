@@ -154,7 +154,34 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         ) : null}
       </div>
 
-      {canManage && request.deadlineStatus === "pendente" ? <DeadlineActions requestId={request.id} /> : null}
+      <div
+        className="rounded-lg border p-4 flex flex-col gap-2"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      >
+        <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+          Responsável pelo atendimento
+        </h3>
+        {isDeliveryType ? (
+          canManage ? (
+            <DriverNameField requestId={request.id} value={request.driverName} drivers={drivers} />
+          ) : (
+            <Row label="Nome do motorista" value={request.driverName ?? "Não definido"} />
+          )
+        ) : canManage ? (
+          <AssemblerNameField requestId={request.id} requestType={request.type} value={request.assemblerName} assemblers={assemblers} />
+        ) : (
+          <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
+        )}
+      </div>
+
+      {canManage && request.deadlineStatus !== "aprovado" ? (
+        <DeadlineActions
+          requestId={request.id}
+          requestedDeadline={request.requestedDeadline}
+          deadlineStatus={request.deadlineStatus as "pendente" | "recusado"}
+          approvedDeadline={request.approvedDeadline}
+        />
+      ) : null}
 
       {canManage ? (
         <RequestActions
@@ -167,12 +194,31 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         />
       ) : null}
 
+      <div
+        className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      >
+        <h3 className="text-xs font-semibold uppercase tracking-wide sm:col-span-2" style={{ color: "var(--text-muted)" }}>
+          Pedido e cliente
+        </h3>
+        <Row label="Código do pedido/venda" value={request.orderCode} />
+        <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
+        <Row label="Vendedor(a)" value={request.sellerName} />
+        <Row label="Cliente" value={request.clientName} />
+        <Row label="CPF" value={request.clientCpf} />
+        <Row label="Telefone" value={request.clientPhone} />
+        <Row label="Endereço" value={request.clientAddress} />
+        <Row label="Bairro" value={request.clientNeighborhood} />
+      </div>
+
       {canManage ? (
         <RequestItemsTable
           items={request.items}
           requestId={request.id}
           requestStatus={request.status}
+          requestType={request.type}
           canEditValues={profile.fullName === PAYMENTS_CONTROLLER_NAME}
+          canEditItems={profile.role === "admin" || profile.role === "assistencia"}
         />
       ) : request.items.length > 0 ? (
         <div
@@ -206,39 +252,6 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       ) : null}
 
       <div
-        className="rounded-lg border p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Fotos
-        </h3>
-        <PhotoGallery photos={photos} deleteMode={canManage ? "staff" : undefined} />
-        {photos.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhuma foto anexada ainda.
-          </p>
-        ) : null}
-        {canManage ? <RequestPhotoUpload requestId={request.id} /> : null}
-      </div>
-
-      <div
-        className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <h3 className="text-xs font-semibold uppercase tracking-wide sm:col-span-2" style={{ color: "var(--text-muted)" }}>
-          Pedido e cliente
-        </h3>
-        <Row label="Código do pedido/venda" value={request.orderCode} />
-        <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
-        <Row label="Vendedor(a)" value={request.sellerName} />
-        <Row label="Cliente" value={request.clientName} />
-        <Row label="CPF" value={request.clientCpf} />
-        <Row label="Telefone" value={request.clientPhone} />
-        <Row label="Endereço" value={request.clientAddress} />
-        <Row label="Bairro" value={request.clientNeighborhood} />
-      </div>
-
-      <div
         className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
         style={{ background: "var(--brand-orange-soft)", borderColor: "var(--brand-orange)", borderLeftWidth: "4px" }}
       >
@@ -250,17 +263,6 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         <Row label="Observações" value={request.notes} />
         <Row label="Solicitado por" value={request.requestedByName} />
         <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
-        {isDeliveryType ? (
-          canManage ? (
-            <DriverNameField requestId={request.id} value={request.driverName} drivers={drivers} />
-          ) : (
-            <Row label="Nome do motorista" value={request.driverName ?? "Não definido"} />
-          )
-        ) : canManage ? (
-          <AssemblerNameField requestId={request.id} requestType={request.type} value={request.assemblerName} assemblers={assemblers} />
-        ) : (
-          <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
-        )}
         {(request.type === "montagem" || request.type === "desmontagem") && !canManage ? (
           <Row
             label={request.type === "montagem" ? "Também precisa desmontar o antigo?" : "Também precisa montar o novo?"}
@@ -366,6 +368,22 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
             ))}
           </ul>
         )}
+      </div>
+
+      <div
+        className="rounded-lg border p-4 flex flex-col gap-3"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+      >
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          Fotos
+        </h3>
+        <PhotoGallery photos={photos} deleteMode={canManage ? "staff" : undefined} />
+        {photos.length === 0 ? (
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Nenhuma foto anexada ainda.
+          </p>
+        ) : null}
+        {canManage ? <RequestPhotoUpload requestId={request.id} /> : null}
       </div>
     </div>
   );

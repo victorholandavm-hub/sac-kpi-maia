@@ -961,6 +961,79 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
   revalidatePath(`/assistencia/${requestId}`);
 }
 
+// Adicionar/remover produto era só do gerente da loja, e só enquanto o
+// chamado ainda está "aberta" (ver editServiceRequestByGerente) -- isso
+// continua valendo pra correção antes do atendimento começar. Mas no meio
+// do atendimento (ex.: montador em loja, gerente pede pra montar/desmontar
+// mais um item, o montador avisa a assistência) só a assistência/admin
+// pode ajustar, em qualquer status -- daí essas duas actions à parte, sem
+// trava de status nenhuma.
+export async function addRequestItemByStaff(
+  requestId: string,
+  input: { product: string; partCode?: string; quantity: number; action?: "montar" | "desmontar" | null }
+): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  const admin = getSupabaseAdmin();
+
+  const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
+  if (!current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+
+  const product = input.product.trim();
+  if (!product) throw new Error("Informe o produto.");
+  const quantity = Math.max(1, input.quantity || 1);
+
+  const { error } = await admin.from("service_request_items").insert({
+    request_id: requestId,
+    product,
+    part_code: input.partCode?.trim() || null,
+    quantity,
+    item_action: input.action ?? null,
+  });
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: `Produto adicionado: ${quantity > 1 ? `${quantity}x ` : ""}${product}${input.action ? ` (${input.action})` : ""}.`,
+  });
+
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
+export async function removeRequestItemByStaff(requestId: string, itemId: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  const admin = getSupabaseAdmin();
+
+  const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
+  if (!current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+
+  const { data: item } = await admin
+    .from("service_request_items")
+    .select("product, quantity, payment_released")
+    .eq("id", itemId)
+    .eq("request_id", requestId)
+    .maybeSingle();
+  if (!item) throw new Error("Item não encontrado.");
+  if (item.payment_released) throw new Error("Esse item já teve pagamento liberado — não dá pra remover.");
+
+  const { error } = await admin.from("service_request_items").delete().eq("id", itemId);
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: `Produto removido: ${item.quantity > 1 ? `${item.quantity}x ` : ""}${item.product}.`,
+  });
+
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
 // Liga/desliga a necessidade complementar (montagem<->desmontagem) num
 // chamado já criado — a loja pode ter esquecido de marcar, ou a assistência
 // percebe depois que precisa das duas coisas na mesma visita.

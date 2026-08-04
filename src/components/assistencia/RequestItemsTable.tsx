@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { setItemUnitValue, setItemPaymentReleased, setItemPaymentAuthorizedBy } from "@/app/assistencia/pagamentos-actions";
+import { addRequestItemByStaff, removeRequestItemByStaff } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
 import type { RequestItem } from "@/lib/serviceRequests";
 
@@ -18,11 +19,13 @@ function ItemRow({
   requestId,
   requestStatus,
   canEditValues,
+  canEditItems,
 }: {
   item: RequestItem;
   requestId: string;
   requestStatus: string;
   canEditValues: boolean;
+  canEditItems: boolean;
 }) {
   const isConcluded = requestStatus === "concluida";
   const { pending, run, showToast } = useQuickAction();
@@ -32,6 +35,11 @@ function ItemRow({
   const [authValue, setAuthValue] = useState(item.paymentAuthorizedBy ?? "");
 
   const total = item.unitValue !== null ? item.unitValue * item.quantity : null;
+
+  function remove() {
+    if (!window.confirm(`Remover "${item.product}" desse chamado?`)) return;
+    run(() => removeRequestItemByStaff(requestId, item.id), "Produto removido.");
+  }
 
   function saveValue() {
     const parsed = parseFloat(value.replace(",", "."));
@@ -80,6 +88,16 @@ function ItemRow({
         {item.quantity > 1 ? `${item.quantity}x ` : ""}
         {item.product}
         {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
+        {canEditItems ? (
+          <button
+            onClick={remove}
+            disabled={pending}
+            className="text-xs underline ml-2 disabled:opacity-60"
+            style={{ color: "var(--status-critical)" }}
+          >
+            remover
+          </button>
+        ) : null}
       </span>
       <div className="flex items-center gap-3">
         {editing ? (
@@ -184,18 +202,100 @@ function ItemRow({
   );
 }
 
+// Só assistência/admin vê isso (canEditItems) -- montador em loja pede pra
+// ajustar montagem/desmontagem na hora, e a assistência precisa conseguir
+// adicionar/remover produto sem depender do gerente reabrir a solicitação
+// (que só funciona enquanto o status ainda é "aberta", ver
+// editServiceRequestByGerente em actions.ts).
+function AddItemForm({ requestId, requestType }: { requestId: string; requestType: string }) {
+  const { pending, run, showToast } = useQuickAction();
+  const showAction = requestType === "montagem" || requestType === "desmontagem";
+  const [product, setProduct] = useState("");
+  const [partCode, setPartCode] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [action, setAction] = useState<"" | "montar" | "desmontar">(showAction ? "montar" : "");
+
+  function add() {
+    if (!product.trim()) {
+      showToast("Informe o produto.", "error");
+      return;
+    }
+    run(async () => {
+      await addRequestItemByStaff(requestId, {
+        product,
+        partCode: partCode || undefined,
+        quantity: Math.max(1, parseInt(quantity, 10) || 1),
+        action: showAction ? action || null : null,
+      });
+      setProduct("");
+      setPartCode("");
+      setQuantity("1");
+    }, "Produto adicionado.");
+  }
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap pt-2" style={{ borderTop: "1px solid var(--gridline)" }}>
+      <input
+        value={product}
+        onChange={(e) => setProduct(e.target.value)}
+        placeholder="Produto"
+        className="rounded border px-2 py-1 text-sm flex-1 min-w-[140px]"
+        style={{ borderColor: "var(--border)" }}
+      />
+      <input
+        value={partCode}
+        onChange={(e) => setPartCode(e.target.value)}
+        placeholder="Código (opcional)"
+        className="rounded border px-2 py-1 text-sm w-32"
+        style={{ borderColor: "var(--border)" }}
+      />
+      <input
+        value={quantity}
+        onChange={(e) => setQuantity(e.target.value)}
+        type="number"
+        min={1}
+        className="rounded border px-2 py-1 text-sm w-16"
+        style={{ borderColor: "var(--border)" }}
+      />
+      {showAction ? (
+        <select
+          value={action}
+          onChange={(e) => setAction(e.target.value as "montar" | "desmontar")}
+          className="rounded border px-2 py-1 text-sm"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <option value="montar">Montar</option>
+          <option value="desmontar">Desmontar</option>
+        </select>
+      ) : null}
+      <button
+        onClick={add}
+        disabled={pending}
+        className="text-xs rounded px-2 py-1.5 font-medium disabled:opacity-60"
+        style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+      >
+        + Adicionar produto
+      </button>
+    </div>
+  );
+}
+
 export function RequestItemsTable({
   items,
   requestId,
   requestStatus,
+  requestType,
   canEditValues,
+  canEditItems,
 }: {
   items: RequestItem[];
   requestId: string;
   requestStatus: string;
+  requestType: string;
   canEditValues: boolean;
+  canEditItems: boolean;
 }) {
-  if (items.length === 0) return null;
+  if (items.length === 0 && !canEditItems) return null;
   const total = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
 
   return (
@@ -214,8 +314,16 @@ export function RequestItemsTable({
         ) : null}
       </div>
       {items.map((item) => (
-        <ItemRow key={item.id} item={item} requestId={requestId} requestStatus={requestStatus} canEditValues={canEditValues} />
+        <ItemRow
+          key={item.id}
+          item={item}
+          requestId={requestId}
+          requestStatus={requestStatus}
+          canEditValues={canEditValues}
+          canEditItems={canEditItems}
+        />
       ))}
+      {canEditItems ? <AddItemForm requestId={requestId} requestType={requestType} /> : null}
     </div>
   );
 }
