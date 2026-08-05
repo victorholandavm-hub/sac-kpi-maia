@@ -20,6 +20,10 @@ export function EditRequestForm({ request, stores }: { request: ServiceRequestDe
   const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, undefined);
   const showAddressNumber = request.type === "montagem" || request.type === "desmontagem";
   const [isApartment, setIsApartment] = useState(request.clientIsApartment);
+  // Só tipos que passam por montador/técnico -- entrega é sempre motorista
+  // (sem montador pra instruir) e notificação externa não tem visita
+  // nenhuma.
+  const showMontadorInstruction = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"].includes(request.type);
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -109,6 +113,19 @@ export function EditRequestForm({ request, stores }: { request: ServiceRequestDe
       <Field label="Motivo">
         <textarea name="reason" defaultValue={request.reason ?? ""} rows={2} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
+
+      {showMontadorInstruction ? (
+        <Field label="Instrução pro montador (visível pra ele, separado do Motivo acima)">
+          <textarea
+            name="montador_instruction"
+            defaultValue={request.montadorInstruction ?? ""}
+            rows={2}
+            placeholder="Ex: cliente prefere que chegue depois das 14h, subir móvel pelo elevador de serviço…"
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+        </Field>
+      ) : null}
 
       <Field label="Restrição / observação">
         <input name="restriction_note" defaultValue={request.restrictionNote ?? ""} className="rounded border px-3 py-2" style={inputStyle} />

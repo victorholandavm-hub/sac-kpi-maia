@@ -1352,6 +1352,7 @@ export async function updateRequestDetails(
       client_address_complement: emptyToNull(addressNumberFields.complement),
       client_neighborhood: emptyToNull(formData.get("client_neighborhood")),
       reason: emptyToNull(formData.get("reason")),
+      montador_instruction: emptyToNull(formData.get("montador_instruction")),
       restriction_note: emptyToNull(formData.get("restriction_note")),
       notes: emptyToNull(formData.get("notes")),
       seller_name: emptyToNull(formData.get("seller_name")),
@@ -1491,7 +1492,6 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       shift: shift || null,
       assembler_name: assemblerName,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
-      montador_instruction: emptyToNull(formData.get("montador_instruction")),
       // Criação rápida não coleta prazo pedido pela loja, então não há nada
       // pra "aprovar" — sem isso, o padrão do banco (pendente) fazia a tela
       // sempre mostrar "prazo pendente de aprovação" sem sentido.
@@ -1580,13 +1580,34 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   }
 
   const driverNameInput = emptyToNull(formData.get("driver_name"));
-  const product = emptyToNull(formData.get("product"));
-  const partCode = emptyToNull(formData.get("part_code"));
-  const quantity = Math.max(1, parseInt(String(formData.get("quantity") ?? "1"), 10) || 1);
   const urgent = formData.get("urgent") === "on";
   // Só faz sentido pra montagem -- mesma ideia de createQuickRequest, pedir
   // pra desmontar o móvel velho na mesma visita sem abrir um segundo chamado.
   const comboMontagemDesmontagem = type === "montagem" && formData.get("combo_montagem_desmontagem") === "on";
+
+  function parseItems(prefix: string): { product: string; quantity: number; partCode: string | null }[] {
+    const products = formData.getAll(prefix + "_product").map((v) => String(v).trim());
+    const quantities = formData.getAll(prefix + "_quantity").map((v) => {
+      const n = parseInt(String(v), 10);
+      return Number.isFinite(n) && n > 0 ? n : 1;
+    });
+    const codes = formData.getAll(prefix + "_code").map((v) => String(v).trim() || null);
+    return products
+      .map((product, i) => ({ product, quantity: quantities[i] ?? 1, partCode: codes[i] ?? null }))
+      .filter((item) => item.product.length > 0);
+  }
+
+  // "item" é a lista principal (produto a entregar, ou a montar quando o
+  // type é montagem); "item_secondary" só existe com o combo marcado, e é
+  // sempre "a desmontar" (SAC não cria desmontagem isolada).
+  const primaryItems = parseItems("item").map((item) => ({ ...item, action: comboMontagemDesmontagem ? ("montar" as const) : null }));
+  const secondaryItems = comboMontagemDesmontagem
+    ? parseItems("item_secondary").map((item) => ({ ...item, action: "desmontar" as const }))
+    : [];
+  if (comboMontagemDesmontagem && secondaryItems.length === 0) {
+    return { error: "Informe pelo menos um móvel pra desmontar (a outra ação da visita combo)." };
+  }
+  const items = [...primaryItems, ...secondaryItems];
 
   const admin = getSupabaseAdmin();
   const driverName = driverNameInput ? await resolveDriverName(driverNameInput) : null;
@@ -1639,15 +1660,18 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     return { error: `Não foi possível criar: ${error?.message ?? "erro desconhecido"}` };
   }
 
-  if (product) {
-    const { error: itemError } = await admin.from("service_request_items").insert({
-      request_id: data.id,
-      product,
-      part_code: partCode,
-      quantity,
-    });
-    if (itemError) {
-      return { error: `Solicitação #${data.ticket_number} criada, mas falhou ao salvar o item: ${itemError.message}` };
+  if (items.length > 0) {
+    const { error: itemsError } = await admin.from("service_request_items").insert(
+      items.map((item) => ({
+        request_id: data.id,
+        product: item.product,
+        part_code: item.partCode,
+        quantity: item.quantity,
+        item_action: item.action,
+      }))
+    );
+    if (itemsError) {
+      return { error: `Solicitação #${data.ticket_number} criada, mas falhou ao salvar os itens: ${itemsError.message}` };
     }
   }
 

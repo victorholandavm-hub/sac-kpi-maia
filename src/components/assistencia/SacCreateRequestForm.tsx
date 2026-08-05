@@ -30,6 +30,92 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+type Item = { product: string; quantity: number; code: string };
+type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
+const blankItem = (): Item => ({ product: "", quantity: 1, code: "" });
+
+// Compartilhado entre a lista normal e a segunda lista do combo (montar +
+// desmontar na mesma visita) -- mesmo desenho de PublicRequestForm.tsx.
+function ItemsFields({
+  items,
+  lookupStatus,
+  onUpdate,
+  onAdd,
+  onRemove,
+  onLookup,
+  namePrefix,
+  productLabel,
+}: {
+  items: Item[];
+  lookupStatus: Record<number, ProductLookupStatus>;
+  onUpdate: (index: number, patch: Partial<Item>) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  onLookup: (index: number, code: string) => void;
+  namePrefix: string;
+  productLabel: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((item, i) => (
+        <div key={i} className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              name={`${namePrefix}_code`}
+              value={item.code}
+              onChange={(e) => onUpdate(i, { code: e.target.value })}
+              onBlur={(e) => onLookup(i, e.target.value)}
+              placeholder="Código"
+              className="w-28 rounded border px-2 py-2"
+              style={inputStyle}
+            />
+            <input
+              name={`${namePrefix}_product`}
+              value={item.product}
+              onChange={(e) => onUpdate(i, { product: e.target.value })}
+              required
+              placeholder={productLabel}
+              className="flex-1 min-w-[140px] rounded border px-2 py-2"
+              style={inputStyle}
+            />
+            <input
+              name={`${namePrefix}_quantity`}
+              type="number"
+              min={1}
+              value={item.quantity}
+              onChange={(e) => onUpdate(i, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+              className="w-16 rounded border px-2 py-2"
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              onClick={() => onRemove(i)}
+              disabled={items.length === 1}
+              className="text-sm px-2 py-2 disabled:opacity-40"
+              style={{ color: "var(--status-critical)" }}
+              aria-label="Remover item"
+            >
+              remover
+            </button>
+          </div>
+          {lookupStatus[i] === "loading" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Buscando…
+            </span>
+          ) : lookupStatus[i] === "not_found" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Código não encontrado.
+            </span>
+          ) : null}
+        </div>
+      ))}
+      <button type="button" onClick={onAdd} className="text-sm self-start underline" style={{ color: "var(--text-secondary)" }}>
+        + adicionar produto
+      </button>
+    </div>
+  );
+}
+
 
 export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; drivers: string[] }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
@@ -50,9 +136,52 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
   // desmontagem isolada (ver SacType acima).
   const showAddressNumber = type === "montagem";
 
-  const [productCode, setProductCode] = useState("");
-  const [product, setProduct] = useState("");
-  const [productLookupStatus, setProductLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+  // Combo só existe pra montagem -- SAC nem oferece desmontagem isolada (ver
+  // SacType). "item" é a lista principal (produtos a entregar, ou a montar
+  // quando o type é montagem); "item_secondary" só existe com o combo
+  // marcado, e é sempre "a desmontar" (não tem o inverso, já que SAC não
+  // cria desmontagem sozinha).
+  const [combo, setCombo] = useState(false);
+  const [items, setItems] = useState<Item[]>([blankItem()]);
+  const [itemsLookupStatus, setItemsLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
+  const [secondaryItems, setSecondaryItems] = useState<Item[]>([blankItem()]);
+  const [secondaryLookupStatus, setSecondaryLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
+
+  function makeItemHandlers(
+    setList: React.Dispatch<React.SetStateAction<Item[]>>,
+    setStatus: React.Dispatch<React.SetStateAction<Record<number, ProductLookupStatus>>>
+  ) {
+    function update(index: number, patch: Partial<Item>) {
+      setList((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+    }
+    function add() {
+      setList((prev) => [...prev, blankItem()]);
+    }
+    function remove(index: number) {
+      setList((prev) => prev.filter((_, i) => i !== index));
+    }
+    function lookup(index: number, code: string) {
+      if (!code.trim()) {
+        setStatus((prev) => ({ ...prev, [index]: "idle" }));
+        return;
+      }
+      setStatus((prev) => ({ ...prev, [index]: "loading" }));
+      lookupTotvsProductForTeam(code)
+        .then((match) => {
+          if (!match || !match.description) {
+            setStatus((prev) => ({ ...prev, [index]: "not_found" }));
+            return;
+          }
+          update(index, { product: match.description! });
+          setStatus((prev) => ({ ...prev, [index]: "found" }));
+        })
+        .catch(() => setStatus((prev) => ({ ...prev, [index]: "not_found" })));
+    }
+    return { update, add, remove, lookup };
+  }
+
+  const itemHandlers = makeItemHandlers(setItems, setItemsLookupStatus);
+  const secondaryHandlers = makeItemHandlers(setSecondaryItems, setSecondaryLookupStatus);
 
   // Mesma ideia de PublicRequestForm.tsx: código é só atalho, não trava nada
   // se não achar -- a pessoa preenche à mão como já era.
@@ -85,27 +214,6 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
     return () => clearTimeout(timer);
   }, [clientCode]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!productCode.trim()) {
-        setProductLookupStatus("idle");
-        return;
-      }
-      setProductLookupStatus("loading");
-      lookupTotvsProductForTeam(productCode)
-        .then((match) => {
-          if (!match || !match.description) {
-            setProductLookupStatus("not_found");
-            return;
-          }
-          setProduct(match.description);
-          setProductLookupStatus("found");
-        })
-        .catch(() => setProductLookupStatus("not_found"));
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [productCode]);
-
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
       <FormSection title="Tipo e loja" number={1}>
@@ -113,7 +221,11 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
           <select
             name="type"
             value={type}
-            onChange={(e) => setType(e.target.value as SacType)}
+            onChange={(e) => {
+              const next = e.target.value as SacType;
+              setType(next);
+              if (next !== "montagem") setCombo(false);
+            }}
             className="rounded border px-3 py-2"
             style={inputStyle}
           >
@@ -275,52 +387,30 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
 
       {showProduct ? (
         <FormSection
-          title={type === "montagem" ? "Móvel a montar" : "Produto e entrega"}
+          title={type === "montagem" ? (combo ? "Móveis a montar" : "Móvel(is) a montar") : "Produto(s) e entrega"}
           number={3}
           hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
         >
-          <div className="grid sm:grid-cols-3 gap-4">
-            <Field label="Código do produto">
-              <input
-                name="part_code"
-                value={productCode}
-                onChange={(e) => setProductCode(e.target.value)}
-                placeholder="Ex: SB-3050"
-                className="rounded border px-3 py-2"
-                style={inputStyle}
-              />
-              {productLookupStatus === "loading" ? (
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Buscando…
-                </span>
-              ) : productLookupStatus === "found" ? (
-                <span className="text-xs" style={{ color: "var(--status-good)" }}>
-                  Produto encontrado.
-                </span>
-              ) : productLookupStatus === "not_found" ? (
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Código não encontrado.
-                </span>
-              ) : null}
-            </Field>
-            <Field label={type === "montagem" ? "Móvel a montar" : "Produto a entregar"}>
-              <input
-                name="product"
-                value={product}
-                onChange={(e) => setProduct(e.target.value)}
-                placeholder="Ex: Super Box Confort Mola Ensacada"
-                className="rounded border px-3 py-2"
-                style={inputStyle}
-              />
-            </Field>
-            <Field label="Quantidade">
-              <input name="quantity" type="number" min={1} defaultValue={1} className="rounded border px-3 py-2" style={inputStyle} />
-            </Field>
-          </div>
+          <ItemsFields
+            items={items}
+            lookupStatus={itemsLookupStatus}
+            onUpdate={itemHandlers.update}
+            onAdd={itemHandlers.add}
+            onRemove={itemHandlers.remove}
+            onLookup={itemHandlers.lookup}
+            namePrefix="item"
+            productLabel="Ex: Super Box Confort Mola Ensacada"
+          />
 
           {type === "montagem" ? (
             <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
-              <input type="checkbox" name="combo_montagem_desmontagem" className="rounded" />
+              <input
+                type="checkbox"
+                name="combo_montagem_desmontagem"
+                checked={combo}
+                onChange={(e) => setCombo(e.target.checked)}
+                className="rounded"
+              />
               Também precisa desmontar o móvel antigo
             </label>
           ) : null}
@@ -338,7 +428,22 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         </FormSection>
       ) : null}
 
-      <FormSection title="Detalhes" number={4} hint="Conte o que aconteceu, com o máximo de detalhe que puder.">
+      {combo ? (
+        <FormSection title="Móveis a desmontar" number={4}>
+          <ItemsFields
+            items={secondaryItems}
+            lookupStatus={secondaryLookupStatus}
+            onUpdate={secondaryHandlers.update}
+            onAdd={secondaryHandlers.add}
+            onRemove={secondaryHandlers.remove}
+            onLookup={secondaryHandlers.lookup}
+            namePrefix="item_secondary"
+            productLabel="Ex: Roupeiro antigo"
+          />
+        </FormSection>
+      ) : null}
+
+      <FormSection title="Detalhes" number={5} hint="Conte o que aconteceu, com o máximo de detalhe que puder.">
         <Field label="Motivo *">
           <textarea name="reason" rows={2} required placeholder="Ex: produto entregue com avaria" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
