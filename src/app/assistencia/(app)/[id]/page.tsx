@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { RequestActions } from "@/components/assistencia/RequestActions";
 import { DeadlineActions } from "@/components/assistencia/DeadlineActions";
 import { AssemblerNameField } from "@/components/assistencia/AssemblerNameField";
+import { MontadorInstructionField } from "@/components/assistencia/MontadorInstructionField";
 import { ComboMontagemDesmontagemField } from "@/components/assistencia/ComboMontagemDesmontagemField";
 import { DriverNameField } from "@/components/assistencia/DriverNameField";
 import { ScheduleField } from "@/components/assistencia/ScheduleField";
@@ -168,7 +169,10 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
             <Row label="Nome do motorista" value={request.driverName ?? "Não definido"} />
           )
         ) : canManage ? (
-          <AssemblerNameField requestId={request.id} requestType={request.type} value={request.assemblerName} assemblers={assemblers} />
+          <>
+            <AssemblerNameField requestId={request.id} requestType={request.type} value={request.assemblerName} assemblers={assemblers} />
+            <MontadorInstructionField requestId={request.id} value={request.montadorInstruction} />
+          </>
         ) : (
           <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
         )}

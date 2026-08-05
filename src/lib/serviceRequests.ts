@@ -326,6 +326,7 @@ export type ServiceRequestDetail = ServiceRequestSummary & {
   notes: string | null;
   deliveryRating: number | null;
   resolutionRating: number | null;
+  montadorInstruction: string | null;
 };
 
 export type RequestEvent = {
@@ -356,6 +357,7 @@ type DetailRow = SummaryRow & {
   notes: string | null;
   delivery_rating: number | null;
   resolution_rating: number | null;
+  montador_instruction: string | null;
 };
 
 type EventRow = {
@@ -369,7 +371,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 export async function getRequestDetail(
   id: string
@@ -408,6 +410,7 @@ export async function getRequestDetail(
     notes: row.notes,
     deliveryRating: row.delivery_rating,
     resolutionRating: row.resolution_rating,
+    montadorInstruction: row.montador_instruction,
   };
 
   return { request, events };
@@ -572,6 +575,7 @@ export type AssemblerRequestView = {
   createdAt: string;
   completedAt: string | null;
   comboMontagemDesmontagem: boolean;
+  montadorInstruction: string | null;
 };
 
 // Montagem/desmontagem raramente passa pelo "agendar" (ScheduleField) --
@@ -592,8 +596,11 @@ const ASSEMBLER_VIEW_LIMIT = 200;
 // Sem "reason" (Motivo) de propósito -- pode conter detalhe sensível (ex.:
 // valor já pago pelo cliente, ver #4578) que o montador não deveria ver.
 // Fora da lista de colunas, não só escondido na tela, pra nem trafegar.
+// montador_instruction é diferente: campo separado que só assistência/admin
+// escreve (ver setMontadorInstruction em actions.ts), pensado justamente
+// pra aparecer aqui -- não tem o mesmo risco do Motivo do gerente.
 const ASSEMBLER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, stores(name), items:service_request_items(id, product, quantity, item_action, completed)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, montador_instruction, stores(name), items:service_request_items(id, product, quantity, item_action, completed)";
 
 type AssemblerViewRow = {
   id: string;
@@ -615,6 +622,7 @@ type AssemblerViewRow = {
   created_at: string;
   completed_at: string | null;
   combo_montagem_desmontagem: boolean;
+  montador_instruction: string | null;
   stores: { name: string } | null;
   items: { id: string; product: string; quantity: number; item_action: string | null; completed: boolean }[] | null;
 };
@@ -649,6 +657,7 @@ function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
     createdAt: row.created_at,
     completedAt: row.completed_at,
     comboMontagemDesmontagem: row.combo_montagem_desmontagem,
+    montadorInstruction: row.montador_instruction,
   };
 }
 

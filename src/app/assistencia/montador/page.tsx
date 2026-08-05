@@ -35,6 +35,14 @@ function RequestRow({ r }: { r: AssemblerRequestView }) {
               {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
             </span>
           ) : null}
+          {r.montadorInstruction ? (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+            >
+              ⚠ Instrução
+            </span>
+          ) : null}
         </div>
         <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
           {r.clientName ?? "Sem nome de cliente"}

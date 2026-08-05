@@ -1003,6 +1003,35 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
   revalidatePath(`/assistencia/${requestId}`);
 }
 
+// Campo separado do "Motivo" (que é do gerente da loja e continua escondido
+// do montador, ver ASSEMBLER_VIEW_COLUMNS em serviceRequests.ts) -- aqui só
+// assistência/admin escreve, e o texto é pensado pra ser visto pelo
+// montador, sem risco de vazar detalhe do gerente.
+export async function setMontadorInstruction(requestId: string, note: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+
+  const admin = getSupabaseAdmin();
+  const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
+  if (!current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+
+  const trimmed = note.trim();
+  const { error } = await admin.from("service_requests").update({ montador_instruction: trimmed || null }).eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: trimmed ? `Instrução pro montador atualizada: ${trimmed}` : "Instrução pro montador removida.",
+  });
+
+  revalidatePath(`/assistencia/${requestId}`);
+  revalidatePath("/assistencia/montador");
+  revalidatePath(`/assistencia/montador/${requestId}`);
+}
+
 // Adicionar/remover produto era só do gerente da loja, e só enquanto o
 // chamado ainda está "aberta" (ver editServiceRequestByGerente) -- isso
 // continua valendo pra correção antes do atendimento começar. Mas no meio

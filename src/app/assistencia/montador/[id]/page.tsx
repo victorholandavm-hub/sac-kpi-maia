@@ -79,6 +79,20 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           </p>
         ) : null}
 
+        {request.montadorInstruction ? (
+          <div
+            className="rounded-lg p-4 flex flex-col gap-1"
+            style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
+          >
+            <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+              ⚠ Instrução da assistência
+            </span>
+            <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-primary)" }}>
+              {request.montadorInstruction}
+            </p>
+          </div>
+        ) : null}
+
         <div
           className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
           style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
