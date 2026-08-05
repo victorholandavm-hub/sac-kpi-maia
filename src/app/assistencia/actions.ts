@@ -1388,16 +1388,54 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   if (assemblerName && (MANOEL_ONLY_TYPES as readonly string[]).includes(type) && assemblerName !== MANOEL_ONLY_ASSEMBLER) {
     return { error: `Só ${MANOEL_ONLY_ASSEMBLER} pode ser responsável por ${REQUEST_TYPE_LABELS[type]?.toLowerCase() ?? type}.` };
   }
-  const product = emptyToNull(formData.get("product"));
-  const unitValueRaw = String(formData.get("unit_value") ?? "").trim();
-  const unitValue = unitValueRaw ? parseFloat(unitValueRaw.replace(",", ".")) : null;
-  if (unitValueRaw && (unitValue === null || Number.isNaN(unitValue) || unitValue < 0)) {
-    return { error: "Valor inválido." };
-  }
-
   // Só faz sentido pra montagem/desmontagem — pedir os dois numa visita só,
   // sem precisar abrir dois chamados separados pro mesmo cliente.
   const comboMontagemDesmontagem = (type === "montagem" || type === "desmontagem") && formData.get("combo_montagem_desmontagem") === "on";
+
+  function parseItems(prefix: string): { product: string; quantity: number; partCode: string | null; unitValue: number | null }[] | { error: string } {
+    const products = formData.getAll(prefix + "_product").map((v) => String(v).trim());
+    const quantities = formData.getAll(prefix + "_quantity").map((v) => {
+      const n = parseInt(String(v), 10);
+      return Number.isFinite(n) && n > 0 ? n : 1;
+    });
+    const codes = formData.getAll(prefix + "_code").map((v) => String(v).trim() || null);
+    const unitValuesRaw = formData.getAll(prefix + "_unit_value").map((v) => String(v).trim());
+    const unitValues: (number | null)[] = [];
+    for (const raw of unitValuesRaw) {
+      if (!raw) {
+        unitValues.push(null);
+        continue;
+      }
+      const parsed = parseFloat(raw.replace(",", "."));
+      if (!Number.isFinite(parsed) || parsed < 0) return { error: "Valor inválido." };
+      unitValues.push(parsed);
+    }
+    return products
+      .map((product, i) => ({ product, quantity: quantities[i] ?? 1, partCode: codes[i] ?? null, unitValue: unitValues[i] ?? null }))
+      .filter((item) => item.product.length > 0);
+  }
+
+  // Sem combo, "item" é a lista única de sempre (a ação já é o type do
+  // chamado, quando aplicável). Com combo, "item" continua sendo os
+  // produtos do type principal e "item_secondary" os da ação oposta -- ver
+  // QuickCreateRequestForm.tsx.
+  const primaryAction: "montar" | "desmontar" | null = comboMontagemDesmontagem ? (type === "montagem" ? "montar" : "desmontar") : null;
+  const secondaryAction: "montar" | "desmontar" = primaryAction === "montar" ? "desmontar" : "montar";
+
+  const primaryItemsResult = parseItems("item");
+  if ("error" in primaryItemsResult) return { error: primaryItemsResult.error };
+  const primaryItems = primaryItemsResult.map((item) => ({ ...item, action: primaryAction }));
+
+  let secondaryItems: (typeof primaryItems)[number][] = [];
+  if (comboMontagemDesmontagem) {
+    const secondaryItemsResult = parseItems("item_secondary");
+    if ("error" in secondaryItemsResult) return { error: secondaryItemsResult.error };
+    secondaryItems = secondaryItemsResult.map((item) => ({ ...item, action: secondaryAction }));
+    if (secondaryItems.length === 0) {
+      return { error: `Informe pelo menos um produto pra ${secondaryAction === "montar" ? "montar" : "desmontar"} (a outra ação da visita combo).` };
+    }
+  }
+  const items = [...primaryItems, ...secondaryItems];
 
   const admin = getSupabaseAdmin();
 
@@ -1436,17 +1474,19 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     return { error: `Não foi possível criar: ${error?.message ?? "erro desconhecido"}` };
   }
 
-  if (product) {
-    const quantity = Math.max(1, parseInt(String(formData.get("quantity") ?? "1"), 10) || 1);
-    const { error: itemError } = await admin.from("service_request_items").insert({
-      request_id: data.id,
-      product,
-      part_code: emptyToNull(formData.get("part_code")),
-      quantity,
-      unit_value: unitValue,
-    });
-    if (itemError) {
-      return { error: `Solicitação criada, mas falhou ao salvar o item: ${itemError.message}` };
+  if (items.length > 0) {
+    const { error: itemsError } = await admin.from("service_request_items").insert(
+      items.map((item) => ({
+        request_id: data.id,
+        product: item.product,
+        part_code: item.partCode,
+        quantity: item.quantity,
+        unit_value: item.unitValue,
+        item_action: item.action,
+      }))
+    );
+    if (itemsError) {
+      return { error: `Solicitação criada, mas falhou ao salvar os itens: ${itemsError.message}` };
     }
   }
 
