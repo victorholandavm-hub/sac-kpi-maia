@@ -61,10 +61,10 @@ export default async function PedidoFornecedorDetailPage({ params }: { params: P
           </h2>
         </div>
 
-        <div className="rounded-lg border p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+        <div className="rounded-lg p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Produtos
-          </span>
+          </h3>
           <ul className="flex flex-col gap-1">
             {pedido.items.map((item) => (
               <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
@@ -74,7 +74,10 @@ export default async function PedidoFornecedorDetailPage({ params }: { params: P
           </ul>
         </div>
 
-        <div className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="rounded-lg p-4 grid sm:grid-cols-2 gap-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+          <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
+            Detalhes
+          </h3>
           <Row label="Pedido feito por" value={pedido.requestedByName} />
           <Row label="Criado em" value={formatDateTimeBr(pedido.createdAt)} />
           <Row label="Observações" value={pedido.notes} />
@@ -84,8 +87,8 @@ export default async function PedidoFornecedorDetailPage({ params }: { params: P
 
         <PedidoFornecedorActions pedidoId={pedido.id} status={pedido.status} />
 
-        <div className="rounded-lg border p-4 flex flex-col gap-3" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+        <div className="rounded-lg p-4 flex flex-col gap-3" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Histórico
           </h3>
           <PedidoFornecedorTimeline events={events} />

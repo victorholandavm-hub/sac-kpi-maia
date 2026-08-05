@@ -44,8 +44,8 @@ function timeAgo(iso: string): string {
 
 function AdminSection({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
-    <details className="rounded-lg border" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-      <summary className="text-base font-bold cursor-pointer p-4" style={{ color: "var(--brand-green)" }}>
+    <details className="rounded-lg" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+      <summary className="text-base font-bold cursor-pointer p-4" style={{ color: "var(--text-primary)" }}>
         {title}
         {count !== undefined ? ` (${count})` : ""}
       </summary>

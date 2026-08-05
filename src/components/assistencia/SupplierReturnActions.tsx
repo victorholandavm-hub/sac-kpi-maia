@@ -21,8 +21,8 @@ export function SupplierReturnActions({ returnId, status }: { returnId: string; 
   const nextStatuses = NEXT_STATUSES[status] ?? [];
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-      <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+    <div className="flex flex-col gap-3 rounded-lg p-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+      <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
         Ações
       </h3>
 

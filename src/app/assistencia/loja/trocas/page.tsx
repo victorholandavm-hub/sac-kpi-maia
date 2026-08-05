@@ -114,9 +114,9 @@ export default async function LojaTrocasPage({
       ) : (
         <div className="flex flex-col gap-5">
           {groupRequestsByDate(requests, showCompleted).map(([dateLabel, group]) => (
-            <div key={dateLabel} className="rounded-xl border" style={{ borderColor: "var(--brand-orange)" }}>
-              <div className="px-4 py-2 flex items-center gap-2 flex-wrap rounded-t-xl" style={{ background: "var(--brand-orange)" }}>
-                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "#fff" }}>
+            <div key={dateLabel} className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+              <div className="px-4 py-2 flex items-center gap-2 flex-wrap" style={{ background: "var(--brand-green)" }}>
+                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--brand-green-ink)" }}>
                   {showCompleted ? `Concluídas em ${dateLabel}` : `Solicitado em ${dateLabel}`}
                 </span>
               </div>

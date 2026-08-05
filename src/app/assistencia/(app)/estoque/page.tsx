@@ -89,7 +89,7 @@ export default async function EstoquePage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
             {movements.map((m) => (
               <div key={m.id} className="flex items-center justify-between gap-4 p-4 flex-wrap">

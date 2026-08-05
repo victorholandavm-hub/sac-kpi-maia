@@ -132,15 +132,28 @@ export default async function AgendaPage({
         groups.map((group) => {
           const isOverdue = group.dateKey < todayKey;
           return (
-            <div key={group.dateKey} className="flex flex-col gap-2">
-              <h3
-                className="text-xs font-medium uppercase tracking-wide"
-                style={{ color: group.dateKey === todayKey ? "var(--brand-orange)" : isOverdue ? "var(--status-critical)" : "var(--text-muted)" }}
-              >
-                {group.label}
-                {group.dateKey === todayKey ? " · hoje" : isOverdue ? " · atrasado" : ""}
-              </h3>
-              <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+            <div key={group.dateKey} className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+              <div className="px-4 py-2 flex items-center gap-2 flex-wrap" style={{ background: "var(--brand-green)" }}>
+                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--brand-green-ink)" }}>
+                  {group.label}
+                </span>
+                {group.dateKey === todayKey ? (
+                  <span
+                    className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                    style={{ color: "var(--text-primary)", background: "var(--surface-1)" }}
+                  >
+                    HOJE
+                  </span>
+                ) : isOverdue ? (
+                  <span
+                    className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                    style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 45%, var(--surface-1))" }}
+                  >
+                    ATRASADO
+                  </span>
+                ) : null}
+              </div>
+              <div style={{ background: "var(--surface-1)" }}>
                 <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
                   {group.items.map((r) => {
                     const rowOverdue = isOverdue && r.status !== "concluida" && r.status !== "cancelada";
@@ -149,7 +162,7 @@ export default async function AgendaPage({
                         key={r.id}
                         href={`/assistencia/${r.id}`}
                         className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
-                        style={rowOverdue ? { background: "rgba(208, 59, 59, 0.07)" } : undefined}
+                        style={rowOverdue ? { borderLeft: "4px solid var(--status-critical)" } : undefined}
                       >
                         <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -159,8 +172,8 @@ export default async function AgendaPage({
                             <StatusBadge status={r.status} />
                             {rowOverdue ? (
                               <span
-                                className="text-xs font-medium px-2 py-0.5 rounded-full"
-                                style={{ color: "var(--status-critical)", border: "1px solid var(--status-critical)" }}
+                                className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
                               >
                                 Atrasada
                               </span>
@@ -183,8 +196,8 @@ export default async function AgendaPage({
                             ) : null}
                             {r.rota ? (
                               <span
-                                className="text-xs font-medium px-2 py-0.5 rounded-full"
-                                style={{ color: "var(--brand-green)", border: "1px solid var(--brand-green)" }}
+                                className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
                               >
                                 {ROTA_LABELS[r.rota]}
                                 {r.rotaExceptionNote ? " ⚠" : ""}

@@ -8,8 +8,8 @@ function StatusBadge({ status }: { status: string }) {
   const color = SUPPLIER_RETURN_STATUS_COLORS[status] ?? "var(--text-muted)";
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-      style={{ color, border: `1px solid ${color}` }}
+      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+      style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
     >
       <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: color }} />
       {SUPPLIER_RETURN_STATUS_LABELS[status] ?? status}
@@ -62,9 +62,12 @@ export default async function SupplierReturnDetailPage({ params }: { params: Pro
       </div>
 
       <div
-        className="rounded-lg border p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
+        <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
+          Detalhes
+        </h3>
         <Row label="Produto do cliente" value={supplierReturn.product} />
         <Row label="Fornecedor" value={supplierReturn.supplier} />
         <Row label="Nº da nota fiscal" value={supplierReturn.invoiceNumber} />
@@ -83,8 +86,8 @@ export default async function SupplierReturnDetailPage({ params }: { params: Pro
       <SupplierReturnActions returnId={supplierReturn.id} status={supplierReturn.status} />
 
       {supplierReturn.notes ? (
-        <div className="rounded-lg border p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+        <div className="rounded-lg p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Observações
           </h3>
           <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-secondary)" }}>

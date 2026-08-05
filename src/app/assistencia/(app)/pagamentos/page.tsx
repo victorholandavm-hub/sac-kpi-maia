@@ -109,14 +109,14 @@ export default async function PagamentosPage({
           return (
             <div
               key={group.assemblerName}
-              className="rounded-lg border overflow-hidden"
-              style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+              className="rounded-lg overflow-hidden"
+              style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
             >
               <div
                 className="flex items-center justify-between px-4 py-3"
                 style={{ borderBottom: "1px solid var(--gridline)" }}
               >
-                <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
                   {group.assemblerName}
                 </span>
                 <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
@@ -147,8 +147,8 @@ export default async function PagamentosPage({
                         <span>em {formatDate(item.paymentReleasedAt)}</span>
                       ) : null}
                       <span
-                        className="px-2 py-0.5 rounded-full"
-                        style={{ color: STAGE_COLORS[stage], border: `1px solid ${STAGE_COLORS[stage]}` }}
+                        className="px-2 py-0.5 rounded-full font-medium"
+                        style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${STAGE_COLORS[stage]} 35%, var(--surface-1))` }}
                       >
                         {STAGE_LABELS[stage]}
                       </span>

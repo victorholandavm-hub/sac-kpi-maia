@@ -121,7 +121,7 @@ export default async function SacHomePage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
             {requests.map((r) => (
               <Link
@@ -141,7 +141,7 @@ export default async function SacHomePage({
                     {r.type === "troca_produto" && !r.pickupCompleted && r.status !== "concluida" && r.status !== "cancelada" ? (
                       <span
                         className="text-xs font-medium px-2 py-0.5 rounded-full"
-                        style={{ color: "var(--brand-orange)", border: "1px solid var(--brand-orange)" }}
+                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
                       >
                         Recolher produto
                       </span>

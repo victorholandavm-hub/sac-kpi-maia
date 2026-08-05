@@ -14,8 +14,8 @@ function StatusBadge({ status }: { status: string }) {
   const color = SUPPLIER_RETURN_STATUS_COLORS[status] ?? "var(--text-muted)";
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-      style={{ color, border: `1px solid ${color}` }}
+      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+      style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
     >
       <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: color }} />
       {SUPPLIER_RETURN_STATUS_LABELS[status] ?? status}
@@ -120,7 +120,7 @@ export default async function FornecedoresPage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
             {returns.map((r) => {
               const overdue = r.status !== "finalizado" && isOverdue(r.expectedReturnAt);
@@ -137,7 +137,10 @@ export default async function FornecedoresPage({
                       </span>
                       <StatusBadge status={r.status} />
                       {overdue ? (
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ color: "var(--status-critical)", border: "1px solid var(--status-critical)" }}>
+                        <span
+                          className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                          style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
+                        >
                           Atrasado
                         </span>
                       ) : null}

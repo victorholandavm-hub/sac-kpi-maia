@@ -64,7 +64,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           {request.comboMontagemDesmontagem ? (
             <span
               className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-              style={{ color: "var(--brand-orange)", border: "1px solid var(--brand-orange)" }}
+              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
             >
               Visita combo — ver produtos abaixo
             </span>

@@ -122,7 +122,7 @@ export function DriverRouteGroup({
                   {!showCompleted && !r.pickupCompleted ? (
                     <span
                       className="text-xs font-medium px-2 py-0.5 rounded-full"
-                      style={{ color: "var(--brand-orange)", border: "1px solid var(--brand-orange)" }}
+                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
                     >
                       Recolher produto
                     </span>

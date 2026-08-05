@@ -3,6 +3,7 @@ import { getRequestsReport, getServiceTypeIndicators, type ReportRow } from "@/l
 import { listPaymentItems, paymentStage } from "@/lib/payments";
 import { getSupplierReconciliation } from "@/lib/supplierReturns";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import { StatTile } from "@/components/StatTile";
 
 const REQUEST_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
 
@@ -51,8 +52,8 @@ function ReportTable({
   labelFor?: (key: string) => string;
 }) {
   return (
-    <details className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-      <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--brand-green)", borderBottom: "1px solid var(--gridline)" }}>
+    <details className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+      <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
         {title} ({rows.length})
       </summary>
       {rows.length === 0 ? (
@@ -151,34 +152,13 @@ export default async function RelatoriosPage({
       </form>
 
       <div className="grid sm:grid-cols-3 gap-4">
-        <div className="rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <span className="text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>
-            {report.totalRequests}
-          </span>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Solicitações no período
-          </p>
-        </div>
-        <div className="rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <span className="text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>
-            {formatBRL(paymentTotal)}
-          </span>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Total pago a montadores
-          </p>
-        </div>
-        <div className="rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <span className="text-2xl font-semibold" style={{ color: "var(--status-warning)" }}>
-            {formatBRL(paymentPending)}
-          </span>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Pendente de liberação
-          </p>
-        </div>
+        <StatTile label="Solicitações no período" value={report.totalRequests} />
+        <StatTile label="Total pago a montadores" value={formatBRL(paymentTotal)} />
+        <StatTile label="Pendente de liberação" value={formatBRL(paymentPending)} accent="var(--status-warning)" />
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+      <div className="flex flex-col gap-3 rounded-lg p-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Indicadores de {REQUEST_TYPE_LABELS[indicatorType]?.toLowerCase() ?? indicatorType}
         </h3>
 
@@ -350,8 +330,8 @@ export default async function RelatoriosPage({
         emptyMessage="Nenhuma solicitação com vendedor(a) preenchido nesse período — campo novo, só passa a existir dado a partir de agora."
       />
 
-      <details className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-        <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--brand-green)", borderBottom: "1px solid var(--gridline)" }}>
+      <details className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+        <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
           Pagamento por montador ({assemblerRows.length})
         </summary>
         {assemblerRows.length === 0 ? (
@@ -392,8 +372,8 @@ export default async function RelatoriosPage({
         )}
       </details>
 
-      <details className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-        <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--brand-green)", borderBottom: "1px solid var(--gridline)" }}>
+      <details className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+        <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
           Reconciliação com fornecedor ({supplierReconciliation.length}) — acumulado, todas as remessas
         </summary>
         {supplierReconciliation.length === 0 ? (

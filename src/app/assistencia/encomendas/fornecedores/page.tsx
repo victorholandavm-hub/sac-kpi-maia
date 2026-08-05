@@ -63,10 +63,10 @@ export default async function PedidosFornecedorPage({
 
       {enviado ? (
         <div
-          className="rounded-lg border p-4"
-          style={{ background: "var(--surface-1)", borderColor: "var(--status-good)" }}
+          className="rounded-lg p-4"
+          style={{ background: "color-mix(in srgb, var(--status-good) 20%, var(--surface-1))", border: "2px solid var(--status-good)" }}
         >
-          <p className="text-sm font-medium" style={{ color: "var(--status-good)" }}>
+          <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
             Pedido enviado com sucesso!{pedido ? ` Pedido #${pedido}.` : ""}
           </p>
         </div>
@@ -101,7 +101,7 @@ export default async function PedidosFornecedorPage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
             {pedidos.map((p) => {
               const atrasado = p.status === "pedido_feito" && !!p.expectedAt && p.expectedAt < today;
@@ -118,7 +118,10 @@ export default async function PedidosFornecedorPage({
                       </span>
                       <PedidoFornecedorStatusBadge status={p.status} />
                       {atrasado ? (
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ color: "#fff", background: "var(--status-critical)" }}>
+                        <span
+                          className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                          style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
+                        >
                           Atrasado
                         </span>
                       ) : null}
@@ -134,7 +137,13 @@ export default async function PedidosFornecedorPage({
                     <span>{formatDateTimeBr(p.createdAt)}</span>
                     <span>Pedido por {p.requestedByName}</span>
                     {p.expectedAt ? (
-                      <span style={{ color: atrasado ? "var(--status-critical)" : "var(--status-good)", fontWeight: 600 }}>
+                      <span
+                        className="font-semibold px-2 py-0.5 rounded-full"
+                        style={{
+                          color: "var(--text-primary)",
+                          background: `color-mix(in srgb, ${atrasado ? "var(--status-critical)" : "var(--status-good)"} 35%, var(--surface-1))`,
+                        }}
+                      >
                         Previsão: {new Date(`${p.expectedAt}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : null}

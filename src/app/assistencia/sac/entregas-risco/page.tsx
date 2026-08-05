@@ -77,7 +77,7 @@ function Section({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+      <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
         {title} ({items.length})
       </h3>
       {items.length === 0 ? (
@@ -87,7 +87,7 @@ function Section({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
             {items.map((item) => (
               <EntregaRiscoCard key={`${item.pedido}-${item.filialVenda}`} item={item} atendentes={atendentes} />

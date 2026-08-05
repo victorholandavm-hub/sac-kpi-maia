@@ -50,7 +50,7 @@ export function LojaDeadlineControl({
           {shownDate ? (
             <span
               className={highlight ? "text-xs font-bold px-2.5 py-1 rounded-lg" : "text-xs font-semibold px-2 py-0.5 rounded-lg"}
-              style={{ color, background: "var(--surface-1)", border: `1.5px solid ${color}` }}
+              style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
             >
               Prazo: {formatDateOnly(shownDate)} ({statusLabel})
             </span>
@@ -62,7 +62,7 @@ export function LojaDeadlineControl({
           <button
             onClick={() => setEditing(true)}
             className="text-xs font-medium rounded-lg border px-2 py-1 whitespace-nowrap"
-            style={{ borderColor: "var(--brand-orange)", color: "var(--brand-orange)" }}
+            style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
           >
             Propor data
           </button>
@@ -72,7 +72,7 @@ export function LojaDeadlineControl({
           {shownDate ? (
             <span
               className={highlight ? "text-xs font-bold px-2.5 py-1 rounded-lg" : "text-xs font-semibold px-2 py-0.5 rounded-lg"}
-              style={{ color, background: "var(--surface-1)", border: `1.5px solid ${color}` }}
+              style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
             >
               Prazo: {formatDateOnly(shownDate)} ({statusLabel})
             </span>

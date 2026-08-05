@@ -41,10 +41,10 @@ export default async function LojaEquipePage() {
       </Link>
 
       <section
-        className="rounded-lg border p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        className="rounded-lg p-4 flex flex-col gap-2"
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Caixas
         </h3>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -67,10 +67,10 @@ export default async function LojaEquipePage() {
       </section>
 
       <section
-        className="rounded-lg border p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        className="rounded-lg p-4 flex flex-col gap-2"
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
       >
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           Montadores
         </h3>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
