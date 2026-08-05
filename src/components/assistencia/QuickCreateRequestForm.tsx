@@ -429,6 +429,16 @@ export function QuickCreateRequestForm({
             )}
           </Field>
         </div>
+
+        <Field label="Instrução pro montador (visível pra ele, separado do que a loja escreveu)">
+          <textarea
+            name="montador_instruction"
+            rows={2}
+            placeholder="Ex: cliente prefere que chegue depois das 14h, subir móvel pelo elevador de serviço…"
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+        </Field>
       </FormSection>
 
       <FormSection

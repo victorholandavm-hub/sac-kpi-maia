@@ -1491,6 +1491,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       shift: shift || null,
       assembler_name: assemblerName,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
+      montador_instruction: emptyToNull(formData.get("montador_instruction")),
       // Criação rápida não coleta prazo pedido pela loja, então não há nada
       // pra "aprovar" — sem isso, o padrão do banco (pendente) fazia a tela
       // sempre mostrar "prazo pendente de aprovação" sem sentido.
