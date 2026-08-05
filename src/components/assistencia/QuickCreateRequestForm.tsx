@@ -44,7 +44,13 @@ export function QuickCreateRequestForm({
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientAddress, setClientAddress] = useState("");
+  const [addressNumber, setAddressNumber] = useState("");
+  const [isApartment, setIsApartment] = useState(false);
+  const [addressComplement, setAddressComplement] = useState("");
   const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+  // Só montagem/desmontagem envolve entrar num prédio de verdade -- ver
+  // ADDRESS_NUMBER_REQUIRED_TYPES em serviceRequests.ts.
+  const showAddressNumber = type === "montagem" || type === "desmontagem";
 
   // Mesma ideia de PublicRequestForm.tsx: código é só atalho, não trava nada
   // se não achar -- a pessoa preenche à mão como já era.
@@ -63,8 +69,12 @@ export function QuickCreateRequestForm({
           }
           setClientName(match.name);
           if (match.phone1) setClientPhone(match.phone1);
-          const addressParts = [match.addressStreet, match.addressNumber].filter(Boolean).join(", ");
-          if (addressParts) setClientAddress(match.addressComplement ? `${addressParts} — ${match.addressComplement}` : addressParts);
+          if (match.addressStreet) setClientAddress(match.addressStreet);
+          if (match.addressNumber) setAddressNumber(match.addressNumber);
+          if (match.addressComplement) {
+            setIsApartment(true);
+            setAddressComplement(match.addressComplement);
+          }
           setClientLookupStatus("found");
         })
         .catch(() => setClientLookupStatus("not_found"));
@@ -181,6 +191,46 @@ export function QuickCreateRequestForm({
             />
           </Field>
         </div>
+
+        {showAddressNumber ? (
+          <div className="flex flex-col gap-3">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Número *">
+                <input
+                  name="client_address_number"
+                  value={addressNumber}
+                  onChange={(e) => setAddressNumber(e.target.value)}
+                  required
+                  className="rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+              </Field>
+              <label className="flex items-center gap-2 text-sm self-end pb-2" style={{ color: "var(--text-primary)" }}>
+                <input
+                  type="checkbox"
+                  name="client_is_apartment"
+                  checked={isApartment}
+                  onChange={(e) => setIsApartment(e.target.checked)}
+                  className="rounded"
+                />
+                É apartamento/prédio?
+              </label>
+            </div>
+            {isApartment ? (
+              <Field label="Apto/Bloco *">
+                <input
+                  name="client_address_complement"
+                  value={addressComplement}
+                  onChange={(e) => setAddressComplement(e.target.value)}
+                  required
+                  placeholder="Ex: Apto 302, Bloco B"
+                  className="rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+              </Field>
+            ) : null}
+          </div>
+        ) : null}
 
         <Field label="O que precisa ser feito *">
           <textarea name="reason" rows={2} required className="rounded border px-3 py-2" style={inputStyle} />

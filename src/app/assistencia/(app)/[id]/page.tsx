@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/dal";
-import { getRequestDetail } from "@/lib/serviceRequests";
+import { getRequestDetail, formatFullAddress } from "@/lib/serviceRequests";
 import { listAssemblersForStores, listDrivers } from "@/lib/payments";
 import {
   REQUEST_TYPE_LABELS,
@@ -207,7 +207,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         <Row label="Cliente" value={request.clientName} />
         <Row label="CPF" value={request.clientCpf} />
         <Row label="Telefone" value={request.clientPhone} />
-        <Row label="Endereço" value={request.clientAddress} />
+        <Row label="Endereço" value={formatFullAddress(request)} />
         <Row label="Bairro" value={request.clientNeighborhood} />
       </div>
 

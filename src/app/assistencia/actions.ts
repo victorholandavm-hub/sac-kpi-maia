@@ -42,6 +42,7 @@ import {
 import { verifyPin } from "@/lib/pinAuth";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
+import { ADDRESS_NUMBER_REQUIRED_TYPES } from "@/lib/serviceRequests";
 
 const REQUEST_TYPES = [
   "montagem",
@@ -58,6 +59,23 @@ const SHIFTS = ["manha", "tarde", "dia", "urgencia"] as const;
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const str = String(value ?? "").trim();
   return str.length > 0 ? str : null;
+}
+
+// Número é obrigatório em montagem/desmontagem (ver ADDRESS_NUMBER_REQUIRED_TYPES);
+// apto/bloco só é obrigatório quando a pessoa marcou "é apartamento" — usado
+// nas 3 telas de criação (loja, SAC, assistência/admin) e nas 2 de edição.
+function readAddressNumberFields(
+  formData: FormData,
+  type: string
+): { number: string; isApartment: boolean; complement: string; error?: string } {
+  const number = String(formData.get("client_address_number") ?? "").trim();
+  const isApartment = formData.get("client_is_apartment") === "on";
+  const complement = String(formData.get("client_address_complement") ?? "").trim();
+  if ((ADDRESS_NUMBER_REQUIRED_TYPES as string[]).includes(type)) {
+    if (!number) return { number, isApartment, complement, error: "Informe o número do endereço." };
+    if (isApartment && !complement) return { number, isApartment, complement, error: "Informe o número do apartamento." };
+  }
+  return { number, isApartment, complement };
 }
 
 export type FormState = { error?: string } | undefined;
@@ -319,6 +337,9 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
   let clientPhone = "";
   let clientAddress = "";
   let clientNeighborhood = "";
+  let addressNumber = "";
+  let addressIsApartment = false;
+  let addressComplement = "";
 
   if (!isStoreTarget) {
     clientName = String(formData.get("client_name") ?? "").trim();
@@ -349,6 +370,12 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       if (!clientAddress) return { error: "Informe o endereço." };
       clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
       if (!clientNeighborhood) return { error: "Informe o bairro." };
+
+      const addressNumberFields = readAddressNumberFields(formData, type);
+      if (addressNumberFields.error) return { error: addressNumberFields.error };
+      addressNumber = addressNumberFields.number;
+      addressIsApartment = addressNumberFields.isApartment;
+      addressComplement = addressNumberFields.complement;
     }
   }
 
@@ -413,6 +440,9 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       client_cpf: emptyToNull(clientCpf),
       client_phone: emptyToNull(clientPhone),
       client_address: emptyToNull(clientAddress),
+      client_address_number: emptyToNull(addressNumber),
+      client_is_apartment: addressIsApartment,
+      client_address_complement: emptyToNull(addressComplement),
       client_neighborhood: emptyToNull(clientNeighborhood),
       reason: reason,
       restriction_note: emptyToNull(formData.get("restriction_note")),
@@ -511,6 +541,9 @@ export async function editServiceRequestByGerente(requestId: string, _state: For
   let clientPhone = "";
   let clientAddress = "";
   let clientNeighborhood = "";
+  let addressNumber = "";
+  let addressIsApartment = false;
+  let addressComplement = "";
 
   if (!isStoreTarget) {
     clientName = String(formData.get("client_name") ?? "").trim();
@@ -537,6 +570,12 @@ export async function editServiceRequestByGerente(requestId: string, _state: For
       if (!clientAddress) return { error: "Informe o endereço." };
       clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
       if (!clientNeighborhood) return { error: "Informe o bairro." };
+
+      const addressNumberFields = readAddressNumberFields(formData, type);
+      if (addressNumberFields.error) return { error: addressNumberFields.error };
+      addressNumber = addressNumberFields.number;
+      addressIsApartment = addressNumberFields.isApartment;
+      addressComplement = addressNumberFields.complement;
     }
   }
 
@@ -585,6 +624,9 @@ export async function editServiceRequestByGerente(requestId: string, _state: For
       client_cpf: emptyToNull(clientCpf),
       client_phone: emptyToNull(clientPhone),
       client_address: emptyToNull(clientAddress),
+      client_address_number: emptyToNull(addressNumber),
+      client_is_apartment: addressIsApartment,
+      client_address_complement: emptyToNull(addressComplement),
       client_neighborhood: emptyToNull(clientNeighborhood),
       reason,
       restriction_note: emptyToNull(formData.get("restriction_note")),
@@ -1264,6 +1306,9 @@ export async function updateRequestDetails(
   if (!currentRequest) return { error: "Solicitação não encontrada." };
   requireManageAccess(profile, currentRequest.type);
 
+  const addressNumberFields = readAddressNumberFields(formData, currentRequest.type);
+  if (addressNumberFields.error) return { error: addressNumberFields.error };
+
   const { error } = await admin
     .from("service_requests")
     .update({
@@ -1273,6 +1318,9 @@ export async function updateRequestDetails(
       client_cpf: emptyToNull(formData.get("client_cpf")),
       client_phone: emptyToNull(formData.get("client_phone")),
       client_address: emptyToNull(formData.get("client_address")),
+      client_address_number: emptyToNull(addressNumberFields.number),
+      client_is_apartment: addressNumberFields.isApartment,
+      client_address_complement: emptyToNull(addressNumberFields.complement),
       client_neighborhood: emptyToNull(formData.get("client_neighborhood")),
       reason: emptyToNull(formData.get("reason")),
       restriction_note: emptyToNull(formData.get("restriction_note")),
@@ -1325,6 +1373,9 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   const clientAddress = String(formData.get("client_address") ?? "").trim();
   if (!clientAddress) return { error: "Informe o endereço." };
 
+  const addressNumberFields = readAddressNumberFields(formData, type);
+  if (addressNumberFields.error) return { error: addressNumberFields.error };
+
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) return { error: "Informe o que precisa ser feito." };
 
@@ -1363,6 +1414,9 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       client_name: clientName,
       client_phone: clientPhone,
       client_address: clientAddress,
+      client_address_number: emptyToNull(addressNumberFields.number),
+      client_is_apartment: addressNumberFields.isApartment,
+      client_address_complement: emptyToNull(addressNumberFields.complement),
       client_protheus_code: emptyToNull(formData.get("client_protheus_code")),
       reason: reason,
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
@@ -1443,6 +1497,9 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
   if (!clientNeighborhood) return { error: "Informe o bairro." };
 
+  const addressNumberFields = readAddressNumberFields(formData, type);
+  if (addressNumberFields.error) return { error: addressNumberFields.error };
+
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) return { error: "Informe o motivo." };
 
@@ -1489,6 +1546,9 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       client_name: clientName,
       client_phone: clientPhone,
       client_address: clientAddress,
+      client_address_number: emptyToNull(addressNumberFields.number),
+      client_is_apartment: addressNumberFields.isApartment,
+      client_address_complement: emptyToNull(addressNumberFields.complement),
       client_neighborhood: clientNeighborhood,
       client_protheus_code: emptyToNull(formData.get("client_protheus_code")),
       reason: reason,

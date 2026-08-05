@@ -109,6 +109,8 @@ export function EditServiceRequestForm({ request }: { request: ServiceRequestDet
   const isStoreTarget = !request.orderCode && (request.clientName ?? "").startsWith("Mostruário — ");
   const showAddress =
     !isStoreTarget && (type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria");
+  const showAddressNumber = type === "montagem" || type === "desmontagem";
+  const [isApartment, setIsApartment] = useState(request.clientIsApartment);
   const showItems = type !== "notificacao_externa";
   const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
   const showCombo = type === "montagem" || type === "desmontagem";
@@ -255,6 +257,44 @@ export function EditServiceRequestForm({ request }: { request: ServiceRequestDet
                   style={inputStyle}
                 />
               </Field>
+            </div>
+          ) : null}
+
+          {showAddressNumber ? (
+            <div className="flex flex-col gap-3">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Número *">
+                  <input
+                    name="client_address_number"
+                    required
+                    defaultValue={request.clientAddressNumber ?? ""}
+                    className="rounded border px-3 py-2"
+                    style={inputStyle}
+                  />
+                </Field>
+                <label className="flex items-center gap-2 text-sm self-end pb-2" style={{ color: "var(--text-primary)" }}>
+                  <input
+                    type="checkbox"
+                    name="client_is_apartment"
+                    checked={isApartment}
+                    onChange={(e) => setIsApartment(e.target.checked)}
+                    className="rounded"
+                  />
+                  É apartamento/prédio?
+                </label>
+              </div>
+              {isApartment ? (
+                <Field label="Apto/Bloco *">
+                  <input
+                    name="client_address_complement"
+                    required
+                    defaultValue={request.clientAddressComplement ?? ""}
+                    placeholder="Ex: Apto 302, Bloco B"
+                    className="rounded border px-3 py-2"
+                    style={inputStyle}
+                  />
+                </Field>
+              ) : null}
             </div>
           ) : null}
         </FormSection>

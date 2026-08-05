@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getMontadorSession } from "@/app/assistencia/montador-actions";
-import { getAssemblerRequestDetail, montadorEffectiveDate } from "@/lib/serviceRequests";
+import { getAssemblerRequestDetail, montadorEffectiveDate, formatFullAddress } from "@/lib/serviceRequests";
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
@@ -48,7 +48,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
   const photos = await listRequestPhotos(request.id);
   const showCompleted = request.status === "concluida" || request.status === "cancelada";
   const montadorDate = montadorEffectiveDate(request);
-  const mapsQuery = [request.clientAddress, request.clientNeighborhood].filter(Boolean).join(", ");
+  const mapsQuery = [request.clientAddress, request.clientAddressNumber, request.clientNeighborhood].filter(Boolean).join(", ");
 
   return (
     <ToastProvider>
@@ -116,7 +116,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           ) : (
             <Row label="Produto" value={request.productSummary} />
           )}
-          <Row label="Endereço" value={request.clientAddress} />
+          <Row label="Endereço" value={formatFullAddress(request)} />
           <Row label="Bairro" value={request.clientNeighborhood} />
         </div>
 

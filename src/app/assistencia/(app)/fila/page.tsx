@@ -2,12 +2,18 @@ import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, type RequestItem, type ServiceRequestSummary } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
-import { REQUEST_TYPE_LABELS, ASSISTENCIA_MANAGED_TYPES, STATUS_COLORS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, ASSISTENCIA_MANAGED_TYPES, STATUS_COLORS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { NewSinceBadge } from "@/components/assistencia/NewSinceBadge";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
+
+function formatDateOnly(value: string | null): string | null {
+  if (!value) return null;
+  const [y, m, d] = value.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 function itemsSummary(items: RequestItem[]): string | null {
   if (items.length === 0) return null;
@@ -219,6 +225,16 @@ export default async function AssistenciaQueuePage({
                             style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
                           >
                             {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
+                          </span>
+                        ) : null}
+                        {r.scheduledDate ? (
+                          <span
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                            style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
+                          >
+                            📅 {formatDateOnly(r.scheduledDate)}
+                            {r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
+                            {r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
                           </span>
                         ) : null}
                         <span className="text-xs" style={{ color: "var(--text-muted)" }}>

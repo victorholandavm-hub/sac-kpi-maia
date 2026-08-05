@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { updateRequestDetails, type FormState } from "@/app/assistencia/actions";
 import type { ServiceRequestDetail, Store } from "@/lib/serviceRequests";
 
@@ -18,6 +18,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function EditRequestForm({ request, stores }: { request: ServiceRequestDetail; stores: Store[] }) {
   const boundAction = updateRequestDetails.bind(null, request.id);
   const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, undefined);
+  const showAddressNumber = request.type === "montagem" || request.type === "desmontagem";
+  const [isApartment, setIsApartment] = useState(request.clientIsApartment);
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -65,6 +67,44 @@ export function EditRequestForm({ request, stores }: { request: ServiceRequestDe
           <input name="client_neighborhood" defaultValue={request.clientNeighborhood ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
       </div>
+
+      {showAddressNumber ? (
+        <div className="flex flex-col gap-3">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Número *">
+              <input
+                name="client_address_number"
+                required
+                defaultValue={request.clientAddressNumber ?? ""}
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-sm self-end pb-2" style={{ color: "var(--text-primary)" }}>
+              <input
+                type="checkbox"
+                name="client_is_apartment"
+                checked={isApartment}
+                onChange={(e) => setIsApartment(e.target.checked)}
+                className="rounded"
+              />
+              É apartamento/prédio?
+            </label>
+          </div>
+          {isApartment ? (
+            <Field label="Apto/Bloco *">
+              <input
+                name="client_address_complement"
+                required
+                defaultValue={request.clientAddressComplement ?? ""}
+                placeholder="Ex: Apto 302, Bloco B"
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+            </Field>
+          ) : null}
+        </div>
+      ) : null}
 
       <Field label="Motivo">
         <textarea name="reason" defaultValue={request.reason ?? ""} rows={2} className="rounded border px-3 py-2" style={inputStyle} />

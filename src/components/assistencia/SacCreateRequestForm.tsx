@@ -42,7 +42,13 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
   const [clientPhone, setClientPhone] = useState("");
   const [clientAddress, setClientAddress] = useState("");
   const [clientNeighborhood, setClientNeighborhood] = useState("");
+  const [addressNumber, setAddressNumber] = useState("");
+  const [isApartment, setIsApartment] = useState(false);
+  const [addressComplement, setAddressComplement] = useState("");
   const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+  // Só montagem envolve entrar num prédio de verdade -- SAC nem oferece
+  // desmontagem isolada (ver SacType acima).
+  const showAddressNumber = type === "montagem";
 
   const [productCode, setProductCode] = useState("");
   const [product, setProduct] = useState("");
@@ -65,8 +71,12 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
           }
           setClientName(match.name);
           if (match.phone1) setClientPhone(match.phone1);
-          const addressParts = [match.addressStreet, match.addressNumber].filter(Boolean).join(", ");
-          if (addressParts) setClientAddress(match.addressComplement ? `${addressParts} — ${match.addressComplement}` : addressParts);
+          if (match.addressStreet) setClientAddress(match.addressStreet);
+          if (match.addressNumber) setAddressNumber(match.addressNumber);
+          if (match.addressComplement) {
+            setIsApartment(true);
+            setAddressComplement(match.addressComplement);
+          }
           if (match.addressNeighborhood) setClientNeighborhood(match.addressNeighborhood);
           setClientLookupStatus("found");
         })
@@ -221,6 +231,46 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
             style={inputStyle}
           />
         </Field>
+
+        {showAddressNumber ? (
+          <div className="flex flex-col gap-3">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Número *">
+                <input
+                  name="client_address_number"
+                  value={addressNumber}
+                  onChange={(e) => setAddressNumber(e.target.value)}
+                  required
+                  className="rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+              </Field>
+              <label className="flex items-center gap-2 text-sm self-end pb-2" style={{ color: "var(--text-primary)" }}>
+                <input
+                  type="checkbox"
+                  name="client_is_apartment"
+                  checked={isApartment}
+                  onChange={(e) => setIsApartment(e.target.checked)}
+                  className="rounded"
+                />
+                É apartamento/prédio?
+              </label>
+            </div>
+            {isApartment ? (
+              <Field label="Apto/Bloco *">
+                <input
+                  name="client_address_complement"
+                  value={addressComplement}
+                  onChange={(e) => setAddressComplement(e.target.value)}
+                  required
+                  placeholder="Ex: Apto 302, Bloco B"
+                  className="rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+              </Field>
+            ) : null}
+          </div>
+        ) : null}
       </FormSection>
 
       {showProduct ? (

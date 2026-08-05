@@ -205,6 +205,9 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
   const [clientPhone, setClientPhone] = useState("");
   const [clientAddress, setClientAddress] = useState("");
   const [clientNeighborhood, setClientNeighborhood] = useState("");
+  const [addressNumber, setAddressNumber] = useState("");
+  const [isApartment, setIsApartment] = useState(false);
+  const [addressComplement, setAddressComplement] = useState("");
   const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
 
   // Busca o cliente pelo código pra autopreencher nome/CPF/telefone (dado
@@ -226,8 +229,12 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
           setClientName(match.name);
           setClientCpf(match.cpfCnpj);
           if (match.phone1) setClientPhone(match.phone1);
-          const addressParts = [match.addressStreet, match.addressNumber].filter(Boolean).join(", ");
-          if (addressParts) setClientAddress(match.addressComplement ? `${addressParts} — ${match.addressComplement}` : addressParts);
+          if (match.addressStreet) setClientAddress(match.addressStreet);
+          if (match.addressNumber) setAddressNumber(match.addressNumber);
+          if (match.addressComplement) {
+            setIsApartment(true);
+            setAddressComplement(match.addressComplement);
+          }
           if (match.addressNeighborhood) setClientNeighborhood(match.addressNeighborhood);
           setLookupStatus("found");
         })
@@ -239,6 +246,9 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
   const showAddress =
     !isStoreTarget &&
     (type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria");
+  // Só montagem/desmontagem envolve entrar num prédio de verdade -- ver
+  // ADDRESS_NUMBER_REQUIRED_TYPES em serviceRequests.ts.
+  const showAddressNumber = type === "montagem" || type === "desmontagem";
   const showItems = type !== "notificacao_externa";
   const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
   const showCombo = type === "montagem" || type === "desmontagem";
@@ -487,6 +497,46 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
             </Field>
           </div>
         ) : null}
+
+        {showAddressNumber ? (
+          <div className="flex flex-col gap-3">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Número *">
+                <input
+                  name="client_address_number"
+                  value={addressNumber}
+                  onChange={(e) => setAddressNumber(e.target.value)}
+                  required
+                  className="rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+              </Field>
+              <label className="flex items-center gap-2 text-sm self-end pb-2" style={{ color: "var(--text-primary)" }}>
+                <input
+                  type="checkbox"
+                  name="client_is_apartment"
+                  checked={isApartment}
+                  onChange={(e) => setIsApartment(e.target.checked)}
+                  className="rounded"
+                />
+                É apartamento/prédio?
+              </label>
+            </div>
+            {isApartment ? (
+              <Field label="Apto/Bloco *">
+                <input
+                  name="client_address_complement"
+                  value={addressComplement}
+                  onChange={(e) => setAddressComplement(e.target.value)}
+                  required
+                  placeholder="Ex: Apto 302, Bloco B"
+                  className="rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+              </Field>
+            ) : null}
+          </div>
+        ) : null}
       </FormSection>
       )}
 
@@ -581,7 +631,18 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
                 <SummaryRow label="Cliente" value={clientName} />
                 <SummaryRow label="CPF" value={clientCpf} />
                 <SummaryRow label="Telefone" value={clientPhone} />
-                {showAddress ? <SummaryRow label="Endereço" value={[clientAddress, clientNeighborhood].filter(Boolean).join(" — ")} /> : null}
+                {showAddress ? (
+                  <SummaryRow
+                    label="Endereço"
+                    value={[
+                      [clientAddress, addressNumber ? `nº ${addressNumber}` : null].filter(Boolean).join(", "),
+                      isApartment && addressComplement ? `apto ${addressComplement}` : null,
+                      clientNeighborhood,
+                    ]
+                      .filter(Boolean)
+                      .join(" — ")}
+                  />
+                ) : null}
                 <SummaryRow label="Pedido/venda" value={snapshot.orderCode} />
                 <SummaryRow label="Nota fiscal" value={snapshot.invoiceNumber} />
                 <SummaryRow label="Vendedor(a)" value={snapshot.sellerName} />

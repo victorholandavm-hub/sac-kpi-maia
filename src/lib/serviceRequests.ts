@@ -35,6 +35,30 @@ export function isRequestStatus(value: string | undefined | null): value is Requ
   return !!value && (REQUEST_STATUSES as string[]).includes(value);
 }
 
+// Montagem/desmontagem envolve entrar num prédio de verdade — sem número
+// (e apto, quando for o caso) o montador/motorista chega no endereço e não
+// sabe onde tocar a campainha. Os outros tipos com endereço (recolhimento,
+// troca de peça, vistoria) continuam com endereço livre, sem exigir número
+// separado.
+export const ADDRESS_NUMBER_REQUIRED_TYPES: RequestType[] = ["montagem", "desmontagem"];
+
+// Usado em toda tela que exibe o endereço (detalhe do chamado, montador,
+// motorista) — mantém rua/número/apto num único texto formatado em vez de
+// cada tela remontar essa lógica na mão.
+export function formatFullAddress(input: {
+  clientAddress: string | null;
+  clientAddressNumber?: string | null;
+  clientIsApartment?: boolean;
+  clientAddressComplement?: string | null;
+}): string | null {
+  if (!input.clientAddress) return null;
+  let line = input.clientAddressNumber ? `${input.clientAddress}, nº ${input.clientAddressNumber}` : input.clientAddress;
+  if (input.clientIsApartment && input.clientAddressComplement) {
+    line += ` — apto ${input.clientAddressComplement}`;
+  }
+  return line;
+}
+
 export type Store = { id: string; name: string };
 
 export async function listStores(): Promise<Store[]> {
@@ -291,6 +315,9 @@ export async function listRequests(
 export type ServiceRequestDetail = ServiceRequestSummary & {
   clientCpf: string | null;
   clientAddress: string | null;
+  clientAddressNumber: string | null;
+  clientIsApartment: boolean;
+  clientAddressComplement: string | null;
   clientNeighborhood: string | null;
   restrictionNote: string | null;
   notes: string | null;
@@ -318,6 +345,9 @@ export type RequestEvent = {
 type DetailRow = SummaryRow & {
   client_cpf: string | null;
   client_address: string | null;
+  client_address_number: string | null;
+  client_is_apartment: boolean;
+  client_address_complement: string | null;
   client_neighborhood: string | null;
   restriction_note: string | null;
   notes: string | null;
@@ -336,7 +366,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action)";
 
 export async function getRequestDetail(
   id: string
@@ -367,6 +397,9 @@ export async function getRequestDetail(
     ...toSummary(row),
     clientCpf: row.client_cpf,
     clientAddress: row.client_address,
+    clientAddressNumber: row.client_address_number,
+    clientIsApartment: row.client_is_apartment,
+    clientAddressComplement: row.client_address_complement,
     clientNeighborhood: row.client_neighborhood,
     restrictionNote: row.restriction_note,
     notes: row.notes,
@@ -522,6 +555,9 @@ export type AssemblerRequestView = {
   clientName: string | null;
   clientPhone: string | null;
   clientAddress: string | null;
+  clientAddressNumber: string | null;
+  clientIsApartment: boolean;
+  clientAddressComplement: string | null;
   clientNeighborhood: string | null;
   productSummary: string | null;
   items: AssemblerRequestItem[];
@@ -554,7 +590,7 @@ const ASSEMBLER_VIEW_LIMIT = 200;
 // valor já pago pelo cliente, ver #4578) que o montador não deveria ver.
 // Fora da lista de colunas, não só escondido na tela, pra nem trafegar.
 const ASSEMBLER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, stores(name), items:service_request_items(product, quantity, item_action)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, stores(name), items:service_request_items(product, quantity, item_action)";
 
 type AssemblerViewRow = {
   id: string;
@@ -564,6 +600,9 @@ type AssemblerViewRow = {
   client_name: string | null;
   client_phone: string | null;
   client_address: string | null;
+  client_address_number: string | null;
+  client_is_apartment: boolean;
+  client_address_complement: string | null;
   client_neighborhood: string | null;
   scheduled_date: string | null;
   scheduled_time: string | null;
@@ -587,6 +626,9 @@ function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
     clientName: row.client_name,
     clientPhone: row.client_phone,
     clientAddress: row.client_address,
+    clientAddressNumber: row.client_address_number,
+    clientIsApartment: row.client_is_apartment,
+    clientAddressComplement: row.client_address_complement,
     clientNeighborhood: row.client_neighborhood,
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
     items: (row.items ?? []).map((i) => ({
@@ -678,6 +720,9 @@ export type DriverRequestView = {
   clientName: string | null;
   clientPhone: string | null;
   clientAddress: string | null;
+  clientAddressNumber: string | null;
+  clientIsApartment: boolean;
+  clientAddressComplement: string | null;
   clientNeighborhood: string | null;
   productSummary: string | null;
   reason: string | null;
@@ -697,7 +742,7 @@ export type DriverRequestView = {
 
 const DRIVER_VIEW_LIMIT = 200;
 const DRIVER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, stores(name), items:service_request_items(product)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, stores(name), items:service_request_items(product)";
 
 type DriverViewRow = {
   id: string;
@@ -707,6 +752,9 @@ type DriverViewRow = {
   client_name: string | null;
   client_phone: string | null;
   client_address: string | null;
+  client_address_number: string | null;
+  client_is_apartment: boolean;
+  client_address_complement: string | null;
   client_neighborhood: string | null;
   reason: string | null;
   restriction_note: string | null;
@@ -735,6 +783,9 @@ function toDriverView(row: DriverViewRow): DriverRequestView {
     clientName: row.client_name,
     clientPhone: row.client_phone,
     clientAddress: row.client_address,
+    clientAddressNumber: row.client_address_number,
+    clientIsApartment: row.client_is_apartment,
+    clientAddressComplement: row.client_address_complement,
     clientNeighborhood: row.client_neighborhood,
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
     reason: row.reason,

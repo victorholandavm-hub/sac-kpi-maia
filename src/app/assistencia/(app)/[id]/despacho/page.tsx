@@ -1,5 +1,5 @@
 import { getProfile } from "@/lib/dal";
-import { getRequestDetail, type ServiceRequestDetail } from "@/lib/serviceRequests";
+import { getRequestDetail, formatFullAddress, type ServiceRequestDetail } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { PrintButton } from "@/components/assistencia/PrintButton";
 
@@ -79,7 +79,7 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Cliente" value={request.clientName} />
           <Field label="Telefone" value={request.clientPhone} />
-          <Field label="Endereço" value={request.clientAddress} />
+          <Field label="Endereço" value={formatFullAddress(request)} />
           <Field label="Bairro" value={request.clientNeighborhood} />
           <Field label="Loja / solicitado por" value={`${request.storeName} · ${request.requestedByName ?? "—"}`} />
           <Field label="Tipo" value={REQUEST_TYPE_LABELS[request.type] ?? request.type} />
