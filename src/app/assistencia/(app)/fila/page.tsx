@@ -182,6 +182,15 @@ export default async function AssistenciaQueuePage({
               <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
                 {group.items.map((r) => {
                   const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
+                  // Só scheduledDate (ScheduleField) ou approvedDeadline
+                  // (approveDeadline/rejectDeadline) -- as duas são decisão
+                  // da assistência. De propósito SEM cair pra requestedDeadline
+                  // (o pedido da loja, ainda não aprovado): mostrar isso aqui
+                  // como se fosse a data definida enganaria quem tá vendo a
+                  // fila -- pra esse caso já existe o badge "Prazo pendente".
+                  // Diferente de montadorEffectiveDate (usado nas telas do
+                  // montador), que cai pro pedido da loja como último recurso.
+                  const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
                   return (
                   <Link
                     key={r.id}
@@ -227,14 +236,14 @@ export default async function AssistenciaQueuePage({
                             {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
                           </span>
                         ) : null}
-                        {r.scheduledDate ? (
+                        {effectiveDate ? (
                           <span
                             className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
                             style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
                           >
-                            📅 {formatDateOnly(r.scheduledDate)}
-                            {r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
-                            {r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
+                            📅 {formatDateOnly(effectiveDate)}
+                            {effectiveDate === r.scheduledDate && r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
+                            {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
                           </span>
                         ) : null}
                         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
