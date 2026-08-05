@@ -271,6 +271,18 @@ type SyncResult = { checked: number; upserted: number; errors: string[] };
 // pra página 1 (ver "page = 1" abaixo), a página pulada é tentada de novo.
 const CLIENT_PAGE_FAIL_LIMIT = 3;
 
+// Mesmo problema do CLIENT_PAGE_FAIL_LIMIT acima, mas em pedidos: descoberto
+// em 2026-08-05 com o cursor travado ~1 mês parado num único dia (a mesma
+// disputa de licença/timeout de 45s da página 1 daquele dia, sempre no
+// mesmo lugar) -- como o catch original só dava break sem avançar dia nem
+// página, a próxima rodada tentava exatamente o mesmo dia/página de novo,
+// pra sempre. Depois de N falhas seguidas no mesmo dia+página, pula pro dia
+// seguinte em vez de travar o sync inteiro dali pra frente. Diferente do de
+// clientes, pedidos não fazem ciclo (não voltam pra página 1 do começo), então
+// um dia pulado só é reprocessado com um reset manual do cursor -- aceitável
+// pra não perder todo o progresso seguinte por causa de um dia ruim isolado.
+const ORDER_DAY_FAIL_LIMIT = 3;
+
 async function syncClients(supabase: SupabaseAdmin): Promise<SyncResult> {
   const started = Date.now();
   let page = Number(await getSyncState(supabase, "totvs_clients_next_page")) || 1;
@@ -414,6 +426,9 @@ async function syncOrders(supabase: SupabaseAdmin): Promise<SyncResult> {
   let page = Number(await getSyncState(supabase, "totvs_orders_next_page")) || 1;
   const today = new Date();
 
+  const [failDay, failPageRaw, failCountRaw] = ((await getSyncState(supabase, "totvs_orders_day_fail")) ?? "").split(":");
+  let failCount = failDay === day && Number(failPageRaw) === page ? Number(failCountRaw) || 0 : 0;
+
   let checked = 0;
   let upserted = 0;
   const errors: string[] = [];
@@ -427,8 +442,22 @@ async function syncOrders(supabase: SupabaseAdmin): Promise<SyncResult> {
         `${BASE_URL}/rest/orders?StartDate=${day}&EndDate=${day}&Page=${page}&Size=${ORDER_PAGE_SIZE}`
       );
     } catch (err) {
+      failCount += 1;
+      if (failCount >= ORDER_DAY_FAIL_LIMIT) {
+        errors.push(`orders ${day} page ${page}: ${(err as Error).message} (pulado após ${failCount} falhas seguidas)`);
+        await setSyncState(supabase, "totvs_orders_day_fail", "");
+        day = isoDate(new Date(new Date(day).getTime() + ORDERS_WINDOW_DAYS * DAY_MS));
+        page = 1;
+        failCount = 0;
+        continue;
+      }
       errors.push(`orders ${day} page ${page}: ${(err as Error).message}`);
+      await setSyncState(supabase, "totvs_orders_day_fail", `${day}:${page}:${failCount}`);
       break;
+    }
+    if (failCount > 0) {
+      await setSyncState(supabase, "totvs_orders_day_fail", "");
+      failCount = 0;
     }
     const rows = json.data ?? [];
     checked += rows.length;

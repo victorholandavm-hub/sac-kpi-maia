@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { setItemUnitValue, setItemPaymentReleased, setItemPaymentAuthorizedBy } from "@/app/assistencia/pagamentos-actions";
-import { addRequestItemByStaff, removeRequestItemByStaff } from "@/app/assistencia/actions";
+import { addRequestItemByStaff, removeRequestItemByStaff, lookupTotvsProductForTeam } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
 import type { RequestItem } from "@/lib/serviceRequests";
 
@@ -214,6 +214,30 @@ function AddItemForm({ requestId, requestType }: { requestId: string; requestTyp
   const [partCode, setPartCode] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [action, setAction] = useState<"" | "montar" | "desmontar">(showAction ? "montar" : "");
+  const [productLookupStatus, setProductLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  // Mesma ideia dos formulários de criação: código é só atalho, não trava
+  // nada se não achar -- a pessoa preenche o nome à mão como já era.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!partCode.trim()) {
+        setProductLookupStatus("idle");
+        return;
+      }
+      setProductLookupStatus("loading");
+      lookupTotvsProductForTeam(partCode)
+        .then((match) => {
+          if (!match || !match.description) {
+            setProductLookupStatus("not_found");
+            return;
+          }
+          setProduct(match.description);
+          setProductLookupStatus("found");
+        })
+        .catch(() => setProductLookupStatus("not_found"));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [partCode]);
 
   function add() {
     if (!product.trim()) {
@@ -230,23 +254,39 @@ function AddItemForm({ requestId, requestType }: { requestId: string; requestTyp
       setProduct("");
       setPartCode("");
       setQuantity("1");
+      setProductLookupStatus("idle");
     }, "Produto adicionado.");
   }
 
   return (
     <div className="flex items-center gap-2 flex-wrap pt-2" style={{ borderTop: "1px solid var(--gridline)" }}>
+      <div className="flex flex-col gap-0.5">
+        <input
+          value={partCode}
+          onChange={(e) => setPartCode(e.target.value)}
+          placeholder="Código (opcional)"
+          className="rounded border px-2 py-1 text-sm w-32"
+          style={{ borderColor: "var(--border)" }}
+        />
+        {productLookupStatus === "loading" ? (
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Buscando…
+          </span>
+        ) : productLookupStatus === "found" ? (
+          <span className="text-xs" style={{ color: "var(--status-good)" }}>
+            Produto encontrado.
+          </span>
+        ) : productLookupStatus === "not_found" ? (
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Código não encontrado.
+          </span>
+        ) : null}
+      </div>
       <input
         value={product}
         onChange={(e) => setProduct(e.target.value)}
         placeholder="Produto"
         className="rounded border px-2 py-1 text-sm flex-1 min-w-[140px]"
-        style={{ borderColor: "var(--border)" }}
-      />
-      <input
-        value={partCode}
-        onChange={(e) => setPartCode(e.target.value)}
-        placeholder="Código (opcional)"
-        className="rounded border px-2 py-1 text-sm w-32"
         style={{ borderColor: "var(--border)" }}
       />
       <input

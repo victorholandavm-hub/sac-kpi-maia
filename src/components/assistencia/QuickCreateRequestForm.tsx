@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { createQuickRequest, lookupTotvsClientForTeam, type FormState } from "@/app/assistencia/actions";
+import { createQuickRequest, lookupTotvsClientForTeam, lookupTotvsProductForTeam, type FormState } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { SHIFTS, type Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
@@ -81,6 +81,31 @@ export function QuickCreateRequestForm({
     }, 400);
     return () => clearTimeout(timer);
   }, [clientCode]);
+
+  const [productCode, setProductCode] = useState("");
+  const [product, setProduct] = useState("");
+  const [productLookupStatus, setProductLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!productCode.trim()) {
+        setProductLookupStatus("idle");
+        return;
+      }
+      setProductLookupStatus("loading");
+      lookupTotvsProductForTeam(productCode)
+        .then((match) => {
+          if (!match || !match.description) {
+            setProductLookupStatus("not_found");
+            return;
+          }
+          setProduct(match.description);
+          setProductLookupStatus("found");
+        })
+        .catch(() => setProductLookupStatus("not_found"));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [productCode]);
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -278,10 +303,40 @@ export function QuickCreateRequestForm({
         </div>
       </FormSection>
 
-      <FormSection title="Pagamento" number={4}>
-        <div className="grid sm:grid-cols-3 gap-4">
+      <FormSection title="Pagamento" number={4} hint="Digite o código do produto pra preencher o nome automaticamente (se souber).">
+        <div className="grid sm:grid-cols-4 gap-4">
+          <Field label="Código do produto">
+            <input
+              name="part_code"
+              value={productCode}
+              onChange={(e) => setProductCode(e.target.value)}
+              placeholder="Ex: SB-3050"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+            {productLookupStatus === "loading" ? (
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Buscando…
+              </span>
+            ) : productLookupStatus === "found" ? (
+              <span className="text-xs" style={{ color: "var(--status-good)" }}>
+                Produto encontrado.
+              </span>
+            ) : productLookupStatus === "not_found" ? (
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Código não encontrado.
+              </span>
+            ) : null}
+          </Field>
           <Field label="Produto/serviço (pagamento)">
-            <input name="product" placeholder="Ex: Trocar porta" className="rounded border px-3 py-2" style={inputStyle} />
+            <input
+              name="product"
+              value={product}
+              onChange={(e) => setProduct(e.target.value)}
+              placeholder="Ex: Trocar porta"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
           </Field>
           <Field label="Quantidade">
             <input name="quantity" type="number" min={1} defaultValue={1} className="rounded border px-3 py-2" style={inputStyle} />

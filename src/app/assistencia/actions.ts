@@ -1441,6 +1441,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     const { error: itemError } = await admin.from("service_request_items").insert({
       request_id: data.id,
       product,
+      part_code: emptyToNull(formData.get("part_code")),
       quantity,
       unit_value: unitValue,
     });
