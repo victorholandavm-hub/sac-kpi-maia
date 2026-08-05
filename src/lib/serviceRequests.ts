@@ -80,6 +80,7 @@ export type RequestItem = {
   paymentReleasedAt: string | null;
   paymentAuthorizedBy: string | null;
   action: ItemAction | null;
+  completed: boolean;
 };
 
 type ItemRow = {
@@ -92,6 +93,7 @@ type ItemRow = {
   payment_released_at: string | null;
   payment_authorized_by: string | null;
   item_action: string | null;
+  completed: boolean;
 };
 
 export type ServiceRequestSummary = {
@@ -172,7 +174,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -185,6 +187,7 @@ function toItem(row: ItemRow): RequestItem {
     paymentReleasedAt: row.payment_released_at,
     paymentAuthorizedBy: row.payment_authorized_by,
     action: row.item_action === "montar" || row.item_action === "desmontar" ? row.item_action : null,
+    completed: row.completed,
   };
 }
 
@@ -366,7 +369,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, notes, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 export async function getRequestDetail(
   id: string
@@ -544,7 +547,7 @@ export async function listOpenMontagemQueueIds(): Promise<string[]> {
   return (data ?? []).map((row) => row.id as string);
 }
 
-export type AssemblerRequestItem = { product: string; quantity: number; action: ItemAction | null };
+export type AssemblerRequestItem = { id: string; product: string; quantity: number; action: ItemAction | null; completed: boolean };
 
 export type AssemblerRequestView = {
   id: string;
@@ -590,7 +593,7 @@ const ASSEMBLER_VIEW_LIMIT = 200;
 // valor já pago pelo cliente, ver #4578) que o montador não deveria ver.
 // Fora da lista de colunas, não só escondido na tela, pra nem trafegar.
 const ASSEMBLER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, stores(name), items:service_request_items(product, quantity, item_action)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, stores(name), items:service_request_items(id, product, quantity, item_action, completed)";
 
 type AssemblerViewRow = {
   id: string;
@@ -613,7 +616,7 @@ type AssemblerViewRow = {
   completed_at: string | null;
   combo_montagem_desmontagem: boolean;
   stores: { name: string } | null;
-  items: { product: string; quantity: number; item_action: string | null }[] | null;
+  items: { id: string; product: string; quantity: number; item_action: string | null; completed: boolean }[] | null;
 };
 
 function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
@@ -632,9 +635,11 @@ function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
     clientNeighborhood: row.client_neighborhood,
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
     items: (row.items ?? []).map((i) => ({
+      id: i.id,
       product: i.product,
       quantity: i.quantity,
       action: i.item_action === "montar" || i.item_action === "desmontar" ? i.item_action : null,
+      completed: i.completed,
     })),
     scheduledDate: row.scheduled_date,
     scheduledTime: row.scheduled_time,
@@ -854,6 +859,15 @@ export type AgendaRange = "atrasado" | "hoje" | "semana";
 // Agenda de visitas técnicas: toda solicitação com data marcada, ordenada por
 // data e depois por turno — substitui o controle que era feito à parte na
 // planilha "Agenda de Assistência".
+// Só scheduledDate (ScheduleField) ou approvedDeadline (approveDeadline/
+// rejectDeadline) contam -- as duas são decisão da assistência. De propósito
+// SEM cair pro requestedDeadline (o pedido da loja, ainda não aprovado):
+// mesma régua já usada na fila principal (ver fila/page.tsx), pra não tratar
+// um prazo que a loja só pediu como se fosse data confirmada.
+export function agendaEffectiveDate(r: Pick<ServiceRequestSummary, "scheduledDate" | "approvedDeadline">): string | null {
+  return r.scheduledDate ?? r.approvedDeadline;
+}
+
 export async function listScheduledRequests(
   opts: { range?: AgendaRange } = {}
 ): Promise<ServiceRequestSummary[]> {
@@ -861,36 +875,47 @@ export async function listScheduledRequests(
   const today = new Date().toISOString().slice(0, 10);
   const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  // Tipado como `any` de propósito: encadear vários `.eq()`/`.lt()` condicionais
-  // no builder do Supabase faz o TypeScript tentar inferir um tipo genérico tão
-  // profundo que trava a compilação ("Type instantiation is excessively deep").
+  // Antes só trazia quem tinha scheduled_date (o campo "Agendar visita")
+  // explicitamente preenchido -- um chamado com prazo já aprovado pela
+  // assistência (approveDeadline/rejectDeadline), mas que nunca passou por
+  // esse campo específico, sumia da agenda inteira, não só sem uma
+  // informação: o chamado inteiro ficava invisível. Owner .or() pra trazer
+  // quem tem qualquer uma das duas datas -- o filtro por período (abaixo) e
+  // a ordenação usam agendaEffectiveDate (o mesmo "qual data vale" da fila),
+  // calculado em JS porque não dá pra expressar um coalesce de 2 colunas no
+  // builder do Supabase sem SQL bruto.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query: any = admin
+  const query: any = admin
     .from("service_requests")
     .select(SUMMARY_COLUMNS)
-    .not("scheduled_date", "is", null)
-    .order("scheduled_date", { ascending: true });
-
-  if (opts.range === "atrasado") {
-    query = query.lt("scheduled_date", today).not("status", "in", "(concluida,cancelada)");
-  } else if (opts.range === "hoje") {
-    query = query.eq("scheduled_date", today);
-  } else if (opts.range === "semana") {
-    query = query.gte("scheduled_date", today).lte("scheduled_date", in7Days);
-  }
+    .or("scheduled_date.not.is.null,approved_deadline.not.is.null");
 
   const { data, error } = (await query) as { data: SummaryRow[] | null; error: { message: string } | null };
   if (error) throw new Error(error.message);
 
-  return ((data ?? []) as unknown as SummaryRow[])
-    .map(toSummary)
-    .sort((a, b) => {
-      const dateCompare = (a.scheduledDate ?? "").localeCompare(b.scheduledDate ?? "");
-      if (dateCompare !== 0) return dateCompare;
-      const shiftCompare = (SHIFT_ORDER[a.shift ?? "dia"] ?? 99) - (SHIFT_ORDER[b.shift ?? "dia"] ?? 99);
-      if (shiftCompare !== 0) return shiftCompare;
-      return (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? "");
+  let items = ((data ?? []) as unknown as SummaryRow[]).map(toSummary);
+
+  if (opts.range === "atrasado") {
+    items = items.filter((r) => {
+      const d = agendaEffectiveDate(r);
+      return !!d && d < today && r.status !== "concluida" && r.status !== "cancelada";
     });
+  } else if (opts.range === "hoje") {
+    items = items.filter((r) => agendaEffectiveDate(r) === today);
+  } else if (opts.range === "semana") {
+    items = items.filter((r) => {
+      const d = agendaEffectiveDate(r);
+      return !!d && d >= today && d <= in7Days;
+    });
+  }
+
+  return items.sort((a, b) => {
+    const dateCompare = (agendaEffectiveDate(a) ?? "").localeCompare(agendaEffectiveDate(b) ?? "");
+    if (dateCompare !== 0) return dateCompare;
+    const shiftCompare = (SHIFT_ORDER[a.shift ?? "dia"] ?? 99) - (SHIFT_ORDER[b.shift ?? "dia"] ?? 99);
+    if (shiftCompare !== 0) return shiftCompare;
+    return (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? "");
+  });
 }
 
 export type RequestsOverview = {

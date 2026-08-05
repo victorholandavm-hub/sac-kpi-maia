@@ -74,6 +74,14 @@ function ItemRow({
   return (
     <div className="flex items-center justify-between gap-3 py-2 flex-wrap" style={{ borderTop: "1px solid var(--gridline)" }}>
       <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+        {item.completed ? (
+          <span
+            className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
+            style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-good) 35%, var(--surface-1))" }}
+          >
+            ✓ Feito
+          </span>
+        ) : null}
         {item.action ? (
           <span
             className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"

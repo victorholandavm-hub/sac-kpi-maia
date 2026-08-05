@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
-import { listScheduledRequests, type ServiceRequestSummary, type AgendaRange } from "@/lib/serviceRequests";
+import { listScheduledRequests, agendaEffectiveDate, type ServiceRequestSummary, type AgendaRange } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
@@ -10,7 +10,7 @@ import { ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
 function groupByDate(requests: ServiceRequestSummary[]) {
   const groups: { dateKey: string; label: string; items: ServiceRequestSummary[] }[] = [];
   for (const r of requests) {
-    const dateKey = r.scheduledDate ?? "";
+    const dateKey = agendaEffectiveDate(r) ?? "";
     let group = groups.find((g) => g.dateKey === dateKey);
     if (!group) {
       const [y, m, d] = dateKey.split("-");

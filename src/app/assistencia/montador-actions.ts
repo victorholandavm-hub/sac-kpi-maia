@@ -230,6 +230,81 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
   revalidatePath(`/assistencia/${requestId}`);
 }
 
+// Visita rendeu só parte dos itens (ex.: montou 2 dos 4 móveis) -- marca
+// esses como feitos e joga o chamado pra "remarcar", igual montadorReportIssue,
+// pra assistência decidir a nova data do que sobrou (montador não escolhe
+// data, mesma regra de sempre). Diferente de "não consegui montar": aqui
+// teve progresso de verdade, então fica registrado item por item em vez de
+// só um motivo em texto livre.
+export async function montadorCompletePartially(requestId: string, completedItemIds: string[], note: string): Promise<void> {
+  const assemblerName = await getMontadorSession();
+  if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
+  if (completedItemIds.length === 0) throw new Error("Marque pelo menos um item como feito.");
+
+  const admin = getSupabaseAdmin();
+  const { data: request, error } = await admin
+    .from("service_requests")
+    .select("assembler_name, status, store_id")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (error || !request || request.assembler_name !== assemblerName) {
+    throw new Error("Esse chamado não é seu.");
+  }
+  if (request.status === "concluida" || request.status === "cancelada") {
+    throw new Error("Esse chamado já foi encerrado.");
+  }
+
+  const { error: itemsError } = await admin
+    .from("service_request_items")
+    .update({ completed: true })
+    .eq("request_id", requestId)
+    .in("id", completedItemIds);
+  if (itemsError) throw new Error(itemsError.message);
+
+  const { data: updated, error: updateError } = await admin
+    .from("service_requests")
+    .update({ status: "remarcar" })
+    .eq("id", requestId)
+    .eq("status", request.status)
+    .select("id")
+    .maybeSingle();
+  if (updateError) throw new Error(updateError.message);
+  if (!updated) throw new Error("Esse chamado já foi atualizado por outra pessoa. Recarregue a página e tente de novo.");
+
+  const { data: items } = await admin
+    .from("service_request_items")
+    .select("product, quantity, completed")
+    .eq("request_id", requestId);
+  const label = (i: { product: string; quantity: number }) => (i.quantity > 1 ? `${i.quantity}x ${i.product}` : i.product);
+  const done = (items ?? []).filter((i) => i.completed).map(label);
+  const pending = (items ?? []).filter((i) => !i.completed).map(label);
+  const trimmedNote = note.trim();
+
+  const eventNote =
+    `${assemblerName} (montador) concluiu parcialmente. Feito: ${done.join(", ") || "—"}. Falta: ${pending.join(", ") || "—"}.` +
+    (trimmedNote ? ` Observação: ${trimmedNote}` : "");
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: null,
+    event_type: "status_changed",
+    from_status: request.status,
+    to_status: "remarcar",
+    note: eventNote,
+  });
+
+  await notifyLoja(request.store_id, {
+    type: "status_changed",
+    title: "Solicitação: Concluída parcialmente",
+    message: eventNote,
+    link: `/assistencia/${requestId}`,
+  });
+
+  revalidatePath("/assistencia/montador");
+  revalidatePath(`/assistencia/montador/${requestId}`);
+  revalidatePath("/assistencia/fila");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
 export async function montadorAddNote(requestId: string, note: string): Promise<void> {
   const assemblerName = await getMontadorSession();
   if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");

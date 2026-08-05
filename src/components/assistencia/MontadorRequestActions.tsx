@@ -1,19 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { montadorCompleteRequest, montadorAddNote, montadorReportIssue } from "@/app/assistencia/montador-actions";
+import {
+  montadorCompleteRequest,
+  montadorAddNote,
+  montadorReportIssue,
+  montadorCompletePartially,
+} from "@/app/assistencia/montador-actions";
 import { useQuickAction } from "./useQuickAction";
 import { RatingScale } from "./RatingScale";
+import type { AssemblerRequestItem } from "@/lib/serviceRequests";
 
-type Mode = null | "complete" | "rating" | "issue";
+type Mode = null | "complete" | "rating" | "issue" | "partial";
 
-export function MontadorRequestActions({ requestId }: { requestId: string }) {
+export function MontadorRequestActions({ requestId, items }: { requestId: string; items: AssemblerRequestItem[] }) {
   const { pending, run, showToast } = useQuickAction();
   const [mode, setMode] = useState<Mode>(null);
   const [issueReason, setIssueReason] = useState("");
   const [note, setNote] = useState("");
   const [deliveryRating, setDeliveryRating] = useState<number | null>(null);
   const [resolutionRating, setResolutionRating] = useState<number | null>(null);
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  const [partialNote, setPartialNote] = useState("");
 
   function confirmIssue() {
     if (!issueReason.trim()) {
@@ -32,6 +40,23 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
       await montadorCompleteRequest(requestId, withRating ? deliveryRating : null, withRating ? resolutionRating : null);
       setMode(null);
     }, "Chamado marcado como concluído.");
+  }
+
+  function toggleChecked(id: string) {
+    setCheckedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
+  }
+
+  function confirmPartial() {
+    if (checkedIds.length === 0) {
+      showToast("Marque pelo menos um item como feito.", "error");
+      return;
+    }
+    run(async () => {
+      await montadorCompletePartially(requestId, checkedIds, partialNote);
+      setCheckedIds([]);
+      setPartialNote("");
+      setMode(null);
+    }, "Chamado concluído parcialmente.");
   }
 
   return (
@@ -70,6 +95,16 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
           >
             Marcar como concluído
           </button>
+          {items.length > 0 ? (
+            <button
+              disabled={pending}
+              onClick={() => setMode("partial")}
+              className="text-sm rounded-lg px-3 py-3 font-medium border disabled:opacity-60"
+              style={{ borderColor: "var(--status-warning)", color: "var(--status-warning)" }}
+            >
+              Concluir parcialmente
+            </button>
+          ) : null}
           <button
             disabled={pending}
             onClick={() => setMode("issue")}
@@ -132,6 +167,79 @@ export function MontadorRequestActions({ requestId }: { requestId: string }) {
           >
             Cliente não quis avaliar — concluir sem avaliação
           </button>
+        </div>
+      ) : null}
+
+      {mode === "partial" ? (
+        <div
+          className="flex flex-col gap-3 rounded-lg p-3"
+          style={{ border: "2px solid var(--status-warning)", background: "color-mix(in srgb, var(--status-warning) 8%, var(--surface-1))" }}
+        >
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            Marque só os itens que já foram montados/desmontados nesta visita. O resto fica pendente — a assistência
+            entra em contato pra combinar a data de conclusão.
+          </span>
+          <div className="flex flex-col gap-1.5">
+            {items.map((item) => (
+              <label key={item.id} className="flex items-center gap-2 text-sm rounded-lg border p-2" style={{ borderColor: "var(--border)" }}>
+                <input
+                  type="checkbox"
+                  checked={checkedIds.includes(item.id)}
+                  onChange={() => toggleChecked(item.id)}
+                  className="rounded"
+                />
+                <span style={{ color: "var(--text-primary)" }}>
+                  {item.action ? (
+                    <span
+                      className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
+                      style={{
+                        color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--text-primary)",
+                        background: item.action === "montar" ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))",
+                      }}
+                    >
+                      {item.action === "montar" ? "Montar" : "Desmontar"}
+                    </span>
+                  ) : null}
+                  {item.quantity > 1 ? `${item.quantity}x ` : ""}
+                  {item.product}
+                </span>
+              </label>
+            ))}
+          </div>
+          {checkedIds.length === items.length && items.length > 0 ? (
+            <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+              Marcou tudo? Se terminou a visita inteira, use &ldquo;Marcar como concluído&rdquo; em vez desta opção.
+            </span>
+          ) : null}
+          <textarea
+            value={partialNote}
+            onChange={(e) => setPartialNote(e.target.value)}
+            rows={2}
+            placeholder="Observação sobre o que falta (opcional)…"
+            className="rounded-lg border px-3 py-2.5 text-sm"
+            style={{ borderColor: "var(--border)" }}
+          />
+          <div className="flex items-center gap-2">
+            <button
+              disabled={pending || checkedIds.length === 0}
+              onClick={confirmPartial}
+              className="text-sm rounded-lg px-3 py-2.5 font-medium disabled:opacity-60 flex-1"
+              style={{ background: "var(--status-warning)", color: "#fff" }}
+            >
+              Concluir parcialmente
+            </button>
+            <button
+              onClick={() => {
+                setMode(null);
+                setCheckedIds([]);
+                setPartialNote("");
+              }}
+              className="text-sm underline px-2"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              cancelar
+            </button>
+          </div>
         </div>
       ) : null}
 

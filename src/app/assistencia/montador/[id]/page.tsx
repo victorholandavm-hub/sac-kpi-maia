@@ -87,31 +87,40 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
             Detalhes
           </h3>
           <Row label="Cliente" value={request.clientName} />
-          {request.comboMontagemDesmontagem ? (
+          {request.items.length > 0 ? (
             <div className="flex flex-col gap-2">
               <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Produtos
+                {request.comboMontagemDesmontagem ? "Produtos" : "Produto"}
               </span>
-              {(["montar", "desmontar"] as const).map((action) => {
-                const list = request.items.filter((i) => i.action === action);
-                if (list.length === 0) return null;
-                return (
-                  <div key={action} className="flex flex-col gap-0.5">
-                    <span
-                      className="text-xs font-bold w-fit px-1.5 py-0.5 rounded"
-                      style={{
-                        color: action === "montar" ? "var(--brand-green-ink)" : "var(--text-primary)",
-                        background: action === "montar" ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))",
-                      }}
-                    >
-                      {action === "montar" ? "Montar" : "Desmontar"}
-                    </span>
+              <div className="flex flex-col gap-1">
+                {request.items.map((item) => (
+                  <div key={item.id} className="flex items-center gap-1.5 flex-wrap">
+                    {item.completed ? (
+                      <span
+                        className="text-xs font-bold px-1.5 py-0.5 rounded"
+                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-good) 35%, var(--surface-1))" }}
+                      >
+                        ✓ Feito
+                      </span>
+                    ) : null}
+                    {item.action ? (
+                      <span
+                        className="text-xs font-bold px-1.5 py-0.5 rounded"
+                        style={{
+                          color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--text-primary)",
+                          background: item.action === "montar" ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))",
+                        }}
+                      >
+                        {item.action === "montar" ? "Montar" : "Desmontar"}
+                      </span>
+                    ) : null}
                     <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-                      {list.map((i) => `${i.quantity > 1 ? `${i.quantity}x ` : ""}${i.product}`).join(", ")}
+                      {item.quantity > 1 ? `${item.quantity}x ` : ""}
+                      {item.product}
                     </span>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
           ) : (
             <Row label="Produto" value={request.productSummary} />
@@ -162,7 +171,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               Ações
             </h3>
-            <MontadorRequestActions requestId={request.id} />
+            <MontadorRequestActions requestId={request.id} items={request.items} />
           </div>
         ) : null}
       </div>
