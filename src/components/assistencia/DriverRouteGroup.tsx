@@ -14,9 +14,10 @@ function formatDateOnly(value: string | null): string | null {
 }
 
 // Lista reordenável: o motorista decide a própria sequência (ex.: seguir por
-// bairro) com os botões ▲▼ -- reordena local na hora (resposta imediata) e
-// grava em segundo plano via setDriverOrderAction. Só reorganiza dentro do
-// próprio grupo (mesmo dia + mesma rota) que está sendo mostrado -- não mistura
+// bairro) com os botões ▲▼, vendo a posição atual (1, 2, 3...) de cada
+// entrega ao lado -- reordena local na hora (resposta imediata) e grava em
+// segundo plano via setDriverOrderAction. Só reorganiza dentro do próprio
+// grupo (mesmo dia + mesma rota) que está sendo mostrado -- não mistura
 // numa ordem global entre dias/rotas diferentes.
 export function DriverRouteGroup({
   items,
@@ -72,26 +73,37 @@ export function DriverRouteGroup({
       <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
         {order.map((r, i) => (
           <div key={r.id} className="flex items-center gap-2 p-4 flex-wrap">
-            {reorderable && order.length > 1 ? (
-              <div className="flex flex-col shrink-0">
-                <button
-                  onClick={() => move(i, -1)}
-                  disabled={i === 0 || saving}
-                  aria-label="Mover pra cima"
-                  className="text-sm leading-none px-1 disabled:opacity-25"
-                  style={{ color: "var(--text-secondary)" }}
+            {reorderable ? (
+              <div className="flex items-center gap-1 shrink-0">
+                <span
+                  className="text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full shrink-0"
+                  style={{ border: "2px solid var(--brand-green)", color: "var(--text-primary)" }}
+                  aria-label={`Posição ${i + 1} na sequência`}
                 >
-                  ▲
-                </button>
-                <button
-                  onClick={() => move(i, 1)}
-                  disabled={i === order.length - 1 || saving}
-                  aria-label="Mover pra baixo"
-                  className="text-sm leading-none px-1 disabled:opacity-25"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  ▼
-                </button>
+                  {i + 1}
+                </span>
+                {order.length > 1 ? (
+                  <div className="flex flex-col shrink-0">
+                    <button
+                      onClick={() => move(i, -1)}
+                      disabled={i === 0 || saving}
+                      aria-label="Mover pra cima"
+                      className="text-sm leading-none px-1 disabled:opacity-25"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => move(i, 1)}
+                      disabled={i === order.length - 1 || saving}
+                      aria-label="Mover pra baixo"
+                      className="text-sm leading-none px-1 disabled:opacity-25"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      ▼
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
