@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
 :root {
+  /* Sem isso, o Chrome do Android (e outros navegadores com "tema escuro
+     forçado" pra sites que não avisam) reescreve as cores de campos de
+     formulário por conta própria -- o valor do input continua lá, só que
+     pode ficar com o texto na mesma cor do fundo, invisível, mesmo com o
+     dado certo (ver relato: "editar" trazia os campos parecendo vazios).
+     O site sempre foi pensado só pra tema claro, então declarar isso
+     deixa explícito e tira o navegador da jogada. */
+  color-scheme: light;
   --background: #f7f8f6;
   --foreground: #0b0b0b;
 
