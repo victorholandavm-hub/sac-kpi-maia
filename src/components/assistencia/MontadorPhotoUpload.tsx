@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { montadorUploadPhoto } from "@/app/assistencia/montador-actions";
 import { useQuickAction } from "./useQuickAction";
 
 export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
@@ -13,8 +12,16 @@ export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
     const formData = new FormData();
     formData.set("photo", file);
     formData.set("caption", caption);
+    formData.set("requestId", requestId);
     run(async () => {
-      await montadorUploadPhoto(requestId, formData);
+      // POST comum em vez de Server Action -- o montador quase sempre abre
+      // o link de dentro do navegador embutido do WhatsApp, que tem bug
+      // conhecido nesse app com o tipo de resposta em stream que Server
+      // Actions usam (ver comentário em NavigationProgressBar.tsx). Rota
+      // tradicional com resposta JSON simples é bem mais compatível.
+      const res = await fetch("/api/montador/upload-photo", { method: "POST", body: formData });
+      const data: { error?: string } = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Não foi possível enviar a foto.");
       setCaption("");
       setInputKey((k) => k + 1);
     }, "Foto enviada.");

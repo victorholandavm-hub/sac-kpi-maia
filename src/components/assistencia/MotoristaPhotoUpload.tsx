@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { driverUploadPhoto } from "@/app/assistencia/driver-actions";
 import { useQuickAction } from "./useQuickAction";
 
 export function MotoristaPhotoUpload({ requestId }: { requestId: string }) {
@@ -13,8 +12,13 @@ export function MotoristaPhotoUpload({ requestId }: { requestId: string }) {
     const formData = new FormData();
     formData.set("photo", file);
     formData.set("caption", caption);
+    formData.set("requestId", requestId);
     run(async () => {
-      await driverUploadPhoto(requestId, formData);
+      // POST comum em vez de Server Action -- mesmo motivo do
+      // MontadorPhotoUpload.tsx (navegador embutido do WhatsApp).
+      const res = await fetch("/api/motorista/upload-photo", { method: "POST", body: formData });
+      const data: { error?: string } = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Não foi possível enviar a foto.");
       setCaption("");
       setInputKey((k) => k + 1);
     }, "Foto enviada.");
