@@ -16,25 +16,32 @@ function formatDateOnly(value: string | null): string | null {
   return `${d}/${m}/${y}`;
 }
 
+type PaymentFlag = "none" | "partial" | "complete" | "no_items";
+
 // Sempre mostra algo (inclusive "tudo certo") -- silêncio quando o valor já
 // tava definido dava a impressão de que nada tinha sido conferido ainda.
-function paymentValueFlag(items: RequestItem[]): "none" | "partial" | "complete" | null {
-  if (items.length === 0) return null;
+// Chamado sem item nenhum (removido depois, ou nunca cadastrado) também
+// precisa de um selo -- sem isso, "items.length === 0" caía no silêncio de
+// novo, a mesma falta que motivou esse badge existir.
+function paymentValueFlag(items: RequestItem[]): PaymentFlag {
+  if (items.length === 0) return "no_items";
   const withValue = items.filter((i) => i.unitValue != null).length;
   if (withValue === 0) return "none";
   if (withValue < items.length) return "partial";
   return "complete";
 }
 
-const PAYMENT_FLAG_LABELS: Record<"none" | "partial" | "complete", string> = {
+const PAYMENT_FLAG_LABELS: Record<PaymentFlag, string> = {
   none: "💰 Valor não definido",
   partial: "💰 Valor parcial",
   complete: "✓ Valor definido",
+  no_items: "⚠ Sem produto cadastrado",
 };
-const PAYMENT_FLAG_COLORS: Record<"none" | "partial" | "complete", string> = {
+const PAYMENT_FLAG_COLORS: Record<PaymentFlag, string> = {
   none: "var(--status-critical)",
   partial: "var(--status-warning)",
   complete: "var(--status-good)",
+  no_items: "var(--status-critical)",
 };
 
 // Fila reordenável com feedback visual: ao clicar ▲▼, os dois cards que
@@ -119,6 +126,9 @@ export function AssistenciaQueueGroup({ items, reorderable }: { items: ServiceRe
         // "remarcar" com os itens já feitos marcados (ver
         // montadorCompletePartially em montador-actions.ts).
         const isPartialCompletion = r.status === "remarcar" && r.items.some((item) => item.completed);
+        // Só montagem/desmontagem tem valor de montador a pagar por item --
+        // confirmado com o usuário que troca de peça não entra aqui (#4588
+        // era falso positivo).
         const showPaymentFlag = (r.type === "montagem" || r.type === "desmontagem") && (r.status === "concluida" || isPartialCompletion);
         const paymentFlag = showPaymentFlag ? paymentValueFlag(r.items) : null;
 
