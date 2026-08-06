@@ -1,8 +1,12 @@
 import type { NpsSummary } from "@/lib/kpi";
 
+// Meta definida pelo usuário -- sem lugar melhor pra guardar isso hoje
+// (não é dado do GHL, é decisão de negócio), então fica aqui mesmo.
+const NPS_INDEX_TARGET = 65;
+
 function indexColor(value: number | null): string {
   if (value === null) return "var(--text-muted)";
-  if (value >= 50) return "var(--status-good)";
+  if (value >= NPS_INDEX_TARGET) return "var(--status-good)";
   if (value >= 0) return "var(--status-warning)";
   return "var(--status-critical)";
 }
@@ -42,7 +46,7 @@ export function NpsCard({ data }: { data: NpsSummary }) {
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
-              Índice NPS
+              Índice NPS <span style={{ color: "var(--text-muted)" }}>(meta {NPS_INDEX_TARGET})</span>
             </span>
             <span className="text-2xl font-semibold" style={{ color: indexColor(data.npsIndex) }}>
               {data.npsIndex}
