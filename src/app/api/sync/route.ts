@@ -30,6 +30,7 @@ type GhlConversation = {
 type GhlMessage = {
   direction: "inbound" | "outbound";
   dateAdded: string;
+  body?: string;
 };
 
 function ghlHeaders() {
@@ -74,15 +75,19 @@ async function fetchRecentConversations(sinceMs: number): Promise<{ conversation
   return { conversations: conversations.filter((c) => (c.dateUpdated ?? 0) >= sinceMs), error };
 }
 
-async function firstResponseMinutes(ghlConversationId: string): Promise<number | null> {
+async function fetchMessages(ghlConversationId: string): Promise<GhlMessage[] | null> {
   const res = await fetch(`${BASE_URL}/conversations/${ghlConversationId}/messages?limit=100`, {
     headers: ghlHeaders(),
   });
   if (!res.ok) return null;
   const data = await res.json();
-  const msgs: GhlMessage[] = (data.messages?.messages ?? []).slice().sort((a: GhlMessage, b: GhlMessage) =>
-    (a.dateAdded || "").localeCompare(b.dateAdded || "")
-  );
+  const msgs: GhlMessage[] = data.messages?.messages ?? [];
+  return msgs.slice().sort((a, b) => (a.dateAdded || "").localeCompare(b.dateAdded || ""));
+}
+
+async function firstResponseMinutes(ghlConversationId: string): Promise<number | null> {
+  const msgs = await fetchMessages(ghlConversationId);
+  if (!msgs) return null;
   const firstInbound = msgs.find((m) => m.direction === "inbound");
   if (!firstInbound) return null;
   const firstOutbound = msgs.find((m) => m.direction === "outbound" && m.dateAdded > firstInbound.dateAdded);
@@ -90,6 +95,26 @@ async function firstResponseMinutes(ghlConversationId: string): Promise<number |
 
   const minutes = businessMinutesBetween(new Date(firstInbound.dateAdded), new Date(firstOutbound.dateAdded));
   return Math.round(minutes * 10) / 10;
+}
+
+// Gatilho no GHL: quando o atendente marca a conversa como resolvida, um
+// workflow dispara um template de WhatsApp perguntando "de 1 a 5, qual nota
+// você dá pro nosso atendimento" (1 = muito insatisfeito, 5 = muito
+// satisfeito). A resposta do cliente chega como mensagem inbound comum na
+// mesma conversa, com o corpo exatamente igual ao texto da opção escolhida
+// (ex.: "4 - Satisfeito") -- confirmado inspecionando mensagens reais via
+// API antes de escrever esse regex. Pega a resposta mais recente que bater
+// com o padrão, caso o cliente responda a enquete mais de uma vez.
+const NPS_PATTERN = /^([1-5])\s*-\s*(muito insatisfeito|insatisfeito|indiferente|satisfeito|muito satisfeito)\s*$/i;
+
+async function detectNpsScore(ghlConversationId: string): Promise<{ score: number; answeredAt: string } | null> {
+  const msgs = await fetchMessages(ghlConversationId);
+  if (!msgs) return null;
+  const matches = msgs.filter((m) => m.direction === "inbound" && NPS_PATTERN.test((m.body ?? "").trim()));
+  if (matches.length === 0) return null;
+  const last = matches[matches.length - 1];
+  const score = Number(NPS_PATTERN.exec(last.body!.trim())![1]);
+  return { score, answeredAt: last.dateAdded };
 }
 
 export async function GET(req: NextRequest) {
@@ -177,14 +202,36 @@ async function runSync() {
     }
   }
 
+  // Passo à parte de first_response_minutes de propósito: NPS não tem o
+  // corte de windowStart (vale pra qualquer conversa resolvida, não só as
+  // que entraram depois que o SLA de 1ª resposta passou a ser medido), e
+  // fica pendente até o cliente responder -- pode levar mais que um ciclo
+  // de sync pra chegar.
+  const { data: pendingNps } = await supabase
+    .from("conversations")
+    .select("id, ghl_conversation_id")
+    .is("nps_score", null)
+    .order("ghl_updated_at", { ascending: false })
+    .limit(150);
+
+  let npsComputed = 0;
+  for (const row of pendingNps ?? []) {
+    const result = await detectNpsScore(row.ghl_conversation_id);
+    if (result) {
+      await supabase.from("conversations").update({ nps_score: result.score, nps_answered_at: result.answeredAt }).eq("id", row.id);
+      npsComputed++;
+    }
+  }
+
   const ok = errors.length === 0;
-  await recordSyncRun("ghl", ok, { conversationsChecked: conversations.length, conversationsUpserted, responsesComputed }, errors);
+  await recordSyncRun("ghl", ok, { conversationsChecked: conversations.length, conversationsUpserted, responsesComputed, npsComputed }, errors);
 
   return NextResponse.json({
     ok,
     conversationsChecked: conversations.length,
     conversationsUpserted,
     responsesComputed,
+    npsComputed,
     errors,
   });
 }

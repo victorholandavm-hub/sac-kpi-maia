@@ -24,6 +24,10 @@ export type TicketRow = {
   is_recurrence: boolean;
   blocking_tag: string | null;
   blocking_since: string | null;
+  // Não vem de v_ticket_enriched (view mantida direto no Supabase, fora das
+  // migrations do repo) -- juntado em memória a partir de `conversations`
+  // pra não precisar mexer na view. Ver getKpiData.
+  nps_score: number | null;
 };
 
 export type Count = { label: string; count: number };
@@ -121,6 +125,30 @@ export type PerformanceReportSet = {
   month: PerformanceReport;
 };
 
+// Enquete de satisfação (1 a 5) disparada pelo GHL quando o atendente marca
+// resolvido -- ver detectNpsScore em src/app/api/sync/route.ts. Não é NPS
+// no sentido estrito (promotor/detrator em escala 0-10), mas é como o
+// usuário se refere a ela, então mantive o nome.
+export type NpsDistributionEntry = { score: 1 | 2 | 3 | 4 | 5; count: number };
+
+export type NpsSummary = {
+  avgScore: number | null;
+  responseCount: number;
+  eligibleCount: number;
+  responseRatePct: number | null;
+  distribution: NpsDistributionEntry[];
+  promoterCount: number;
+  neutralCount: number;
+  detractorCount: number;
+  promoterPct: number | null;
+  neutralPct: number | null;
+  detractorPct: number | null;
+  // Fórmula clássica de NPS (%promotores - %detratores), -100 a 100 --
+  // adaptada pra escala 1-5 da enquete (sem o "6" do meio que a escala 0-10
+  // original teria como corte).
+  npsIndex: number | null;
+};
+
 export type AgentStat = {
   agent: string;
   total: number;
@@ -177,6 +205,7 @@ export type KpiData = {
   agentQueue: AgentQueueGroup[];
   byAgentStats: AgentStat[];
   performanceReport: PerformanceReportSet;
+  npsSummary: NpsSummary;
 };
 
 function median(values: number[]): number | null {
@@ -429,6 +458,51 @@ function getPreviousWeekRange(nowUtc: Date): { from: Date; to: Date; fromLabel: 
   };
 }
 
+// Só chamado resolvido dispara a enquete no GHL -- "elegível" é resolvido
+// no período, "respondido" é quem tem nota. Sem filtrar por resolvido, a
+// taxa de resposta ficaria artificialmente baixa (contando chamado que nem
+// chegou a receber a enquete ainda).
+function buildNpsSummary(rows: TicketRow[]): NpsSummary {
+  const eligible = rows.filter((r) => r.resolved_effective);
+  const answered = eligible.filter((r) => r.nps_score !== null);
+
+  const distribution: NpsDistributionEntry[] = ([1, 2, 3, 4, 5] as const).map((score) => ({
+    score,
+    count: answered.filter((r) => r.nps_score === score).length,
+  }));
+
+  const avgScore =
+    answered.length > 0
+      ? Math.round((answered.reduce((sum, r) => sum + (r.nps_score as number), 0) / answered.length) * 10) / 10
+      : null;
+
+  // Classificação clássica de NPS adaptada pra escala 1-5 da enquete: 4-5
+  // promotor, 3 neutro, 1-2 detrator -- direto satisfação/insatisfação, sem
+  // o "6" do meio que a escala 0-10 original teria como corte.
+  const promoterCount = answered.filter((r) => (r.nps_score as number) >= 4).length;
+  const neutralCount = answered.filter((r) => r.nps_score === 3).length;
+  const detractorCount = answered.filter((r) => (r.nps_score as number) <= 2).length;
+  const pct = (count: number) => (answered.length > 0 ? Math.round((count / answered.length) * 1000) / 10 : null);
+  const promoterPct = pct(promoterCount);
+  const neutralPct = pct(neutralCount);
+  const detractorPct = pct(detractorCount);
+
+  return {
+    avgScore,
+    responseCount: answered.length,
+    eligibleCount: eligible.length,
+    responseRatePct: eligible.length > 0 ? Math.round((answered.length / eligible.length) * 100) : null,
+    distribution,
+    promoterCount,
+    neutralCount,
+    detractorCount,
+    promoterPct,
+    neutralPct,
+    detractorPct,
+    npsIndex: promoterPct !== null && detractorPct !== null ? Math.round(promoterPct - detractorPct) : null,
+  };
+}
+
 function buildPreviousWeekSummary(allRows: TicketRow[], now: Date): PreviousWeekSummary {
   const { from, to, fromLabel, toLabel } = getPreviousWeekRange(now);
   const weekRows = allRows.filter((r) => {
@@ -616,8 +690,27 @@ export async function getKpiData(
       .order("opened_at", { ascending: false })
       .range(page * pageSize, page * pageSize + pageSize - 1);
     if (ticketError) throw ticketError;
-    allRows.push(...((pageRows ?? []) as TicketRow[]));
+    allRows.push(...((pageRows ?? []) as TicketRow[]).map((r) => ({ ...r, nps_score: null as number | null })));
     if (!pageRows || pageRows.length < pageSize) break;
+  }
+
+  // nps_score não vem de v_ticket_enriched (view mantida direto no Supabase,
+  // fora das migrations do repo) -- busca à parte em conversations e junta
+  // em memória por conversation_id, pra não precisar reescrever uma view
+  // que não dá pra inspecionar com segurança daqui.
+  const npsByConversationId = new Map<string, number>();
+  for (let page = 0; ; page++) {
+    const { data: pageRows, error: npsError } = await supabase
+      .from("conversations")
+      .select("id, nps_score")
+      .not("nps_score", "is", null)
+      .range(page * pageSize, page * pageSize + pageSize - 1);
+    if (npsError) throw npsError;
+    for (const row of pageRows ?? []) npsByConversationId.set(row.id as string, row.nps_score as number);
+    if (!pageRows || pageRows.length < pageSize) break;
+  }
+  for (const row of allRows) {
+    row.nps_score = npsByConversationId.get(row.conversation_id) ?? null;
   }
 
   const rows = allRows.filter((r) => {
@@ -755,5 +848,6 @@ export async function getKpiData(
     agentQueue,
     byAgentStats: buildAgentStats(rows),
     performanceReport: buildPerformanceReportSet(allRows, new Date()),
+    npsSummary: buildNpsSummary(rows),
   };
 }

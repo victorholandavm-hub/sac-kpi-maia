@@ -18,7 +18,16 @@ import { PreviousWeekCard } from "./PreviousWeekCard";
 import { AgentQueue } from "./AgentQueue";
 import { AgentStatsTable } from "./AgentStatsTable";
 import { PerformanceReportButton } from "./PerformanceReportButton";
+import { NpsCard } from "./NpsCard";
 import { categoryLabel, storeLabel, productLabel, blockingLabel } from "@/lib/labels";
+
+const NPS_SCORE_LABELS: Record<number, string> = {
+  5: "5 - Muito satisfeito",
+  4: "4 - Satisfeito",
+  3: "3 - Indiferente",
+  2: "2 - Insatisfeito",
+  1: "1 - Muito insatisfeito",
+};
 
 export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) {
   const resolvedPct =
@@ -29,6 +38,11 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
   const byProduct = data.byProduct.map((c) => ({ ...c, label: productLabel(c.label) }));
   const waitingByType = data.waitingByType.map((c) => ({ ...c, label: blockingLabel(c.label) }));
   const waitingByStore = data.waitingByStore.map((c) => ({ ...c, label: storeLabel(c.label) }));
+  // Ordem invertida (5 no topo) -- fica mais intuitivo no gráfico de barras
+  // horizontal ver "muito satisfeito" em cima.
+  const npsDistribution = [...data.npsSummary.distribution]
+    .sort((a, b) => b.score - a.score)
+    .map((d) => ({ label: NPS_SCORE_LABELS[d.score], count: d.count }));
 
   return (
     <div className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
@@ -102,6 +116,13 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         <BarRanking title="Chamados por loja" data={byStore} coverage={data.storeCoverage} />
         <BarRanking title="Chamados por produto" data={byProduct} coverage={data.productCoverage} />
       </section>
+
+      <NpsCard data={data.npsSummary} />
+      <BarRanking
+        title="Distribuição das notas (enquete GHL)"
+        data={npsDistribution}
+        coverage={{ withValue: data.npsSummary.responseCount, total: data.npsSummary.eligibleCount, pct: data.npsSummary.responseRatePct ?? 0 }}
+      />
 
       <section className="grid md:grid-cols-2 gap-4">
         <BarRanking title="Chamados por agente" data={data.byAgent} />
