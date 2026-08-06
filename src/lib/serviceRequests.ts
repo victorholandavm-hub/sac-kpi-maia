@@ -579,6 +579,63 @@ export async function listOpenMontagemQueueIds(): Promise<string[]> {
   return (data ?? []).map((row) => row.id as string);
 }
 
+export type DayLoadItem = {
+  id: string;
+  ticketNumber: number;
+  type: RequestType;
+  clientName: string | null;
+  clientNeighborhood: string | null;
+  storeName: string;
+  shift: Shift | null;
+  scheduledTime: string | null;
+};
+
+// Visitas já agendadas pra um dia específico -- usado no momento de criar
+// uma solicitação nova (QuickCreateRequestForm) pra mostrar, assim que a
+// assistência escolhe a data, quantas e quais demandas já existem naquele
+// dia, sem precisar sair do formulário e ir checar a agenda à parte. Mesma
+// prioridade de data de agendaEffectiveDate (scheduled_date primeiro,
+// approved_deadline só quando não tem scheduled_date), expressa direto na
+// query porque aqui não dá pra trazer tudo e filtrar em JS como a agenda faz
+// (essa consulta roda a cada data digitada, precisa ser enxuta).
+export async function listDayLoad(date: string): Promise<DayLoadItem[]> {
+  // Validação estrita antes de interpolar na string do filtro -- `date` vem
+  // de input do usuário (mesmo que o <input type="date"> do navegador já
+  // restrinja o formato, a action pode ser chamada direto) e injeção aqui
+  // poderia manipular a sintaxe do filtro do PostgREST.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("service_requests")
+    .select("id, ticket_number, type, client_name, client_neighborhood, shift, scheduled_time, stores(name)")
+    .or(`scheduled_date.eq.${date},and(scheduled_date.is.null,approved_deadline.eq.${date})`)
+    .not("status", "eq", "cancelada")
+    .order("scheduled_time", { ascending: true, nullsFirst: false });
+  if (error) throw new Error(error.message);
+
+  type Row = {
+    id: string;
+    ticket_number: number;
+    type: RequestType;
+    client_name: string | null;
+    client_neighborhood: string | null;
+    shift: Shift | null;
+    scheduled_time: string | null;
+    stores: { name: string } | null;
+  };
+  return ((data ?? []) as unknown as Row[]).map((r) => ({
+    id: r.id,
+    ticketNumber: r.ticket_number,
+    type: r.type,
+    clientName: r.client_name,
+    clientNeighborhood: r.client_neighborhood,
+    storeName: r.stores?.name ?? "—",
+    shift: r.shift,
+    scheduledTime: r.scheduled_time,
+  }));
+}
+
 export type AssemblerRequestItem = { id: string; product: string; quantity: number; action: ItemAction | null; completed: boolean };
 
 export type AssemblerRequestView = {
@@ -950,6 +1007,14 @@ export async function listScheduledRequests(
   return items.sort((a, b) => {
     const dateCompare = (agendaEffectiveDate(a) ?? "").localeCompare(agendaEffectiveDate(b) ?? "");
     if (dateCompare !== 0) return dateCompare;
+    // assistencia_order primeiro (a assistência pode reorganizar o dia, ver
+    // AgendaQueueGroup.tsx) -- quem ainda não foi reorganizado (null) cai
+    // pro final e usa a ordem padrão por turno/horário.
+    const orderA = a.assistenciaOrder;
+    const orderB = b.assistenciaOrder;
+    if (orderA !== null && orderB !== null && orderA !== orderB) return orderA - orderB;
+    if (orderA !== null && orderB === null) return -1;
+    if (orderA === null && orderB !== null) return 1;
     const shiftCompare = (SHIFT_ORDER[a.shift ?? "dia"] ?? 99) - (SHIFT_ORDER[b.shift ?? "dia"] ?? 99);
     if (shiftCompare !== 0) return shiftCompare;
     return (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? "");

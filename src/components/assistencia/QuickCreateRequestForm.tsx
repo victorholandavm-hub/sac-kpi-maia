@@ -1,9 +1,15 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { createQuickRequest, lookupTotvsClientForTeam, lookupTotvsProductForTeam, type FormState } from "@/app/assistencia/actions";
+import {
+  createQuickRequest,
+  lookupTotvsClientForTeam,
+  lookupTotvsProductForTeam,
+  getDayLoadAction,
+  type FormState,
+} from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
-import { SHIFTS, type Store } from "@/lib/serviceRequests";
+import { SHIFTS, type Store, type DayLoadItem } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
 
 const ASSISTENCIA_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"] as const;
@@ -183,6 +189,28 @@ export function QuickCreateRequestForm({
     }, 400);
     return () => clearTimeout(timer);
   }, [clientCode]);
+
+  // Assim que escolhe a data, mostra quantas e quais demandas já existem
+  // naquele dia -- pedido pra não precisar sair do formulário e ir checar a
+  // agenda à parte só pra saber se dá pra encaixar mais uma visita.
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [dayLoad, setDayLoad] = useState<DayLoadItem[] | null>(null);
+  const [dayLoadLoading, setDayLoadLoading] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!scheduledDate) {
+        setDayLoad(null);
+        return;
+      }
+      setDayLoadLoading(true);
+      getDayLoadAction(scheduledDate)
+        .then((items) => setDayLoad(items))
+        .catch(() => setDayLoad(null))
+        .finally(() => setDayLoadLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [scheduledDate]);
 
   // Sem combo, "item" é a lista única de sempre. Com combo, "item" continua
   // sendo os produtos do type principal e "item_secondary" os da ação oposta
@@ -420,7 +448,14 @@ export function QuickCreateRequestForm({
       <FormSection title="Agendamento e responsável" number={3}>
         <div className="grid sm:grid-cols-4 gap-4">
           <Field label="Data agendada">
-            <input name="scheduled_date" type="date" className="rounded border px-3 py-2" style={inputStyle} />
+            <input
+              name="scheduled_date"
+              type="date"
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
           </Field>
           <Field label="Hora">
             <input name="scheduled_time" type="time" className="rounded border px-3 py-2" style={inputStyle} />
@@ -456,6 +491,36 @@ export function QuickCreateRequestForm({
             )}
           </Field>
         </div>
+
+        {scheduledDate ? (
+          <div className="rounded-lg p-3 flex flex-col gap-1.5" style={{ background: "var(--gridline)" }}>
+            {dayLoadLoading ? (
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Verificando a agenda desse dia…
+              </span>
+            ) : dayLoad === null ? null : dayLoad.length === 0 ? (
+              <span className="text-xs font-medium" style={{ color: "var(--status-good)" }}>
+                Nenhuma visita agendada ainda nesse dia.
+              </span>
+            ) : (
+              <>
+                <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {dayLoad.length} visita{dayLoad.length > 1 ? "s" : ""} já {dayLoad.length > 1 ? "agendadas" : "agendada"} nesse dia:
+                </span>
+                <ul className="flex flex-col gap-0.5">
+                  {dayLoad.map((item) => (
+                    <li key={item.id} className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      #{item.ticketNumber} · {REQUEST_TYPE_LABELS[item.type] ?? item.type} · {item.storeName}
+                      {item.clientName ? ` · ${item.clientName}` : ""}
+                      {item.clientNeighborhood ? ` · 📍 ${item.clientNeighborhood}` : ""}
+                      {item.scheduledTime ? ` · ${item.scheduledTime.slice(0, 5)}` : item.shift ? ` · ${SHIFT_LABELS[item.shift]}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        ) : null}
       </FormSection>
 
       <FormSection

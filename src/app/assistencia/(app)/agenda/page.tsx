@@ -2,9 +2,8 @@ import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listScheduledRequests, agendaEffectiveDate, type ServiceRequestSummary, type AgendaRange } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
-import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
+import { AgendaQueueGroup } from "@/components/assistencia/AgendaQueueGroup";
 import { ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
 
 function groupByDate(requests: ServiceRequestSummary[]) {
@@ -159,76 +158,7 @@ export default async function AgendaPage({
                 ) : null}
               </div>
               <div style={{ background: "var(--surface-1)" }}>
-                <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                  {group.items.map((r) => {
-                    const rowOverdue = isOverdue && r.status !== "concluida" && r.status !== "cancelada";
-                    return (
-                      <Link
-                        key={r.id}
-                        href={`/assistencia/${r.id}`}
-                        className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
-                        style={rowOverdue ? { borderLeft: "4px solid var(--status-critical)" } : undefined}
-                      >
-                        <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                              #{r.ticketNumber}
-                            </span>
-                            <StatusBadge status={r.status} />
-                            {rowOverdue ? (
-                              <span
-                                className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                                style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
-                              >
-                                Atrasada
-                              </span>
-                            ) : null}
-                            {r.scheduledTime ? (
-                              <span
-                                className="text-xs font-medium px-2 py-0.5 rounded-full"
-                                style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
-                              >
-                                {r.scheduledTime.slice(0, 5)}
-                              </span>
-                            ) : null}
-                            {r.shift ? (
-                              <span
-                                className="text-xs font-medium px-2 py-0.5 rounded-full"
-                                style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
-                              >
-                                {SHIFT_LABELS[r.shift] ?? r.shift}
-                              </span>
-                            ) : null}
-                            {r.rota ? (
-                              <span
-                                className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                                style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
-                              >
-                                {ROTA_LABELS[r.rota]}
-                                {r.rotaExceptionNote ? " ⚠" : ""}
-                              </span>
-                            ) : null}
-                            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                              {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                            </span>
-                            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                              {r.storeName}
-                            </span>
-                          </div>
-                          <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                            {r.clientName ?? "Sem nome de cliente"}
-                            {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
-                            {r.reason ? ` · ${r.reason}` : ""}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                          <span>{r.assemblerName ? `Técnico: ${r.assemblerName}` : "Sem técnico definido"}</span>
-                          <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
+                <AgendaQueueGroup items={group.items} isOverdue={isOverdue} />
               </div>
             </div>
           );

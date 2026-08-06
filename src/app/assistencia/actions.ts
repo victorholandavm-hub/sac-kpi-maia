@@ -42,7 +42,7 @@ import {
 import { verifyPin } from "@/lib/pinAuth";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
-import { ADDRESS_NUMBER_REQUIRED_TYPES } from "@/lib/serviceRequests";
+import { ADDRESS_NUMBER_REQUIRED_TYPES, listDayLoad, type DayLoadItem } from "@/lib/serviceRequests";
 
 const REQUEST_TYPES = [
   "montagem",
@@ -279,6 +279,14 @@ export async function lookupTotvsClientForTeam(code: string): Promise<TotvsClien
 export async function lookupTotvsProductForTeam(code: string): Promise<TotvsProductMatch | null> {
   await getProfile();
   return findTotvsProductByCode(code);
+}
+
+// Usado no formulário de criação (QuickCreateRequestForm) pra mostrar a
+// carga do dia assim que a assistência escolhe a data agendada -- ver
+// listDayLoad em serviceRequests.ts.
+export async function getDayLoadAction(date: string): Promise<DayLoadItem[]> {
+  await getProfile();
+  return listDayLoad(date);
 }
 
 // Sem sessão do Supabase Auth (usa a sessão de gerente de loja por PIN — ver
@@ -1061,6 +1069,7 @@ export async function setAssistenciaOrderAction(items: { id: string; expectedOrd
   }
 
   revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/agenda");
 }
 
 // Adicionar/remover produto era só do gerente da loja, e só enquanto o
