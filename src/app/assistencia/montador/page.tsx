@@ -6,6 +6,7 @@ import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { groupByDateDetailed } from "@/lib/dateBuckets";
+import { telHref, whatsappHref } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -119,11 +120,22 @@ function RequestRow({ r }: { r: AssemblerRequestView }) {
       <div className="flex items-center gap-2 flex-wrap">
         {r.clientPhone ? (
           <a
-            href={`tel:${r.clientPhone.replace(/\D/g, "")}`}
+            href={telHref(r.clientPhone)}
             className="text-xs font-medium rounded-lg px-2.5 py-1.5"
             style={{ background: "color-mix(in srgb, var(--brand-green) 12%, transparent)", color: "var(--brand-green)" }}
           >
             📞 {r.clientPhone}
+          </a>
+        ) : null}
+        {r.clientPhone ? (
+          <a
+            href={whatsappHref(r.clientPhone)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-medium rounded-lg px-2.5 py-1.5"
+            style={{ background: "color-mix(in srgb, #25d366 18%, transparent)", color: "#1da851" }}
+          >
+            💬 WhatsApp
           </a>
         ) : null}
         {mapsQuery ? (
