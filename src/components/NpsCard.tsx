@@ -18,8 +18,8 @@ export function NpsCard({ data }: { data: NpsSummary }) {
           Satisfação do atendimento (enquete GHL)
         </h3>
         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-          {data.responseCount} de {data.eligibleCount} chamados resolvidos responderam
-          {data.responseRatePct !== null ? ` (${data.responseRatePct}%)` : ""}
+          {data.responseCount} avaliações recebidas
+          {data.responseRatePct !== null ? ` · ~${data.responseRatePct}% dos ${data.eligibleCount} chamados resolvidos no período` : ""}
         </span>
       </div>
 

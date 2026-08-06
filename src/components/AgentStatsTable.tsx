@@ -33,6 +33,7 @@ export function AgentStatsTable({ data }: { data: AgentStat[] }) {
                 <th className="py-1 pr-4 font-normal">Tempo médio de resolução</th>
                 <th className="py-1 pr-4 font-normal">1ª resposta (média)</th>
                 <th className="py-1 pr-4 font-normal">Dentro do SLA</th>
+                <th className="py-1 pr-4 font-normal">Nota (NPS)</th>
               </tr>
             </thead>
             <tbody>
@@ -58,6 +59,16 @@ export function AgentStatsTable({ data }: { data: AgentStat[] }) {
                   </td>
                   <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
                     {row.pctWithinSla !== null ? `${row.pctWithinSla}%` : "—"}
+                  </td>
+                  <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    {row.avgNpsScore !== null ? (
+                      <>
+                        {row.avgNpsScore}/5{" "}
+                        <span style={{ color: "var(--text-muted)" }}>({row.npsResponseCount})</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               ))}

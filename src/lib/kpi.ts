@@ -157,6 +157,8 @@ export type AgentStat = {
   medianResolutionHours: number | null;
   avgFirstResponseMinutes: number | null;
   pctWithinSla: number | null;
+  avgNpsScore: number | null;
+  npsResponseCount: number;
 };
 
 export type StoreBreakdown = {
@@ -368,6 +370,10 @@ function buildAgentStats(rows: TicketRow[]): AgentStat[] {
         .map((r) => r.resolution_hours)
         .filter((h): h is number => h !== null);
       const firstResponseRows = agentRows.filter((r) => r.first_response_minutes !== null);
+      // Nota de avaliação por atendente -- toda avaliação de chamado com a
+      // tag desse agente conta, mesmo sem tag de resolução (mesmo critério
+      // "mostra tudo que respondeu" do resumo geral, ver buildNpsSummary).
+      const npsScores = agentRows.filter((r) => r.nps_score !== null).map((r) => r.nps_score as number);
 
       return {
         agent,
@@ -390,6 +396,8 @@ function buildAgentStats(rows: TicketRow[]): AgentStat[] {
           firstResponseRows.length > 0
             ? Math.round((firstResponseRows.filter((r) => r.within_sla).length / firstResponseRows.length) * 100)
             : null,
+        avgNpsScore: npsScores.length > 0 ? Math.round((npsScores.reduce((a, b) => a + b, 0) / npsScores.length) * 10) / 10 : null,
+        npsResponseCount: npsScores.length,
       };
     })
     .sort((a, b) => b.total - a.total);
@@ -458,40 +466,40 @@ function getPreviousWeekRange(nowUtc: Date): { from: Date; to: Date; fromLabel: 
   };
 }
 
-// Só chamado resolvido dispara a enquete no GHL -- "elegível" é resolvido
-// no período, "respondido" é quem tem nota. Sem filtrar por resolvido, a
-// taxa de resposta ficaria artificialmente baixa (contando chamado que nem
-// chegou a receber a enquete ainda).
-function buildNpsSummary(rows: TicketRow[]): NpsSummary {
-  const eligible = rows.filter((r) => r.resolved_effective);
-  const answered = eligible.filter((r) => r.nps_score !== null);
+// Toda avaliação que existir entra na conta -- mesmo de chamado sem tag de
+// resolução aplicada, ou de conversa que nem apareceu em v_ticket_enriched
+// (sem categoria/loja marcada). Antes filtrava por resolved_effective e
+// escondia quem respondeu de verdade só porque o chamado não tava com a tag
+// certa -- ver relato real onde isso sumiu com 2 de 8 avaliações. "Elegível"
+// (chamados resolvidos no período) continua só como referência pra taxa de
+// resposta, sem funcionar mais como filtro do que aparece.
+function buildNpsSummary(rows: TicketRow[], untrackedScores: number[]): NpsSummary {
+  const eligibleCount = rows.filter((r) => r.resolved_effective).length;
+  const scores = [...rows.filter((r) => r.nps_score !== null).map((r) => r.nps_score as number), ...untrackedScores];
 
   const distribution: NpsDistributionEntry[] = ([1, 2, 3, 4, 5] as const).map((score) => ({
     score,
-    count: answered.filter((r) => r.nps_score === score).length,
+    count: scores.filter((s) => s === score).length,
   }));
 
-  const avgScore =
-    answered.length > 0
-      ? Math.round((answered.reduce((sum, r) => sum + (r.nps_score as number), 0) / answered.length) * 10) / 10
-      : null;
+  const avgScore = scores.length > 0 ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
 
   // Classificação clássica de NPS adaptada pra escala 1-5 da enquete: 4-5
   // promotor, 3 neutro, 1-2 detrator -- direto satisfação/insatisfação, sem
   // o "6" do meio que a escala 0-10 original teria como corte.
-  const promoterCount = answered.filter((r) => (r.nps_score as number) >= 4).length;
-  const neutralCount = answered.filter((r) => r.nps_score === 3).length;
-  const detractorCount = answered.filter((r) => (r.nps_score as number) <= 2).length;
-  const pct = (count: number) => (answered.length > 0 ? Math.round((count / answered.length) * 1000) / 10 : null);
+  const promoterCount = scores.filter((s) => s >= 4).length;
+  const neutralCount = scores.filter((s) => s === 3).length;
+  const detractorCount = scores.filter((s) => s <= 2).length;
+  const pct = (count: number) => (scores.length > 0 ? Math.round((count / scores.length) * 1000) / 10 : null);
   const promoterPct = pct(promoterCount);
   const neutralPct = pct(neutralCount);
   const detractorPct = pct(detractorCount);
 
   return {
     avgScore,
-    responseCount: answered.length,
-    eligibleCount: eligible.length,
-    responseRatePct: eligible.length > 0 ? Math.round((answered.length / eligible.length) * 100) : null,
+    responseCount: scores.length,
+    eligibleCount,
+    responseRatePct: eligibleCount > 0 ? Math.round((scores.length / eligibleCount) * 100) : null,
     distribution,
     promoterCount,
     neutralCount,
@@ -503,6 +511,10 @@ function buildNpsSummary(rows: TicketRow[]): NpsSummary {
   };
 }
 
+// Só dá pra atribuir a nota a um atendente quando o chamado tem a tag de
+// atendente aplicada (mesmo critério de byAgentCounts/buildAgentStats) --
+// avaliação de conversa sem essa tag entra no resumo geral, mas não dá pra
+// saber de quem foi.
 function buildPreviousWeekSummary(allRows: TicketRow[], now: Date): PreviousWeekSummary {
   const { from, to, fromLabel, toLabel } = getPreviousWeekRange(now);
   const weekRows = allRows.filter((r) => {
@@ -697,20 +709,33 @@ export async function getKpiData(
   // nps_score não vem de v_ticket_enriched (view mantida direto no Supabase,
   // fora das migrations do repo) -- busca à parte em conversations e junta
   // em memória por conversation_id, pra não precisar reescrever uma view
-  // que não dá pra inspecionar com segurança daqui.
-  const npsByConversationId = new Map<string, number>();
+  // que não dá pra inspecionar com segurança daqui. Toda avaliação entra na
+  // conta, mesmo quando a conversa não aparece em v_ticket_enriched (sem
+  // categoria/loja marcada) -- essas ficam de fora do join principal, mas
+  // ainda contam pro resumo geral via `untrackedNpsScores` abaixo.
+  const rowsByConversationId = new Map(allRows.map((r) => [r.conversation_id, r]));
+  const untrackedNpsScores: number[] = [];
   for (let page = 0; ; page++) {
     const { data: pageRows, error: npsError } = await supabase
       .from("conversations")
-      .select("id, nps_score")
+      .select("id, nps_score, nps_answered_at")
       .not("nps_score", "is", null)
       .range(page * pageSize, page * pageSize + pageSize - 1);
     if (npsError) throw npsError;
-    for (const row of pageRows ?? []) npsByConversationId.set(row.id as string, row.nps_score as number);
+    for (const row of pageRows ?? []) {
+      const conversationId = row.id as string;
+      const score = row.nps_score as number;
+      const match = rowsByConversationId.get(conversationId);
+      if (match) {
+        match.nps_score = score;
+        continue;
+      }
+      const answeredAt = row.nps_answered_at ? new Date(row.nps_answered_at as string) : null;
+      if (range.from && answeredAt && answeredAt < range.from) continue;
+      if (answeredAt && answeredAt > range.to) continue;
+      untrackedNpsScores.push(score);
+    }
     if (!pageRows || pageRows.length < pageSize) break;
-  }
-  for (const row of allRows) {
-    row.nps_score = npsByConversationId.get(row.conversation_id) ?? null;
   }
 
   const rows = allRows.filter((r) => {
@@ -848,6 +873,6 @@ export async function getKpiData(
     agentQueue,
     byAgentStats: buildAgentStats(rows),
     performanceReport: buildPerformanceReportSet(allRows, new Date()),
-    npsSummary: buildNpsSummary(rows),
+    npsSummary: buildNpsSummary(rows, untrackedNpsScores),
   };
 }
