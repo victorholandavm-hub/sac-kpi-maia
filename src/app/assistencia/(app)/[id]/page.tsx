@@ -178,11 +178,11 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         )}
       </div>
 
-      {canManage && request.deadlineStatus !== "aprovado" ? (
+      {canManage ? (
         <DeadlineActions
           requestId={request.id}
           requestedDeadline={request.requestedDeadline}
-          deadlineStatus={request.deadlineStatus as "pendente" | "recusado"}
+          deadlineStatus={request.deadlineStatus}
           approvedDeadline={request.approvedDeadline}
         />
       ) : null}
