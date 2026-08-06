@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getMontadorSession, montadorSignOut } from "@/app/assistencia/montador-actions";
-import { listRequestsForAssembler, montadorEffectiveDate, type AssemblerRequestView } from "@/lib/serviceRequests";
+import { listRequestsForAssembler, montadorEffectiveDate, formatFullAddress, type AssemblerRequestView } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -15,10 +15,16 @@ function formatDateOnly(value: string | null): string | null {
   return `${d}/${m}/${y}`;
 }
 
+// Tudo que o montador precisa pra decidir/agir sem abrir o chamado -- ele
+// usava planilha antes e via tudo de cara; "Ver chamado" fica só pra ações
+// de verdade (concluir, reportar problema, foto).
 function RequestRow({ r }: { r: AssemblerRequestView }) {
+  const address = formatFullAddress(r);
+  const mapsQuery = [r.clientAddress, r.clientAddressNumber, r.clientNeighborhood].filter(Boolean).join(", ");
+
   return (
-    <div className="flex items-center justify-between gap-3 p-4 flex-wrap">
-      <div className="flex flex-col gap-1 min-w-0">
+    <div className="flex flex-col gap-2 p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
             #{r.ticketNumber}
@@ -35,38 +41,103 @@ function RequestRow({ r }: { r: AssemblerRequestView }) {
               {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
             </span>
           ) : null}
-          {r.montadorInstruction ? (
-            <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-            >
-              ⚠ Instrução
-            </span>
-          ) : null}
         </div>
-        <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
-          {r.clientName ?? "Sem nome de cliente"}
+        <Link
+          href={`/assistencia/montador/${r.id}`}
+          className="text-sm rounded-lg px-3 py-2 font-medium shrink-0"
+          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+        >
+          Ver chamado
+        </Link>
+      </div>
+
+      <p className="text-base font-bold" style={{ color: "var(--text-primary)" }}>
+        {r.clientName ?? "Sem nome de cliente"}
+      </p>
+
+      {montadorEffectiveDate(r) ? (
+        <p className="text-xs font-medium" style={{ color: "var(--brand-green)" }}>
+          Data da montagem: {formatDateOnly(montadorEffectiveDate(r))}
+          {r.scheduledTime ? ` às ${r.scheduledTime.slice(0, 5)}` : ""}
+          {r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
         </p>
-        {r.productSummary ? (
-          <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-            {r.productSummary}
+      ) : null}
+
+      {r.items.length > 0 ? (
+        <div className="flex flex-col gap-1">
+          {r.items.map((item) => (
+            <div key={item.id} className="flex items-center gap-1.5 flex-wrap">
+              {item.completed ? (
+                <span
+                  className="text-xs font-bold px-1.5 py-0.5 rounded"
+                  style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-good) 35%, var(--surface-1))" }}
+                >
+                  ✓ Feito
+                </span>
+              ) : null}
+              {item.action ? (
+                <span
+                  className="text-xs font-bold px-1.5 py-0.5 rounded"
+                  style={{
+                    color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--text-primary)",
+                    background: item.action === "montar" ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))",
+                  }}
+                >
+                  {item.action === "montar" ? "Montar" : "Desmontar"}
+                </span>
+              ) : null}
+              <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+                {item.quantity > 1 ? `${item.quantity}x ` : ""}
+                {item.product}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {r.montadorInstruction ? (
+        <div
+          className="rounded-lg p-2.5 flex flex-col gap-0.5"
+          style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
+        >
+          <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+            ⚠ Instrução da assistência
+          </span>
+          <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-primary)" }}>
+            {r.montadorInstruction}
           </p>
+        </div>
+      ) : null}
+
+      {address || r.clientNeighborhood ? (
+        <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+          📍 {address}
+          {r.clientNeighborhood ? ` — ${r.clientNeighborhood}` : ""}
+        </p>
+      ) : null}
+
+      <div className="flex items-center gap-2 flex-wrap">
+        {r.clientPhone ? (
+          <a
+            href={`tel:${r.clientPhone.replace(/\D/g, "")}`}
+            className="text-xs font-medium rounded-lg px-2.5 py-1.5"
+            style={{ background: "color-mix(in srgb, var(--brand-green) 12%, transparent)", color: "var(--brand-green)" }}
+          >
+            📞 {r.clientPhone}
+          </a>
         ) : null}
-        {montadorEffectiveDate(r) ? (
-          <p className="text-xs font-medium" style={{ color: "var(--brand-green)" }}>
-            Data da montagem: {formatDateOnly(montadorEffectiveDate(r))}
-            {r.scheduledTime ? ` às ${r.scheduledTime.slice(0, 5)}` : ""}
-            {r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
-          </p>
+        {mapsQuery ? (
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-medium rounded-lg px-2.5 py-1.5"
+            style={{ background: "color-mix(in srgb, var(--brand-green) 12%, transparent)", color: "var(--brand-green)" }}
+          >
+            🗺️ Ver no mapa
+          </a>
         ) : null}
       </div>
-      <Link
-        href={`/assistencia/montador/${r.id}`}
-        className="text-sm rounded-lg px-3 py-2 font-medium shrink-0"
-        style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-      >
-        Ver chamado
-      </Link>
     </div>
   );
 }

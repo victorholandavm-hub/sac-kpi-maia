@@ -1032,6 +1032,37 @@ export async function setMontadorInstruction(requestId: string, note: string): P
   revalidatePath(`/assistencia/montador/${requestId}`);
 }
 
+// Assistência organiza a própria fila na ordem que quiser (ex.: agrupar
+// visualmente por bairro pra despachar montador) -- mesmo padrão de
+// setDriverOrderAction (driver-actions.ts), só que sem checar "dono" (não
+// existe: qualquer assistência/admin pode reorganizar qualquer chamado do
+// domínio dela), e reordena só dentro do grupo mostrado na tela (ver
+// AssistenciaQueueGroup.tsx). Cada update leva o assistencia_order que o
+// cliente acreditava ser o atual como trava de corrida, igual às outras
+// mutações desta sessão.
+export async function setAssistenciaOrderAction(items: { id: string; expectedOrder: number | null }[]): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  if (items.length === 0) return;
+
+  const admin = getSupabaseAdmin();
+  const results = await Promise.all(
+    items.map((item, index) => {
+      const query = admin.from("service_requests").update({ assistencia_order: index + 1 }).eq("id", item.id);
+      return (item.expectedOrder === null ? query.is("assistencia_order", null) : query.eq("assistencia_order", item.expectedOrder))
+        .select("id")
+        .maybeSingle();
+    })
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(failed.error.message);
+  if (results.some((r) => !r.data)) {
+    throw new Error("A ordem mudou em outra sessão. Recarregue a página e tente de novo.");
+  }
+
+  revalidatePath("/assistencia/fila");
+}
+
 // Adicionar/remover produto era só do gerente da loja, e só enquanto o
 // chamado ainda está "aberta" (ver editServiceRequestByGerente) -- isso
 // continua valendo pra correção antes do atendimento começar. Mas no meio
@@ -1487,6 +1518,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       client_address_complement: emptyToNull(addressNumberFields.complement),
       client_protheus_code: emptyToNull(formData.get("client_protheus_code")),
       reason: reason,
+      montador_instruction: emptyToNull(formData.get("montador_instruction")),
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
       scheduled_time: emptyToNull(formData.get("scheduled_time")),
       shift: shift || null,

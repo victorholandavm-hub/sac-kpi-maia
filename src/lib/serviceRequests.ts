@@ -106,6 +106,7 @@ export type ServiceRequestSummary = {
   orderCode: string | null;
   clientName: string | null;
   clientPhone: string | null;
+  clientNeighborhood: string | null;
   items: RequestItem[];
   reason: string | null;
   requestedByName: string | null;
@@ -132,6 +133,7 @@ export type ServiceRequestSummary = {
   legalDeadline: string | null;
   escalationRisk: boolean;
   comboMontagemDesmontagem: boolean;
+  assistenciaOrder: number | null;
 };
 
 type SummaryRow = {
@@ -143,6 +145,7 @@ type SummaryRow = {
   order_code: string | null;
   client_name: string | null;
   client_phone: string | null;
+  client_neighborhood: string | null;
   reason: string | null;
   requested_by_name: string | null;
   requested_deadline: string | null;
@@ -163,6 +166,7 @@ type SummaryRow = {
   legal_deadline: string | null;
   escalation_risk: boolean;
   combo_montagem_desmontagem: boolean;
+  assistencia_order: number | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -174,7 +178,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -202,6 +206,7 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     orderCode: row.order_code,
     clientName: row.client_name,
     clientPhone: row.client_phone,
+    clientNeighborhood: row.client_neighborhood,
     items: (row.items ?? []).map(toItem),
     reason: row.reason,
     requestedByName: row.requester?.full_name ?? row.requested_by_name ?? null,
@@ -223,6 +228,7 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     legalDeadline: row.legal_deadline,
     escalationRisk: row.escalation_risk,
     comboMontagemDesmontagem: row.combo_montagem_desmontagem,
+    assistenciaOrder: row.assistencia_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
@@ -257,10 +263,16 @@ export async function listRequests(
   // Tipado como `any` de propósito (ver listScheduledRequests): encadear vários
   // filtros condicionais faz o TypeScript travar tentando inferir um tipo
   // genérico profundo demais.
+  // assistencia_order primeiro -- a assistência pode reorganizar a fila (ex.:
+  // agrupar visualmente por bairro pra despachar montador, ver
+  // setAssistenciaOrderAction); quem ainda não foi reorganizado (null) cai
+  // pro final e usa a ordem padrão por data de criação. Mesma ideia de
+  // driver_order em listRequestsForDriver.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query: any = admin
     .from("service_requests")
     .select(SUMMARY_COLUMNS, { count: "exact" })
+    .order("assistencia_order", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   if (opts.storeId) {
@@ -416,6 +428,8 @@ export async function getRequestDetail(
   return { request, events };
 }
 
+export type OpenRequestForLojaItem = { product: string; quantity: number; partCode: string | null; action: ItemAction | null };
+
 export type OpenRequestForLoja = {
   id: string;
   ticketNumber: number;
@@ -424,7 +438,10 @@ export type OpenRequestForLoja = {
   storeId: string;
   storeName: string;
   clientName: string | null;
+  clientPhone: string | null;
+  clientNeighborhood: string | null;
   productSummary: string | null;
+  items: OpenRequestForLojaItem[];
   createdAt: string;
   completedAt: string | null;
   requestedDeadline: string | null;
@@ -437,10 +454,12 @@ export type OpenRequestForLoja = {
 
 const OPEN_LOJA_LIMIT = 200;
 
-// Visão pública pra loja (sem login) acompanhar a demanda em aberto (ou, com
-// `onlyCompleted`, o histórico de concluídas) sem expor CPF/telefone/endereço
-// do cliente — só o necessário pra dar noção de volume (e o prazo definido
-// pela assistência, pra loja acompanhar/renegociar).
+// Visão da loja (gerente autenticado por PIN, ver getLojaGerenteSession) pra
+// acompanhar a demanda em aberto (ou, com `onlyCompleted`, o histórico de
+// concluídas) -- CPF/endereço completo continuam de fora (só o necessário
+// pra dar noção de volume + contato rápido), mas telefone e bairro entram
+// pra bater com o que a assistência já vê na fila (mesmo cliente, mesma
+// necessidade de identificar sem abrir cada chamado).
 export async function listOpenRequestsForLoja(
   opts: { storeId?: string; storeIds?: string[]; types?: readonly RequestType[]; onlyCompleted?: boolean } = {}
 ): Promise<OpenRequestForLoja[]> {
@@ -448,7 +467,7 @@ export async function listOpenRequestsForLoja(
   let query = admin
     .from("service_requests")
     .select(
-      "id, ticket_number, type, status, store_id, client_name, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, stores(name), items:service_request_items(product)"
+      "id, ticket_number, type, status, store_id, client_name, client_phone, client_neighborhood, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, stores(name), items:service_request_items(product, quantity, part_code, item_action)"
     )
     .limit(OPEN_LOJA_LIMIT);
 
@@ -479,6 +498,8 @@ export async function listOpenRequestsForLoja(
     status: RequestStatus;
     store_id: string;
     client_name: string | null;
+    client_phone: string | null;
+    client_neighborhood: string | null;
     created_at: string;
     completed_at: string | null;
     requested_deadline: string | null;
@@ -488,7 +509,7 @@ export async function listOpenRequestsForLoja(
     driver_name: string | null;
     requested_by_name: string | null;
     stores: { name: string } | null;
-    items: { product: string }[] | null;
+    items: { product: string; quantity: number; part_code: string | null; item_action: string | null }[] | null;
   };
 
   return ((data ?? []) as unknown as Row[]).map((row) => ({
@@ -502,7 +523,15 @@ export async function listOpenRequestsForLoja(
     deadlineStatus: row.deadline_status,
     approvedDeadline: row.approved_deadline,
     clientName: row.client_name,
+    clientPhone: row.client_phone,
+    clientNeighborhood: row.client_neighborhood,
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
+    items: (row.items ?? []).map((i) => ({
+      product: i.product,
+      quantity: i.quantity,
+      partCode: i.part_code,
+      action: i.item_action === "montar" || i.item_action === "desmontar" ? (i.item_action as ItemAction) : null,
+    })),
     createdAt: row.created_at,
     completedAt: row.completed_at,
     assemblerName: row.assembler_name,

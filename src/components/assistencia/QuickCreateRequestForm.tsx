@@ -134,6 +134,8 @@ export function QuickCreateRequestForm({
   const [storeId, setStoreId] = useState("");
   const isManoelOnly = (MANOEL_ONLY_TYPES as readonly string[]).includes(type);
   const showCombo = type === "montagem" || type === "desmontagem";
+  // Mesmos tipos de EditRequestForm.tsx -- só quem passa por montador/técnico.
+  const showMontadorInstruction = ASSISTENCIA_TYPES.includes(type as (typeof ASSISTENCIA_TYPES)[number]);
   // Montador da loja escolhida + globais/legado (store_id nulo) -- a loja só
   // é escolhida aqui no formulário, então o filtro é no cliente.
   const visibleAssemblers = assemblers.filter((a) => a.storeId === null || a.storeId === storeId);
@@ -388,6 +390,18 @@ export function QuickCreateRequestForm({
         <Field label="O que precisa ser feito *">
           <textarea name="reason" rows={2} required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
+
+        {showMontadorInstruction ? (
+          <Field label="Instrução pro montador (visível pra ele, separado do campo acima)">
+            <textarea
+              name="montador_instruction"
+              rows={2}
+              placeholder="Ex: cliente prefere que chegue depois das 14h, subir móvel pelo elevador de serviço…"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+          </Field>
+        ) : null}
       </FormSection>
 
       <FormSection title="Agendamento e responsável" number={3}>

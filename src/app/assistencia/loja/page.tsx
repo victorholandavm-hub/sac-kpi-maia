@@ -16,6 +16,7 @@ import { StatTile } from "@/components/StatTile";
 import { LojaStoreFilter } from "@/components/assistencia/LojaStoreFilter";
 import { LojaTabs } from "@/components/assistencia/LojaTabs";
 import { LojaDeadlineControl } from "@/components/assistencia/LojaDeadlineControl";
+import { ProductsModalButton } from "@/components/assistencia/ProductsModalButton";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { NotificationBell } from "@/components/assistencia/NotificationBell";
@@ -254,13 +255,15 @@ export default async function LojaHomePage({
                     </div>
                     <p className="text-sm font-medium break-words" style={{ color: "var(--text-primary)" }}>
                       {r.clientName ?? "Sem nome de cliente"}
-                      {r.productSummary ? ` · ${r.productSummary}` : ""}
+                      {r.clientPhone ? ` · 📞 ${r.clientPhone}` : ""}
+                      {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
                     </p>
                     {r.assemblerName ? (
                       <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                         Montador: {r.assemblerName}
                       </p>
                     ) : null}
+                    {r.items.length > 0 ? <ProductsModalButton items={r.items} /> : null}
                   </div>
                   <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0 pt-3 mt-1 border-t sm:pt-0 sm:mt-0 sm:border-t-0 w-full sm:w-auto justify-between sm:justify-start" style={{ borderColor: "var(--gridline)" }}>
                     <span className="text-xs font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>

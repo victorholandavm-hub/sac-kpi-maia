@@ -360,6 +360,100 @@ async function syncClients(supabase: SupabaseAdmin): Promise<SyncResult> {
   return { checked, upserted, errors };
 }
 
+const BACKFILL_TIME_BUDGET_MS = 240_000;
+const BACKFILL_LOOKBACK_DAYS = 30;
+const BACKFILL_MAX_CODES = 80;
+
+// Descoberto em 2026-08-05 (relato real: Jaluska não conseguiu achar cliente
+// nem produto criando uma encomenda): a listagem paginada de /rest/client
+// (usada por syncClients acima) não traz alguns clientes reais e ATIVOS,
+// mesmo varrendo as 36/36 páginas reportadas com OrderBy=id e sem
+// duplicata nenhuma -- confirmado testando direto contra a API. Só
+// SearchQuery acha esses clientes. Ou seja: bug do lado do Protheus (a
+// listagem parece vir de uma fonte/cache diferente do índice de busca), não
+// tem conserto possível daqui. Reportado pra TI (ver ONBOARDING.md).
+//
+// Enquanto isso não é corrigido lá, essa função fecha o buraco pro caso que
+// dói de verdade: pega só os códigos de cliente REALMENTE digitados em
+// chamados/pedidos recentes (não um scan geral -- não faz sentido nem daria
+// tempo buscar código por código de 3600+ clientes) que não bateram com o
+// que já sincronizamos, e busca CADA UM via SearchQuery, que funciona
+// mesmo quando a listagem não traz o cliente.
+async function backfillMissingClients(supabase: SupabaseAdmin): Promise<SyncResult> {
+  const started = Date.now();
+  const since = isoDate(new Date(Date.now() - BACKFILL_LOOKBACK_DAYS * DAY_MS));
+  const errors: string[] = [];
+  let checked = 0;
+  let upserted = 0;
+
+  const codes = new Set<string>();
+  const { data: reqRows } = await supabase
+    .from("service_requests")
+    .select("client_protheus_code")
+    .not("client_protheus_code", "is", null)
+    .gte("created_at", since);
+  for (const r of reqRows ?? []) {
+    const code = (r.client_protheus_code as string | null)?.trim();
+    if (code) codes.add(code);
+  }
+  const { data: pedidoRows } = await supabase
+    .from("pedidos_encomenda")
+    .select("cliente_codigo")
+    .not("cliente_codigo", "is", null)
+    .gte("created_at", since);
+  for (const r of pedidoRows ?? []) {
+    const code = (r.cliente_codigo as string | null)?.trim();
+    if (code) codes.add(code);
+  }
+  if (codes.size === 0) return { checked, upserted, errors };
+
+  const { data: existing } = await supabase.from("totvs_clientes").select("protheus_code").in("protheus_code", [...codes]);
+  const existingCodes = new Set((existing ?? []).map((r) => r.protheus_code as string));
+  const missing = [...codes].filter((c) => !existingCodes.has(c)).slice(0, BACKFILL_MAX_CODES);
+
+  for (const code of missing) {
+    if (Date.now() - started > BACKFILL_TIME_BUDGET_MS) break;
+    checked++;
+    let json: TotvsClientListResponse;
+    try {
+      json = await fetchTotvs<TotvsClientListResponse>(`${BASE_URL}/rest/client?SearchQuery=${encodeURIComponent(code)}&Page=1&Size=10`);
+    } catch (err) {
+      errors.push(`backfill client ${code}: ${(err as Error).message}`);
+      continue;
+    }
+    const match = (json.data ?? []).find((c) => String(c.id) === code);
+    if (!match) continue; // não achou nem pela busca -- código digitado errado mesmo, não é problema de sync
+
+    const { error } = await supabase.from("totvs_clientes").upsert(
+      {
+        protheus_code: match.id,
+        cpf_cnpj: match.cpf_cnpj,
+        name: match.name,
+        status: match.status,
+        last_purchase_date: ddmmyyyyToIso(match.lastPurchase),
+        days_without_buying: match.daysWithoutBuying ?? null,
+        phone1: match.phone1 || null,
+        phone2: match.phone2 || null,
+        email: match.email || null,
+        contact_name: match.contactName || null,
+        address_street: match.address?.street || null,
+        address_number: match.address?.number != null ? String(match.address.number) : null,
+        address_complement: match.address?.complement || null,
+        address_neighborhood: match.address?.neighborhood || null,
+        address_city: match.address?.city || null,
+        address_cep: match.address?.cep || null,
+        address_state: match.address?.state || null,
+        synced_at: new Date().toISOString(),
+      },
+      { onConflict: "protheus_code" }
+    );
+    if (error) errors.push(`backfill client ${code}: ${error.message}`);
+    else upserted++;
+  }
+
+  return { checked, upserted, errors };
+}
+
 async function upsertOrder(supabase: SupabaseAdmin, o: TotvsOrder, errors: string[]): Promise<boolean> {
   const { data: orderRow, error } = await supabase
     .from("totvs_orders")
@@ -664,6 +758,7 @@ export type TotvsSyncSummary = {
   clients: { checked: number; upserted: number };
   orders: { checked: number; upserted: number };
   deliveries: { checked: number; upserted: number };
+  clientsBackfill: { checked: number; upserted: number };
   errors: string[];
 };
 
@@ -675,19 +770,21 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
   const clients = await syncClients(supabase);
   const orders = await syncOrders(supabase);
   const deliveries = await syncDeliveries(supabase);
+  const clientsBackfill = await backfillMissingClients(supabase);
 
   const summary: TotvsSyncSummary = {
-    ok: clients.errors.length === 0 && orders.errors.length === 0 && deliveries.errors.length === 0,
+    ok: clients.errors.length === 0 && orders.errors.length === 0 && deliveries.errors.length === 0 && clientsBackfill.errors.length === 0,
     clients: { checked: clients.checked, upserted: clients.upserted },
     orders: { checked: orders.checked, upserted: orders.upserted },
     deliveries: { checked: deliveries.checked, upserted: deliveries.upserted },
-    errors: [...clients.errors, ...orders.errors, ...deliveries.errors],
+    clientsBackfill: { checked: clientsBackfill.checked, upserted: clientsBackfill.upserted },
+    errors: [...clients.errors, ...orders.errors, ...deliveries.errors, ...clientsBackfill.errors],
   };
 
   await recordSyncRun(
     "totvs",
     summary.ok,
-    { clients: summary.clients, orders: summary.orders, deliveries: summary.deliveries },
+    { clients: summary.clients, orders: summary.orders, deliveries: summary.deliveries, clientsBackfill: summary.clientsBackfill },
     summary.errors
   );
 

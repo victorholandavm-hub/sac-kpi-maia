@@ -1,26 +1,11 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
-import { listRequests, listStores, isRequestStatus, type RequestItem, type ServiceRequestSummary } from "@/lib/serviceRequests";
+import { listRequests, listStores, isRequestStatus, type ServiceRequestSummary } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
-import { REQUEST_TYPE_LABELS, ASSISTENCIA_MANAGED_TYPES, STATUS_COLORS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
-import { StatusBadge } from "@/components/assistencia/StatusBadge";
+import { ASSISTENCIA_MANAGED_TYPES, STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
-import { NewSinceBadge } from "@/components/assistencia/NewSinceBadge";
-import { formatDateTimeBr } from "@/lib/formatDateTime";
-
-function formatDateOnly(value: string | null): string | null {
-  if (!value) return null;
-  const [y, m, d] = value.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-function itemsSummary(items: RequestItem[]): string | null {
-  if (items.length === 0) return null;
-  const [first, ...rest] = items;
-  const firstLabel = first.quantity > 1 ? `${first.quantity}x ${first.product}` : first.product;
-  return rest.length > 0 ? `${firstLabel} +${rest.length} item${rest.length > 1 ? "s" : ""}` : firstLabel;
-}
+import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
 
 function groupByDate(requests: ServiceRequestSummary[]) {
   const groups: { dateKey: string; label: string; items: ServiceRequestSummary[] }[] = [];
@@ -179,95 +164,7 @@ export default async function AssistenciaQueuePage({
               </span>
             </div>
             <div style={{ background: "var(--surface-1)" }}>
-              <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {group.items.map((r) => {
-                  const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
-                  // Só scheduledDate (ScheduleField) ou approvedDeadline
-                  // (approveDeadline/rejectDeadline) -- as duas são decisão
-                  // da assistência. De propósito SEM cair pra requestedDeadline
-                  // (o pedido da loja, ainda não aprovado): mostrar isso aqui
-                  // como se fosse a data definida enganaria quem tá vendo a
-                  // fila -- pra esse caso já existe o badge "Prazo pendente".
-                  // Diferente de montadorEffectiveDate (usado nas telas do
-                  // montador), que cai pro pedido da loja como último recurso.
-                  const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
-                  return (
-                  <Link
-                    key={r.id}
-                    href={`/assistencia/${r.id}`}
-                    className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
-                    style={
-                      needsAttention
-                        ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` }
-                        : undefined
-                    }
-                  >
-                    <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                          #{r.ticketNumber}
-                        </span>
-                        <StatusBadge status={r.status} />
-                        <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
-                        {r.deadlineStatus === "pendente" ? (
-                          <span
-                            className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                            style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-                          >
-                            Prazo pendente
-                          </span>
-                        ) : null}
-                        {r.escalationRisk ? (
-                          <span
-                            className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                            style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
-                          >
-                            ⚠ Risco de escalonamento
-                          </span>
-                        ) : null}
-                        <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                          {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                        </span>
-                        {r.comboMontagemDesmontagem ? (
-                          <span
-                            className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                            style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
-                          >
-                            {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
-                          </span>
-                        ) : null}
-                        {effectiveDate ? (
-                          <span
-                            className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                            style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
-                          >
-                            📅 {formatDateOnly(effectiveDate)}
-                            {effectiveDate === r.scheduledDate && r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
-                            {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
-                          </span>
-                        ) : null}
-                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                          {r.storeName}
-                        </span>
-                      </div>
-                      <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                        {r.clientName ?? "Sem nome de cliente"}
-                        {itemsSummary(r.items) ? ` · ${itemsSummary(r.items)}` : ""}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                      <span>Aberta às {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
-                      {r.completedAt ? (
-                        <span>Concluída em {formatDateTimeBr(r.completedAt)}</span>
-                      ) : null}
-                      <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
-                      {r.assemblerName ? <span>Montador: {r.assemblerName}</span> : null}
-                      {r.driverName ? <span>Motorista: {r.driverName}</span> : null}
-                    </div>
-                  </Link>
-                  );
-                })}
-              </div>
+              <AssistenciaQueueGroup items={group.items} reorderable />
             </div>
           </div>
         ))
