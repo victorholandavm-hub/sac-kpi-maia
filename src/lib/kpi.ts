@@ -93,11 +93,6 @@ export type EscalationStoreStat = {
   pendingCount: number;
 };
 
-export type AgentQueueGroup = {
-  agent: string;
-  tickets: AttentionRow[];
-};
-
 export type PerformanceMetric = {
   key: string;
   label: string;
@@ -185,6 +180,10 @@ export type KpiData = {
   dailyVolume: DayCount[];
   backlogOverTime: DayCount[];
   attention: AttentionRow[];
+  // Todos os chamados em aberto (sem o corte de 15 do `attention`) -- pra
+  // filtrar por categoria (ex.: "Dúvida") e ler o resumo de cada um, ver
+  // OpenTicketsBrowser.tsx.
+  openTicketsList: AttentionRow[];
   avgFirstResponseMinutes: number | null;
   pctWithinSla: number | null;
   firstResponseSampleSize: number;
@@ -204,7 +203,6 @@ export type KpiData = {
   escalations: EscalationSummary;
   escalationList: EscalationRow[];
   escalationByStore: EscalationStoreStat[];
-  agentQueue: AgentQueueGroup[];
   byAgentStats: AgentStat[];
   performanceReport: PerformanceReportSet;
   npsSummary: NpsSummary;
@@ -417,28 +415,15 @@ function toAttentionRow(row: TicketRow, now: number): AttentionRow {
   };
 }
 
-function buildAgentQueue(openRows: TicketRow[], now: number): AgentQueueGroup[] {
-  const groups = new Map<string, TicketRow[]>();
-  for (const r of openRows) {
-    const key = r.is_sac_agent && r.agent_name ? r.agent_name : "Sem atendente";
-    const list = groups.get(key) ?? [];
-    list.push(r);
-    groups.set(key, list);
-  }
-
+function buildOpenTicketsList(openRows: TicketRow[], now: number): AttentionRow[] {
   const urgencyRank: Record<string, number> = { alta: 0, media: 1, baixa: 2 };
-  return [...groups.entries()]
-    .map(([agent, agentRows]) => ({
-      agent,
-      tickets: [...agentRows]
-        .sort((a, b) => {
-          const rankDiff = (urgencyRank[a.urgency] ?? 3) - (urgencyRank[b.urgency] ?? 3);
-          if (rankDiff !== 0) return rankDiff;
-          return new Date(a.opened_at).getTime() - new Date(b.opened_at).getTime();
-        })
-        .map((r) => toAttentionRow(r, now)),
-    }))
-    .sort((a, b) => b.tickets.length - a.tickets.length);
+  return [...openRows]
+    .sort((a, b) => {
+      const rankDiff = (urgencyRank[a.urgency] ?? 3) - (urgencyRank[b.urgency] ?? 3);
+      if (rankDiff !== 0) return rankDiff;
+      return new Date(a.opened_at).getTime() - new Date(b.opened_at).getTime();
+    })
+    .map((r) => toAttentionRow(r, now));
 }
 
 // Semana calculada no fuso de Joao Pessoa (America/Fortaleza, UTC-3, sem horario de verao),
@@ -807,7 +792,7 @@ export async function getKpiData(
     "store_tag"
   );
   const waitingList = buildWaitingList(openRows, now);
-  const agentQueue = buildAgentQueue(openRows, now);
+  const openTicketsList = buildOpenTicketsList(openRows, now);
 
   const firstResponseRows = rows.filter((r) => r.first_response_minutes !== null);
   const avgFirstResponseMinutes =
@@ -851,6 +836,7 @@ export async function getKpiData(
     dailyVolume,
     backlogOverTime: buildBacklogOverTime(allRows, range.from, range.to),
     attention,
+    openTicketsList,
     avgFirstResponseMinutes,
     pctWithinSla,
     firstResponseSampleSize: firstResponseRows.length,
@@ -870,7 +856,6 @@ export async function getKpiData(
     escalations,
     escalationList,
     escalationByStore: buildEscalationByStore(escalationRows, labelFns.storeLabel),
-    agentQueue,
     byAgentStats: buildAgentStats(rows),
     performanceReport: buildPerformanceReportSet(allRows, new Date()),
     npsSummary: buildNpsSummary(rows, untrackedNpsScores),

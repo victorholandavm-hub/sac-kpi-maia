@@ -15,7 +15,7 @@ import { EscalationByStoreTable } from "./EscalationByStoreTable";
 import { EscalationPendingTable } from "./EscalationPendingTable";
 import { RangePicker } from "./RangePicker";
 import { PreviousWeekCard } from "./PreviousWeekCard";
-import { AgentQueue } from "./AgentQueue";
+import { OpenTicketsBrowser } from "./OpenTicketsBrowser";
 import { AgentStatsTable } from "./AgentStatsTable";
 import { PerformanceReportButton } from "./PerformanceReportButton";
 import { NpsCard } from "./NpsCard";
@@ -101,13 +101,20 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         {data.escalations.completedCount} ciclos concluídos analisados), sem depender de tags.
       </p>
 
+      <NpsCard data={data.npsSummary} />
+      <BarRanking
+        title="Distribuição das notas (enquete GHL)"
+        data={npsDistribution}
+        coverage={{ withValue: data.npsSummary.responseCount, total: data.npsSummary.eligibleCount, pct: data.npsSummary.responseRatePct ?? 0 }}
+      />
+
       {data.paretoSummary ? (
         <p className="text-sm" style={{ color: "var(--text-primary)" }}>
           {data.paretoSummary}
         </p>
       ) : null}
 
-      <AgentQueue data={data.agentQueue} />
+      <OpenTicketsBrowser data={data.openTicketsList} />
 
       <AgentStatsTable data={data.byAgentStats} />
 
@@ -116,13 +123,6 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         <BarRanking title="Chamados por loja" data={byStore} coverage={data.storeCoverage} />
         <BarRanking title="Chamados por produto" data={byProduct} coverage={data.productCoverage} />
       </section>
-
-      <NpsCard data={data.npsSummary} />
-      <BarRanking
-        title="Distribuição das notas (enquete GHL)"
-        data={npsDistribution}
-        coverage={{ withValue: data.npsSummary.responseCount, total: data.npsSummary.eligibleCount, pct: data.npsSummary.responseRatePct ?? 0 }}
-      />
 
       <section className="grid md:grid-cols-2 gap-4">
         <BarRanking title="Chamados por agente" data={data.byAgent} />
