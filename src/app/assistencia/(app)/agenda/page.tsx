@@ -130,7 +130,12 @@ export default async function AgendaPage({
         </div>
       ) : (
         groups.map((group) => {
-          const isOverdue = group.dateKey < todayKey;
+          // Data no passado só é "atrasado" de verdade se ainda sobrar
+          // trabalho pendente no dia -- um grupo onde tudo já foi concluído
+          // (ou cancelado) não devia carregar o selo vermelho, senão toda
+          // montagem já feita parece atrasada só por estar num dia antigo.
+          const hasPending = group.items.some((r) => r.status !== "concluida" && r.status !== "cancelada");
+          const isOverdue = group.dateKey < todayKey && hasPending;
           return (
             <div key={group.dateKey} className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
               <div className="px-4 py-2 flex items-center gap-2 flex-wrap" style={{ background: "var(--brand-green)" }}>

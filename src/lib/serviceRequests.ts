@@ -134,6 +134,7 @@ export type ServiceRequestSummary = {
   escalationRisk: boolean;
   comboMontagemDesmontagem: boolean;
   assistenciaOrder: number | null;
+  montadorInstruction: string | null;
 };
 
 type SummaryRow = {
@@ -167,6 +168,7 @@ type SummaryRow = {
   escalation_risk: boolean;
   combo_montagem_desmontagem: boolean;
   assistencia_order: number | null;
+  montador_instruction: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -178,7 +180,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -229,6 +231,7 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     escalationRisk: row.escalation_risk,
     comboMontagemDesmontagem: row.combo_montagem_desmontagem,
     assistenciaOrder: row.assistencia_order,
+    montadorInstruction: row.montador_instruction,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
@@ -338,7 +341,6 @@ export type ServiceRequestDetail = ServiceRequestSummary & {
   notes: string | null;
   deliveryRating: number | null;
   resolutionRating: number | null;
-  montadorInstruction: string | null;
 };
 
 export type RequestEvent = {
@@ -369,7 +371,6 @@ type DetailRow = SummaryRow & {
   notes: string | null;
   delivery_rating: number | null;
   resolution_rating: number | null;
-  montador_instruction: string | null;
 };
 
 type EventRow = {
@@ -422,7 +423,6 @@ export async function getRequestDetail(
     notes: row.notes,
     deliveryRating: row.delivery_rating,
     resolutionRating: row.resolution_rating,
-    montadorInstruction: row.montador_instruction,
   };
 
   return { request, events };

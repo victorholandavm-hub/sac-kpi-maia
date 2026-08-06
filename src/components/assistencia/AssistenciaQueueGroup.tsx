@@ -119,9 +119,10 @@ export function AssistenciaQueueGroup({ items, reorderable }: { items: ServiceRe
               if (el) nodeRefs.current.set(r.id, el);
               else nodeRefs.current.delete(r.id);
             }}
-            className="flex items-center gap-2 p-4 flex-wrap"
+            className="flex flex-col gap-2 p-4"
             style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
           >
+          <div className="flex items-center gap-2 flex-wrap">
             {reorderable ? (
               <div className="flex flex-col items-center gap-0.5 shrink-0">
                 <button
@@ -226,6 +227,21 @@ export function AssistenciaQueueGroup({ items, reorderable }: { items: ServiceRe
             <div className="shrink-0">
               <ProductsModalButton items={r.items} />
             </div>
+          </div>
+
+          {r.montadorInstruction ? (
+            <div
+              className="rounded-lg p-2.5 flex flex-col gap-0.5"
+              style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
+            >
+              <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+                ⚠ Instrução pro montador
+              </span>
+              <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-primary)" }}>
+                {r.montadorInstruction}
+              </p>
+            </div>
+          ) : null}
           </div>
         );
       })}
