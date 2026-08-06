@@ -16,16 +16,26 @@ function formatDateOnly(value: string | null): string | null {
   return `${d}/${m}/${y}`;
 }
 
-// Sinaliza só quando falta alguma coisa (item sem valor de montador
-// definido) — de propósito sem badge nenhum quando já está tudo certo, pra
-// não poluir a fila com uma marcação em toda montagem concluída.
-function paymentValueFlag(items: RequestItem[]): "none" | "partial" | null {
+// Sempre mostra algo (inclusive "tudo certo") -- silêncio quando o valor já
+// tava definido dava a impressão de que nada tinha sido conferido ainda.
+function paymentValueFlag(items: RequestItem[]): "none" | "partial" | "complete" | null {
   if (items.length === 0) return null;
   const withValue = items.filter((i) => i.unitValue != null).length;
   if (withValue === 0) return "none";
   if (withValue < items.length) return "partial";
-  return null;
+  return "complete";
 }
+
+const PAYMENT_FLAG_LABELS: Record<"none" | "partial" | "complete", string> = {
+  none: "💰 Valor não definido",
+  partial: "💰 Valor parcial",
+  complete: "✓ Valor definido",
+};
+const PAYMENT_FLAG_COLORS: Record<"none" | "partial" | "complete", string> = {
+  none: "var(--status-critical)",
+  partial: "var(--status-warning)",
+  complete: "var(--status-good)",
+};
 
 // Fila reordenável com feedback visual: ao clicar ▲▼, os dois cards que
 // trocam de lugar deslizam pra posição nova em vez de simplesmente
@@ -157,6 +167,14 @@ export function AssistenciaQueueGroup({ items, reorderable }: { items: ServiceRe
                   </span>
                   <StatusBadge status={r.status} />
                   <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
+                  {isPartialCompletion ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
+                    >
+                      ◐ Concluída parcialmente
+                    </span>
+                  ) : null}
                   {r.deadlineStatus === "pendente" ? (
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full"
@@ -199,10 +217,10 @@ export function AssistenciaQueueGroup({ items, reorderable }: { items: ServiceRe
                       className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
                       style={{
                         color: "var(--text-primary)",
-                        background: `color-mix(in srgb, ${paymentFlag === "none" ? "var(--status-critical)" : "var(--status-warning)"} 35%, var(--surface-1))`,
+                        background: `color-mix(in srgb, ${PAYMENT_FLAG_COLORS[paymentFlag]} 35%, var(--surface-1))`,
                       }}
                     >
-                      💰 {paymentFlag === "none" ? "Valor não definido" : "Valor parcial"}
+                      {PAYMENT_FLAG_LABELS[paymentFlag]}
                     </span>
                   ) : null}
                   <span className="text-xs" style={{ color: "var(--text-muted)" }}>
