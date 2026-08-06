@@ -217,6 +217,7 @@ export default async function AgendaPage({
                           </div>
                           <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
                             {r.clientName ?? "Sem nome de cliente"}
+                            {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
                             {r.reason ? ` · ${r.reason}` : ""}
                           </p>
                         </div>

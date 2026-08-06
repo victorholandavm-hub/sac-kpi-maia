@@ -144,6 +144,7 @@ export function QuickCreateRequestForm({
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientAddress, setClientAddress] = useState("");
+  const [clientNeighborhood, setClientNeighborhood] = useState("");
   const [addressNumber, setAddressNumber] = useState("");
   const [isApartment, setIsApartment] = useState(false);
   const [addressComplement, setAddressComplement] = useState("");
@@ -170,6 +171,7 @@ export function QuickCreateRequestForm({
           setClientName(match.name);
           if (match.phone1) setClientPhone(match.phone1);
           if (match.addressStreet) setClientAddress(match.addressStreet);
+          if (match.addressNeighborhood) setClientNeighborhood(match.addressNeighborhood);
           if (match.addressNumber) setAddressNumber(match.addressNumber);
           if (match.addressComplement) {
             setIsApartment(true);
@@ -346,6 +348,17 @@ export function QuickCreateRequestForm({
             />
           </Field>
         </div>
+
+        <Field label="Bairro *">
+          <input
+            name="client_neighborhood"
+            value={clientNeighborhood}
+            onChange={(e) => setClientNeighborhood(e.target.value)}
+            required
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+        </Field>
 
         {showAddressNumber ? (
           <div className="flex flex-col gap-3">

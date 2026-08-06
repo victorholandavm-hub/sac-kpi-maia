@@ -1434,6 +1434,9 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   const clientAddress = String(formData.get("client_address") ?? "").trim();
   if (!clientAddress) return { error: "Informe o endereço." };
 
+  const clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
+  if (!clientNeighborhood) return { error: "Informe o bairro." };
+
   const addressNumberFields = readAddressNumberFields(formData, type);
   if (addressNumberFields.error) return { error: addressNumberFields.error };
 
@@ -1513,6 +1516,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       client_name: clientName,
       client_phone: clientPhone,
       client_address: clientAddress,
+      client_neighborhood: clientNeighborhood,
       client_address_number: emptyToNull(addressNumberFields.number),
       client_is_apartment: addressNumberFields.isApartment,
       client_address_complement: emptyToNull(addressNumberFields.complement),

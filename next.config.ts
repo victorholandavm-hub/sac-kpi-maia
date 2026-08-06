@@ -6,11 +6,14 @@ const nextConfig: NextConfig = {
     serverActions: {
       // Padrão do Next é 1 MB -- foto de anexo (Peças, SAC, montador,
       // motorista) permite até 10 MB (ver MAX_FILE_SIZE_BYTES em
-      // servicePhotos.ts), e HEIC de celular quase sempre passa de 1 MB.
-      // Sem isso, o upload falhava antes até de chegar no código, com um
-      // erro genérico ("an unexpected response was received from the
-      // server") que não dizia nada sobre tamanho de arquivo.
-      bodySizeLimit: "11mb",
+      // servicePhotos.ts), e HEIC/JPEG de celular quase sempre passa de
+      // 1 MB. Margem de 5 MB acima do limite de 10 MB do app de propósito
+      // (não só o mínimo pro overhead do multipart): sem essa folga, um
+      // arquivo um pouco acima de 10 MB batia direto no limite do Next
+      // antes de chegar na validação com mensagem clara ("foto grande
+      // demais, máximo 10 MB") -- caía de novo no erro genérico ("an
+      // unexpected response was received from the server").
+      bodySizeLimit: "15mb",
     },
   },
 };
