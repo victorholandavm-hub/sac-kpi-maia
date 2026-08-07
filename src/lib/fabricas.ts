@@ -6,9 +6,11 @@
 
 export type InternalFabrica = { id: string; nome: string };
 
+// Cidade na frente do nome de propósito -- pessoal confundia as duas
+// fábricas próprias (mesmo grupo Beds/Aiam, unidades diferentes).
 export const INTERNAL_FABRICAS: InternalFabrica[] = [
-  { id: "colchoes", nome: "Beds/Aiam Colchões" },
-  { id: "estofados", nome: "Beds/Aiam Estofados" },
+  { id: "colchoes", nome: "(Conde) Beds/Aiam Colchões" },
+  { id: "estofados", nome: "(Bayeux) Beds/Aiam Estofados" },
 ];
 
 export const EXTERNAL_FABRICAS: string[] = [
