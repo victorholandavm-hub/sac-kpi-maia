@@ -7,6 +7,11 @@ import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
 
+// listRequests só ordena por created_at (ver comentário lá) -- a ordem
+// manual (assistencia_order) só faz sentido DENTRO de um grupo do mesmo dia
+// (é onde reordenar aparece na tela), então aplica aqui, por grupo, depois de
+// já ter separado por data. Grupos em si vêm sempre do mais novo pro mais
+// antigo, direto pela dateKey (string YYYY-MM-DD ordena igual data).
 function groupByDate(requests: ServiceRequestSummary[]) {
   const groups: { dateKey: string; label: string; items: ServiceRequestSummary[] }[] = [];
   for (const r of requests) {
@@ -20,15 +25,26 @@ function groupByDate(requests: ServiceRequestSummary[]) {
     }
     group.items.push(r);
   }
+  groups.sort((a, b) => (a.dateKey < b.dateKey ? 1 : a.dateKey > b.dateKey ? -1 : 0));
+  for (const group of groups) {
+    group.items.sort((a, b) => {
+      if (a.assistenciaOrder !== null && b.assistenciaOrder !== null) return a.assistenciaOrder - b.assistenciaOrder;
+      if (a.assistenciaOrder !== null) return -1;
+      if (b.assistenciaOrder !== null) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }
   return groups;
 }
 
-function buildHref(params: { status?: string; q?: string; page?: number; store?: string; assembler?: string }) {
+function buildHref(params: { status?: string; q?: string; page?: number; store?: string; assembler?: string; from?: string; to?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
   if (params.store) sp.set("store", params.store);
   if (params.assembler) sp.set("assembler", params.assembler);
+  if (params.from) sp.set("from", params.from);
+  if (params.to) sp.set("to", params.to);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
@@ -46,19 +62,21 @@ const FILTERS: { label: string; value: string | null }[] = [
 export default async function AssistenciaQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; page?: string; store?: string; assembler?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string; store?: string; assembler?: string; from?: string; to?: string }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler } = await searchParams;
+  const { status, q, page: pageParam, store, assembler, from, to } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
+  const dateTo = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : undefined;
   // Assistência só enxerga o próprio domínio (montagem/desmontagem/troca de
   // peça/vistoria) — admin continua vendo tudo, inclusive chamados de SAC,
   // como supervisão.
   const types = profile.role === "assistencia" ? [...ASSISTENCIA_MANAGED_TYPES] : undefined;
   const [{ items: requests, total, pageSize }, stores, assemblers] = await Promise.all([
-    listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: assembler, types }),
+    listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: assembler, types, dateFrom, dateTo }),
     listStores(),
     listAssemblers(),
   ]);
@@ -76,7 +94,7 @@ export default async function AssistenciaQueuePage({
             return (
               <Link
                 key={f.label}
-                href={buildHref({ status: f.value ?? undefined, q, store, assembler })}
+                href={buildHref({ status: f.value ?? undefined, q, store, assembler, from: dateFrom, to: dateTo })}
                 className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
                 style={
                   f.value
@@ -131,6 +149,26 @@ export default async function AssistenciaQueuePage({
           className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
           style={{ borderColor: "var(--border)" }}
         />
+        <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+          De
+          <input
+            type="date"
+            name="from"
+            defaultValue={dateFrom ?? ""}
+            className="rounded border px-2 py-2 text-sm"
+            style={{ borderColor: "var(--border)" }}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+          Até
+          <input
+            type="date"
+            name="to"
+            defaultValue={dateTo ?? ""}
+            className="rounded border px-2 py-2 text-sm"
+            style={{ borderColor: "var(--border)" }}
+          />
+        </label>
         <button
           type="submit"
           className="text-sm px-3 py-2 rounded border"
@@ -138,13 +176,13 @@ export default async function AssistenciaQueuePage({
         >
           Buscar
         </button>
-        {q ? (
+        {q || dateFrom || dateTo ? (
           <Link
             href={buildHref({ status: filterStatus, store, assembler })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
-            Limpar busca
+            Limpar busca/data
           </Link>
         ) : null}
       </form>
@@ -174,7 +212,7 @@ export default async function AssistenciaQueuePage({
         <div className="flex items-center justify-center gap-4 pt-2">
           {page > 1 ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler })}
+              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler, from: dateFrom, to: dateTo })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
@@ -186,7 +224,7 @@ export default async function AssistenciaQueuePage({
           </span>
           {page < totalPages ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler })}
+              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler, from: dateFrom, to: dateTo })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >

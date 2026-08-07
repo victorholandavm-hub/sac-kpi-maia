@@ -274,6 +274,10 @@ export async function listRequests(
     storeId?: string;
     assemblerName?: string;
     types?: RequestType[];
+    // YYYY-MM-DD, valida antes de interpolar (mesmo padrão de listDayLoad) --
+    // filtra por created_at, sempre no fuso de João Pessoa (ver formatDateTime.ts).
+    dateFrom?: string;
+    dateTo?: string;
   } = {}
 ): Promise<ListRequestsResult> {
   const admin = getSupabaseAdmin();
@@ -283,16 +287,20 @@ export async function listRequests(
   // Tipado como `any` de propósito (ver listScheduledRequests): encadear vários
   // filtros condicionais faz o TypeScript travar tentando inferir um tipo
   // genérico profundo demais.
-  // assistencia_order primeiro -- a assistência pode reorganizar a fila (ex.:
-  // agrupar visualmente por bairro pra despachar montador, ver
-  // setAssistenciaOrderAction); quem ainda não foi reorganizado (null) cai
-  // pro final e usa a ordem padrão por data de criação. Mesma ideia de
-  // driver_order em listRequestsForDriver.
+  // Só created_at aqui -- assistencia_order NÃO entra no sort global: ele é
+  // reatribuído (1, 2, 3…) toda vez que a assistência reordena um grupo do
+  // dia na fila (ver setAssistenciaOrderAction), então o mesmo valor pequeno
+  // se repete em dias diferentes. Usar isso como critério global de ordenação
+  // fazia chamado antigo de um dia qualquer que já foi reordenado pular pra
+  // frente de chamados muito mais novos (inclusive furando a paginação, já
+  // que a página 1 é definida por esse sort). A ordem manual continua
+  // valendo, mas só dentro de cada grupo do dia, calculada em JS na página da
+  // fila (ver groupByDate em fila/page.tsx) -- é o único lugar que expõe
+  // reordenar mesmo.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query: any = admin
     .from("service_requests")
     .select(SUMMARY_COLUMNS, { count: "exact" })
-    .order("assistencia_order", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   if (opts.storeId) {
@@ -306,6 +314,12 @@ export async function listRequests(
   }
   if (opts.types && opts.types.length > 0) {
     query = query.in("type", opts.types);
+  }
+  if (opts.dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(opts.dateFrom)) {
+    query = query.gte("created_at", `${opts.dateFrom}T00:00:00-03:00`);
+  }
+  if (opts.dateTo && /^\d{4}-\d{2}-\d{2}$/.test(opts.dateTo)) {
+    query = query.lte("created_at", `${opts.dateTo}T23:59:59-03:00`);
   }
 
   const q = opts.q?.trim();
