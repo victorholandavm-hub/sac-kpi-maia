@@ -144,6 +144,18 @@ export type NpsSummary = {
   npsIndex: number | null;
 };
 
+// Detrator (nota 1-2) com nome/contato do cliente -- pra assistência/SAC
+// conseguirem ligar de volta e entender o que aconteceu. Nome/telefone vêm
+// de `contacts` (GHL), então podem ser null se o contato nunca foi
+// sincronizado com nome/telefone preenchido.
+export type NpsDetractor = {
+  conversationId: string;
+  score: 1 | 2;
+  answeredAt: string;
+  clientName: string | null;
+  clientPhone: string | null;
+};
+
 export type AgentStat = {
   agent: string;
   total: number;
@@ -206,6 +218,7 @@ export type KpiData = {
   byAgentStats: AgentStat[];
   performanceReport: PerformanceReportSet;
   npsSummary: NpsSummary;
+  npsDetractors: NpsDetractor[];
 };
 
 // Victor não é atendente do SAC (é quem administra o sistema) -- alguma
@@ -708,28 +721,70 @@ export async function getKpiData(
   // ainda contam pro resumo geral via `untrackedNpsScores` abaixo.
   const rowsByConversationId = new Map(allRows.map((r) => [r.conversation_id, r]));
   const untrackedNpsScores: number[] = [];
+  // Candidatos a detrator (nota 1-2) juntados aqui na mesma varredura --
+  // tracked (tem linha em v_ticket_enriched) e untracked, pra depois buscar
+  // nome/telefone em `contacts` numa query só (ver npsDetractors abaixo).
+  const detractorCandidates: { conversationId: string; score: 1 | 2; answeredAt: string; contactId: string | null }[] = [];
   for (let page = 0; ; page++) {
     const { data: pageRows, error: npsError } = await supabase
       .from("conversations")
-      .select("id, nps_score, nps_answered_at")
+      .select("id, nps_score, nps_answered_at, contact_id")
       .not("nps_score", "is", null)
       .range(page * pageSize, page * pageSize + pageSize - 1);
     if (npsError) throw npsError;
     for (const row of pageRows ?? []) {
       const conversationId = row.id as string;
       const score = row.nps_score as number;
+      const answeredAt = row.nps_answered_at as string | null;
       const match = rowsByConversationId.get(conversationId);
       if (match) {
         match.nps_score = score;
-        continue;
+      } else {
+        const answeredAtDate = answeredAt ? new Date(answeredAt) : null;
+        if (range.from && answeredAtDate && answeredAtDate < range.from) continue;
+        if (answeredAtDate && answeredAtDate > range.to) continue;
+        untrackedNpsScores.push(score);
       }
-      const answeredAt = row.nps_answered_at ? new Date(row.nps_answered_at as string) : null;
-      if (range.from && answeredAt && answeredAt < range.from) continue;
-      if (answeredAt && answeredAt > range.to) continue;
-      untrackedNpsScores.push(score);
+      if (score <= 2 && answeredAt) {
+        detractorCandidates.push({
+          conversationId,
+          score: score as 1 | 2,
+          answeredAt,
+          contactId: (row.contact_id as string | null) ?? match?.contact_id ?? null,
+        });
+      }
     }
     if (!pageRows || pageRows.length < pageSize) break;
   }
+
+  // Só entra na lista se a resposta caiu dentro do período selecionado --
+  // consistente com o critério já usado pros untracked acima (nps_answered_at,
+  // não opened_at do chamado, já que o cliente pode responder dias depois).
+  const detractorsInRange = detractorCandidates.filter((d) => {
+    const t = new Date(d.answeredAt);
+    if (range.from && t < range.from) return false;
+    if (t > range.to) return false;
+    return true;
+  });
+  const detractorContactIds = [...new Set(detractorsInRange.map((d) => d.contactId).filter((id): id is string => !!id))];
+  let contactsById = new Map<string, { name: string | null; phone: string | null }>();
+  if (detractorContactIds.length > 0) {
+    const { data: contactRows, error: contactsError } = await supabase
+      .from("contacts")
+      .select("id, name, phone")
+      .in("id", detractorContactIds);
+    if (contactsError) throw contactsError;
+    contactsById = new Map((contactRows ?? []).map((c) => [c.id as string, { name: c.name as string | null, phone: c.phone as string | null }]));
+  }
+  const npsDetractors: NpsDetractor[] = detractorsInRange
+    .map((d) => ({
+      conversationId: d.conversationId,
+      score: d.score,
+      answeredAt: d.answeredAt,
+      clientName: contactsById.get(d.contactId ?? "")?.name ?? null,
+      clientPhone: contactsById.get(d.contactId ?? "")?.phone ?? null,
+    }))
+    .sort((a, b) => new Date(b.answeredAt).getTime() - new Date(a.answeredAt).getTime());
 
   const rows = allRows.filter((r) => {
     const opened = new Date(r.opened_at).getTime();
@@ -867,5 +922,6 @@ export async function getKpiData(
     byAgentStats: buildAgentStats(rows),
     performanceReport: buildPerformanceReportSet(allRows, new Date()),
     npsSummary: buildNpsSummary(rows, untrackedNpsScores),
+    npsDetractors,
   };
 }
