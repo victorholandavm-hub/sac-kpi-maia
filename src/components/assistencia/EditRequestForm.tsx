@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { updateRequestDetails, type FormState } from "@/app/assistencia/actions";
-import type { ServiceRequestDetail, Store } from "@/lib/serviceRequests";
+import { ADDRESS_NUMBER_REQUIRED_TYPES, type ServiceRequestDetail, type Store } from "@/lib/serviceRequests";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -18,7 +18,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function EditRequestForm({ request, stores }: { request: ServiceRequestDetail; stores: Store[] }) {
   const boundAction = updateRequestDetails.bind(null, request.id);
   const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, undefined);
-  const showAddressNumber = request.type === "montagem" || request.type === "desmontagem";
+  const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(request.type);
   const [isApartment, setIsApartment] = useState(request.clientIsApartment);
   // Só tipos que passam por montador/técnico -- entrega é sempre motorista
   // (sem montador pra instruir) e notificação externa não tem visita

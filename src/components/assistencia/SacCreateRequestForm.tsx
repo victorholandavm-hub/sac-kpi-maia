@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useActionState } from "react";
 import { createSacRequest, lookupTotvsClientForTeam, lookupTotvsProductForTeam, type FormState } from "@/app/assistencia/actions";
 import { SAC_CATEGORIES, SAC_CATEGORY_LABELS, REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
-import type { Store } from "@/lib/serviceRequests";
+import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -134,7 +134,7 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
   const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
   // Só montagem envolve entrar num prédio de verdade -- SAC nem oferece
   // desmontagem isolada (ver SacType acima).
-  const showAddressNumber = type === "montagem";
+  const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
 
   // Combo só existe pra montagem -- SAC nem oferece desmontagem isolada (ver
   // SacType). "item" é a lista principal (produtos a entregar, ou a montar

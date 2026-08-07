@@ -9,7 +9,7 @@ import {
   type FormState,
 } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
-import { SHIFTS, type Store, type DayLoadItem } from "@/lib/serviceRequests";
+import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
 
 const ASSISTENCIA_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"] as const;
@@ -157,7 +157,7 @@ export function QuickCreateRequestForm({
   const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
   // Só montagem/desmontagem envolve entrar num prédio de verdade -- ver
   // ADDRESS_NUMBER_REQUIRED_TYPES em serviceRequests.ts.
-  const showAddressNumber = type === "montagem" || type === "desmontagem";
+  const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
 
   // Mesma ideia de PublicRequestForm.tsx: código é só atalho, não trava nada
   // se não achar -- a pessoa preenche à mão como já era.

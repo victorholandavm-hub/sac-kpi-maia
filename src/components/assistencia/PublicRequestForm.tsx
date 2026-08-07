@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createPublicRequest, lookupTotvsClient, lookupTotvsProduct, type FormState } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
-import type { Store } from "@/lib/serviceRequests";
+import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
 
 const TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
@@ -246,9 +246,7 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
   const showAddress =
     !isStoreTarget &&
     (type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria");
-  // Só montagem/desmontagem envolve entrar num prédio de verdade -- ver
-  // ADDRESS_NUMBER_REQUIRED_TYPES em serviceRequests.ts.
-  const showAddressNumber = type === "montagem" || type === "desmontagem";
+  const showAddressNumber = !isStoreTarget && (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
   const showItems = type !== "notificacao_externa";
   const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
   const showCombo = type === "montagem" || type === "desmontagem";

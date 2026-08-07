@@ -61,9 +61,10 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
   return str.length > 0 ? str : null;
 }
 
-// Número é obrigatório em montagem/desmontagem (ver ADDRESS_NUMBER_REQUIRED_TYPES);
-// apto/bloco só é obrigatório quando a pessoa marcou "é apartamento" — usado
-// nas 3 telas de criação (loja, SAC, assistência/admin) e nas 2 de edição.
+// Número é obrigatório nos tipos com visita/entrega física (ver
+// ADDRESS_NUMBER_REQUIRED_TYPES); apto/bloco só é obrigatório quando a
+// pessoa marcou "é apartamento" — usado nas 3 telas de criação (loja, SAC,
+// assistência/admin) e nas 2 de edição.
 function readAddressNumberFields(
   formData: FormData,
   type: string
@@ -370,10 +371,10 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     clientPhone = String(formData.get("client_phone") ?? "").trim();
     if (!clientPhone) return { error: "Informe o telefone de contato." };
 
-    // Só os tipos que envolvem visita física exigem endereço -- os outros nem
-    // mostram esse campo no formulário (ver showAddress em PublicRequestForm).
-    const ADDRESS_REQUIRED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"];
-    if (ADDRESS_REQUIRED_TYPES.includes(type)) {
+    // Só os tipos que envolvem visita/entrega física exigem endereço -- os
+    // outros nem mostram esse campo no formulário (ver showAddress em
+    // PublicRequestForm). Mesma lista de ADDRESS_NUMBER_REQUIRED_TYPES.
+    if ((ADDRESS_NUMBER_REQUIRED_TYPES as string[]).includes(type)) {
       clientAddress = String(formData.get("client_address") ?? "").trim();
       if (!clientAddress) return { error: "Informe o endereço." };
       clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
@@ -572,8 +573,7 @@ export async function editServiceRequestByGerente(requestId: string, _state: For
     clientPhone = String(formData.get("client_phone") ?? "").trim();
     if (!clientPhone) return { error: "Informe o telefone de contato." };
 
-    const ADDRESS_REQUIRED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"];
-    if (ADDRESS_REQUIRED_TYPES.includes(type)) {
+    if ((ADDRESS_NUMBER_REQUIRED_TYPES as string[]).includes(type)) {
       clientAddress = String(formData.get("client_address") ?? "").trim();
       if (!clientAddress) return { error: "Informe o endereço." };
       clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
@@ -1221,9 +1221,15 @@ export async function setSchedule(
   }
 
   const admin = getSupabaseAdmin();
-  const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
+  const { data: current } = await admin.from("service_requests").select("type, status").eq("id", requestId).single();
   if (!current) throw new Error("Solicitação não encontrada.");
   requireManageAccess(profile, current.type);
+
+  // "Remarcar" significa "precisa de uma data nova" -- assim que a
+  // assistência define essa data nova, o selo tem que sumir (voltar pro
+  // fluxo normal de em andamento), senão fica preso mostrando "Remarcar"
+  // pra sempre mesmo depois de já remarcado de verdade.
+  const clearingRemarcar = current.status === "remarcar" && !!scheduledDate;
 
   let rotaValue: string | null = null;
   let exceptionNote: string | null = null;
@@ -1252,6 +1258,7 @@ export async function setSchedule(
       scheduled_time: scheduledTime || null,
       rota: rotaValue,
       rota_exception_note: exceptionNote,
+      ...(clearingRemarcar ? { status: "em_andamento" } : {}),
     })
     .eq("id", requestId);
   if (error) throw new Error(error.message);
@@ -1261,7 +1268,9 @@ export async function setSchedule(
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: profile.id,
-    event_type: "note_added",
+    event_type: clearingRemarcar ? "status_changed" : "note_added",
+    from_status: clearingRemarcar ? "remarcar" : undefined,
+    to_status: clearingRemarcar ? "em_andamento" : undefined,
     note: scheduledDate
       ? `Visita agendada: ${scheduledDate}${scheduledTime ? ` às ${scheduledTime}` : ""}${shift ? ` (${shiftLabel})` : ""}${rotaNote}`
       : "Agendamento removido.",

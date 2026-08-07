@@ -35,12 +35,24 @@ export function isRequestStatus(value: string | undefined | null): value is Requ
   return !!value && (REQUEST_STATUSES as string[]).includes(value);
 }
 
-// Montagem/desmontagem envolve entrar num prédio de verdade — sem número
-// (e apto, quando for o caso) o montador/motorista chega no endereço e não
-// sabe onde tocar a campainha. Os outros tipos com endereço (recolhimento,
-// troca de peça, vistoria) continuam com endereço livre, sem exigir número
-// separado.
-export const ADDRESS_NUMBER_REQUIRED_TYPES: RequestType[] = ["montagem", "desmontagem"];
+// Todo tipo com visita/entrega de verdade (montador ou motorista indo até o
+// endereço) exige número -- e apto/bloco, quando for prédio -- separado do
+// resto do endereço em texto livre. Sem isso, casos reais já aconteceram de
+// faltar o bloco/apto e o montador/motorista chegar no endereço sem saber
+// onde tocar a campainha. Só "notificacao_externa" fica de fora (SAC,
+// nunca envolve visita física). Antes só cobria montagem/desmontagem --
+// recolhimento/troca de peça/vistoria (montador) e troca/entrega de
+// produto/envio de peça (motorista) tinham a mesma lacuna.
+export const ADDRESS_NUMBER_REQUIRED_TYPES: RequestType[] = [
+  "montagem",
+  "desmontagem",
+  "recolhimento",
+  "troca_peca",
+  "vistoria",
+  "troca_produto",
+  "entrega_produto",
+  "envio_peca",
+];
 
 // Usado em toda tela que exibe o endereço (detalhe do chamado, montador,
 // motorista) — mantém rua/número/apto num único texto formatado em vez de

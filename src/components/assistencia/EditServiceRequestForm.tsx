@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { editServiceRequestByGerente, lookupTotvsProduct, type FormState } from "@/app/assistencia/actions";
-import type { ServiceRequestDetail } from "@/lib/serviceRequests";
+import { ADDRESS_NUMBER_REQUIRED_TYPES, type ServiceRequestDetail } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -109,7 +109,11 @@ export function EditServiceRequestForm({ request }: { request: ServiceRequestDet
   const isStoreTarget = !request.orderCode && (request.clientName ?? "").startsWith("Mostruário — ");
   const showAddress =
     !isStoreTarget && (type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria");
-  const showAddressNumber = type === "montagem" || type === "desmontagem";
+  // !isStoreTarget também aqui -- antes ficava sem essa checagem, então um
+  // chamado de mostruário (sem endereço nenhum, ver isStoreTarget acima)
+  // exigia número/apto mesmo assim, inconsistente com showAddress logo
+  // abaixo.
+  const showAddressNumber = !isStoreTarget && (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
   const [isApartment, setIsApartment] = useState(request.clientIsApartment);
   const showItems = type !== "notificacao_externa";
   const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
