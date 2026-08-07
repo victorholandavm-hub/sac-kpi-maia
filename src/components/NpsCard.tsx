@@ -1,4 +1,5 @@
-import type { NpsSummary } from "@/lib/kpi";
+import type { NpsSummary, NpsDetractor } from "@/lib/kpi";
+import { NpsDetractorsList } from "./NpsDetractorsList";
 
 // Meta definida pelo usuário -- sem lugar melhor pra guardar isso hoje
 // (não é dado do GHL, é decisão de negócio), então fica aqui mesmo.
@@ -11,7 +12,7 @@ function indexColor(value: number | null): string {
   return "var(--status-critical)";
 }
 
-export function NpsCard({ data }: { data: NpsSummary }) {
+export function NpsCard({ data, detractors }: { data: NpsSummary; detractors: NpsDetractor[] }) {
   return (
     <div
       className="rounded-lg border p-4 flex flex-col gap-3"
@@ -72,9 +73,12 @@ export function NpsCard({ data }: { data: NpsSummary }) {
             <span className="text-xs" style={{ color: "var(--status-critical)" }}>
               Detratores (1-2)
             </span>
-            <span className="text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>
-              {data.detractorPct}%
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-2xl font-semibold" style={{ color: "var(--text-primary)" }}>
+                {data.detractorPct}%
+              </span>
+              <NpsDetractorsList data={detractors} />
+            </div>
           </div>
         </div>
       )}

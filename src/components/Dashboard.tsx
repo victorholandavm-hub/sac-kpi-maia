@@ -15,7 +15,6 @@ import { PreviousWeekCard } from "./PreviousWeekCard";
 import { AgentStatsTable } from "./AgentStatsTable";
 import { PerformanceReportButton } from "./PerformanceReportButton";
 import { NpsCard } from "./NpsCard";
-import { NpsDetractorsList } from "./NpsDetractorsList";
 import { categoryLabel, storeLabel, productLabel } from "@/lib/labels";
 
 const NPS_SCORE_LABELS: Record<number, string> = {
@@ -95,13 +94,12 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         {data.escalations.completedCount} ciclos concluídos analisados), sem depender de tags.
       </p>
 
-      <NpsCard data={data.npsSummary} />
+      <NpsCard data={data.npsSummary} detractors={data.npsDetractors} />
       <BarRanking
         title="Distribuição das notas (enquete GHL)"
         data={npsDistribution}
         coverage={{ withValue: data.npsSummary.responseCount, total: data.npsSummary.eligibleCount, pct: data.npsSummary.responseRatePct ?? 0 }}
       />
-      <NpsDetractorsList data={data.npsDetractors} />
 
       {data.paretoSummary ? (
         <p className="text-sm" style={{ color: "var(--text-primary)" }}>
