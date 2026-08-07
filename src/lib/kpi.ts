@@ -208,6 +208,14 @@ export type KpiData = {
   npsSummary: NpsSummary;
 };
 
+// Victor não é atendente do SAC (é quem administra o sistema) -- alguma
+// conversa de teste/uso interno dele acabou marcada com a tag de agente no
+// GHL, e isso poluía os rankings "por agente" com um nome que não devia
+// estar ali.
+function isRealAgent(agentName: string | null): agentName is string {
+  return !!agentName && !agentName.toLowerCase().includes("victor");
+}
+
 function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -244,7 +252,7 @@ function computeCoverage(rows: TicketRow[], key: "store_tag" | "category" | "pro
 function byAgentCounts(rows: TicketRow[]): Count[] {
   const counts = new Map<string, number>();
   for (const row of rows) {
-    if (!row.is_sac_agent || !row.agent_name) continue;
+    if (!row.is_sac_agent || !isRealAgent(row.agent_name)) continue;
     counts.set(row.agent_name, (counts.get(row.agent_name) ?? 0) + 1);
   }
   return [...counts.entries()]
@@ -355,7 +363,7 @@ function buildPerformanceReportSet(allRows: TicketRow[], now: Date): Performance
 function buildAgentStats(rows: TicketRow[]): AgentStat[] {
   const byAgent = new Map<string, TicketRow[]>();
   for (const row of rows) {
-    if (!row.is_sac_agent || !row.agent_name) continue;
+    if (!row.is_sac_agent || !isRealAgent(row.agent_name)) continue;
     const list = byAgent.get(row.agent_name) ?? [];
     list.push(row);
     byAgent.set(row.agent_name, list);

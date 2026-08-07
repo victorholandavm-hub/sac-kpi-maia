@@ -6,20 +6,16 @@ import type { DateRange } from "@/lib/dateRange";
 import { StatTile } from "./StatTile";
 import { BarRanking } from "./BarRanking";
 import { VolumeChart } from "./VolumeChart";
-import { BacklogTable } from "./BacklogTable";
 import { BacklogTrendChart } from "./BacklogTrendChart";
 import { StoreBreakdownTable } from "./StoreBreakdownTable";
-import { WaitingTable } from "./WaitingTable";
 import { EscalationBreakdown } from "./EscalationBreakdown";
 import { EscalationByStoreTable } from "./EscalationByStoreTable";
-import { EscalationPendingTable } from "./EscalationPendingTable";
 import { RangePicker } from "./RangePicker";
 import { PreviousWeekCard } from "./PreviousWeekCard";
-import { OpenTicketsBrowser } from "./OpenTicketsBrowser";
 import { AgentStatsTable } from "./AgentStatsTable";
 import { PerformanceReportButton } from "./PerformanceReportButton";
 import { NpsCard } from "./NpsCard";
-import { categoryLabel, storeLabel, productLabel, blockingLabel } from "@/lib/labels";
+import { categoryLabel, storeLabel, productLabel } from "@/lib/labels";
 
 const NPS_SCORE_LABELS: Record<number, string> = {
   5: "5 - Muito satisfeito",
@@ -36,8 +32,6 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
   const byCategory = data.byCategory.map((c) => ({ ...c, label: categoryLabel(c.label) }));
   const byStore = data.byStore.map((c) => ({ ...c, label: storeLabel(c.label) }));
   const byProduct = data.byProduct.map((c) => ({ ...c, label: productLabel(c.label) }));
-  const waitingByType = data.waitingByType.map((c) => ({ ...c, label: blockingLabel(c.label) }));
-  const waitingByStore = data.waitingByStore.map((c) => ({ ...c, label: storeLabel(c.label) }));
   // Ordem invertida (5 no topo) -- fica mais intuitivo no gráfico de barras
   // horizontal ver "muito satisfeito" em cima.
   const npsDistribution = [...data.npsSummary.distribution]
@@ -84,7 +78,6 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           value={data.pctWithinSla !== null ? `${data.pctWithinSla}%` : "—"}
         />
         <StatTile label="Taxa de reincidência" value={data.recurrencePct !== null ? `${data.recurrencePct}%` : "—"} />
-        <StatTile label="Esperando resposta externa (tag)" value={data.waitingCount} />
         <StatTile
           label="Espera média por info. externa (IA)"
           value={data.escalations.avgWaitMinutes !== null ? Math.round((data.escalations.avgWaitMinutes / 60) * 10) / 10 : "—"}
@@ -114,8 +107,6 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         </p>
       ) : null}
 
-      <OpenTicketsBrowser data={data.openTicketsList} />
-
       <AgentStatsTable data={data.byAgentStats} />
 
       <section className="grid md:grid-cols-3 gap-4">
@@ -134,24 +125,12 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         <BacklogTrendChart data={data.backlogOverTime} />
       </section>
 
-      <section className="grid md:grid-cols-2 gap-4">
-        <StoreBreakdownTable data={data.storeBreakdown} />
-        <BacklogTable data={data.attention} />
-      </section>
-
-      <section className="grid md:grid-cols-2 gap-4">
-        <BarRanking title="Lojas que mais demoram a responder" data={waitingByStore} />
-        <BarRanking title="Aguardando por tipo" data={waitingByType} />
-      </section>
-
-      <WaitingTable data={data.waitingList} />
+      <StoreBreakdownTable data={data.storeBreakdown} />
 
       <section className="grid md:grid-cols-2 gap-4">
         <EscalationBreakdown data={data.escalations.byTarget} />
         <EscalationByStoreTable data={data.escalationByStore} />
       </section>
-
-      <EscalationPendingTable data={data.escalationList} />
     </div>
   );
 }
