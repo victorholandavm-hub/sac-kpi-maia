@@ -2,6 +2,15 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // As instâncias sac-ip/assistencia-ip da VPS servem sob prefixo de path
+  // (/apps/sac, /apps/ -- ver server block default_server do nginx, é o
+  // fallback de acesso direto por IP). sac/assistencia (domínio próprio)
+  // não setam essa env var, então basePath fica undefined pra elas -- sem
+  // isso aqui, alguém tinha editado esse arquivo direto na VPS pra essas
+  // duas instâncias, sem nunca commitar, e qualquer commit futuro que
+  // tocasse nesse arquivo travava o `git pull` do deploy nelas (silenciosamente:
+  // o pm2 restart rodava mesmo assim, com o código antigo).
+  basePath: process.env.NEXT_BASE_PATH || undefined,
   experimental: {
     serverActions: {
       // Padrão do Next é 1 MB -- foto de anexo (Peças, SAC, montador,
