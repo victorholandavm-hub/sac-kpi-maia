@@ -4,6 +4,7 @@ import { resolveEncomendaRequester, canEditPedido } from "@/lib/encomendaRequest
 import { signOut } from "@/app/assistencia/actions";
 import {
   listPedidosByRequester,
+  listAllPedidos,
   listEventsForPedidos,
   listOpenPedidoEncomendaQueueIds,
   OPEN_PEDIDO_ENCOMENDA_STATUSES,
@@ -39,19 +40,24 @@ export default async function EncomendasSacPage({
 
   const { view } = await searchParams;
   const showCompleted = view === "concluidos";
+  const showAll = view === "todas";
 
-  const [allPedidos, queueIds] = await Promise.all([
+  const [meusPedidos, todosPedidos, queueIds] = await Promise.all([
     listPedidosByRequester(requester.name),
-    showCompleted ? Promise.resolve([]) : listOpenPedidoEncomendaQueueIds(),
+    showAll ? listAllPedidos() : Promise.resolve([]),
+    showAll || showCompleted ? Promise.resolve([]) : listOpenPedidoEncomendaQueueIds(),
   ]);
+  const allPedidos = meusPedidos;
   const queuePosition = new Map(queueIds.map((id, i) => [id, i + 1]));
-  const pedidos = allPedidos
-    .filter((p) => (showCompleted ? !OPEN_STATUSES.includes(p.status) : OPEN_STATUSES.includes(p.status)))
-    .sort((a, b) =>
-      showCompleted
-        ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+  const pedidos = showAll
+    ? [...todosPedidos].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    : allPedidos
+        .filter((p) => (showCompleted ? !OPEN_STATUSES.includes(p.status) : OPEN_STATUSES.includes(p.status)))
+        .sort((a, b) =>
+          showCompleted
+            ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
 
   const byStatus: Record<string, number> = {};
   for (const p of allPedidos) {
@@ -83,18 +89,18 @@ export default async function EncomendasSacPage({
         </div>
       </AssistenciaHeader>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Link
           href={viewHref("abertos")}
           className="text-xs px-3 py-1.5 rounded-full border"
           style={{
             borderColor: "var(--border)",
-            background: !showCompleted ? "var(--surface-1)" : "transparent",
-            color: !showCompleted ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: !showCompleted ? 600 : 400,
+            background: !showCompleted && !showAll ? "var(--surface-1)" : "transparent",
+            color: !showCompleted && !showAll ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: !showCompleted && !showAll ? 600 : 400,
           }}
         >
-          Em aberto
+          Minhas em aberto
         </Link>
         <Link
           href={viewHref("concluidos")}
@@ -106,11 +112,29 @@ export default async function EncomendasSacPage({
             fontWeight: showCompleted ? 600 : 400,
           }}
         >
-          Entregues/cancelados
+          Minhas entregues/canceladas
+        </Link>
+        <Link
+          href={viewHref("todas")}
+          className="text-xs px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: showAll ? "var(--surface-1)" : "transparent",
+            color: showAll ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: showAll ? 600 : 400,
+          }}
+        >
+          Todas as encomendas
         </Link>
       </div>
 
-      {!showCompleted ? (
+      {showAll ? (
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          Visão só de acompanhamento — quem gerencia cada pedido continua sendo a loja, o CD e a fábrica.
+        </p>
+      ) : null}
+
+      {!showCompleted && !showAll ? (
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <StatTile label="Em aberto" value={pedidos.length} />
           <StatTile label="Em produção" value={byStatus.em_producao ?? 0} />
@@ -122,7 +146,7 @@ export default async function EncomendasSacPage({
       {pedidos.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {showCompleted ? "Nenhum pedido entregue/cancelado ainda." : "Nenhum pedido em aberto no momento."}
+            {showAll ? "Nenhuma encomenda lançada ainda." : showCompleted ? "Nenhum pedido entregue/cancelado ainda." : "Nenhum pedido em aberto no momento."}
           </p>
         </div>
       ) : (

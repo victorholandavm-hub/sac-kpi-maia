@@ -1,16 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
-import { signOut } from "@/app/assistencia/actions";
 import { listRequests } from "@/lib/serviceRequests";
-import { countEntregasEmRiscoOverview } from "@/lib/entregasRisco";
-import { REQUEST_TYPE_LABELS, ROLE_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, ROLE_LABELS, ASSISTENCIA_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 
 export const dynamic = "force-dynamic";
 
-export default async function SacHomePage({
+// Visão só de leitura pro SAC acompanhar montagem/desmontagem/recolhimento/
+// troca de peça/vistoria -- tipos geridos pela assistência técnica, fora do
+// escopo de SAC_MANAGED_TYPES (ver /assistencia/sac/page.tsx). SAC não cria
+// nem edita nada aqui -- só consulta; quem gerencia continua sendo
+// assistência/admin (ver canManage em [id]/page.tsx, que já bloqueia ações
+// pra quem não gerencia o tipo).
+export default async function SacMontagensPage({
   searchParams,
 }: {
   searchParams: Promise<{ view?: string }>;
@@ -23,80 +27,34 @@ export default async function SacHomePage({
   const { view } = await searchParams;
   const showCompleted = view === "concluidas";
 
-  const [{ items }, riscos] = await Promise.all([
-    listRequests({
-      types: [...SAC_MANAGED_TYPES],
-      status: showCompleted ? "concluida" : undefined,
-    }),
-    countEntregasEmRiscoOverview(),
-  ]);
+  const { items } = await listRequests({
+    types: [...ASSISTENCIA_MANAGED_TYPES],
+    status: showCompleted ? "concluida" : undefined,
+  });
   const requests = showCompleted ? items : items.filter((r) => r.status !== "concluida" && r.status !== "cancelada");
 
   return (
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-      <AssistenciaHeader title="SAC — Lojas Maia" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`}>
+      <AssistenciaHeader title="Montagens e serviços" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`}>
         <div className="flex items-center gap-3 flex-wrap">
           <Link
-            href="/assistencia/sac/arsenal"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
-            style={{ background: "var(--brand-orange)", color: "#fff" }}
-          >
-            Arsenal do SAC
-          </Link>
-          <Link
-            href="/assistencia/sac/entregas-risco"
-            className={`text-sm px-4 py-2 rounded font-medium whitespace-nowrap border ${riscos.alerta > 0 ? "animate-pulse" : ""}`}
-            style={{
-              background: riscos.alerta > 0 ? "var(--status-critical)" : "var(--surface-1)",
-              color: riscos.alerta > 0 ? "#fff" : "var(--text-primary)",
-              borderColor: "var(--border)",
-            }}
-          >
-            Entregas em risco{riscos.alerta > 0 ? ` (${riscos.alerta})` : ""}
-          </Link>
-          <Link
-            href="/assistencia/sac/nova"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
-            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-          >
-            + Nova solicitação
-          </Link>
-          <Link
-            href="/assistencia/encomendas/solicitar"
+            href="/assistencia/sac"
             className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
             style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
           >
-            + Nova encomenda
+            ← Painel do SAC
           </Link>
-          <Link
-            href="/assistencia/encomendas/sac"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
-            style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
-          >
-            Minhas encomendas
-          </Link>
-          <Link
-            href="/assistencia/sac/montagens"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
-            style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
-          >
-            Montagens e serviços
-          </Link>
-          <form action={signOut}>
-            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-              Sair
-            </button>
-          </form>
         </div>
       </AssistenciaHeader>
 
-      <h2 className="text-xl font-bold" style={{ color: "var(--brand-orange)" }}>
-        Solicitações
-      </h2>
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        Visão só de acompanhamento — quem gerencia montagem, desmontagem, recolhimento, troca de peça e vistoria continua sendo a
+        assistência técnica.
+      </p>
 
       <div className="flex items-center gap-2">
         <Link
-          href="/assistencia/sac"
+          href="/assistencia/sac/montagens"
           className="text-xs px-3 py-1.5 rounded-full border"
           style={{
             borderColor: "var(--border)",
@@ -108,7 +66,7 @@ export default async function SacHomePage({
           Em aberto
         </Link>
         <Link
-          href="/assistencia/sac?view=concluidas"
+          href="/assistencia/sac/montagens?view=concluidas"
           className="text-xs px-3 py-1.5 rounded-full border"
           style={{
             borderColor: "var(--border)",
@@ -124,7 +82,7 @@ export default async function SacHomePage({
       {requests.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {showCompleted ? "Nenhuma solicitação concluída ainda." : "Nenhuma notificação ou troca em aberto no momento."}
+            {showCompleted ? "Nenhuma concluída ainda." : "Nenhuma em aberto no momento."}
           </p>
         </div>
       ) : (
@@ -145,21 +103,13 @@ export default async function SacHomePage({
                     <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                       {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                     </span>
-                    {r.type === "troca_produto" && !r.pickupCompleted && r.status !== "concluida" && r.status !== "cancelada" ? (
-                      <span
-                        className="text-xs font-medium px-2 py-0.5 rounded-full"
-                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
-                      >
-                        Recolher produto
-                      </span>
-                    ) : null}
                   </div>
                   <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
                     {r.clientName ?? "Sem nome de cliente"}
                   </p>
                   <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                     {r.storeName}
-                    {r.driverName ? ` · Motorista: ${r.driverName}` : ""}
+                    {r.assemblerName ? ` · Montador: ${r.assemblerName}` : ""}
                   </p>
                 </div>
               </Link>
@@ -168,7 +118,7 @@ export default async function SacHomePage({
         </div>
       )}
 
-      <Link href="/assistencia" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
+      <Link href="/assistencia/sac" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
         ← Voltar
       </Link>
     </div>
