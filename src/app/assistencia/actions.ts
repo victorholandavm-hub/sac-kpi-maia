@@ -918,6 +918,63 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   revalidatePath(`/assistencia/${requestId}`);
 }
 
+// Produto trocado pode vir errado/avariado de novo -- em vez de a loja abrir
+// um chamado novo do zero (perdendo o histórico do primeiro), reabre esse
+// mesmo chamado de troca_produto pra uma nova rodada: volta pra "em
+// andamento" e zera pickup_completed, senão o motorista não veria a etapa de
+// recolher o produto (de novo defeituoso) como pendente -- ver
+// driverMarkPickupCompleted/driverCompleteRequest em driver-actions.ts, que
+// tratam entrega e recolhimento como pernas independentes da mesma rota.
+export async function requestNewExchange(requestId: string, reason: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin", "sac");
+  const reasonTrimmed = reason.trim();
+  if (!reasonTrimmed) throw new Error("Informe o motivo da nova troca.");
+
+  const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("status, type, store_id, exchange_round")
+    .eq("id", requestId)
+    .single();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+  if (current.type !== "troca_produto") throw new Error("Nova troca só se aplica a chamados de troca de produto.");
+  if (current.status !== "concluida") throw new Error("Só dá pra pedir uma nova troca depois que a troca anterior foi concluída.");
+
+  const nextRound = (current.exchange_round ?? 1) + 1;
+
+  const { data: updated, error } = await admin
+    .from("service_requests")
+    .update({ status: "em_andamento", completed_at: null, pickup_completed: false, exchange_round: nextRound })
+    .eq("id", requestId)
+    .eq("status", "concluida")
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!updated) throw new Error("Essa solicitação já foi atualizada por outra pessoa. Recarregue a página e tente de novo.");
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "status_changed",
+    from_status: "concluida",
+    to_status: "em_andamento",
+    note: `${nextRound}ª troca solicitada -- produto trocado anteriormente apresentou problema: ${reasonTrimmed}`,
+  });
+
+  await notifyLoja(current.store_id, {
+    type: "status_changed",
+    title: "Solicitação: nova troca necessária",
+    message: reasonTrimmed,
+    link: `/assistencia/${requestId}`,
+  });
+
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/sac");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
 export async function addNote(requestId: string, note: string) {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");

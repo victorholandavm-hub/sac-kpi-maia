@@ -153,6 +153,14 @@ export default async function SacHomePage({
                         Recolher produto
                       </span>
                     ) : null}
+                    {r.type === "troca_produto" && r.exchangeRound > 1 ? (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: "var(--status-warning)", color: "#fff" }}
+                      >
+                        {r.exchangeRound}ª troca
+                      </span>
+                    ) : null}
                   </div>
                   <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
                     {r.clientName ?? "Sem nome de cliente"}

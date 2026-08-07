@@ -122,6 +122,18 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
             Chamado #{request.ticketNumber}
           </span>
           <StatusBadge status={request.status} />
+          {request.type === "troca_produto" ? (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+              style={
+                request.exchangeRound > 1
+                  ? { background: "var(--status-warning)", color: "#fff" }
+                  : { color: "var(--text-secondary)", background: "color-mix(in srgb, var(--text-secondary) 15%, var(--surface-1))" }
+              }
+            >
+              {request.exchangeRound}ª troca
+            </span>
+          ) : null}
           <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             {REQUEST_TYPE_LABELS[request.type] ?? request.type} · {request.storeName}
           </h2>
@@ -190,6 +202,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
       {canManage ? (
         <RequestActions
           requestId={request.id}
+          requestType={request.type}
           status={request.status}
           isAssignedToMe={request.assignedToId === profile.id}
           hasAssignee={isDeliveryType ? !!request.driverName : !!request.assemblerName}

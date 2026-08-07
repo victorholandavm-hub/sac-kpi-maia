@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { claimRequest, updateStatus, addNote } from "@/app/assistencia/actions";
+import { claimRequest, updateStatus, addNote, requestNewExchange } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/assistenciaLabels";
 
@@ -48,6 +48,7 @@ const PREVIOUS_STATUS: Record<string, string | null> = {
 
 export function RequestActions({
   requestId,
+  requestType,
   status,
   isAssignedToMe,
   hasAssignee,
@@ -55,6 +56,7 @@ export function RequestActions({
   hideClaim = false,
 }: {
   requestId: string;
+  requestType: string;
   status: string;
   isAssignedToMe: boolean;
   hasAssignee: boolean;
@@ -65,6 +67,25 @@ export function RequestActions({
   const [note, setNote] = useState("");
   const [remarcarReason, setRemarcarReason] = useState("");
   const [askingRemarcarReason, setAskingRemarcarReason] = useState(false);
+  const [novaTrocaReason, setNovaTrocaReason] = useState("");
+  const [askingNovaTroca, setAskingNovaTroca] = useState(false);
+
+  // Produto trocado pode voltar com defeito de novo -- em vez de abrir outro
+  // chamado do zero, reabre esse mesmo pra uma nova rodada (ver
+  // requestNewExchange no servidor).
+  const canRequestNewExchange = requestType === "troca_produto" && status === "concluida";
+
+  function confirmNovaTroca() {
+    if (!novaTrocaReason.trim()) {
+      showToast("Informe o motivo da nova troca.", "error");
+      return;
+    }
+    run(async () => {
+      await requestNewExchange(requestId, novaTrocaReason);
+      setNovaTrocaReason("");
+      setAskingNovaTroca(false);
+    }, "Nova troca solicitada.");
+  }
 
   function confirmRemarcar() {
     if (!remarcarReason.trim()) {
@@ -138,7 +159,7 @@ export function RequestActions({
         </div>
       ) : null}
 
-      {previousStatus ? (
+      {previousStatus && !canRequestNewExchange ? (
         <button
           disabled={pending}
           onClick={() =>
@@ -152,6 +173,54 @@ export function RequestActions({
         >
           ↩ Reverter pra {STATUS_LABELS[previousStatus] ?? previousStatus} (marquei errado)
         </button>
+      ) : null}
+
+      {canRequestNewExchange && !askingNovaTroca ? (
+        <button
+          disabled={pending}
+          onClick={() => setAskingNovaTroca(true)}
+          className="text-sm rounded px-3 py-2 self-start disabled:opacity-60"
+          style={{ background: "var(--status-warning)", color: "#fff" }}
+        >
+          🔁 Produto trocado veio com problema — pedir nova troca
+        </button>
+      ) : null}
+
+      {askingNovaTroca ? (
+        <div className="flex flex-col gap-2 rounded border p-3" style={{ borderColor: "var(--status-warning)" }}>
+          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+            O que aconteceu com o produto trocado?
+          </span>
+          <textarea
+            value={novaTrocaReason}
+            onChange={(e) => setNovaTrocaReason(e.target.value)}
+            rows={2}
+            placeholder="Ex: veio com a mesma avaria, cor errada de novo…"
+            className="rounded border px-3 py-2 text-sm"
+            style={{ borderColor: "var(--border)" }}
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <button
+              disabled={pending || !novaTrocaReason.trim()}
+              onClick={confirmNovaTroca}
+              className="text-sm rounded px-3 py-2 disabled:opacity-60"
+              style={{ background: "var(--status-warning)", color: "#fff" }}
+            >
+              Confirmar nova troca
+            </button>
+            <button
+              onClick={() => {
+                setAskingNovaTroca(false);
+                setNovaTrocaReason("");
+              }}
+              className="text-sm underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              cancelar
+            </button>
+          </div>
+        </div>
       ) : null}
 
       {askingRemarcarReason ? (
