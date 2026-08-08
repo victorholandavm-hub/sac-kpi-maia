@@ -10,6 +10,14 @@ export const ROTA_LABELS: Record<Rota, string> = {
   centro: "Centro",
 };
 
+// Cor própria por rota na agenda (ver AgendaQueueGroup) -- bate o olho em
+// qual região é sem precisar ler o texto.
+export const ROTA_COLORS: Record<Rota, string> = {
+  praia: "var(--series-5)",
+  sul: "var(--series-1)",
+  centro: "var(--series-4)",
+};
+
 export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
 export function isRota(value: string | null | undefined): value is Rota {

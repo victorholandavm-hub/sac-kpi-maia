@@ -19,11 +19,12 @@ import { switchRafaelToFabrica, switchRafaelToCd } from "@/app/assistencia/rafae
 
 export const dynamic = "force-dynamic";
 
-function buildHref(params: { status?: string; store?: string; fornecedor?: string }) {
+function buildHref(params: { status?: string; store?: string; fornecedor?: string; q?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.store) sp.set("store", params.store);
   if (params.fornecedor) sp.set("fornecedor", params.fornecedor);
+  if (params.q) sp.set("q", params.q);
   const qs = sp.toString();
   return qs ? `/assistencia/encomendas/fila?${qs}` : "/assistencia/encomendas/fila";
 }
@@ -56,13 +57,13 @@ const FILTERS: { label: string; value: string | null }[] = [
 export default async function EncomendasQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; store?: string; fornecedor?: string }>;
+  searchParams: Promise<{ status?: string; store?: string; fornecedor?: string; q?: string }>;
 }) {
   // Aceita sessão PIN de CD/fábrica ou perfil Supabase Auth de
   // admin/assistência — ver src/lib/encomendaAuth.ts. Página fora do grupo
   // (app) porque CD/fábrica não têm sessão Supabase Auth.
   const actor = await requireEncomendaActor();
-  const { status, store, fornecedor } = await searchParams;
+  const { status, store, fornecedor, q } = await searchParams;
   const filterStatus = isPedidoEncomendaStatus(status) ? status : undefined;
   const showAllStatuses = status === "todos";
 
@@ -88,6 +89,7 @@ export default async function EncomendasQueuePage({
       storeId: store,
       fabricaId: fabricaIdFilter,
       fornecedorTipo: fornecedorTipoFilter,
+      q,
     }),
     listStores(),
     listOpenPedidoEncomendaQueueIds(),
@@ -164,7 +166,7 @@ export default async function EncomendasQueuePage({
           return (
             <Link
               key={f.label}
-              href={buildHref({ status: f.value ?? undefined, store, fornecedor })}
+              href={buildHref({ status: f.value ?? undefined, store, fornecedor, q })}
               className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
               style={
                 isStatusPill
@@ -195,7 +197,7 @@ export default async function EncomendasQueuePage({
             return (
               <Link
                 key={f.label}
-                href={buildHref({ status, store, fornecedor: f.value ?? undefined })}
+                href={buildHref({ status, store, fornecedor: f.value ?? undefined, q })}
                 className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
                 style={{
                   border: "1px solid var(--border)",
@@ -214,6 +216,36 @@ export default async function EncomendasQueuePage({
       <div className="flex items-center gap-2 flex-wrap">
         <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
       </div>
+
+      <form action="/assistencia/encomendas/fila" method="GET" className="flex items-center gap-2 flex-wrap">
+        {status ? <input type="hidden" name="status" value={status} /> : null}
+        {store ? <input type="hidden" name="store" value={store} /> : null}
+        {fornecedor ? <input type="hidden" name="fornecedor" value={fornecedor} /> : null}
+        <input
+          type="search"
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Buscar por nº do pedido, cliente ou produto…"
+          className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
+          style={{ borderColor: "var(--border)" }}
+        />
+        <button
+          type="submit"
+          className="text-sm px-3 py-2 rounded border"
+          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+        >
+          Buscar
+        </button>
+        {q ? (
+          <Link
+            href={buildHref({ status, store, fornecedor })}
+            className="text-xs underline"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Limpar busca
+          </Link>
+        ) : null}
+      </form>
 
       {pedidos.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>

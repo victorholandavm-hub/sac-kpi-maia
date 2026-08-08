@@ -10,6 +10,17 @@ export const REQUEST_TYPE_LABELS: Record<string, string> = {
   envio_peca: "Envio de peça",
 };
 
+// Cor suave por tipo de visita -- só usado na agenda (ver AgendaQueueGroup),
+// pra diferenciar a natureza do serviço batendo o olho, sem precisar ler o
+// texto do tipo.
+export const REQUEST_TYPE_COLORS: Record<string, string> = {
+  montagem: "var(--series-1)",
+  desmontagem: "var(--series-2)",
+  recolhimento: "var(--series-8)",
+  troca_peca: "var(--series-5)",
+  vistoria: "var(--series-3)",
+};
+
 export const STATUS_LABELS: Record<string, string> = {
   aberta: "Aberta",
   em_contato: "Em contato",
@@ -26,6 +37,16 @@ export const STATUS_DESCRIPTIONS: Partial<Record<string, string>> = {
   em_contato: "A assistência já viu a solicitação e está avaliando os detalhes antes de agendar o atendimento.",
   em_andamento: "Já tem um montador definido e o atendimento está em andamento.",
 };
+
+// Caminho "feliz" da solicitação, pro StatusStepper -- remarcar (mostra em
+// cima de "em_andamento", é uma variação dele) e cancelada (não é progresso,
+// é saída) ficam de fora dessa sequência de propósito.
+export const REQUEST_STATUS_STEPS: { key: string; label: string }[] = [
+  { key: "aberta", label: "Aberta" },
+  { key: "em_contato", label: "Em contato" },
+  { key: "em_andamento", label: "Em andamento" },
+  { key: "concluida", label: "Concluída" },
+];
 
 export const STATUS_COLORS: Record<string, string> = {
   aberta: "var(--status-warning)",
@@ -90,6 +111,17 @@ export const PEDIDO_ENCOMENDA_STATUS_LABELS: Record<string, string> = {
   cancelado: "Cancelado",
   negado: "Negado",
 };
+
+// Idem REQUEST_STATUS_STEPS, mas pro pedido de encomenda -- cancelado/negado
+// ficam de fora (não são progresso, são saída).
+export const PEDIDO_ENCOMENDA_STATUS_STEPS: { key: string; label: string }[] = [
+  { key: "solicitado", label: "Solicitado" },
+  { key: "em_producao", label: "Em produção" },
+  { key: "pronto_para_expedicao", label: "Enviado CD" },
+  { key: "em_carga", label: "Em carga" },
+  { key: "faturado", label: "Faturado" },
+  { key: "entregue", label: "Entregue" },
+];
 
 export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
   solicitado: "var(--status-warning)",

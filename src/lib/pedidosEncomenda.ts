@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { notifyLoja, notifyFabrica, notifyCd } from "./notifications";
 import { PEDIDO_ENCOMENDA_STATUS_LABELS } from "./assistenciaLabels";
 import { findInternalFabrica } from "./fabricas";
+import { sanitizeOrFilterValue } from "./searchFilter";
 
 export type PedidoEncomendaStatus =
   | "solicitado"
@@ -233,6 +234,9 @@ export async function listAllPedidos(
     storeId?: string;
     fabricaId?: string;
     fornecedorTipo?: "fabrica_interna" | "fabrica_externa";
+    // Busca por nº do pedido, código do cliente, quem pediu ou nome do
+    // produto -- mesmo espírito de listRequests (serviceRequests.ts).
+    q?: string;
   } = {}
 ): Promise<PedidoEncomendaSummary[]> {
   const admin = getSupabaseAdmin();
@@ -247,6 +251,27 @@ export async function listAllPedidos(
   // externos, nunca da outra fábrica interna (ver fila/page.tsx).
   if (opts.fabricaId) query = query.eq("fabrica_id", opts.fabricaId);
   if (opts.fornecedorTipo) query = query.eq("fornecedor_tipo", opts.fornecedorTipo);
+
+  const q = opts.q?.trim();
+  if (q) {
+    const { data: itemMatches } = await admin
+      .from("pedido_encomenda_itens")
+      .select("pedido_id")
+      .ilike("produto_descricao", `%${q}%`);
+    const matchingIds = [...new Set((itemMatches ?? []).map((r) => r.pedido_id as string))];
+
+    const qSafe = sanitizeOrFilterValue(q);
+    const orParts = [`cliente_codigo.ilike.%${qSafe}%`, `requested_by_name.ilike.%${qSafe}%`, `vendedor_name.ilike.%${qSafe}%`];
+    if (matchingIds.length > 0) {
+      orParts.push(`id.in.(${matchingIds.join(",")})`);
+    }
+    const pedidoNumberMatch = /^#?(\d+)$/.exec(q);
+    if (pedidoNumberMatch) {
+      orParts.push(`pedido_number.eq.${pedidoNumberMatch[1]}`);
+    }
+    query = query.or(orParts.join(","));
+  }
+
   // Ascendente (mais antigo primeiro) -- é literalmente a fila (FIFO), e o
   // número "Nº na fila" (ver listOpenPedidoEncomendaQueueIds) já segue essa
   // ordem. Com ordem descendente aqui, a lista mostrava o 2º antes do 1º.

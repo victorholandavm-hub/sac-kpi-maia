@@ -10,8 +10,10 @@ import {
   SAC_CATEGORY_LABELS,
   SAC_MANAGED_TYPES,
   PAYMENTS_CONTROLLER_NAME,
+  REQUEST_STATUS_STEPS,
 } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
+import { StatusStepper } from "@/components/assistencia/StatusStepper";
 import { RequestActions } from "@/components/assistencia/RequestActions";
 import { DeadlineActions } from "@/components/assistencia/DeadlineActions";
 import { AssemblerNameField } from "@/components/assistencia/AssemblerNameField";
@@ -50,34 +52,29 @@ function formatDateOnly(value: string | null | undefined) {
   return `${d}/${m}/${y}`;
 }
 
-function eventDescription(event: {
-  eventType: string;
-  fromStatus: string | null;
-  toStatus: string | null;
-  note: string | null;
-  actorName: string | null;
-}) {
-  const actor = event.actorName ?? "Alguém";
+// Só a ação, sem o nome do autor -- o nome fica em negrito, separado, na
+// renderização (ver Histórico), não amassado dentro da frase.
+function eventAction(event: { eventType: string; fromStatus: string | null; toStatus: string | null }) {
   switch (event.eventType) {
     case "created":
-      return `${actor} abriu a solicitação.`;
+      return "abriu a solicitação.";
     case "assigned":
-      return `${actor} assumiu a solicitação.`;
+      return "assumiu a solicitação.";
     case "status_changed": {
       const from = event.fromStatus ? STATUS_LABELS[event.fromStatus] ?? event.fromStatus : "—";
       const to = event.toStatus ? STATUS_LABELS[event.toStatus] ?? event.toStatus : "—";
-      return `${actor} mudou o status de ${from} para ${to}.`;
+      return `mudou o status de ${from} para ${to}.`;
     }
     case "note_added":
-      return `${actor} adicionou uma nota.`;
+      return "adicionou uma nota.";
     case "deadline_approved":
-      return `${actor} aprovou o prazo pedido.`;
+      return "aprovou o prazo pedido.";
     case "deadline_rejected":
-      return `${actor} recusou o prazo e propôs outra data.`;
+      return "recusou o prazo e propôs outra data.";
     case "edited":
-      return `${actor} corrigiu os dados da solicitação.`;
+      return "corrigiu os dados da solicitação.";
     default:
-      return actor;
+      return "";
   }
 }
 
@@ -166,6 +163,10 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           </div>
         ) : null}
       </div>
+
+      {request.status !== "cancelada" ? (
+        <StatusStepper steps={REQUEST_STATUS_STEPS} currentKey={request.status === "remarcar" ? "em_andamento" : request.status} />
+      ) : null}
 
       <div
         className="rounded-lg p-4 flex flex-col gap-2"
@@ -373,22 +374,29 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
             Sem eventos registrados.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {events.map((event) => (
-              <li key={event.id} className="flex flex-col gap-0.5 py-2" style={{ borderTop: "1px solid var(--gridline)" }}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-                    {eventDescription(event)}
-                  </span>
-                  <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                    {formatDateTimeBr(event.createdAt)}
-                  </span>
+          <ul className="flex flex-col">
+            {events.map((event, i) => (
+              <li key={event.id} className="flex gap-3">
+                {/* Bolinha + linha vertical conectando ao próximo evento --
+                    último item não tem linha embaixo. */}
+                <div className="flex flex-col items-center shrink-0">
+                  <div className="w-2.5 h-2.5 rounded-full mt-1.5" style={{ background: "var(--brand-green)" }} />
+                  {i < events.length - 1 ? <div className="w-px flex-1" style={{ background: "var(--gridline)" }} /> : null}
                 </div>
-                {event.note ? (
-                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    {event.note}
-                  </p>
-                ) : null}
+                <div className="flex flex-col gap-0.5 pb-4 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+                      <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{event.actorName ?? "Alguém"}</strong>{" "}
+                      {eventAction(event)}
+                    </span>
+                  </div>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{formatDateTimeBr(event.createdAt)}</span>
+                  {event.note ? (
+                    <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                      {event.note}
+                    </p>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>

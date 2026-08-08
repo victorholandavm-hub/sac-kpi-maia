@@ -10,6 +10,8 @@ import { PedidoPrazoField } from "@/components/assistencia/PedidoPrazoField";
 import { listEncomendaPhotos } from "@/lib/pedidoEncomendaPhotos";
 import { FormSection } from "@/components/assistencia/FormSection";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
+import { StatusStepper } from "@/components/assistencia/StatusStepper";
+import { PEDIDO_ENCOMENDA_STATUS_STEPS } from "@/lib/assistenciaLabels";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +90,10 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
           {pedido.storeName}
         </h2>
       </div>
+
+      {pedido.status !== "cancelado" && pedido.status !== "negado" ? (
+        <StatusStepper steps={PEDIDO_ENCOMENDA_STATUS_STEPS} currentKey={pedido.status} />
+      ) : null}
 
       <FormSection title="Produtos">
         <ul className="flex flex-col gap-1">

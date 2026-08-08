@@ -14,6 +14,19 @@ import type { PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
 // vez, em vez de abrir pedido por pedido (ver bulkMarkEnviadoParaCD).
 const BULK_ELIGIBLE_STATUS = "em_producao";
 
+// Vermelho quando já venceu ou vence hoje/amanhã -- é a informação mais
+// crítica pra quem despacha, não devia ter o mesmo peso visual de um prazo
+// folgado. Compara só a data (sem hora), sempre no fuso local do navegador
+// (prazoFabricaCd/prazoCdLoja são "date", sem componente de hora mesmo).
+function prazoStyle(dateStr: string): React.CSSProperties {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const prazo = new Date(`${dateStr}T00:00:00`);
+  const diffDays = Math.round((prazo.getTime() - today.getTime()) / 86_400_000);
+  if (diffDays <= 1) return { color: "var(--status-critical)", fontWeight: 700 };
+  return { color: "var(--status-good)", fontWeight: 600 };
+}
+
 export function PedidoEncomendaFilaList({
   pedidos,
   queuePosition,
@@ -111,9 +124,19 @@ export function PedidoEncomendaFilaList({
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                      {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
-                    </p>
+                    {p.items.length > 1 ? (
+                      <ul className="text-sm list-disc pl-4" style={{ color: "var(--text-secondary)" }}>
+                        {p.items.map((i, idx) => (
+                          <li key={idx} className="truncate">
+                            {i.quantidade}x {i.produtoDescricao}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
+                        {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
+                      </p>
+                    )}
                     {p.clienteCodigo ? (
                       <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
                         Cliente: {p.clienteCodigo}
@@ -126,13 +149,13 @@ export function PedidoEncomendaFilaList({
                     </span>
                     <span>Pedido por {p.requestedByName}</span>
                     {p.prazoFabricaCd ? (
-                      <span style={{ color: "var(--status-good)", fontWeight: 600 }}>
-                        Prazo p/ CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
+                      <span style={prazoStyle(p.prazoFabricaCd)}>
+                        🕐 Prazo p/ CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : null}
                     {p.prazoCdLoja ? (
-                      <span style={{ color: "var(--status-good)", fontWeight: 600 }}>
-                        Prazo p/ loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
+                      <span style={prazoStyle(p.prazoCdLoja)}>
+                        🕐 Prazo p/ loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : null}
                     {p.carga ? <span>Carga {p.carga}</span> : null}

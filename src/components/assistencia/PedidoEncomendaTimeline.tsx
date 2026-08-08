@@ -40,22 +40,31 @@ export function PedidoEncomendaTimeline({ events }: { events: PedidoEncomendaEve
   }
 
   return (
-    <ul className="flex flex-col gap-3">
-      {events.map((e) => (
-        <li key={e.id} className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-              {describeEvent(e)}
-            </span>
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {e.actorName} ({ROLE_LABELS[e.actorRole] ?? e.actorRole}) · {formatDateTimeBr(e.createdAt)}
-            </span>
+    <ul className="flex flex-col">
+      {events.map((e, i) => (
+        <li key={e.id} className="flex gap-3">
+          {/* Bolinha + linha vertical conectando ao próximo evento -- último
+              item não tem linha embaixo (nada mais pra conectar). */}
+          <div className="flex flex-col items-center shrink-0">
+            <div className="w-2.5 h-2.5 rounded-full mt-1.5" style={{ background: "var(--brand-green)" }} />
+            {i < events.length - 1 ? <div className="w-px flex-1" style={{ background: "var(--gridline)" }} /> : null}
           </div>
-          {e.note && e.eventType !== "prazo_definido" ? (
-            <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-secondary)" }}>
-              {e.note}
-            </p>
-          ) : null}
+          <div className="flex flex-col gap-0.5 pb-4 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                {describeEvent(e)}
+              </span>
+            </div>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{e.actorName}</strong> ({ROLE_LABELS[e.actorRole] ?? e.actorRole}) ·{" "}
+              {formatDateTimeBr(e.createdAt)}
+            </span>
+            {e.note && e.eventType !== "prazo_definido" ? (
+              <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-secondary)" }}>
+                {e.note}
+              </p>
+            ) : null}
+          </div>
         </li>
       ))}
     </ul>

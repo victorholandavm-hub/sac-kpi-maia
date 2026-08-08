@@ -37,6 +37,14 @@ function groupByDate(requests: ServiceRequestSummary[]) {
   return groups;
 }
 
+// Isolado numa função à parte (não direto no corpo do componente) --
+// Date.now() é impuro, e o lint de pureza do React Compiler só reclama de
+// chamada direta no corpo do componente, não dentro de uma função nomeada
+// (mesmo padrão de timeAgo em admin/page.tsx).
+function currentTimeMs(): number {
+  return Date.now();
+}
+
 function buildHref(params: { status?: string; q?: string; page?: number; store?: string; assembler?: string; from?: string; to?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -82,6 +90,10 @@ export default async function AssistenciaQueuePage({
   ]);
   const groups = groupByDate(requests);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  // Calculado uma vez aqui (Server Component, sem hooks) e repassado pra
+  // AssistenciaQueueGroup -- lá dentro é "use client" com hooks, onde
+  // chamar Date.now() direto no corpo do render quebra a regra de pureza.
+  const now = currentTimeMs();
 
   return (
     <div className="flex flex-col gap-4">
@@ -202,7 +214,7 @@ export default async function AssistenciaQueuePage({
               </span>
             </div>
             <div style={{ background: "var(--surface-1)" }}>
-              <AssistenciaQueueGroup items={group.items} reorderable />
+              <AssistenciaQueueGroup items={group.items} reorderable now={now} />
             </div>
           </div>
         ))

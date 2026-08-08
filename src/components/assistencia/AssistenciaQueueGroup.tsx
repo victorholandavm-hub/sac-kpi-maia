@@ -52,7 +52,18 @@ const PAYMENT_FLAG_COLORS: Record<PaymentFlag, string> = {
 // segundo plano com trava de corrida via expectedOrder), adaptada pra fila
 // da assistência: só reordena dentro do grupo do dia mostrado na tela, não
 // mistura ordem entre dias diferentes.
-export function AssistenciaQueueGroup({ items, reorderable }: { items: ServiceRequestSummary[]; reorderable: boolean }) {
+export function AssistenciaQueueGroup({
+  items,
+  reorderable,
+  now,
+}: {
+  items: ServiceRequestSummary[];
+  reorderable: boolean;
+  // Vem do servidor (ver fila/page.tsx) em vez de Date.now() aqui dentro --
+  // esse componente usa hooks ("use client"), e chamar função impura direto
+  // no corpo do render quebra a regra de pureza do React Compiler.
+  now: number;
+}) {
   const [order, setOrder] = useState(items);
   const [saving, setSaving] = useState(false);
   const [syncedItems, setSyncedItems] = useState(items);
@@ -131,6 +142,10 @@ export function AssistenciaQueueGroup({ items, reorderable }: { items: ServiceRe
         // era falso positivo).
         const showPaymentFlag = (r.type === "montagem" || r.type === "desmontagem") && (r.status === "concluida" || isPartialCompletion);
         const paymentFlag = showPaymentFlag ? paymentValueFlag(r.items) : null;
+        // "Aberta" parada há muito tempo sem ninguém sequer entrar em
+        // contato -- indício de triagem esquecida, não de trabalho em
+        // andamento (esse já muda pra "em_contato"/"em_andamento").
+        const staleOpen = r.status === "aberta" && now - new Date(r.createdAt).getTime() > 4 * 3_600_000;
 
         return (
           <div
@@ -176,6 +191,14 @@ export function AssistenciaQueueGroup({ items, reorderable }: { items: ServiceRe
                     #{r.ticketNumber}
                   </span>
                   <StatusBadge status={r.status} />
+                  {staleOpen ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: "var(--status-critical)", color: "#fff" }}
+                    >
+                      ⏱ parada há {Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h
+                    </span>
+                  ) : null}
                   <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
                   {isPartialCompletion ? (
                     <span
@@ -258,17 +281,20 @@ export function AssistenciaQueueGroup({ items, reorderable }: { items: ServiceRe
           </div>
 
           {r.montadorInstruction ? (
-            <div
-              className="rounded-lg p-2.5 flex flex-col gap-0.5"
+            // Recolhida por padrão -- expandida sempre (era o normal antes),
+            // ela sozinha esgota boa parte da rolagem da fila quando tem
+            // muito chamado com instrução. `<details>` nativo, sem JS extra.
+            <details
+              className="rounded-lg p-2.5"
               style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
             >
-              <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+              <summary className="text-xs font-bold cursor-pointer" style={{ color: "var(--text-primary)" }}>
                 ⚠ Instrução pro montador
-              </span>
-              <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-primary)" }}>
+              </summary>
+              <p className="text-sm whitespace-pre-line mt-1" style={{ color: "var(--text-primary)" }}>
                 {r.montadorInstruction}
               </p>
-            </div>
+            </details>
           ) : null}
           </div>
         );

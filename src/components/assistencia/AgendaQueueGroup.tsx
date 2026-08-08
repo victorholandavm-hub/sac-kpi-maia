@@ -3,8 +3,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { setAssistenciaOrderAction } from "@/app/assistencia/actions";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
-import { ROTA_LABELS } from "@/lib/rotas";
+import { REQUEST_TYPE_LABELS, REQUEST_TYPE_COLORS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { ROTA_LABELS, ROTA_COLORS } from "@/lib/rotas";
 import { StatusBadge } from "./StatusBadge";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
 
@@ -142,13 +142,19 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                   {r.rota ? (
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
+                      style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${ROTA_COLORS[r.rota]} 35%, var(--surface-1))` }}
                     >
                       {ROTA_LABELS[r.rota]}
                       {r.rotaExceptionNote ? " ⚠" : ""}
                     </span>
                   ) : null}
-                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                  <span
+                    className="text-sm font-medium px-1.5 py-0.5 rounded"
+                    style={{
+                      color: "var(--text-primary)",
+                      background: `color-mix(in srgb, ${REQUEST_TYPE_COLORS[r.type] ?? "var(--text-secondary)"} 20%, var(--surface-1))`,
+                    }}
+                  >
                     {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                   </span>
                   <span className="text-xs" style={{ color: "var(--text-muted)" }}>
