@@ -31,6 +31,7 @@ import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
 import { RequestPhotoUpload } from "@/components/assistencia/RequestPhotoUpload";
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
+import { RequestHistoryTimeline } from "@/components/assistencia/RequestHistoryTimeline";
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -168,239 +169,226 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
         <StatusStepper steps={REQUEST_STATUS_STEPS} currentKey={request.status === "remarcar" ? "em_andamento" : request.status} />
       ) : null}
 
-      <div
-        className="rounded-lg p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-      >
-        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Responsável pelo atendimento
-        </h3>
-        {isDeliveryType ? (
-          canManage ? (
-            <DriverNameField requestId={request.id} value={request.driverName} drivers={drivers} />
-          ) : (
-            <Row label="Nome do motorista" value={request.driverName ?? "Não definido"} />
-          )
-        ) : canManage ? (
-          <>
-            <AssemblerNameField requestId={request.id} requestType={request.type} value={request.assemblerName} assemblers={assemblers} />
-            <MontadorInstructionField requestId={request.id} value={request.montadorInstruction} />
-          </>
-        ) : (
-          <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
-        )}
-      </div>
+      {/* 2 colunas no desktop -- esquerda é leitura (cliente/pedido/produtos/
+          detalhes), direita é ação/acompanhamento (responsável, prazo, ações,
+          histórico). Empilha normal (uma coluna só) até "lg", igual sempre
+          foi no celular/tablet. */}
+      <div className="grid lg:grid-cols-2 gap-4 items-start">
+        <div className="flex flex-col gap-4">
+          <div
+            className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
+            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          >
+            <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
+              Pedido e cliente
+            </h3>
+            <Row label="Código do pedido/venda" value={request.orderCode} />
+            <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
+            <Row label="Vendedor(a)" value={request.sellerName} />
+            <Row label="Cliente" value={request.clientName} />
+            <Row label="CPF" value={request.clientCpf} />
+            <Row label="Telefone" value={request.clientPhone} />
+            <Row label="Endereço" value={formatFullAddress(request)} />
+            <Row label="Bairro" value={request.clientNeighborhood} />
+          </div>
 
-      {canManage ? (
-        <DeadlineActions
-          requestId={request.id}
-          requestedDeadline={request.requestedDeadline}
-          deadlineStatus={request.deadlineStatus}
-          approvedDeadline={request.approvedDeadline}
-        />
-      ) : null}
+          {canManage ? (
+            <RequestItemsTable
+              items={request.items}
+              requestId={request.id}
+              requestStatus={request.status}
+              requestType={request.type}
+              canEditValues={profile.fullName === PAYMENTS_CONTROLLER_NAME}
+              canEditItems={profile.role === "admin" || profile.role === "assistencia"}
+            />
+          ) : request.items.length > 0 ? (
+            <div
+              className="rounded-lg p-4 flex flex-col gap-2"
+              style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+            >
+              <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                Produtos
+              </span>
+              <ul className="flex flex-col gap-1">
+                {request.items.map((item) => (
+                  <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
+                    {item.completed ? (
+                      <span
+                        className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
+                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-good) 35%, var(--surface-1))" }}
+                      >
+                        ✓ Feito
+                      </span>
+                    ) : null}
+                    {item.action ? (
+                      <span
+                        className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
+                        style={{
+                          color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--text-primary)",
+                          background:
+                            item.action === "montar" ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))",
+                        }}
+                      >
+                        {item.action === "montar" ? "Montar" : "Desmontar"}
+                      </span>
+                    ) : null}
+                    {item.quantity > 1 ? `${item.quantity}x ` : ""}
+                    {item.product}
+                    {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
-      {canManage ? (
-        <RequestActions
-          requestId={request.id}
-          requestType={request.type}
-          status={request.status}
-          isAssignedToMe={request.assignedToId === profile.id}
-          hasAssignee={isDeliveryType ? !!request.driverName : !!request.assemblerName}
-          assigneeLabel={isDeliveryType ? "o motorista" : "o montador"}
-          hideClaim={isSacType}
-        />
-      ) : null}
-
-      <div
-        className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-      >
-        <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
-          Pedido e cliente
-        </h3>
-        <Row label="Código do pedido/venda" value={request.orderCode} />
-        <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
-        <Row label="Vendedor(a)" value={request.sellerName} />
-        <Row label="Cliente" value={request.clientName} />
-        <Row label="CPF" value={request.clientCpf} />
-        <Row label="Telefone" value={request.clientPhone} />
-        <Row label="Endereço" value={formatFullAddress(request)} />
-        <Row label="Bairro" value={request.clientNeighborhood} />
-      </div>
-
-      {canManage ? (
-        <RequestItemsTable
-          items={request.items}
-          requestId={request.id}
-          requestStatus={request.status}
-          requestType={request.type}
-          canEditValues={profile.fullName === PAYMENTS_CONTROLLER_NAME}
-          canEditItems={profile.role === "admin" || profile.role === "assistencia"}
-        />
-      ) : request.items.length > 0 ? (
-        <div
-          className="rounded-lg p-4 flex flex-col gap-2"
-          style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-        >
-          <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-            Produtos
-          </span>
-          <ul className="flex flex-col gap-1">
-            {request.items.map((item) => (
-              <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
-                {item.completed ? (
-                  <span
-                    className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
-                    style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-good) 35%, var(--surface-1))" }}
-                  >
-                    ✓ Feito
-                  </span>
-                ) : null}
-                {item.action ? (
-                  <span
-                    className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
-                    style={{
-                      color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--text-primary)",
-                      background: item.action === "montar" ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))",
-                    }}
-                  >
-                    {item.action === "montar" ? "Montar" : "Desmontar"}
-                  </span>
-                ) : null}
-                {item.quantity > 1 ? `${item.quantity}x ` : ""}
-                {item.product}
-                {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
-              </li>
-            ))}
-          </ul>
+          <div
+            className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
+            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          >
+            <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
+              Atendimento — o que a assistência precisa acompanhar
+            </h3>
+            <Row label="Motivo" value={request.reason} />
+            <Row label="Restrição / observação" value={request.restrictionNote} />
+            <Row label="Observações" value={request.notes} />
+            <Row label="Solicitado por" value={request.requestedByName} />
+            <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
+            {(request.type === "montagem" || request.type === "desmontagem") && !canManage ? (
+              <Row
+                label={request.type === "montagem" ? "Também precisa desmontar o antigo?" : "Também precisa montar o novo?"}
+                value={request.comboMontagemDesmontagem ? "Sim" : "Não"}
+              />
+            ) : null}
+            {request.type === "troca_produto" ? (
+              <Row label="Produto recolhido?" value={request.pickupCompleted ? "Sim" : "Ainda não"} />
+            ) : null}
+            {(request.type === "troca_produto" || request.type === "montagem") && request.deliveryRating !== null ? (
+              <Row
+                label={request.type === "montagem" ? "Nota do cliente — montagem" : "Nota do cliente — entrega"}
+                value={`${request.deliveryRating}/10`}
+              />
+            ) : null}
+            {(request.type === "troca_produto" || request.type === "montagem") && request.resolutionRating !== null ? (
+              <Row label="Nota do cliente — resolução do problema" value={`${request.resolutionRating}/10`} />
+            ) : null}
+            {canManage ? (
+              <ScheduleField
+                requestId={request.id}
+                scheduledDate={request.scheduledDate}
+                scheduledTime={request.scheduledTime}
+                shift={request.shift}
+                rota={request.rota}
+                rotaExceptionNote={request.rotaExceptionNote}
+                nextDatesByRota={nextDatesByRota}
+              />
+            ) : (
+              <Row
+                label="Visita agendada"
+                value={
+                  request.scheduledDate
+                    ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}${request.rota ? ` · rota ${ROTA_LABELS[request.rota]}` : ""}`
+                    : null
+                }
+              />
+            )}
+            <Row label="Prazo pedido" value={formatDateOnly(request.requestedDeadline)} />
+            <Row label="Status do prazo" value={DEADLINE_STATUS_LABELS[request.deadlineStatus]} />
+            <Row
+              label={request.deadlineStatus === "recusado" ? "Nova data proposta" : "Prazo aprovado"}
+              value={formatDateOnly(request.approvedDeadline)}
+            />
+            {request.type === "notificacao_externa" ? (
+              <>
+                <Row label="Protocolo" value={request.protocolNumber} />
+                {canManage ? (
+                  <SacCategoryField requestId={request.id} value={request.sacCategory} />
+                ) : (
+                  <Row label="Categoria SAC" value={request.sacCategory ? SAC_CATEGORY_LABELS[request.sacCategory] : null} />
+                )}
+                {canManage ? (
+                  <LegalDeadlineField requestId={request.id} legalDeadline={request.legalDeadline} />
+                ) : (
+                  <Row label="Prazo legal" value={formatDateOnly(request.legalDeadline)} />
+                )}
+              </>
+            ) : null}
+            <Row label="Criada em" value={formatDateTimeBr(request.createdAt)} />
+            {request.completedAt ? <Row label="Encerrada em" value={formatDateTimeBr(request.completedAt)} /> : null}
+          </div>
         </div>
-      ) : null}
 
-      <div
-        className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-      >
-        <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
-          Atendimento — o que a assistência precisa acompanhar
-        </h3>
-        <Row label="Motivo" value={request.reason} />
-        <Row label="Restrição / observação" value={request.restrictionNote} />
-        <Row label="Observações" value={request.notes} />
-        <Row label="Solicitado por" value={request.requestedByName} />
-        <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
-        {(request.type === "montagem" || request.type === "desmontagem") && !canManage ? (
-          <Row
-            label={request.type === "montagem" ? "Também precisa desmontar o antigo?" : "Também precisa montar o novo?"}
-            value={request.comboMontagemDesmontagem ? "Sim" : "Não"}
-          />
-        ) : null}
-        {request.type === "troca_produto" ? (
-          <Row label="Produto recolhido?" value={request.pickupCompleted ? "Sim" : "Ainda não"} />
-        ) : null}
-        {(request.type === "troca_produto" || request.type === "montagem") && request.deliveryRating !== null ? (
-          <Row
-            label={request.type === "montagem" ? "Nota do cliente — montagem" : "Nota do cliente — entrega"}
-            value={`${request.deliveryRating}/10`}
-          />
-        ) : null}
-        {(request.type === "troca_produto" || request.type === "montagem") && request.resolutionRating !== null ? (
-          <Row label="Nota do cliente — resolução do problema" value={`${request.resolutionRating}/10`} />
-        ) : null}
-        {canManage ? (
-          <ScheduleField
-            requestId={request.id}
-            scheduledDate={request.scheduledDate}
-            scheduledTime={request.scheduledTime}
-            shift={request.shift}
-            rota={request.rota}
-            rotaExceptionNote={request.rotaExceptionNote}
-            nextDatesByRota={nextDatesByRota}
-          />
-        ) : (
-          <Row
-            label="Visita agendada"
-            value={
-              request.scheduledDate
-                ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}${request.rota ? ` · rota ${ROTA_LABELS[request.rota]}` : ""}`
-                : null
-            }
-          />
-        )}
-        <Row label="Prazo pedido" value={formatDateOnly(request.requestedDeadline)} />
-        <Row label="Status do prazo" value={DEADLINE_STATUS_LABELS[request.deadlineStatus]} />
-        <Row
-          label={request.deadlineStatus === "recusado" ? "Nova data proposta" : "Prazo aprovado"}
-          value={formatDateOnly(request.approvedDeadline)}
-        />
-        {request.type === "notificacao_externa" ? (
-          <>
-            <Row label="Protocolo" value={request.protocolNumber} />
-            {canManage ? (
-              <SacCategoryField requestId={request.id} value={request.sacCategory} />
+        <div className="flex flex-col gap-4">
+          <div
+            className="rounded-lg p-4 flex flex-col gap-2"
+            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          >
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              Responsável pelo atendimento
+            </h3>
+            {isDeliveryType ? (
+              canManage ? (
+                <DriverNameField requestId={request.id} value={request.driverName} drivers={drivers} />
+              ) : (
+                <Row label="Nome do motorista" value={request.driverName ?? "Não definido"} />
+              )
+            ) : canManage ? (
+              <>
+                <AssemblerNameField requestId={request.id} requestType={request.type} value={request.assemblerName} assemblers={assemblers} />
+                <MontadorInstructionField requestId={request.id} value={request.montadorInstruction} />
+              </>
             ) : (
-              <Row label="Categoria SAC" value={request.sacCategory ? SAC_CATEGORY_LABELS[request.sacCategory] : null} />
+              <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
             )}
-            {canManage ? (
-              <LegalDeadlineField requestId={request.id} legalDeadline={request.legalDeadline} />
-            ) : (
-              <Row label="Prazo legal" value={formatDateOnly(request.legalDeadline)} />
-            )}
-          </>
-        ) : null}
-        <Row label="Criada em" value={formatDateTimeBr(request.createdAt)} />
-        {request.completedAt ? (
-          <Row label="Encerrada em" value={formatDateTimeBr(request.completedAt)} />
-        ) : null}
-      </div>
+          </div>
 
-      {canManage && (request.type === "montagem" || request.type === "desmontagem") ? (
-        <ComboMontagemDesmontagemField requestId={request.id} type={request.type} value={request.comboMontagemDesmontagem} />
-      ) : null}
+          {canManage ? (
+            <DeadlineActions
+              requestId={request.id}
+              requestedDeadline={request.requestedDeadline}
+              deadlineStatus={request.deadlineStatus}
+              approvedDeadline={request.approvedDeadline}
+            />
+          ) : null}
 
-      {canManage && request.type === "notificacao_externa" ? (
-        <EscalationRiskToggle requestId={request.id} atRisk={request.escalationRisk} />
-      ) : null}
+          {canManage ? (
+            <RequestActions
+              requestId={request.id}
+              requestType={request.type}
+              status={request.status}
+              isAssignedToMe={request.assignedToId === profile.id}
+              hasAssignee={isDeliveryType ? !!request.driverName : !!request.assemblerName}
+              assigneeLabel={isDeliveryType ? "o motorista" : "o montador"}
+              hideClaim={isSacType}
+            />
+          ) : null}
 
-      <div
-        className="rounded-lg p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-      >
-        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Histórico
-        </h3>
-        {events.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Sem eventos registrados.
-          </p>
-        ) : (
-          <ul className="flex flex-col">
-            {events.map((event, i) => (
-              <li key={event.id} className="flex gap-3">
-                {/* Bolinha + linha vertical conectando ao próximo evento --
-                    último item não tem linha embaixo. */}
-                <div className="flex flex-col items-center shrink-0">
-                  <div className="w-2.5 h-2.5 rounded-full mt-1.5" style={{ background: "var(--brand-green)" }} />
-                  {i < events.length - 1 ? <div className="w-px flex-1" style={{ background: "var(--gridline)" }} /> : null}
-                </div>
-                <div className="flex flex-col gap-0.5 pb-4 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-                      <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{event.actorName ?? "Alguém"}</strong>{" "}
-                      {eventAction(event)}
-                    </span>
-                  </div>
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>{formatDateTimeBr(event.createdAt)}</span>
-                  {event.note ? (
-                    <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                      {event.note}
-                    </p>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+          {canManage && (request.type === "montagem" || request.type === "desmontagem") ? (
+            <ComboMontagemDesmontagemField requestId={request.id} type={request.type} value={request.comboMontagemDesmontagem} />
+          ) : null}
+
+          {canManage && request.type === "notificacao_externa" ? (
+            <EscalationRiskToggle requestId={request.id} atRisk={request.escalationRisk} />
+          ) : null}
+
+          <div
+            className="rounded-lg p-4 flex flex-col gap-3"
+            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          >
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              Histórico
+            </h3>
+            <RequestHistoryTimeline
+              events={events.map((event) => ({
+                id: event.id,
+                eventType: event.eventType,
+                note: event.note,
+                createdAt: event.createdAt,
+                actorName: event.actorName,
+                actionText: eventAction(event),
+              }))}
+            />
+          </div>
+        </div>
       </div>
 
       <div

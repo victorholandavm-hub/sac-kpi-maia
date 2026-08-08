@@ -75,7 +75,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
 
   return (
     <ToastProvider>
-    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-4 w-full min-w-0">
+    <div className="max-w-5xl mx-auto p-6 flex flex-col gap-4 w-full min-w-0">
       <RealtimeQueueRefresher requestId={pedido.id} table="pedidos_encomenda" eventsTable="pedido_encomenda_events" eventsIdColumn="pedido_id" />
 
       <Link href="/assistencia/encomendas/fila" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
@@ -121,80 +121,94 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         </div>
       ) : null}
 
-      <FormSection title="Produtos">
-        <ul className="flex flex-col gap-1">
-          {pedido.items.map((item) => (
-            <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
-              {item.quantidade}x {item.produtoDescricao}
-            </li>
-          ))}
-        </ul>
-      </FormSection>
+      {/* 2 colunas no desktop -- esquerda é leitura (produtos/detalhes/cupom),
+          direita é ação/acompanhamento (status, prazos, histórico). Empilha
+          normal (uma coluna só) até "lg". */}
+      <div className="grid lg:grid-cols-2 gap-4 items-start">
+        <div className="flex flex-col gap-4">
+          <FormSection title="Produtos">
+            <ul className="flex flex-col gap-1">
+              {pedido.items.map((item) => (
+                <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
+                  {item.quantidade}x {item.produtoDescricao}
+                </li>
+              ))}
+            </ul>
+          </FormSection>
 
-      <FormSection title="Detalhes do pedido">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Row label="Fornecedor" value={fornecedorLabel} />
-          <Row label="Solicitado por" value={pedido.requestedByName} />
-          <Row label="Vendedor" value={pedido.vendedorName} />
-          <Row label="Código do cliente" value={pedido.clienteCodigo} />
-          <Row label="Criado em" value={formatDateTimeBr(pedido.createdAt)} />
-          <Row label="Carga" value={pedido.carga} />
-          <Row label="NF-e" value={pedido.nfE} />
-          <Row label="Observações" value={pedido.notes} />
+          <FormSection title="Detalhes do pedido">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Row label="Fornecedor" value={fornecedorLabel} />
+              <Row label="Solicitado por" value={pedido.requestedByName} />
+              <Row label="Vendedor" value={pedido.vendedorName} />
+              <Row label="Código do cliente" value={pedido.clienteCodigo} />
+              <Row label="Criado em" value={formatDateTimeBr(pedido.createdAt)} />
+              <Row label="Carga" value={pedido.carga} />
+              <Row label="NF-e" value={pedido.nfE} />
+              <Row label="Observações" value={pedido.notes} />
+            </div>
+          </FormSection>
+
+          {photos.length > 0 ? (
+            <FormSection title="Cupom fiscal">
+              <div className="flex flex-wrap gap-2">
+                {photos.map((p) => (
+                  <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p.url}
+                      alt="Cupom fiscal"
+                      className="h-32 w-32 object-cover rounded border"
+                      style={{ borderColor: "var(--border)" }}
+                    />
+                  </a>
+                ))}
+              </div>
+            </FormSection>
+          ) : null}
         </div>
-      </FormSection>
 
-      {photos.length > 0 ? (
-        <FormSection title="Cupom fiscal">
-          <div className="flex flex-wrap gap-2">
-            {photos.map((p) => (
-              <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.url} alt="Cupom fiscal" className="h-32 w-32 object-cover rounded border" style={{ borderColor: "var(--border)" }} />
-              </a>
-            ))}
-          </div>
-        </FormSection>
-      ) : null}
+        <div className="flex flex-col gap-4">
+          <PedidoEncomendaActions
+            pedidoId={pedido.id}
+            status={pedido.status}
+            role={actor.role}
+            storeId={pedido.storeId}
+            prazoFabricaCd={pedido.prazoFabricaCd}
+            prazoCdLoja={pedido.prazoCdLoja}
+            fornecedorTipo={pedido.fornecedorTipo}
+            fabricaId={pedido.fabricaId}
+            fornecedorExterno={pedido.fornecedorExterno}
+            matchesFabrica={matchesFabrica}
+            undoTarget={undoTarget}
+          >
+            <div className="grid sm:grid-cols-2 gap-4">
+              <PedidoPrazoField
+                pedidoId={pedido.id}
+                field="fabrica_cd"
+                label="Prazo fábrica → CD"
+                value={pedido.prazoFabricaCd}
+                canEdit={
+                  actor.role === "admin" ||
+                  actor.role === "assistencia" ||
+                  (externo ? actor.role === "cd" : actor.role === "fabrica" && matchesFabrica)
+                }
+              />
+              <PedidoPrazoField
+                pedidoId={pedido.id}
+                field="cd_loja"
+                label="Prazo CD → loja"
+                value={pedido.prazoCdLoja}
+                canEdit={actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia"}
+              />
+            </div>
+          </PedidoEncomendaActions>
 
-      <PedidoEncomendaActions
-        pedidoId={pedido.id}
-        status={pedido.status}
-        role={actor.role}
-        storeId={pedido.storeId}
-        prazoFabricaCd={pedido.prazoFabricaCd}
-        prazoCdLoja={pedido.prazoCdLoja}
-        fornecedorTipo={pedido.fornecedorTipo}
-        fabricaId={pedido.fabricaId}
-        fornecedorExterno={pedido.fornecedorExterno}
-        matchesFabrica={matchesFabrica}
-        undoTarget={undoTarget}
-      >
-        <div className="grid sm:grid-cols-2 gap-4">
-          <PedidoPrazoField
-            pedidoId={pedido.id}
-            field="fabrica_cd"
-            label="Prazo fábrica → CD"
-            value={pedido.prazoFabricaCd}
-            canEdit={
-              actor.role === "admin" ||
-              actor.role === "assistencia" ||
-              (externo ? actor.role === "cd" : actor.role === "fabrica" && matchesFabrica)
-            }
-          />
-          <PedidoPrazoField
-            pedidoId={pedido.id}
-            field="cd_loja"
-            label="Prazo CD → loja"
-            value={pedido.prazoCdLoja}
-            canEdit={actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia"}
-          />
+          <FormSection title="Histórico">
+            <PedidoEncomendaTimeline events={events} />
+          </FormSection>
         </div>
-      </PedidoEncomendaActions>
-
-      <FormSection title="Histórico">
-        <PedidoEncomendaTimeline events={events} />
-      </FormSection>
+      </div>
     </div>
     </ToastProvider>
   );
