@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { getMontadorSession } from "@/app/assistencia/montador-actions";
+import { MONTADOR_COOKIE_NAME, verifyMontadorSession } from "@/lib/montadorAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { saveRequestPhoto } from "@/lib/servicePhotos";
 
@@ -10,15 +11,20 @@ import { saveRequestPhoto } from "@/lib/servicePhotos";
 // (ver NavigationProgressBar.tsx). Server Actions dependem desse mesmo tipo
 // de resposta especial (RSC em stream); um POST comum com resposta JSON
 // simples é bem mais compatível com esse navegador restrito.
+//
+// Importante: NÃO importar getMontadorSession de montador-actions.ts (arquivo
+// "use server") aqui -- isso prendia essa rota inteira na maquinaria de
+// resolução de Server Action do Next (toda requisição virava um redirect 307
+// pra "/assistencia" antes até de entrar nessa função, sem log nenhum
+// aparecer -- foi isso que causava o "erro 500" que o montador via). Lê o
+// cookie direto, com os mesmos helpers puros de @/lib/montadorAuth que
+// montador-actions.ts também usa por baixo.
 export async function POST(req: NextRequest) {
-  // Diagnóstico temporário -- montador reportando erro 500 sem mensagem
-  // específica (indício de algo estourando FORA do try/catch abaixo, que já
-  // devolve JSON com detalhe). Envolve a rota inteira, loga qualquer exceção
-  // não prevista com stack completo, pra aparecer certinho no `pm2 logs`.
   try {
     console.log("[montador-upload] request recebida");
 
-    const assemblerName = await getMontadorSession();
+    const cookieStore = await cookies();
+    const assemblerName = verifyMontadorSession(cookieStore.get(MONTADOR_COOKIE_NAME)?.value);
     if (!assemblerName) {
       return NextResponse.json({ error: "Sessão expirada. Faça login de novo." }, { status: 401 });
     }
