@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getMontadorSession } from "@/app/assistencia/montador-actions";
-import { getAssemblerRequestDetail, montadorEffectiveDate, formatFullAddress } from "@/lib/serviceRequests";
+import { getAssemblerRequestDetail, montadorEffectiveDate, formatFullAddress, isMostruarioRequest } from "@/lib/serviceRequests";
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
@@ -197,7 +197,11 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               Ações
             </h3>
-            <MontadorRequestActions requestId={request.id} items={request.items} />
+            <MontadorRequestActions
+              requestId={request.id}
+              items={request.items}
+              isMostruario={isMostruarioRequest(request.orderCode, request.clientName)}
+            />
           </div>
         ) : null}
       </div>

@@ -4,8 +4,10 @@ import {
   listOpenRequestsForLoja,
   listOpenMontagemQueueIds,
   listStores,
+  isMostruarioRequest,
   type DeadlineStatus,
 } from "@/lib/serviceRequests";
+import { LojaGerenteRatingPrompt } from "@/components/assistencia/LojaGerenteRatingPrompt";
 import { getLojaStorePreference } from "@/app/assistencia/actions";
 import { getLojaGerenteSession, lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
@@ -199,10 +201,16 @@ export default async function LojaHomePage({
               const isOwnRequest = r.requestedByName === gerenteName;
               const position = montagemPosition.get(r.id);
               const dateLabel = new Date(showCompleted ? (r.completedAt ?? r.createdAt) : r.createdAt).toLocaleDateString("pt-BR");
+              // Mostruário concluído, pedido por esse gerente, ainda sem
+              // nota -- o montador pulou a avaliação na hora (ver
+              // MontadorRequestActions.tsx), fica pendente aqui até o
+              // gerente avaliar quando quiser.
+              const needsGerenteRating =
+                showCompleted && isOwnRequest && r.deliveryRating === null && isMostruarioRequest(r.orderCode, r.clientName);
               return (
                 <div
                   key={r.id}
-                  className={isOwnRequest ? "flex items-start gap-3 p-4 rounded-lg m-2" : "flex items-start gap-3 p-4"}
+                  className={isOwnRequest ? "flex items-start gap-3 p-4 rounded-lg m-2 flex-wrap" : "flex items-start gap-3 p-4 flex-wrap"}
                   style={
                     isOwnRequest
                       ? { background: "var(--brand-green-soft)", border: "2px solid var(--brand-green)" }
@@ -297,6 +305,11 @@ export default async function LojaHomePage({
                     ) : null}
                   </div>
                   </div>
+                  {needsGerenteRating ? (
+                    <div className="w-full pt-2">
+                      <LojaGerenteRatingPrompt requestId={r.id} />
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

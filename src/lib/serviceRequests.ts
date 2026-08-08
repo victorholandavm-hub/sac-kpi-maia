@@ -31,6 +31,16 @@ export function isShift(value: string | undefined | null): value is Shift {
   return !!value && (SHIFTS as string[]).includes(value);
 }
 
+// Chamado de "Mostruário" -- a loja monta/desmonta um item de exposição
+// própria, sem cliente real (client_name vira "Mostruário — <Loja>",
+// endereço/telefone ficam null por design). Mesmo critério usado em
+// EditServiceRequestForm.tsx/PublicRequestForm.tsx, centralizado aqui pra
+// não duplicar (ver montador-actions.ts/loja/page.tsx, que também
+// precisam disso pra pular a avaliação do "cliente").
+export function isMostruarioRequest(orderCode: string | null | undefined, clientName: string | null | undefined): boolean {
+  return !orderCode && (clientName ?? "").startsWith("Mostruário — ");
+}
+
 export function isRequestStatus(value: string | undefined | null): value is RequestStatus {
   return !!value && (REQUEST_STATUSES as string[]).includes(value);
 }
@@ -468,6 +478,7 @@ export type OpenRequestForLoja = {
   status: RequestStatus;
   storeId: string;
   storeName: string;
+  orderCode: string | null;
   clientName: string | null;
   clientPhone: string | null;
   clientNeighborhood: string | null;
@@ -481,6 +492,8 @@ export type OpenRequestForLoja = {
   assemblerName: string | null;
   driverName: string | null;
   requestedByName: string | null;
+  deliveryRating: number | null;
+  resolutionRating: number | null;
 };
 
 const OPEN_LOJA_LIMIT = 200;
@@ -498,7 +511,7 @@ export async function listOpenRequestsForLoja(
   let query = admin
     .from("service_requests")
     .select(
-      "id, ticket_number, type, status, store_id, client_name, client_phone, client_neighborhood, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, stores(name), items:service_request_items(product, quantity, part_code, item_action)"
+      "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, delivery_rating, resolution_rating, stores(name), items:service_request_items(product, quantity, part_code, item_action)"
     )
     .limit(OPEN_LOJA_LIMIT);
 
@@ -528,6 +541,7 @@ export async function listOpenRequestsForLoja(
     type: RequestType;
     status: RequestStatus;
     store_id: string;
+    order_code: string | null;
     client_name: string | null;
     client_phone: string | null;
     client_neighborhood: string | null;
@@ -539,6 +553,8 @@ export async function listOpenRequestsForLoja(
     assembler_name: string | null;
     driver_name: string | null;
     requested_by_name: string | null;
+    delivery_rating: number | null;
+    resolution_rating: number | null;
     stores: { name: string } | null;
     items: { product: string; quantity: number; part_code: string | null; item_action: string | null }[] | null;
   };
@@ -550,6 +566,7 @@ export async function listOpenRequestsForLoja(
     status: row.status,
     storeId: row.store_id,
     storeName: row.stores?.name ?? "—",
+    orderCode: row.order_code,
     requestedDeadline: row.requested_deadline,
     deadlineStatus: row.deadline_status,
     approvedDeadline: row.approved_deadline,
@@ -568,6 +585,8 @@ export async function listOpenRequestsForLoja(
     assemblerName: row.assembler_name,
     driverName: row.driver_name,
     requestedByName: row.requested_by_name,
+    deliveryRating: row.delivery_rating,
+    resolutionRating: row.resolution_rating,
   }));
 }
 
@@ -675,6 +694,7 @@ export type AssemblerRequestView = {
   type: RequestType;
   status: RequestStatus;
   storeName: string;
+  orderCode: string | null;
   clientName: string | null;
   clientPhone: string | null;
   clientAddress: string | null;
@@ -717,13 +737,14 @@ const ASSEMBLER_VIEW_LIMIT = 200;
 // escreve (ver setMontadorInstruction em actions.ts), pensado justamente
 // pra aparecer aqui -- não tem o mesmo risco do Motivo do gerente.
 const ASSEMBLER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, montador_instruction, stores(name), items:service_request_items(id, product, quantity, item_action, completed)";
+  "id, ticket_number, type, status, order_code, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, montador_instruction, stores(name), items:service_request_items(id, product, quantity, item_action, completed)";
 
 type AssemblerViewRow = {
   id: string;
   ticket_number: number;
   type: RequestType;
   status: RequestStatus;
+  order_code: string | null;
   client_name: string | null;
   client_phone: string | null;
   client_address: string | null;
@@ -751,6 +772,7 @@ function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
     type: row.type,
     status: row.status,
     storeName: row.stores?.name ?? "—",
+    orderCode: row.order_code,
     clientName: row.client_name,
     clientPhone: row.client_phone,
     clientAddress: row.client_address,

@@ -13,7 +13,18 @@ import type { AssemblerRequestItem } from "@/lib/serviceRequests";
 
 type Mode = null | "complete" | "rating" | "issue" | "partial";
 
-export function MontadorRequestActions({ requestId, items }: { requestId: string; items: AssemblerRequestItem[] }) {
+export function MontadorRequestActions({
+  requestId,
+  items,
+  isMostruario,
+}: {
+  requestId: string;
+  items: AssemblerRequestItem[];
+  // Mostruário é item de exposição da própria loja -- não tem cliente pra
+  // virar o celular. A avaliação, nesse caso, fica pro gerente que pediu
+  // fazer depois, na própria tela dele (ver loja/page.tsx), não aqui.
+  isMostruario: boolean;
+}) {
   const { pending, run, showToast } = useQuickAction();
   const [mode, setMode] = useState<Mode>(null);
   const [issueReason, setIssueReason] = useState("");
@@ -124,7 +135,7 @@ export function MontadorRequestActions({ requestId, items }: { requestId: string
           <div className="flex items-center gap-2">
             <button
               disabled={pending}
-              onClick={() => setMode("rating")}
+              onClick={() => (isMostruario ? finishComplete(false) : setMode("rating"))}
               className="text-sm rounded-lg px-3 py-2.5 font-medium disabled:opacity-60 flex-1"
               style={{ background: "var(--status-good)", color: "#fff" }}
             >
