@@ -3,7 +3,7 @@ import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listScheduledRequests, agendaEffectiveDate, type ServiceRequestSummary, type AgendaRange } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
-import { AgendaQueueGroup } from "@/components/assistencia/AgendaQueueGroup";
+import { AgendaDayGroups } from "@/components/assistencia/AgendaDayGroups";
 import { ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
 
 function groupByDate(requests: ServiceRequestSummary[]) {
@@ -128,41 +128,7 @@ export default async function AgendaPage({
           </p>
         </div>
       ) : (
-        groups.map((group) => {
-          // Data no passado só é "atrasado" de verdade se ainda sobrar
-          // trabalho pendente no dia -- um grupo onde tudo já foi concluído
-          // (ou cancelado) não devia carregar o selo vermelho, senão toda
-          // montagem já feita parece atrasada só por estar num dia antigo.
-          const hasPending = group.items.some((r) => r.status !== "concluida" && r.status !== "cancelada");
-          const isOverdue = group.dateKey < todayKey && hasPending;
-          return (
-            <div key={group.dateKey} className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
-              <div className="px-4 py-2 flex items-center gap-2 flex-wrap" style={{ background: "var(--brand-green)" }}>
-                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--brand-green-ink)" }}>
-                  {group.label}
-                </span>
-                {group.dateKey === todayKey ? (
-                  <span
-                    className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                    style={{ color: "var(--text-primary)", background: "var(--surface-1)" }}
-                  >
-                    HOJE
-                  </span>
-                ) : isOverdue ? (
-                  <span
-                    className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                    style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 45%, var(--surface-1))" }}
-                  >
-                    ATRASADO
-                  </span>
-                ) : null}
-              </div>
-              <div style={{ background: "var(--surface-1)" }}>
-                <AgendaQueueGroup items={group.items} isOverdue={isOverdue} />
-              </div>
-            </div>
-          );
-        })
+        <AgendaDayGroups groups={groups} todayKey={todayKey} />
       )}
     </div>
   );

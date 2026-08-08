@@ -1070,6 +1070,11 @@ export async function listScheduledRequests(
     if (orderA === null && orderB !== null) return 1;
     const shiftCompare = (SHIFT_ORDER[a.shift ?? "dia"] ?? 99) - (SHIFT_ORDER[b.shift ?? "dia"] ?? 99);
     if (shiftCompare !== 0) return shiftCompare;
+    // Sem ordem manual, dentro do mesmo turno: agrupa por bairro antes do
+    // horário -- ajuda a planejar a rota de despacho (visitas próximas
+    // ficam juntas na lista), sem bagunçar o agrupamento por turno em si.
+    const neighborhoodCompare = (a.clientNeighborhood ?? "").localeCompare(b.clientNeighborhood ?? "");
+    if (neighborhoodCompare !== 0) return neighborhoodCompare;
     return (a.scheduledTime ?? "").localeCompare(b.scheduledTime ?? "");
   });
 }
