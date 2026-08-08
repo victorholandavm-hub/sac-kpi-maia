@@ -58,7 +58,10 @@ export async function driverSignIn(_state: DriverFormState, formData: FormData):
     secure: true,
     sameSite: "lax",
     maxAge: DRIVER_SESSION_MAX_AGE,
-    path: "/assistencia/motorista",
+    // Path "/" (era "/assistencia/motorista") -- mesma armadilha do
+    // montador (ver comentário em montador-actions.ts): /api/motorista/upload-photo
+    // é rota irmã, fora do escopo antigo, então o cookie nunca chegava lá.
+    path: "/",
   });
 
   redirect("/assistencia/motorista");
@@ -66,7 +69,7 @@ export async function driverSignIn(_state: DriverFormState, formData: FormData):
 
 export async function driverSignOut() {
   const cookieStore = await cookies();
-  cookieStore.delete({ name: DRIVER_COOKIE_NAME, path: "/assistencia/motorista" });
+  cookieStore.delete({ name: DRIVER_COOKIE_NAME, path: "/" });
   redirect("/assistencia/motorista/login");
 }
 

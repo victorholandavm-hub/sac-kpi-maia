@@ -20,8 +20,22 @@ export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
       // Actions usam (ver comentário em NavigationProgressBar.tsx). Rota
       // tradicional com resposta JSON simples é bem mais compatível.
       const res = await fetch("/api/montador/upload-photo", { method: "POST", body: formData });
-      const data: { error?: string } = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Não foi possível enviar a foto.");
+      // Lê como texto primeiro (só dá pra ler o corpo uma vez) -- se não for
+      // JSON válido, é sinal de que a resposta nem chegou na nossa rota (ex.:
+      // nginx/proxy barrando antes, devolvendo página de erro HTML). Nesses
+      // casos mostra o status HTTP na mensagem em vez de um erro genérico
+      // mudo, pra dar pista de diagnóstico sem precisar de devtools no
+      // celular do montador.
+      const raw = await res.text();
+      let data: { error?: string } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        // não era JSON -- segue com data vazio, cai no fallback abaixo
+      }
+      if (!res.ok) {
+        throw new Error(data.error || `Não foi possível enviar a foto (erro ${res.status}).`);
+      }
       setCaption("");
       setInputKey((k) => k + 1);
     }, "Foto enviada.");

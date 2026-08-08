@@ -60,7 +60,13 @@ export async function montadorSignIn(_state: MontadorFormState, formData: FormDa
     secure: true,
     sameSite: "lax",
     maxAge: MONTADOR_SESSION_MAX_AGE,
-    path: "/assistencia/montador",
+    // Path "/" (era "/assistencia/montador") -- a rota de upload de foto
+    // (/api/montador/upload-photo, ver route.ts) é uma path irmã, fora do
+    // escopo antigo, então o navegador nunca mandava esse cookie nela e a
+    // rota sempre via "sem sessão". Mesma armadilha já documentada nesse
+    // projeto: usar o prefixo mínimo comum entre todas as rotas que
+    // precisam ler o cookie -- aqui isso é a raiz mesmo.
+    path: "/",
   });
 
   redirect("/assistencia/montador");
@@ -68,7 +74,7 @@ export async function montadorSignIn(_state: MontadorFormState, formData: FormDa
 
 export async function montadorSignOut() {
   const cookieStore = await cookies();
-  cookieStore.delete({ name: MONTADOR_COOKIE_NAME, path: "/assistencia/montador" });
+  cookieStore.delete({ name: MONTADOR_COOKIE_NAME, path: "/" });
   redirect("/assistencia/montador/login");
 }
 

@@ -17,8 +17,20 @@ export function MotoristaPhotoUpload({ requestId }: { requestId: string }) {
       // POST comum em vez de Server Action -- mesmo motivo do
       // MontadorPhotoUpload.tsx (navegador embutido do WhatsApp).
       const res = await fetch("/api/motorista/upload-photo", { method: "POST", body: formData });
-      const data: { error?: string } = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Não foi possível enviar a foto.");
+      // Ver comentário equivalente em MontadorPhotoUpload.tsx -- inclui o
+      // status HTTP na mensagem quando a resposta não é JSON (proxy barrando
+      // antes de chegar na nossa rota), pra dar pista sem precisar de
+      // devtools no celular do motorista.
+      const raw = await res.text();
+      let data: { error?: string } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        // não era JSON -- segue com data vazio, cai no fallback abaixo
+      }
+      if (!res.ok) {
+        throw new Error(data.error || `Não foi possível enviar a foto (erro ${res.status}).`);
+      }
       setCaption("");
       setInputKey((k) => k + 1);
     }, "Foto enviada.");
