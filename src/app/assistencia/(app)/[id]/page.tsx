@@ -15,6 +15,7 @@ import {
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { StatusStepper } from "@/components/assistencia/StatusStepper";
 import { RequestActions } from "@/components/assistencia/RequestActions";
+import { MobileActionSheet } from "@/components/assistencia/MobileActionSheet";
 import { DeadlineActions } from "@/components/assistencia/DeadlineActions";
 import { AssemblerNameField } from "@/components/assistencia/AssemblerNameField";
 import { MontadorInstructionField } from "@/components/assistencia/MontadorInstructionField";
@@ -351,15 +352,17 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
           ) : null}
 
           {canManage ? (
-            <RequestActions
-              requestId={request.id}
-              requestType={request.type}
-              status={request.status}
-              isAssignedToMe={request.assignedToId === profile.id}
-              hasAssignee={isDeliveryType ? !!request.driverName : !!request.assemblerName}
-              assigneeLabel={isDeliveryType ? "o motorista" : "o montador"}
-              hideClaim={isSacType}
-            />
+            <MobileActionSheet>
+              <RequestActions
+                requestId={request.id}
+                requestType={request.type}
+                status={request.status}
+                isAssignedToMe={request.assignedToId === profile.id}
+                hasAssignee={isDeliveryType ? !!request.driverName : !!request.assemblerName}
+                assigneeLabel={isDeliveryType ? "o motorista" : "o montador"}
+                hideClaim={isSacType}
+              />
+            </MobileActionSheet>
           ) : null}
 
           {canManage && (request.type === "montagem" || request.type === "desmontagem") ? (
