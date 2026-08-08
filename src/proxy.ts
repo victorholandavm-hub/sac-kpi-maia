@@ -50,5 +50,12 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/ghl-webhook|api/sync|api/backup|api/totvs-sync|_next/static|_next/image|favicon.ico|icon.png|logo.png).*)"],
+  // api/montador/upload-photo e api/motorista/upload-photo faltavam aqui --
+  // sem a exceção, qualquer instância com ASSISTENCIA_ONLY_PROJECT (ex.: a
+  // VPS) redirecionava essas rotas pra "/assistencia" antes delas rodarem,
+  // fazendo o upload de foto do montador/motorista falhar sempre (307 em vez
+  // de chegar na rota de verdade -- achado com curl direto em produção).
+  matcher: [
+    "/((?!api/ghl-webhook|api/sync|api/backup|api/totvs-sync|api/montador/upload-photo|api/motorista/upload-photo|_next/static|_next/image|favicon.ico|icon.png|logo.png).*)",
+  ],
 };
