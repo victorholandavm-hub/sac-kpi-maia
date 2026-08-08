@@ -7,25 +7,13 @@ import { useQuickAction } from "./useQuickAction";
 import { PedidoEncomendaStatusBadge } from "./PedidoEncomendaStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
+import { prazoUrgencyStyle } from "@/lib/prazoStyle";
 import type { PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
 
 // Único status de origem elegível pra seleção em lote hoje: fábrica termina a
 // produção de vários pedidos e marca todos como "enviado para o CD" de uma
 // vez, em vez de abrir pedido por pedido (ver bulkMarkEnviadoParaCD).
 const BULK_ELIGIBLE_STATUS = "em_producao";
-
-// Vermelho quando já venceu ou vence hoje/amanhã -- é a informação mais
-// crítica pra quem despacha, não devia ter o mesmo peso visual de um prazo
-// folgado. Compara só a data (sem hora), sempre no fuso local do navegador
-// (prazoFabricaCd/prazoCdLoja são "date", sem componente de hora mesmo).
-function prazoStyle(dateStr: string): React.CSSProperties {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const prazo = new Date(`${dateStr}T00:00:00`);
-  const diffDays = Math.round((prazo.getTime() - today.getTime()) / 86_400_000);
-  if (diffDays <= 1) return { color: "var(--status-critical)", fontWeight: 700 };
-  return { color: "var(--status-good)", fontWeight: 600 };
-}
 
 export function PedidoEncomendaFilaList({
   pedidos,
@@ -149,12 +137,12 @@ export function PedidoEncomendaFilaList({
                     </span>
                     <span>Pedido por {p.requestedByName}</span>
                     {p.prazoFabricaCd ? (
-                      <span style={prazoStyle(p.prazoFabricaCd)}>
+                      <span style={prazoUrgencyStyle(p.prazoFabricaCd)}>
                         🕐 Prazo p/ CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : null}
                     {p.prazoCdLoja ? (
-                      <span style={prazoStyle(p.prazoCdLoja)}>
+                      <span style={prazoUrgencyStyle(p.prazoCdLoja)}>
                         🕐 Prazo p/ loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : null}

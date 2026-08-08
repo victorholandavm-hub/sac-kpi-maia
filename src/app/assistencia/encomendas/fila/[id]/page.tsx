@@ -12,6 +12,7 @@ import { FormSection } from "@/components/assistencia/FormSection";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { StatusStepper } from "@/components/assistencia/StatusStepper";
 import { PEDIDO_ENCOMENDA_STATUS_STEPS } from "@/lib/assistenciaLabels";
+import { prazoUrgencyStyle } from "@/lib/prazoStyle";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +94,31 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
 
       {pedido.status !== "cancelado" && pedido.status !== "negado" ? (
         <StatusStepper steps={PEDIDO_ENCOMENDA_STATUS_STEPS} currentKey={pedido.status} />
+      ) : null}
+
+      {pedido.prazoFabricaCd || pedido.prazoCdLoja ? (
+        <div className="rounded-lg p-4 grid sm:grid-cols-2 gap-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+          {pedido.prazoFabricaCd ? (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Prazo fábrica → CD
+              </span>
+              <span className="text-xl" style={prazoUrgencyStyle(pedido.prazoFabricaCd)}>
+                🕐 {new Date(`${pedido.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
+              </span>
+            </div>
+          ) : null}
+          {pedido.prazoCdLoja ? (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Prazo CD → loja
+              </span>
+              <span className="text-xl" style={prazoUrgencyStyle(pedido.prazoCdLoja)}>
+                🕐 {new Date(`${pedido.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
+              </span>
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       <FormSection title="Produtos">

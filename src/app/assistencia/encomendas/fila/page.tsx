@@ -157,7 +157,7 @@ export default async function EncomendasQueuePage({
         </div>
       </AssistenciaHeader>
 
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
         {FILTERS.map((f) => {
           const activeValue = showAllStatuses ? "todos" : (filterStatus ?? null);
           const selected = (f.value ?? null) === activeValue;
@@ -167,7 +167,7 @@ export default async function EncomendasQueuePage({
             <Link
               key={f.label}
               href={buildHref({ status: f.value ?? undefined, store, fornecedor, q })}
-              className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+              className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
               style={
                 isStatusPill
                   ? {
@@ -191,14 +191,14 @@ export default async function EncomendasQueuePage({
       </div>
 
       {showFornecedorFilter ? (
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
           {FORNECEDOR_FILTERS.map((f) => {
             const selected = (f.value ?? undefined) === fornecedor;
             return (
               <Link
                 key={f.label}
                 href={buildHref({ status, store, fornecedor: f.value ?? undefined, q })}
-                className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+                className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
                 style={{
                   border: "1px solid var(--border)",
                   background: selected ? "var(--surface-1)" : "transparent",

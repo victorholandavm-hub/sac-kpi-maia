@@ -99,7 +99,7 @@ export default async function AssistenciaQueuePage({
     <div className="flex flex-col gap-4">
       <RealtimeQueueRefresher notifyOnInsert="Nova solicitação recebida!" />
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
           {FILTERS.map((f) => {
             const selected = (f.value ?? undefined) === filterStatus;
             const color = f.value ? STATUS_COLORS[f.value] ?? "var(--text-secondary)" : "var(--text-secondary)";
@@ -107,7 +107,7 @@ export default async function AssistenciaQueuePage({
               <Link
                 key={f.label}
                 href={buildHref({ status: f.value ?? undefined, q, store, assembler, from: dateFrom, to: dateTo })}
-                className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+                className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
                 style={
                   f.value
                     ? {

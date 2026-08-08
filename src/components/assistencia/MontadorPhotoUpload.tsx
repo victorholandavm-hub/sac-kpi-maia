@@ -64,15 +64,16 @@ export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
           nativo (câmera OU galeria). Um clique só: escolher já envia, sem
           passo extra. */}
       <label
-        className="text-sm rounded-lg px-3 py-2.5 font-medium text-center cursor-pointer"
+        className="text-base rounded-xl px-4 py-6 font-semibold text-center cursor-pointer flex flex-col items-center gap-1.5"
         style={{
-          background: "var(--brand-green)",
-          color: "var(--brand-green-ink)",
+          border: "2px dashed var(--brand-green)",
+          color: "var(--brand-green)",
           opacity: pending ? 0.6 : 1,
           pointerEvents: pending ? "none" : "auto",
         }}
       >
-        {pending ? "Enviando…" : "Anexar foto"}
+        <span className="text-3xl leading-none">📷</span>
+        {pending ? "Enviando…" : "Tirar ou enviar foto"}
         <input
           key={inputKey}
           type="file"
