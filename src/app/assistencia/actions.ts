@@ -1065,6 +1065,7 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
   });
 
   revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/agenda");
   revalidatePath(`/assistencia/${requestId}`);
 }
 

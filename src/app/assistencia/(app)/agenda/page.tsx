@@ -4,6 +4,7 @@ import { listScheduledRequests, agendaEffectiveDate, type ServiceRequestSummary,
 import { listAssemblers } from "@/lib/payments";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { AgendaDayGroups } from "@/components/assistencia/AgendaDayGroups";
+import { AgendaKanbanBoard } from "@/components/assistencia/AgendaKanbanBoard";
 import { ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
 
 function groupByDate(requests: ServiceRequestSummary[]) {
@@ -37,14 +38,15 @@ const FILTERS: { label: string; value: AgendaRange | null }[] = [
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; rota?: string; assembler?: string }>;
+  searchParams: Promise<{ range?: string; rota?: string; assembler?: string; view?: string }>;
 }) {
   redirectIfSac(await getProfile());
-  const { range, rota, assembler } = await searchParams;
+  const { range, rota, assembler, view } = await searchParams;
   const filterRange = (["atrasado", "hoje", "semana"] as const).includes(range as AgendaRange)
     ? (range as AgendaRange)
     : undefined;
   const filterRota = isRota(rota) ? rota : undefined;
+  const showKanban = view === "montador";
   const [allRequests, assemblers] = await Promise.all([listScheduledRequests({ range: filterRange }), listAssemblers()]);
   const requests = allRequests
     .filter((r) => !filterRota || r.rota === filterRota)
@@ -73,6 +75,7 @@ export default async function AgendaPage({
           if (f.value) sp.set("range", f.value);
           if (filterRota) sp.set("rota", filterRota);
           if (assembler) sp.set("assembler", assembler);
+          if (showKanban) sp.set("view", "montador");
           const qs = sp.toString();
           return (
             <Link
@@ -98,6 +101,7 @@ export default async function AgendaPage({
           if (filterRange) sp.set("range", filterRange);
           if (f.value) sp.set("rota", f.value);
           if (assembler) sp.set("assembler", assembler);
+          if (showKanban) sp.set("view", "montador");
           const qs = sp.toString();
           return (
             <Link
@@ -121,11 +125,60 @@ export default async function AgendaPage({
         <FilterSelect name="assembler" placeholder="Todos os montadores" options={assemblers} />
       </div>
 
+      {/* Kanban por montador só faz sentido com mouse/teclado pra arrastar
+          -- desktop only, mesmo padrão de MobileActionSheet/AgendaDayGroups
+          (interação diferente por tamanho de tela, não só reflow). No
+          celular a alternância nem aparece, sempre fica na visão por dia. */}
+      <div className="hidden sm:flex items-center gap-2">
+        <Link
+          href={(() => {
+            const sp = new URLSearchParams();
+            if (filterRange) sp.set("range", filterRange);
+            if (filterRota) sp.set("rota", filterRota);
+            if (assembler) sp.set("assembler", assembler);
+            const qs = sp.toString();
+            return qs ? `/assistencia/agenda?${qs}` : "/assistencia/agenda";
+          })()}
+          className="text-xs px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: !showKanban ? "var(--surface-1)" : "transparent",
+            color: !showKanban ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: !showKanban ? 600 : 400,
+          }}
+        >
+          Por dia
+        </Link>
+        <Link
+          href={(() => {
+            const sp = new URLSearchParams();
+            if (filterRange) sp.set("range", filterRange);
+            if (filterRota) sp.set("rota", filterRota);
+            if (assembler) sp.set("assembler", assembler);
+            sp.set("view", "montador");
+            return `/assistencia/agenda?${sp.toString()}`;
+          })()}
+          className="text-xs px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: showKanban ? "var(--surface-1)" : "transparent",
+            color: showKanban ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: showKanban ? 600 : 400,
+          }}
+        >
+          Por montador
+        </Link>
+      </div>
+
       {requests.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             {filterRange ? "Nenhuma visita nesse período." : "Nenhuma visita agendada ainda."}
           </p>
+        </div>
+      ) : showKanban ? (
+        <div className="hidden sm:block">
+          <AgendaKanbanBoard requests={requests} assemblers={assemblers} />
         </div>
       ) : (
         <AgendaDayGroups groups={groups} todayKey={todayKey} />
