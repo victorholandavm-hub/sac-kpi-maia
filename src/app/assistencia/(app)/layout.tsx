@@ -11,7 +11,13 @@ import { MobileNav } from "@/components/assistencia/MobileNav";
 import { NotificationBell } from "@/components/assistencia/NotificationBell";
 import { listAdminNotificationsAction } from "@/app/assistencia/notifications-actions";
 
-export default async function AssistenciaAppLayout({ children }: { children: React.ReactNode }) {
+export default async function AssistenciaAppLayout({
+  children,
+  modal,
+}: {
+  children: React.ReactNode;
+  modal: React.ReactNode;
+}) {
   const profile = await getProfile();
   const isAdmin = profile.role === "admin";
   const isSac = profile.role === "sac";
@@ -55,6 +61,7 @@ export default async function AssistenciaAppLayout({ children }: { children: Rea
         </div>
         {children}
       </div>
+      {modal}
       {isSac ? null : (
         <div className="print:hidden">
           <MobileNav isAdmin={isAdmin} counts={counts} />

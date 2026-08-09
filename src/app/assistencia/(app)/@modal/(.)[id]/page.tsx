@@ -5,10 +5,15 @@ import { SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { getRotaWeekdayConfig, getNextRotaDates, ROTAS, type Rota } from "@/lib/rotas";
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { RequestDetailContent } from "@/components/assistencia/RequestDetailContent";
+import { RequestDetailModal } from "@/components/assistencia/RequestDetailModal";
 
 export const dynamic = "force-dynamic";
 
-export default async function SolicitacaoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+// Versão interceptada de [id]/page.tsx -- só é alcançada por navegação
+// client-side vinda de dentro de (app) (fila/agenda/pagamentos/peças);
+// link direto ou refresh sempre cai na página cheia de verdade. Mesma
+// busca de dados que a página cheia (ver comentário lá sobre paralelizar).
+export default async function SolicitacaoDetailModalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [profile, result] = await Promise.all([getProfile(), getRequestDetail(id)]);
 
@@ -34,13 +39,15 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
     : ({ praia: [], sul: [], centro: [] } as Record<Rota, string[]>);
 
   return (
-    <RequestDetailContent
-      profile={profile}
-      result={result}
-      assemblers={assemblers}
-      drivers={drivers}
-      photos={photos}
-      nextDatesByRota={nextDatesByRota}
-    />
+    <RequestDetailModal>
+      <RequestDetailContent
+        profile={profile}
+        result={result}
+        assemblers={assemblers}
+        drivers={drivers}
+        photos={photos}
+        nextDatesByRota={nextDatesByRota}
+      />
+    </RequestDetailModal>
   );
 }

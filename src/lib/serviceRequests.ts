@@ -431,16 +431,21 @@ export async function getRequestDetail(
   id: string
 ): Promise<{ request: ServiceRequestDetail; events: RequestEvent[] } | null> {
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("service_requests").select(DETAIL_COLUMNS).eq("id", id).single();
+  // As duas consultas são independentes (nenhuma depende do resultado da
+  // outra) -- rodar em paralelo em vez de uma atrás da outra economiza uma
+  // ida e volta ao banco, e essa função é chamada por 4 telas diferentes
+  // (chamado, editar, despacho, editar da loja).
+  const [{ data, error }, { data: eventRows }] = await Promise.all([
+    admin.from("service_requests").select(DETAIL_COLUMNS).eq("id", id).single(),
+    admin
+      .from("service_request_events")
+      .select("id, event_type, from_status, to_status, note, created_at, actor:profiles!actor_id(full_name)")
+      .eq("request_id", id)
+      .order("created_at", { ascending: true }),
+  ]);
 
   if (error || !data) return null;
   const row = data as unknown as DetailRow;
-
-  const { data: eventRows } = await admin
-    .from("service_request_events")
-    .select("id, event_type, from_status, to_status, note, created_at, actor:profiles!actor_id(full_name)")
-    .eq("request_id", id)
-    .order("created_at", { ascending: true });
 
   const events: RequestEvent[] = ((eventRows ?? []) as unknown as EventRow[]).map((e) => ({
     id: e.id,
