@@ -8,6 +8,19 @@ export async function listAssemblers(): Promise<string[]> {
   return (data ?? []).map((a) => a.name as string);
 }
 
+// A assistência só gerencia os montadores da região dela -- o resto (Bayeux,
+// Santa Rita etc.) é de unidades do interior, cada uma com sua própria
+// gestão, fora do alcance daqui. Não tem uma coluna própria pra isso na
+// tabela assemblers, mas o nome já entrega: todo montador de unidade do
+// interior tem um código de 3 dígitos da loja no final ("GERSON 214",
+// "DEDE216"), enquanto os da assistência não têm nada depois do nome
+// ("Eduardo", "Manoel"). Usado pra não poluir o Kanban da agenda
+// (ver AgendaKanbanBoard.tsx) com colunas de gente que a assistência nunca
+// vai atribuir chamado nenhum.
+export function isAssistenciaControlledAssembler(name: string): boolean {
+  return !/\d{3}\s*$/.test(name.trim());
+}
+
 // Montadores da(s) loja(s) informada(s) + os globais/legado (store_id nulo)
 // -- usado pra sugerir montador na criação de solicitação de uma loja
 // específica (src/app/assistencia/(app)/[id]/page.tsx, nova-rapida).

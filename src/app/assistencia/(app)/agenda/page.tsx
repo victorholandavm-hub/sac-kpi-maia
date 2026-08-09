@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listScheduledRequests, agendaEffectiveDate, type ServiceRequestSummary, type AgendaRange } from "@/lib/serviceRequests";
-import { listAssemblers } from "@/lib/payments";
+import { listAssemblers, isAssistenciaControlledAssembler } from "@/lib/payments";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { AgendaDayGroups } from "@/components/assistencia/AgendaDayGroups";
 import { AgendaKanbanBoard } from "@/components/assistencia/AgendaKanbanBoard";
@@ -178,7 +178,10 @@ export default async function AgendaPage({
         </div>
       ) : showKanban ? (
         <div className="hidden sm:block">
-          <AgendaKanbanBoard requests={requests} assemblers={assemblers} />
+          {/* Kanban é só dos montadores que a assistência de fato controla --
+              o filtro "Por dia" acima continua com a lista inteira (útil se
+              algum chamado real estiver atribuído a alguém do interior). */}
+          <AgendaKanbanBoard requests={requests} assemblers={assemblers.filter(isAssistenciaControlledAssembler)} />
         </div>
       ) : (
         <AgendaDayGroups groups={groups} todayKey={todayKey} />
