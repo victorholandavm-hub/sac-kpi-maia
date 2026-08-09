@@ -13,10 +13,8 @@ import { listAdminNotificationsAction } from "@/app/assistencia/notifications-ac
 
 export default async function AssistenciaAppLayout({
   children,
-  modal,
 }: {
   children: React.ReactNode;
-  modal: React.ReactNode;
 }) {
   const profile = await getProfile();
   const isAdmin = profile.role === "admin";
@@ -61,7 +59,6 @@ export default async function AssistenciaAppLayout({
         </div>
         {children}
       </div>
-      {modal}
       {isSac ? null : (
         <div className="print:hidden">
           <MobileNav isAdmin={isAdmin} counts={counts} />

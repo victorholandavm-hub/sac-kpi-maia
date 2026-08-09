@@ -79,11 +79,13 @@ function eventAction(event: { eventType: string; fromStatus: string | null; toSt
   }
 }
 
-// Todo o conteúdo da tela de detalhe -- extraído de [id]/page.tsx pra ser
-// reaproveitado tanto pela página cheia quanto pela versão em gaveta
-// (rota interceptada @modal/(.)[id]/page.tsx), sem duplicar esse JSX
-// grande nos dois lugares. Inclui o tratamento de "não encontrada" (result
-// null) aqui dentro de propósito, pelo mesmo motivo.
+// Todo o conteúdo da tela de detalhe -- extraído de [id]/page.tsx só pra
+// manter esse arquivo grande separado da busca de dados. (Chegou a existir
+// uma versão em gaveta via rota interceptada @modal/(.)[id], revertida por
+// um bug real do Next 16: navegação client-side pra rotas literais tipo
+// fila/agenda/encomendas às vezes resolvia errado pro [id] dinâmico da
+// gaveta, mostrando "não encontrada" no lugar da tela certa.) Inclui o
+// tratamento de "não encontrada" (result null) aqui dentro.
 export function RequestDetailContent({
   profile,
   result,
