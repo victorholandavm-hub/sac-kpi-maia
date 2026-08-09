@@ -15,6 +15,7 @@ import {
   MANOEL_ONLY_ASSEMBLER,
   REQUEST_TYPE_LABELS,
   STATUS_LABELS,
+  DELIVERY_REQUEST_TYPES,
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
 import { resolveDriverName } from "@/lib/payments";
@@ -1289,18 +1290,27 @@ export async function setSchedule(
   // pra sempre mesmo depois de já remarcado de verdade.
   const clearingRemarcar = current.status === "remarcar" && !!scheduledDate;
 
+  // Rota (praia/sul/centro) é só pra quem sai de motorista -- montagem,
+  // desmontagem, vistoria e troca de peça são visita de montador e não têm
+  // rota, mesmo tendo data agendada. Ignora silenciosamente em vez de
+  // travar: a UI já esconde o campo pra esses tipos (ver ScheduleField),
+  // isso aqui é só a segunda trava, pra nunca gravar rota fora do lugar
+  // mesmo se algo chamar essa action diretamente.
+  const isDeliveryType = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(current.type);
+  const rotaInput = isDeliveryType ? rota : undefined;
+
   let rotaValue: string | null = null;
   let exceptionNote: string | null = null;
-  if (scheduledDate && rota) {
-    if (!isRota(rota)) throw new Error("Rota inválida.");
+  if (scheduledDate && rotaInput) {
+    if (!isRota(rotaInput)) throw new Error("Rota inválida.");
     const config = await getRotaWeekdayConfig();
     const expectedRota = getRotaForDate(scheduledDate, config);
-    const isException = expectedRota !== rota;
+    const isException = expectedRota !== rotaInput;
     if (isException && !rotaExceptionNote?.trim()) {
       const expectedLabel = expectedRota ? ROTA_LABELS[expectedRota] : "nenhuma rota";
-      throw new Error(`Essa data é de ${expectedLabel}, não de ${ROTA_LABELS[rota]} — informe o motivo do encaixe fora da rota.`);
+      throw new Error(`Essa data é de ${expectedLabel}, não de ${ROTA_LABELS[rotaInput]} — informe o motivo do encaixe fora da rota.`);
     }
-    rotaValue = rota;
+    rotaValue = rotaInput;
     // Só grava a nota quando a data realmente diverge da rota esperada --
     // senão uma nota antiga "gruda" mesmo depois do chamado ser reagendado
     // pra um dia normal da rota, e o motorista continua vendo o aviso de

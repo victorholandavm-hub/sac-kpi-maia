@@ -8,6 +8,7 @@ import {
   SHIFT_LABELS,
   SAC_CATEGORY_LABELS,
   SAC_MANAGED_TYPES,
+  DELIVERY_REQUEST_TYPES,
   PAYMENTS_CONTROLLER_NAME,
   REQUEST_STATUS_STEPS,
 } from "@/lib/assistenciaLabels";
@@ -118,7 +119,7 @@ export function RequestDetailContent({
   // Troca de produto, entrega de produto e envio de peça são todos entregues
   // pelo motorista — só notificação externa (e os tipos da assistência
   // técnica) usam montador.
-  const isDeliveryType = request.type === "troca_produto" || request.type === "entrega_produto" || request.type === "envio_peca";
+  const isDeliveryType = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(request.type);
 
   return (
     <div className="flex flex-col gap-4">
@@ -286,16 +287,17 @@ export function RequestDetailContent({
                 scheduledDate={request.scheduledDate}
                 scheduledTime={request.scheduledTime}
                 shift={request.shift}
-                rota={request.rota}
-                rotaExceptionNote={request.rotaExceptionNote}
+                rota={isDeliveryType ? request.rota : null}
+                rotaExceptionNote={isDeliveryType ? request.rotaExceptionNote : null}
                 nextDatesByRota={nextDatesByRota}
+                showRota={isDeliveryType}
               />
             ) : (
               <Row
                 label="Visita agendada"
                 value={
                   request.scheduledDate
-                    ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}${request.rota ? ` · rota ${ROTA_LABELS[request.rota]}` : ""}`
+                    ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}${isDeliveryType && request.rota ? ` · rota ${ROTA_LABELS[request.rota]}` : ""}`
                     : null
                 }
               />

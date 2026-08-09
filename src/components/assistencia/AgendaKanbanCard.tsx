@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useDraggable } from "@dnd-kit/core";
-import { REQUEST_TYPE_LABELS, REQUEST_TYPE_COLORS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, REQUEST_TYPE_COLORS, SHIFT_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { ROTA_LABELS, ROTA_COLORS } from "@/lib/rotas";
 import { StatusBadge } from "./StatusBadge";
 import { agendaEffectiveDate, type ServiceRequestSummary } from "@/lib/serviceRequests";
@@ -80,7 +80,9 @@ export function AgendaKanbanCard({
               {SHIFT_LABELS[item.shift] ?? item.shift}
             </span>
           ) : null}
-          {item.rota ? (
+          {/* Rota é só de visita de motorista -- não existe pra montagem/
+              desmontagem/vistoria/troca de peça, mesmo com dado velho. */}
+          {item.rota && (DELIVERY_REQUEST_TYPES as readonly string[]).includes(item.type) ? (
             <span
               className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
               style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${ROTA_COLORS[item.rota]} 35%, var(--surface-1))` }}

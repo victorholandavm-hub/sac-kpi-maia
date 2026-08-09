@@ -26,6 +26,7 @@ export function ScheduleField({
   rota,
   rotaExceptionNote,
   nextDatesByRota,
+  showRota,
 }: {
   requestId: string;
   scheduledDate: string | null;
@@ -34,6 +35,10 @@ export function ScheduleField({
   rota: Rota | null;
   rotaExceptionNote: string | null;
   nextDatesByRota: Record<Rota, string[]>;
+  // Rota (praia/sul/centro) é só pro motorista de entrega/recolhimento --
+  // montagem, desmontagem, vistoria e troca de peça são visita de montador
+  // e não têm rota nenhuma (ver isDeliveryType em RequestDetailContent).
+  showRota: boolean;
 }) {
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
@@ -56,7 +61,7 @@ export function ScheduleField({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm" style={{ color: "var(--text-primary)" }}>
             {scheduledDate
-              ? `${formatDateOnly(scheduledDate)}${formatTimeOnly(scheduledTime) ? ` às ${formatTimeOnly(scheduledTime)}` : ""}${shift ? ` · ${SHIFT_LABELS[shift]}` : ""}${rota ? ` · rota ${ROTA_LABELS[rota]}` : ""}`
+              ? `${formatDateOnly(scheduledDate)}${formatTimeOnly(scheduledTime) ? ` às ${formatTimeOnly(scheduledTime)}` : ""}${shift ? ` · ${SHIFT_LABELS[shift]}` : ""}${showRota && rota ? ` · rota ${ROTA_LABELS[rota]}` : ""}`
               : "Não agendada"}
           </span>
           <button
@@ -67,7 +72,7 @@ export function ScheduleField({
             {scheduledDate ? "editar" : "agendar"}
           </button>
         </div>
-        {rotaExceptionNote ? (
+        {showRota && rotaExceptionNote ? (
           <span className="text-xs" style={{ color: "var(--status-warning)" }}>
             Fora da rota do dia: {rotaExceptionNote}
           </span>
@@ -84,40 +89,42 @@ export function ScheduleField({
         Visita agendada
       </span>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <select
-          value={selectedRota}
-          onChange={(e) => setSelectedRota(e.target.value)}
-          className="rounded border px-2 py-1 text-sm"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <option value="">Sem rota</option>
-          {(Object.keys(ROTA_LABELS) as Rota[]).map((r) => (
-            <option key={r} value={r}>
-              {ROTA_LABELS[r]}
-            </option>
-          ))}
-        </select>
-        {selectedRota && validDatesForRota.length > 0 ? (
-          <div className="flex items-center gap-1 flex-wrap">
-            {validDatesForRota.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDate(d)}
-                className="text-xs rounded-full px-2 py-1 border whitespace-nowrap"
-                style={
-                  date === d
-                    ? { background: "var(--brand-green)", color: "var(--brand-green-ink)", borderColor: "var(--brand-green)" }
-                    : { borderColor: "var(--border)", color: "var(--text-secondary)" }
-                }
-              >
-                {formatDateOnly(d)}
-              </button>
+      {showRota ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={selectedRota}
+            onChange={(e) => setSelectedRota(e.target.value)}
+            className="rounded border px-2 py-1 text-sm"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <option value="">Sem rota</option>
+            {(Object.keys(ROTA_LABELS) as Rota[]).map((r) => (
+              <option key={r} value={r}>
+                {ROTA_LABELS[r]}
+              </option>
             ))}
-          </div>
-        ) : null}
-      </div>
+          </select>
+          {selectedRota && validDatesForRota.length > 0 ? (
+            <div className="flex items-center gap-1 flex-wrap">
+              {validDatesForRota.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDate(d)}
+                  className="text-xs rounded-full px-2 py-1 border whitespace-nowrap"
+                  style={
+                    date === d
+                      ? { background: "var(--brand-green)", color: "var(--brand-green-ink)", borderColor: "var(--brand-green)" }
+                      : { borderColor: "var(--border)", color: "var(--text-secondary)" }
+                  }
+                >
+                  {formatDateOnly(d)}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-2 flex-wrap">
         <input

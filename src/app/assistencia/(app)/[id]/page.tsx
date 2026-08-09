@@ -1,7 +1,7 @@
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail } from "@/lib/serviceRequests";
 import { listAssemblersForStores, listDrivers } from "@/lib/payments";
-import { SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import { SAC_MANAGED_TYPES, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { getRotaWeekdayConfig, getNextRotaDates, ROTAS, type Rota } from "@/lib/rotas";
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { RequestDetailContent } from "@/components/assistencia/RequestDetailContent";
@@ -18,9 +18,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
     (profile.role === "admin" ||
       (profile.role === "assistencia" && !isSacType) ||
       (profile.role === "sac" && isSacType));
-  const isDeliveryType =
-    !!result &&
-    (result.request.type === "troca_produto" || result.request.type === "entrega_produto" || result.request.type === "envio_peca");
+  const isDeliveryType = !!result && (DELIVERY_REQUEST_TYPES as readonly string[]).includes(result.request.type);
 
   const [assemblers, drivers, photos, rotaConfig] = await Promise.all([
     canManage && result ? listAssemblersForStores([result.request.storeId]) : Promise.resolve([]),

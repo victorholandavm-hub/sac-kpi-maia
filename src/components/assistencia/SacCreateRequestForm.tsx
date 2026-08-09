@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useActionState } from "react";
 import { createSacRequest, lookupTotvsClientForTeam, lookupTotvsProductForTeam, type FormState } from "@/app/assistencia/actions";
-import { SAC_CATEGORIES, SAC_CATEGORY_LABELS, REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import { SAC_CATEGORIES, SAC_CATEGORY_LABELS, REQUEST_TYPE_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
 
@@ -14,7 +14,7 @@ type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "notificacao
 // Tipos que envolvem entrega pelo motorista (produto/peça + quem vai levar).
 // "O que recolher" só se aplica a troca_produto — os outros dois não têm
 // recolhimento nenhum.
-const DELIVERY_TYPES: SacType[] = ["troca_produto", "entrega_produto", "envio_peca"];
+const DELIVERY_TYPES: SacType[] = [...DELIVERY_REQUEST_TYPES];
 
 // Montagem também tem produto (o móvel a montar), mas sem motorista -- quem
 // vai até o cliente é um montador, atribuído depois por assistência/admin

@@ -147,13 +147,24 @@ export const PEDIDO_FORNECEDOR_STATUS_COLORS: Record<string, string> = {
 };
 
 // Únicos tipos de chamado que o papel SAC pode gerenciar (ver dal.ts
-// requireManageAccess) — o resto da fila (montagem, troca_peça etc.)
-// continua exclusivo de assistência/admin.
-export const SAC_MANAGED_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa"] as const;
+// requireManageAccess) — o resto da fila (montagem, envio de peça etc.)
+// continua exclusivo de assistência/admin. Envio de peça é criado pelo SAC
+// como intake (ver SAC_REQUEST_TYPES em actions.ts, mesmo padrão de
+// montagem), mas quem executa e gerencia depois é a assistência -- é ela
+// quem manda a peça, com motorista e rota, só que o pedido nasce no SAC.
+export const SAC_MANAGED_TYPES = ["troca_produto", "entrega_produto", "notificacao_externa"] as const;
 
 // Complemento de SAC_MANAGED_TYPES — únicos tipos que o papel "assistencia"
 // gerencia (admin continua com acesso total aos dois grupos, como supervisão).
-export const ASSISTENCIA_MANAGED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"] as const;
+export const ASSISTENCIA_MANAGED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "envio_peca"] as const;
+
+// Tipos que saem de fato com motorista, em rota (praia/sul/centro) --
+// cruza os dois grupos acima (troca/entrega de produto são SAC, envio de
+// peça é assistência, mas os três usam motorista e rota do mesmo jeito).
+// Montagem/desmontagem/vistoria/troca de peça são visita de montador e não
+// têm rota -- são dois mundos que não se comunicam, mesmo os dois tendo
+// "data agendada".
+export const DELIVERY_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca"] as const;
 
 // Vistoria e troca de peça exigem confiança/qualificação que só um
 // funcionário de verdade tem — hoje só o Manoel; os outros montadores são

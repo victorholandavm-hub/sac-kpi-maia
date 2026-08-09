@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { setAssistenciaOrderAction } from "@/app/assistencia/actions";
-import { REQUEST_TYPE_LABELS, REQUEST_TYPE_COLORS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, REQUEST_TYPE_COLORS, SHIFT_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { ROTA_LABELS, ROTA_COLORS } from "@/lib/rotas";
 import { StatusBadge } from "./StatusBadge";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
@@ -139,7 +139,10 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                       {SHIFT_LABELS[r.shift] ?? r.shift}
                     </span>
                   ) : null}
-                  {r.rota ? (
+                  {/* Rota (praia/sul/centro) é só pra visita de motorista --
+                      montagem/desmontagem/vistoria/troca de peça não têm
+                      rota, mesmo que exista algum dado velho errado no banco. */}
+                  {r.rota && (DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type) ? (
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full"
                       style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${ROTA_COLORS[r.rota]} 35%, var(--surface-1))` }}
