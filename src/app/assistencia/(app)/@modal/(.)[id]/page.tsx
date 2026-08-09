@@ -6,6 +6,8 @@ import { getRotaWeekdayConfig, getNextRotaDates, ROTAS, type Rota } from "@/lib/
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { RequestDetailContent } from "@/components/assistencia/RequestDetailContent";
 import { RequestDetailModal } from "@/components/assistencia/RequestDetailModal";
+import { HardRedirect } from "@/components/assistencia/HardRedirect";
+import { isReservedAssistenciaSlug } from "@/lib/reservedAssistenciaSlugs";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,12 @@ export const dynamic = "force-dynamic";
 // busca de dados que a página cheia (ver comentário lá sobre paralelizar).
 export default async function SolicitacaoDetailModalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // Ver reservedAssistenciaSlugs.ts -- navegação suave pra essas rotas às
+  // vezes cai errado aqui (como gaveta "não encontrada") em vez da página
+  // literal de verdade.
+  if (isReservedAssistenciaSlug(id)) {
+    return <HardRedirect to={`/assistencia/${id}`} />;
+  }
   const [profile, result] = await Promise.all([getProfile(), getRequestDetail(id)]);
 
   const isSacType = result ? (SAC_MANAGED_TYPES as readonly string[]).includes(result.request.type) : false;
