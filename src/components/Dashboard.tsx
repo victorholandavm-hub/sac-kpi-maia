@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import type { KpiData } from "@/lib/kpi";
+import type { KpiData, Count, StoreBreakdownTicket } from "@/lib/kpi";
 import type { DateRange } from "@/lib/dateRange";
 import { StatTile } from "./StatTile";
 import { BarRanking } from "./BarRanking";
@@ -15,6 +16,7 @@ import { PreviousWeekCard } from "./PreviousWeekCard";
 import { AgentStatsTable } from "./AgentStatsTable";
 import { PerformanceReportButton } from "./PerformanceReportButton";
 import { NpsCard } from "./NpsCard";
+import { CategoryTicketsModal } from "./CategoryTicketsModal";
 import { categoryLabel, storeLabel, productLabel } from "@/lib/labels";
 
 const NPS_SCORE_LABELS: Record<number, string> = {
@@ -29,9 +31,23 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
   const resolvedPct =
     data.totalTickets > 0 ? Math.round((data.resolvedCount / data.totalTickets) * 100) : 0;
 
-  const byCategory = data.byCategory.map((c) => ({ ...c, label: categoryLabel(c.label) }));
+  // `tag` preserva o valor cru ("cat-duvida") por trás do label traduzido --
+  // usado pra abrir o drill-down (data.categoryTickets é indexado pela tag).
+  const byCategory = data.byCategory.map((c) => ({ ...c, tag: c.label, label: categoryLabel(c.label) }));
   const byStore = data.byStore.map((c) => ({ ...c, label: storeLabel(c.label) }));
   const byProduct = data.byProduct.map((c) => ({ ...c, label: productLabel(c.label) }));
+
+  const [categoryModal, setCategoryModal] = useState<{ title: string; totalCount: number; tickets: StoreBreakdownTicket[] } | null>(
+    null
+  );
+  function openCategoryDrilldown(item: Count) {
+    const tag = item.tag ?? item.label;
+    setCategoryModal({
+      title: item.label,
+      totalCount: item.count,
+      tickets: data.categoryTickets[tag] ?? [],
+    });
+  }
   // Ordem invertida (5 no topo) -- fica mais intuitivo no gráfico de barras
   // horizontal ver "muito satisfeito" em cima.
   const npsDistribution = [...data.npsSummary.distribution]
@@ -110,7 +126,12 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
       <AgentStatsTable data={data.byAgentStats} />
 
       <section className="grid md:grid-cols-3 gap-4">
-        <BarRanking title="Principais categorias de problema" data={byCategory} coverage={data.categoryCoverage} />
+        <BarRanking
+          title="Principais categorias de problema"
+          data={byCategory}
+          coverage={data.categoryCoverage}
+          onSelect={openCategoryDrilldown}
+        />
         <BarRanking title="Chamados por loja" data={byStore} coverage={data.storeCoverage} />
         <BarRanking title="Chamados por produto" data={byProduct} coverage={data.productCoverage} />
       </section>
@@ -131,6 +152,15 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         <EscalationBreakdown data={data.escalations.byTarget} />
         <EscalationByStoreTable data={data.escalationByStore} />
       </section>
+
+      {categoryModal ? (
+        <CategoryTicketsModal
+          title={categoryModal.title}
+          totalCount={categoryModal.totalCount}
+          tickets={categoryModal.tickets}
+          onClose={() => setCategoryModal(null)}
+        />
+      ) : null}
     </div>
   );
 }

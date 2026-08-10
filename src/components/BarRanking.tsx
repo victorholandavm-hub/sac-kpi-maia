@@ -3,7 +3,17 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Count, Coverage } from "@/lib/kpi";
 
-export function BarRanking({ title, data, coverage }: { title: string; data: Count[]; coverage?: Coverage }) {
+export function BarRanking({
+  title,
+  data,
+  coverage,
+  onSelect,
+}: {
+  title: string;
+  data: Count[];
+  coverage?: Coverage;
+  onSelect?: (item: Count) => void;
+}) {
   const height = Math.max(160, data.length * 36 + 24);
   return (
     <div
@@ -20,6 +30,11 @@ export function BarRanking({ title, data, coverage }: { title: string; data: Cou
       ) : (
         <div className="mb-3" />
       )}
+      {onSelect && data.length > 0 ? (
+        <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+          Clique numa barra pra ver os chamados.
+        </p>
+      ) : null}
       {data.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Sem dados suficientes ainda.
@@ -46,7 +61,14 @@ export function BarRanking({ title, data, coverage }: { title: string; data: Cou
                 fontSize: 12,
               }}
             />
-            <Bar dataKey="count" fill="var(--series-1)" radius={[0, 4, 4, 0]} maxBarSize={20} />
+            <Bar
+              dataKey="count"
+              fill="var(--series-1)"
+              radius={[0, 4, 4, 0]}
+              maxBarSize={20}
+              cursor={onSelect ? "pointer" : undefined}
+              onClick={onSelect ? (bar: { payload?: Count }) => bar.payload && onSelect(bar.payload) : undefined}
+            />
           </BarChart>
         </ResponsiveContainer>
       )}

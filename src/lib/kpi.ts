@@ -30,7 +30,11 @@ export type TicketRow = {
   nps_score: number | null;
 };
 
-export type Count = { label: string; count: number };
+// `tag` (opcional) carrega o valor cru por trás de `label` quando o label é
+// só um texto de exibição traduzido (ex.: byCategory) -- usado pra buscar o
+// drill-down de chamados sem precisar re-derivar o tag original a partir do
+// texto já traduzido.
+export type Count = { label: string; count: number; tag?: string };
 export type Coverage = { withValue: number; total: number; pct: number };
 export type DayCount = { date: string; count: number };
 
@@ -60,6 +64,8 @@ export type PreviousWeekSummary = {
   totalTickets: number;
   topStore: Count | null;
   topCategory: Count | null;
+  // Drill-down do topCategory acima -- mesma ideia de StoreBreakdown.topCategoryTickets.
+  topCategoryTickets: StoreBreakdownTicket[];
 };
 
 export type EscalationRow = {
@@ -221,6 +227,10 @@ export type KpiData = {
   recurrencePct: number | null;
   paretoSummary: string | null;
   storeBreakdown: StoreBreakdown[];
+  // Drill-down de byCategory acima -- por tag crua de categoria (ex.:
+  // "cat-duvida"), os chamados mais recentes daquela categoria no período
+  // selecionado. Ver CategoryTicketsModal / BarRanking.
+  categoryTickets: Record<string, StoreBreakdownTicket[]>;
   waitingCount: number;
   waitingByType: Count[];
   waitingByStore: Count[];
@@ -544,12 +554,14 @@ function buildPreviousWeekSummary(allRows: TicketRow[], now: Date): PreviousWeek
     const opened = new Date(r.opened_at).getTime();
     return opened >= from.getTime() && opened <= to.getTime();
   });
+  const topCategory = topCounts(weekRows, "category")[0] ?? null;
   return {
     from: fromLabel,
     to: toLabel,
     totalTickets: weekRows.length,
     topStore: topCounts(weekRows, "store_tag")[0] ?? null,
-    topCategory: topCounts(weekRows, "category")[0] ?? null,
+    topCategory,
+    topCategoryTickets: topCategory ? buildTicketList(weekRows.filter((r) => r.category === topCategory.label)) : [],
   };
 }
 
@@ -679,6 +691,35 @@ function buildBacklogOverTime(rows: TicketRow[], from: Date | null, to: Date): D
 
 const MAX_TOP_CATEGORY_TICKETS = 30;
 
+// Nome/telefone do contato entram depois, numa query em lote (ver
+// getKpiData) -- aqui só junta os chamados crus, mais recentes primeiro.
+function buildTicketList(rows: TicketRow[], limit = MAX_TOP_CATEGORY_TICKETS): StoreBreakdownTicket[] {
+  return [...rows]
+    .sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime())
+    .slice(0, limit)
+    .map((r) => ({
+      conversationId: r.conversation_id,
+      contactId: r.contact_id,
+      clientName: null,
+      clientPhone: null,
+      openedAt: r.opened_at,
+      summaryAi: r.summary_ai,
+    }));
+}
+
+// Drill-down de byCategory (ver KpiData.categoryTickets) -- chave é a tag
+// crua da categoria (ex.: "cat-duvida"), não o label traduzido.
+function buildCategoryTicketsMap(rows: TicketRow[]): Record<string, StoreBreakdownTicket[]> {
+  const byCategoryRows = new Map<string, TicketRow[]>();
+  for (const row of rows) {
+    if (!row.category) continue;
+    const list = byCategoryRows.get(row.category) ?? [];
+    list.push(row);
+    byCategoryRows.set(row.category, list);
+  }
+  return Object.fromEntries([...byCategoryRows.entries()].map(([category, catRows]) => [category, buildTicketList(catRows)]));
+}
+
 function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => string, categoryLabelFn: (tag: string) => string): StoreBreakdown[] {
   const byStoreRows = new Map<string, TicketRow[]>();
   for (const row of rows) {
@@ -696,22 +737,8 @@ function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => s
         catCounts.set(r.category, (catCounts.get(r.category) ?? 0) + 1);
       }
       const top = [...catCounts.entries()].sort((a, b) => b[1] - a[1])[0];
-      // Nome/telefone do contato entram depois, numa query em lote (ver
-      // getKpiData) -- aqui só junta os chamados crus da categoria mais
-      // comum, mais recentes primeiro.
       const topCategoryTickets: StoreBreakdownTicket[] = top
-        ? storeRows
-            .filter((r) => r.category === top[0])
-            .sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime())
-            .slice(0, MAX_TOP_CATEGORY_TICKETS)
-            .map((r) => ({
-              conversationId: r.conversation_id,
-              contactId: r.contact_id,
-              clientName: null,
-              clientPhone: null,
-              openedAt: r.opened_at,
-              summaryAi: r.summary_ai,
-            }))
+        ? buildTicketList(storeRows.filter((r) => r.category === top[0]))
         : [];
       return {
         store: storeLabelFn(store),
@@ -918,14 +945,16 @@ export async function getKpiData(
   );
 
   const storeBreakdown = buildStoreBreakdown(rows, labelFns.storeLabel, labelFns.categoryLabel);
-  // Nome/telefone dos chamados por trás do "problema mais comum" -- query em
-  // lote única (mesmo padrão de npsDetractors acima), pra não disparar uma
-  // consulta por chamado.
-  const breakdownContactIds = [
-    ...new Set(
-      storeBreakdown.flatMap((s) => s.topCategoryTickets.map((t) => t.contactId)).filter((id): id is string => !!id)
-    ),
+  const categoryTickets = buildCategoryTicketsMap(rows);
+  // Nome/telefone dos chamados por trás do "problema mais comum" (loja,
+  // categoria geral e semana anterior) -- query em lote única (mesmo padrão
+  // de npsDetractors acima), pra não disparar uma consulta por chamado.
+  const allBreakdownTickets = [
+    ...storeBreakdown.flatMap((s) => s.topCategoryTickets),
+    ...Object.values(categoryTickets).flat(),
+    ...previousWeek.topCategoryTickets,
   ];
+  const breakdownContactIds = [...new Set(allBreakdownTickets.map((t) => t.contactId).filter((id): id is string => !!id))];
   if (breakdownContactIds.length > 0) {
     const { data: contactRows, error: breakdownContactsError } = await supabase
       .from("contacts")
@@ -935,12 +964,10 @@ export async function getKpiData(
     const breakdownContactsById = new Map(
       (contactRows ?? []).map((c) => [c.id as string, { name: c.name as string | null, phone: c.phone as string | null }])
     );
-    for (const store of storeBreakdown) {
-      for (const ticket of store.topCategoryTickets) {
-        const info = breakdownContactsById.get(ticket.contactId ?? "");
-        ticket.clientName = info?.name ?? null;
-        ticket.clientPhone = info?.phone ?? null;
-      }
+    for (const ticket of allBreakdownTickets) {
+      const info = breakdownContactsById.get(ticket.contactId ?? "");
+      ticket.clientName = info?.name ?? null;
+      ticket.clientPhone = info?.phone ?? null;
     }
   }
 
@@ -972,6 +999,7 @@ export async function getKpiData(
     recurrencePct: rows.length > 0 ? Math.round((recurrenceCount / rows.length) * 100) : null,
     paretoSummary: buildParetoSummary(byCategory, rows.length, labelFns.categoryLabel),
     storeBreakdown,
+    categoryTickets,
     waitingCount: waitingOpenRows.length,
     waitingByType,
     waitingByStore,

@@ -1,5 +1,9 @@
+"use client";
+
+import { useState } from "react";
 import type { PreviousWeekSummary } from "@/lib/kpi";
 import { categoryLabel, storeLabel } from "@/lib/labels";
+import { CategoryTicketsModal } from "./CategoryTicketsModal";
 
 function formatDate(iso: string) {
   const [, month, day] = iso.split("-");
@@ -7,6 +11,7 @@ function formatDate(iso: string) {
 }
 
 export function PreviousWeekCard({ data }: { data: PreviousWeekSummary }) {
+  const [open, setOpen] = useState(false);
   return (
     <div
       className="rounded-lg border p-4"
@@ -30,9 +35,31 @@ export function PreviousWeekCard({ data }: { data: PreviousWeekSummary }) {
           <strong style={{ color: "var(--text-primary)" }}>
             {data.topCategory ? `${categoryLabel(data.topCategory.label)} (${data.topCategory.count})` : "—"}
           </strong>
+          {data.topCategoryTickets.length > 0 ? (
+            <>
+              {" "}
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="text-xs underline"
+                style={{ color: "var(--brand-green)" }}
+              >
+                Ver chamados
+              </button>
+            </>
+          ) : null}
           .
         </p>
       )}
+
+      {open && data.topCategory ? (
+        <CategoryTicketsModal
+          title={categoryLabel(data.topCategory.label)}
+          totalCount={data.topCategory.count}
+          tickets={data.topCategoryTickets}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
