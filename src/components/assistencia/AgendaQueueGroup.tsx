@@ -171,7 +171,14 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                <span>{r.assemblerName ? `Técnico: ${r.assemblerName}` : "Sem técnico definido"}</span>
+                {/* Troca/entrega de produto e envio de peça saem de motorista,
+                    o resto (montagem/vistoria/etc.) é montador -- mesma
+                    distinção de isDeliveryType em RequestDetailContent. */}
+                {(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type) ? (
+                  <span>{r.driverName ? `Motorista: ${r.driverName}` : "Sem motorista definido"}</span>
+                ) : (
+                  <span>{r.assemblerName ? `Técnico: ${r.assemblerName}` : "Sem técnico definido"}</span>
+                )}
                 <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
               </div>
             </Link>

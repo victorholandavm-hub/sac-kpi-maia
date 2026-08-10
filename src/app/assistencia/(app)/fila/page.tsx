@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
-import { listRequests, listStores, isRequestStatus, type ServiceRequestSummary } from "@/lib/serviceRequests";
+import { listRequests, listStores, isRequestStatus, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
-import { ASSISTENCIA_MANAGED_TYPES, STATUS_COLORS } from "@/lib/assistenciaLabels";
+import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
@@ -45,7 +45,16 @@ function currentTimeMs(): number {
   return Date.now();
 }
 
-function buildHref(params: { status?: string; q?: string; page?: number; store?: string; assembler?: string; from?: string; to?: string }) {
+function buildHref(params: {
+  status?: string;
+  q?: string;
+  page?: number;
+  store?: string;
+  assembler?: string;
+  from?: string;
+  to?: string;
+  tab?: string;
+}) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
@@ -53,6 +62,7 @@ function buildHref(params: { status?: string; q?: string; page?: number; store?:
   if (params.assembler) sp.set("assembler", params.assembler);
   if (params.from) sp.set("from", params.from);
   if (params.to) sp.set("to", params.to);
+  if (params.tab) sp.set("tab", params.tab);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
@@ -67,24 +77,39 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Canceladas", value: "cancelada" },
 ];
 
+// Troca/entrega de produto (SAC) e envio de peça (assistência) saem no
+// mesmo carro, na mesma rota do dia -- por isso ficam juntos numa aba só,
+// visível tanto daqui quanto de /assistencia/sac (ver lá), cada lado vendo
+// a rota inteira mesmo só gerenciando o que é seu (canManage já cuida
+// disso). Não tem nada a ver com visita de montador (montagem/desmontagem/
+// recolhimento/troca de peça/vistoria), que fica exclusiva na outra aba.
+const VISITA_TYPES: RequestType[] = ASSISTENCIA_MANAGED_TYPES.filter((t) => t !== "envio_peca");
+const ENTREGA_TYPES: RequestType[] = [...DELIVERY_REQUEST_TYPES];
+
 export default async function AssistenciaQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; page?: string; store?: string; assembler?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string; store?: string; assembler?: string; from?: string; to?: string; tab?: string }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler, from, to } = await searchParams;
+  const { status, q, page: pageParam, store, assembler, from, to, tab } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
   const dateTo = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : undefined;
-  // Assistência só enxerga o próprio domínio (montagem/desmontagem/troca de
-  // peça/vistoria) — admin continua vendo tudo, inclusive chamados de SAC,
-  // como supervisão.
-  const types = profile.role === "assistencia" ? [...ASSISTENCIA_MANAGED_TYPES] : undefined;
+  // Aba "Visitas" (padrão) x "Entregas" -- pros dois papéis que chegam
+  // aqui (SAC nunca chega, ver redirectIfSac acima; notificação externa
+  // continua só em /assistencia/sac, não é entrega de rota).
+  const showPecas = tab === "pecas";
+  const types = showPecas ? ENTREGA_TYPES : VISITA_TYPES;
+  // Entrega de peça não tem montador (é motorista) -- ignora um valor de
+  // "assembler" que tenha sobrado na URL de antes de trocar de aba, senão
+  // filtra por um campo que essas linhas nunca preenchem e a lista some
+  // inteira sem nenhuma explicação.
+  const effectiveAssembler = showPecas ? undefined : assembler;
   const [{ items: requests, total, pageSize }, stores, assemblers] = await Promise.all([
-    listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: assembler, types, dateFrom, dateTo }),
+    listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: effectiveAssembler, types, dateFrom, dateTo }),
     listStores(),
     listAssemblers(),
   ]);
@@ -98,6 +123,33 @@ export default async function AssistenciaQueuePage({
   return (
     <div className="flex flex-col gap-4">
       <RealtimeQueueRefresher notifyOnInsert="Nova solicitação recebida!" />
+
+      <div className="flex items-center gap-2">
+        <Link
+          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo })}
+          className="text-sm px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: !showPecas ? "var(--surface-1)" : "transparent",
+            color: !showPecas ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: !showPecas ? 600 : 400,
+          }}
+        >
+          Visitas
+        </Link>
+        <Link
+          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas" })}
+          className="text-sm px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: showPecas ? "var(--surface-1)" : "transparent",
+            color: showPecas ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: showPecas ? 600 : 400,
+          }}
+        >
+          Entregas
+        </Link>
+      </div>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
           {FILTERS.map((f) => {
@@ -106,7 +158,7 @@ export default async function AssistenciaQueuePage({
             return (
               <Link
                 key={f.label}
-                href={buildHref({ status: f.value ?? undefined, q, store, assembler, from: dateFrom, to: dateTo })}
+                href={buildHref({ status: f.value ?? undefined, q, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined })}
                 className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
                 style={
                   f.value
@@ -146,13 +198,17 @@ export default async function AssistenciaQueuePage({
 
       <div className="flex items-center gap-2 flex-wrap">
         <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
-        <FilterSelect name="assembler" placeholder="Todos os montadores" options={assemblers} />
+        {/* Filtro de montador não existe na aba de entrega de peça -- lá é
+            motorista, não montador (ver Motorista/Montador em
+            AssistenciaQueueGroup.tsx). */}
+        {showPecas ? null : <FilterSelect name="assembler" placeholder="Todos os montadores" options={assemblers} />}
       </div>
 
       <form action="/assistencia/fila" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
         {store ? <input type="hidden" name="store" value={store} /> : null}
-        {assembler ? <input type="hidden" name="assembler" value={assembler} /> : null}
+        {effectiveAssembler ? <input type="hidden" name="assembler" value={effectiveAssembler} /> : null}
+        {showPecas ? <input type="hidden" name="tab" value="pecas" /> : null}
         <input
           type="search"
           name="q"
@@ -190,7 +246,7 @@ export default async function AssistenciaQueuePage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, assembler })}
+            href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, tab: showPecas ? "pecas" : undefined })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -224,7 +280,7 @@ export default async function AssistenciaQueuePage({
         <div className="flex items-center justify-center gap-4 pt-2">
           {page > 1 ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler, from: dateFrom, to: dateTo })}
+              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
@@ -236,7 +292,7 @@ export default async function AssistenciaQueuePage({
           </span>
           {page < totalPages ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler, from: dateFrom, to: dateTo })}
+              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >

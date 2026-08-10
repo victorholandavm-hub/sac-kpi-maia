@@ -69,7 +69,9 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
               Urgente!
             </span>
           ) : null}
-          {!showCompleted && !request.pickupCompleted ? (
+          {/* Recolhimento só existe pra troca_produto -- mesma regra de
+              MotoristaRequestActions.tsx/DriverRouteGroup.tsx. */}
+          {!showCompleted && request.type === "troca_produto" && !request.pickupCompleted ? (
             <span
               className="text-xs font-medium px-2 py-0.5 rounded-full"
               style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
@@ -99,7 +101,7 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
             Detalhes
           </h3>
           <Row label="Cliente" value={request.clientName} />
-          <Row label="Produto a entregar" value={request.productSummary} />
+          <Row label={request.type === "envio_peca" ? "Peça a entregar" : "Produto a entregar"} value={request.productSummary} />
           <Row label="Endereço" value={formatFullAddress(request)} />
           <Row label="Bairro" value={request.clientNeighborhood} />
           <Row label="Motivo" value={request.reason} />

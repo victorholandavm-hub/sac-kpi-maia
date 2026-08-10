@@ -119,7 +119,11 @@ export function DriverRouteGroup({
                       Urgente!
                     </span>
                   ) : null}
-                  {!showCompleted && !r.pickupCompleted ? (
+                  {/* Recolhimento só existe pra troca_produto (recolhe o
+                      errado + entrega o certo) -- entrega_produto e envio de
+                      peça são entrega em etapa única, sem nada pra recolher
+                      (mesma regra de MotoristaRequestActions.tsx). */}
+                  {!showCompleted && r.type === "troca_produto" && !r.pickupCompleted ? (
                     <span
                       className="text-xs font-medium px-2 py-0.5 rounded-full"
                       style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}

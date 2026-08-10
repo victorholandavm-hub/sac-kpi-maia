@@ -25,7 +25,11 @@ export default async function SacHomePage({
 
   const [{ items }, riscos] = await Promise.all([
     listRequests({
-      types: [...SAC_MANAGED_TYPES],
+      // Envio de peça (gerido pela assistência) sai no mesmo carro/rota do
+      // dia que troca/entrega de produto do SAC -- mostra aqui também, pra
+      // quem monta a rota ver tudo que vai naquele carro, mesmo sem poder
+      // editar o que não é seu (canManage barra a ação, não a visão).
+      types: [...SAC_MANAGED_TYPES, "envio_peca"],
       status: showCompleted ? "concluida" : undefined,
     }),
     countEntregasEmRiscoOverview(),

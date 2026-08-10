@@ -6,6 +6,7 @@ import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { AgendaDayGroups } from "@/components/assistencia/AgendaDayGroups";
 import { AgendaKanbanBoard } from "@/components/assistencia/AgendaKanbanBoard";
 import { ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
+import { DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 
 function groupByDate(requests: ServiceRequestSummary[]) {
   const groups: { dateKey: string; label: string; items: ServiceRequestSummary[] }[] = [];
@@ -180,8 +181,15 @@ export default async function AgendaPage({
         <div className="hidden sm:block">
           {/* Kanban é só dos montadores que a assistência de fato controla --
               o filtro "Por dia" acima continua com a lista inteira (útil se
-              algum chamado real estiver atribuído a alguém do interior). */}
-          <AgendaKanbanBoard requests={requests} assemblers={assemblers.filter(isAssistenciaControlledAssembler)} />
+              algum chamado real estiver atribuído a alguém do interior).
+              Também exclui os tipos que saem de motorista (troca/entrega de
+              produto, envio de peça): esse Kanban arrasta pra reatribuir
+              MONTADOR (setAssemblerName) -- não faz sentido um chamado de
+              motorista aparecer aqui, ele não tem montador nenhum pra trocar. */}
+          <AgendaKanbanBoard
+            requests={requests.filter((r) => !(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type))}
+            assemblers={assemblers.filter(isAssistenciaControlledAssembler)}
+          />
         </div>
       ) : (
         <AgendaDayGroups groups={groups} todayKey={todayKey} />

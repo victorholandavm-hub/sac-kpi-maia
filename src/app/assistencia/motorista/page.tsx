@@ -46,7 +46,7 @@ export default async function MotoristaHomePage({
 
   return (
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-      <AssistenciaHeader title={`Olá, ${driverName}`} subtitle="Suas rotas de troca de produto e recolhimento.">
+      <AssistenciaHeader title={`Olá, ${driverName}`} subtitle="Suas rotas de troca/entrega de produto e envio de peça.">
         <div className="flex items-center gap-4">
           <Link href="/assistencia" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             ← Voltar
