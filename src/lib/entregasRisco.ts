@@ -67,6 +67,18 @@ export function computeRiscoAutomatico(
   baselineIso: string,
   todayIso: string
 ): { nivel: EntregaRiscoNivel; motivo: string } | null {
+  // Carga entregue fica com statusCarga "Encerrada" (não é mais "aberta") e
+  // statusEntrega "Entregue"/"Entregue Parcial" -- sem essa checagem,
+  // "nenhuma carga aberta" ficava ambíguo entre "nunca teve carga" e "já
+  // entregou e fechou", e os dois caíam na mesma regra de "sem carga
+  // agendada" abaixo, sinalizando risco em pedido já entregue. O
+  // status_atual do pedido (checado pelo chamador antes de chegar aqui) não
+  // cobre esse caso: pela documentação da TOTVS ele reflete só a carga mais
+  // recente, não um resumo confiável de "já entregou alguma vez".
+  if (cargas.some((c) => RESOLVIDO_LABELS.includes(c.statusEntrega ?? ""))) {
+    return null;
+  }
+
   const deadline = addBusinessDays(baselineIso, PRAZO_DIAS_UTEIS);
   const abertas = cargas.filter((c) => CARGA_ABERTA_LABELS.includes(c.statusCarga ?? ""));
 

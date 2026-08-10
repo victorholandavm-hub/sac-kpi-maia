@@ -55,6 +55,27 @@ describe("computeRiscoAutomatico", () => {
     );
     expect(risco?.nivel).toBe("alerta");
   });
+
+  it("carga encerrada com entrega confirmada (statusEntrega Entregue), mesmo além do prazo -> não aparece (null)", () => {
+    const risco = computeRiscoAutomatico(
+      [carga({ statusCarga: "Encerrada", statusEntrega: "Entregue", dtPrevisao: "2026-08-01" })],
+      BASELINE,
+      "2026-08-06"
+    );
+    expect(risco).toBeNull();
+  });
+
+  it("entrega parcial confirmada numa carga também não é risco, mesmo com outra carga ainda pendente", () => {
+    const risco = computeRiscoAutomatico(
+      [
+        carga({ carga: "C1", statusCarga: "Encerrada", statusEntrega: "Entregue Parcial", dtPrevisao: "2026-08-01" }),
+        carga({ carga: "C2", statusCarga: "Encerrada", dtPrevisao: "2026-08-02" }),
+      ],
+      BASELINE,
+      "2026-08-06"
+    );
+    expect(risco).toBeNull();
+  });
 });
 
 describe("baselineFor", () => {
