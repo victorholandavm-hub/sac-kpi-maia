@@ -1,8 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { computeDashboardToken, DASHBOARD_COOKIE_NAME } from "@/lib/dashboardSession";
 
+// Rotas que precisam passar direto, sem cair em nenhum redirect de auth
+// abaixo (webhooks/sync externos, assets estáticos, upload de foto). Isso
+// substitui o antigo `config.matcher` com regex "tudo menos X" -- aquele
+// idioma não cobria a raiz do domínio ("/") de jeito nenhum, nem mesmo
+// com "/" adicionado explicitamente como item à parte no array (bug
+// confirmado direto em produção, comparando comportamento com/sem matcher).
+// Checagem simples de string aqui, sem depender de regex/matcher do Next.
+const PASSTHROUGH_PREFIXES = [
+  "/api/ghl-webhook",
+  "/api/sync",
+  "/api/backup",
+  "/api/totvs-sync",
+  "/api/montador/upload-photo",
+  "/api/motorista/upload-photo",
+  "/_next/static",
+  "/_next/image",
+  "/favicon.ico",
+  "/icon.png",
+  "/logo.png",
+];
+
 export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
+
+  if (PASSTHROUGH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next();
+  }
 
   // Este projeto Vercel (o painel de KPIs do SAC) não hospeda mais o módulo de
   // assistência — ele mora em um projeto/domínio separado. Se ASSISTENCIA_REDIRECT_URL
@@ -49,22 +74,5 @@ export async function proxy(req: NextRequest) {
   return NextResponse.redirect(loginUrl);
 }
 
-export const config = {
-  // api/montador/upload-photo e api/motorista/upload-photo faltavam aqui --
-  // sem a exceção, qualquer instância com ASSISTENCIA_ONLY_PROJECT (ex.: a
-  // VPS) redirecionava essas rotas pra "/assistencia" antes delas rodarem,
-  // fazendo o upload de foto do montador/motorista falhar sempre (307 em vez
-  // de chegar na rota de verdade -- achado com curl direto em produção).
-  //
-  // "/" entrou à parte porque o padrão de exclusão abaixo (idioma padrão do
-  // Next pra "tudo menos X") não casava com a raiz do domínio -- fazia a
-  // instância assistencia-only (VPS) nunca redirecionar "/" pra
-  // "/assistencia", caindo direto na 2ª camada de proteção do painel de KPIs
-  // (requireDashboardAuth em dashboardSession.ts), que redireciona pra
-  // "/login" sem saber de ASSISTENCIA_ONLY_PROJECT -- achado com curl direto
-  // em produção comparando o comportamento com e sem matcher.
-  matcher: [
-    "/",
-    "/((?!api/ghl-webhook|api/sync|api/backup|api/totvs-sync|api/montador/upload-photo|api/motorista/upload-photo|_next/static|_next/image|favicon.ico|icon.png|logo.png).*)",
-  ],
-};
+// Sem `config.matcher` de propósito (ver PASSTHROUGH_PREFIXES acima) --
+// proxy roda em toda requisição, comportamento padrão do Next sem matcher.
