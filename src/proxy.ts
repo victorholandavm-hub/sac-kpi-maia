@@ -55,7 +55,16 @@ export const config = {
   // VPS) redirecionava essas rotas pra "/assistencia" antes delas rodarem,
   // fazendo o upload de foto do montador/motorista falhar sempre (307 em vez
   // de chegar na rota de verdade -- achado com curl direto em produção).
+  //
+  // "/" entrou à parte porque o padrão de exclusão abaixo (idioma padrão do
+  // Next pra "tudo menos X") não casava com a raiz do domínio -- fazia a
+  // instância assistencia-only (VPS) nunca redirecionar "/" pra
+  // "/assistencia", caindo direto na 2ª camada de proteção do painel de KPIs
+  // (requireDashboardAuth em dashboardSession.ts), que redireciona pra
+  // "/login" sem saber de ASSISTENCIA_ONLY_PROJECT -- achado com curl direto
+  // em produção comparando o comportamento com e sem matcher.
   matcher: [
+    "/",
     "/((?!api/ghl-webhook|api/sync|api/backup|api/totvs-sync|api/montador/upload-photo|api/motorista/upload-photo|_next/static|_next/image|favicon.ico|icon.png|logo.png).*)",
   ],
 };
