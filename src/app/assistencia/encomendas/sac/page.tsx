@@ -14,6 +14,7 @@ import { listEncomendaPhotosForPedidos } from "@/lib/pedidoEncomendaPhotos";
 import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { SacTabs } from "@/components/assistencia/SacTabs";
 import { StatTile } from "@/components/StatTile";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 
@@ -88,6 +89,8 @@ export default async function EncomendasSacPage({
           </form>
         </div>
       </AssistenciaHeader>
+
+      <SacTabs active="encomendas" />
 
       <div className="flex items-center gap-2 flex-wrap">
         <Link

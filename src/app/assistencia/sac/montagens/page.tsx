@@ -5,6 +5,7 @@ import { listRequests } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, ROLE_LABELS, ASSISTENCIA_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { SacTabs } from "@/components/assistencia/SacTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -35,17 +36,9 @@ export default async function SacMontagensPage({
 
   return (
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-      <AssistenciaHeader title="Montagens e serviços" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`}>
-        <div className="flex items-center gap-3 flex-wrap">
-          <Link
-            href="/assistencia/sac"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
-            style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
-          >
-            ← Painel do SAC
-          </Link>
-        </div>
-      </AssistenciaHeader>
+      <AssistenciaHeader title="Montagens e serviços" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`} />
+
+      <SacTabs active="montagens" />
 
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
         Visão só de acompanhamento — quem gerencia montagem, desmontagem, recolhimento, troca de peça e vistoria continua sendo a

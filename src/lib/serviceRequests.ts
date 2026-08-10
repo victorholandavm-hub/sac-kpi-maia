@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
+import { ASSISTENCIA_MANAGED_TYPES } from "./assistenciaLabels";
 
 export type RequestType =
   | "montagem"
@@ -1131,6 +1132,86 @@ export async function countRequestsOverview(): Promise<RequestsOverview> {
     needsReschedule: remarcarRes.count ?? 0,
     completedToday: completedTodayRes.count ?? 0,
   };
+}
+
+// Badge do card "Montagens e serviços" no painel do SAC -- mesmo espírito
+// de countRequestsOverview/countPedidosEncomendaSolicitados.
+export async function countMontagensOverview(): Promise<number> {
+  const admin = getSupabaseAdmin();
+  const { count, error } = await admin
+    .from("service_requests")
+    .select("id", { count: "exact", head: true })
+    .in("type", [...ASSISTENCIA_MANAGED_TYPES])
+    .not("status", "in", "(concluida,cancelada)");
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+export type RecentlyHandledRequest = {
+  id: string;
+  ticketNumber: number;
+  type: RequestType;
+  status: RequestStatus;
+  clientName: string | null;
+  storeName: string;
+  handledAt: string;
+};
+
+// Substitui o "Nenhuma notificação" vazio do painel do SAC quando não há
+// chamado em aberto pra mostrar -- os últimos chamados que o próprio
+// usuário logado movimentou (não é "criados por", é qualquer evento de
+// status/nota que ele tenha registrado). Duas consultas independentes
+// (eventos, depois os chamados) em vez de um join, porque o que queremos é
+// o chamado mais recente POR chamado (deduplicado), não um evento por vez.
+export async function listRecentlyHandledBySac(profileId: string, limit = 3): Promise<RecentlyHandledRequest[]> {
+  const admin = getSupabaseAdmin();
+  const { data: eventRows, error: eventsError } = await admin
+    .from("service_request_events")
+    .select("request_id, created_at")
+    .eq("actor_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(limit * 5);
+  if (eventsError) throw new Error(eventsError.message);
+
+  const seen = new Set<string>();
+  const recentIds: { id: string; handledAt: string }[] = [];
+  for (const row of eventRows ?? []) {
+    if (seen.has(row.request_id)) continue;
+    seen.add(row.request_id);
+    recentIds.push({ id: row.request_id, handledAt: row.created_at });
+    if (recentIds.length >= limit) break;
+  }
+  if (recentIds.length === 0) return [];
+
+  const { data: requestRows, error: requestsError } = await admin
+    .from("service_requests")
+    .select("id, ticket_number, type, status, client_name, stores(name)")
+    .in(
+      "id",
+      recentIds.map((r) => r.id)
+    );
+  if (requestsError) throw new Error(requestsError.message);
+
+  const byId = new Map((requestRows ?? []).map((r) => [r.id as string, r]));
+  return recentIds
+    .map(({ id, handledAt }) => {
+      const row = byId.get(id);
+      if (!row) return null;
+      // `stores` vem como objeto ou array de 1 dependendo de como o
+      // postgrest-js infere a relação -- cobre os dois formatos.
+      const storesField = row.stores as { name: string }[] | { name: string } | null;
+      const storeName = (Array.isArray(storesField) ? storesField[0] : storesField)?.name ?? "—";
+      return {
+        id,
+        ticketNumber: row.ticket_number as number,
+        type: row.type as RequestType,
+        status: row.status as RequestStatus,
+        clientName: row.client_name as string | null,
+        storeName,
+        handledAt,
+      };
+    })
+    .filter((r): r is RecentlyHandledRequest => r !== null);
 }
 
 export type ReportRow = { key: string; total: number; concluida: number; cancelada: number };
