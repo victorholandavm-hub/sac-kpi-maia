@@ -168,12 +168,29 @@ export type AgentStat = {
   npsResponseCount: number;
 };
 
+// Chamado por trás do "problema mais comum" de uma loja -- drill-down pra ver
+// do que se trata de verdade (categoria tipo "Dúvida" é só um rótulo vago; o
+// resumo de IA por conversa mostra o assunto real). Nome/telefone vêm de
+// `contacts` (GHL), então podem ser null se o contato nunca foi sincronizado.
+export type StoreBreakdownTicket = {
+  conversationId: string;
+  contactId: string | null;
+  clientName: string | null;
+  clientPhone: string | null;
+  openedAt: string;
+  summaryAi: string | null;
+};
+
 export type StoreBreakdown = {
   store: string;
   total: number;
   topCategory: string | null;
   topCategoryCount: number;
   topCategoryPct: number;
+  // Os mais recentes do total acima (ver MAX_TOP_CATEGORY_TICKETS) -- lista
+  // completa não é necessária, é só pra dar contexto do que está por trás do
+  // número.
+  topCategoryTickets: StoreBreakdownTicket[];
 };
 
 export type KpiData = {
@@ -660,6 +677,8 @@ function buildBacklogOverTime(rows: TicketRow[], from: Date | null, to: Date): D
   return result;
 }
 
+const MAX_TOP_CATEGORY_TICKETS = 30;
+
 function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => string, categoryLabelFn: (tag: string) => string): StoreBreakdown[] {
   const byStoreRows = new Map<string, TicketRow[]>();
   for (const row of rows) {
@@ -677,12 +696,30 @@ function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => s
         catCounts.set(r.category, (catCounts.get(r.category) ?? 0) + 1);
       }
       const top = [...catCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+      // Nome/telefone do contato entram depois, numa query em lote (ver
+      // getKpiData) -- aqui só junta os chamados crus da categoria mais
+      // comum, mais recentes primeiro.
+      const topCategoryTickets: StoreBreakdownTicket[] = top
+        ? storeRows
+            .filter((r) => r.category === top[0])
+            .sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime())
+            .slice(0, MAX_TOP_CATEGORY_TICKETS)
+            .map((r) => ({
+              conversationId: r.conversation_id,
+              contactId: r.contact_id,
+              clientName: null,
+              clientPhone: null,
+              openedAt: r.opened_at,
+              summaryAi: r.summary_ai,
+            }))
+        : [];
       return {
         store: storeLabelFn(store),
         total: storeRows.length,
         topCategory: top ? categoryLabelFn(top[0]) : null,
         topCategoryCount: top ? top[1] : 0,
         topCategoryPct: top ? Math.round((top[1] / storeRows.length) * 100) : 0,
+        topCategoryTickets,
       };
     })
     .sort((a, b) => b.total - a.total);
@@ -880,6 +917,33 @@ export async function getKpiData(
     (a, b) => new Date(b.asked_at).getTime() - new Date(a.asked_at).getTime()
   );
 
+  const storeBreakdown = buildStoreBreakdown(rows, labelFns.storeLabel, labelFns.categoryLabel);
+  // Nome/telefone dos chamados por trás do "problema mais comum" -- query em
+  // lote única (mesmo padrão de npsDetractors acima), pra não disparar uma
+  // consulta por chamado.
+  const breakdownContactIds = [
+    ...new Set(
+      storeBreakdown.flatMap((s) => s.topCategoryTickets.map((t) => t.contactId)).filter((id): id is string => !!id)
+    ),
+  ];
+  if (breakdownContactIds.length > 0) {
+    const { data: contactRows, error: breakdownContactsError } = await supabase
+      .from("contacts")
+      .select("id, name, phone")
+      .in("id", breakdownContactIds);
+    if (breakdownContactsError) throw breakdownContactsError;
+    const breakdownContactsById = new Map(
+      (contactRows ?? []).map((c) => [c.id as string, { name: c.name as string | null, phone: c.phone as string | null }])
+    );
+    for (const store of storeBreakdown) {
+      for (const ticket of store.topCategoryTickets) {
+        const info = breakdownContactsById.get(ticket.contactId ?? "");
+        ticket.clientName = info?.name ?? null;
+        ticket.clientPhone = info?.phone ?? null;
+      }
+    }
+  }
+
   return {
     totalTickets: rows.length,
     resolvedCount: resolvedRows.length,
@@ -907,7 +971,7 @@ export async function getKpiData(
     recurrenceCount,
     recurrencePct: rows.length > 0 ? Math.round((recurrenceCount / rows.length) * 100) : null,
     paretoSummary: buildParetoSummary(byCategory, rows.length, labelFns.categoryLabel),
-    storeBreakdown: buildStoreBreakdown(rows, labelFns.storeLabel, labelFns.categoryLabel),
+    storeBreakdown,
     waitingCount: waitingOpenRows.length,
     waitingByType,
     waitingByStore,

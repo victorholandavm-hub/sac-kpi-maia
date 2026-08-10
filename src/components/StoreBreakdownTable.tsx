@@ -1,4 +1,5 @@
 import type { StoreBreakdown } from "@/lib/kpi";
+import { StoreCategoryDrilldown } from "./StoreCategoryDrilldown";
 
 export function StoreBreakdownTable({ data }: { data: StoreBreakdown[] }) {
   return (
@@ -36,7 +37,21 @@ export function StoreBreakdownTable({ data }: { data: StoreBreakdown[] }) {
                     {row.total}
                   </td>
                   <td className="py-2 pr-4">
-                    {row.topCategory ? `${row.topCategory} (${row.topCategoryPct}%)` : "—"}
+                    {row.topCategory ? (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span>
+                          {row.topCategory} ({row.topCategoryPct}%)
+                        </span>
+                        <StoreCategoryDrilldown
+                          store={row.store}
+                          category={row.topCategory}
+                          totalCount={row.topCategoryCount}
+                          tickets={row.topCategoryTickets}
+                        />
+                      </div>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               ))}
