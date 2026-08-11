@@ -35,7 +35,12 @@ export function AssistenciaNav({
   counts?: { solicitacoes?: number; encomendas?: number };
 }) {
   const pathname = usePathname();
-  const tabs = isAdmin ? [...TABS, { label: "Admin", href: "/assistencia/admin" }] : TABS;
+  // "Vendas" (curva de venda por produto + ranking) é admin/CD só, por
+  // pedido explícito -- não entra na lista geral porque "assistencia"
+  // também veria esse tab (mesma lista de TABS pros dois papéis), e a
+  // página em si barra quem não é admin/CD de qualquer forma (ver
+  // src/lib/vendasAuth.ts) -- aqui é só pra não mostrar link morto.
+  const tabs = isAdmin ? [...TABS, { label: "Vendas", href: "/assistencia/vendas" }, { label: "Admin", href: "/assistencia/admin" }] : TABS;
 
   function badgeCountFor(label: string): number {
     if (label === "Solicitações") return counts?.solicitacoes ?? 0;

@@ -135,6 +135,11 @@ export default async function EncomendasQueuePage({
               Pedidos a fornecedores
             </Link>
           ) : null}
+          {actor.role === "cd" ? (
+            <Link href="/assistencia/vendas" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              Vendas por produto
+            </Link>
+          ) : null}
           {isRafael && actor.role === "cd" ? (
             <form action={switchRafaelToFabrica}>
               <button type="submit" className="text-sm underline" style={{ color: "var(--brand-green)" }}>
