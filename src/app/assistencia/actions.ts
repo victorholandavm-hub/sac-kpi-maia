@@ -16,6 +16,7 @@ import {
   REQUEST_TYPE_LABELS,
   STATUS_LABELS,
   DELIVERY_REQUEST_TYPES,
+  ALL_REQUEST_TYPES,
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
 import { resolveDriverName } from "@/lib/payments";
@@ -1448,16 +1449,41 @@ export async function updateRequestDetails(
   if (!storeId) return { error: "Selecione a loja." };
 
   const admin = getSupabaseAdmin();
-  const { data: currentRequest } = await admin.from("service_requests").select("type").eq("id", requestId).single();
+  const { data: currentRequest } = await admin.from("service_requests").select("type, assembler_name").eq("id", requestId).single();
   if (!currentRequest) return { error: "Solicitação não encontrada." };
   requireManageAccess(profile, currentRequest.type);
 
-  const addressNumberFields = readAddressNumberFields(formData, currentRequest.type);
+  // Corrigir o tipo (ex: alguém abriu como "montagem" mas era "troca de
+  // peça") -- restrito ao mesmo domínio que o papel já gerencia (ver
+  // manageableTypesForRole/requireManageAccess): sem essa 2ª checagem, dava
+  // pra mover um chamado pra um tipo que o próprio papel que editou não
+  // consegue mais enxergar/gerenciar depois.
+  const type = String(formData.get("type") ?? currentRequest.type).trim();
+  if (!(ALL_REQUEST_TYPES as readonly string[]).includes(type)) {
+    return { error: "Tipo de solicitação inválido." };
+  }
+  const typeChanged = type !== currentRequest.type;
+  if (typeChanged) requireManageAccess(profile, type);
+
+  // Vistoria/troca de peça exigem o Manoel (ver MANOEL_ONLY_TYPES) -- se o
+  // chamado tinha outro montador definido e o tipo virou um desses, esse
+  // montador some da lista de destino, então a atribuição atual viraria
+  // inválida silenciosamente. Mais seguro limpar e deixar quem editou
+  // reatribuir do que manter um estado que os pagamentos não reconhecem.
+  const assemblerNowInvalid =
+    typeChanged &&
+    (MANOEL_ONLY_TYPES as readonly string[]).includes(type) &&
+    !!currentRequest.assembler_name &&
+    currentRequest.assembler_name !== MANOEL_ONLY_ASSEMBLER;
+
+  const addressNumberFields = readAddressNumberFields(formData, type);
   if (addressNumberFields.error) return { error: addressNumberFields.error };
 
   const { error } = await admin
     .from("service_requests")
     .update({
+      type,
+      ...(assemblerNowInvalid ? { assembler_name: null } : {}),
       store_id: storeId,
       order_code: emptyToNull(formData.get("order_code")),
       client_name: clientName,
@@ -1485,7 +1511,9 @@ export async function updateRequestDetails(
     request_id: requestId,
     actor_id: profile.id,
     event_type: "edited",
-    note: "Dados da solicitação corrigidos.",
+    note: typeChanged
+      ? `Tipo alterado: ${REQUEST_TYPE_LABELS[currentRequest.type] ?? currentRequest.type} → ${REQUEST_TYPE_LABELS[type] ?? type}.`
+      : "Dados da solicitação corrigidos.",
   });
 
   revalidatePath("/assistencia/fila");

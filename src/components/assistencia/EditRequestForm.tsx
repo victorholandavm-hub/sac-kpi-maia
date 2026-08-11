@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { updateRequestDetails, type FormState } from "@/app/assistencia/actions";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type ServiceRequestDetail, type Store } from "@/lib/serviceRequests";
+import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -15,18 +16,53 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function EditRequestForm({ request, stores }: { request: ServiceRequestDetail; stores: Store[] }) {
+export function EditRequestForm({
+  request,
+  stores,
+  editableTypes,
+}: {
+  request: ServiceRequestDetail;
+  stores: Store[];
+  editableTypes: readonly string[];
+}) {
   const boundAction = updateRequestDetails.bind(null, request.id);
   const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, undefined);
-  const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(request.type);
+  // O tipo atual sempre aparece como opção, mesmo que por algum motivo não
+  // esteja na lista do papel (não deveria acontecer -- quem chega até aqui
+  // já passou pelo canEdit em page.tsx -- mas evita sumir com o valor atual
+  // do <select> se acontecer).
+  const typeOptions = editableTypes.includes(request.type) ? editableTypes : [request.type, ...editableTypes];
+  const [type, setType] = useState<string>(request.type);
+  const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
   const [isApartment, setIsApartment] = useState(request.clientIsApartment);
   // Só tipos que passam por montador/técnico -- entrega é sempre motorista
   // (sem montador pra instruir) e notificação externa não tem visita
   // nenhuma.
-  const showMontadorInstruction = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"].includes(request.type);
+  const showMontadorInstruction = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"].includes(type);
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
+      {typeOptions.length > 1 ? (
+        <Field label="Tipo *">
+          <select
+            name="type"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            required
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          >
+            {typeOptions.map((t) => (
+              <option key={t} value={t}>
+                {REQUEST_TYPE_LABELS[t] ?? t}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : (
+        <input type="hidden" name="type" value={type} />
+      )}
+
       <Field label="Loja *">
         <select name="store_id" defaultValue={request.storeId} required className="rounded border px-3 py-2" style={inputStyle}>
           {stores.map((s) => (

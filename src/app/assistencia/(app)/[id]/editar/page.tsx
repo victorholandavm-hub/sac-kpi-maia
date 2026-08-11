@@ -1,7 +1,7 @@
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail, listStores } from "@/lib/serviceRequests";
 import { EditRequestForm } from "@/components/assistencia/EditRequestForm";
-import { SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import { SAC_MANAGED_TYPES, manageableTypesForRole } from "@/lib/assistenciaLabels";
 
 export default async function EditRequestPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,13 +29,14 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
   }
 
   const stores = await listStores();
+  const editableTypes = manageableTypesForRole(profile.role);
 
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
         Corrigir solicitação
       </h2>
-      <EditRequestForm request={result.request} stores={stores} />
+      <EditRequestForm request={result.request} stores={stores} editableTypes={editableTypes} />
     </div>
   );
 }

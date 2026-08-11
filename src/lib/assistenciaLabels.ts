@@ -158,6 +158,27 @@ export const SAC_MANAGED_TYPES = ["troca_produto", "entrega_produto", "notificac
 // gerencia (admin continua com acesso total aos dois grupos, como supervisão).
 export const ASSISTENCIA_MANAGED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "envio_peca"] as const;
 
+// União dos dois grupos acima -- todo tipo de chamado que existe hoje (mesmas
+// chaves de REQUEST_TYPE_LABELS). Usado só pra oferecer a troca de tipo na
+// edição do chamado (ver manageableTypesForRole) -- lista central pra não
+// desalinhar de REQUEST_TYPE_LABELS de novo.
+export const ALL_REQUEST_TYPES = [...SAC_MANAGED_TYPES, ...ASSISTENCIA_MANAGED_TYPES] as const;
+
+// Pra quais tipos um papel pode TROCAR um chamado (ex: alguém abriu como
+// "montagem" mas era "troca de peça") -- reaproveita o mesmo domínio de
+// requireManageAccess (dal.ts): assistência só troca entre tipos que ela
+// mesma gerencia, SAC só entre os dela, admin pode qualquer um. Sem isso a
+// edição deixaria criar um chamado que o próprio papel que editou não
+// consegue mais gerenciar depois (ver updateRequestDetails em actions.ts,
+// que valida de novo no servidor com requireManageAccess -- isso aqui só
+// monta a lista de opções mostradas na tela).
+export function manageableTypesForRole(role: string): readonly string[] {
+  if (role === "admin") return ALL_REQUEST_TYPES;
+  if (role === "assistencia") return ASSISTENCIA_MANAGED_TYPES;
+  if (role === "sac") return SAC_MANAGED_TYPES;
+  return [];
+}
+
 // Tipos que saem de fato com motorista, em rota (praia/sul/centro) --
 // cruza os dois grupos acima (troca/entrega de produto são SAC, envio de
 // peça é assistência, mas os três usam motorista e rota do mesmo jeito).
