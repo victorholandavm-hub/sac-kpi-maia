@@ -124,6 +124,7 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
   const showProduct = PRODUCT_TYPES.includes(type);
 
   const [clientCode, setClientCode] = useState("");
+  const [clientCpf, setClientCpf] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientAddress, setClientAddress] = useState("");
@@ -274,13 +275,14 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
       <FormSection
         title="Dados do cliente"
         number={2}
-        hint="Digite o código do cliente pra preencher o resto automaticamente (se souber). Só o nome é obrigatório."
+        hint="Digite o código do cliente pra preencher o resto automaticamente (se souber). É obrigatório informar o código do cliente ou o CPF (pelo menos um)."
       >
-        <Field label="Código do cliente">
+        <Field label={`Código do cliente${clientCpf.trim() ? "" : " *"}`}>
           <input
             name="client_protheus_code"
             value={clientCode}
             onChange={(e) => setClientCode(e.target.value)}
+            required={!clientCpf.trim()}
             className="rounded border px-3 py-2"
             style={inputStyle}
           />
@@ -297,6 +299,17 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
               Código não encontrado — preencha os dados abaixo à mão.
             </span>
           ) : null}
+        </Field>
+
+        <Field label={`CPF do cliente${clientCode.trim() ? "" : " *"}`}>
+          <input
+            name="client_cpf"
+            value={clientCpf}
+            onChange={(e) => setClientCpf(e.target.value)}
+            required={!clientCode.trim()}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
         </Field>
 
         <Field label="Nome do cliente *">
