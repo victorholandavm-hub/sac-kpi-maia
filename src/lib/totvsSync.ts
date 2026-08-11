@@ -28,9 +28,16 @@ const CLIENT_PAGE_SIZE = 100;
 const CLIENT_PAGE_CAP = 30;
 const CLIENT_TIME_BUDGET_MS = 120_000;
 
-const ORDER_PAGE_SIZE = 20;
+// Aumentados de 20/300s em 2026-08-11: com o bug de retry corrigido (ver
+// syncOrders abaixo), o gargalo passou a ser throughput puro -- 20 pedidos
+// por página significa muitas idas e vindas na API do TOTVS pra cobrir um
+// dia só. 100 é o mesmo tamanho já usado em CLIENT_PAGE_SIZE e está dentro
+// do limite documentado da API (máximo 500). O orçamento de tempo maior
+// (15min) deixa cada execução cobrir mais dias -- a tarefa agendada só roda
+// 1x/dia, então não há risco de sobrepor com a próxima chamada.
+const ORDER_PAGE_SIZE = 100;
 const ORDERS_WINDOW_DAYS = 1;
-const ORDERS_TIME_BUDGET_MS = 300_000;
+const ORDERS_TIME_BUDGET_MS = 900_000;
 const INITIAL_ORDERS_LOOKBACK_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -480,39 +487,71 @@ async function backfillMissingClients(supabase: SupabaseAdmin): Promise<SyncResu
   return { checked, upserted, errors };
 }
 
-async function upsertOrder(supabase: SupabaseAdmin, o: TotvsOrder, errors: string[]): Promise<boolean> {
-  const { data: orderRow, error } = await supabase
+// Grava a PÁGINA inteira de pedidos (e itens) em duas chamadas só, em vez
+// de uma chamada por pedido + uma por item (era o gargalo real do sync de
+// pedidos, descoberto em 2026-08-11 -- mesmo depois de corrigir o bug de
+// retry, uma página de 100 pedidos com ~1.8 item cada significava ~280
+// idas-e-voltas de rede sequenciais só nessa página). upsert aceita array
+// igual aceita objeto único -- mesma semântica de onConflict, só que pra
+// várias linhas de uma vez.
+//
+// Contrapartida aceita: se UMA linha do lote tiver dado inválido (violação
+// de constraint etc.), o Postgres reverte o lote inteiro, não só a linha
+// ruim -- diferente do laço um-a-um antigo, onde um pedido malformado não
+// travava os outros da mesma página. Aceitável porque isso nunca aconteceu
+// nos syncs reais até aqui (sempre 0 erros); se voltar a acontecer, dá pra
+// reintroduzir um fallback pra gravação individual só no lote que falhar.
+async function upsertOrdersBatch(supabase: SupabaseAdmin, orders: TotvsOrder[], errors: string[]): Promise<number> {
+  if (orders.length === 0) return 0;
+
+  const orderRows = orders.map((o) => ({
+    invoice: o.invoice,
+    serie: o.serie,
+    branch: o.branch,
+    issue_date: ddmmyyyyToIso(o.date),
+    payment_method: o.paymentMethod || null,
+    invoice_total: o.invoiceTotal ?? 0,
+    type: o.type,
+    nfe_key: o.nfeKey || null,
+    seller_id: o.seller?.id || null,
+    seller_name: o.seller?.name || null,
+    client_id: o.client?.id || null,
+    client_cpf_cnpj: o.client?.cpf_cnpj || null,
+    client_name: o.client?.name || null,
+    client_loja: o.client?.loja || null,
+  }));
+
+  const { data: upsertedOrders, error } = await supabase
     .from("totvs_orders")
-    .upsert(
-      {
-        invoice: o.invoice,
-        serie: o.serie,
-        branch: o.branch,
-        issue_date: ddmmyyyyToIso(o.date),
-        payment_method: o.paymentMethod || null,
-        invoice_total: o.invoiceTotal ?? 0,
-        type: o.type,
-        nfe_key: o.nfeKey || null,
-        seller_id: o.seller?.id || null,
-        seller_name: o.seller?.name || null,
-        client_id: o.client?.id || null,
-        client_cpf_cnpj: o.client?.cpf_cnpj || null,
-        client_name: o.client?.name || null,
-        client_loja: o.client?.loja || null,
-      },
-      { onConflict: "invoice,serie,branch" }
-    )
-    .select("id")
-    .single();
-  if (error || !orderRow) {
-    errors.push(`order ${o.invoice}/${o.serie}: ${error?.message ?? "sem id retornado"}`);
-    return false;
+    .upsert(orderRows, { onConflict: "invoice,serie,branch" })
+    .select("id, invoice, serie, branch");
+  if (error || !upsertedOrders) {
+    errors.push(`orders lote de ${orders.length}: ${error?.message ?? "sem retorno"}`);
+    return 0;
   }
 
-  for (const item of o.items ?? []) {
-    const { error: itemError } = await supabase.from("totvs_order_items").upsert(
-      {
-        order_id: orderRow.id,
+  const idByKey = new Map(upsertedOrders.map((r) => [`${r.invoice}|${r.serie}|${r.branch}`, r.id]));
+  const itemRows: {
+    order_id: string;
+    item_number: string;
+    product: string | null;
+    description: string | null;
+    manufacturer: string | null;
+    unit: string | null;
+    quantity: number;
+    unit_price: number | null;
+    sale_price: number | null;
+    total: number;
+    discount: number | null;
+    tes: string | null;
+    cfop: string | null;
+  }[] = [];
+  for (const o of orders) {
+    const orderId = idByKey.get(`${o.invoice}|${o.serie}|${o.branch}`);
+    if (!orderId) continue;
+    for (const item of o.items ?? []) {
+      itemRows.push({
+        order_id: orderId,
         item_number: item.itemNumber,
         product: item.product || null,
         description: item.description || null,
@@ -525,12 +564,16 @@ async function upsertOrder(supabase: SupabaseAdmin, o: TotvsOrder, errors: strin
         discount: item.discount ?? null,
         tes: item.tes || null,
         cfop: item.cfop || null,
-      },
-      { onConflict: "order_id,item_number" }
-    );
-    if (itemError) errors.push(`order ${o.invoice} item ${item.itemNumber}: ${itemError.message}`);
+      });
+    }
   }
-  return true;
+
+  if (itemRows.length > 0) {
+    const { error: itemsError } = await supabase.from("totvs_order_items").upsert(itemRows, { onConflict: "order_id,item_number" });
+    if (itemsError) errors.push(`order items lote de ${itemRows.length}: ${itemsError.message}`);
+  }
+
+  return upsertedOrders.length;
 }
 
 // Varre dia a dia (não um StartDate/EndDate largo -- ver nota acima sobre o
@@ -593,10 +636,7 @@ async function syncOrders(supabase: SupabaseAdmin): Promise<SyncResult> {
     }
     const rows = json.data ?? [];
     checked += rows.length;
-
-    for (const o of rows) {
-      if (await upsertOrder(supabase, o, errors)) upserted++;
-    }
+    upserted += await upsertOrdersBatch(supabase, rows, errors);
 
     if (rows.length === 0 || page >= (json.totalPages ?? page)) {
       day = isoDate(new Date(new Date(day).getTime() + ORDERS_WINDOW_DAYS * DAY_MS));
