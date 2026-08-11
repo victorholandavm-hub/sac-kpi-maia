@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { recordSyncRun } from "@/lib/syncRuns";
+import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
 
 const BUCKET = "system-backups";
 const KEEP_DAYS = 14;
 const PAGE_SIZE = 1000;
+
+// Dump completo das 11 tabelas TODO dia gerava egress do banco proporcional
+// ao tamanho dele a cada execução -- descoberto em 2026-08-10 (egress do
+// Supabase estourou a cota do Free com um banco de só 49 MB no total, sinal
+// de releitura redundante, não de dado grande). 3 dias ainda deixa ~4-5
+// pontos de restauração dentro dos 14 dias de retenção -- perde no pior caso
+// os últimos 3 dias de dado em vez de 1, troca aceitável dado que isso cobre
+// exclusão acidental dentro do app, não corrupção/perda de infraestrutura
+// (que teria sinais bem antes de 3 dias).
+const MIN_INTERVAL_HOURS = 72;
 
 // Todas as tabelas do módulo de assistência — transacionais (chamados, peças,
 // fornecedor, estoque) e de cadastro (lojas, contas, montadores,
@@ -49,6 +59,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const lastRunAt = await getLastSuccessfulRunAt("backup");
+    if (lastRunAt && Date.now() - new Date(lastRunAt).getTime() < MIN_INTERVAL_HOURS * 60 * 60 * 1000) {
+      return NextResponse.json({ ok: true, skipped: true, reason: `último backup com sucesso há menos de ${MIN_INTERVAL_HOURS}h`, lastRunAt });
+    }
+
     const admin = getSupabaseAdmin();
     const dump: Record<string, unknown[]> = {};
     for (const table of TABLES) {

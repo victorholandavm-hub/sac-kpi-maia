@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { businessMinutesBetween } from "@/lib/businessHours";
-import { recordSyncRun } from "@/lib/syncRuns";
+import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
+
+// Descoberto em 2026-08-10: essa rota estava sendo chamada bem mais vezes
+// por dia do que o `vercel.json` (1x/dia) sugere -- suspeita de deploy
+// duplicado/zumbi ainda ativo chamando o cron por fora, mas não dá pra
+// confirmar nem corrigir isso a partir do código. Esse teto é a defesa que
+// dá pra aplicar daqui: nem que algo dispare a rota de novo minutos depois,
+// ela não repete o trabalho (nem o request pro GHL, nem as leituras no
+// Supabase) até passar o intervalo mínimo.
+const MIN_INTERVAL_MINUTES = 60;
 
 const CHANNEL_MAP: Record<string, string> = {
   TYPE_WHATSAPP: "WhatsApp",
@@ -127,6 +136,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const lastRunAt = await getLastSuccessfulRunAt("ghl");
+    if (lastRunAt && Date.now() - new Date(lastRunAt).getTime() < MIN_INTERVAL_MINUTES * 60 * 1000) {
+      return NextResponse.json({ ok: true, skipped: true, reason: `última sincronização com sucesso há menos de ${MIN_INTERVAL_MINUTES}min`, lastRunAt });
+    }
     return await runSync();
   } catch (err) {
     const message = (err as Error).message;
