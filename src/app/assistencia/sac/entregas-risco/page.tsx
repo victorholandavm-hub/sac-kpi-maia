@@ -9,8 +9,34 @@ import { EntregaRiscoAssignField } from "@/components/assistencia/EntregaRiscoAs
 
 export const dynamic = "force-dynamic";
 
+// A partir de quantos dias sem re-sincronizar um alerta passa a valer menos
+// confiança -- descoberto em 2026-08-10: dois pedidos já entregues no
+// Protheus continuaram aparecendo como risco porque o job de sync (roda numa
+// máquina fora daqui, ver scripts/totvs-sync.ts) ficou dias sem rodar e o
+// snapshot local nunca foi atualizado. 2 dias cobre folga de fim de semana
+// sem já soar falso alarme numa segunda-feira normal.
+const SYNC_STALE_WARNING_DAYS = 2;
+
 function formatDate(value: string): string {
   return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function diasDesde(iso: string): number {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
+}
+
+function SyncStaleness({ syncedAt }: { syncedAt: string }) {
+  const dias = diasDesde(syncedAt);
+  const stale = dias >= SYNC_STALE_WARNING_DAYS;
+  return (
+    <p className="text-xs" style={stale ? { color: "var(--status-critical)", fontWeight: 600 } : { color: "var(--text-muted)" }}>
+      {stale
+        ? `⚠ Dado da TOTVS sem atualizar há ${dias} dias — confira direto no Protheus antes de agir.`
+        : dias === 0
+          ? "Dado da TOTVS sincronizado hoje."
+          : `Dado da TOTVS sincronizado há ${dias} dia${dias === 1 ? "" : "s"}.`}
+    </p>
+  );
 }
 
 function EntregaRiscoCard({ item, atendentes }: { item: EntregaRiscoItem; atendentes: EntregaRiscoAtendente[] }) {
@@ -57,6 +83,7 @@ function EntregaRiscoCard({ item, atendentes }: { item: EntregaRiscoItem; atende
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
         {item.baselineOrigem === "nota_fiscal" ? `Venda em ${formatDate(item.baselineData)} (nota fiscal)` : `Visto pela 1ª vez em ${formatDate(item.baselineData)} (estimado)`}
       </p>
+      <SyncStaleness syncedAt={item.syncedAt} />
 
       <EntregaRiscoAssignField pedido={item.pedido} filialVenda={item.filialVenda} assignedTo={item.assignedTo} atendentes={atendentes} />
       <EntregaRiscoClassificarField pedido={item.pedido} filialVenda={item.filialVenda} classificacao={item.classificacao} />

@@ -45,6 +45,24 @@ const DELIVERY_PAGE_SIZE = 100;
 const DELIVERY_PAGE_CAP = 40;
 const DELIVERIES_TIME_BUDGET_MS = 120_000;
 
+// Cópia de RESOLVIDO_LABELS (src/lib/entregasRisco.ts) -- ver nota lá sobre
+// por que este arquivo não importa daquele. Usado só pra decidir quais
+// pedidos vale a pena re-sincronizar com prioridade abaixo.
+const DELIVERY_RESOLVIDO_LABELS = ["Entregue", "Entregue Parcial"];
+
+// O full-scan sequencial de syncDeliveries só revisita um pedido já
+// sincronizado quando o cursor dá a volta inteira nas páginas -- com bastante
+// linha na tabela e execuções que nem sempre completam (disputa de licença
+// do Protheus, timeout), isso pode levar dias/semanas. Descoberto em
+// 2026-08-10: dois pedidos entregues ficaram sinalizados como risco porque o
+// snapshot local (de quando o pedido foi visto pela 1ª vez) nunca foi
+// atualizado depois. Antes do scan sequencial, busca com prioridade os N
+// pedidos "não resolvidos" com `synced_at` mais antigo, refazendo a consulta
+// por CPF/CNPJ do cliente (filtro `document` da API, existe justamente pra
+// isso) -- mais barato que esperar o cursor chegar lá.
+const STALE_PRIORITY_LIMIT = 15;
+const STALE_PRIORITY_TIME_BUDGET_MS = 60_000;
+
 // URL e paginação (page/size minúsculo) confirmados contra a API real em
 // 2026-07-30 -- api-totvs.yaml também errava os nomes de alguns campos do
 // payload (ver TotvsDeliveryOrder/TotvsDeliveryCarga abaixo: "order"/"branch"
@@ -714,6 +732,57 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
   return true;
 }
 
+type StaleDeliveryCandidate = { pedido: string; client_cpf_cnpj: string | null; status_atual: string | null; synced_at: string };
+
+async function syncStaleDeliveries(supabase: SupabaseAdmin): Promise<SyncResult> {
+  const started = Date.now();
+  const errors: string[] = [];
+  let checked = 0;
+  let upserted = 0;
+
+  // Busca mais candidatos do que o limite final (STALE_PRIORITY_LIMIT) porque
+  // vários pedidos podem compartilhar o mesmo CPF/CNPJ (mesmo cliente com
+  // mais de uma venda) -- dedup por documento abaixo reduz antes de aplicar
+  // o teto de chamadas à API.
+  const { data: rows, error: fetchError } = await supabase
+    .from("totvs_deliveries")
+    .select("pedido, client_cpf_cnpj, status_atual, synced_at")
+    .not("client_cpf_cnpj", "is", null)
+    .order("synced_at", { ascending: true })
+    .limit(STALE_PRIORITY_LIMIT * 4);
+  if (fetchError) {
+    errors.push(`stale deliveries: ${fetchError.message}`);
+    return { checked, upserted, errors };
+  }
+
+  const candidates = ((rows ?? []) as StaleDeliveryCandidate[]).filter(
+    (r) => !DELIVERY_RESOLVIDO_LABELS.includes(r.status_atual ?? "")
+  );
+  const documents = [...new Set(candidates.map((r) => r.client_cpf_cnpj).filter((v): v is string => !!v))].slice(
+    0,
+    STALE_PRIORITY_LIMIT
+  );
+
+  for (const document of documents) {
+    if (Date.now() - started > STALE_PRIORITY_TIME_BUDGET_MS) break;
+    checked++;
+    let json: TotvsDeliveryListResponse;
+    try {
+      json = await fetchTotvs<TotvsDeliveryListResponse>(
+        `${BASE_URL}/rest/ai/deliveries?document=${encodeURIComponent(document)}&page=1&size=50`
+      );
+    } catch (err) {
+      errors.push(`stale delivery document ${document}: ${(err as Error).message}`);
+      continue;
+    }
+    for (const d of json.data ?? []) {
+      if (await upsertDelivery(supabase, d, errors)) upserted++;
+    }
+  }
+
+  return { checked, upserted, errors };
+}
+
 async function syncDeliveries(supabase: SupabaseAdmin): Promise<SyncResult> {
   const started = Date.now();
   let page = Number(await getSyncState(supabase, "totvs_deliveries_next_page")) || 1;
@@ -757,6 +826,7 @@ export type TotvsSyncSummary = {
   ok: boolean;
   clients: { checked: number; upserted: number };
   orders: { checked: number; upserted: number };
+  deliveriesStale: { checked: number; upserted: number };
   deliveries: { checked: number; upserted: number };
   clientsBackfill: { checked: number; upserted: number };
   errors: string[];
@@ -769,22 +839,37 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
 
   const clients = await syncClients(supabase);
   const orders = await syncOrders(supabase);
+  // Antes do scan sequencial: refresca com prioridade os pedidos não
+  // resolvidos mais desatualizados (ver comentário em syncStaleDeliveries).
+  const deliveriesStale = await syncStaleDeliveries(supabase);
   const deliveries = await syncDeliveries(supabase);
   const clientsBackfill = await backfillMissingClients(supabase);
 
   const summary: TotvsSyncSummary = {
-    ok: clients.errors.length === 0 && orders.errors.length === 0 && deliveries.errors.length === 0 && clientsBackfill.errors.length === 0,
+    ok:
+      clients.errors.length === 0 &&
+      orders.errors.length === 0 &&
+      deliveriesStale.errors.length === 0 &&
+      deliveries.errors.length === 0 &&
+      clientsBackfill.errors.length === 0,
     clients: { checked: clients.checked, upserted: clients.upserted },
     orders: { checked: orders.checked, upserted: orders.upserted },
+    deliveriesStale: { checked: deliveriesStale.checked, upserted: deliveriesStale.upserted },
     deliveries: { checked: deliveries.checked, upserted: deliveries.upserted },
     clientsBackfill: { checked: clientsBackfill.checked, upserted: clientsBackfill.upserted },
-    errors: [...clients.errors, ...orders.errors, ...deliveries.errors, ...clientsBackfill.errors],
+    errors: [...clients.errors, ...orders.errors, ...deliveriesStale.errors, ...deliveries.errors, ...clientsBackfill.errors],
   };
 
   await recordSyncRun(
     "totvs",
     summary.ok,
-    { clients: summary.clients, orders: summary.orders, deliveries: summary.deliveries, clientsBackfill: summary.clientsBackfill },
+    {
+      clients: summary.clients,
+      orders: summary.orders,
+      deliveriesStale: summary.deliveriesStale,
+      deliveries: summary.deliveries,
+      clientsBackfill: summary.clientsBackfill,
+    },
     summary.errors
   );
 

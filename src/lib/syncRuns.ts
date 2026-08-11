@@ -40,6 +40,26 @@ export async function recordSyncRun(
   }
 }
 
+// Usado pelas próprias rotas de cron (backup, ghl) pra se auto-limitar:
+// mesmo que algo dispare a rota com mais frequência do que o previsto (cron
+// duplicado, retry externo, etc.), a rota consulta essa única linha antes de
+// fazer qualquer leitura pesada no banco -- descoberto em 2026-08-10: egress
+// do Supabase estourou a cota do plano Free (6,6 GB de 5 GB) com um banco de
+// só 49 MB, sinal de chamada repetida demais, não de dado grande. Consulta
+// em si é minúscula (1 linha, 1 coluna) perto do que evita.
+export async function getLastSuccessfulRunAt(job: SyncJob): Promise<string | null> {
+  const admin = getSupabaseAdmin();
+  const { data } = await admin
+    .from("sync_runs")
+    .select("ran_at")
+    .eq("job", job)
+    .eq("ok", true)
+    .order("ran_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.ran_at ?? null;
+}
+
 export type LatestSyncRun = { job: SyncJob; ok: boolean; ranAt: string; errors: string[] };
 
 // Uma linha por job (a mais recente) -- não dá pra fazer "distinct on" via

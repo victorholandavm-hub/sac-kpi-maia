@@ -11,7 +11,14 @@ import { addBusinessDays } from "./businessDays";
 export type EntregaRiscoNivel = "alerta" | "acompanhamento";
 
 const CARGA_ABERTA_LABELS = ["Programada", "Faturada", "Liberada", "Em Rota"];
-const RESOLVIDO_LABELS = ["Entregue", "Entregue Parcial"];
+// Exportado por conveniência de reuso; totvsSync.ts mantém sua PRÓPRIA cópia
+// deste array (RESOLVIDO_LABELS lá) em vez de importar daqui -- esse arquivo
+// roda dentro do Next.js (resolve import sem extensão), mas totvsSync.ts
+// também roda standalone via `node scripts/totvs-sync.ts`, cujo resolvedor
+// ESM nativo exige extensão ".ts" em todo import relativo; importar este
+// módulo puxaria addBusinessDays/supabaseAdmin sem extensão junto e quebraria
+// o script. Se este array mudar, atualizar os dois lugares.
+export const RESOLVIDO_LABELS = ["Entregue", "Entregue Parcial"];
 const PRAZO_DIAS_UTEIS = 5;
 
 export type EntregaRiscoCarga = {
@@ -54,6 +61,7 @@ export type EntregaRiscoItem = {
   cargaAtual: EntregaRiscoCarga | null;
   classificacao: EntregaRiscoClassificacao | null;
   assignedTo: EntregaRiscoAssignedTo | null;
+  syncedAt: string;
 };
 
 // Regras 1-3 do plano da feature: compara rótulos de status contra o prazo
@@ -149,6 +157,7 @@ type DeliveryRow = {
   client_state: string | null;
   status_atual: string | null;
   first_seen_at: string;
+  synced_at: string;
   risk_trigger_at: string | null;
   risk_trigger_reason: string | null;
   totvs_delivery_cargas: DeliveryCargaRow[] | null;
@@ -175,7 +184,7 @@ function hasClassificacao(row: ClassificacaoRow): boolean {
 }
 
 const DELIVERY_COLUMNS =
-  "pedido, filial_venda, loja, client_id, client_name, client_cpf_cnpj, client_neighborhood, client_city, client_state, status_atual, first_seen_at, risk_trigger_at, risk_trigger_reason, " +
+  "pedido, filial_venda, loja, client_id, client_name, client_cpf_cnpj, client_neighborhood, client_city, client_state, status_atual, first_seen_at, synced_at, risk_trigger_at, risk_trigger_reason, " +
   "totvs_delivery_cargas(carga, dt_previsao, tentativa, tipo_entrega, status_carga, status_entrega, motorista_nome, transportadora, nota_fiscal, serie)";
 
 function toEntregaRiscoCarga(row: DeliveryCargaRow): EntregaRiscoCarga {
@@ -266,6 +275,7 @@ export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
       baselineData: baseline.data,
       baselineOrigem: baseline.origem,
       cargaAtual: proximaCarga,
+      syncedAt: d.synced_at,
       classificacao:
         classificacaoRow && hasClassificacao(classificacaoRow)
           ? {

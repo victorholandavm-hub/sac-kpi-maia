@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { businessMinutesBetween } from "@/lib/businessHours";
-import { recordSyncRun } from "@/lib/syncRuns";
+import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
+
+// A cadência real de 2h vem de .github/workflows/sync-cron.yml (curl direto
+// pra sac-kpi-maia.vercel.app/api/sync), não do cron nativo em vercel.json
+// (que pede 1x/dia mas o plano Hobby da Vercel não deixa ir abaixo disso --
+// o workflow do GitHub Actions é o contorno). O workflow também tem
+// workflow_dispatch habilitado (disparo manual), então esse teto é só
+// segurança pra um disparo manual não coincidir com o agendado e repetir o
+// trabalho (request ao GHL + leituras no Supabase) sem necessidade.
+const MIN_INTERVAL_MINUTES = 60;
 
 const CHANNEL_MAP: Record<string, string> = {
   TYPE_WHATSAPP: "WhatsApp",
@@ -127,6 +136,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const lastRunAt = await getLastSuccessfulRunAt("ghl");
+    if (lastRunAt && Date.now() - new Date(lastRunAt).getTime() < MIN_INTERVAL_MINUTES * 60 * 1000) {
+      return NextResponse.json({ ok: true, skipped: true, reason: `última sincronização com sucesso há menos de ${MIN_INTERVAL_MINUTES}min`, lastRunAt });
+    }
     return await runSync();
   } catch (err) {
     const message = (err as Error).message;
