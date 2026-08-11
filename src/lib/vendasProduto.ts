@@ -1,12 +1,12 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 
 // Tela "Vendas por produto" (admin + CD, ver 0073_vendas_produto_rls.sql):
-// curva semanal de um produto e ranking dos mais vendidos, em cima do
-// histórico de NFs já sincronizado do TOTVS (totvs_orders/totvs_order_items,
-// ver 0039_totvs_sync.sql). Quantidade é sempre a SOMA líquida (venda +
-// devolução) -- devolução já vem com quantidade negativa no payload da
-// TOTVS (confirmado no schema da API), então somar direto já dá o volume
-// líquido vendido, sem precisar tratar os dois tipos separado.
+// curva semanal de um produto, ranking dos mais vendidos e classificação por
+// tipo (colchão, roupeiro...), em cima do histórico de NFs já sincronizado
+// do TOTVS (totvs_orders/totvs_order_items, ver 0039_totvs_sync.sql).
+// Quantidade é sempre a SOMA líquida (venda + devolução) -- devolução já
+// vem com quantidade negativa no payload da TOTVS, então somar direto já dá
+// o volume líquido vendido, sem precisar tratar os dois tipos separado.
 
 // Cada semana bucket pela SEGUNDA-feira daquela semana -- rótulo estável,
 // não depende de qual dia da semana é "hoje" quando a tela é aberta.
@@ -20,6 +20,38 @@ function segundaFeiraDe(isoDate: string): string {
 
 function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+// A API do TOTVS não traz categoria/família de produto nenhuma (conferido
+// no schema documentado de /rest/orders) -- só código e descrição em texto
+// livre. Classificação por palavra-chave na descrição, primeira que bater
+// (ordem importa: "COLCHAO" antes de "BOX" evita cruzar "protetor de
+// colchão" com box, por ex.). Aproximado por natureza -- fácil de ajustar
+// essa lista depois se algum produto cair na categoria errada.
+export const PRODUTO_CATEGORIAS = [
+  {
+    key: "colchao",
+    label: "Colchão",
+    keywords: ["COLCHAO", "COLCHÃO", "COLCHONETE", "COL ", "TRAV ", "TRAVESSEIRO", "PROTETOR", "PILLOW"],
+  },
+  { key: "box_base", label: "Box / Base", keywords: ["BOX", "BASE TOP", "FL BASE", "BAU "] },
+  { key: "cama", label: "Cama / Beliche / Cabeceira", keywords: ["BELICHE", "CABECEIRA", "CAMA "] },
+  { key: "roupeiro", label: "Roupeiro / Armário", keywords: ["ROUPEIRO", "ROUP ", "ARMARIO", "ARMÁRIO", "MULTI-USO", "MULTIUSO", "GUARDA-ROUPA", "GUARDA ROUPA"] },
+  { key: "comoda", label: "Cômoda", keywords: ["COMODA", "CÔMODA"] },
+  { key: "cozinha", label: "Cozinha", keywords: ["COZINHA", "BALCAO", "BALCÃO", "PANELEIRO", "FRUTEIRA"] },
+  { key: "sala_jantar", label: "Sala de estar / jantar", keywords: ["SOFA", "SOFÁ", "POLTRONA", "CRISTALEIRA", "BUFFET", "ESTOFADO"] },
+  { key: "mesa_cadeira", label: "Mesa / Cadeira", keywords: ["MESA", "CADEIRA", "CONJ."] },
+  { key: "estante_home", label: "Estante / Home / Rack", keywords: ["HOME", "RACK", "ESTANTE", "APARADOR"] },
+] as const;
+
+export type ProdutoCategoriaKey = (typeof PRODUTO_CATEGORIAS)[number]["key"] | "outros";
+
+export function classificarProduto(description: string | null): { key: ProdutoCategoriaKey; label: string } {
+  const upper = (description ?? "").toUpperCase();
+  for (const cat of PRODUTO_CATEGORIAS) {
+    if (cat.keywords.some((k) => upper.includes(k))) return { key: cat.key, label: cat.label };
+  }
+  return { key: "outros", label: "Outros" };
 }
 
 export type ProdutoSugestao = { productCode: string; description: string | null };
@@ -49,7 +81,16 @@ export async function searchProdutosVenda(query: string): Promise<ProdutoSugesta
 }
 
 export type SemanaVenda = { semanaInicio: string; quantidade: number; valor: number };
-export type ProdutoVendaCurva = { productCode: string; description: string | null; semanas: SemanaVenda[] };
+export type ProdutoVendaCurva = {
+  productCode: string;
+  description: string | null;
+  categoria: { key: ProdutoCategoriaKey; label: string };
+  semanas: SemanaVenda[];
+  totalPeriodo: number;
+  valorPeriodo: number;
+  semanaAtual: number;
+  semanaAnterior: number;
+};
 
 type ItemComData = {
   quantity: number;
@@ -60,7 +101,7 @@ type ItemComData = {
 
 // Curva semanal de UM produto -- todas as linhas do período cabem numa
 // página só (um produto específico, poucas semanas, não precisa paginar).
-export async function getVendaCurvaProduto(productCode: string, numSemanas = 12): Promise<ProdutoVendaCurva | null> {
+export async function getVendaCurvaProduto(productCode: string, numSemanas: number): Promise<ProdutoVendaCurva | null> {
   const trimmed = productCode.trim();
   if (!trimmed) return null;
 
@@ -76,16 +117,19 @@ export async function getVendaCurvaProduto(productCode: string, numSemanas = 12)
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as unknown as ItemComData[];
-  if (rows.length === 0) {
+  let description: string | null = null;
+  if (rows.length > 0) {
+    description = rows[0].description;
+  } else {
     // Produto pode existir (catálogo veio de vendas antigas) mas sem
     // movimento no período -- ainda assim mostra a curva zerada em vez de
     // "produto não encontrado", que seria enganoso.
     const { data: anyRow } = await admin.from("totvs_order_items").select("description").eq("product", trimmed).limit(1).maybeSingle();
     if (!anyRow) return null;
-    return buildCurva(trimmed, anyRow.description, [], numSemanas);
+    description = anyRow.description;
   }
 
-  return buildCurva(trimmed, rows[0].description, rows, numSemanas);
+  return buildCurva(trimmed, description, rows, numSemanas);
 }
 
 function buildCurva(productCode: string, description: string | null, rows: ItemComData[], numSemanas: number): ProdutoVendaCurva {
@@ -114,21 +158,42 @@ function buildCurva(productCode: string, description: string | null, rows: ItemC
     cursor.setDate(cursor.getDate() + 7);
   }
 
-  return { productCode, description, semanas };
+  const totalPeriodo = semanas.reduce((s, w) => s + w.quantidade, 0);
+  const valorPeriodo = semanas.reduce((s, w) => s + w.valor, 0);
+  const semanaAtual = semanas[semanas.length - 1]?.quantidade ?? 0;
+  const semanaAnterior = semanas[semanas.length - 2]?.quantidade ?? 0;
+
+  return {
+    productCode,
+    description,
+    categoria: classificarProduto(description),
+    semanas,
+    totalPeriodo,
+    valorPeriodo,
+    semanaAtual,
+    semanaAnterior,
+  };
 }
 
-export type ProdutoRankingItem = { productCode: string; description: string | null; quantidade: number; valor: number };
+export type ProdutoRankingItem = {
+  productCode: string;
+  description: string | null;
+  categoria: { key: ProdutoCategoriaKey; label: string };
+  quantidade: number;
+  valor: number;
+};
 
 type ItemRankingRow = { product: string | null; description: string | null; quantity: number; total: number };
 
-// Ranking geral -- paginado de verdade (não confia no default de 1000
+// Todo o histórico do período cabe em memória pra agregar (ranking geral E
+// por categoria) -- paginado de verdade (não confia no default de 1000
 // linhas do PostgREST): num período de várias semanas, o total de itens
 // pode passar disso fácil. Corta em MAX_PAGINAS por segurança (nunca deve
 // bater nisso com o volume atual, mas evita loop sem fim se um dia bater).
 const RANKING_PAGE_SIZE = 1000;
-const RANKING_MAX_PAGINAS = 20;
+const RANKING_MAX_PAGINAS = 30;
 
-export async function listRankingProdutos(numSemanas = 4, limit = 20): Promise<ProdutoRankingItem[]> {
+async function fetchItensDoPeriodo(numSemanas: number): Promise<ItemRankingRow[]> {
   const admin = getSupabaseAdmin();
   const cutoff = isoDaysAgo(numSemanas * 7);
 
@@ -146,11 +211,24 @@ export async function listRankingProdutos(numSemanas = 4, limit = 20): Promise<P
     rows.push(...batch);
     if (batch.length < RANKING_PAGE_SIZE) break;
   }
+  return rows;
+}
+
+// categoria opcional -- quando informada, filtra o ranking só pra produtos
+// classificados nela (ver classificarProduto).
+export async function listRankingProdutos(
+  numSemanas: number,
+  limit: number,
+  categoria?: ProdutoCategoriaKey
+): Promise<ProdutoRankingItem[]> {
+  const rows = await fetchItensDoPeriodo(numSemanas);
 
   const porProduto = new Map<string, ProdutoRankingItem>();
   for (const row of rows) {
     if (!row.product) continue;
-    const acc = porProduto.get(row.product) ?? { productCode: row.product, description: row.description, quantidade: 0, valor: 0 };
+    const cat = classificarProduto(row.description);
+    if (categoria && cat.key !== categoria) continue;
+    const acc = porProduto.get(row.product) ?? { productCode: row.product, description: row.description, categoria: cat, quantidade: 0, valor: 0 };
     acc.quantidade += row.quantity;
     acc.valor += row.total;
     if (!acc.description && row.description) acc.description = row.description;
@@ -158,4 +236,24 @@ export async function listRankingProdutos(numSemanas = 4, limit = 20): Promise<P
   }
 
   return [...porProduto.values()].sort((a, b) => b.quantidade - a.quantidade).slice(0, limit);
+}
+
+export type CategoriaResumo = { key: ProdutoCategoriaKey; label: string; quantidade: number; valor: number };
+
+// Visão "por tipo de produto" -- resposta direta ao que a tela não tinha
+// antes (só listava produto por produto, sem dar pra comparar categoria
+// contra categoria de cara).
+export async function listVendasPorCategoria(numSemanas: number): Promise<CategoriaResumo[]> {
+  const rows = await fetchItensDoPeriodo(numSemanas);
+
+  const porCategoria = new Map<ProdutoCategoriaKey, CategoriaResumo>();
+  for (const row of rows) {
+    const cat = classificarProduto(row.description);
+    const acc = porCategoria.get(cat.key) ?? { key: cat.key, label: cat.label, quantidade: 0, valor: 0 };
+    acc.quantidade += row.quantity;
+    acc.valor += row.total;
+    porCategoria.set(cat.key, acc);
+  }
+
+  return [...porCategoria.values()].sort((a, b) => b.quantidade - a.quantidade);
 }

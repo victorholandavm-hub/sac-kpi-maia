@@ -10,18 +10,11 @@ function formatSemana(value: unknown) {
 }
 
 export function ProdutoVendaCurvaChart({ semanas }: { semanas: SemanaVenda[] }) {
-  const totalPeriodo = semanas.reduce((sum, s) => sum + s.quantidade, 0);
-
   return (
-    <div className="rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Vendas por semana
-        </h3>
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Total no período: <strong style={{ color: "var(--text-primary)" }}>{totalPeriodo}</strong>
-        </span>
-      </div>
+    <div className="rounded-lg p-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+      <h3 className="text-sm font-bold mb-3" style={{ color: "var(--text-primary)" }}>
+        Vendas por semana
+      </h3>
       {semanas.every((s) => s.quantidade === 0) ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Nenhuma venda desse produto no período.
@@ -49,7 +42,7 @@ export function ProdutoVendaCurvaChart({ semanas }: { semanas: SemanaVenda[] }) 
                 fontSize: 12,
               }}
             />
-            <Bar dataKey="quantidade" fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={48} />
+            <Bar dataKey="quantidade" fill="var(--brand-green)" radius={[4, 4, 0, 0]} maxBarSize={48} />
           </BarChart>
         </ResponsiveContainer>
       )}
