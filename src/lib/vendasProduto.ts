@@ -8,6 +8,11 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 // vem com quantidade negativa no payload da TOTVS, então somar direto já dá
 // o volume líquido vendido, sem precisar tratar os dois tipos separado.
 
+// Todas as funções recebem um período em datas exatas (não "últimas N
+// semanas") -- a tela oferece atalhos (4/8/12/26 semanas) que só calculam
+// esse range antes de chamar aqui, mas o range em si é sempre explícito.
+export type DateRange = { from: string; to: string };
+
 // Cada semana bucket pela SEGUNDA-feira daquela semana -- rótulo estável,
 // não depende de qual dia da semana é "hoje" quando a tela é aberta.
 function segundaFeiraDe(isoDate: string): string {
@@ -18,8 +23,18 @@ function segundaFeiraDe(isoDate: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-function isoDaysAgo(days: number): string {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+// Toda segunda-feira entre o início e o fim do período (inclusive), em
+// ordem crescente -- base pra preencher semana sem venda com 0 em vez de
+// pular ela silenciosamente.
+function segundasNoPeriodo(range: DateRange): string[] {
+  const semanas: string[] = [];
+  const cursor = new Date(`${segundaFeiraDe(range.from)}T00:00:00`);
+  const fim = new Date(`${segundaFeiraDe(range.to)}T00:00:00`);
+  while (cursor.getTime() <= fim.getTime()) {
+    semanas.push(cursor.toISOString().slice(0, 10));
+    cursor.setDate(cursor.getDate() + 7);
+  }
+  return semanas;
 }
 
 // A API do TOTVS não traz categoria/família de produto nenhuma (conferido
@@ -100,19 +115,18 @@ type ItemComData = {
 };
 
 // Curva semanal de UM produto -- todas as linhas do período cabem numa
-// página só (um produto específico, poucas semanas, não precisa paginar).
-export async function getVendaCurvaProduto(productCode: string, numSemanas: number): Promise<ProdutoVendaCurva | null> {
+// página só (um produto específico, período limitado, não precisa paginar).
+export async function getVendaCurvaProduto(productCode: string, range: DateRange): Promise<ProdutoVendaCurva | null> {
   const trimmed = productCode.trim();
   if (!trimmed) return null;
 
   const admin = getSupabaseAdmin();
-  const cutoff = isoDaysAgo(numSemanas * 7);
-
   const { data, error } = await admin
     .from("totvs_order_items")
     .select("quantity, total, description, totvs_orders!inner(issue_date)")
     .eq("product", trimmed)
-    .gte("totvs_orders.issue_date", cutoff)
+    .gte("totvs_orders.issue_date", range.from)
+    .lte("totvs_orders.issue_date", range.to)
     .limit(5000);
   if (error) throw new Error(error.message);
 
@@ -129,10 +143,10 @@ export async function getVendaCurvaProduto(productCode: string, numSemanas: numb
     description = anyRow.description;
   }
 
-  return buildCurva(trimmed, description, rows, numSemanas);
+  return buildCurva(trimmed, description, rows, range);
 }
 
-function buildCurva(productCode: string, description: string | null, rows: ItemComData[], numSemanas: number): ProdutoVendaCurva {
+function buildCurva(productCode: string, description: string | null, rows: ItemComData[], range: DateRange): ProdutoVendaCurva {
   const porSemana = new Map<string, { quantidade: number; valor: number }>();
   for (const row of rows) {
     if (!row.totvs_orders) continue;
@@ -145,18 +159,11 @@ function buildCurva(productCode: string, description: string | null, rows: ItemC
 
   // Preenche TODAS as semanas do período, mesmo as sem venda nenhuma (fica
   // 0) -- senão o gráfico "pula" semanas silenciosamente e passa a
-  // impressão errada de que a semana nem existiu. Da semana mais antiga
-  // (hoje - numSemanas) até a semana atual, em ordem crescente.
-  const semanas: SemanaVenda[] = [];
-  const hojeSemana = segundaFeiraDe(new Date().toISOString().slice(0, 10));
-  const cursor = new Date(`${hojeSemana}T00:00:00`);
-  cursor.setDate(cursor.getDate() - (numSemanas - 1) * 7);
-  for (let i = 0; i < numSemanas; i++) {
-    const semanaIso = cursor.toISOString().slice(0, 10);
+  // impressão errada de que a semana nem existiu.
+  const semanas: SemanaVenda[] = segundasNoPeriodo(range).map((semanaIso) => {
     const acc = porSemana.get(semanaIso) ?? { quantidade: 0, valor: 0 };
-    semanas.push({ semanaInicio: semanaIso, quantidade: acc.quantidade, valor: acc.valor });
-    cursor.setDate(cursor.getDate() + 7);
-  }
+    return { semanaInicio: semanaIso, quantidade: acc.quantidade, valor: acc.valor };
+  });
 
   const totalPeriodo = semanas.reduce((s, w) => s + w.quantidade, 0);
   const valorPeriodo = semanas.reduce((s, w) => s + w.valor, 0);
@@ -183,19 +190,25 @@ export type ProdutoRankingItem = {
   valor: number;
 };
 
-type ItemRankingRow = { product: string | null; description: string | null; quantity: number; total: number };
+type ItemRankingRow = {
+  product: string | null;
+  description: string | null;
+  quantity: number;
+  total: number;
+  totvs_orders: { issue_date: string } | null;
+};
 
-// Todo o histórico do período cabe em memória pra agregar (ranking geral E
-// por categoria) -- paginado de verdade (não confia no default de 1000
-// linhas do PostgREST): num período de várias semanas, o total de itens
-// pode passar disso fácil. Corta em MAX_PAGINAS por segurança (nunca deve
-// bater nisso com o volume atual, mas evita loop sem fim se um dia bater).
+// Todo o histórico do período cabe em memória pra agregar (ranking geral,
+// por categoria E por categoria-por-semana) -- paginado de verdade (não
+// confia no default de 1000 linhas do PostgREST): num período de várias
+// semanas, o total de itens pode passar disso fácil. Corta em MAX_PAGINAS
+// por segurança (nunca deve bater nisso com o volume atual, mas evita loop
+// sem fim se um dia bater).
 const RANKING_PAGE_SIZE = 1000;
 const RANKING_MAX_PAGINAS = 30;
 
-async function fetchItensDoPeriodo(numSemanas: number): Promise<ItemRankingRow[]> {
+async function fetchItensDoPeriodo(range: DateRange): Promise<ItemRankingRow[]> {
   const admin = getSupabaseAdmin();
-  const cutoff = isoDaysAgo(numSemanas * 7);
 
   const rows: ItemRankingRow[] = [];
   for (let pagina = 0; pagina < RANKING_MAX_PAGINAS; pagina++) {
@@ -203,7 +216,8 @@ async function fetchItensDoPeriodo(numSemanas: number): Promise<ItemRankingRow[]
     const { data, error } = await admin
       .from("totvs_order_items")
       .select("product, description, quantity, total, totvs_orders!inner(issue_date)")
-      .gte("totvs_orders.issue_date", cutoff)
+      .gte("totvs_orders.issue_date", range.from)
+      .lte("totvs_orders.issue_date", range.to)
       .not("product", "is", null)
       .range(from, from + RANKING_PAGE_SIZE - 1);
     if (error) throw new Error(error.message);
@@ -216,12 +230,8 @@ async function fetchItensDoPeriodo(numSemanas: number): Promise<ItemRankingRow[]
 
 // categoria opcional -- quando informada, filtra o ranking só pra produtos
 // classificados nela (ver classificarProduto).
-export async function listRankingProdutos(
-  numSemanas: number,
-  limit: number,
-  categoria?: ProdutoCategoriaKey
-): Promise<ProdutoRankingItem[]> {
-  const rows = await fetchItensDoPeriodo(numSemanas);
+export async function listRankingProdutos(range: DateRange, limit: number, categoria?: ProdutoCategoriaKey): Promise<ProdutoRankingItem[]> {
+  const rows = await fetchItensDoPeriodo(range);
 
   const porProduto = new Map<string, ProdutoRankingItem>();
   for (const row of rows) {
@@ -242,9 +252,10 @@ export type CategoriaResumo = { key: ProdutoCategoriaKey; label: string; quantid
 
 // Visão "por tipo de produto" -- resposta direta ao que a tela não tinha
 // antes (só listava produto por produto, sem dar pra comparar categoria
-// contra categoria de cara).
-export async function listVendasPorCategoria(numSemanas: number): Promise<CategoriaResumo[]> {
-  const rows = await fetchItensDoPeriodo(numSemanas);
+// contra categoria de cara). Uma foto do período inteiro (sem quebra por
+// semana) -- ver listVendasPorCategoriaPorSemana pra evolução no tempo.
+export async function listVendasPorCategoria(range: DateRange): Promise<CategoriaResumo[]> {
+  const rows = await fetchItensDoPeriodo(range);
 
   const porCategoria = new Map<ProdutoCategoriaKey, CategoriaResumo>();
   for (const row of rows) {
@@ -256,4 +267,53 @@ export async function listVendasPorCategoria(numSemanas: number): Promise<Catego
   }
 
   return [...porCategoria.values()].sort((a, b) => b.quantidade - a.quantidade);
+}
+
+// { semanaInicio: "2026-07-06", colchao: 12, roupeiro: 4, ... } -- uma linha
+// por semana, uma chave por categoria -- formato que o recharts espera pra
+// desenhar barras empilhadas com uma <Bar> por categoria (ver
+// CategoriaEvolucaoChart.tsx). Só entram categorias com pelo menos 1 venda
+// em ALGUMA semana do período, pra não empilhar série vazia.
+export type CategoriaEvolucaoSemana = { semanaInicio: string } & Record<string, number | string>;
+
+export async function listVendasPorCategoriaPorSemana(
+  range: DateRange
+): Promise<{ semanas: CategoriaEvolucaoSemana[]; categorias: { key: ProdutoCategoriaKey; label: string }[] }> {
+  const rows = await fetchItensDoPeriodo(range);
+
+  const porSemanaCategoria = new Map<string, Map<ProdutoCategoriaKey, number>>();
+  const categoriasVistas = new Map<ProdutoCategoriaKey, string>();
+  for (const row of rows) {
+    if (!row.totvs_orders) continue;
+    const semana = segundaFeiraDe(row.totvs_orders.issue_date);
+    const cat = classificarProduto(row.description);
+    categoriasVistas.set(cat.key, cat.label);
+    const porCategoria = porSemanaCategoria.get(semana) ?? new Map<ProdutoCategoriaKey, number>();
+    porCategoria.set(cat.key, (porCategoria.get(cat.key) ?? 0) + row.quantity);
+    porSemanaCategoria.set(semana, porCategoria);
+  }
+
+  // Ordena categorias pelo volume total (maior primeiro) -- na barra
+  // empilhada isso deixa a categoria mais vendida na base, mais fácil de
+  // comparar visualmente.
+  const totalPorCategoria = new Map<ProdutoCategoriaKey, number>();
+  for (const porCategoria of porSemanaCategoria.values()) {
+    for (const [key, qtd] of porCategoria) {
+      totalPorCategoria.set(key, (totalPorCategoria.get(key) ?? 0) + qtd);
+    }
+  }
+  const categorias = [...categoriasVistas.entries()]
+    .map(([key, label]) => ({ key, label }))
+    .sort((a, b) => (totalPorCategoria.get(b.key) ?? 0) - (totalPorCategoria.get(a.key) ?? 0));
+
+  const semanas: CategoriaEvolucaoSemana[] = segundasNoPeriodo(range).map((semanaIso) => {
+    const porCategoria = porSemanaCategoria.get(semanaIso);
+    const linha: CategoriaEvolucaoSemana = { semanaInicio: semanaIso };
+    for (const cat of categorias) {
+      linha[cat.key] = porCategoria?.get(cat.key) ?? 0;
+    }
+    return linha;
+  });
+
+  return { semanas, categorias };
 }
