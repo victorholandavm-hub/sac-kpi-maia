@@ -5,13 +5,13 @@ import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
-// Descoberto em 2026-08-10: essa rota estava sendo chamada bem mais vezes
-// por dia do que o `vercel.json` (1x/dia) sugere -- suspeita de deploy
-// duplicado/zumbi ainda ativo chamando o cron por fora, mas não dá pra
-// confirmar nem corrigir isso a partir do código. Esse teto é a defesa que
-// dá pra aplicar daqui: nem que algo dispare a rota de novo minutos depois,
-// ela não repete o trabalho (nem o request pro GHL, nem as leituras no
-// Supabase) até passar o intervalo mínimo.
+// A cadência real de 2h vem de .github/workflows/sync-cron.yml (curl direto
+// pra sac-kpi-maia.vercel.app/api/sync), não do cron nativo em vercel.json
+// (que pede 1x/dia mas o plano Hobby da Vercel não deixa ir abaixo disso --
+// o workflow do GitHub Actions é o contorno). O workflow também tem
+// workflow_dispatch habilitado (disparo manual), então esse teto é só
+// segurança pra um disparo manual não coincidir com o agendado e repetir o
+// trabalho (request ao GHL + leituras no Supabase) sem necessidade.
 const MIN_INTERVAL_MINUTES = 60;
 
 const CHANNEL_MAP: Record<string, string> = {
