@@ -5,8 +5,19 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 // agrupadas pelo código da carga -- uma carga física carrega vários
 // pedidos/clientes diferentes na mesma viagem (um totvs_delivery_cargas por
 // pedido, todos compartilhando o mesmo `carga`), então os campos da viagem
-// em si (motorista, conferente, transportadora, veículo) só fazem sentido
-// olhados uma vez por grupo, mesmo vindo repetidos em cada linha.
+// em si (motorista, transportadora, veículo) só fazem sentido olhados uma
+// vez por grupo, mesmo vindo repetidos em cada linha.
+//
+// Conferente NÃO aparece aqui de propósito, mesmo a coluna conferente_nome
+// existindo em totvs_delivery_cargas e sendo capturada pelo sync
+// (totvsSync.ts): confirmado em 2026-08-11, direto na API real (1.136
+// cargas checadas via /rest/ai/deliveries), que o vínculo carga→conferente
+// (ZAG_CONFER, tabela AC4) vem sempre vazio -- o conferente de verdade é
+// identificado no faturamento da nota (por um código numérico próprio da
+// AC4), não na carga, e esse vínculo não está exposto em nenhum endpoint
+// disponível hoje (nem /rest/orders, nem /rest/ai/deliveries). Captura
+// continua ligada pra quando esse campo passar a vir preenchido -- só a
+// exibição foi desligada.
 const DIAS_RETROATIVOS = 30;
 
 export type CargaProblema = {
@@ -35,7 +46,6 @@ export type CargaGroup = {
   dtPrevisao: string | null;
   statusCarga: string | null;
   motoristaNome: string | null;
-  conferenteNome: string | null;
   transportadora: string | null;
   veiculo: string | null;
   pedidos: CargaPedidoItem[];
@@ -49,7 +59,6 @@ type CargaRow = {
   status_entrega: string | null;
   tentativa: number | null;
   motorista_nome: string | null;
-  conferente_nome: string | null;
   transportadora: string | null;
   veiculo: string | null;
   ocorrencia_descricao: string | null;
@@ -70,7 +79,7 @@ type CargaRow = {
 };
 
 const CARGA_COLUMNS =
-  "id, carga, dt_previsao, status_carga, status_entrega, tentativa, motorista_nome, conferente_nome, transportadora, veiculo, ocorrencia_descricao, " +
+  "id, carga, dt_previsao, status_carga, status_entrega, tentativa, motorista_nome, transportadora, veiculo, ocorrencia_descricao, " +
   "totvs_deliveries!inner(pedido, filial_venda, loja, client_name, client_id, client_cpf_cnpj), " +
   "carga_problemas(id, description, reported_by_name, created_at)";
 
@@ -98,7 +107,6 @@ export async function listCargasRecentes(): Promise<CargaGroup[]> {
         dtPrevisao: row.dt_previsao,
         statusCarga: row.status_carga,
         motoristaNome: row.motorista_nome,
-        conferenteNome: row.conferente_nome,
         transportadora: row.transportadora,
         veiculo: row.veiculo,
         pedidos: [],
