@@ -1514,6 +1514,9 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   const clientName = String(formData.get("client_name") ?? "").trim();
   if (!clientName) return { error: "Informe o nome do cliente." };
 
+  const clientProtheusCode = String(formData.get("client_protheus_code") ?? "").trim();
+  if (!clientProtheusCode) return { error: "Informe o código do cliente." };
+
   const clientPhone = String(formData.get("client_phone") ?? "").trim();
   if (!clientPhone) return { error: "Informe o telefone." };
 
@@ -1606,7 +1609,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       client_address_number: emptyToNull(addressNumberFields.number),
       client_is_apartment: addressNumberFields.isApartment,
       client_address_complement: emptyToNull(addressNumberFields.complement),
-      client_protheus_code: emptyToNull(formData.get("client_protheus_code")),
+      client_protheus_code: emptyToNull(clientProtheusCode),
       reason: reason,
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
@@ -1680,6 +1683,12 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
 
   const clientName = String(formData.get("client_name") ?? "").trim();
   if (!clientName) return { error: "Informe o nome do cliente." };
+
+  const clientProtheusCode = String(formData.get("client_protheus_code") ?? "").trim();
+  const clientCpf = String(formData.get("client_cpf") ?? "").trim();
+  if (!clientProtheusCode && !clientCpf) {
+    return { error: "Informe o código do cliente ou o CPF." };
+  }
 
   const clientPhone = String(formData.get("client_phone") ?? "").trim();
   if (!clientPhone) return { error: "Informe o telefone." };
@@ -1764,7 +1773,8 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       client_is_apartment: addressNumberFields.isApartment,
       client_address_complement: emptyToNull(addressNumberFields.complement),
       client_neighborhood: clientNeighborhood,
-      client_protheus_code: emptyToNull(formData.get("client_protheus_code")),
+      client_protheus_code: emptyToNull(clientProtheusCode),
+      client_cpf: emptyToNull(clientCpf),
       reason: reason,
       restriction_note: emptyToNull(formData.get("restriction_note")),
       driver_name: driverName,

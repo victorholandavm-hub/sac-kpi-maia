@@ -89,11 +89,12 @@ export function EditPedidoEncomendaForm({ pedido }: { pedido: PedidoEncomendaSum
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
       <FormSection title="Cliente" number={1}>
-        <Field label="Código do cliente">
+        <Field label="Código do cliente *">
           <input
             name="cliente_codigo"
             value={clienteCodigo}
             onChange={(e) => setClienteCodigo(e.target.value)}
+            required
             placeholder="Código do cliente na venda"
             className="rounded border px-3 py-2"
             style={inputStyle}

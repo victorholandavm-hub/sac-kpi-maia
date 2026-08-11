@@ -318,13 +318,14 @@ export function QuickCreateRequestForm({
       <FormSection
         title="Dados do cliente"
         number={2}
-        hint="Digite o código do cliente pra preencher o resto automaticamente (se souber). Só o nome é obrigatório."
+        hint="Digite o código do cliente pra preencher o resto automaticamente (se souber) — é obrigatório."
       >
-        <Field label="Código do cliente">
+        <Field label="Código do cliente *">
           <input
             name="client_protheus_code"
             value={clientCode}
             onChange={(e) => setClientCode(e.target.value)}
+            required
             className="rounded border px-3 py-2"
             style={inputStyle}
           />

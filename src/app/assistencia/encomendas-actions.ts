@@ -133,6 +133,7 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
 
   const vendedorName = String(formData.get("vendedor_name") ?? "").trim() || null;
   const clienteCodigo = String(formData.get("cliente_codigo") ?? "").trim() || null;
+  if (!clienteCodigo) return { error: "Informe o código do cliente." };
 
   const produtoDescricoes = formData.getAll("item_produto_descricao").map((v) => String(v).trim());
   const produtoCodigos = formData.getAll("item_produto_codigo").map((v) => String(v).trim() || null);
@@ -216,6 +217,7 @@ export async function editPedidoEncomendaAction(pedidoId: string, _state: FormSt
 
   const vendedorName = String(formData.get("vendedor_name") ?? "").trim() || null;
   const clienteCodigo = String(formData.get("cliente_codigo") ?? "").trim() || null;
+  if (!clienteCodigo) return { error: "Informe o código do cliente." };
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
   const produtoDescricoes = formData.getAll("item_produto_descricao").map((v) => String(v).trim());
