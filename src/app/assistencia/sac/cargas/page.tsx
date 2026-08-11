@@ -41,7 +41,6 @@ function CargaCard({ group }: { group: CargaGroup }) {
           <span className="text-xs" style={{ color: "var(--text-muted)" }}>
             Previsão {formatDate(group.dtPrevisao)}
             {group.motoristaNome ? ` · Motorista: ${group.motoristaNome}` : ""}
-            {group.conferenteNome ? ` · Conferente: ${group.conferenteNome}` : ""}
           </span>
           <span className="text-xs" style={{ color: "var(--text-muted)" }}>
             {group.transportadora ? `${group.transportadora}` : ""}
