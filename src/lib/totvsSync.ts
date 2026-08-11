@@ -166,6 +166,9 @@ type TotvsDeliveryCarga = {
   statusEntregaCodigo?: string;
   statusOrigem?: "CARGA" | "ENTREGA";
   motorista?: TotvsDeliveryMotorista;
+  // Mesmo formato de motorista (codigo/nome), fonte AC4 -- ver
+  // 0072_carga_conferente_e_problemas.sql pras colunas novas que guardam isso.
+  conferente?: TotvsDeliveryMotorista;
   transportadora?: string;
   veiculo?: string;
   regiao?: string;
@@ -697,6 +700,8 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
         status_origem: c.statusOrigem || null,
         motorista_codigo: c.motorista?.codigo || null,
         motorista_nome: c.motorista?.nome || null,
+        conferente_codigo: c.conferente?.codigo || null,
+        conferente_nome: c.conferente?.nome || null,
         transportadora: c.transportadora || null,
         veiculo: c.veiculo || null,
         regiao: c.regiao || null,
