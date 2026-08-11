@@ -52,12 +52,17 @@ export async function cdSignIn(_state: CdFormState, formData: FormData): Promise
   cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia/encomendas" });
   cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia" });
 
+  // path "/assistencia" (não só "/assistencia/encomendas") -- descoberto em
+  // 2026-08-11: /assistencia/vendas (fora de encomendas) precisa ler essa
+  // sessão também, e um cookie com path estreito não chega em rotas irmãs
+  // fora do prefixo (mesma armadilha de LOJA_GERENTE_COOKIE_NAME, que já
+  // usa "/assistencia" por esse motivo -- ver getGerenteStoreIds/loja-actions.ts).
   cookieStore.set(CD_COOKIE_NAME, signCdSession(data.name), {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
     maxAge: CD_SESSION_MAX_AGE,
-    path: "/assistencia/encomendas",
+    path: "/assistencia",
   });
 
   redirect("/assistencia/encomendas/fila");
@@ -65,6 +70,10 @@ export async function cdSignIn(_state: CdFormState, formData: FormData): Promise
 
 export async function cdSignOut() {
   const cookieStore = await cookies();
+  // Apaga nos dois paths -- sessões antigas (de antes do path mudar pra
+  // "/assistencia") ainda podem existir no navegador de quem já estava
+  // logado; sem isso o cookie velho, mais específico, ficava esquecido.
+  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia" });
   cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia/encomendas" });
   redirect("/assistencia/encomendas/cd/login");
 }
