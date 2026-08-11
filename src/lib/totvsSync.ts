@@ -330,9 +330,14 @@ async function syncClients(supabase: SupabaseAdmin): Promise<SyncResult> {
         failCount = 0;
         continue;
       }
+      // `continue` (não `break`) pelo mesmo motivo do syncOrders logo abaixo
+      // -- tenta a mesma página de novo aqui mesmo (consome 1 iteração do
+      // CLIENT_PAGE_CAP, não o orçamento de tempo inteiro) em vez de acabar
+      // a execução inteira por causa de 1 pico passageiro de disputa de
+      // licença.
       errors.push(`clients page ${page}: ${(err as Error).message}`);
       await setSyncState(supabase, "totvs_clients_page_fail", `${page}:${failCount}`);
-      break;
+      continue;
     }
     if (failCount > 0) {
       await setSyncState(supabase, "totvs_clients_page_fail", "");
@@ -566,9 +571,21 @@ async function syncOrders(supabase: SupabaseAdmin): Promise<SyncResult> {
         failCount = 0;
         continue;
       }
+      // Antes disso era `break` -- terminava a execução inteira do sync de
+      // pedidos por causa de UM pico passageiro de disputa de licença,
+      // jogando fora o resto do orçamento de tempo (~300s) sem tentar mais
+      // nada. Como esse erro é sempre o mesmo dia+página até a próxima
+      // rodada do cron/script, "esperar a próxima execução" significava
+      // esperar uma rodada inteira só pra reduzir o failCount em 1 --
+      // descoberto em 2026-08-11 com o cursor 1 mês parado (2026-07-09,
+      // página 4), sempre no mesmo lugar. `continue` tenta o mesmo dia+página
+      // de novo aqui mesmo, ainda dentro do orçamento de tempo desta
+      // execução (checado no topo do loop) -- geralmente resolve na 2ª/3ª
+      // tentativa sem precisar de uma rodada nova, e só quando bate no
+      // ORDER_DAY_FAIL_LIMIT é que pula o dia de verdade.
       errors.push(`orders ${day} page ${page}: ${(err as Error).message}`);
       await setSyncState(supabase, "totvs_orders_day_fail", `${day}:${page}:${failCount}`);
-      break;
+      continue;
     }
     if (failCount > 0) {
       await setSyncState(supabase, "totvs_orders_day_fail", "");
