@@ -40,7 +40,10 @@ export function AssistenciaNav({
   // também veria esse tab (mesma lista de TABS pros dois papéis), e a
   // página em si barra quem não é admin/CD de qualquer forma (ver
   // src/lib/vendasAuth.ts) -- aqui é só pra não mostrar link morto.
-  const tabs = isAdmin ? [...TABS, { label: "Vendas", href: "/assistencia/vendas" }, { label: "Admin", href: "/assistencia/admin" }] : TABS;
+  // "Admin" NÃO entra mais aqui -- virou link fixo no cabeçalho (ver
+  // layout.tsx), porque ficava perdido no fim de uma fileira que rola sem
+  // indicação visual nenhuma de que tem mais coisa pra ver.
+  const tabs = isAdmin ? [...TABS, { label: "Vendas", href: "/assistencia/vendas" }] : TABS;
 
   function badgeCountFor(label: string): number {
     if (label === "Solicitações") return counts?.solicitacoes ?? 0;
@@ -49,7 +52,10 @@ export function AssistenciaNav({
   }
 
   return (
-    <nav className="flex items-center gap-2 overflow-x-auto min-w-0 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+    // Scrollbar visível de propósito (era escondida, `scrollbarWidth: "none"`)
+    // -- sem nenhum sinal visual, "tem mais aba rolando pra direita" ficava
+    // invisível, e a última aba (era "Admin") quase nunca era vista.
+    <nav className="flex items-center gap-2 overflow-x-auto min-w-0 -mx-1 px-1 pb-1">
       {tabs.map((tab) => {
         const active = pathname.startsWith(tab.href);
         return (

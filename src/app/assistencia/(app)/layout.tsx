@@ -40,6 +40,15 @@ export default async function AssistenciaAppLayout({
           >
             <div className="flex items-center gap-3">
               {isAdmin ? <NotificationBell fetchAction={listAdminNotificationsAction} storageKey="admin" /> : null}
+              {/* Fora da fila de abas que rola horizontal (AssistenciaNav) de
+                  propósito -- "Admin" ficava quase invisível no fim de uma
+                  fileira de 11 abas sem indicação nenhuma de que dava pra
+                  rolar pra ver mais. Fixo aqui, sempre visível. */}
+              {isAdmin ? (
+                <Link href="/assistencia/admin" className="text-sm font-semibold" style={{ color: "var(--brand-orange)" }}>
+                  Admin
+                </Link>
+              ) : null}
               <form action={signOut}>
                 <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
                   Sair

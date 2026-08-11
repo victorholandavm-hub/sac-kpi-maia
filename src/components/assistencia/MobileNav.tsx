@@ -119,10 +119,10 @@ export function MobileNav({
 }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
-  // "Vendas" só pra admin, mesmo motivo do AssistenciaNav (desktop).
-  const moreTabs = isAdmin
-    ? [...MORE_TABS, { label: "Vendas", href: "/assistencia/vendas" }, { label: "Admin", href: "/assistencia/admin" }]
-    : MORE_TABS;
+  // "Vendas" só pra admin, mesmo motivo do AssistenciaNav (desktop). "Admin"
+  // não entra mais aqui -- virou link fixo no cabeçalho (layout.tsx), visível
+  // em mobile também (o cabeçalho não é escondido em telas pequenas).
+  const moreTabs = isAdmin ? [...MORE_TABS, { label: "Vendas", href: "/assistencia/vendas" }] : MORE_TABS;
   const moreActive = moreTabs.some((t) => pathname.startsWith(t.href));
   const solicitacoesCount = counts?.solicitacoes ?? 0;
   const encomendasCount = counts?.encomendas ?? 0;
