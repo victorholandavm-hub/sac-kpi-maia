@@ -5,7 +5,15 @@ function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export function ProdutoRankingList({ items, title }: { items: ProdutoRankingItem[]; title: string }) {
+export function ProdutoRankingList({
+  items,
+  title,
+  productHref,
+}: {
+  items: ProdutoRankingItem[];
+  title: string;
+  productHref: (productCode: string) => string;
+}) {
   return (
     <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
       <h3 className="text-sm font-bold p-4 pb-2" style={{ color: "var(--text-primary)" }}>
@@ -20,7 +28,7 @@ export function ProdutoRankingList({ items, title }: { items: ProdutoRankingItem
           {items.map((item, i) => (
             <Link
               key={item.productCode}
-              href={`/assistencia/vendas?q=${encodeURIComponent(item.productCode)}`}
+              href={productHref(item.productCode)}
               className="flex items-center gap-3 p-3 hover:opacity-80"
             >
               <span
