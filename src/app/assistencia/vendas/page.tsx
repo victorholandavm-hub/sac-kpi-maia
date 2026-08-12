@@ -5,7 +5,10 @@ import {
   searchProdutosVenda,
   listRankingProdutos,
   listVendasPorCategoria,
-  listVendasPorCategoriaPorSemana,
+  listVendasPorFamiliaLogisticaPorSemana,
+  listVendidoVsDespachadoPorSemana,
+  listTendenciaProdutos,
+  listSaldoEstoqueProdutos,
   type ProdutoSugestao,
   type ProdutoCategoriaKey,
   type DateRange,
@@ -15,6 +18,7 @@ import { ProdutoVendaCurvaChart } from "@/components/assistencia/ProdutoVendaCur
 import { VendasPorCategoriaList } from "@/components/assistencia/VendasPorCategoriaList";
 import { ProdutoRankingList } from "@/components/assistencia/ProdutoRankingList";
 import { CategoriaEvolucaoChart } from "@/components/assistencia/CategoriaEvolucaoChart";
+import { VendidoDespachadoChart } from "@/components/assistencia/VendidoDespachadoChart";
 import { StatTile } from "@/components/StatTile";
 
 export const dynamic = "force-dynamic";
@@ -82,10 +86,19 @@ export default async function VendasProdutoPage({
     }
   }
 
-  const [ranking, categorias, evolucao] = await Promise.all([
+  const [ranking, categorias, evolucao, vendidoDespachado] = await Promise.all([
     listRankingProdutos(range, RANKING_LIMIT, categoriaAtiva),
     listVendasPorCategoria(range),
-    listVendasPorCategoriaPorSemana(range),
+    listVendasPorFamiliaLogisticaPorSemana(range),
+    listVendidoVsDespachadoPorSemana(range),
+  ]);
+  // Dependem dos códigos do ranking acima, por isso vêm depois -- ambas são
+  // sempre relativas a hoje, não ao período filtrado (ver
+  // listTendenciaProdutos/listSaldoEstoqueProdutos).
+  const rankingCodes = ranking.map((r) => r.productCode);
+  const [tendencias, saldos] = await Promise.all([
+    listTendenciaProdutos(rankingCodes),
+    listSaldoEstoqueProdutos(rankingCodes),
   ]);
 
   const variacao =
@@ -104,41 +117,46 @@ export default async function VendasProdutoPage({
 
       {/* Período -- controla curva, ranking, resumo por tipo e evolução,
           todos juntos (mesmo período pra tudo, evita confusão de "de qual
-          janela é esse número"). Atalhos por semana OU data exata. */}
-      <div className="rounded-lg p-3 flex flex-col gap-2" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-        <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
-          {PERIODOS_ATALHO.map((semanas) => {
-            const selected = !customRange && semanas === PERIODO_PADRAO_SEMANAS;
-            return (
-              <Link
-                key={semanas}
-                href={buildHref({ q: query || undefined, categoria: categoriaAtiva, ...rangeFromSemanas(semanas) })}
-                className="text-xs px-3 py-1.5 rounded-full whitespace-nowrap shrink-0 border"
-                style={{
-                  borderColor: selected ? "transparent" : "var(--border)",
-                  background: selected ? "var(--brand-green)" : "transparent",
-                  color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
-                  fontWeight: selected ? 600 : 400,
-                }}
-              >
-                {semanas} semanas
-              </Link>
-            );
-          })}
-        </div>
+          janela é esse número"). Atalhos por semana OU data exata, numa
+          única barra horizontal (rola no mobile) pra não empilhar linhas
+          acima do gráfico. */}
+      <div
+        className="rounded-lg p-3 flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-4"
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+      >
+        {PERIODOS_ATALHO.map((semanas) => {
+          const selected = !customRange && semanas === PERIODO_PADRAO_SEMANAS;
+          return (
+            <Link
+              key={semanas}
+              href={buildHref({ q: query || undefined, categoria: categoriaAtiva, ...rangeFromSemanas(semanas) })}
+              className="text-xs px-3 py-1.5 rounded-full whitespace-nowrap shrink-0 border"
+              style={{
+                borderColor: selected ? "transparent" : "var(--border)",
+                background: selected ? "var(--brand-green)" : "transparent",
+                color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                fontWeight: selected ? 600 : 400,
+              }}
+            >
+              {semanas} semanas
+            </Link>
+          );
+        })}
 
-        <form action="/assistencia/vendas" method="GET" className="flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: "1px solid var(--gridline)" }}>
+        <span className="h-5 w-px shrink-0" style={{ background: "var(--gridline)" }} />
+
+        <form action="/assistencia/vendas" method="GET" className="flex items-center gap-2 flex-nowrap shrink-0">
           {query ? <input type="hidden" name="q" value={query} /> : null}
           {categoriaAtiva ? <input type="hidden" name="categoria" value={categoriaAtiva} /> : null}
-          <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
+          <label className="flex items-center gap-1.5 text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
             De
             <input type="date" name="from" defaultValue={range.from} className="rounded border px-2 py-1 text-xs" style={{ borderColor: "var(--border)" }} />
           </label>
-          <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
+          <label className="flex items-center gap-1.5 text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
             Até
             <input type="date" name="to" defaultValue={range.to} className="rounded border px-2 py-1 text-xs" style={{ borderColor: "var(--border)" }} />
           </label>
-          <button type="submit" className="text-xs px-3 py-1.5 rounded border font-medium" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+          <button type="submit" className="text-xs px-3 py-1.5 rounded border font-medium whitespace-nowrap shrink-0" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
             Aplicar
           </button>
         </form>
@@ -240,12 +258,16 @@ export default async function VendasProdutoPage({
         </div>
       ) : null}
 
-      <CategoriaEvolucaoChart semanas={evolucao.semanas} categorias={evolucao.categorias} />
+      <CategoriaEvolucaoChart semanas={evolucao.semanas} categorias={evolucao.familias} />
+
+      <VendidoDespachadoChart semanas={vendidoDespachado} />
 
       <VendasPorCategoriaList categorias={categorias} baseHref={rankingBaseHref} categoriaAtiva={categoriaAtiva} />
 
       <ProdutoRankingList
         items={ranking}
+        tendencias={tendencias}
+        saldos={saldos}
         title={
           categoriaAtiva
             ? `Mais vendidos — ${categorias.find((c) => c.key === categoriaAtiva)?.label ?? categoriaAtiva} — ${periodoLabel}`
