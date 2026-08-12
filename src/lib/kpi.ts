@@ -191,10 +191,6 @@ export type StoreBreakdown = {
   store: string;
   total: number;
   topCategory: string | null;
-  // Tag crua por trás do `topCategory` traduzido (ex.: "cat-duvida") --
-  // usada só pra bater com ALERT_SUGGESTIONS (src/lib/alertSuggestions.ts),
-  // já que o label traduzido não é uma chave estável.
-  topCategoryTag: string | null;
   topCategoryCount: number;
   topCategoryPct: number;
   // Os mais recentes do total acima (ver MAX_TOP_CATEGORY_TICKETS) -- lista
@@ -202,8 +198,6 @@ export type StoreBreakdown = {
   // número.
   topCategoryTickets: StoreBreakdownTicket[];
 };
-
-export type BacklogTrend = { deltaAbs: number; direction: "up" | "down" | "flat" };
 
 export type KpiData = {
   totalTickets: number;
@@ -227,26 +221,16 @@ export type KpiData = {
   openTicketsList: AttentionRow[];
   avgFirstResponseMinutes: number | null;
   pctWithinSla: number | null;
-  // % de chamados com 1ª resposta em até 5min -- corte fixo, separado do
-  // SLA configurável acima (30min hoje). Mesma amostra (firstResponseRows).
-  pctWithin5Min: number | null;
   firstResponseSampleSize: number;
   slaMinutesThreshold: number;
   recurrenceCount: number;
   recurrencePct: number | null;
   paretoSummary: string | null;
-  // Backlog subindo ou descendo no período (primeiro vs. último ponto de
-  // backlogOverTime) -- null quando não há pontos suficientes pra comparar.
-  backlogTrend: BacklogTrend | null;
   storeBreakdown: StoreBreakdown[];
   // Drill-down de byCategory acima -- por tag crua de categoria (ex.:
   // "cat-duvida"), os chamados mais recentes daquela categoria no período
   // selecionado. Ver CategoryTicketsModal / BarRanking.
   categoryTickets: Record<string, StoreBreakdownTicket[]>;
-  // Drill-down por agente (ver AgentStatsTable) -- chamados ainda pendentes
-  // ou com nota de satisfação baixa (1-2) daquele agente, mais recentes
-  // primeiro. Chave é AgentStat.agent.
-  agentTickets: Record<string, StoreBreakdownTicket[]>;
   waitingCount: number;
   waitingByType: Count[];
   waitingByStore: Count[];
@@ -736,30 +720,6 @@ function buildCategoryTicketsMap(rows: TicketRow[]): Record<string, StoreBreakdo
   return Object.fromEntries([...byCategoryRows.entries()].map(([category, catRows]) => [category, buildTicketList(catRows)]));
 }
 
-// Drill-down de AgentStatsTable (ver KpiData.agentTickets) -- só os
-// chamados problemáticos de cada agente (ainda pendentes ou avaliação
-// baixa), não o histórico inteiro -- é pra correção de rota, não auditoria.
-function buildAgentTicketsMap(rows: TicketRow[]): Record<string, StoreBreakdownTicket[]> {
-  const byAgentRows = new Map<string, TicketRow[]>();
-  for (const row of rows) {
-    if (!isRealAgent(row.agent_name)) continue;
-    const isProblem = !row.resolved_effective || (row.nps_score !== null && row.nps_score <= 2);
-    if (!isProblem) continue;
-    const list = byAgentRows.get(row.agent_name) ?? [];
-    list.push(row);
-    byAgentRows.set(row.agent_name, list);
-  }
-  return Object.fromEntries([...byAgentRows.entries()].map(([agent, agentRows]) => [agent, buildTicketList(agentRows)]));
-}
-
-function buildBacklogTrend(backlogOverTime: DayCount[]): BacklogTrend | null {
-  if (backlogOverTime.length < 2) return null;
-  const first = backlogOverTime[0].count;
-  const last = backlogOverTime[backlogOverTime.length - 1].count;
-  const deltaAbs = last - first;
-  return { deltaAbs: Math.abs(deltaAbs), direction: deltaAbs > 0 ? "up" : deltaAbs < 0 ? "down" : "flat" };
-}
-
 function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => string, categoryLabelFn: (tag: string) => string): StoreBreakdown[] {
   const byStoreRows = new Map<string, TicketRow[]>();
   for (const row of rows) {
@@ -784,7 +744,6 @@ function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => s
         store: storeLabelFn(store),
         total: storeRows.length,
         topCategory: top ? categoryLabelFn(top[0]) : null,
-        topCategoryTag: top ? top[0] : null,
         topCategoryCount: top ? top[1] : 0,
         topCategoryPct: top ? Math.round((top[1] / storeRows.length) * 100) : 0,
         topCategoryTickets,
@@ -975,14 +934,6 @@ export async function getKpiData(
     firstResponseRows.length > 0
       ? Math.round((firstResponseRows.filter((r) => r.within_sla).length / firstResponseRows.length) * 100)
       : null;
-  const pctWithin5Min =
-    firstResponseRows.length > 0
-      ? Math.round(
-          (firstResponseRows.filter((r) => (r.first_response_minutes ?? Infinity) <= 5).length /
-            firstResponseRows.length) *
-            100
-        )
-      : null;
 
   const recurrenceCount = rows.filter((r) => r.is_recurrence).length;
 
@@ -995,16 +946,12 @@ export async function getKpiData(
 
   const storeBreakdown = buildStoreBreakdown(rows, labelFns.storeLabel, labelFns.categoryLabel);
   const categoryTickets = buildCategoryTicketsMap(rows);
-  const agentTickets = buildAgentTicketsMap(rows);
-  const backlogOverTime = buildBacklogOverTime(allRows, range.from, range.to);
   // Nome/telefone dos chamados por trás do "problema mais comum" (loja,
-  // categoria geral, semana anterior e agente) -- query em lote única
-  // (mesmo padrão de npsDetractors acima), pra não disparar uma consulta
-  // por chamado.
+  // categoria geral e semana anterior) -- query em lote única (mesmo padrão
+  // de npsDetractors acima), pra não disparar uma consulta por chamado.
   const allBreakdownTickets = [
     ...storeBreakdown.flatMap((s) => s.topCategoryTickets),
     ...Object.values(categoryTickets).flat(),
-    ...Object.values(agentTickets).flat(),
     ...previousWeek.topCategoryTickets,
   ];
   const breakdownContactIds = [...new Set(allBreakdownTickets.map((t) => t.contactId).filter((id): id is string => !!id))];
@@ -1041,21 +988,18 @@ export async function getKpiData(
     byAgent: byAgentCounts(rows),
     byChannel: topCounts(rows, "channel"),
     dailyVolume,
-    backlogOverTime,
+    backlogOverTime: buildBacklogOverTime(allRows, range.from, range.to),
     attention,
     openTicketsList,
     avgFirstResponseMinutes,
     pctWithinSla,
-    pctWithin5Min,
     firstResponseSampleSize: firstResponseRows.length,
     slaMinutesThreshold: 30,
     recurrenceCount,
     recurrencePct: rows.length > 0 ? Math.round((recurrenceCount / rows.length) * 100) : null,
     paretoSummary: buildParetoSummary(byCategory, rows.length, labelFns.categoryLabel),
-    backlogTrend: buildBacklogTrend(backlogOverTime),
     storeBreakdown,
     categoryTickets,
-    agentTickets,
     waitingCount: waitingOpenRows.length,
     waitingByType,
     waitingByStore,

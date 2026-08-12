@@ -3,11 +3,9 @@ import { NpsDetractorsList } from "./NpsDetractorsList";
 
 // Meta definida pelo usuário -- sem lugar melhor pra guardar isso hoje
 // (não é dado do GHL, é decisão de negócio), então fica aqui mesmo.
-// Exportado pro banner de destaque do Dashboard reaproveitar a mesma régua
-// de cor no tile de NPS, em vez de duplicar o threshold.
-export const NPS_INDEX_TARGET = 65;
+const NPS_INDEX_TARGET = 65;
 
-export function indexColor(value: number | null): string {
+function indexColor(value: number | null): string {
   if (value === null) return "var(--text-muted)";
   if (value >= NPS_INDEX_TARGET) return "var(--status-good)";
   if (value >= 0) return "var(--status-warning)";

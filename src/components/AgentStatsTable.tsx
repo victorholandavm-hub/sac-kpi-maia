@@ -1,19 +1,11 @@
-"use client";
-
-import { useState } from "react";
-import type { AgentStat, StoreBreakdownTicket } from "@/lib/kpi";
-import { CategoryTicketsModal } from "./CategoryTicketsModal";
+import type { AgentStat } from "@/lib/kpi";
 
 function formatMinutes(minutes: number) {
   if (minutes >= 60) return `${(minutes / 60).toFixed(1)}h`;
   return `${Math.round(minutes)}min`;
 }
 
-// Clique na linha abre o drill-down (mesmo modal genérico já usado pra
-// categoria/loja/semana anterior) com os chamados pendentes ou de nota
-// baixa daquele agente -- pra correção de rota rápida sem sair do painel.
-export function AgentStatsTable({ data, ticketsByAgent }: { data: AgentStat[]; ticketsByAgent: Record<string, StoreBreakdownTicket[]> }) {
-  const [selected, setSelected] = useState<AgentStat | null>(null);
+export function AgentStatsTable({ data }: { data: AgentStat[] }) {
   return (
     <div
       className="rounded-lg border p-4"
@@ -24,7 +16,7 @@ export function AgentStatsTable({ data, ticketsByAgent }: { data: AgentStat[]; t
       </h3>
       <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
         Tempo de resolução considera só chamados com a tag de status aplicada. 1ª resposta/SLA já
-        considera horário comercial. Clique num agente pra ver os chamados pendentes ou com nota baixa.
+        considera horário comercial.
       </p>
       {data.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -46,13 +38,8 @@ export function AgentStatsTable({ data, ticketsByAgent }: { data: AgentStat[]; t
             </thead>
             <tbody>
               {data.map((row) => (
-                <tr
-                  key={row.agent}
-                  onClick={() => setSelected(row)}
-                  className="cursor-pointer hover:opacity-80"
-                  style={{ borderTop: "1px solid var(--gridline)" }}
-                >
-                  <td className="py-2 pr-4 underline" style={{ color: "var(--text-primary)" }}>
+                <tr key={row.agent} style={{ borderTop: "1px solid var(--gridline)" }}>
+                  <td className="py-2 pr-4" style={{ color: "var(--text-primary)" }}>
                     {row.agent}
                   </td>
                   <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -89,15 +76,6 @@ export function AgentStatsTable({ data, ticketsByAgent }: { data: AgentStat[]; t
           </table>
         </div>
       )}
-
-      {selected ? (
-        <CategoryTicketsModal
-          title={`Pendentes/nota baixa — ${selected.agent}`}
-          totalCount={(ticketsByAgent[selected.agent] ?? []).length}
-          tickets={ticketsByAgent[selected.agent] ?? []}
-          onClose={() => setSelected(null)}
-        />
-      ) : null}
     </div>
   );
 }
