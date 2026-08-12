@@ -12,7 +12,8 @@ export type PedidoEncomendaStatus =
   | "faturado"
   | "entregue"
   | "cancelado"
-  | "negado";
+  | "negado"
+  | "recebido_cd";
 
 export const PEDIDO_ENCOMENDA_STATUSES: PedidoEncomendaStatus[] = [
   "solicitado",
@@ -23,6 +24,7 @@ export const PEDIDO_ENCOMENDA_STATUSES: PedidoEncomendaStatus[] = [
   "entregue",
   "cancelado",
   "negado",
+  "recebido_cd",
 ];
 
 export function isPedidoEncomendaStatus(value: string | undefined | null): value is PedidoEncomendaStatus {
