@@ -313,9 +313,6 @@ export async function advancePedidoStatus(
   if (aceitandoPedido && !current.prazo_fabrica_cd) {
     throw new Error('Defina o "Prazo fábrica → CD" antes de avançar.');
   }
-  if (toStatus === "em_carga" && !opts.carga?.trim()) {
-    throw new Error("Informe o número da carga.");
-  }
   if (toStatus === "em_carga" && !current.prazo_cd_loja) {
     throw new Error('Defina o "Prazo CD → loja" antes de avançar.');
   }

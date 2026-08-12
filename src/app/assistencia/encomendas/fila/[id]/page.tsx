@@ -92,7 +92,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
         </h2>
       </div>
 
-      {pedido.status !== "cancelado" && pedido.status !== "negado" ? (
+      {pedido.status !== "cancelado" && pedido.status !== "negado" && pedido.status !== "recebido_cd" ? (
         <StatusStepper steps={PEDIDO_ENCOMENDA_STATUS_STEPS} currentKey={pedido.status} />
       ) : null}
 

@@ -87,7 +87,9 @@ const FABRICA_TRANSITIONS: Record<string, string[]> = {
 };
 
 const CD_TRANSITIONS: Record<string, string[]> = {
-  pronto_para_expedicao: ["em_carga"],
+  // "em_carga" -- vai pra loja (fluxo normal); "recebido_cd" -- fica no CD,
+  // venda direta pro cliente sem passar pela loja (ver PedidoEncomendaActions.tsx).
+  pronto_para_expedicao: ["em_carga", "recebido_cd"],
   em_carga: ["faturado"],
   faturado: ["entregue"],
 };

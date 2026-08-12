@@ -110,6 +110,7 @@ export const PEDIDO_ENCOMENDA_STATUS_LABELS: Record<string, string> = {
   entregue: "Entregue",
   cancelado: "Cancelado",
   negado: "Negado",
+  recebido_cd: "Recebido pelo CD / Em estoque",
 };
 
 // Idem REQUEST_STATUS_STEPS, mas pro pedido de encomenda -- cancelado/negado
@@ -132,6 +133,7 @@ export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
   entregue: "var(--status-good)",
   cancelado: "var(--text-muted)",
   negado: "var(--status-critical)",
+  recebido_cd: "var(--status-good)",
 };
 
 export const PEDIDO_FORNECEDOR_STATUS_LABELS: Record<string, string> = {

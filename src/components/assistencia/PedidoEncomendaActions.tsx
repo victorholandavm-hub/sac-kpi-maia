@@ -19,7 +19,6 @@ import { FormSection } from "./FormSection";
 type NextStep = {
   toStatus: string;
   label: string;
-  needsCarga?: boolean;
   needsNfE?: boolean;
   needsPrazoFabricaCd?: boolean;
   needsPrazoCdLoja?: boolean;
@@ -27,7 +26,11 @@ type NextStep = {
 
 const NEXT_STEP: Record<string, NextStep | undefined> = {
   em_producao: { toStatus: "pronto_para_expedicao", label: "Marcar como enviado para o CD" },
-  pronto_para_expedicao: { toStatus: "em_carga", label: "Informar carga e expedir", needsCarga: true, needsPrazoCdLoja: true },
+  // Não pede mais nº da carga -- deixou de ser obrigatório (a NF-e da etapa
+  // seguinte continua sendo). "recebido_cd" (pedido direto pro cliente, sem
+  // passar pela loja) é um botão separado, renderizado à parte logo abaixo,
+  // só nesse status -- ver comentário no JSX.
+  pronto_para_expedicao: { toStatus: "em_carga", label: "Marcar como enviado para a loja", needsPrazoCdLoja: true },
   em_carga: { toStatus: "faturado", label: "Informar NF-e e faturar", needsNfE: true },
   faturado: { toStatus: "entregue", label: "Marcar entregue" },
 };
@@ -87,7 +90,6 @@ export function PedidoEncomendaActions({
   children?: React.ReactNode;
 }) {
   const { pending, run } = useQuickAction();
-  const [carga, setCarga] = useState("");
   const [nfE, setNfE] = useState("");
   const [nfSuggestions, setNfSuggestions] = useState<TotvsOrderSuggestion[]>([]);
   const [note, setNote] = useState("");
@@ -146,17 +148,6 @@ export function PedidoEncomendaActions({
 
       {nextStep ? (
         <div className="flex items-end gap-2 flex-wrap">
-          {nextStep.needsCarga ? (
-            <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
-              Nº da carga
-              <input
-                value={carga}
-                onChange={(e) => setCarga(e.target.value)}
-                className="rounded border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--border)" }}
-              />
-            </label>
-          ) : null}
           {nextStep.needsNfE ? (
             <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
               Nº da NF-e
@@ -180,7 +171,6 @@ export function PedidoEncomendaActions({
           <button
             disabled={
               pending ||
-              (nextStep.needsCarga && !carga.trim()) ||
               (nextStep.needsNfE && !nfE.trim()) ||
               (nextStep.needsPrazoFabricaCd && !prazoFabricaCd) ||
               (nextStep.needsPrazoCdLoja && !prazoCdLoja)
@@ -189,7 +179,6 @@ export function PedidoEncomendaActions({
               run(
                 () =>
                   advancePedidoStatus(pedidoId, nextStep.toStatus, {
-                    carga: nextStep.needsCarga ? carga : undefined,
                     nfE: nextStep.needsNfE ? nfE : undefined,
                   }),
                 `Status atualizado para ${PEDIDO_ENCOMENDA_STATUS_LABELS[nextStep.toStatus] ?? nextStep.toStatus}.`
@@ -200,10 +189,28 @@ export function PedidoEncomendaActions({
           >
             {nextStep.label}
           </button>
+          {/* Caminho alternativo só nessa etapa: pedido não vai pra loja,
+              venda direta do CD pro cliente -- clique único, sem campo
+              nenhum (ver CD_TRANSITIONS em src/lib/dal.ts). */}
+          {nextStep.toStatus === "em_carga" ? (
+            <button
+              disabled={pending}
+              onClick={() =>
+                run(
+                  () => advancePedidoStatus(pedidoId, "recebido_cd"),
+                  `Status atualizado para ${PEDIDO_ENCOMENDA_STATUS_LABELS.recebido_cd}.`
+                )
+              }
+              className="text-sm rounded px-3 py-2 font-medium border disabled:opacity-60"
+              style={{ borderColor: "var(--status-good)", color: "var(--status-good)" }}
+            >
+              Recebido pelo CD / Em estoque
+            </button>
+          ) : null}
         </div>
       ) : (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          {status === "entregue" || status === "cancelado" || status === "negado"
+          {status === "entregue" || status === "cancelado" || status === "negado" || status === "recebido_cd"
             ? "Pedido encerrado."
             : "Nenhuma ação disponível para o seu papel neste momento."}
         </p>
