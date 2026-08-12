@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,8 +15,7 @@ export function AppHeader() {
 
   return (
     <header className="flex items-center gap-4 pb-4 flex-wrap" style={{ borderBottom: "3px solid var(--brand-orange)" }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo.png" alt="Lojas Maia" className="h-12 w-12 object-contain shrink-0" />
+      <Image src="/logo.png" alt="Lojas Maia" width={225} height={225} className="h-12 w-12 object-contain shrink-0" />
       <nav className="flex-1 flex items-center gap-2 flex-wrap">
         {TABS.map((tab) => {
           const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);

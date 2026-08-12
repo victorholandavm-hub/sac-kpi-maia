@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import { useActionState } from "react";
 import Link from "next/link";
@@ -11,8 +12,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="max-w-sm w-full flex flex-col gap-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Lojas Maia" className="h-16 w-16 object-contain" />
+          <Image src="/logo.png" alt="Lojas Maia" width={225} height={225} className="h-16 w-16 object-contain" />
           <div>
             <h1 className="text-xl font-semibold" style={{ color: "var(--brand-green)" }}>
               Assistência

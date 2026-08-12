@@ -1,3 +1,4 @@
+import Image from "next/image";
 export function AssistenciaHeader({
   title,
   subtitle,
@@ -13,8 +14,7 @@ export function AssistenciaHeader({
       style={{ borderBottom: "3px solid var(--brand-orange)" }}
     >
       <div className="flex items-center gap-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="Lojas Maia" className="h-14 w-14 object-contain shrink-0" />
+        <Image src="/logo.png" alt="Lojas Maia" width={225} height={225} className="h-14 w-14 object-contain shrink-0" />
         <div>
           <h1 className="text-2xl font-semibold" style={{ color: "var(--brand-green)" }}>
             {title}
