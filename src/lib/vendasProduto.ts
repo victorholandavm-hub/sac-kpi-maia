@@ -43,20 +43,24 @@ function segundasNoPeriodo(range: DateRange): string[] {
 // (ordem importa: "COLCHAO" antes de "BOX" evita cruzar "protetor de
 // colchão" com box, por ex.). Aproximado por natureza -- fácil de ajustar
 // essa lista depois se algum produto cair na categoria errada.
+//
+// Travesseiro/protetor e cabeceira viraram categorias próprias (separadas
+// de colchão e cama/beliche) especificamente pra alimentar o agrupamento
+// por família logística abaixo -- itens pequenos/acessórios não podem ficar
+// misturados com o item grande que normalmente os acompanha na descrição.
 export const PRODUTO_CATEGORIAS = [
-  {
-    key: "colchao",
-    label: "Colchão",
-    keywords: ["COLCHAO", "COLCHÃO", "COLCHONETE", "COL ", "TRAV ", "TRAVESSEIRO", "PROTETOR", "PILLOW"],
-  },
+  { key: "colchao", label: "Colchão", keywords: ["COLCHAO", "COLCHÃO", "COLCHONETE", "COL "] },
+  { key: "travesseiro", label: "Travesseiro / Protetor", keywords: ["TRAVESSEIRO", "TRAV ", "PROTETOR", "PILLOW"] },
   { key: "box_base", label: "Box / Base", keywords: ["BOX", "BASE TOP", "FL BASE", "BAU "] },
-  { key: "cama", label: "Cama / Beliche / Cabeceira", keywords: ["BELICHE", "CABECEIRA", "CAMA "] },
+  { key: "cama", label: "Cama / Beliche", keywords: ["BELICHE", "CAMA "] },
+  { key: "cabeceira", label: "Cabeceira", keywords: ["CABECEIRA"] },
   { key: "roupeiro", label: "Roupeiro / Armário", keywords: ["ROUPEIRO", "ROUP ", "ARMARIO", "ARMÁRIO", "MULTI-USO", "MULTIUSO", "GUARDA-ROUPA", "GUARDA ROUPA"] },
   { key: "comoda", label: "Cômoda", keywords: ["COMODA", "CÔMODA"] },
   { key: "cozinha", label: "Cozinha", keywords: ["COZINHA", "BALCAO", "BALCÃO", "PANELEIRO", "FRUTEIRA"] },
   { key: "sala_jantar", label: "Sala de estar / jantar", keywords: ["SOFA", "SOFÁ", "POLTRONA", "CRISTALEIRA", "BUFFET", "ESTOFADO"] },
   { key: "mesa_cadeira", label: "Mesa / Cadeira", keywords: ["MESA", "CADEIRA", "CONJ."] },
   { key: "estante_home", label: "Estante / Home / Rack", keywords: ["HOME", "RACK", "ESTANTE", "APARADOR"] },
+  { key: "puxador", label: "Puxador", keywords: ["PUXADOR"] },
 ] as const;
 
 export type ProdutoCategoriaKey = (typeof PRODUTO_CATEGORIAS)[number]["key"] | "outros";
@@ -67,6 +71,40 @@ export function classificarProduto(description: string | null): { key: ProdutoCa
     if (cat.keywords.some((k) => upper.includes(k))) return { key: cat.key, label: cat.label };
   }
   return { key: "outros", label: "Outros" };
+}
+
+// Agrupamento por volume de transporte (logística), não por nome comercial
+// -- pergunta que importa pra quem monta carga é "isso ocupa muito espaço no
+// caminhão?", não "isso é sofá ou colchão?". Usado só no gráfico de evolução
+// (ver listVendasPorFamiliaLogisticaPorSemana) -- o resto da tela continua
+// usando a categoria comercial normal (mais útil pra achar produto).
+export const FAMILIA_LOGISTICA_KEYS = ["grande", "medio", "pequeno"] as const;
+export type FamiliaLogisticaKey = (typeof FAMILIA_LOGISTICA_KEYS)[number];
+
+export const FAMILIA_LOGISTICA_LABELS: Record<FamiliaLogisticaKey, string> = {
+  grande: "Grandes volumes",
+  medio: "Volumes médios",
+  pequeno: "Pequenos / Acessórios",
+};
+
+const FAMILIA_POR_CATEGORIA: Record<ProdutoCategoriaKey, FamiliaLogisticaKey> = {
+  roupeiro: "grande",
+  sala_jantar: "grande",
+  box_base: "grande",
+  estante_home: "grande",
+  colchao: "medio",
+  cama: "medio",
+  mesa_cadeira: "medio",
+  cozinha: "medio",
+  comoda: "medio",
+  travesseiro: "pequeno",
+  cabeceira: "pequeno",
+  puxador: "pequeno",
+  outros: "pequeno",
+};
+
+export function familiaLogisticaDaCategoria(key: ProdutoCategoriaKey): FamiliaLogisticaKey {
+  return FAMILIA_POR_CATEGORIA[key];
 }
 
 export type ProdutoSugestao = { productCode: string; description: string | null };
@@ -248,6 +286,135 @@ export async function listRankingProdutos(range: DateRange, limit: number, categ
   return [...porProduto.values()].sort((a, b) => b.quantidade - a.quantidade).slice(0, limit);
 }
 
+export type ProdutoSaldoEstoque = {
+  saldoAtual: number;
+  // null = sem venda nos últimos RUNWAY_DIAS_JANELA_VENDA dias -- não dá
+  // pra calcular "dias restantes" que faça sentido (mesmo com saldo baixo,
+  // sem saída não é ruptura iminente), a UI trata isso não mostrando alerta.
+  diasDeCobertura: number | null;
+};
+
+const RUNWAY_DIAS_JANELA_VENDA = 30;
+export const RUNWAY_DIAS_ALERTA = 7;
+
+// Saldo atual no CD (totvs_stock, sincronizado do WSStock -- ver
+// syncStock em totvsSync.ts, roda fora do request, então esse saldo tem o
+// atraso do último sync, não é em tempo real) + dias de cobertura (saldo /
+// média de saída diária nos últimos 30 dias, sempre relativo a hoje, igual
+// listTendenciaProdutos).
+export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<Map<string, ProdutoSaldoEstoque>> {
+  const resultado = new Map<string, ProdutoSaldoEstoque>();
+  if (productCodes.length === 0) return resultado;
+
+  const admin = getSupabaseAdmin();
+
+  // `totvs_stock` é tabela nova (0074_totvs_stock.sql) alimentada por um
+  // sync que roda fora do request (ver syncStock em totvsSync.ts) -- se a
+  // migration ainda não rodou nesse ambiente, ou o sync ainda não populou
+  // nada, o resto da tela (ranking, curva, tendência) não pode cair junto
+  // só por causa disso. Loga e devolve vazio em vez de derrubar a página.
+  try {
+    const [{ data: stockRows, error: stockError }, vendaPorProduto] = await Promise.all([
+      admin.from("totvs_stock").select("product_code, current_balance").in("product_code", productCodes),
+      (async () => {
+        const inicio = isoDateSub(RUNWAY_DIAS_JANELA_VENDA);
+        const fim = isoDateSub(0);
+        const acc = new Map<string, number>();
+        for (let pagina = 0; pagina < RANKING_MAX_PAGINAS; pagina++) {
+          const from = pagina * RANKING_PAGE_SIZE;
+          const { data, error } = await admin
+            .from("totvs_order_items")
+            .select("product, quantity, totvs_orders!inner(issue_date)")
+            .in("product", productCodes)
+            .gte("totvs_orders.issue_date", inicio)
+            .lte("totvs_orders.issue_date", fim)
+            .range(from, from + RANKING_PAGE_SIZE - 1);
+          if (error) throw new Error(error.message);
+          const batch = (data ?? []) as unknown as { product: string | null; quantity: number }[];
+          for (const row of batch) {
+            if (!row.product) continue;
+            acc.set(row.product, (acc.get(row.product) ?? 0) + row.quantity);
+          }
+          if (batch.length < RANKING_PAGE_SIZE) break;
+        }
+        return acc;
+      })(),
+    ]);
+    if (stockError) throw new Error(stockError.message);
+
+    const saldoPorProduto = new Map<string, number>();
+    for (const row of stockRows ?? []) {
+      saldoPorProduto.set(row.product_code, Number(row.current_balance) || 0);
+    }
+
+    for (const code of productCodes) {
+      const saldoAtual = saldoPorProduto.get(code) ?? 0;
+      const totalVendido = vendaPorProduto.get(code) ?? 0;
+      const mediaDiaria = totalVendido / RUNWAY_DIAS_JANELA_VENDA;
+      const diasDeCobertura = mediaDiaria > 0 ? saldoAtual / mediaDiaria : null;
+      resultado.set(code, { saldoAtual, diasDeCobertura });
+    }
+  } catch (err) {
+    console.error("listSaldoEstoqueProdutos:", (err as Error).message);
+  }
+  return resultado;
+}
+
+export type ProdutoTendencia = { variacaoPct: number | null };
+
+const TENDENCIA_SEMANAS = 12;
+
+function isoDateSub(dias: number): string {
+  return new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+// Tendência por produto -- últimas 12 semanas vs. as 12 anteriores a essas,
+// sempre relativo a HOJE (não ao período que o comprador escolheu filtrar
+// no ranking) -- dá um sinal estável de "subindo/esfriando" que não muda
+// só porque o filtro de período da tela mudou. `previas === 0` não vira
+// "infinito", vira `null` (sem base de comparação -- produto novo ou sem
+// venda nenhuma nas 12 semanas anteriores), a UI trata isso escondendo o
+// indicador em vez de mostrar um percentual sem sentido.
+export async function listTendenciaProdutos(productCodes: string[]): Promise<Map<string, ProdutoTendencia>> {
+  const resultado = new Map<string, ProdutoTendencia>();
+  if (productCodes.length === 0) return resultado;
+
+  const fim = isoDateSub(0);
+  const inicioUltimas = isoDateSub(TENDENCIA_SEMANAS * 7);
+  const inicioPrevias = isoDateSub(TENDENCIA_SEMANAS * 2 * 7);
+
+  const admin = getSupabaseAdmin();
+  const ultimasPorProduto = new Map<string, number>();
+  const previasPorProduto = new Map<string, number>();
+
+  for (let pagina = 0; pagina < RANKING_MAX_PAGINAS; pagina++) {
+    const from = pagina * RANKING_PAGE_SIZE;
+    const { data, error } = await admin
+      .from("totvs_order_items")
+      .select("product, quantity, totvs_orders!inner(issue_date)")
+      .in("product", productCodes)
+      .gte("totvs_orders.issue_date", inicioPrevias)
+      .lte("totvs_orders.issue_date", fim)
+      .range(from, from + RANKING_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const batch = (data ?? []) as unknown as { product: string | null; quantity: number; totvs_orders: { issue_date: string } | null }[];
+    for (const row of batch) {
+      if (!row.product || !row.totvs_orders) continue;
+      const bucket = row.totvs_orders.issue_date >= inicioUltimas ? ultimasPorProduto : previasPorProduto;
+      bucket.set(row.product, (bucket.get(row.product) ?? 0) + row.quantity);
+    }
+    if (batch.length < RANKING_PAGE_SIZE) break;
+  }
+
+  for (const code of productCodes) {
+    const ultimas = ultimasPorProduto.get(code) ?? 0;
+    const previas = previasPorProduto.get(code) ?? 0;
+    const variacaoPct = previas > 0 ? Math.round(((ultimas - previas) / previas) * 100) : null;
+    resultado.set(code, { variacaoPct });
+  }
+  return resultado;
+}
+
 export type CategoriaResumo = { key: ProdutoCategoriaKey; label: string; quantidade: number; valor: number };
 
 // Visão "por tipo de produto" -- resposta direta ao que a tela não tinha
@@ -316,4 +483,159 @@ export async function listVendasPorCategoriaPorSemana(
   });
 
   return { semanas, categorias };
+}
+
+// Mesmo formato/uso de listVendasPorCategoriaPorSemana acima, só que
+// agrupado pelas 3 famílias logísticas (ver familiaLogisticaDaCategoria) em
+// vez das categorias comerciais -- pergunta de quem monta carga, não de
+// quem procura produto. Sempre retorna as 3 famílias (mesmo com 0 no
+// período), ao contrário da versão por categoria, que só inclui categoria
+// com venda -- com só 3 séries fixas, mostrar a família zerada é mais fácil
+// de comparar do que ela sumir do gráfico.
+export async function listVendasPorFamiliaLogisticaPorSemana(
+  range: DateRange
+): Promise<{ semanas: CategoriaEvolucaoSemana[]; familias: { key: FamiliaLogisticaKey; label: string }[] }> {
+  const rows = await fetchItensDoPeriodo(range);
+
+  const porSemanaFamilia = new Map<string, Map<FamiliaLogisticaKey, number>>();
+  for (const row of rows) {
+    if (!row.totvs_orders) continue;
+    const semana = segundaFeiraDe(row.totvs_orders.issue_date);
+    const cat = classificarProduto(row.description);
+    const familia = familiaLogisticaDaCategoria(cat.key);
+    const porFamilia = porSemanaFamilia.get(semana) ?? new Map<FamiliaLogisticaKey, number>();
+    porFamilia.set(familia, (porFamilia.get(familia) ?? 0) + row.quantity);
+    porSemanaFamilia.set(semana, porFamilia);
+  }
+
+  const familias = FAMILIA_LOGISTICA_KEYS.map((key) => ({ key, label: FAMILIA_LOGISTICA_LABELS[key] }));
+
+  const semanas: CategoriaEvolucaoSemana[] = segundasNoPeriodo(range).map((semanaIso) => {
+    const porFamilia = porSemanaFamilia.get(semanaIso);
+    const linha: CategoriaEvolucaoSemana = { semanaInicio: semanaIso };
+    for (const familia of familias) {
+      linha[familia.key] = porFamilia?.get(familia.key) ?? 0;
+    }
+    return linha;
+  });
+
+  return { semanas, familias };
+}
+
+export type VendidoDespachadoSemana = { semanaInicio: string; vendido: number; despachado: number };
+
+const DESPACHO_PAGE_SIZE = 1000;
+const DESPACHO_MAX_PAGINAS = 30;
+
+// "Despachado" = cargas com status_entrega "Entregue" (entrega concluída) --
+// o sync do Protheus não guarda nenhum evento de "saiu do CD", "Entregue" é
+// o sinal mais próximo disponível (decisão confirmada com o usuário
+// 12/08/2026). "Entregue Parcial" fica de fora de propósito: não temos a
+// quantidade real entregue nessa carga, só do pedido inteiro -- contar como
+// se fosse total superestimaria o despacho.
+async function buildDespachoPorSemana(range: DateRange): Promise<Map<string, number>> {
+  const admin = getSupabaseAdmin();
+  const resultado = new Map<string, number>();
+
+  const cargas: { notaFiscal: string; serie: string; semana: string }[] = [];
+  for (let pagina = 0; pagina < DESPACHO_MAX_PAGINAS; pagina++) {
+    const from = pagina * DESPACHO_PAGE_SIZE;
+    const { data, error } = await admin
+      .from("totvs_delivery_cargas")
+      .select("nota_fiscal, serie, dt_retorno")
+      .eq("status_entrega", "Entregue")
+      .not("nota_fiscal", "is", null)
+      .not("serie", "is", null)
+      .gte("dt_retorno", range.from)
+      .lte("dt_retorno", range.to)
+      .range(from, from + DESPACHO_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const batch = data ?? [];
+    for (const row of batch) {
+      if (!row.nota_fiscal || !row.serie || !row.dt_retorno) continue;
+      cargas.push({ notaFiscal: row.nota_fiscal, serie: row.serie, semana: segundaFeiraDe(row.dt_retorno) });
+    }
+    if (batch.length < DESPACHO_PAGE_SIZE) break;
+  }
+  if (cargas.length === 0) return resultado;
+
+  // Sem FK física entre totvs_delivery_cargas e totvs_orders (syncs
+  // independentes, mesmo motivo de sempre) -- join em código, mesmo padrão
+  // já usado no resto do arquivo.
+  const notasFiscais = [...new Set(cargas.map((c) => c.notaFiscal))];
+  const { data: ordersData, error: ordersError } = await admin
+    .from("totvs_orders")
+    .select("id, invoice, serie")
+    .in("invoice", notasFiscais);
+  if (ordersError) throw new Error(ordersError.message);
+
+  const orderIdPorNotaSerie = new Map<string, string>();
+  for (const o of ordersData ?? []) {
+    orderIdPorNotaSerie.set(`${o.invoice}|${o.serie}`, o.id);
+  }
+
+  // Dedup por pedido -- um pedido pode ter mais de uma carga (múltiplas
+  // tentativas de entrega), mas a quantidade dele só pode contar UMA vez;
+  // fica na semana da entrega concluída mais recente.
+  const semanaPorOrderId = new Map<string, string>();
+  for (const carga of cargas) {
+    const orderId = orderIdPorNotaSerie.get(`${carga.notaFiscal}|${carga.serie}`);
+    if (!orderId) continue;
+    const atual = semanaPorOrderId.get(orderId);
+    if (!atual || carga.semana > atual) semanaPorOrderId.set(orderId, carga.semana);
+  }
+  const orderIds = [...semanaPorOrderId.keys()];
+  if (orderIds.length === 0) return resultado;
+
+  const qtdPorOrderId = new Map<string, number>();
+  for (let pagina = 0; pagina < DESPACHO_MAX_PAGINAS; pagina++) {
+    const from = pagina * DESPACHO_PAGE_SIZE;
+    const { data, error } = await admin
+      .from("totvs_order_items")
+      .select("order_id, quantity")
+      .in("order_id", orderIds)
+      .range(from, from + DESPACHO_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const batch = data ?? [];
+    for (const row of batch) {
+      qtdPorOrderId.set(row.order_id, (qtdPorOrderId.get(row.order_id) ?? 0) + row.quantity);
+    }
+    if (batch.length < DESPACHO_PAGE_SIZE) break;
+  }
+
+  for (const [orderId, semana] of semanaPorOrderId) {
+    const qtd = qtdPorOrderId.get(orderId) ?? 0;
+    resultado.set(semana, (resultado.get(semana) ?? 0) + qtd);
+  }
+  return resultado;
+}
+
+// Vendido (totvs_order_items pela data de emissão) vs. Despachado (ver
+// buildDespachoPorSemana) por semana -- a diferença entre as duas barras é
+// o backlog que a logística ainda precisa carregar/entregar. Falha
+// isolada (mesmo espírito de listSaldoEstoqueProdutos): se o cruzamento de
+// despacho der erro, o gráfico ainda mostra o "vendido" sozinho em vez de
+// derrubar a tela inteira.
+export async function listVendidoVsDespachadoPorSemana(range: DateRange): Promise<VendidoDespachadoSemana[]> {
+  const itensVendidos = await fetchItensDoPeriodo(range);
+
+  const vendidoPorSemana = new Map<string, number>();
+  for (const row of itensVendidos) {
+    if (!row.totvs_orders) continue;
+    const semana = segundaFeiraDe(row.totvs_orders.issue_date);
+    vendidoPorSemana.set(semana, (vendidoPorSemana.get(semana) ?? 0) + row.quantity);
+  }
+
+  let despachoPorSemana = new Map<string, number>();
+  try {
+    despachoPorSemana = await buildDespachoPorSemana(range);
+  } catch (err) {
+    console.error("listVendidoVsDespachadoPorSemana (despacho):", (err as Error).message);
+  }
+
+  return segundasNoPeriodo(range).map((semanaIso) => ({
+    semanaInicio: semanaIso,
+    vendido: vendidoPorSemana.get(semanaIso) ?? 0,
+    despachado: despachoPorSemana.get(semanaIso) ?? 0,
+  }));
 }

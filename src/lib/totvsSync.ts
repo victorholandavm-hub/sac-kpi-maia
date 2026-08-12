@@ -107,6 +107,27 @@ type TotvsClientListResponse = {
   data: TotvsClient[];
 };
 
+// WSStock (totvs.md) -- saldo no armazém 75 (o CD), detalhado por filial em
+// `stores[]`. current_balance/reserved_qty em totvs_stock são a SOMA dessas
+// filiais, não uma filial só (ver syncStock).
+type TotvsStockStore = { storeCode: string; currentBalance: number; reservedQty: number };
+
+type TotvsStockItem = {
+  code: string;
+  description?: string;
+  manufacturer?: string;
+  unitCost?: number;
+  purchaseOrderBalance?: number;
+  estimatedArrivalDate?: string;
+  stores: TotvsStockStore[];
+};
+
+type TotvsStockListResponse = {
+  currentPage: number;
+  totalPages: number;
+  data: TotvsStockItem[];
+};
+
 type TotvsOrderItem = {
   itemNumber: string;
   product?: string;
@@ -390,6 +411,85 @@ async function syncClients(supabase: SupabaseAdmin): Promise<SyncResult> {
   }
 
   await setSyncState(supabase, "totvs_clients_next_page", String(page));
+  return { checked, upserted, errors };
+}
+
+const STOCK_PAGE_SIZE = 200;
+const STOCK_PAGE_CAP = 30;
+const STOCK_TIME_BUDGET_MS = 120_000;
+const STOCK_PAGE_FAIL_LIMIT = 3;
+
+// Mesmo padrão de syncClients acima (paginação simples por página/tamanho,
+// não por período como syncOrders) -- WSStock é uma foto do catálogo
+// inteiro, não bounded por data.
+async function syncStock(supabase: SupabaseAdmin): Promise<SyncResult> {
+  const started = Date.now();
+  let page = Number(await getSyncState(supabase, "totvs_stock_next_page")) || 1;
+  const [failPageRaw, failCountRaw] = ((await getSyncState(supabase, "totvs_stock_page_fail")) ?? "").split(":");
+  let failCount = Number(failPageRaw) === page ? Number(failCountRaw) || 0 : 0;
+  let checked = 0;
+  let upserted = 0;
+  const errors: string[] = [];
+
+  for (let i = 0; i < STOCK_PAGE_CAP; i++) {
+    if (Date.now() - started > STOCK_TIME_BUDGET_MS) break;
+
+    let json: TotvsStockListResponse;
+    try {
+      json = await fetchTotvs<TotvsStockListResponse>(`${BASE_URL}/rest/stock?Page=${page}&Size=${STOCK_PAGE_SIZE}`);
+    } catch (err) {
+      failCount += 1;
+      if (failCount >= STOCK_PAGE_FAIL_LIMIT) {
+        errors.push(`stock page ${page}: ${(err as Error).message} (pulada após ${failCount} falhas seguidas)`);
+        await setSyncState(supabase, "totvs_stock_page_fail", "");
+        page += 1;
+        failCount = 0;
+        continue;
+      }
+      errors.push(`stock page ${page}: ${(err as Error).message}`);
+      await setSyncState(supabase, "totvs_stock_page_fail", `${page}:${failCount}`);
+      continue;
+    }
+    if (failCount > 0) {
+      await setSyncState(supabase, "totvs_stock_page_fail", "");
+      failCount = 0;
+    }
+
+    const rows = json.data ?? [];
+    checked += rows.length;
+
+    for (const item of rows) {
+      if (!item.code) continue;
+      const stores = item.stores ?? [];
+      // Soma as filiais -- ver comentário em TotvsStockItem acima.
+      const currentBalance = stores.reduce((s, st) => s + (st.currentBalance ?? 0), 0);
+      const reservedQty = stores.reduce((s, st) => s + (st.reservedQty ?? 0), 0);
+      const { error } = await supabase.from("totvs_stock").upsert(
+        {
+          product_code: item.code,
+          description: item.description || null,
+          manufacturer: item.manufacturer || null,
+          unit_cost: item.unitCost ?? null,
+          current_balance: currentBalance,
+          reserved_qty: reservedQty,
+          purchase_order_balance: item.purchaseOrderBalance ?? null,
+          estimated_arrival_date: item.estimatedArrivalDate || null,
+          synced_at: new Date().toISOString(),
+        },
+        { onConflict: "product_code" }
+      );
+      if (!error) upserted++;
+      else errors.push(`stock ${item.code}: ${error.message}`);
+    }
+
+    if (rows.length === 0 || page >= (json.totalPages ?? page)) {
+      page = 1;
+      break;
+    }
+    page += 1;
+  }
+
+  await setSyncState(supabase, "totvs_stock_next_page", String(page));
   return { checked, upserted, errors };
 }
 
@@ -891,6 +991,7 @@ export type TotvsSyncSummary = {
   deliveriesStale: { checked: number; upserted: number };
   deliveries: { checked: number; upserted: number };
   clientsBackfill: { checked: number; upserted: number };
+  stock: { checked: number; upserted: number };
   errors: string[];
 };
 
@@ -906,6 +1007,7 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
   const deliveriesStale = await syncStaleDeliveries(supabase);
   const deliveries = await syncDeliveries(supabase);
   const clientsBackfill = await backfillMissingClients(supabase);
+  const stock = await syncStock(supabase);
 
   const summary: TotvsSyncSummary = {
     ok:
@@ -913,13 +1015,15 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
       orders.errors.length === 0 &&
       deliveriesStale.errors.length === 0 &&
       deliveries.errors.length === 0 &&
-      clientsBackfill.errors.length === 0,
+      clientsBackfill.errors.length === 0 &&
+      stock.errors.length === 0,
     clients: { checked: clients.checked, upserted: clients.upserted },
     orders: { checked: orders.checked, upserted: orders.upserted },
     deliveriesStale: { checked: deliveriesStale.checked, upserted: deliveriesStale.upserted },
     deliveries: { checked: deliveries.checked, upserted: deliveries.upserted },
     clientsBackfill: { checked: clientsBackfill.checked, upserted: clientsBackfill.upserted },
-    errors: [...clients.errors, ...orders.errors, ...deliveriesStale.errors, ...deliveries.errors, ...clientsBackfill.errors],
+    stock: { checked: stock.checked, upserted: stock.upserted },
+    errors: [...clients.errors, ...orders.errors, ...deliveriesStale.errors, ...deliveries.errors, ...clientsBackfill.errors, ...stock.errors],
   };
 
   await recordSyncRun(
@@ -931,6 +1035,7 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
       deliveriesStale: summary.deliveriesStale,
       deliveries: summary.deliveries,
       clientsBackfill: summary.clientsBackfill,
+      stock: summary.stock,
     },
     summary.errors
   );
