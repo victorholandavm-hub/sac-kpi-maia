@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { BoxIcon, HardHatIcon, TruckIcon } from "@/components/assistencia/RoleIcons";
 
@@ -45,8 +46,7 @@ export default function EncomendasHubPage() {
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="max-w-xl w-full flex flex-col items-center gap-8 text-center">
         <div className="flex flex-col items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Lojas Maia" className="h-20 w-20 object-contain" />
+          <Image src="/logo.png" alt="Lojas Maia" width={225} height={225} className="h-20 w-20 object-contain" />
           <div>
             <h1 className="text-2xl font-semibold" style={{ color: "var(--brand-green)" }}>
               Encomendas
