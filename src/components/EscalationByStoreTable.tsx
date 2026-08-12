@@ -1,5 +1,9 @@
 import type { EscalationStoreStat } from "@/lib/kpi";
 
+// Valor de negócio (não é regra do sistema) -- acima disso a loja demorou
+// tempo demais pra responder o SAC e vale destaque visual imediato.
+const SLOW_STORE_THRESHOLD_MINUTES = 240;
+
 function formatMinutes(minutes: number) {
   if (minutes >= 60) return `${(minutes / 60).toFixed(1)}h`;
   return `${Math.round(minutes)}min`;
@@ -34,22 +38,34 @@ export function EscalationByStoreTable({ data }: { data: EscalationStoreStat[] }
               </tr>
             </thead>
             <tbody>
-              {data.map((row) => (
-                <tr key={row.store} style={{ borderTop: "1px solid var(--gridline)" }}>
-                  <td className="py-2 pr-4" style={{ color: "var(--text-primary)" }}>
-                    {row.store}
-                  </td>
-                  <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {row.count}
-                  </td>
-                  <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {row.avgWaitMinutes !== null ? formatMinutes(row.avgWaitMinutes) : "—"}
-                  </td>
-                  <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {row.pendingCount}
-                  </td>
-                </tr>
-              ))}
+              {data.map((row) => {
+                const isSlow = row.avgWaitMinutes !== null && row.avgWaitMinutes > SLOW_STORE_THRESHOLD_MINUTES;
+                return (
+                  <tr
+                    key={row.store}
+                    style={{
+                      borderTop: "1px solid var(--gridline)",
+                      background: isSlow ? "color-mix(in srgb, var(--status-critical) 12%, var(--surface-1))" : undefined,
+                    }}
+                  >
+                    <td className="py-2 pr-4" style={{ color: "var(--text-primary)" }}>
+                      {row.store}
+                    </td>
+                    <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {row.count}
+                    </td>
+                    <td
+                      className="py-2 pr-4"
+                      style={{ fontVariantNumeric: "tabular-nums", color: isSlow ? "var(--status-critical)" : undefined, fontWeight: isSlow ? 700 : undefined }}
+                    >
+                      {row.avgWaitMinutes !== null ? formatMinutes(row.avgWaitMinutes) : "—"}
+                    </td>
+                    <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {row.pendingCount}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
