@@ -9,6 +9,7 @@ import {
   listVendidoVsDespachadoPorSemana,
   listTendenciaProdutos,
   listSaldoEstoqueProdutos,
+  getEarliestSyncedOrderDate,
   type ProdutoSugestao,
   type ProdutoCategoriaKey,
   type DateRange,
@@ -86,12 +87,18 @@ export default async function VendasProdutoPage({
     }
   }
 
-  const [ranking, categorias, evolucao, vendidoDespachado] = await Promise.all([
+  const [ranking, categorias, evolucao, vendidoDespachado, earliestSyncedDate] = await Promise.all([
     listRankingProdutos(range, RANKING_LIMIT, categoriaAtiva),
     listVendasPorCategoria(range),
     listVendasPorFamiliaLogisticaPorSemana(range),
     listVendidoVsDespachadoPorSemana(range),
+    getEarliestSyncedOrderDate(),
   ]);
+  // Descoberto em 2026-08-13: o sync de pedidos só cobria os últimos ~30
+  // dias quando foi ligado -- período pedido além disso mostrava "0 vendas"
+  // silencioso em vez do valor real. Backfill histórico foi estendido, mas
+  // esse aviso fica de proteção permanente caso o sync atrase de novo.
+  const dadosIncompletos = !!earliestSyncedDate && range.from < earliestSyncedDate;
   // Dependem dos códigos do ranking acima, por isso vêm depois -- ambas são
   // sempre relativas a hoje, não ao período filtrado (ver
   // listTendenciaProdutos/listSaldoEstoqueProdutos).
@@ -161,6 +168,17 @@ export default async function VendasProdutoPage({
           </button>
         </form>
       </div>
+
+      {dadosIncompletos ? (
+        <p
+          className="text-xs px-3 py-2 rounded-lg"
+          style={{ background: "color-mix(in srgb, var(--status-warning) 15%, var(--surface-1))", color: "var(--text-primary)" }}
+        >
+          ⚠ O período escolhido começa antes de {new Date(`${earliestSyncedDate}T00:00:00`).toLocaleDateString("pt-BR")} — a
+          sincronização com o TOTVS só tem histórico a partir dessa data, então os números podem estar subestimados pra dias
+          anteriores a ela.
+        </p>
+      ) : null}
 
       <form action="/assistencia/vendas" method="GET" className="flex items-center gap-2 flex-wrap">
         {customRange ? <input type="hidden" name="from" value={range.from} /> : null}

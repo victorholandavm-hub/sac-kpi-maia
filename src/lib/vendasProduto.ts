@@ -107,6 +107,24 @@ export function familiaLogisticaDaCategoria(key: ProdutoCategoriaKey): FamiliaLo
   return FAMILIA_POR_CATEGORIA[key];
 }
 
+// Data mais antiga que já existe sincronizada em totvs_orders -- usado pra
+// avisar na tela quando o período escolhido (ex.: "26 semanas") vai além do
+// que o sync já cobre. Descoberto em 2026-08-13: o sync de pedidos só fez
+// backfill de 30 dias quando foi ligado (INITIAL_ORDERS_LOOKBACK_DAYS em
+// totvsSync.ts), então qualquer período pedido antes disso mostrava
+// silenciosamente "0 vendas" em vez do valor real -- um produto que vendeu
+// mais de 500 aparecia como 382, sem nenhum sinal de que faltava dado. O
+// backfill histórico foi estendido pra 26 semanas (ver conversa com o
+// usuário), mas essa checagem fica de proteção permanente: se o sync algum
+// dia atrasar nesse cursor de novo, a tela avisa em vez de mentir um número
+// baixo.
+export async function getEarliestSyncedOrderDate(): Promise<string | null> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("totvs_orders").select("issue_date").order("issue_date", { ascending: true }).limit(1).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.issue_date ?? null;
+}
+
 export type ProdutoSugestao = { productCode: string; description: string | null };
 
 // Busca por código OU descrição -- ilike em substring, mesmo padrão de
