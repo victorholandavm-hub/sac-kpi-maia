@@ -92,8 +92,8 @@ export async function setItemPaymentReleased(itemId: string, requestId: string, 
     actor_id: profile.id,
     event_type: "note_added",
     note: released
-      ? `Pagamento aprovado: "${item?.product ?? "item"}".`
-      : `Aprovação de pagamento revertida: "${item?.product ?? "item"}".`,
+      ? `Pagamento marcado como pago: "${item?.product ?? "item"}".`
+      : `Pagamento revertido para pendente: "${item?.product ?? "item"}".`,
   });
 
   revalidatePath(`/assistencia/${requestId}`);

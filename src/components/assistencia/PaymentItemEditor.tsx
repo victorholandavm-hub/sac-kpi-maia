@@ -22,7 +22,23 @@ function formatDate(value: string) {
 // Existir separado da versão em RequestItemsTable é o preço de UI de listas
 // achatadas x aninhadas -- não dava pra reaproveitar o componente sem
 // reconciliar os dois formatos de dado.
-export function PaymentItemEditor({ item, canEdit }: { item: PaymentItem; canEdit: boolean }) {
+//
+// `checked`/`onToggle` só vêm preenchidos quando o item é elegível pra
+// seleção em lote (concluída, com valor, ainda não paga -- ver
+// AssemblerPaymentGroup.tsx) -- os outros casos (a montar, já pago) não
+// mostram checkbox, porque marcar em lote só faz sentido pra quem ainda
+// está pendente.
+export function PaymentItemEditor({
+  item,
+  canEdit,
+  checked,
+  onToggle,
+}: {
+  item: PaymentItem;
+  canEdit: boolean;
+  checked?: boolean;
+  onToggle?: () => void;
+}) {
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(item.unitValue !== null ? String(item.unitValue) : "");
@@ -47,7 +63,7 @@ export function PaymentItemEditor({ item, canEdit }: { item: PaymentItem; canEdi
   function toggleReleased() {
     run(
       () => setItemPaymentReleased(item.itemId, item.requestId, !item.paymentReleased),
-      item.paymentReleased ? "Pagamento revertido para pendente." : "Pagamento aprovado."
+      item.paymentReleased ? "Pagamento revertido para pendente." : "Pagamento marcado como pago."
     );
   }
 
@@ -65,10 +81,21 @@ export function PaymentItemEditor({ item, canEdit }: { item: PaymentItem; canEdi
   return (
     <div className="flex flex-col gap-1.5 p-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Link href={`/assistencia/${item.requestId}`} className="text-sm min-w-0 hover:underline" style={{ color: "var(--text-primary)" }}>
-          {item.quantity > 1 ? `${item.quantity}x ` : ""}
-          {item.product}
-        </Link>
+        <span className="flex items-center gap-2 min-w-0">
+          {onToggle ? (
+            <input
+              type="checkbox"
+              checked={checked ?? false}
+              onChange={onToggle}
+              className="rounded shrink-0"
+              aria-label={`Selecionar ${item.product}`}
+            />
+          ) : null}
+          <Link href={`/assistencia/${item.requestId}`} className="text-sm min-w-0 hover:underline" style={{ color: "var(--text-primary)" }}>
+            {item.quantity > 1 ? `${item.quantity}x ` : ""}
+            {item.product}
+          </Link>
+        </span>
         <div className="flex items-center gap-3 shrink-0">
           {editing ? (
             <>
@@ -109,7 +136,7 @@ export function PaymentItemEditor({ item, canEdit }: { item: PaymentItem; canEdi
                   borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
                 }}
               >
-                {item.paymentReleased ? "✓ Aprovado" : "Aprovar pagamento"}
+                {item.paymentReleased ? "✓ Pago" : "Marcar como pago"}
               </button>
             ) : (
               <span
@@ -119,7 +146,7 @@ export function PaymentItemEditor({ item, canEdit }: { item: PaymentItem; canEdi
                   borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
                 }}
               >
-                {item.paymentReleased ? "✓ Aprovado" : "Pendente"}
+                {item.paymentReleased ? "✓ Pago" : "Pendente"}
               </span>
             )
           ) : (
@@ -133,7 +160,7 @@ export function PaymentItemEditor({ item, canEdit }: { item: PaymentItem; canEdi
           )}
           {item.paymentReleased && item.paymentReleasedAt ? (
             <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-              em {formatDate(item.paymentReleasedAt)}
+              pago em {formatDate(item.paymentReleasedAt)}
             </span>
           ) : null}
         </div>

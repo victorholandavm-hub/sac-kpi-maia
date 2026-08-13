@@ -10,6 +10,16 @@ function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function buildHref(params: { pendentes?: string; assembler?: string; from?: string; to?: string }) {
+  const sp = new URLSearchParams();
+  if (params.pendentes) sp.set("pendentes", params.pendentes);
+  if (params.assembler) sp.set("assembler", params.assembler);
+  if (params.from) sp.set("from", params.from);
+  if (params.to) sp.set("to", params.to);
+  const qs = sp.toString();
+  return qs ? `/assistencia/pagamentos?${qs}` : "/assistencia/pagamentos";
+}
+
 function groupByAssembler(items: PaymentItem[]) {
   const groups: { assemblerName: string; items: PaymentItem[] }[] = [];
   for (const item of items) {
@@ -27,7 +37,7 @@ function groupByAssembler(items: PaymentItem[]) {
 export default async function PagamentosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pendentes?: string; assembler?: string }>;
+  searchParams: Promise<{ pendentes?: string; assembler?: string; from?: string; to?: string }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
@@ -35,15 +45,12 @@ export default async function PagamentosPage({
   // controla tanto o botão de exportar quanto a edição inline de valor/
   // aprovação/autorização aqui na tela.
   const canExport = profile.fullName === PAYMENTS_CONTROLLER_NAME;
-  const { pendentes, assembler } = await searchParams;
-  // Sempre inclui item sem valor -- antes só entrava com um montador
-  // escolhido, e isso escondia o próprio caso que "Só pendentes de
-  // liberação" deveria mostrar primeiro: montagem concluída que o Antonio
-  // ainda nem começou a precificar (ver includeNoValue em payments.ts e
-  // paymentStage abaixo, que já classifica concluída+sem valor como
-  // "pendente" -- só faltava a consulta trazer essas linhas).
+  const { pendentes, assembler, from, to } = await searchParams;
+  // Filtra pela data da solicitação (quando a montagem foi pedida), não pela
+  // data do pagamento -- decisão do usuário 13/08/2026: itens ainda não
+  // pagos continuam aparecendo mesmo filtrando um período passado.
   const [rawItems, assemblers] = await Promise.all([
-    listPaymentItems({ assemblerName: assembler, includeNoValue: true }),
+    listPaymentItems({ assemblerName: assembler, includeNoValue: true, dateFrom: from, dateTo: to }),
     listAssemblers(),
   ]);
   // Esconde "ainda em andamento e sem valor" -- isso não é acionável (a
@@ -58,13 +65,18 @@ export default async function PagamentosPage({
   const pendingTotal = items
     .filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente")
     .reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
+  // "Pago" = soma do que o Antonio já marcou como pago (payment_released) --
+  // junto com "Pendente" ao lado, deixa visível o desconto: Total = Pago +
+  // Pendente (+ o que ainda tá "a montar", sem entrar na conta de nenhum
+  // dos dois).
+  const paidTotal = items.filter((i) => i.paymentReleased).reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <Link
-            href={assembler ? `/assistencia/pagamentos?assembler=${assembler}` : "/assistencia/pagamentos"}
+            href={buildHref({ assembler, from, to })}
             className="text-xs px-3 py-1 rounded-full border"
             style={{
               borderColor: "var(--border)",
@@ -76,7 +88,7 @@ export default async function PagamentosPage({
             Todos
           </Link>
           <Link
-            href={`/assistencia/pagamentos?pendentes=1${assembler ? `&assembler=${assembler}` : ""}`}
+            href={buildHref({ pendentes: "1", assembler, from, to })}
             className="text-xs px-3 py-1 rounded-full border"
             style={{
               borderColor: "var(--border)",
@@ -88,10 +100,31 @@ export default async function PagamentosPage({
             Só pendentes de liberação
           </Link>
           <FilterSelect name="assembler" placeholder="Todos os montadores" options={assemblers} />
+          <form action="/assistencia/pagamentos" method="GET" className="flex items-center gap-2 flex-wrap">
+            {pendentes ? <input type="hidden" name="pendentes" value={pendentes} /> : null}
+            {assembler ? <input type="hidden" name="assembler" value={assembler} /> : null}
+            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+              De
+              <input type="date" name="from" defaultValue={from ?? ""} className="rounded border px-2 py-1 text-xs" style={{ borderColor: "var(--border)" }} />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+              Até
+              <input type="date" name="to" defaultValue={to ?? ""} className="rounded border px-2 py-1 text-xs" style={{ borderColor: "var(--border)" }} />
+            </label>
+            <button type="submit" className="text-xs px-3 py-1.5 rounded border font-medium whitespace-nowrap" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+              Aplicar
+            </button>
+            {from || to ? (
+              <Link href={buildHref({ pendentes, assembler })} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+                Limpar data
+              </Link>
+            ) : null}
+          </form>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Total: <strong>{formatBRL(grandTotal)}</strong> · Pendente:{" "}
+            Total: <strong>{formatBRL(grandTotal)}</strong> · Pago:{" "}
+            <strong style={{ color: "var(--status-good)" }}>{formatBRL(paidTotal)}</strong> · Pendente:{" "}
             <strong style={{ color: "var(--status-warning)" }}>{formatBRL(pendingTotal)}</strong>
           </div>
           {canExport ? <PaymentsExportButton items={items} /> : null}

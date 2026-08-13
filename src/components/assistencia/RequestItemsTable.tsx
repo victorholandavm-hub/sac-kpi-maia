@@ -57,7 +57,7 @@ function ItemRow({
   function toggleReleased() {
     run(
       () => setItemPaymentReleased(item.id, requestId, !item.paymentReleased),
-      item.paymentReleased ? "Pagamento revertido para pendente." : "Pagamento aprovado."
+      item.paymentReleased ? "Pagamento revertido para pendente." : "Pagamento marcado como pago."
     );
   }
 
@@ -148,7 +148,7 @@ function ItemRow({
                 borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
               }}
             >
-              {item.paymentReleased ? "✓ Aprovado" : "Aprovar pagamento"}
+              {item.paymentReleased ? "✓ Pago" : "Marcar como pago"}
             </button>
           ) : (
             <span
@@ -158,7 +158,7 @@ function ItemRow({
                 borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
               }}
             >
-              {item.paymentReleased ? "✓ Aprovado" : "Pendente"}
+              {item.paymentReleased ? "✓ Pago" : "Pendente"}
             </span>
           )
         ) : (
@@ -172,7 +172,7 @@ function ItemRow({
         )}
         {item.paymentReleased && item.paymentReleasedAt ? (
           <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-            em {formatDate(item.paymentReleasedAt)}
+            pago em {formatDate(item.paymentReleasedAt)}
           </span>
         ) : null}
       </div>
