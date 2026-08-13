@@ -17,6 +17,7 @@ import {
   STATUS_LABELS,
   DELIVERY_REQUEST_TYPES,
   ALL_REQUEST_TYPES,
+  CAUSA_RAIZ_OPTIONS,
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
 import { resolveDriverName } from "@/lib/payments";
@@ -1733,6 +1734,24 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) return { error: "Informe o motivo." };
 
+  // Causa raiz só existe pra troca_produto -- os outros tipos (entrega,
+  // envio de peça, notificação, montagem) não passam por aqui.
+  let causaRaiz: string | null = null;
+  let causaCarga: string | null = null;
+  let causaConferente: string | null = null;
+  if (type === "troca_produto") {
+    causaRaiz = String(formData.get("causa_raiz") ?? "").trim();
+    if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
+      return { error: "Selecione a causa raiz da troca." };
+    }
+    if (causaRaiz === "erro_cd") {
+      causaCarga = String(formData.get("causa_carga") ?? "").trim();
+      causaConferente = String(formData.get("causa_conferente") ?? "").trim();
+      if (!causaCarga) return { error: "Informe a carga (erro do CD precisa registrar qual foi)." };
+      if (!causaConferente) return { error: "Informe o conferente (erro do CD precisa registrar quem conferiu)." };
+    }
+  }
+
   const photo = formData.get("photo");
   if (!(photo instanceof File) || photo.size === 0) {
     return { error: "Anexe uma foto ou PDF da notificação." };
@@ -1808,6 +1827,9 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       driver_name: driverName,
       shift: urgent ? "urgencia" : null,
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
+      causa_raiz: causaRaiz,
+      causa_carga: causaCarga,
+      causa_conferente: causaConferente,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
       // Criado direto pelo SAC, não pela loja — não há prazo pra aprovar.
       deadline_status: "aprovado",

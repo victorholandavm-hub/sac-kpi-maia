@@ -161,6 +161,12 @@ export type ServiceRequestSummary = {
   // Só relevante pra troca_produto (ver requestNewExchange) -- 1 na criação,
   // incrementa cada vez que o produto trocado volta com problema.
   exchangeRound: number;
+  // Causa raiz da troca (troca_produto) -- ver CAUSA_RAIZ_LABELS. Quando
+  // "erro_cd", causaCarga/causaConferente são preenchimento obrigatório na
+  // criação (ver createSacRequest).
+  causaRaiz: string | null;
+  causaCarga: string | null;
+  causaConferente: string | null;
 };
 
 type SummaryRow = {
@@ -196,6 +202,9 @@ type SummaryRow = {
   assistencia_order: number | null;
   montador_instruction: string | null;
   exchange_round: number;
+  causa_raiz: string | null;
+  causa_carga: string | null;
+  causa_conferente: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -207,7 +216,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -260,6 +269,9 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     assistenciaOrder: row.assistencia_order,
     montadorInstruction: row.montador_instruction,
     exchangeRound: row.exchange_round,
+    causaRaiz: row.causa_raiz,
+    causaCarga: row.causa_carga,
+    causaConferente: row.causa_conferente,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
@@ -426,7 +438,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 export async function getRequestDetail(
   id: string
