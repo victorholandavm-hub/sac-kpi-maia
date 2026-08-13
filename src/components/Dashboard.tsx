@@ -15,7 +15,7 @@ import { RangePicker } from "./RangePicker";
 import { PreviousWeekCard } from "./PreviousWeekCard";
 import { AgentStatsTable } from "./AgentStatsTable";
 import { PerformanceReportButton } from "./PerformanceReportButton";
-import { NpsCard } from "./NpsCard";
+import { NpsCard, NPS_INDEX_TARGET, indexColor } from "./NpsCard";
 import { CategoryTicketsModal } from "./CategoryTicketsModal";
 import { categoryLabel, storeLabel, productLabel } from "@/lib/labels";
 
@@ -26,6 +26,16 @@ const NPS_SCORE_LABELS: Record<number, string> = {
   2: "2 - Insatisfeito",
   1: "1 - Muito insatisfeito",
 };
+
+// As 3 abas do painel -- separa "o que aconteceu" (volumetria), "quem
+// atendeu" (equipe) e "onde travou" (gargalos/logística) em vez de uma
+// rolagem só com tudo misturado.
+const TABS = [
+  { id: "geral", label: "Geral e Volumetria" },
+  { id: "performance", label: "Performance da Equipe" },
+  { id: "gargalos", label: "Gargalos e Logística" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
 
 export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) {
   const resolvedPct =
@@ -40,6 +50,7 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
   const [categoryModal, setCategoryModal] = useState<{ title: string; totalCount: number; tickets: StoreBreakdownTicket[] } | null>(
     null
   );
+  const [activeTab, setActiveTab] = useState<TabId>("geral");
   function openCategoryDrilldown(item: Count) {
     const tag = item.tag ?? item.label;
     setCategoryModal({
@@ -72,86 +83,147 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         </div>
       </div>
 
-      <PreviousWeekCard data={data.previousWeek} />
-
+      {/* Banner de resumo -- os 4 números que mais importam de relance,
+          em fonte grande, sempre visíveis independente da aba ativa. */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatTile label="Total de chamados" value={data.totalTickets} />
-        <StatTile label="Em aberto" value={data.openCount} />
-        <StatTile label="Resolvidos" value={`${resolvedPct}%`} />
-        <StatTile label="Urgência alta em aberto" value={data.highUrgencyOpenCount} />
+        <StatTile label="Total de chamados" value={data.totalTickets} size="lg" />
         <StatTile
-          label="Tempo médio de resolução"
-          value={data.avgResolutionHours ?? "—"}
-          suffix={data.avgResolutionHours !== null ? "h" : undefined}
-        />
-        <StatTile
-          label="1ª resposta (média)"
+          label="Tempo médio de resposta"
           value={data.avgFirstResponseMinutes ?? "—"}
           suffix={data.avgFirstResponseMinutes !== null ? "min" : undefined}
+          size="lg"
         />
         <StatTile
-          label={`Dentro do SLA (${data.slaMinutesThreshold}min)`}
-          value={data.pctWithinSla !== null ? `${data.pctWithinSla}%` : "—"}
+          label={`Satisfação (NPS, meta ${NPS_INDEX_TARGET})`}
+          value={data.npsSummary.npsIndex ?? "—"}
+          size="lg"
+          accent="var(--brand-orange)"
+          valueColor={indexColor(data.npsSummary.npsIndex)}
         />
-        <StatTile label="Taxa de reincidência" value={data.recurrencePct !== null ? `${data.recurrencePct}%` : "—"} />
         <StatTile
-          label="Espera média por info. externa (IA)"
-          value={data.escalations.avgWaitMinutes !== null ? Math.round((data.escalations.avgWaitMinutes / 60) * 10) / 10 : "—"}
-          suffix={data.escalations.avgWaitMinutes !== null ? "h" : undefined}
+          label="Urgência alta em aberto"
+          value={data.highUrgencyOpenCount}
+          size="lg"
+          accent="var(--status-critical)"
+          valueColor={data.highUrgencyOpenCount > 0 ? "var(--status-critical)" : undefined}
         />
-        <StatTile label="Ciclos de consulta ainda em aberto (IA)" value={data.escalations.pendingCount} />
       </section>
-      <p className="text-xs -mt-4" style={{ color: "var(--text-muted)" }}>
-        Tempo de resolução calculado apenas para os {data.resolvedByTagCount} chamados com a tag de
-        status aplicada. 1ª resposta/SLA já considera horário comercial (seg-sex 8h-18h, sáb 8h-17h)
-        para {data.firstResponseSampleSize} chamados com mensagens suficientes — ainda assim é uma
-        aproximação nossa e pode não bater exatamente com o relatório nativo do GHL. A espera por
-        informação externa é lida diretamente do texto das conversas por IA (
-        {data.escalations.completedCount} ciclos concluídos analisados), sem depender de tags.
-      </p>
 
-      <NpsCard data={data.npsSummary} detractors={data.npsDetractors} />
-      <BarRanking
-        title="Distribuição das notas (enquete GHL)"
-        data={npsDistribution}
-        coverage={{ withValue: data.npsSummary.responseCount, total: data.npsSummary.eligibleCount, pct: data.npsSummary.responseRatePct ?? 0 }}
-      />
+      {/* Abas -- cada uma monta só o conteúdo dela (sem manter as outras
+          fora de tela) pra não pagar o custo de renderizar tudo de uma vez;
+          como todos os dados já vieram prontos em `data`, trocar de aba é
+          só troca de estado local, sem nova requisição. */}
+      <div className="flex flex-wrap gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+        {TABS.map((tab) => {
+          const active = tab.id === activeTab;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className="text-sm font-medium px-4 py-2 -mb-px rounded-t-lg border border-b-0"
+              style={{
+                color: active ? "var(--brand-green)" : "var(--text-secondary)",
+                background: active ? "var(--surface-1)" : "transparent",
+                borderColor: active ? "var(--border)" : "transparent",
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-      {data.paretoSummary ? (
-        <p className="text-sm" style={{ color: "var(--text-primary)" }}>
-          {data.paretoSummary}
-        </p>
+      {activeTab === "geral" ? (
+        <div className="flex flex-col gap-6">
+          <PreviousWeekCard data={data.previousWeek} />
+
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatTile label="Em aberto" value={data.openCount} />
+            <StatTile label="Resolvidos" value={`${resolvedPct}%`} />
+          </section>
+
+          {data.paretoSummary ? (
+            <p className="text-sm" style={{ color: "var(--text-primary)" }}>
+              {data.paretoSummary}
+            </p>
+          ) : null}
+
+          <VolumeChart data={data.dailyVolume} />
+
+          <section className="grid md:grid-cols-3 gap-4">
+            <BarRanking title="Chamados por canal" data={data.byChannel} />
+            <BarRanking title="Chamados por produto" data={byProduct} coverage={data.productCoverage} />
+            <BarRanking title="Chamados por loja" data={byStore} coverage={data.storeCoverage} />
+          </section>
+        </div>
       ) : null}
 
-      <AgentStatsTable data={data.byAgentStats} />
+      {activeTab === "performance" ? (
+        <div className="flex flex-col gap-6">
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatTile
+              label={`Dentro do SLA (${data.slaMinutesThreshold}min)`}
+              value={data.pctWithinSla !== null ? `${data.pctWithinSla}%` : "—"}
+            />
+            <StatTile label="Taxa de reincidência" value={data.recurrencePct !== null ? `${data.recurrencePct}%` : "—"} />
+          </section>
+          <p className="text-xs -mt-4" style={{ color: "var(--text-muted)" }}>
+            1ª resposta/SLA já considera horário comercial (seg-sex 8h-18h, sáb 8h-17h) para{" "}
+            {data.firstResponseSampleSize} chamados com mensagens suficientes — ainda assim é uma
+            aproximação nossa e pode não bater exatamente com o relatório nativo do GHL.
+          </p>
 
-      <section className="grid md:grid-cols-3 gap-4">
-        <BarRanking
-          title="Principais categorias de problema"
-          data={byCategory}
-          coverage={data.categoryCoverage}
-          onSelect={openCategoryDrilldown}
-        />
-        <BarRanking title="Chamados por loja" data={byStore} coverage={data.storeCoverage} />
-        <BarRanking title="Chamados por produto" data={byProduct} coverage={data.productCoverage} />
-      </section>
+          <NpsCard data={data.npsSummary} detractors={data.npsDetractors} />
+          <BarRanking
+            title="Distribuição das notas (enquete GHL)"
+            data={npsDistribution}
+            coverage={{ withValue: data.npsSummary.responseCount, total: data.npsSummary.eligibleCount, pct: data.npsSummary.responseRatePct ?? 0 }}
+          />
 
-      <section className="grid md:grid-cols-2 gap-4">
-        <BarRanking title="Chamados por agente" data={data.byAgent} />
-        <BarRanking title="Chamados por canal" data={data.byChannel} />
-      </section>
+          <AgentStatsTable data={data.byAgentStats} />
+          <BarRanking title="Chamados por agente" data={data.byAgent} />
+        </div>
+      ) : null}
 
-      <section className="grid md:grid-cols-2 gap-4">
-        <VolumeChart data={data.dailyVolume} />
-        <BacklogTrendChart data={data.backlogOverTime} />
-      </section>
+      {activeTab === "gargalos" ? (
+        <div className="flex flex-col gap-6">
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatTile
+              label="Tempo médio de resolução"
+              value={data.avgResolutionHours ?? "—"}
+              suffix={data.avgResolutionHours !== null ? "h" : undefined}
+            />
+            <StatTile
+              label="Espera média por info. externa (IA)"
+              value={data.escalations.avgWaitMinutes !== null ? Math.round((data.escalations.avgWaitMinutes / 60) * 10) / 10 : "—"}
+              suffix={data.escalations.avgWaitMinutes !== null ? "h" : undefined}
+            />
+            <StatTile label="Ciclos de consulta ainda em aberto (IA)" value={data.escalations.pendingCount} />
+          </section>
+          <p className="text-xs -mt-4" style={{ color: "var(--text-muted)" }}>
+            Tempo de resolução calculado apenas para os {data.resolvedByTagCount} chamados com a tag
+            de status aplicada. A espera por informação externa é lida diretamente do texto das
+            conversas por IA ({data.escalations.completedCount} ciclos concluídos analisados), sem
+            depender de tags.
+          </p>
 
-      <StoreBreakdownTable data={data.storeBreakdown} />
+          <BarRanking
+            title="Principais categorias de problema (motivos)"
+            data={byCategory}
+            coverage={data.categoryCoverage}
+            onSelect={openCategoryDrilldown}
+          />
 
-      <section className="grid md:grid-cols-2 gap-4">
-        <EscalationBreakdown data={data.escalations.byTarget} />
-        <EscalationByStoreTable data={data.escalationByStore} />
-      </section>
+          <BacklogTrendChart data={data.backlogOverTime} />
+          <StoreBreakdownTable data={data.storeBreakdown} />
+
+          <section className="grid md:grid-cols-2 gap-4">
+            <EscalationBreakdown data={data.escalations.byTarget} />
+            <EscalationByStoreTable data={data.escalationByStore} />
+          </section>
+        </div>
+      ) : null}
 
       {categoryModal ? (
         <CategoryTicketsModal
