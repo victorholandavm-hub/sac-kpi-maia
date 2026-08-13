@@ -285,10 +285,10 @@ async function fetchItensDoPeriodo(range: DateRange): Promise<ItemRankingRow[]> 
 }
 
 // categoria opcional -- quando informada, filtra o ranking só pra produtos
-// classificados nela (ver classificarProduto).
-export async function listRankingProdutos(range: DateRange, limit: number, categoria?: ProdutoCategoriaKey): Promise<ProdutoRankingItem[]> {
-  const rows = await fetchItensDoPeriodo(range);
-
+// classificados nela (ver classificarProduto). Extraída de listRankingProdutos
+// pra poder rodar em cima de um `rows` já buscado (ver getVendasPeriodoResumo)
+// em vez de buscar de novo -- mesmo dado, sem ida ao banco repetida.
+function aggregateRankingProdutos(rows: ItemRankingRow[], limit: number, categoria?: ProdutoCategoriaKey): ProdutoRankingItem[] {
   const porProduto = new Map<string, ProdutoRankingItem>();
   for (const row of rows) {
     if (!row.product) continue;
@@ -302,6 +302,11 @@ export async function listRankingProdutos(range: DateRange, limit: number, categ
   }
 
   return [...porProduto.values()].sort((a, b) => b.quantidade - a.quantidade).slice(0, limit);
+}
+
+export async function listRankingProdutos(range: DateRange, limit: number, categoria?: ProdutoCategoriaKey): Promise<ProdutoRankingItem[]> {
+  const rows = await fetchItensDoPeriodo(range);
+  return aggregateRankingProdutos(rows, limit, categoria);
 }
 
 export type ProdutoSaldoEstoque = {
@@ -439,9 +444,7 @@ export type CategoriaResumo = { key: ProdutoCategoriaKey; label: string; quantid
 // antes (só listava produto por produto, sem dar pra comparar categoria
 // contra categoria de cara). Uma foto do período inteiro (sem quebra por
 // semana) -- ver listVendasPorCategoriaPorSemana pra evolução no tempo.
-export async function listVendasPorCategoria(range: DateRange): Promise<CategoriaResumo[]> {
-  const rows = await fetchItensDoPeriodo(range);
-
+function aggregateVendasPorCategoria(rows: ItemRankingRow[]): CategoriaResumo[] {
   const porCategoria = new Map<ProdutoCategoriaKey, CategoriaResumo>();
   for (const row of rows) {
     const cat = classificarProduto(row.description);
@@ -452,6 +455,11 @@ export async function listVendasPorCategoria(range: DateRange): Promise<Categori
   }
 
   return [...porCategoria.values()].sort((a, b) => b.quantidade - a.quantidade);
+}
+
+export async function listVendasPorCategoria(range: DateRange): Promise<CategoriaResumo[]> {
+  const rows = await fetchItensDoPeriodo(range);
+  return aggregateVendasPorCategoria(rows);
 }
 
 // { semanaInicio: "2026-07-06", colchao: 12, roupeiro: 4, ... } -- uma linha
@@ -510,11 +518,10 @@ export async function listVendasPorCategoriaPorSemana(
 // período), ao contrário da versão por categoria, que só inclui categoria
 // com venda -- com só 3 séries fixas, mostrar a família zerada é mais fácil
 // de comparar do que ela sumir do gráfico.
-export async function listVendasPorFamiliaLogisticaPorSemana(
+function aggregateVendasPorFamiliaLogisticaPorSemana(
+  rows: ItemRankingRow[],
   range: DateRange
-): Promise<{ semanas: CategoriaEvolucaoSemana[]; familias: { key: FamiliaLogisticaKey; label: string }[] }> {
-  const rows = await fetchItensDoPeriodo(range);
-
+): { semanas: CategoriaEvolucaoSemana[]; familias: { key: FamiliaLogisticaKey; label: string }[] } {
   const porSemanaFamilia = new Map<string, Map<FamiliaLogisticaKey, number>>();
   for (const row of rows) {
     if (!row.totvs_orders) continue;
@@ -538,6 +545,13 @@ export async function listVendasPorFamiliaLogisticaPorSemana(
   });
 
   return { semanas, familias };
+}
+
+export async function listVendasPorFamiliaLogisticaPorSemana(
+  range: DateRange
+): Promise<{ semanas: CategoriaEvolucaoSemana[]; familias: { key: FamiliaLogisticaKey; label: string }[] }> {
+  const rows = await fetchItensDoPeriodo(range);
+  return aggregateVendasPorFamiliaLogisticaPorSemana(rows, range);
 }
 
 export type VendidoDespachadoSemana = { semanaInicio: string; vendido: number; despachado: number };
@@ -628,6 +642,16 @@ async function buildDespachoPorSemana(range: DateRange): Promise<Map<string, num
   return resultado;
 }
 
+function aggregateVendidoPorSemana(rows: ItemRankingRow[]): Map<string, number> {
+  const vendidoPorSemana = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.totvs_orders) continue;
+    const semana = segundaFeiraDe(row.totvs_orders.issue_date);
+    vendidoPorSemana.set(semana, (vendidoPorSemana.get(semana) ?? 0) + row.quantity);
+  }
+  return vendidoPorSemana;
+}
+
 // Vendido (totvs_order_items pela data de emissão) vs. Despachado (ver
 // buildDespachoPorSemana) por semana -- a diferença entre as duas barras é
 // o backlog que a logística ainda precisa carregar/entregar. Falha
@@ -636,13 +660,7 @@ async function buildDespachoPorSemana(range: DateRange): Promise<Map<string, num
 // derrubar a tela inteira.
 export async function listVendidoVsDespachadoPorSemana(range: DateRange): Promise<VendidoDespachadoSemana[]> {
   const itensVendidos = await fetchItensDoPeriodo(range);
-
-  const vendidoPorSemana = new Map<string, number>();
-  for (const row of itensVendidos) {
-    if (!row.totvs_orders) continue;
-    const semana = segundaFeiraDe(row.totvs_orders.issue_date);
-    vendidoPorSemana.set(semana, (vendidoPorSemana.get(semana) ?? 0) + row.quantity);
-  }
+  const vendidoPorSemana = aggregateVendidoPorSemana(itensVendidos);
 
   let despachoPorSemana = new Map<string, number>();
   try {
@@ -656,4 +674,46 @@ export async function listVendidoVsDespachadoPorSemana(range: DateRange): Promis
     vendido: vendidoPorSemana.get(semanaIso) ?? 0,
     despachado: despachoPorSemana.get(semanaIso) ?? 0,
   }));
+}
+
+export type VendasPeriodoResumo = {
+  ranking: ProdutoRankingItem[];
+  categorias: CategoriaResumo[];
+  evolucaoFamilia: { semanas: CategoriaEvolucaoSemana[]; familias: { key: FamiliaLogisticaKey; label: string }[] };
+  vendidoDespachado: VendidoDespachadoSemana[];
+};
+
+// Ranking, resumo por categoria, evolução por família logística e vendido-x-
+// despachado dependiam TODOS do mesmo `fetchItensDoPeriodo(range)` -- até
+// aqui, cada função buscava esse conjunto de novo (4 idas ao banco pro MESMO
+// dado, em paralelo mas ainda assim 4x o trabalho), o maior gargalo de
+// carregamento da tela "Vendas por produto" (identificado 2026-08-13). Busca
+// uma vez só e agrega os 4 jeitos em memória; o fetch de despacho continua
+// separado (tabela diferente, totvs_delivery_cargas, não depende dos itens)
+// e roda em paralelo com o fetch dos itens.
+export async function getVendasPeriodoResumo(
+  range: DateRange,
+  rankingLimit: number,
+  categoriaFiltro?: ProdutoCategoriaKey
+): Promise<VendasPeriodoResumo> {
+  const [rows, despachoPorSemana] = await Promise.all([
+    fetchItensDoPeriodo(range),
+    buildDespachoPorSemana(range).catch((err) => {
+      console.error("getVendasPeriodoResumo (despacho):", (err as Error).message);
+      return new Map<string, number>();
+    }),
+  ]);
+
+  const vendidoPorSemana = aggregateVendidoPorSemana(rows);
+
+  return {
+    ranking: aggregateRankingProdutos(rows, rankingLimit, categoriaFiltro),
+    categorias: aggregateVendasPorCategoria(rows),
+    evolucaoFamilia: aggregateVendasPorFamiliaLogisticaPorSemana(rows, range),
+    vendidoDespachado: segundasNoPeriodo(range).map((semanaIso) => ({
+      semanaInicio: semanaIso,
+      vendido: vendidoPorSemana.get(semanaIso) ?? 0,
+      despachado: despachoPorSemana.get(semanaIso) ?? 0,
+    })),
+  };
 }

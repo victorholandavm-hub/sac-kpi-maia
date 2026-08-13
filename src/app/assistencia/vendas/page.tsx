@@ -3,10 +3,7 @@ import { requireVendasActor } from "@/lib/vendasAuth";
 import {
   getVendaCurvaProduto,
   searchProdutosVenda,
-  listRankingProdutos,
-  listVendasPorCategoria,
-  listVendasPorFamiliaLogisticaPorSemana,
-  listVendidoVsDespachadoPorSemana,
+  getVendasPeriodoResumo,
   listTendenciaProdutos,
   listSaldoEstoqueProdutos,
   getEarliestSyncedOrderDate,
@@ -87,11 +84,8 @@ export default async function VendasProdutoPage({
     }
   }
 
-  const [ranking, categorias, evolucao, vendidoDespachado, earliestSyncedDate] = await Promise.all([
-    listRankingProdutos(range, RANKING_LIMIT, categoriaAtiva),
-    listVendasPorCategoria(range),
-    listVendasPorFamiliaLogisticaPorSemana(range),
-    listVendidoVsDespachadoPorSemana(range),
+  const [{ ranking, categorias, evolucaoFamilia: evolucao, vendidoDespachado }, earliestSyncedDate] = await Promise.all([
+    getVendasPeriodoResumo(range, RANKING_LIMIT, categoriaAtiva),
     getEarliestSyncedOrderDate(),
   ]);
   // Descoberto em 2026-08-13: o sync de pedidos só cobria os últimos ~30
