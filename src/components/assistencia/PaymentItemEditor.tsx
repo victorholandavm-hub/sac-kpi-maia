@@ -130,10 +130,11 @@ export function PaymentItemEditor({
               <button
                 onClick={toggleReleased}
                 disabled={pending}
-                className="text-xs font-medium px-2.5 py-1 rounded-full border disabled:opacity-60 whitespace-nowrap"
+                title={item.paymentReleased ? "Clique pra reverter pra pendente" : undefined}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap shadow-sm"
                 style={{
-                  color: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
-                  borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
+                  color: item.paymentReleased ? "#fff" : "var(--brand-green-ink)",
+                  background: item.paymentReleased ? "var(--status-good)" : "var(--brand-green)",
                 }}
               >
                 {item.paymentReleased ? "✓ Pago" : "Marcar como pago"}
