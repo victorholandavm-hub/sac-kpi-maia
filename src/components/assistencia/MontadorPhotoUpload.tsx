@@ -3,42 +3,83 @@
 import { useState } from "react";
 import { useQuickAction } from "./useQuickAction";
 
+// Limite por seleção (não é um total acumulado do chamado) -- alinhado com o
+// nginx (client_max_body_size 15m): 10 fotos de até 10 MB cada dariam até
+// 100 MB se fossem num POST só, por isso cada foto continua indo em uma
+// requisição própria (loop sequencial abaixo), só a limitação de mandar
+// muitas de uma vez que muda.
+const MAX_PHOTOS_POR_VEZ = 10;
+
+async function uploadOne(requestId: string, file: File, caption: string): Promise<void> {
+  const formData = new FormData();
+  formData.set("photo", file);
+  formData.set("caption", caption);
+  formData.set("requestId", requestId);
+  // POST comum em vez de Server Action -- o montador quase sempre abre
+  // o link de dentro do navegador embutido do WhatsApp, que tem bug
+  // conhecido nesse app com o tipo de resposta em stream que Server
+  // Actions usam (ver comentário em NavigationProgressBar.tsx). Rota
+  // tradicional com resposta JSON simples é bem mais compatível.
+  const res = await fetch("/api/montador/upload-photo", { method: "POST", body: formData });
+  // Lê como texto primeiro (só dá pra ler o corpo uma vez) -- se não for
+  // JSON válido, é sinal de que a resposta nem chegou na nossa rota (ex.:
+  // nginx/proxy barrando antes, devolvendo página de erro HTML). Nesses
+  // casos mostra o status HTTP na mensagem em vez de um erro genérico
+  // mudo, pra dar pista de diagnóstico sem precisar de devtools no
+  // celular do montador.
+  const raw = await res.text();
+  let data: { error?: string } = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    // não era JSON -- segue com data vazio, cai no fallback abaixo
+  }
+  if (!res.ok) {
+    throw new Error(data.error || `Não foi possível enviar a foto (erro ${res.status}).`);
+  }
+}
+
 export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
-  const { pending, run } = useQuickAction();
+  const { pending, run, showToast } = useQuickAction();
   const [caption, setCaption] = useState("");
   const [inputKey, setInputKey] = useState(0);
+  const [progresso, setProgresso] = useState<{ atual: number; total: number } | null>(null);
 
-  function upload(file: File) {
-    const formData = new FormData();
-    formData.set("photo", file);
-    formData.set("caption", caption);
-    formData.set("requestId", requestId);
+  function upload(files: File[]) {
+    const selecionadas = files.slice(0, MAX_PHOTOS_POR_VEZ);
+    const excedente = files.length - selecionadas.length;
+    if (excedente > 0) {
+      showToast(`Só dá pra enviar ${MAX_PHOTOS_POR_VEZ} fotos por vez -- ${excedente} não ${excedente === 1 ? "foi selecionada" : "foram selecionadas"}.`, "error");
+    }
+
     run(async () => {
-      // POST comum em vez de Server Action -- o montador quase sempre abre
-      // o link de dentro do navegador embutido do WhatsApp, que tem bug
-      // conhecido nesse app com o tipo de resposta em stream que Server
-      // Actions usam (ver comentário em NavigationProgressBar.tsx). Rota
-      // tradicional com resposta JSON simples é bem mais compatível.
-      const res = await fetch("/api/montador/upload-photo", { method: "POST", body: formData });
-      // Lê como texto primeiro (só dá pra ler o corpo uma vez) -- se não for
-      // JSON válido, é sinal de que a resposta nem chegou na nossa rota (ex.:
-      // nginx/proxy barrando antes, devolvendo página de erro HTML). Nesses
-      // casos mostra o status HTTP na mensagem em vez de um erro genérico
-      // mudo, pra dar pista de diagnóstico sem precisar de devtools no
-      // celular do montador.
-      const raw = await res.text();
-      let data: { error?: string } = {};
-      try {
-        data = raw ? JSON.parse(raw) : {};
-      } catch {
-        // não era JSON -- segue com data vazio, cai no fallback abaixo
+      const falhas: string[] = [];
+      for (let i = 0; i < selecionadas.length; i++) {
+        setProgresso({ atual: i + 1, total: selecionadas.length });
+        try {
+          // Sequencial, não em paralelo -- celular do montador costuma estar
+          // em rede ruim (obra/loja), várias uploads simultâneas competindo
+          // por banda tendem a estourar timeout todas juntas em vez de só
+          // uma por vez.
+          await uploadOne(requestId, selecionadas[i], caption);
+        } catch (err) {
+          falhas.push(`${selecionadas[i].name || "foto"}: ${err instanceof Error ? err.message : "erro"}`);
+        }
       }
-      if (!res.ok) {
-        throw new Error(data.error || `Não foi possível enviar a foto (erro ${res.status}).`);
-      }
+      setProgresso(null);
       setCaption("");
       setInputKey((k) => k + 1);
-    }, "Foto enviada.");
+
+      if (falhas.length === selecionadas.length) {
+        throw new Error(selecionadas.length === 1 ? falhas[0].split(": ").slice(1).join(": ") || "Não foi possível enviar a foto." : "Não foi possível enviar nenhuma foto.");
+      }
+      const enviadas = selecionadas.length - falhas.length;
+      if (falhas.length > 0) {
+        showToast(`${enviadas} de ${selecionadas.length} fotos enviadas. Falhou: ${falhas.join("; ")}.`, "error");
+      } else {
+        showToast(enviadas === 1 ? "Foto enviada." : `${enviadas} fotos enviadas.`, "success");
+      }
+    });
   }
 
   return (
@@ -73,14 +114,24 @@ export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
         }}
       >
         <span className="text-3xl leading-none">📷</span>
-        {pending ? "Enviando…" : "Tirar ou enviar foto"}
+        {pending
+          ? progresso
+            ? `Enviando ${progresso.atual}/${progresso.total}…`
+            : "Enviando…"
+          : "Tirar ou enviar fotos"}
+        {pending ? null : (
+          <span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>
+            Pode escolher várias de uma vez (até {MAX_PHOTOS_POR_VEZ})
+          </span>
+        )}
         <input
           key={inputKey}
           type="file"
+          multiple
           accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) upload(file);
+            const files = Array.from(e.target.files ?? []);
+            if (files.length > 0) upload(files);
           }}
           className="hidden"
         />
