@@ -15,8 +15,8 @@ function ghlHeaders() {
 }
 
 // Extraído de api/sync/route.ts -- usado ali (1ª resposta/NPS) e também por
-// aiClassification.ts (lê o texto da conversa pra classificar categoria real
-// / produto / loja). Mesma lógica, um lugar só.
+// ticketClassification.ts (lê o texto da conversa pra classificar categoria
+// real / produto / loja). Mesma lógica, um lugar só.
 export async function fetchGhlMessages(ghlConversationId: string): Promise<GhlMessage[] | null> {
   const res = await fetch(`${BASE_URL}/conversations/${ghlConversationId}/messages?limit=100`, {
     headers: ghlHeaders(),

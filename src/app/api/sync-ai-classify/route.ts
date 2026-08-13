@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
-import { classifyConversation, AI_CLASSIFICATION_MODEL } from "@/lib/aiClassification";
+import { classifyConversation, CLASSIFICATION_METHOD } from "@/lib/ticketClassification";
 
 // Mesmo motivo do /api/sync: protege contra disparo duplicado (manual +
 // agendado) rodando a mesma leva de classificações duas vezes.
 const MIN_INTERVAL_MINUTES = 60;
 
-// Uma rodada de cron processa no máximo isso -- filosofia incremental igual
-// ao /api/sync (não estourar tempo/custo numa chamada só); o backfill do
-// histórico acontece sozinho ao longo de várias rodadas.
-const BATCH_LIMIT = 25;
+// Uma rodada de cron processa no máximo isso -- sem custo de API (é
+// classificação por palavras-chave, não IA -- ver ticketClassification.ts),
+// então o limite aqui é só sobre a API do GHL (1 requisição por chamado, pra
+// buscar as mensagens), não sobre orçamento. Mesmo teto que os outros loops
+// de /api/sync usam nas próprias chamadas ao GHL.
+const BATCH_LIMIT = 100;
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
@@ -73,14 +75,15 @@ async function runClassify() {
 
     const ticket = ticketByConvo.get(convo.id);
     // Sem linha em v_ticket_enriched = chamado sem categoria/loja marcada
-    // ainda no GHL -- exatamente o caso que mais precisa da IA.
+    // ainda no GHL -- exatamente o caso que mais precisa da classificação
+    // automática.
     const needsCategory = !ticket || !ticket.category || ticket.category === "cat-duvida";
     const needsProduct = !ticket || !ticket.product;
 
     if (!needsCategory && !needsProduct) {
       // Já tem categoria específica e produto marcados manualmente -- marca
-      // como analisado sem gastar chamada de IA, só pra não reconsultar essa
-      // mesma conversa toda rodada.
+      // como analisado sem gastar a requisição ao GHL, só pra não
+      // reconsultar essa mesma conversa toda rodada.
       await supabase.from("conversations").update({ ai_analyzed_at: new Date().toISOString() }).eq("id", convo.id);
       skippedAlreadySpecific++;
       continue;
@@ -96,14 +99,14 @@ async function runClassify() {
           ai_store_tag: result?.storeTag ?? null,
           ai_confidence: result?.confidence ?? null,
           ai_analyzed_at: new Date().toISOString(),
-          ai_model: result ? AI_CLASSIFICATION_MODEL : null,
+          ai_model: result ? CLASSIFICATION_METHOD : null,
         })
         .eq("id", convo.id);
       if (updateError) throw updateError;
       if (result) classified++;
     } catch (err) {
-      // Não marca ai_analyzed_at aqui -- erro pode ser transitório (GHL/IA
-      // fora do ar), então essa conversa continua na fila pra próxima rodada
+      // Não marca ai_analyzed_at aqui -- erro pode ser transitório (GHL fora
+      // do ar), então essa conversa continua na fila pra próxima rodada
       // tentar de novo, em vez de ficar presa com um erro permanente.
       errors.push(`conversation ${convo.id}: ${(err as Error).message}`);
     }

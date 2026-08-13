@@ -17,15 +17,15 @@ const CATEGORY_LABELS: Record<string, string> = {
   "cat-trocaproduto": "Troca de produto",
   "cat-vendasemestoque": "Venda sem estoque",
   // Adicionadas pra classificação por IA ter opções específicas de sobra
-  // antes de cair no fallback genérico "Dúvida" -- ver aiClassification.ts.
+  // antes de cair no fallback genérico "Dúvida" -- ver ticketClassification.ts.
   "cat-montagem": "Problema na montagem/instalação",
   "cat-cobranca": "Cobrança/pagamento/nota fiscal",
   "cat-demora": "Demora no atendimento/retorno",
   "cat-informacaoincorreta": "Informação incorreta passada pelo atendimento",
 };
 
-// Exportado pra aiClassification.ts montar a lista de categorias válidas do
-// prompt sem duplicar esse dicionário.
+// Exportado pra ticketClassification.ts montar a lista de categorias
+// válidas sem duplicar esse dicionário.
 export { CATEGORY_LABELS };
 
 export function categoryLabel(tag: string): string {
@@ -38,8 +38,8 @@ export function categoryLabel(tag: string): string {
 
 // Mapa filial -> "Loja + Nome da filial", conforme planilha de contatos da rede.
 // Numeros que nao aparecerem aqui caem no fallback "Loja {numero}".
-// Exportado pra aiClassification.ts oferecer a lista de lojas válidas no
-// prompt (formato do tag: "loja-<numero>").
+// Exportado pra ticketClassification.ts oferecer a lista de lojas válidas
+// (formato do tag: "loja-<numero>").
 export const STORE_LABELS: Record<string, string> = {
   "201": "Maia Bayeux",
   "202": "Maia Santa Rita",
