@@ -11,6 +11,7 @@ import {
   DELIVERY_REQUEST_TYPES,
   PAYMENTS_CONTROLLER_NAME,
   REQUEST_STATUS_STEPS,
+  CAUSA_RAIZ_LABELS,
 } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
 import { StatusStepper } from "./StatusStepper";
@@ -259,6 +260,13 @@ export function RequestDetailContent({
               Atendimento — o que a assistência precisa acompanhar
             </h3>
             <Row label="Motivo" value={request.reason} />
+            {request.causaRaiz ? <Row label="Causa raiz" value={CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz} /> : null}
+            {request.causaRaiz === "erro_cd" ? (
+              <>
+                <Row label="Carga (erro do CD)" value={request.causaCarga} />
+                <Row label="Conferente (erro do CD)" value={request.causaConferente} />
+              </>
+            ) : null}
             <Row label="Restrição / observação" value={request.restrictionNote} />
             <Row label="Observações" value={request.notes} />
             <Row label="Solicitado por" value={request.requestedByName} />

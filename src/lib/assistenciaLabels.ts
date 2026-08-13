@@ -234,6 +234,31 @@ export const ARSENAL_CATEGORY_LABELS: Record<string, string> = {
   cdc: "Código de Defesa do Consumidor",
 };
 
+// Causa raiz da troca de produto (SAC, troca_produto) -- quando é
+// "erro_cd", carga + conferente viram obrigatórios na criação (ver
+// createSacRequest e SacCreateRequestForm.tsx). Registrado à parte do
+// "Motivo" (texto livre): motivo é o que aconteceu em palavras, causa raiz é
+// pra quem apurar depois conseguir filtrar/cobrar por origem do erro.
+export const CAUSA_RAIZ_OPTIONS = [
+  "erro_cd",
+  "erro_loja",
+  "erro_vendedor",
+  "avaria_transporte",
+  "defeito_fabricacao",
+  "solicitacao_cliente",
+  "outro",
+] as const;
+
+export const CAUSA_RAIZ_LABELS: Record<string, string> = {
+  erro_cd: "Erro do CD (produto errado/mal conferido saiu do centro de distribuição)",
+  erro_loja: "Erro da loja",
+  erro_vendedor: "Erro do vendedor",
+  avaria_transporte: "Avaria no transporte",
+  defeito_fabricacao: "Defeito de fabricação",
+  solicitacao_cliente: "Solicitação do cliente (desistência/arrependimento)",
+  outro: "Outro",
+};
+
 export const SAC_CATEGORIES = [
   "atraso_entrega",
   "entrega_parcial",

@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import { useActionState } from "react";
 import { createSacRequest, lookupTotvsClientForTeam, lookupTotvsProductForTeam, type FormState } from "@/app/assistencia/actions";
-import { SAC_CATEGORIES, SAC_CATEGORY_LABELS, REQUEST_TYPE_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
+import {
+  SAC_CATEGORIES,
+  SAC_CATEGORY_LABELS,
+  REQUEST_TYPE_LABELS,
+  DELIVERY_REQUEST_TYPES,
+  CAUSA_RAIZ_OPTIONS,
+  CAUSA_RAIZ_LABELS,
+} from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
 
@@ -117,11 +124,23 @@ function ItemsFields({
 }
 
 
-export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; drivers: string[] }) {
+export function SacCreateRequestForm({
+  stores,
+  drivers,
+  cargas,
+}: {
+  stores: Store[];
+  drivers: string[];
+  cargas: { carga: string; label: string }[];
+}) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
   const [type, setType] = useState<SacType>("troca_produto");
   const isDelivery = DELIVERY_TYPES.includes(type);
   const showProduct = PRODUCT_TYPES.includes(type);
+  // Só existe pra troca_produto -- controla se carga/conferente aparecem
+  // como obrigatórios (ver "Detalhes" abaixo e a validação espelhada em
+  // createSacRequest).
+  const [causaRaiz, setCausaRaiz] = useState("");
 
   const [clientCode, setClientCode] = useState("");
   const [clientCpf, setClientCpf] = useState("");
@@ -460,6 +479,62 @@ export function SacCreateRequestForm({ stores, drivers }: { stores: Store[]; dri
         <Field label="Motivo *">
           <textarea name="reason" rows={2} required placeholder="Ex: produto entregue com avaria" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
+
+        {type === "troca_produto" ? (
+          <Field label="Causa raiz *">
+            <select
+              name="causa_raiz"
+              required
+              value={causaRaiz}
+              onChange={(e) => setCausaRaiz(e.target.value)}
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            >
+              <option value="" disabled>
+                Selecione…
+              </option>
+              {CAUSA_RAIZ_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {CAUSA_RAIZ_LABELS[c]}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
+
+        {type === "troca_produto" && causaRaiz === "erro_cd" ? (
+          <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
+            <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+              Erro do CD -- precisa registrar qual carga e quem conferiu antes de seguir com a troca.
+            </p>
+            <Field label="Carga *">
+              <input
+                name="causa_carga"
+                list="sac-cargas"
+                required
+                placeholder="Ex: 000123"
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+              <datalist id="sac-cargas">
+                {cargas.map((c) => (
+                  <option key={c.carga} value={c.carga}>
+                    {c.label}
+                  </option>
+                ))}
+              </datalist>
+            </Field>
+            <Field label="Conferente *">
+              <input
+                name="causa_conferente"
+                required
+                placeholder="Nome de quem conferiu a carga"
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+            </Field>
+          </div>
+        ) : null}
 
         {type === "troca_produto" ? (
           <Field label="O que recolher / instrução pro motorista">
