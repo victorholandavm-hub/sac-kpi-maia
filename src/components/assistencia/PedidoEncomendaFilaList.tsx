@@ -15,16 +15,32 @@ import type { PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
 // vez, em vez de abrir pedido por pedido (ver bulkMarkEnviadoParaCD).
 const BULK_ELIGIBLE_STATUS = "em_producao";
 
+// A partir daqui o pedido já saiu da fábrica -- o prazo fábrica→CD já foi
+// cumprido ou não, mas deixou de ser um prazo "vivo" (ver
+// chegadaCdByPedido/prazoFabricaCd abaixo).
+const JA_SAIU_DA_FABRICA: PedidoEncomendaSummary["status"][] = [
+  "pronto_para_expedicao",
+  "recebido_cd",
+  "em_carga",
+  "faturado",
+  "entregue",
+];
+
 export function PedidoEncomendaFilaList({
   pedidos,
   queuePosition,
   actionNeededIds,
   canBulkAdvance,
+  chegadaCdByPedido,
 }: {
   pedidos: PedidoEncomendaSummary[];
   queuePosition: [string, number][];
   actionNeededIds: Set<string>;
   canBulkAdvance: boolean;
+  // Data real (não prazo) em que cada pedido chegou no CD -- ver
+  // getChegadaCdDates (pedidosEncomenda.ts). Ausente quando o pedido ainda
+  // não passou por lá.
+  chegadaCdByPedido: Record<string, string>;
 }) {
   const positionMap = new Map(queuePosition);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -136,10 +152,18 @@ export function PedidoEncomendaFilaList({
                       {new Date(p.createdAt).toLocaleString("pt-BR")}
                     </span>
                     <span>Pedido por {p.requestedByName}</span>
-                    {p.prazoFabricaCd ? (
+                    {/* Antes de sair da fábrica: o prazo fábrica→CD é o que
+                        vale, com cor de urgência (pode estourar). Depois de
+                        sair: esse prazo já foi cumprido ou não, não é mais
+                        "vivo" -- troca pela data real de chegada (fato, sem
+                        cor de urgência) assim que ela existir. */}
+                    {!JA_SAIU_DA_FABRICA.includes(p.status) && p.prazoFabricaCd ? (
                       <span style={prazoUrgencyStyle(p.prazoFabricaCd)}>
                         🕐 Prazo p/ CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
+                    ) : null}
+                    {JA_SAIU_DA_FABRICA.includes(p.status) && chegadaCdByPedido[p.id] ? (
+                      <span>📦 Chegou no CD: {new Date(chegadaCdByPedido[p.id]).toLocaleDateString("pt-BR")}</span>
                     ) : null}
                     {p.prazoCdLoja ? (
                       <span style={prazoUrgencyStyle(p.prazoCdLoja)}>

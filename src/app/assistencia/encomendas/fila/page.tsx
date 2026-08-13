@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireEncomendaActor } from "@/lib/encomendaAuth";
 import { listStores } from "@/lib/serviceRequests";
-import { listAllPedidos, listOpenPedidoEncomendaQueueIds, isPedidoEncomendaStatus } from "@/lib/pedidosEncomenda";
+import { listAllPedidos, listOpenPedidoEncomendaQueueIds, isPedidoEncomendaStatus, getChegadaCdDates } from "@/lib/pedidosEncomenda";
 import { encomendaCanAdvance } from "@/lib/dal";
 import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 import { ROLE_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
@@ -95,6 +95,10 @@ export default async function EncomendasQueuePage({
     listStores(),
     listOpenPedidoEncomendaQueueIds(),
   ]);
+  // Depende dos ids de `pedidos` acima, então não dá pra entrar no mesmo
+  // Promise.all -- ver getChegadaCdDates (troca "Prazo p/ CD" por "Chegou no
+  // CD: <data>" assim que o pedido sai da fábrica, na lista abaixo).
+  const chegadaCdByPedido = Object.fromEntries(await getChegadaCdDates(pedidos.map((p) => p.id)));
   const queuePosition: [string, number][] = queueIds.map((id, i) => [id, i + 1]);
   const actionNeededIds = new Set(
     pedidos
@@ -265,6 +269,7 @@ export default async function EncomendasQueuePage({
           queuePosition={queuePosition}
           actionNeededIds={actionNeededIds}
           canBulkAdvance={canBulkAdvance}
+          chegadaCdByPedido={chegadaCdByPedido}
         />
       )}
     </div>
