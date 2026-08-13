@@ -362,18 +362,18 @@ export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<
 
 export type ProdutoTendencia = { variacaoPct: number | null };
 
-const TENDENCIA_SEMANAS = 12;
+const TENDENCIA_SEMANAS = 4;
 
 function isoDateSub(dias: number): string {
   return new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-// Tendência por produto -- últimas 12 semanas vs. as 12 anteriores a essas,
+// Tendência por produto -- últimas 4 semanas vs. as 4 anteriores a essas,
 // sempre relativo a HOJE (não ao período que o comprador escolheu filtrar
 // no ranking) -- dá um sinal estável de "subindo/esfriando" que não muda
 // só porque o filtro de período da tela mudou. `previas === 0` não vira
 // "infinito", vira `null` (sem base de comparação -- produto novo ou sem
-// venda nenhuma nas 12 semanas anteriores), a UI trata isso escondendo o
+// venda nenhuma nas 4 semanas anteriores), a UI trata isso escondendo o
 // indicador em vez de mostrar um percentual sem sentido.
 export async function listTendenciaProdutos(productCodes: string[]): Promise<Map<string, ProdutoTendencia>> {
   const resultado = new Map<string, ProdutoTendencia>();

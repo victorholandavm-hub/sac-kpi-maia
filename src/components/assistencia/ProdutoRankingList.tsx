@@ -6,8 +6,8 @@ function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-// Seta + percentual comparando as últimas 12 semanas de venda desse produto
-// com as 12 anteriores -- sinal rápido de "esquentando/esfriando" pro
+// Seta + percentual comparando as últimas 4 semanas de venda desse produto
+// com as 4 anteriores -- sinal rápido de "esquentando/esfriando" pro
 // comprador da loja, sem precisar abrir a curva individual do produto. Sem
 // indicador quando não há base de comparação (variacaoPct null).
 function TendenciaBadge({ tendencia }: { tendencia: ProdutoTendencia | undefined }) {
@@ -25,7 +25,7 @@ function TendenciaBadge({ tendencia }: { tendencia: ProdutoTendencia | undefined
     <span
       className="text-xs font-semibold whitespace-nowrap"
       style={{ color: subindo ? "var(--status-good)" : "var(--status-critical)" }}
-      title="Comparado às 12 semanas anteriores"
+      title="Comparado às 4 semanas anteriores"
     >
       {subindo ? "▲" : "▼"} {Math.abs(variacaoPct)}%
     </span>
