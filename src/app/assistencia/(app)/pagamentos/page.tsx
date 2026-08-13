@@ -4,20 +4,10 @@ import { listPaymentItems, listAssemblers, paymentStage, type PaymentItem } from
 import { PAYMENTS_CONTROLLER_NAME } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { PaymentsExportButton } from "@/components/assistencia/PaymentsExportButton";
-
-const STAGE_LABELS: Record<string, string> = { a_montar: "A montar", pendente: "Pendente", liberado: "Liberado" };
-const STAGE_COLORS: Record<string, string> = {
-  a_montar: "var(--text-muted)",
-  pendente: "var(--status-warning)",
-  liberado: "var(--status-good)",
-};
+import { PaymentItemEditor } from "@/components/assistencia/PaymentItemEditor";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("pt-BR");
 }
 
 function groupByAssembler(items: PaymentItem[]) {
@@ -34,6 +24,24 @@ function groupByAssembler(items: PaymentItem[]) {
   return groups.sort((a, b) => a.assemblerName.localeCompare(b.assemblerName));
 }
 
+// Sub-agrupamento por loja dentro de um montador -- só faz diferença
+// visualmente quando um montador específico é escolhido (o Antonio pediu
+// pra dividir por loja, mesmo que ainda fique tudo na mesma tela, sem sair
+// clicando solicitação por solicitação).
+function groupByStore(items: PaymentItem[]) {
+  const groups: { storeName: string; items: PaymentItem[] }[] = [];
+  for (const item of items) {
+    const name = item.storeName || "Sem loja";
+    let group = groups.find((g) => g.storeName === name);
+    if (!group) {
+      group = { storeName: name, items: [] };
+      groups.push(group);
+    }
+    group.items.push(item);
+  }
+  return groups.sort((a, b) => a.storeName.localeCompare(b.storeName));
+}
+
 export default async function PagamentosPage({
   searchParams,
 }: {
@@ -41,9 +49,20 @@ export default async function PagamentosPage({
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
+  // Mesma checagem de requirePaymentsController (pagamentos-actions.ts) --
+  // controla tanto o botão de exportar quanto a edição inline de valor/
+  // aprovação/autorização aqui na tela.
   const canExport = profile.fullName === PAYMENTS_CONTROLLER_NAME;
   const { pendentes, assembler } = await searchParams;
-  const [allItems, assemblers] = await Promise.all([listPaymentItems({ assemblerName: assembler }), listAssemblers()]);
+  // Com um montador escolhido, o Antonio quer ver TUDO dessa pessoa,
+  // inclusive o que ainda não tem valor definido -- é exatamente o momento
+  // de definir, sem precisar abrir cada solicitação uma por uma (ver
+  // includeNoValue em payments.ts). Sem montador escolhido, mantém a visão
+  // geral só com quem já tem valor, senão a lista de "Todos" fica poluída.
+  const [allItems, assemblers] = await Promise.all([
+    listPaymentItems({ assemblerName: assembler, includeNoValue: !!assembler }),
+    listAssemblers(),
+  ]);
   const items = pendentes ? allItems.filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente") : allItems;
   const groups = groupByAssembler(items);
   const grandTotal = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
@@ -100,12 +119,18 @@ export default async function PagamentosPage({
       {groups.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhum item com valor definido ainda. Defina o valor unitário na tela da solicitação.
+            {assembler
+              ? "Nenhuma montagem desse montador encontrada no período."
+              : "Nenhum item com valor definido ainda. Escolha um montador acima pra ver (e definir) tudo dessa pessoa."}
           </p>
         </div>
       ) : (
         groups.map((group) => {
           const total = group.items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
+          // Sub-divisão por loja só quando um montador específico está
+          // selecionado (senão cada grupo já é o próprio montador, e
+          // dividir de novo por loja não ajuda em nada na visão geral).
+          const storeGroups = assembler ? groupByStore(group.items) : [{ storeName: "", items: group.items }];
           return (
             <div
               key={group.assemblerName}
@@ -123,40 +148,22 @@ export default async function PagamentosPage({
                   {formatBRL(total)}
                 </span>
               </div>
-              <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {group.items.map((item) => {
-                  const stage = paymentStage(item.requestStatus, item.paymentReleased);
-                  return (
-                  <Link
-                    key={item.itemId}
-                    href={`/assistencia/${item.requestId}`}
-                    className="flex items-center justify-between gap-4 p-3 flex-wrap hover:opacity-80"
-                  >
-                    <div className="flex flex-col gap-0.5 min-w-0 w-0 grow">
-                      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-                        {item.quantity > 1 ? `${item.quantity}x ` : ""}
-                        {item.product}
-                      </span>
-                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        {item.clientName ?? "Sem cliente"} · {item.storeName}
+              {storeGroups.map((storeGroup) => (
+                <div key={storeGroup.storeName || "unica"}>
+                  {storeGroup.storeName ? (
+                    <div className="px-4 py-1.5" style={{ background: "var(--surface-2, var(--gridline))" }}>
+                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+                        {storeGroup.storeName}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-muted)" }}>
-                      <span>{formatBRL((item.unitValue ?? 0) * item.quantity)}</span>
-                      {item.paymentReleased && item.paymentReleasedAt ? (
-                        <span>em {formatDate(item.paymentReleasedAt)}</span>
-                      ) : null}
-                      <span
-                        className="px-2 py-0.5 rounded-full font-medium"
-                        style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${STAGE_COLORS[stage]} 35%, var(--surface-1))` }}
-                      >
-                        {STAGE_LABELS[stage]}
-                      </span>
-                    </div>
-                  </Link>
-                  );
-                })}
-              </div>
+                  ) : null}
+                  <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                    {storeGroup.items.map((item) => (
+                      <PaymentItemEditor key={item.itemId} item={item} canEdit={canExport} />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           );
         })

@@ -162,16 +162,25 @@ type PaymentItemRow = {
 };
 
 export async function listPaymentItems(
-  opts: { assemblerName?: string; dateFrom?: string; dateTo?: string } = {}
+  opts: { assemblerName?: string; dateFrom?: string; dateTo?: string; includeNoValue?: boolean } = {}
 ): Promise<PaymentItem[]> {
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin
+  let query = admin
     .from("service_request_items")
     .select(
       "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, status, assembler_name, client_name, created_at, stores(name))"
     )
-    .not("unit_value", "is", null)
     .order("created_at", { ascending: false });
+  // Visão geral (sem montador escolhido) só mostra quem já tem valor --
+  // senão a lista fica poluída com anos de item sem preço nenhum. Ao
+  // escolher um montador específico (ver pagamentos/page.tsx), o Antonio
+  // quer exatamente o contrário: ver tudo dessa pessoa, inclusive o que
+  // ainda não tem valor, pra já definir ali mesmo sem entrar em cada
+  // solicitação.
+  if (!opts.includeNoValue) {
+    query = query.not("unit_value", "is", null);
+  }
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
 
