@@ -54,15 +54,22 @@ export default async function PagamentosPage({
   // aprovação/autorização aqui na tela.
   const canExport = profile.fullName === PAYMENTS_CONTROLLER_NAME;
   const { pendentes, assembler } = await searchParams;
-  // Com um montador escolhido, o Antonio quer ver TUDO dessa pessoa,
-  // inclusive o que ainda não tem valor definido -- é exatamente o momento
-  // de definir, sem precisar abrir cada solicitação uma por uma (ver
-  // includeNoValue em payments.ts). Sem montador escolhido, mantém a visão
-  // geral só com quem já tem valor, senão a lista de "Todos" fica poluída.
-  const [allItems, assemblers] = await Promise.all([
-    listPaymentItems({ assemblerName: assembler, includeNoValue: !!assembler }),
+  // Sempre inclui item sem valor -- antes só entrava com um montador
+  // escolhido, e isso escondia o próprio caso que "Só pendentes de
+  // liberação" deveria mostrar primeiro: montagem concluída que o Antonio
+  // ainda nem começou a precificar (ver includeNoValue em payments.ts e
+  // paymentStage abaixo, que já classifica concluída+sem valor como
+  // "pendente" -- só faltava a consulta trazer essas linhas).
+  const [rawItems, assemblers] = await Promise.all([
+    listPaymentItems({ assemblerName: assembler, includeNoValue: true }),
     listAssemblers(),
   ]);
+  // Esconde "ainda em andamento e sem valor" -- isso não é acionável (a
+  // montagem nem terminou) e seria só ruído. O que precisa de atenção do
+  // Antonio é quem já tem valor (qualquer status) ou quem já concluiu mas
+  // ainda não tem valor -- essa segunda parte é justamente o que estava
+  // faltando aparecer.
+  const allItems = rawItems.filter((i) => i.unitValue !== null || i.requestStatus === "concluida");
   const items = pendentes ? allItems.filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente") : allItems;
   const groups = groupByAssembler(items);
   const grandTotal = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
@@ -120,8 +127,10 @@ export default async function PagamentosPage({
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             {assembler
-              ? "Nenhuma montagem desse montador encontrada no período."
-              : "Nenhum item com valor definido ainda. Escolha um montador acima pra ver (e definir) tudo dessa pessoa."}
+              ? "Nenhuma montagem desse montador encontrada."
+              : pendentes
+                ? "Nada pendente de valor ou liberação no momento."
+                : "Nenhuma montagem encontrada."}
           </p>
         </div>
       ) : (
