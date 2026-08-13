@@ -83,15 +83,26 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         </div>
       </div>
 
-      {/* Banner de resumo -- os 4 números que mais importam de relance,
-          em fonte grande, sempre visíveis independente da aba ativa. */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Banner de resumo -- os números que mais importam de relance, em
+          fonte grande, sempre visíveis independente da aba ativa. Tempo de
+          resposta vira 2 números (1º contato + % em até 5min) em vez de só
+          a média geral -- a média sozinha escondia o problema real (uma
+          resposta rápida e outra de 20min dão a mesma média de 10min de
+          uma que demorou 10min certinho, mas são situações bem diferentes
+          pro cliente no WhatsApp). */}
+      <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatTile label="Total de chamados" value={data.totalTickets} size="lg" />
         <StatTile
-          label="Tempo médio de resposta"
+          label="Resposta no 1º contato"
           value={data.avgFirstResponseMinutes ?? "—"}
           suffix={data.avgFirstResponseMinutes !== null ? "min" : undefined}
           size="lg"
+        />
+        <StatTile
+          label="Respondidos em até 5min"
+          value={data.pctWithin5Min !== null ? `${data.pctWithin5Min}%` : "—"}
+          size="lg"
+          valueColor={data.pctWithin5Min !== null && data.pctWithin5Min < 50 ? "var(--status-warning)" : undefined}
         />
         <StatTile
           label={`Satisfação (NPS, meta ${NPS_INDEX_TARGET})`}
@@ -181,7 +192,7 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
             coverage={{ withValue: data.npsSummary.responseCount, total: data.npsSummary.eligibleCount, pct: data.npsSummary.responseRatePct ?? 0 }}
           />
 
-          <AgentStatsTable data={data.byAgentStats} />
+          <AgentStatsTable data={data.byAgentStats} drilldown={data.agentDrilldown} />
           <BarRanking title="Chamados por agente" data={data.byAgent} />
         </div>
       ) : null}

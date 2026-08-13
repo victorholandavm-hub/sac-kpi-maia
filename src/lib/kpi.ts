@@ -187,12 +187,25 @@ export type StoreBreakdownTicket = {
   summaryAi: string | null;
 };
 
+// Igual StoreBreakdownTicket, + a nota da avaliação -- usado só no
+// drill-down de "avaliações negativas" por agente (ver AgentDrilldownModal),
+// pra mostrar 1 ou 2 junto do resumo em vez de só "avaliação negativa".
+export type AgentDrilldownTicket = StoreBreakdownTicket & { npsScore: number | null };
+
 export type StoreBreakdown = {
   store: string;
   total: number;
   topCategory: string | null;
+  // Tag crua por trás de topCategory (ex.: "cat-duvida") -- topCategory já
+  // vem traduzido pro label em português, sem isso não dava pra detectar
+  // "é duvida genérica" de forma confiável (ver alertSignal).
+  topCategoryTag: string | null;
   topCategoryCount: number;
   topCategoryPct: number;
+  // Sugestão de causa provável, cruzando categoria dominante + volume/%
+  // (ver buildAlertSignal) -- null quando não há padrão claro o bastante
+  // pra sugerir algo. É uma dica pro gestor investigar, não um diagnóstico.
+  alertSignal: string | null;
   // Os mais recentes do total acima (ver MAX_TOP_CATEGORY_TICKETS) -- lista
   // completa não é necessária, é só pra dar contexto do que está por trás do
   // número.
@@ -221,6 +234,9 @@ export type KpiData = {
   openTicketsList: AttentionRow[];
   avgFirstResponseMinutes: number | null;
   pctWithinSla: number | null;
+  // % dos chamados (com 1ª resposta medida) respondidos em até 5min --
+  // corte que importa pro WhatsApp, mais rígido que o SLA de 30min acima.
+  pctWithin5Min: number | null;
   firstResponseSampleSize: number;
   slaMinutesThreshold: number;
   recurrenceCount: number;
@@ -246,6 +262,10 @@ export type KpiData = {
   performanceReport: PerformanceReportSet;
   npsSummary: NpsSummary;
   npsDetractors: NpsDetractor[];
+  // Drill-down por agente (ver AgentDrilldownModal) -- pendentes em aberto e
+  // avaliações negativas (nota 1-2) atribuídas a esse agente no período.
+  // Chave é o nome do agente, mesma chave de AgentStat.agent.
+  agentDrilldown: Record<string, { pending: StoreBreakdownTicket[]; negative: AgentDrilldownTicket[] }>;
 };
 
 // Victor não é atendente do SAC (é quem administra o sistema) -- alguma
@@ -447,6 +467,46 @@ function buildAgentStats(rows: TicketRow[]): AgentStat[] {
       };
     })
     .sort((a, b) => b.total - a.total);
+}
+
+// Igual buildTicketList, + a nota da avaliação -- não dá pra reaproveitar
+// buildTicketList direto porque ela reordena/corta a lista internamente
+// (perderia o alinhamento pra juntar nps_score de volta por índice).
+function buildAgentTicketList(rows: TicketRow[]): AgentDrilldownTicket[] {
+  return [...rows]
+    .sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime())
+    .slice(0, MAX_TOP_CATEGORY_TICKETS)
+    .map((r) => ({
+      conversationId: r.conversation_id,
+      contactId: r.contact_id,
+      clientName: null,
+      clientPhone: null,
+      openedAt: r.opened_at,
+      summaryAi: r.summary_ai,
+      npsScore: r.nps_score,
+    }));
+}
+
+// Drill-down por agente (ver AgentDrilldownModal): pendentes (em aberto) e
+// avaliações negativas (nota 1-2), pro gestor clicar no nome do agente na
+// tabela de desempenho e já ver o que precisa de correção de rota.
+function buildAgentDrilldown(rows: TicketRow[]): Record<string, { pending: StoreBreakdownTicket[]; negative: AgentDrilldownTicket[] }> {
+  const byAgent = new Map<string, TicketRow[]>();
+  for (const row of rows) {
+    if (!row.is_sac_agent || !isRealAgent(row.agent_name)) continue;
+    const list = byAgent.get(row.agent_name) ?? [];
+    list.push(row);
+    byAgent.set(row.agent_name, list);
+  }
+
+  const result: Record<string, { pending: StoreBreakdownTicket[]; negative: AgentDrilldownTicket[] }> = {};
+  for (const [agent, agentRows] of byAgent.entries()) {
+    result[agent] = {
+      pending: buildTicketList(agentRows.filter((r) => !r.resolved_effective)),
+      negative: buildAgentTicketList(agentRows.filter((r) => r.nps_score !== null && r.nps_score <= 2)),
+    };
+  }
+  return result;
 }
 
 function toAttentionRow(row: TicketRow, now: number): AttentionRow {
@@ -720,6 +780,33 @@ function buildCategoryTicketsMap(rows: TicketRow[]): Record<string, StoreBreakdo
   return Object.fromEntries([...byCategoryRows.entries()].map(([category, catRows]) => [category, buildTicketList(catRows)]));
 }
 
+// Regras de negócio pra sugerir uma causa provável por trás da categoria
+// dominante de uma loja -- ex.: muita "Dúvida" concentrada numa loja é
+// sintoma comum de vendedor sem treinamento de produto. É heurística
+// (categoria + volume mínimo), não uma conclusão definitiva; o gestor ainda
+// decide se investiga. Limiar de "concentração" (topCategoryPct) e de
+// "volume mínimo" (total de chamados da loja) evita disparar sugestão em
+// cima de amostra pequena (ex.: 1 chamado de dúvida em 2 no total já dá 50%).
+const ALERT_MIN_TOTAL = 5;
+const ALERT_RULES: { tag: string; minPct: number; signal: string }[] = [
+  { tag: "cat-duvida", minPct: 40, signal: "Falta de treinamento de produto na equipe de vendas" },
+  { tag: "cat-errovendedor", minPct: 30, signal: "Vendedor(es) passando informação incorreta na venda -- reforçar treinamento comercial" },
+  { tag: "cat-informacaoincorreta", minPct: 30, signal: "Atendimento da loja passando informação incorreta -- reforçar treinamento" },
+  { tag: "cat-atraso", minPct: 40, signal: "Prazo de entrega combinado na loja pode estar desalinhado com o CD" },
+  { tag: "cat-avaria", minPct: 40, signal: "Possível falha na conferência/embalagem antes da entrega sair dessa loja" },
+  { tag: "cat-erroloja", minPct: 30, signal: "Erro operacional recorrente da loja -- vale reforço de processo" },
+  { tag: "cat-montagem", minPct: 40, signal: "Equipe de montagem vinculada a essa loja com problemas recorrentes" },
+  { tag: "cat-cobranca", minPct: 30, signal: "Clientes confusos com cobrança/parcelamento -- revisar comunicação financeira na venda" },
+  { tag: "cat-demora", minPct: 30, signal: "Loja demorando a retornar o cliente -- gargalo de atendimento local" },
+];
+
+function buildAlertSignal(topCategoryTag: string | null, topCategoryPct: number, total: number): string | null {
+  if (!topCategoryTag || total < ALERT_MIN_TOTAL) return null;
+  const rule = ALERT_RULES.find((r) => r.tag === topCategoryTag);
+  if (!rule || topCategoryPct < rule.minPct) return null;
+  return rule.signal;
+}
+
 function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => string, categoryLabelFn: (tag: string) => string): StoreBreakdown[] {
   const byStoreRows = new Map<string, TicketRow[]>();
   for (const row of rows) {
@@ -740,12 +827,15 @@ function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => s
       const topCategoryTickets: StoreBreakdownTicket[] = top
         ? buildTicketList(storeRows.filter((r) => r.category === top[0]))
         : [];
+      const topCategoryPct = top ? Math.round((top[1] / storeRows.length) * 100) : 0;
       return {
         store: storeLabelFn(store),
         total: storeRows.length,
         topCategory: top ? categoryLabelFn(top[0]) : null,
+        topCategoryTag: top ? top[0] : null,
         topCategoryCount: top ? top[1] : 0,
-        topCategoryPct: top ? Math.round((top[1] / storeRows.length) * 100) : 0,
+        topCategoryPct,
+        alertSignal: buildAlertSignal(top ? top[0] : null, topCategoryPct, storeRows.length),
         topCategoryTickets,
       };
     })
@@ -964,6 +1054,13 @@ export async function getKpiData(
     firstResponseRows.length > 0
       ? Math.round((firstResponseRows.filter((r) => r.within_sla).length / firstResponseRows.length) * 100)
       : null;
+  // Separado do SLA de 30min (pctWithinSla) -- "respondido em até 5min" é o
+  // corte que importa de verdade pro WhatsApp (cliente já espera resposta
+  // quase instantânea nesse canal, 30min já é vivido como demora).
+  const pctWithin5Min =
+    firstResponseRows.length > 0
+      ? Math.round((firstResponseRows.filter((r) => (r.first_response_minutes ?? Infinity) <= 5).length / firstResponseRows.length) * 100)
+      : null;
 
   const recurrenceCount = rows.filter((r) => r.is_recurrence).length;
 
@@ -976,6 +1073,7 @@ export async function getKpiData(
 
   const storeBreakdown = buildStoreBreakdown(rows, labelFns.storeLabel, labelFns.categoryLabel);
   const categoryTickets = buildCategoryTicketsMap(rows);
+  const agentDrilldown = buildAgentDrilldown(rows);
   // Nome/telefone dos chamados por trás do "problema mais comum" (loja,
   // categoria geral e semana anterior) -- query em lote única (mesmo padrão
   // de npsDetractors acima), pra não disparar uma consulta por chamado.
@@ -983,6 +1081,7 @@ export async function getKpiData(
     ...storeBreakdown.flatMap((s) => s.topCategoryTickets),
     ...Object.values(categoryTickets).flat(),
     ...previousWeek.topCategoryTickets,
+    ...Object.values(agentDrilldown).flatMap((a) => [...a.pending, ...a.negative]),
   ];
   const breakdownContactIds = [...new Set(allBreakdownTickets.map((t) => t.contactId).filter((id): id is string => !!id))];
   if (breakdownContactIds.length > 0) {
@@ -1023,6 +1122,7 @@ export async function getKpiData(
     openTicketsList,
     avgFirstResponseMinutes,
     pctWithinSla,
+    pctWithin5Min,
     firstResponseSampleSize: firstResponseRows.length,
     slaMinutesThreshold: 30,
     recurrenceCount,
@@ -1045,5 +1145,6 @@ export async function getKpiData(
     performanceReport: buildPerformanceReportSet(allRows, new Date()),
     npsSummary: buildNpsSummary(rows, untrackedNpsScores),
     npsDetractors,
+    agentDrilldown,
   };
 }
