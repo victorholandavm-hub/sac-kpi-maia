@@ -4,7 +4,7 @@ import { listPaymentItems, listAssemblers, paymentStage, type PaymentItem } from
 import { PAYMENTS_CONTROLLER_NAME } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { PaymentsExportButton } from "@/components/assistencia/PaymentsExportButton";
-import { PaymentItemEditor } from "@/components/assistencia/PaymentItemEditor";
+import { AssemblerPaymentGroup } from "@/components/assistencia/AssemblerPaymentGroup";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -22,24 +22,6 @@ function groupByAssembler(items: PaymentItem[]) {
     group.items.push(item);
   }
   return groups.sort((a, b) => a.assemblerName.localeCompare(b.assemblerName));
-}
-
-// Sub-agrupamento por loja dentro de um montador -- só faz diferença
-// visualmente quando um montador específico é escolhido (o Antonio pediu
-// pra dividir por loja, mesmo que ainda fique tudo na mesma tela, sem sair
-// clicando solicitação por solicitação).
-function groupByStore(items: PaymentItem[]) {
-  const groups: { storeName: string; items: PaymentItem[] }[] = [];
-  for (const item of items) {
-    const name = item.storeName || "Sem loja";
-    let group = groups.find((g) => g.storeName === name);
-    if (!group) {
-      group = { storeName: name, items: [] };
-      groups.push(group);
-    }
-    group.items.push(item);
-  }
-  return groups.sort((a, b) => a.storeName.localeCompare(b.storeName));
 }
 
 export default async function PagamentosPage({
@@ -136,44 +118,19 @@ export default async function PagamentosPage({
       ) : (
         groups.map((group) => {
           const total = group.items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
-          // Sub-divisão por loja só quando um montador específico está
-          // selecionado (senão cada grupo já é o próprio montador, e
-          // dividir de novo por loja não ajuda em nada na visão geral).
-          const storeGroups = assembler ? groupByStore(group.items) : [{ storeName: "", items: group.items }];
           return (
-            <div
+            <AssemblerPaymentGroup
               key={group.assemblerName}
-              className="rounded-lg overflow-hidden"
-              style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-            >
-              <div
-                className="flex items-center justify-between px-4 py-3"
-                style={{ borderBottom: "1px solid var(--gridline)" }}
-              >
-                <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-                  {group.assemblerName}
-                </span>
-                <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                  {formatBRL(total)}
-                </span>
-              </div>
-              {storeGroups.map((storeGroup) => (
-                <div key={storeGroup.storeName || "unica"}>
-                  {storeGroup.storeName ? (
-                    <div className="px-4 py-1.5" style={{ background: "var(--surface-2, var(--gridline))" }}>
-                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-                        {storeGroup.storeName}
-                      </span>
-                    </div>
-                  ) : null}
-                  <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                    {storeGroup.items.map((item) => (
-                      <PaymentItemEditor key={item.itemId} item={item} canEdit={canExport} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+              assemblerName={group.assemblerName}
+              items={group.items}
+              total={total}
+              canEdit={canExport}
+              // Aberto de cara só quando esse montador já foi escolhido no
+              // filtro, ou quando é o único grupo na tela -- senão fica
+              // recolhido, pra não ter que descer passando pelas montagens
+              // de todo mundo só pra ver o próximo montador.
+              defaultOpen={group.assemblerName === assembler || groups.length === 1}
+            />
           );
         })
       )}
