@@ -15,16 +15,13 @@ import type { PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
 // vez, em vez de abrir pedido por pedido (ver bulkMarkEnviadoParaCD).
 const BULK_ELIGIBLE_STATUS = "em_producao";
 
-// A partir daqui o pedido já saiu da fábrica -- o prazo fábrica→CD já foi
-// cumprido ou não, mas deixou de ser um prazo "vivo" (ver
-// chegadaCdByPedido/prazoFabricaCd abaixo).
-const JA_SAIU_DA_FABRICA: PedidoEncomendaSummary["status"][] = [
-  "pronto_para_expedicao",
-  "recebido_cd",
-  "em_carga",
-  "faturado",
-  "entregue",
-];
+// A partir daqui o CD já confirmou o pedido de alguma forma (botou em carga
+// ou marcou recebido/em estoque) -- só nesse ponto existe uma data real de
+// chegada pra mostrar. "pronto_para_expedicao" fica DE FORA de propósito:
+// é a fábrica dizendo "enviei", não o CD confirmando "recebi", então o
+// prazo fábrica→CD continua sendo a informação que vale até o CD agir de
+// verdade (ver chegadaCdByPedido/getChegadaCdDates em pedidosEncomenda.ts).
+const CD_JA_CONFIRMOU: PedidoEncomendaSummary["status"][] = ["recebido_cd", "em_carga", "faturado", "entregue"];
 
 export function PedidoEncomendaFilaList({
   pedidos,
@@ -152,17 +149,18 @@ export function PedidoEncomendaFilaList({
                       {new Date(p.createdAt).toLocaleString("pt-BR")}
                     </span>
                     <span>Pedido por {p.requestedByName}</span>
-                    {/* Antes de sair da fábrica: o prazo fábrica→CD é o que
-                        vale, com cor de urgência (pode estourar). Depois de
-                        sair: esse prazo já foi cumprido ou não, não é mais
-                        "vivo" -- troca pela data real de chegada (fato, sem
-                        cor de urgência) assim que ela existir. */}
-                    {!JA_SAIU_DA_FABRICA.includes(p.status) && p.prazoFabricaCd ? (
+                    {/* Prazo fábrica→CD continua valendo até o CD confirmar
+                        de verdade (botar em carga / marcar recebido) --
+                        "enviado para o CD" sozinho é só a fábrica dizendo
+                        que despachou, não prova que chegou. Só depois da
+                        confirmação do CD troca pela data real de chegada
+                        (fato, sem cor de urgência). */}
+                    {!CD_JA_CONFIRMOU.includes(p.status) && p.prazoFabricaCd ? (
                       <span style={prazoUrgencyStyle(p.prazoFabricaCd)}>
                         🕐 Prazo p/ CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : null}
-                    {JA_SAIU_DA_FABRICA.includes(p.status) && chegadaCdByPedido[p.id] ? (
+                    {CD_JA_CONFIRMOU.includes(p.status) && chegadaCdByPedido[p.id] ? (
                       <span>📦 Chegou no CD: {new Date(chegadaCdByPedido[p.id]).toLocaleDateString("pt-BR")}</span>
                     ) : null}
                     {p.prazoCdLoja ? (

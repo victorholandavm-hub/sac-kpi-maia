@@ -307,13 +307,16 @@ type EventRow = {
 };
 
 // Data real de chegada no CD, por pedido -- não existe uma coluna própria
-// pra isso hoje (só o prazo/expectativa em prazo_fabrica_cd), mas o momento
-// em que o status virou "pronto_para_expedicao" já fica registrado no
-// histórico de eventos, então dá pra derivar sem precisar de coluna nova.
-// Usado pra, na fila (PedidoEncomendaFilaList.tsx), trocar "Prazo p/ CD"
-// (que já passou a valer/não fazer mais sentido) por "Chegou no CD: <data>"
-// assim que o pedido sai da fábrica -- ver conversa com o usuário em
-// 2026-08-13 (prazo da fábrica confundia depois de já ter chegado).
+// pra isso hoje (só o prazo/expectativa em prazo_fabrica_cd). Importante:
+// NÃO é o momento em que o status virou "pronto_para_expedicao" -- essa
+// transição é a fábrica dizendo "enviei", não o CD confirmando "recebi", e
+// usar ela aqui dava uma "chegada" falsa no exato instante em que a fábrica
+// clica enviar, antes até do pedido sair fisicamente de lá. A data real é a
+// primeira ação que o próprio CD toma sobre o pedido -- botar em carga ou
+// marcar recebido/em estoque -- porque só aí existe confirmação de que o
+// pedido está fisicamente na mão do CD. Ver conversa com o usuário em
+// 2026-08-13 (prazo da fábrica confundia depois de já ter chegado; a
+// primeira versão disso aqui trocou uma confusão por outra).
 export async function getChegadaCdDates(pedidoIds: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (pedidoIds.length === 0) return map;
@@ -323,13 +326,13 @@ export async function getChegadaCdDates(pedidoIds: string[]): Promise<Map<string
     .from("pedido_encomenda_events")
     .select("pedido_id, created_at")
     .in("pedido_id", pedidoIds)
-    .eq("to_status", "pronto_para_expedicao")
+    .in("to_status", ["em_carga", "recebido_cd"])
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
 
   for (const row of (data ?? []) as { pedido_id: string; created_at: string }[]) {
-    // Primeira ocorrência (mais antiga) -- se o pedido por algum motivo foi
-    // marcado "enviado pro CD" mais de uma vez, mantém a primeira data real.
+    // Primeira ocorrência (mais antiga) -- mantém a primeira vez que o CD
+    // agiu, mesmo que o pedido depois volte a mudar de status de novo.
     if (!map.has(row.pedido_id)) map.set(row.pedido_id, row.created_at);
   }
   return map;

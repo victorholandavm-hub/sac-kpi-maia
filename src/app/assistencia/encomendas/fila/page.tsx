@@ -97,7 +97,7 @@ export default async function EncomendasQueuePage({
   ]);
   // Depende dos ids de `pedidos` acima, então não dá pra entrar no mesmo
   // Promise.all -- ver getChegadaCdDates (troca "Prazo p/ CD" por "Chegou no
-  // CD: <data>" assim que o pedido sai da fábrica, na lista abaixo).
+  // CD: <data>" assim que o CD confirma o pedido, na lista abaixo).
   const chegadaCdByPedido = Object.fromEntries(await getChegadaCdDates(pedidos.map((p) => p.id)));
   const queuePosition: [string, number][] = queueIds.map((id, i) => [id, i + 1]);
   const actionNeededIds = new Set(
