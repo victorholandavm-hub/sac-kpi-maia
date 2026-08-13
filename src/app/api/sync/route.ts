@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { businessMinutesBetween } from "@/lib/businessHours";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
+import { fetchGhlMessages } from "@/lib/ghlClient";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -34,12 +35,6 @@ type GhlConversation = {
   dateAdded: number;
   dateUpdated: number;
   sort?: number[];
-};
-
-type GhlMessage = {
-  direction: "inbound" | "outbound";
-  dateAdded: string;
-  body?: string;
 };
 
 function ghlHeaders() {
@@ -84,18 +79,8 @@ async function fetchRecentConversations(sinceMs: number): Promise<{ conversation
   return { conversations: conversations.filter((c) => (c.dateUpdated ?? 0) >= sinceMs), error };
 }
 
-async function fetchMessages(ghlConversationId: string): Promise<GhlMessage[] | null> {
-  const res = await fetch(`${BASE_URL}/conversations/${ghlConversationId}/messages?limit=100`, {
-    headers: ghlHeaders(),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const msgs: GhlMessage[] = data.messages?.messages ?? [];
-  return msgs.slice().sort((a, b) => (a.dateAdded || "").localeCompare(b.dateAdded || ""));
-}
-
 async function firstResponseMinutes(ghlConversationId: string): Promise<number | null> {
-  const msgs = await fetchMessages(ghlConversationId);
+  const msgs = await fetchGhlMessages(ghlConversationId);
   if (!msgs) return null;
   const firstInbound = msgs.find((m) => m.direction === "inbound");
   if (!firstInbound) return null;
@@ -117,7 +102,7 @@ async function firstResponseMinutes(ghlConversationId: string): Promise<number |
 const NPS_PATTERN = /^([1-5])\s*-\s*(muito insatisfeito|insatisfeito|indiferente|satisfeito|muito satisfeito)\s*$/i;
 
 async function detectNpsScore(ghlConversationId: string): Promise<{ score: number; answeredAt: string } | null> {
-  const msgs = await fetchMessages(ghlConversationId);
+  const msgs = await fetchGhlMessages(ghlConversationId);
   if (!msgs) return null;
   const matches = msgs.filter((m) => m.direction === "inbound" && NPS_PATTERN.test((m.body ?? "").trim()));
   if (matches.length === 0) return null;

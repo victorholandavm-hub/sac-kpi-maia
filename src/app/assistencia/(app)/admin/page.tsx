@@ -29,6 +29,7 @@ const SYNC_JOB_LABELS: Record<SyncJob, string> = {
   totvs: "TOTVS (clientes, pedidos, entregas)",
   ghl: "GoHighLevel (conversas)",
   backup: "Backup diário do Supabase",
+  "ai-classify": "Classificação por IA (categoria/produto/loja do SAC)",
 };
 
 // Sem casa decimal nem "há 0h" logo depois de rodar -- minuto é preciso o
