@@ -132,13 +132,26 @@ type Snapshot = {
   reason: string;
   restrictionNote: string;
   notes: string;
+  assemblerName: string;
 };
 
 // `stores` já vem restrito às lojas do gerente autenticado (um gerente pode
 // cuidar de mais de uma — ver src/lib/gerentes.ts e src/app/assistencia/solicitar/page.tsx,
 // que exige sessão antes de renderizar este formulário). `requesterName` vem
-// da mesma sessão (nome+PIN) — não pedimos de novo no formulário.
-export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; requesterName: string }) {
+// da mesma sessão (nome+PIN) — não pedimos de novo no formulário. `ownAssemblers`
+// só vem preenchido pras lojas com montador próprio (Mamanguape, Campina
+// Grande...) -- ver listOwnStoreAssemblers -- e habilita o campo de montador
+// abaixo; nas demais lojas o campo nem aparece (quem atribui é a assistência
+// depois, como sempre foi).
+export function PublicRequestForm({
+  stores,
+  requesterName,
+  ownAssemblers = [],
+}: {
+  stores: Store[];
+  requesterName: string;
+  ownAssemblers?: string[];
+}) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createPublicRequest, undefined);
   const formRef = useRef<HTMLFormElement>(null);
   const [reviewing, setReviewing] = useState(false);
@@ -250,6 +263,8 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
   const showItems = type !== "notificacao_externa";
   const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
   const showCombo = type === "montagem" || type === "desmontagem";
+  const showAssembler = (type === "montagem" || type === "desmontagem") && ownAssemblers.length > 0;
+  const [assemblerName, setAssemblerName] = useState("");
 
   // Não envia nada ainda -- só valida (mesma validação nativa do navegador
   // que rodaria no submit, só que sem submeter) e monta o resumo a partir do
@@ -275,6 +290,7 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
       reason: String(fd.get("reason") ?? "").trim(),
       restrictionNote: String(fd.get("restriction_note") ?? "").trim(),
       notes: String(fd.get("notes") ?? "").trim(),
+      assemblerName: String(fd.get("assembler_name") ?? "").trim(),
     });
     setReviewing(true);
   }
@@ -365,6 +381,25 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
             >
               <option value="cliente">Cliente</option>
               <option value="loja">Mostruário da própria loja</option>
+            </select>
+          </Field>
+        ) : null}
+
+        {showAssembler ? (
+          <Field label="Montador">
+            <select
+              name="assembler_name"
+              value={assemblerName}
+              onChange={(e) => setAssemblerName(e.target.value)}
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            >
+              <option value="">A definir depois</option>
+              {ownAssemblers.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
             </select>
           </Field>
         ) : null}
@@ -647,6 +682,7 @@ export function PublicRequestForm({ stores, requesterName }: { stores: Store[]; 
               </>
             )}
             <SummaryRow label="Categoria da notificação" value={snapshot.sacCategory} />
+            {showAssembler ? <SummaryRow label="Montador" value={snapshot.assemblerName || "A definir depois"} /> : null}
             {showItems ? (
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs" style={{ color: "var(--text-muted)" }}>

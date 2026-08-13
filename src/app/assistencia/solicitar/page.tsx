@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { listStores } from "@/lib/serviceRequests";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
+import { listOwnStoreAssemblers } from "@/lib/payments";
 import { PublicRequestForm } from "@/components/assistencia/PublicRequestForm";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 
@@ -24,6 +25,12 @@ export default async function SolicitarAssistenciaPage({
 
   const [stores, gerenteStoreIds] = await Promise.all([listStores(), getGerenteStoreIds(gerenteName)]);
   const restrictedStores = stores.filter((s) => gerenteStoreIds.includes(s.id));
+
+  // Montador da própria loja (Mamanguape, Campina Grande...) só faz sentido
+  // de mostrar aqui quando a loja já vem fixa no formulário (gerente de uma
+  // loja só) -- com várias lojas pra escolher, ainda não dá pra saber qual
+  // lista de montador mostrar antes de a loja ser selecionada no cliente.
+  const ownAssemblers = restrictedStores.length === 1 ? await listOwnStoreAssemblers(restrictedStores[0].id) : [];
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
@@ -54,7 +61,7 @@ export default async function SolicitarAssistenciaPage({
         </div>
       ) : null}
 
-      <PublicRequestForm stores={restrictedStores} requesterName={gerenteName} />
+      <PublicRequestForm stores={restrictedStores} requesterName={gerenteName} ownAssemblers={ownAssemblers} />
     </div>
   );
 }

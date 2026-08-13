@@ -36,6 +36,25 @@ export async function listAssemblersForStores(storeIds: string[]): Promise<strin
   return (data ?? []).map((a) => a.name as string);
 }
 
+// Montador(es) da própria loja (Mamanguape/Campina Grande hoje, mas não
+// travado nesses dois -- qualquer loja com montador próprio cai aqui) --
+// usado pra deixar o GERENTE da loja (não a assistência) escolher e editar
+// quem vai montar, sem depender de ninguém da central atribuir. Duas formas
+// de reconhecer "é dessa loja": store_id certo (cadastro novo via "Equipe da
+// loja", ver addAssemblerForStore) ou o nome termina com o código da loja
+// (cadastro antigo, sempre feito assim -- "GERSON 214", "DEDE216" -- mesma
+// convenção de isAssistenciaControlledAssembler acima). Nunca inclui os
+// globais/legado (store_id nulo sem o código no nome) -- esses são só do
+// pool da central.
+export async function listOwnStoreAssemblers(storeId: string): Promise<string[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("assemblers").select("name, store_id").order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .filter((a) => a.store_id === storeId || (a.store_id === null && (a.name as string).trim().endsWith(storeId)))
+    .map((a) => a.name as string);
+}
+
 // Cadastro em um passo só: gerente já define o PIN na hora e repassa pro
 // montador (diferente do fluxo admin em admin-actions.ts, que separa criar
 // de definir PIN em duas ações).
