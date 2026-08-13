@@ -47,7 +47,7 @@ export function PaymentItemEditor({ item, canEdit }: { item: PaymentItem; canEdi
   function toggleReleased() {
     run(
       () => setItemPaymentReleased(item.itemId, item.requestId, !item.paymentReleased),
-      item.paymentReleased ? "Pagamento revertido para pendente." : "Pagamento aprovado."
+      item.paymentReleased ? "Pagamento revertido para pendente." : "Pagamento marcado como pago."
     );
   }
 
@@ -109,7 +109,7 @@ export function PaymentItemEditor({ item, canEdit }: { item: PaymentItem; canEdi
                   borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
                 }}
               >
-                {item.paymentReleased ? "✓ Aprovado" : "Aprovar pagamento"}
+                {item.paymentReleased ? "✓ Pago" : "Marcar como pago"}
               </button>
             ) : (
               <span
@@ -119,7 +119,7 @@ export function PaymentItemEditor({ item, canEdit }: { item: PaymentItem; canEdi
                   borderColor: item.paymentReleased ? "var(--status-good)" : "var(--status-warning)",
                 }}
               >
-                {item.paymentReleased ? "✓ Aprovado" : "Pendente"}
+                {item.paymentReleased ? "✓ Pago" : "Pendente"}
               </span>
             )
           ) : (
@@ -133,7 +133,7 @@ export function PaymentItemEditor({ item, canEdit }: { item: PaymentItem; canEdi
           )}
           {item.paymentReleased && item.paymentReleasedAt ? (
             <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-              em {formatDate(item.paymentReleasedAt)}
+              pago em {formatDate(item.paymentReleasedAt)}
             </span>
           ) : null}
         </div>
