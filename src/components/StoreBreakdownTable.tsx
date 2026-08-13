@@ -25,6 +25,7 @@ export function StoreBreakdownTable({ data }: { data: StoreBreakdown[] }) {
                 <th className="py-1 pr-4 font-normal">Loja</th>
                 <th className="py-1 pr-4 font-normal">Total</th>
                 <th className="py-1 pr-4 font-normal">Problema mais comum</th>
+                <th className="py-1 pr-4 font-normal">Sinal de alerta</th>
               </tr>
             </thead>
             <tbody>
@@ -51,6 +52,19 @@ export function StoreBreakdownTable({ data }: { data: StoreBreakdown[] }) {
                       </div>
                     ) : (
                       "—"
+                    )}
+                  </td>
+                  <td className="py-2 pr-4">
+                    {row.alertSignal ? (
+                      <span
+                        className="text-xs font-medium px-2 py-1 rounded inline-block"
+                        style={{ background: "var(--status-warning)", color: "#fff" }}
+                        title="Sugestão automática cruzando volume + motivo dominante -- vale confirmar antes de agir."
+                      >
+                        ⚠ {row.alertSignal}
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--text-muted)" }}>—</span>
                     )}
                   </td>
                 </tr>

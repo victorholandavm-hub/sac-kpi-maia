@@ -1,11 +1,26 @@
-import type { AgentStat } from "@/lib/kpi";
+"use client";
+
+import { useState } from "react";
+import type { AgentStat, StoreBreakdownTicket, AgentDrilldownTicket } from "@/lib/kpi";
+import { AgentDrilldownModal } from "./AgentDrilldownModal";
 
 function formatMinutes(minutes: number) {
   if (minutes >= 60) return `${(minutes / 60).toFixed(1)}h`;
   return `${Math.round(minutes)}min`;
 }
 
-export function AgentStatsTable({ data }: { data: AgentStat[] }) {
+export function AgentStatsTable({
+  data,
+  drilldown,
+}: {
+  data: AgentStat[];
+  drilldown: Record<string, { pending: StoreBreakdownTicket[]; negative: AgentDrilldownTicket[] }>;
+}) {
+  // Clicar no nome abre o modal com pendentes/avaliações negativas dessa
+  // pessoa -- correção de rota rápida sem sair caçando na fila geral (ver
+  // AgentDrilldownModal).
+  const [openAgent, setOpenAgent] = useState<string | null>(null);
+
   return (
     <div
       className="rounded-lg border p-4"
@@ -16,7 +31,8 @@ export function AgentStatsTable({ data }: { data: AgentStat[] }) {
       </h3>
       <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
         Tempo de resolução considera só chamados com a tag de status aplicada. 1ª resposta/SLA já
-        considera horário comercial.
+        considera horário comercial. Clique no nome pra ver pendentes e avaliações negativas dessa
+        pessoa.
       </p>
       {data.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -39,8 +55,15 @@ export function AgentStatsTable({ data }: { data: AgentStat[] }) {
             <tbody>
               {data.map((row) => (
                 <tr key={row.agent} style={{ borderTop: "1px solid var(--gridline)" }}>
-                  <td className="py-2 pr-4" style={{ color: "var(--text-primary)" }}>
-                    {row.agent}
+                  <td className="py-2 pr-4">
+                    <button
+                      type="button"
+                      onClick={() => setOpenAgent(row.agent)}
+                      className="text-left underline decoration-dotted"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {row.agent}
+                    </button>
                   </td>
                   <td className="py-2 pr-4" style={{ fontVariantNumeric: "tabular-nums" }}>
                     {row.total}
@@ -76,6 +99,15 @@ export function AgentStatsTable({ data }: { data: AgentStat[] }) {
           </table>
         </div>
       )}
+
+      {openAgent ? (
+        <AgentDrilldownModal
+          agent={openAgent}
+          pending={drilldown[openAgent]?.pending ?? []}
+          negative={drilldown[openAgent]?.negative ?? []}
+          onClose={() => setOpenAgent(null)}
+        />
+      ) : null}
     </div>
   );
 }
