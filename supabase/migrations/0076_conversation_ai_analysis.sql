@@ -2,7 +2,7 @@
 -- 0069 (conversations é mantida fora deste repo, mas colunas nossas entram
 -- normalmente via migration). Usado quando a categoria do GHL é genérica
 -- ("Dúvida") ou quando produto/loja não vieram marcados pelo atendente --
--- ver src/lib/aiClassification.ts e a rota /api/sync-ai-classify.
+-- ver src/lib/ticketClassification.ts e a rota /api/sync-ai-classify.
 alter table conversations add column if not exists ai_category text;
 alter table conversations add column if not exists ai_product text;
 alter table conversations add column if not exists ai_store_tag text;

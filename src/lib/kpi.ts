@@ -853,7 +853,7 @@ export async function getKpiData(
   // Mesma lógica do nps_score acima (coluna própria em `conversations`, fora
   // de v_ticket_enriched) -- só que aqui é pra SUBSTITUIR categoria/produto/
   // loja do chamado quando a tag manual do GHL for genérica ou estiver
-  // faltando (ver src/lib/aiClassification.ts e a rota /api/sync-ai-classify
+  // faltando (ver src/lib/ticketClassification.ts e a rota /api/sync-ai-classify
   // que preenche essas colunas). Confiança "baixa" não é aplicada -- prefere
   // deixar "Dúvida"/sem produto a arriscar um chute ruim virando estatística.
   for (let page = 0; ; page++) {
