@@ -100,8 +100,16 @@ function ProductItemsFields({
 // Edição do que o próprio gerente abriu (ver editServiceRequestByGerente em
 // src/app/assistencia/actions.ts) -- ao contrário do PublicRequestForm.tsx
 // (criação), aqui tipo e "pra quem é" (cliente x mostruário) já vêm fixos
-// do chamado existente, não dá pra trocar.
-export function EditServiceRequestForm({ request }: { request: ServiceRequestDetail }) {
+// do chamado existente, não dá pra trocar. `ownAssemblers` só vem
+// preenchido pras lojas com montador próprio (ver listOwnStoreAssemblers) --
+// nas demais o campo de montador nem aparece, é assunto da assistência.
+export function EditServiceRequestForm({
+  request,
+  ownAssemblers = [],
+}: {
+  request: ServiceRequestDetail;
+  ownAssemblers?: string[];
+}) {
   const boundAction = editServiceRequestByGerente.bind(null, request.id);
   const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, undefined);
 
@@ -118,6 +126,8 @@ export function EditServiceRequestForm({ request }: { request: ServiceRequestDet
   const showItems = type !== "notificacao_externa";
   const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
   const showCombo = type === "montagem" || type === "desmontagem";
+  const showAssembler = (type === "montagem" || type === "desmontagem") && ownAssemblers.length > 0;
+  const [assemblerName, setAssemblerName] = useState(request.assemblerName ?? "");
   const primaryAction: "montar" | "desmontar" = type === "montagem" ? "montar" : "desmontar";
 
   const secondaryAction: "montar" | "desmontar" = primaryAction === "montar" ? "desmontar" : "montar";
@@ -200,6 +210,25 @@ export function EditServiceRequestForm({ request }: { request: ServiceRequestDet
             />
             {type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
           </label>
+        ) : null}
+
+        {showAssembler ? (
+          <Field label="Montador">
+            <select
+              name="assembler_name"
+              value={assemblerName}
+              onChange={(e) => setAssemblerName(e.target.value)}
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            >
+              <option value="">A definir depois</option>
+              {ownAssemblers.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </Field>
         ) : null}
       </FormSection>
 

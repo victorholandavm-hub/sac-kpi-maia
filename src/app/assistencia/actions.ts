@@ -20,7 +20,7 @@ import {
   CAUSA_RAIZ_OPTIONS,
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
-import { resolveDriverName } from "@/lib/payments";
+import { resolveDriverName, listOwnStoreAssemblers } from "@/lib/payments";
 import {
   saveRequestPhoto,
   getPhotoForAuth,
@@ -333,6 +333,23 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     return { error: "Tipo de solicitação inválido." };
   }
 
+  // Loja com montador próprio (Mamanguape, Campina Grande...) pode escolher
+  // direto quem vai montar/desmontar, sem esperar a assistência atribuir --
+  // nunca confia no nome que veio do form sem checar contra quem está
+  // cadastrado pra essa loja (ver listOwnStoreAssemblers), senão dava pra
+  // "atribuir" qualquer nome via devtools.
+  let assemblerName: string | null = null;
+  if (type === "montagem" || type === "desmontagem") {
+    const requestedAssembler = String(formData.get("assembler_name") ?? "").trim();
+    if (requestedAssembler) {
+      const ownAssemblers = await listOwnStoreAssemblers(storeId);
+      if (!ownAssemblers.includes(requestedAssembler)) {
+        return { error: "Montador inválido." };
+      }
+      assemblerName = requestedAssembler;
+    }
+  }
+
   // Montagem/desmontagem pode ser pra um cliente (o normal) ou pra móvel de
   // mostruário da própria loja -- nesse segundo caso não existe venda,
   // cliente, CPF nem endereço pra pedir (ver showClientFields em
@@ -463,6 +480,7 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       invoice_number: emptyToNull(invoiceNumber),
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
+      assembler_name: assemblerName,
     })
     .select("id, ticket_number")
     .single();
@@ -506,6 +524,15 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     to_status: "aberta",
   });
 
+  if (assemblerName) {
+    await admin.from("service_request_events").insert({
+      request_id: data.id,
+      actor_id: null,
+      event_type: "note_added",
+      note: `Montador definido: ${assemblerName}`,
+    });
+  }
+
   redirect(`/assistencia/solicitar?enviado=1&chamado=${data.ticket_number}`);
 }
 
@@ -523,7 +550,7 @@ export async function editServiceRequestByGerente(requestId: string, _state: For
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("type, status, store_id, client_name, order_code")
+    .select("type, status, store_id, client_name, order_code, assembler_name")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) return { error: "Solicitação não encontrada." };
@@ -544,6 +571,28 @@ export async function editServiceRequestByGerente(requestId: string, _state: For
 
   const comboMontagemDesmontagem =
     (type === "montagem" || type === "desmontagem") && formData.get("combo_montagem_desmontagem") === "on";
+
+  // Mesma validação de createPublicRequest -- nunca confia no nome vindo do
+  // form sem checar contra quem está cadastrado pra essa loja. Só mexe no
+  // campo quando a loja TEM montador próprio (o campo só existe no form
+  // nesse caso, ver EditServiceRequestForm) -- nas demais lojas o valor
+  // atual fica intacto, senão uma edição comum apagaria o montador que a
+  // assistência já tivesse atribuído por fora.
+  let assemblerName = current.assembler_name as string | null;
+  if (type === "montagem" || type === "desmontagem") {
+    const ownAssemblers = await listOwnStoreAssemblers(current.store_id);
+    if (ownAssemblers.length > 0) {
+      const requestedAssembler = String(formData.get("assembler_name") ?? "").trim();
+      if (requestedAssembler) {
+        if (!ownAssemblers.includes(requestedAssembler)) {
+          return { error: "Montador inválido." };
+        }
+        assemblerName = requestedAssembler;
+      } else {
+        assemblerName = null;
+      }
+    }
+  }
 
   let clientName = current.client_name ?? "";
   let orderCode = "";
@@ -645,6 +694,7 @@ export async function editServiceRequestByGerente(requestId: string, _state: For
       seller_name: emptyToNull(sellerName),
       invoice_number: emptyToNull(invoiceNumber),
       combo_montagem_desmontagem: comboMontagemDesmontagem,
+      assembler_name: assemblerName,
     })
     .eq("id", requestId);
   if (updateError) return { error: `Não foi possível salvar: ${updateError.message}` };
@@ -670,6 +720,15 @@ export async function editServiceRequestByGerente(requestId: string, _state: For
     actor_id: null,
     event_type: "edited",
   });
+
+  if (assemblerName !== current.assembler_name) {
+    await admin.from("service_request_events").insert({
+      request_id: requestId,
+      actor_id: null,
+      event_type: "note_added",
+      note: assemblerName ? `Montador definido: ${assemblerName}` : "Montador removido.",
+    });
+  }
 
   revalidatePath("/assistencia/loja");
   revalidatePath(`/assistencia/loja/${requestId}/editar`);

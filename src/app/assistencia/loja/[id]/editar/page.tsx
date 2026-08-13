@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getRequestDetail } from "@/lib/serviceRequests";
+import { listOwnStoreAssemblers } from "@/lib/payments";
 import { EditServiceRequestForm } from "@/components/assistencia/EditServiceRequestForm";
 import { CancelServiceRequestButton } from "@/components/assistencia/CancelServiceRequestButton";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -40,6 +41,8 @@ export default async function EditarSolicitacaoLojaPage({
   const gerenteStoreIds = await getGerenteStoreIds(gerenteName);
   const canEdit = gerenteStoreIds.includes(request.storeId) && request.status === "aberta";
 
+  const ownAssemblers = canEdit ? await listOwnStoreAssemblers(request.storeId) : [];
+
   if (!canEdit) {
     return (
       <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
@@ -68,7 +71,7 @@ export default async function EditarSolicitacaoLojaPage({
           </p>
         ) : null}
 
-        <EditServiceRequestForm request={request} />
+        <EditServiceRequestForm request={request} ownAssemblers={ownAssemblers} />
 
         <CancelServiceRequestButton requestId={request.id} />
       </div>
