@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { setItemUnitValue, setItemPaymentReleased, setItemPaymentAuthorizedBy } from "@/app/assistencia/pagamentos-actions";
 import { addRequestItemByStaff, removeRequestItemByStaff, lookupTotvsProductForTeam } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
+import { withRetry } from "@/lib/retryLookup";
 import type { RequestItem } from "@/lib/serviceRequests";
 
 function formatBRL(value: number) {
@@ -224,26 +225,31 @@ function AddItemForm({ requestId, requestType }: { requestId: string; requestTyp
   const [action, setAction] = useState<"" | "montar" | "desmontar">(showAction ? "montar" : "");
   const [productLookupStatus, setProductLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
 
+  // Extraído do effect abaixo pra também poder ser chamado pelo botão
+  // "Tentar de novo" (aparece quando não encontrou -- ver
+  // productLookupStatus === "not_found" mais abaixo).
+  function runProductLookup(code: string) {
+    if (!code.trim()) {
+      setProductLookupStatus("idle");
+      return;
+    }
+    setProductLookupStatus("loading");
+    withRetry(() => lookupTotvsProductForTeam(code))
+      .then((match) => {
+        if (!match || !match.description) {
+          setProductLookupStatus("not_found");
+          return;
+        }
+        setProduct(match.description);
+        setProductLookupStatus("found");
+      })
+      .catch(() => setProductLookupStatus("not_found"));
+  }
+
   // Mesma ideia dos formulários de criação: código é só atalho, não trava
   // nada se não achar -- a pessoa preenche o nome à mão como já era.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!partCode.trim()) {
-        setProductLookupStatus("idle");
-        return;
-      }
-      setProductLookupStatus("loading");
-      lookupTotvsProductForTeam(partCode)
-        .then((match) => {
-          if (!match || !match.description) {
-            setProductLookupStatus("not_found");
-            return;
-          }
-          setProduct(match.description);
-          setProductLookupStatus("found");
-        })
-        .catch(() => setProductLookupStatus("not_found"));
-    }, 400);
+    const timer = setTimeout(() => runProductLookup(partCode), 400);
     return () => clearTimeout(timer);
   }, [partCode]);
 
@@ -285,8 +291,16 @@ function AddItemForm({ requestId, requestType }: { requestId: string; requestTyp
             Produto encontrado.
           </span>
         ) : productLookupStatus === "not_found" ? (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          <span className="text-xs flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
             Código não encontrado.
+            <button
+              type="button"
+              onClick={() => runProductLookup(partCode)}
+              className="underline"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              🔄 Tentar de novo
+            </button>
           </span>
         ) : null}
       </div>
