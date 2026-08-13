@@ -850,6 +850,36 @@ export async function getKpiData(
     }))
     .sort((a, b) => new Date(b.answeredAt).getTime() - new Date(a.answeredAt).getTime());
 
+  // Mesma lógica do nps_score acima (coluna própria em `conversations`, fora
+  // de v_ticket_enriched) -- só que aqui é pra SUBSTITUIR categoria/produto/
+  // loja do chamado quando a tag manual do GHL for genérica ou estiver
+  // faltando (ver src/lib/aiClassification.ts e a rota /api/sync-ai-classify
+  // que preenche essas colunas). Confiança "baixa" não é aplicada -- prefere
+  // deixar "Dúvida"/sem produto a arriscar um chute ruim virando estatística.
+  for (let page = 0; ; page++) {
+    const { data: pageRows, error: aiError } = await supabase
+      .from("conversations")
+      .select("id, ai_category, ai_product, ai_store_tag, ai_confidence")
+      .not("ai_analyzed_at", "is", null)
+      .range(page * pageSize, page * pageSize + pageSize - 1);
+    if (aiError) throw aiError;
+    for (const row of pageRows ?? []) {
+      const match = rowsByConversationId.get(row.id as string);
+      if (!match) continue;
+      if (row.ai_confidence === "baixa") continue;
+      if ((!match.category || match.category === "cat-duvida") && row.ai_category) {
+        match.category = row.ai_category as string;
+      }
+      if (!match.product && row.ai_product) {
+        match.product = row.ai_product as string;
+      }
+      if (!match.store_tag && row.ai_store_tag) {
+        match.store_tag = row.ai_store_tag as string;
+      }
+    }
+    if (!pageRows || pageRows.length < pageSize) break;
+  }
+
   const rows = allRows.filter((r) => {
     const opened = new Date(r.opened_at).getTime();
     if (range.from && opened < range.from.getTime()) return false;

@@ -6,12 +6,13 @@
 import { getSupabaseAdmin } from "./supabaseAdmin.ts";
 import { notifyAdmin } from "./notifications.ts";
 
-export type SyncJob = "totvs" | "ghl" | "backup";
+export type SyncJob = "totvs" | "ghl" | "backup" | "ai-classify";
 
 const JOB_LABELS: Record<SyncJob, string> = {
   totvs: "TOTVS",
   ghl: "GoHighLevel",
   backup: "Backup diário",
+  "ai-classify": "Classificação por IA (SAC)",
 };
 
 // Só observabilidade -- uma falha ao gravar o histórico nunca pode derrubar
