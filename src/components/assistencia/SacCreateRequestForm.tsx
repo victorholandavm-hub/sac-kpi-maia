@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useActionState } from "react";
 import { createSacRequest, lookupTotvsClientForTeam, lookupTotvsProductForTeam, type FormState } from "@/app/assistencia/actions";
+import { withRetry } from "@/lib/retryLookup";
 import {
   SAC_CATEGORIES,
   SAC_CATEGORY_LABELS,
@@ -110,8 +111,11 @@ function ItemsFields({
               Buscando…
             </span>
           ) : lookupStatus[i] === "not_found" ? (
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            <span className="text-xs flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
               Código não encontrado.
+              <button type="button" onClick={() => onLookup(i, item.code)} className="underline" style={{ color: "var(--text-secondary)" }}>
+                🔄 Tentar de novo
+              </button>
             </span>
           ) : null}
         </div>
@@ -186,7 +190,7 @@ export function SacCreateRequestForm({
         return;
       }
       setStatus((prev) => ({ ...prev, [index]: "loading" }));
-      lookupTotvsProductForTeam(code)
+      withRetry(() => lookupTotvsProductForTeam(code))
         .then((match) => {
           if (!match || !match.description) {
             setStatus((prev) => ({ ...prev, [index]: "not_found" }));
@@ -203,34 +207,39 @@ export function SacCreateRequestForm({
   const itemHandlers = makeItemHandlers(setItems, setItemsLookupStatus);
   const secondaryHandlers = makeItemHandlers(setSecondaryItems, setSecondaryLookupStatus);
 
+  // Extraído do effect abaixo pra também poder ser chamado pelo botão
+  // "Tentar de novo" (aparece quando não encontrou -- ver clientLookupStatus
+  // === "not_found" mais abaixo).
+  function runClientLookup(code: string) {
+    if (!code.trim()) {
+      setClientLookupStatus("idle");
+      return;
+    }
+    setClientLookupStatus("loading");
+    withRetry(() => lookupTotvsClientForTeam(code))
+      .then((match) => {
+        if (!match) {
+          setClientLookupStatus("not_found");
+          return;
+        }
+        setClientName(match.name);
+        if (match.phone1) setClientPhone(match.phone1);
+        if (match.addressStreet) setClientAddress(match.addressStreet);
+        if (match.addressNumber) setAddressNumber(match.addressNumber);
+        if (match.addressComplement) {
+          setIsApartment(true);
+          setAddressComplement(match.addressComplement);
+        }
+        if (match.addressNeighborhood) setClientNeighborhood(match.addressNeighborhood);
+        setClientLookupStatus("found");
+      })
+      .catch(() => setClientLookupStatus("not_found"));
+  }
+
   // Mesma ideia de PublicRequestForm.tsx: código é só atalho, não trava nada
   // se não achar -- a pessoa preenche à mão como já era.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!clientCode.trim()) {
-        setClientLookupStatus("idle");
-        return;
-      }
-      setClientLookupStatus("loading");
-      lookupTotvsClientForTeam(clientCode)
-        .then((match) => {
-          if (!match) {
-            setClientLookupStatus("not_found");
-            return;
-          }
-          setClientName(match.name);
-          if (match.phone1) setClientPhone(match.phone1);
-          if (match.addressStreet) setClientAddress(match.addressStreet);
-          if (match.addressNumber) setAddressNumber(match.addressNumber);
-          if (match.addressComplement) {
-            setIsApartment(true);
-            setAddressComplement(match.addressComplement);
-          }
-          if (match.addressNeighborhood) setClientNeighborhood(match.addressNeighborhood);
-          setClientLookupStatus("found");
-        })
-        .catch(() => setClientLookupStatus("not_found"));
-    }, 400);
+    const timer = setTimeout(() => runClientLookup(clientCode), 400);
     return () => clearTimeout(timer);
   }, [clientCode]);
 
@@ -314,8 +323,16 @@ export function SacCreateRequestForm({
               Cliente encontrado — confira os dados abaixo.
             </span>
           ) : clientLookupStatus === "not_found" ? (
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            <span className="text-xs flex items-center gap-1.5 flex-wrap" style={{ color: "var(--text-muted)" }}>
               Código não encontrado — preencha os dados abaixo à mão.
+              <button
+                type="button"
+                onClick={() => runClientLookup(clientCode)}
+                className="underline"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                🔄 Tentar de novo
+              </button>
             </span>
           ) : null}
         </Field>
