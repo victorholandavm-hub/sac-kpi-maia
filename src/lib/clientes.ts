@@ -2,11 +2,13 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 
 // Perfil de compra/relacionamento dos clientes -- pedido do Victor
-// 14/08/2026: "preciso classificar os clientes". A classificação em si
-// (ativo/inativo/nunca comprou + dias sem comprar) já vem PRONTA do
-// Protheus, sincronizada em totvs_clientes (ver syncClients em
-// totvsSync.ts) -- essa tela só organiza/expõe o que já existe, não
-// inventa uma lógica de segmentação nova.
+// 14/08/2026: "preciso classificar os clientes". A classificação por
+// STATUS (ativo/inativo/nunca comprou + dias sem comprar) já vem PRONTA
+// do Protheus, sincronizada em totvs_clientes (ver syncClients em
+// totvsSync.ts). A classificação por NÍVEL DE RELACIONAMENTO
+// (Bronze/Prata/Ouro/Diamante, mais abaixo) é uma regra própria que o
+// Victor passou (tabela de critérios), calculada em cima do histórico de
+// pedidos -- ver calcularNivel.
 
 export const CLIENTE_STATUSES = ["ativo", "inativo", "nunca comprou"] as const;
 export type ClienteStatus = (typeof CLIENTE_STATUSES)[number];
@@ -162,4 +164,143 @@ export async function listClientes(
     page,
     pageSize,
   };
+}
+
+// ---------------------------------------------------------------------
+// Nível de relacionamento (Bronze/Prata/Ouro/Diamante) -- regra própria
+// passada pelo Victor 14/08/2026 (tabela de critérios), calculada em cima
+// do histórico de pedidos (totvs_orders), NÃO do cadastro totvs_clientes:
+// só 3.760 clientes têm cadastro completo sincronizado, mas 24.584
+// códigos de cliente distintos já aparecem como comprador em algum
+// pedido -- usar o cadastro como base deixaria de fora a esmagadora
+// maioria de quem já comprou de verdade. Nome/CPF-CNPJ vêm do próprio
+// pedido (client_name/client_cpf_cnpj, sempre preenchidos), não precisa
+// do cadastro pra isso.
+// ---------------------------------------------------------------------
+
+export const CLIENTE_NIVEIS = ["diamante", "ouro", "prata", "bronze", "sem_compra"] as const;
+export type ClienteNivel = (typeof CLIENTE_NIVEIS)[number];
+
+export function isClienteNivel(value: string | undefined | null): value is ClienteNivel {
+  return !!value && (CLIENTE_NIVEIS as readonly string[]).includes(value);
+}
+
+export const CLIENTE_NIVEL_LABELS: Record<ClienteNivel, string> = {
+  diamante: "Diamante",
+  ouro: "Ouro",
+  prata: "Prata",
+  bronze: "Bronze",
+  sem_compra: "Sem compra",
+};
+
+export const CLIENTE_NIVEL_COLORS: Record<ClienteNivel, string> = {
+  diamante: "var(--series-4)",
+  ouro: "var(--series-3)",
+  prata: "var(--text-secondary)",
+  bronze: "var(--brand-orange)",
+  sem_compra: "var(--text-muted)",
+};
+
+function mesesEntre(dataIso: string, hoje: Date): number {
+  const d = new Date(`${dataIso}T00:00:00`);
+  return (hoje.getFullYear() - d.getFullYear()) * 12 + (hoje.getMonth() - d.getMonth());
+}
+
+// Cada nível é "basta um destes" (OR entre os 2-3 critérios) -- checado do
+// nível mais alto pro mais baixo, o primeiro que bater vence. Sem compra
+// nenhuma não é "Bronze" (Bronze exige "1ª compra") -- fica de fora, num
+// nível à parte (sem_compra), pra não confundir "comprou uma vez, recente"
+// com "nunca comprou".
+export function calcularNivel(compras: number, gastoAcumulado: number, mesesRelacionamento: number | null): ClienteNivel {
+  if (compras <= 0 || mesesRelacionamento === null) return "sem_compra";
+  const recompras = compras - 1;
+
+  if (gastoAcumulado > 10000 || (mesesRelacionamento >= 24 && recompras >= 2)) return "diamante";
+  if (compras >= 3 || (mesesRelacionamento >= 12 && mesesRelacionamento <= 24 && recompras >= 1) || (gastoAcumulado >= 5000 && gastoAcumulado <= 10000)) {
+    return "ouro";
+  }
+  if (compras >= 2 || (mesesRelacionamento >= 6 && mesesRelacionamento <= 12) || (gastoAcumulado >= 1500 && gastoAcumulado <= 5000)) {
+    return "prata";
+  }
+  return "bronze";
+}
+
+export type ClienteNivelInfo = {
+  clientId: string;
+  nome: string | null;
+  cpfCnpj: string | null;
+  compras: number;
+  gastoAcumulado: number;
+  primeiraCompra: string | null;
+  mesesRelacionamento: number | null;
+  nivel: ClienteNivel;
+};
+
+const ORDER_PAGE_SIZE = 1000;
+const ORDER_MAX_PAGINAS = 200;
+
+// Busca o histórico de pedidos inteiro (paginado de verdade -- ver
+// convenção já usada em vendasProduto.ts/entregasRisco.ts) e agrega por
+// cliente. Gasto acumulado é líquido (Venda soma, Devolução subtrai,
+// mesma convenção de vendasProduto.ts pra quantidade vendida). Computa
+// tudo de uma vez -- cards e lista filtrável reaproveitam o mesmo array em
+// memória, sem repetir a varredura.
+export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
+  const admin = getSupabaseAdmin();
+
+  type Row = {
+    client_id: string | null;
+    type: string;
+    invoice_total: number;
+    issue_date: string;
+    client_name: string | null;
+    client_cpf_cnpj: string | null;
+  };
+  const rows: Row[] = [];
+  for (let pagina = 0; pagina < ORDER_MAX_PAGINAS; pagina++) {
+    const from = pagina * ORDER_PAGE_SIZE;
+    const { data, error } = await admin
+      .from("totvs_orders")
+      .select("client_id, type, invoice_total, issue_date, client_name, client_cpf_cnpj")
+      .not("client_id", "is", null)
+      .range(from, from + ORDER_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const batch = (data ?? []) as unknown as Row[];
+    rows.push(...batch);
+    if (batch.length < ORDER_PAGE_SIZE) break;
+  }
+
+  type Acc = { nome: string | null; cpfCnpj: string | null; compras: number; gasto: number; primeira: string | null };
+  const porCliente = new Map<string, Acc>();
+  for (const r of rows) {
+    if (!r.client_id) continue;
+    const acc = porCliente.get(r.client_id) ?? { nome: null, cpfCnpj: null, compras: 0, gasto: 0, primeira: null };
+    if (r.type === "Venda") {
+      acc.compras += 1;
+      acc.gasto += r.invoice_total;
+      if (!acc.primeira || r.issue_date < acc.primeira) acc.primeira = r.issue_date;
+    } else if (r.type === "Devolucao") {
+      acc.gasto -= r.invoice_total;
+    }
+    if (!acc.nome && r.client_name) acc.nome = r.client_name;
+    if (!acc.cpfCnpj && r.client_cpf_cnpj) acc.cpfCnpj = r.client_cpf_cnpj;
+    porCliente.set(r.client_id, acc);
+  }
+
+  const hoje = new Date();
+  const resultado: ClienteNivelInfo[] = [];
+  for (const [clientId, acc] of porCliente) {
+    const meses = acc.primeira ? mesesEntre(acc.primeira, hoje) : null;
+    resultado.push({
+      clientId,
+      nome: acc.nome,
+      cpfCnpj: acc.cpfCnpj,
+      compras: acc.compras,
+      gastoAcumulado: acc.gasto,
+      primeiraCompra: acc.primeira,
+      mesesRelacionamento: meses,
+      nivel: calcularNivel(acc.compras, acc.gasto, meses),
+    });
+  }
+  return resultado;
 }

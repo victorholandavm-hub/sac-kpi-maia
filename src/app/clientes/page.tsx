@@ -3,14 +3,22 @@ import { requireDashboardAuth } from "@/lib/dashboardSession";
 import {
   getClientesResumo,
   listClientes,
+  listClientesPorNivel,
   isClienteStatus,
+  isClienteNivel,
   CLIENTE_STATUSES,
   CLIENTE_STATUS_LABELS,
   CLIENTE_STATUS_COLORS,
+  CLIENTE_NIVEIS,
+  CLIENTE_NIVEL_LABELS,
+  CLIENTE_NIVEL_COLORS,
+  type ClienteNivelInfo,
 } from "@/lib/clientes";
 import { AppHeader } from "@/components/AppHeader";
 
 export const dynamic = "force-dynamic";
+
+const LIST_PAGE_SIZE = 50;
 
 function formatDateOnly(value: string | null): string {
   if (!value) return "—";
@@ -18,10 +26,16 @@ function formatDateOnly(value: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
-function buildHref(params: { q?: string; status?: string; page?: number }): string {
+function formatBRL(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function buildHref(params: { view?: string; q?: string; status?: string; nivel?: string; page?: number }): string {
   const sp = new URLSearchParams();
+  if (params.view && params.view !== "status") sp.set("view", params.view);
   if (params.q) sp.set("q", params.q);
   if (params.status) sp.set("status", params.status);
+  if (params.nivel) sp.set("nivel", params.nivel);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/clientes?${qs}` : "/clientes";
@@ -30,12 +44,64 @@ function buildHref(params: { q?: string; status?: string; page?: number }): stri
 export default async function ClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ view?: string; q?: string; status?: string; nivel?: string; page?: string }>;
 }) {
   await requireDashboardAuth();
-  const { q, status, page: pageParam } = await searchParams;
-  const filterStatus = isClienteStatus(status) ? status : undefined;
+  const { view: viewParam, q, status, nivel, page: pageParam } = await searchParams;
+  const view = viewParam === "nivel" ? "nivel" : "status";
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+
+  return (
+    <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
+      <AppHeader />
+
+      <div>
+        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+          Clientes
+        </h1>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          Perfil de compra/relacionamento, direto do histórico do Protheus.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Link
+          href={buildHref({ view: "status" })}
+          className="text-sm px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: view === "status" ? "var(--brand-orange)" : "transparent",
+            color: view === "status" ? "#fff" : "var(--text-secondary)",
+            fontWeight: view === "status" ? 600 : 400,
+          }}
+        >
+          Status (Protheus)
+        </Link>
+        <Link
+          href={buildHref({ view: "nivel" })}
+          className="text-sm px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: "var(--border)",
+            background: view === "nivel" ? "var(--brand-orange)" : "transparent",
+            color: view === "nivel" ? "#fff" : "var(--text-secondary)",
+            fontWeight: view === "nivel" ? 600 : 400,
+          }}
+        >
+          Nível de relacionamento
+        </Link>
+      </div>
+
+      {view === "status" ? (
+        <StatusView q={q} status={status} page={page} />
+      ) : (
+        <NivelView q={q} nivel={nivel} page={page} />
+      )}
+    </div>
+  );
+}
+
+async function StatusView({ q, status, page }: { q?: string; status?: string; page: number }) {
+  const filterStatus = isClienteStatus(status) ? status : undefined;
 
   const [resumo, listResult] = await Promise.all([
     getClientesResumo(),
@@ -51,23 +117,16 @@ export default async function ClientesPage({
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
-      <AppHeader />
-
-      <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
-          Clientes
-        </h1>
-        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Perfil de compra/relacionamento, direto do cadastro do Protheus — {resumo.totalGeral} clientes sincronizados.
-        </p>
-      </div>
+    <>
+      <p className="text-xs -mt-4" style={{ color: "var(--text-muted)" }}>
+        {resumo.totalGeral} clientes com cadastro completo sincronizado do Protheus.
+      </p>
 
       <div className="grid sm:grid-cols-3 gap-4">
         {CLIENTE_STATUSES.map((s) => (
           <Link
             key={s}
-            href={buildHref({ q, status: filterStatus === s ? undefined : s })}
+            href={buildHref({ view: "status", q, status: filterStatus === s ? undefined : s })}
             className="rounded-xl border p-5 flex flex-col gap-1"
             style={{
               background: "var(--surface-1)",
@@ -97,6 +156,7 @@ export default async function ClientesPage({
       </div>
 
       <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap">
+        <input type="hidden" name="view" value="status" />
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
         <input
           type="search"
@@ -106,15 +166,11 @@ export default async function ClientesPage({
           className="text-sm flex-1 min-w-[220px] rounded border px-3 py-2"
           style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
         />
-        <button
-          type="submit"
-          className="text-sm px-4 py-2 rounded font-medium"
-          style={{ background: "var(--brand-orange)", color: "#fff" }}
-        >
+        <button type="submit" className="text-sm px-4 py-2 rounded font-medium" style={{ background: "var(--brand-orange)", color: "#fff" }}>
           Buscar
         </button>
         {q || filterStatus ? (
-          <Link href="/clientes" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+          <Link href={buildHref({ view: "status" })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             Limpar
           </Link>
         ) : null}
@@ -182,7 +238,7 @@ export default async function ClientesPage({
       {totalPages > 1 ? (
         <div className="flex items-center gap-2">
           <Link
-            href={buildHref({ q, status: filterStatus, page: Math.max(1, page - 1) })}
+            href={buildHref({ view: "status", q, status: filterStatus, page: Math.max(1, page - 1) })}
             aria-disabled={page <= 1}
             className="text-sm px-3 py-1.5 rounded border"
             style={{ borderColor: "var(--border)", color: page <= 1 ? "var(--text-muted)" : "var(--text-primary)", pointerEvents: page <= 1 ? "none" : undefined }}
@@ -190,7 +246,7 @@ export default async function ClientesPage({
             ← Anterior
           </Link>
           <Link
-            href={buildHref({ q, status: filterStatus, page: Math.min(totalPages, page + 1) })}
+            href={buildHref({ view: "status", q, status: filterStatus, page: Math.min(totalPages, page + 1) })}
             aria-disabled={page >= totalPages}
             className="text-sm px-3 py-1.5 rounded border"
             style={{
@@ -203,6 +259,167 @@ export default async function ClientesPage({
           </Link>
         </div>
       ) : null}
-    </div>
+    </>
+  );
+}
+
+async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page: number }) {
+  const filterNivel = isClienteNivel(nivel) ? nivel : undefined;
+  const todos = await listClientesPorNivel();
+
+  const porNivel = new Map<string, number>();
+  for (const c of todos) porNivel.set(c.nivel, (porNivel.get(c.nivel) ?? 0) + 1);
+
+  const qLower = q?.trim().toLowerCase();
+  let filtrados = todos;
+  if (filterNivel) filtrados = filtrados.filter((c) => c.nivel === filterNivel);
+  if (qLower) {
+    filtrados = filtrados.filter(
+      (c) => (c.nome ?? "").toLowerCase().includes(qLower) || (c.cpfCnpj ?? "").toLowerCase().includes(qLower)
+    );
+  }
+  // Maior gasto primeiro dentro de cada nível já filtrado -- ordem que
+  // mais importa pra achar rápido quem vale mais dentro do recorte.
+  filtrados = [...filtrados].sort((a, b) => b.gastoAcumulado - a.gastoAcumulado);
+
+  const total = filtrados.length;
+  const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
+  const pageClamped = Math.min(page, totalPages);
+  const pageItems = filtrados.slice((pageClamped - 1) * LIST_PAGE_SIZE, pageClamped * LIST_PAGE_SIZE);
+
+  return (
+    <>
+      <p className="text-xs -mt-4" style={{ color: "var(--text-muted)" }}>
+        {todos.length} clientes com pelo menos um pedido no Protheus (compra, devolução ou ambos).
+      </p>
+
+      <div className="grid sm:grid-cols-5 gap-4">
+        {CLIENTE_NIVEIS.map((n) => (
+          <Link
+            key={n}
+            href={buildHref({ view: "nivel", q, nivel: filterNivel === n ? undefined : n })}
+            className="rounded-xl border p-4 flex flex-col gap-1"
+            style={{
+              background: "var(--surface-1)",
+              borderColor: filterNivel === n ? CLIENTE_NIVEL_COLORS[n] : "var(--border)",
+              borderTopWidth: 3,
+              borderTopColor: CLIENTE_NIVEL_COLORS[n],
+            }}
+          >
+            <span className="text-2xl font-bold" style={{ color: CLIENTE_NIVEL_COLORS[n] }}>
+              {porNivel.get(n) ?? 0}
+            </span>
+            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              {CLIENTE_NIVEL_LABELS[n]}
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap">
+        <input type="hidden" name="view" value="nivel" />
+        {filterNivel ? <input type="hidden" name="nivel" value={filterNivel} /> : null}
+        <input
+          type="search"
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Buscar por nome ou CPF/CNPJ…"
+          className="text-sm flex-1 min-w-[220px] rounded border px-3 py-2"
+          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+        />
+        <button type="submit" className="text-sm px-4 py-2 rounded font-medium" style={{ background: "var(--brand-orange)", color: "#fff" }}>
+          Buscar
+        </button>
+        {q || filterNivel ? (
+          <Link href={buildHref({ view: "nivel" })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            Limpar
+          </Link>
+        ) : null}
+      </form>
+
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        {total} cliente{total === 1 ? "" : "s"} encontrado{total === 1 ? "" : "s"}
+        {totalPages > 1 ? ` · página ${pageClamped} de ${totalPages}` : ""}
+      </p>
+
+      {pageItems.length === 0 ? (
+        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Nenhum cliente encontrado.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Nome</th>
+                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Nível</th>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Compras</th>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Gasto acumulado</th>
+                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Cliente desde</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                {pageItems.map((c: ClienteNivelInfo) => (
+                  <tr key={c.clientId}>
+                    <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
+                      {c.nome ?? c.clientId}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
+                        style={{ color: CLIENTE_NIVEL_COLORS[c.nivel], borderColor: CLIENTE_NIVEL_COLORS[c.nivel] }}
+                      >
+                        {CLIENTE_NIVEL_LABELS[c.nivel]}
+                      </span>
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {c.compras}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {formatBRL(c.gastoAcumulado)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {formatDateOnly(c.primeiraCompra)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {totalPages > 1 ? (
+        <div className="flex items-center gap-2">
+          <Link
+            href={buildHref({ view: "nivel", q, nivel: filterNivel, page: Math.max(1, pageClamped - 1) })}
+            aria-disabled={pageClamped <= 1}
+            className="text-sm px-3 py-1.5 rounded border"
+            style={{
+              borderColor: "var(--border)",
+              color: pageClamped <= 1 ? "var(--text-muted)" : "var(--text-primary)",
+              pointerEvents: pageClamped <= 1 ? "none" : undefined,
+            }}
+          >
+            ← Anterior
+          </Link>
+          <Link
+            href={buildHref({ view: "nivel", q, nivel: filterNivel, page: Math.min(totalPages, pageClamped + 1) })}
+            aria-disabled={pageClamped >= totalPages}
+            className="text-sm px-3 py-1.5 rounded border"
+            style={{
+              borderColor: "var(--border)",
+              color: pageClamped >= totalPages ? "var(--text-muted)" : "var(--text-primary)",
+              pointerEvents: pageClamped >= totalPages ? "none" : undefined,
+            }}
+          >
+            Próxima →
+          </Link>
+        </div>
+      ) : null}
+    </>
   );
 }
