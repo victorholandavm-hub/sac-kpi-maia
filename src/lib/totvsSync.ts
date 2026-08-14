@@ -53,9 +53,17 @@ const DELIVERY_PAGE_CAP = 40;
 const DELIVERIES_TIME_BUDGET_MS = 120_000;
 
 // Cópia de RESOLVIDO_LABELS (src/lib/entregasRisco.ts) -- ver nota lá sobre
-// por que este arquivo não importa daquele. Usado só pra decidir quais
-// pedidos vale a pena re-sincronizar com prioridade abaixo.
+// por que este arquivo não importa daquele. Usado tanto pra decidir quais
+// pedidos vale a pena re-sincronizar com prioridade (syncStaleDeliveries)
+// quanto pra guarda de detectDeliveryRiskTrigger (nunca reabre risco de
+// pedido já entregue por outra carga).
 const DELIVERY_RESOLVIDO_LABELS = ["Entregue", "Entregue Parcial"];
+
+// Cópia de PEDIDO_ENCERRADO_LABELS (src/lib/entregasRisco.ts) -- venda
+// cancelada nunca vai bater "Entregue", então sem isso syncStaleDeliveries
+// ficava re-sincronizando pedido cancelado pra sempre (nunca "resolve"),
+// disputando orçamento de tempo/chamadas com pedido genuinamente pendente.
+const DELIVERY_ENCERRADO_LABELS = [...DELIVERY_RESOLVIDO_LABELS, "Cancelada"];
 
 // O full-scan sequencial de syncDeliveries só revisita um pedido já
 // sincronizado quando o cursor dá a volta inteira nas páginas -- com bastante
@@ -931,7 +939,7 @@ async function syncStaleDeliveries(supabase: SupabaseAdmin): Promise<SyncResult>
   }
 
   const candidates = ((rows ?? []) as StaleDeliveryCandidate[]).filter(
-    (r) => !DELIVERY_RESOLVIDO_LABELS.includes(r.status_atual ?? "")
+    (r) => !DELIVERY_ENCERRADO_LABELS.includes(r.status_atual ?? "")
   );
   const documents = [...new Set(candidates.map((r) => r.client_cpf_cnpj).filter((v): v is string => !!v))].slice(
     0,

@@ -19,6 +19,18 @@ const CARGA_ABERTA_LABELS = ["Programada", "Faturada", "Liberada", "Em Rota"];
 // módulo puxaria addBusinessDays/supabaseAdmin sem extensão junto e quebraria
 // o script. Se este array mudar, atualizar os dois lugares.
 export const RESOLVIDO_LABELS = ["Entregue", "Entregue Parcial"];
+
+// "Cancelada" no status_atual do PEDIDO (não da carga) é a venda cancelada
+// por inteiro -- não é "atraso na entrega", é "não vai ter entrega
+// nenhuma". Achado real em produção 14/08/2026: 546 dos 707 pedidos em
+// "alerta" (77%!) eram vendas canceladas -- nunca vão bater "Entregue"
+// (RESOLVIDO_LABELS), então ficavam marcadas como risco pra sempre.
+// Separado de RESOLVIDO_LABELS de propósito: "resolvido" continua
+// significando só "entregue" nos outros usos deste arquivo (ex.:
+// pedidoJaEntregue, que olha status da CARGA, não do pedido) -- esse
+// array aqui é só pro filtro inicial de "vale a pena nem considerar pra
+// risco".
+const PEDIDO_ENCERRADO_LABELS = [...RESOLVIDO_LABELS, "Cancelada"];
 const PRAZO_DIAS_UTEIS = 5;
 
 export type EntregaRiscoCarga = {
@@ -246,7 +258,7 @@ export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
 
   const deliveryRows = await fetchAllDeliveryRows(admin);
 
-  const deliveries = deliveryRows.filter((d) => !RESOLVIDO_LABELS.includes(d.status_atual ?? ""));
+  const deliveries = deliveryRows.filter((d) => !PEDIDO_ENCERRADO_LABELS.includes(d.status_atual ?? ""));
   if (deliveries.length === 0) return [];
 
   const invoices = [
