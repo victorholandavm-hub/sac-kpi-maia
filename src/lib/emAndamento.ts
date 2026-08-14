@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { fetchInBatches } from "./supabaseBatch";
 
 export type EmAndamentoRow = {
   conversationId: string;
@@ -59,25 +60,25 @@ export async function getEmAndamentoList(): Promise<EmAndamentoRow[]> {
   const emAndamento = [...latestByConversation.values()].filter((r) => r.tag === "status-andamento");
   if (emAndamento.length === 0) return [];
 
+  // Ver supabaseBatch.ts: `.in()` com lista grande estoura o limite de
+  // cabeçalho HTTP da requisição (HeadersOverflowError, bug real em
+  // produção 14/08/2026) -- busca em lotes em vez de uma lista só.
   const conversationIds = emAndamento.map((r) => r.conversation_id);
-  const { data: ticketRows, error: ticketError } = await supabase
-    .from("v_ticket_enriched")
-    .select("conversation_id, ghl_conversation_id, contact_id, store_tag, category, agent_name, channel, urgency")
-    .in("conversation_id", conversationIds);
-  if (ticketError) throw ticketError;
-
-  const ticketByConversation = new Map<string, TicketInfoRow>(
-    ((ticketRows ?? []) as TicketInfoRow[]).map((r) => [r.conversation_id, r])
+  const ticketRows = await fetchInBatches<TicketInfoRow>(conversationIds, (batch) =>
+    supabase
+      .from("v_ticket_enriched")
+      .select("conversation_id, ghl_conversation_id, contact_id, store_tag, category, agent_name, channel, urgency")
+      .in("conversation_id", batch)
   );
 
-  const contactIds = [...new Set([...ticketByConversation.values()].map((r) => r.contact_id))];
-  const { data: contactRows, error: contactError } =
-    contactIds.length > 0
-      ? await supabase.from("contacts").select("id, name, phone").in("id", contactIds)
-      : { data: [] as ContactRow[], error: null };
-  if (contactError) throw contactError;
+  const ticketByConversation = new Map<string, TicketInfoRow>(ticketRows.map((r) => [r.conversation_id, r]));
 
-  const contactById = new Map<string, ContactRow>(((contactRows ?? []) as ContactRow[]).map((r) => [r.id, r]));
+  const contactIds = [...new Set([...ticketByConversation.values()].map((r) => r.contact_id))];
+  const contactRows = await fetchInBatches<ContactRow>(contactIds, (batch) =>
+    supabase.from("contacts").select("id, name, phone").in("id", batch)
+  );
+
+  const contactById = new Map<string, ContactRow>(contactRows.map((r) => [r.id, r]));
 
   const now = Date.now();
   const result: EmAndamentoRow[] = [];
