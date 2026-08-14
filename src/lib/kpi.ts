@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import type { DateRange } from "./dateRange";
+import { fetchInBatches } from "./supabaseBatch";
 
 export type TicketRow = {
   conversation_id: string;
@@ -842,15 +843,9 @@ function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => s
     .sort((a, b) => b.total - a.total);
 }
 
-// PostgREST manda o `.in("col", ids)` inteiro na URL da requisição -- com
-// muitos IDs (UUID = 36 chars cada), a URL passa fácil dos ~16KB de limite
-// de cabeçalho HTTP, e a chamada quebra com HeadersOverflowError (erro real
-// em produção 14/08/2026: lista de contatos de "problema mais comum" por
-// loja/categoria/agente cresceu o bastante pra estourar isso, derrubando a
-// tela de KPIs inteira). Faz em lotes pequenos o bastante pra nunca chegar
-// perto do limite, em paralelo.
-const CONTACT_IDS_BATCH_SIZE = 200;
-
+// Lista de contatos de "problema mais comum" por loja/categoria/agente
+// pode ficar grande -- ver supabaseBatch.ts pro motivo (HeadersOverflowError,
+// bug real em produção 14/08/2026 que derrubou a tela de KPIs inteira).
 async function fetchContactsByIds(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   ids: string[]
@@ -858,19 +853,11 @@ async function fetchContactsByIds(
   const result = new Map<string, { name: string | null; phone: string | null }>();
   if (ids.length === 0) return result;
 
-  const batches: string[][] = [];
-  for (let i = 0; i < ids.length; i += CONTACT_IDS_BATCH_SIZE) {
-    batches.push(ids.slice(i, i + CONTACT_IDS_BATCH_SIZE));
-  }
-
-  const batchResults = await Promise.all(
-    batches.map((batch) => supabase.from("contacts").select("id, name, phone").in("id", batch))
+  const contactRows = await fetchInBatches<{ id: string; name: string | null; phone: string | null }>(ids, (batch) =>
+    supabase.from("contacts").select("id, name, phone").in("id", batch)
   );
-  for (const { data, error } of batchResults) {
-    if (error) throw error;
-    for (const c of data ?? []) {
-      result.set(c.id as string, { name: c.name as string | null, phone: c.phone as string | null });
-    }
+  for (const c of contactRows) {
+    result.set(c.id, { name: c.name, phone: c.phone });
   }
   return result;
 }
