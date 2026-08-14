@@ -200,6 +200,18 @@ export const MANOEL_ONLY_ASSEMBLER = "Manoel";
 // consegue, por pedido explícito do Victor (dono do sistema).
 export const PAYMENTS_CONTROLLER_NAME = "Antonio";
 
+// Lojas com montador próprio (Mamanguape/214, Campina Grande/216 -- ver
+// listOwnStoreAssemblers em payments.ts). Montagem/desmontagem/vistoria
+// dessas lojas é responsabilidade exclusiva delas: só a própria loja e os
+// admins (papel admin + Antonio, ver canSeeOwnAssemblerStoreRequests em
+// dal.ts) devem ver esses chamados -- nem outras lojas, nem o resto da
+// assistência central enxergam. Pedido do Victor, 14/08/2026.
+// Recolhimento/troca de peça/envio de peça ficam de fora -- continuam
+// sendo atendimento central (ver MANOEL_ONLY_TYPES), não passam pelo
+// montador da loja.
+export const OWN_ASSEMBLER_STORE_IDS = ["214", "216"] as const;
+export const OWN_ASSEMBLER_RESTRICTED_TYPES = ["montagem", "desmontagem", "vistoria"] as const;
+
 export const SUPPLIER_RETURN_STATUS_LABELS: Record<string, string> = {
   aguardando_envio: "Aguardando envio",
   enviado: "Enviado ao fornecedor",

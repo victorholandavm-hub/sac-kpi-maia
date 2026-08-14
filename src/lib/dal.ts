@@ -2,7 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getSupabaseServer } from "./supabaseServer";
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { SAC_MANAGED_TYPES, ASSISTENCIA_MANAGED_TYPES } from "./assistenciaLabels";
+import { SAC_MANAGED_TYPES, ASSISTENCIA_MANAGED_TYPES, PAYMENTS_CONTROLLER_NAME } from "./assistenciaLabels";
 
 export type Role = "assistencia" | "admin" | "sac";
 
@@ -69,6 +69,15 @@ export function requireManageAccess(profile: Profile, requestType: string) {
   if (profile.role === "assistencia" && (ASSISTENCIA_MANAGED_TYPES as readonly string[]).includes(requestType)) return;
   if (profile.role === "sac" && (SAC_MANAGED_TYPES as readonly string[]).includes(requestType)) return;
   throw new Error(`Ação não permitida para o papel "${profile.role}" nesse chamado.`);
+}
+
+// Montagem/desmontagem/vistoria das lojas com montador próprio (ver
+// OWN_ASSEMBLER_STORE_IDS) é assunto da própria loja -- só admin e o
+// Antonio (por nome, mesma regra de PAYMENTS_CONTROLLER_NAME) têm
+// visibilidade central sobre esses chamados. O resto da equipe de
+// assistência/SAC vê a fila normalmente, só sem essas duas lojas.
+export function canSeeOwnAssemblerStoreRequests(profile: Profile): boolean {
+  return profile.role === "admin" || profile.fullName === PAYMENTS_CONTROLLER_NAME;
 }
 
 // Regras de transição de status do pedido de encomenda (ver

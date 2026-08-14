@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { getProfile, redirectIfSac } from "@/lib/dal";
+import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
 import { listAssemblers } from "@/lib/payments";
-import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, STATUS_COLORS } from "@/lib/assistenciaLabels";
+import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
@@ -108,8 +108,14 @@ export default async function AssistenciaQueuePage({
   // filtra por um campo que essas linhas nunca preenchem e a lista some
   // inteira sem nenhuma explicação.
   const effectiveAssembler = showPecas ? undefined : assembler;
+  // Montagem/desmontagem/vistoria de Mamanguape/Campina Grande (lojas com
+  // montador próprio) só aparece pra admin e Antonio -- resto da equipe de
+  // assistência vê a fila normalmente, só sem essas duas (ver
+  // OWN_ASSEMBLER_STORE_IDS). Sem efeito na aba "Entregas", que nunca tem
+  // esses tipos.
+  const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const [{ items: requests, total, pageSize }, stores, assemblers] = await Promise.all([
-    listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: effectiveAssembler, types, dateFrom, dateTo }),
+    listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: effectiveAssembler, types, dateFrom, dateTo, excludeOwnAssemblerStoreIds }),
     listStores(),
     listAssemblers(),
   ]);

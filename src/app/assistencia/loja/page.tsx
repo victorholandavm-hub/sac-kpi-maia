@@ -11,7 +11,7 @@ import { LojaGerenteRatingPrompt } from "@/components/assistencia/LojaGerenteRat
 import { getLojaStorePreference } from "@/app/assistencia/actions";
 import { getLojaGerenteSession, lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
-import { REQUEST_TYPE_LABELS, STATUS_LABELS, ASSISTENCIA_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, STATUS_LABELS, ASSISTENCIA_MANAGED_TYPES, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
@@ -89,10 +89,27 @@ export default async function LojaHomePage({
   const storeId = storePref ?? "";
   const showCompleted = view === "concluidas";
 
-  const [requests, stores, gerenteStoreIds, montagemQueueIds] = await Promise.all([
-    listOpenRequestsForLoja({ storeId: storeId || undefined, types: ASSISTENCIA_MANAGED_TYPES, onlyCompleted: showCompleted }),
-    listStores(),
-    getGerenteStoreIds(gerenteName),
+  const [stores, gerenteStoreIds] = await Promise.all([listStores(), getGerenteStoreIds(gerenteName)]);
+
+  // Gerente de loja com montador próprio (Mamanguape/Campina Grande) só
+  // enxerga a própria loja pra montagem/desmontagem/vistoria -- nunca
+  // "todas as lojas" nem outra loja qualquer pra esses 3 tipos, mesmo
+  // trocando o parâmetro na URL. Gerente comum simplesmente não vê essas
+  // duas lojas nesses 3 tipos (ver OWN_ASSEMBLER_STORE_IDS/
+  // OWN_ASSEMBLER_RESTRICTED_TYPES). Recolhimento/troca de peça/envio de
+  // peça continuam cross-loja como sempre, pra todo mundo.
+  const ownsRestrictedStore = gerenteStoreIds.some((id) => (OWN_ASSEMBLER_STORE_IDS as readonly string[]).includes(id));
+  const excludeOwnAssemblerStoreIds = ownsRestrictedStore
+    ? stores.map((s) => s.id).filter((id) => !gerenteStoreIds.includes(id))
+    : [...OWN_ASSEMBLER_STORE_IDS];
+
+  const [requests, montagemQueueIds] = await Promise.all([
+    listOpenRequestsForLoja({
+      storeId: storeId || undefined,
+      types: ASSISTENCIA_MANAGED_TYPES,
+      onlyCompleted: showCompleted,
+      excludeOwnAssemblerStoreIds,
+    }),
     showCompleted ? Promise.resolve([]) : listOpenMontagemQueueIds(),
   ]);
 
