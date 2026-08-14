@@ -96,4 +96,30 @@ describe("detectDeliveryRiskTrigger", () => {
     const incoming: { carga: string; tentativa?: number; statusEntrega?: string }[] = [];
     expect(detectDeliveryRiskTrigger(existing, incoming)?.reason).toMatch(/não aparece mais/i);
   });
+
+  // Bug real em produção, achado 14/08/2026: pedido com uma carga já
+  // entregue e OUTRA carga cancelada/retirada depois (duplicada/
+  // administrativa) ficava preso em "alerta" pra sempre em
+  // listEntregasEmRisco, porque o gatilho não considerava que o pedido já
+  // tinha sido resolvido por outra carga.
+  it("carga cancelada, mas outra carga do pedido já foi entregue -> sem gatilho", () => {
+    const existing = [
+      { carga: "C1", tentativa: 1, status_entrega: "Entregue" },
+      { carga: "C2", tentativa: 2, status_entrega: "Programada" },
+    ];
+    const incoming = [
+      { carga: "C1", tentativa: 1, statusEntrega: "Entregue" },
+      { carga: "C2", tentativa: 2, statusEntrega: "Cancelada" },
+    ];
+    expect(detectDeliveryRiskTrigger(existing, incoming)).toBeNull();
+  });
+
+  it("carga some do payload, mas outra carga do pedido já foi entregue -> sem gatilho", () => {
+    const existing = [
+      { carga: "C1", tentativa: 1, status_entrega: "Entregue" },
+      { carga: "C2", tentativa: 2, status_entrega: "Programada" },
+    ];
+    const incoming = [{ carga: "C1", tentativa: 1, statusEntrega: "Entregue" }];
+    expect(detectDeliveryRiskTrigger(existing, incoming)).toBeNull();
+  });
 });
