@@ -5,6 +5,12 @@ import { setArsenalEntryActiveAction } from "@/app/assistencia/arsenal-actions";
 import { useQuickAction } from "./useQuickAction";
 import { ArsenalEntryForm } from "./ArsenalEntryForm";
 import type { ArsenalEntry } from "@/lib/arsenalSac";
+import { ARSENAL_CATEGORY_COLORS, ARSENAL_HIGHLIGHT_LABELS, ARSENAL_HIGHLIGHT_COLORS } from "@/lib/assistenciaLabels";
+
+const HIGHLIGHT_ICONS: Record<string, string> = {
+  regra_ouro: "★",
+  atencao: "⚠",
+};
 
 export function ArsenalEntryCard({ entry, canEdit }: { entry: ArsenalEntry; canEdit: boolean }) {
   const { pending, run } = useQuickAction();
@@ -21,17 +27,41 @@ export function ArsenalEntryCard({ entry, canEdit }: { entry: ArsenalEntry; canE
         .filter(Boolean)
     : [];
 
+  // Card normal só ganha um traço fino da cor da categoria; 'regra_ouro' e
+  // 'atencao' viram caixa de alerta de verdade (fundo tingido, borda grossa)
+  // -- é o pedido do Victor de dar "cara" pras regras rígidas em vez delas
+  // se perderem no meio do texto (ex.: "nunca deixar dois produtos na casa
+  // do cliente").
+  const categoryColor = ARSENAL_CATEGORY_COLORS[entry.category] ?? "var(--brand-green)";
+  const highlightColor = ARSENAL_HIGHLIGHT_COLORS[entry.highlightType];
+  const isHighlighted = entry.active && !!highlightColor;
+
   return (
     <div
       className="rounded-lg border p-4 flex flex-col gap-2"
       style={{
-        background: "var(--surface-1)",
-        borderColor: "var(--border)",
-        borderLeft: `3px solid ${entry.active ? "color-mix(in srgb, var(--brand-green) 45%, transparent)" : "var(--border)"}`,
+        background: isHighlighted ? `color-mix(in srgb, ${highlightColor} 10%, var(--surface-1))` : "var(--surface-1)",
+        borderColor: isHighlighted ? `color-mix(in srgb, ${highlightColor} 40%, transparent)` : "var(--border)",
+        borderLeft: `${isHighlighted ? 4 : 3}px solid ${
+          isHighlighted
+            ? highlightColor
+            : entry.active
+              ? `color-mix(in srgb, ${categoryColor} 55%, transparent)`
+              : "var(--border)"
+        }`,
       }}
     >
+      {isHighlighted ? (
+        <span className="text-xs font-bold uppercase tracking-wide flex items-center gap-1" style={{ color: highlightColor }}>
+          <span aria-hidden>{HIGHLIGHT_ICONS[entry.highlightType]}</span>
+          {ARSENAL_HIGHLIGHT_LABELS[entry.highlightType]}
+        </span>
+      ) : null}
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-base font-bold leading-snug" style={{ color: entry.active ? "var(--brand-green)" : "var(--text-muted)" }}>
+        <h3
+          className="text-base font-bold leading-snug"
+          style={{ color: !entry.active ? "var(--text-muted)" : isHighlighted ? highlightColor : categoryColor }}
+        >
           {entry.title}
           {!entry.active ? (
             <span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>

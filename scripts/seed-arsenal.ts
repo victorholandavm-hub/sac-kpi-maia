@@ -11,8 +11,8 @@
 //
 // Idempotente: upsert por slug (categoria+título normalizados, ver
 // buildArsenalSlug). Rodar de novo com o array atualizado sobrescreve
-// título/corpo/keywords das entradas já existentes e cria só as novas --
-// não duplica.
+// título/corpo/keywords/highlight_type das entradas já existentes e cria só
+// as novas -- não duplica.
 //
 // `active` é DELIBERADAMENTE omitido do payload de upsert: se incluíssemos
 // `active: true` aqui, reimportar o documento reativaria sem querer uma
@@ -21,13 +21,14 @@
 // não toca no valor de active em linhas já existentes.
 
 import { getSupabaseAdmin } from "../src/lib/supabaseAdmin.ts";
-import { buildArsenalSlug, type ArsenalCategory } from "../src/lib/arsenalSac.ts";
+import { buildArsenalSlug, type ArsenalCategory, type ArsenalHighlightType } from "../src/lib/arsenalSac.ts";
 
 type SeedEntry = {
   category: ArsenalCategory;
   title: string;
   body: string;
   keywords?: string;
+  highlightType?: ArsenalHighlightType;
 };
 
 const ENTRIES: SeedEntry[] = [
@@ -456,25 +457,82 @@ const ENTRIES: SeedEntry[] = [
   // ---- Processos de atendimento --------------------------------------------
   {
     category: "processos",
+    title: "Rotina diária de triagem no CRM",
+    body:
+      "Todo dia, filtrar no CRM os clientes com status \"andamento\".\n" +
+      "Contato novo é tageado automaticamente e recebe resposta automática pedindo CPF e assunto.\n" +
+      "Com o CPF em mãos, consultar o Protheus (por código do cliente, nome completo ou CPF) pra ver produto " +
+      "comprado, status de entrega e prazo.\n" +
+      "Tagear o chamado com loja, tipo de problema e setor que errou, de acordo com o caso — as tags já estão " +
+      "cadastradas no CRM, é só usar a que se encaixa.\n" +
+      "Depois que o problema for resolvido, marcar o caso com a tag status-resolvido.",
+    keywords: "crm, rotina, tag, cpf, protheus, triagem, andamento, status-resolvido, tags de loja, setor que errou",
+  },
+  {
+    category: "processos",
     title: "Princípios de atendimento (regras de ouro)",
     body:
       "O cliente nunca fica sem resposta. A última fala é sempre nossa.\n" +
       "Estar perto do horário de saída não é motivo para deixar o problema sem solução — o cliente precisa sair " +
       "da conversa com pelo menos uma resposta conclusiva sobre a demanda dele.\n" +
+      "Nunca passar o contato de outro setor (loja ou assistência) para o cliente — é o contrário: passa-se o " +
+      "contato do cliente para o outro setor.\n" +
       "Encaminhou uma demanda para outro setor? Acompanhe até se certificar de que o cliente foi atendido " +
       "devidamente e que não cabe mais nenhuma ação da sua parte.\n" +
+      "Caso parado sem solução: escalar de forma proativa, sem esperar o cliente ameaçar Procon/Reclame Aqui — a " +
+      "regra é se antecipar, não esperar.\n" +
       "Não existe \"cliente meu\" ou \"cliente seu\" — todos os clientes são nossos. Um caso encaminhado continua " +
       "sendo responsabilidade de todos até ser resolvido.",
-    keywords: "regras de ouro, principio, postura, atendimento, resposta, acompanhar",
+    keywords: "regras de ouro, principio, postura, atendimento, resposta, acompanhar, escalar, contato de outro setor",
+    highlightType: "regra_ouro",
+  },
+  {
+    category: "processos",
+    title: "Loja × CD: quem resolve a troca",
+    body:
+      "Cliente retirou o produto na loja: a loja resolve a troca.\n" +
+      "Cliente recebeu o produto por entrega do CD: o SAC resolve a troca.",
+    keywords: "loja, cd, quem resolve, entrega, retirada",
+  },
+  {
+    category: "processos",
+    title: "Logística na troca física do produto",
+    body:
+      "Nunca deixar o produto errado ou avariado na casa do cliente — sempre é preciso recolher.\n" +
+      "Se não for possível recolher o produto antigo, não se entrega o novo.\n" +
+      "Nunca pode haver dois produtos (o velho e o novo) na casa do cliente ao mesmo tempo.",
+    keywords: "logistica, recolher, avariado, dois produtos, entrega, troca fisica",
+    highlightType: "atencao",
   },
   {
     category: "processos",
     title: "Fluxo: produto chegou com peças avariadas na casa do cliente",
     body:
       "1º passo: acionar a equipe de assistência para avaliar o caso.\n" +
-      "Se o problema for só de peça(s): a demanda segue para a assistência técnica (reposição de peça).\n" +
-      "Se o problema for do produto completo: o SAC faz a notificação de troca e encaminha para a troca do produto.",
-    keywords: "peca avariada, avaria, produto danificado, assistencia tecnica, reposicao, troca",
+      "Produto com montagem: o problema de peça avariada vai para a assistência técnica trocar só a peça.\n" +
+      "Produto sem montagem: o SAC troca o produto completo direto, de acordo com a disponibilidade do produto e " +
+      "a rota de entrega.\n" +
+      "Quando for realmente o produto completo que precisa trocar (não só a peça): o SAC faz a notificação de " +
+      "troca (ver \"Notificação de troca — campos obrigatórios\") e encaminha para a troca do produto.",
+    keywords: "peca avariada, avaria, produto danificado, assistencia tecnica, reposicao, troca, montagem",
+  },
+  {
+    category: "processos",
+    title: "Notificação de troca — campos obrigatórios",
+    body:
+      "Ao abrir a notificação de troca no Sistema Integrado, preencher: nome do cliente, endereço, bairro, " +
+      "telefone, código do cliente, CPF do cliente, loja, motivo, produto, código do produto, NF completa e " +
+      "observações.",
+    keywords: "notificacao de troca, sistema integrado, campos obrigatorios, checklist",
+  },
+  {
+    category: "processos",
+    title: "Fluxo: erro de faturamento e pós-venda por escolha do cliente",
+    body:
+      "Erro de faturamento: encaminhar direto para a loja resolver.\n" +
+      "Se o cliente quiser trocar por outro produto por escolha própria (não por defeito), a loja também faz o " +
+      "pós-venda — ver \"Fluxo: troca de produto por pedido do cliente\".",
+    keywords: "erro de faturamento, alcada da loja, pos-venda, faturamento",
   },
   {
     category: "processos",
@@ -489,8 +547,13 @@ const ENTRIES: SeedEntry[] = [
   {
     category: "processos",
     title: "Fluxo: estorno",
-    body: "Estorno é sempre tratado apenas com a loja — nunca diretamente pelo SAC ou pela assistência técnica.",
-    keywords: "estorno, reembolso, devolucao de valor, cancelamento",
+    body:
+      "Estorno é sempre tratado apenas com a loja — nunca diretamente pelo SAC ou pela assistência técnica: a " +
+      "loja solicita e o financeiro executa o estorno.\n" +
+      "Vale também pra compra feita pelo site: o site é sempre venda da loja Maia Shopping, o CD nunca faz venda " +
+      "direta — então o estorno de uma compra do site passa pela loja Maia Shopping do mesmo jeito.",
+    keywords: "estorno, reembolso, devolucao de valor, cancelamento, site, shopping",
+    highlightType: "regra_ouro",
   },
 
   // ---- Prazos de garantia (genéricos por tipo de produto) ------------------
@@ -500,7 +563,7 @@ const ENTRIES: SeedEntry[] = [
     body:
       "Tecido — prazo padrão 90 dias (3 meses): cobre furos, rasgos, tramas soltas de origem, descolamento do " +
       "pillow top.\n" +
-      "Espuma — prazo padrão 1 ano: cobre deformação permanente (cedeu, geralmente acima de 3 cm), esfarelamento, " +
+      "Espuma — prazo padrão 1 ano: cobre deformação permanente (cedeu, geralmente entre 2 e 3 cm), esfarelamento, " +
       "perda rápida de resiliência.\n" +
       "Molas / Molejo — prazo padrão 1 a 5 anos (varia por fabricante): cobre molas quebradas/tortas, defeito na " +
       "estrutura do molejo.\n" +
@@ -521,10 +584,12 @@ const ENTRIES: SeedEntry[] = [
     category: "garantias",
     title: "Garantia de sofás",
     body:
+      "Segue o mesmo critério do colchão, por componente: estrutura de madeira (mesmo prazo de móveis — 90 dias " +
+      "pra notificar avarias/vícios), espuma do assento (mesmo prazo da espuma de colchão — 1 ano) e mecanismo " +
+      "retrátil (mesmo prazo da espuma de colchão — 1 ano).\n" +
       "A planilha de devoluções de sofás registra ocorrências da marca Conceito (barulho na madeira do assento, " +
       "encaixe macho/fêmea, retrátil travando) — hoje tratada como fábrica própria (Conceito Estofados, contato " +
-      "João Maia). Recomenda-se formalizar prazos de garantia por componente de sofá (estrutura de madeira, " +
-      "espuma do assento, mecanismo retrátil) do mesmo jeito que foi feito para colchão.",
+      "João Maia).",
     keywords: "garantia sofa, conceito, retratil, estrutura, madeira, assento",
   },
 
@@ -607,6 +672,7 @@ async function main() {
     title: e.title,
     body: e.body,
     keywords: e.keywords ?? null,
+    highlight_type: e.highlightType ?? "normal",
   }));
 
   const { error, count } = await supabase.from("arsenal_sac_entries").upsert(rows, { onConflict: "slug", count: "exact" });

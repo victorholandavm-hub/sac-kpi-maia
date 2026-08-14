@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { createArsenalEntryAction, updateArsenalEntryAction } from "@/app/assistencia/arsenal-actions";
 import { useQuickAction } from "./useQuickAction";
-import { ARSENAL_CATEGORIES, type ArsenalCategory, type ArsenalEntry } from "@/lib/arsenalSac";
-import { ARSENAL_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
+import { ARSENAL_CATEGORIES, ARSENAL_HIGHLIGHT_TYPES, type ArsenalCategory, type ArsenalEntry, type ArsenalHighlightType } from "@/lib/arsenalSac";
+import { ARSENAL_CATEGORY_LABELS, ARSENAL_HIGHLIGHT_LABELS } from "@/lib/assistenciaLabels";
 
 const EMPTY_CATEGORY = ARSENAL_CATEGORIES[0];
 
@@ -14,9 +14,10 @@ export function ArsenalEntryForm({ entry, onCancel }: { entry?: ArsenalEntry; on
   const [title, setTitle] = useState(entry?.title ?? "");
   const [body, setBody] = useState(entry?.body ?? "");
   const [keywords, setKeywords] = useState(entry?.keywords ?? "");
+  const [highlightType, setHighlightType] = useState<ArsenalHighlightType>(entry?.highlightType ?? "normal");
 
   function submit() {
-    const input = { category, title, body, keywords: keywords.trim() || null };
+    const input = { category, title, body, keywords: keywords.trim() || null, highlightType };
     run(async () => {
       if (entry) {
         await updateArsenalEntryAction(entry.id, input);
@@ -27,6 +28,7 @@ export function ArsenalEntryForm({ entry, onCancel }: { entry?: ArsenalEntry; on
         setTitle("");
         setBody("");
         setKeywords("");
+        setHighlightType("normal");
       }
     }, entry ? "Entrada atualizada." : "Entrada criada.");
   }
@@ -72,6 +74,22 @@ export function ArsenalEntryForm({ entry, onCancel }: { entry?: ArsenalEntry; on
         className="rounded border px-3 py-2 text-sm"
         style={{ borderColor: "var(--border)" }}
       />
+      <label className="flex flex-col gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+        Destaque
+        <select
+          value={highlightType}
+          onChange={(e) => setHighlightType(e.target.value as ArsenalHighlightType)}
+          className="rounded border px-3 py-2 text-sm"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <option value="normal">Nenhum (padrão)</option>
+          {ARSENAL_HIGHLIGHT_TYPES.filter((t) => t !== "normal").map((t) => (
+            <option key={t} value={t}>
+              {ARSENAL_HIGHLIGHT_LABELS[t]}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="flex items-center gap-2 flex-wrap">
         <button
           disabled={pending || !title.trim() || !body.trim()}
