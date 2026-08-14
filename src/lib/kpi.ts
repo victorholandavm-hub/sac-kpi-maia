@@ -842,6 +842,39 @@ function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => s
     .sort((a, b) => b.total - a.total);
 }
 
+// PostgREST manda o `.in("col", ids)` inteiro na URL da requisição -- com
+// muitos IDs (UUID = 36 chars cada), a URL passa fácil dos ~16KB de limite
+// de cabeçalho HTTP, e a chamada quebra com HeadersOverflowError (erro real
+// em produção 14/08/2026: lista de contatos de "problema mais comum" por
+// loja/categoria/agente cresceu o bastante pra estourar isso, derrubando a
+// tela de KPIs inteira). Faz em lotes pequenos o bastante pra nunca chegar
+// perto do limite, em paralelo.
+const CONTACT_IDS_BATCH_SIZE = 200;
+
+async function fetchContactsByIds(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  ids: string[]
+): Promise<Map<string, { name: string | null; phone: string | null }>> {
+  const result = new Map<string, { name: string | null; phone: string | null }>();
+  if (ids.length === 0) return result;
+
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += CONTACT_IDS_BATCH_SIZE) {
+    batches.push(ids.slice(i, i + CONTACT_IDS_BATCH_SIZE));
+  }
+
+  const batchResults = await Promise.all(
+    batches.map((batch) => supabase.from("contacts").select("id, name, phone").in("id", batch))
+  );
+  for (const { data, error } of batchResults) {
+    if (error) throw error;
+    for (const c of data ?? []) {
+      result.set(c.id as string, { name: c.name as string | null, phone: c.phone as string | null });
+    }
+  }
+  return result;
+}
+
 export async function getKpiData(
   range: DateRange,
   labelFns: {
@@ -921,15 +954,7 @@ export async function getKpiData(
     return true;
   });
   const detractorContactIds = [...new Set(detractorsInRange.map((d) => d.contactId).filter((id): id is string => !!id))];
-  let contactsById = new Map<string, { name: string | null; phone: string | null }>();
-  if (detractorContactIds.length > 0) {
-    const { data: contactRows, error: contactsError } = await supabase
-      .from("contacts")
-      .select("id, name, phone")
-      .in("id", detractorContactIds);
-    if (contactsError) throw contactsError;
-    contactsById = new Map((contactRows ?? []).map((c) => [c.id as string, { name: c.name as string | null, phone: c.phone as string | null }]));
-  }
+  const contactsById = await fetchContactsByIds(supabase, detractorContactIds);
   const npsDetractors: NpsDetractor[] = detractorsInRange
     .map((d) => ({
       conversationId: d.conversationId,
@@ -1085,14 +1110,7 @@ export async function getKpiData(
   ];
   const breakdownContactIds = [...new Set(allBreakdownTickets.map((t) => t.contactId).filter((id): id is string => !!id))];
   if (breakdownContactIds.length > 0) {
-    const { data: contactRows, error: breakdownContactsError } = await supabase
-      .from("contacts")
-      .select("id, name, phone")
-      .in("id", breakdownContactIds);
-    if (breakdownContactsError) throw breakdownContactsError;
-    const breakdownContactsById = new Map(
-      (contactRows ?? []).map((c) => [c.id as string, { name: c.name as string | null, phone: c.phone as string | null }])
-    );
+    const breakdownContactsById = await fetchContactsByIds(supabase, breakdownContactIds);
     for (const ticket of allBreakdownTickets) {
       const info = breakdownContactsById.get(ticket.contactId ?? "");
       ticket.clientName = info?.name ?? null;
