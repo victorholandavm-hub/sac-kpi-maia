@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { searchArsenalEntries, listArsenalEntries, isArsenalCategory, ARSENAL_CATEGORIES, type ArsenalEntrySearchResult } from "@/lib/arsenalSac";
-import { ARSENAL_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
+import { ARSENAL_CATEGORY_LABELS, ARSENAL_CATEGORY_COLORS } from "@/lib/assistenciaLabels";
 import { ArsenalEntryCard } from "@/components/assistencia/ArsenalEntryCard";
 import { ArsenalEntryForm } from "@/components/assistencia/ArsenalEntryForm";
 import { ArsenalCategorySection } from "@/components/assistencia/ArsenalCategorySection";
@@ -90,15 +90,16 @@ export default async function ArsenalSacPage({
         </Link>
         {ARSENAL_CATEGORIES.map((c) => {
           const active = filterCategory === c;
+          const color = ARSENAL_CATEGORY_COLORS[c];
           return (
             <Link
               key={c}
               href={buildHref({ q, category: active ? undefined : c })}
               className="text-xs px-3 py-1.5 rounded-full border font-medium whitespace-nowrap"
               style={{
-                borderColor: "var(--border)",
-                background: active ? "var(--surface-1)" : "transparent",
-                color: active ? "var(--text-primary)" : "var(--text-secondary)",
+                borderColor: active ? color : "var(--border)",
+                background: active ? `color-mix(in srgb, ${color} 14%, var(--surface-1))` : "transparent",
+                color: active ? color : "var(--text-secondary)",
                 fontWeight: active ? 600 : 400,
               }}
             >
@@ -131,6 +132,7 @@ export default async function ArsenalSacPage({
             key={g.category}
             label={ARSENAL_CATEGORY_LABELS[g.category]}
             count={g.entries.length}
+            color={ARSENAL_CATEGORY_COLORS[g.category]}
             defaultOpen={!!trimmedQ}
           >
             {g.entries.map((e) => (

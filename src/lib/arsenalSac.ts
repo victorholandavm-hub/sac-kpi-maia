@@ -14,6 +14,17 @@ export function isArsenalCategory(value: string | undefined | null): value is Ar
   return !!value && (ARSENAL_CATEGORIES as readonly string[]).includes(value);
 }
 
+// Destaque visual da entrada (ver 0079_arsenal_highlight_type.sql) --
+// 'normal' é a maioria das entradas (sem destaque nenhum); 'regra_ouro' e
+// 'atencao' viram caixa de alerta colorida na UI (ArsenalEntryCard).
+export const ARSENAL_HIGHLIGHT_TYPES = ["normal", "regra_ouro", "atencao"] as const;
+
+export type ArsenalHighlightType = (typeof ARSENAL_HIGHLIGHT_TYPES)[number];
+
+export function isArsenalHighlightType(value: string | undefined | null): value is ArsenalHighlightType {
+  return !!value && (ARSENAL_HIGHLIGHT_TYPES as readonly string[]).includes(value);
+}
+
 export type ArsenalEntry = {
   id: string;
   category: ArsenalCategory;
@@ -22,6 +33,7 @@ export type ArsenalEntry = {
   body: string;
   keywords: string | null;
   active: boolean;
+  highlightType: ArsenalHighlightType;
   createdAt: string;
   updatedAt: string;
 };
@@ -36,11 +48,12 @@ type ArsenalEntryRow = {
   body: string;
   keywords: string | null;
   active: boolean;
+  highlight_type: string;
   created_at: string;
   updated_at: string;
 };
 
-const ENTRY_COLUMNS = "id, category, slug, title, body, keywords, active, created_at, updated_at";
+const ENTRY_COLUMNS = "id, category, slug, title, body, keywords, active, highlight_type, created_at, updated_at";
 
 function toArsenalEntry(row: ArsenalEntryRow): ArsenalEntry {
   return {
@@ -51,6 +64,7 @@ function toArsenalEntry(row: ArsenalEntryRow): ArsenalEntry {
     body: row.body,
     keywords: row.keywords,
     active: row.active,
+    highlightType: isArsenalHighlightType(row.highlight_type) ? row.highlight_type : "normal",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -114,6 +128,7 @@ export type ArsenalEntryInput = {
   title: string;
   body: string;
   keywords: string | null;
+  highlightType: ArsenalHighlightType;
 };
 
 export async function createArsenalEntry(input: ArsenalEntryInput): Promise<void> {
@@ -125,6 +140,7 @@ export async function createArsenalEntry(input: ArsenalEntryInput): Promise<void
     title: input.title.trim(),
     body: input.body.trim(),
     keywords: input.keywords?.trim() || null,
+    highlight_type: input.highlightType,
   });
   if (error) throw new Error(error.message);
 }
@@ -140,6 +156,7 @@ export async function updateArsenalEntry(id: string, input: ArsenalEntryInput): 
       title: input.title.trim(),
       body: input.body.trim(),
       keywords: input.keywords?.trim() || null,
+      highlight_type: input.highlightType,
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

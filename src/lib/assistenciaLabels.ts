@@ -234,6 +234,28 @@ export const ARSENAL_CATEGORY_LABELS: Record<string, string> = {
   cdc: "Código de Defesa do Consumidor",
 };
 
+// Cor de identidade por categoria -- reaproveita a paleta categórica que já
+// existe pros gráficos (--series-1..8 em globals.css) em vez de inventar
+// tom novo, só pra dar "escaneabilidade" rápida (pill de filtro e cabeçalho
+// da seção usam a mesma cor da categoria).
+export const ARSENAL_CATEGORY_COLORS: Record<string, string> = {
+  contatos_internos: "var(--series-5)",
+  fornecedores: "var(--series-8)",
+  processos: "var(--brand-green)",
+  garantias: "var(--series-2)",
+  cdc: "var(--series-4)",
+};
+
+export const ARSENAL_HIGHLIGHT_LABELS: Record<string, string> = {
+  regra_ouro: "Regra de ouro",
+  atencao: "Atenção",
+};
+
+export const ARSENAL_HIGHLIGHT_COLORS: Record<string, string> = {
+  regra_ouro: "var(--status-warning)",
+  atencao: "var(--status-critical)",
+};
+
 // Causa raiz da troca de produto (SAC, troca_produto) -- quando é
 // "erro_cd", carga + conferente viram obrigatórios na criação (ver
 // createSacRequest e SacCreateRequestForm.tsx). Registrado à parte do
