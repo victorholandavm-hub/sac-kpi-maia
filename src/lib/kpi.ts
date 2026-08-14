@@ -284,6 +284,15 @@ function median(values: number[]): number | null {
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+// "Dúvida" é o fallback genérico do classificador (heurístico, sem IA paga
+// -- ver ticketClassification.ts) pra quando nenhum padrão de palavra-chave
+// bate. Pedido do Victor 14/08/2026: nunca deixar essa categoria vaga
+// ganhar o ranking de "problema mais comum" (nem geral, nem por loja, nem
+// da semana anterior) -- excluída SÓ dessas seleções de "qual é o
+// problema", não some do resto (ex.: coverage de categoria continua
+// contando "Dúvida" como categoria preenchida, só não como "o" problema).
+const DUVIDA_CATEGORY_TAG = "cat-duvida";
+
 function topCounts(
   rows: TicketRow[],
   key: "store_tag" | "category" | "product" | "channel" | "blocking_tag",
@@ -615,7 +624,7 @@ function buildPreviousWeekSummary(allRows: TicketRow[], now: Date): PreviousWeek
     const opened = new Date(r.opened_at).getTime();
     return opened >= from.getTime() && opened <= to.getTime();
   });
-  const topCategory = topCounts(weekRows, "category")[0] ?? null;
+  const topCategory = topCounts(weekRows.filter((r) => r.category !== DUVIDA_CATEGORY_TAG), "category")[0] ?? null;
   return {
     from: fromLabel,
     to: toLabel,
@@ -821,7 +830,7 @@ function buildStoreBreakdown(rows: TicketRow[], storeLabelFn: (tag: string) => s
     .map(([store, storeRows]) => {
       const catCounts = new Map<string, number>();
       for (const r of storeRows) {
-        if (!r.category) continue;
+        if (!r.category || r.category === DUVIDA_CATEGORY_TAG) continue;
         catCounts.set(r.category, (catCounts.get(r.category) ?? 0) + 1);
       }
       const top = [...catCounts.entries()].sort((a, b) => b[1] - a[1])[0];
@@ -1076,7 +1085,7 @@ export async function getKpiData(
 
   const recurrenceCount = rows.filter((r) => r.is_recurrence).length;
 
-  const byCategory = topCounts(rows, "category");
+  const byCategory = topCounts(rows.filter((r) => r.category !== DUVIDA_CATEGORY_TAG), "category");
   const previousWeek = buildPreviousWeekSummary(allRows, new Date());
   const escalations = buildEscalationSummary(escalationRows);
   const escalationList = [...escalationRows].sort(
