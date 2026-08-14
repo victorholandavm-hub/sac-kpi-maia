@@ -12,25 +12,14 @@
 -- histórico pra migrar.
 --
 -- O check de "causa_raiz in (...)" em 0077 foi criado sem nome (inline no
--- ADD COLUMN), então o Postgres gerou o nome sozinho -- em vez de assumir
--- qual foi, acha pelo catálogo (mesmo espírito de "add constraint if not
--- exists" que o projeto já usa via pg_constraint, ver 0072/0075/0077).
-do $$
-declare
-  old_check_name text;
-begin
-  select con.conname into old_check_name
-  from pg_constraint con
-  where con.conrelid = 'service_requests'::regclass
-    and con.contype = 'c'
-    and pg_get_constraintdef(con.oid) ilike '%causa_raiz%in%'
-  limit 1;
-
-  if old_check_name is not null then
-    execute format('alter table service_requests drop constraint %I', old_check_name);
-  end if;
-end $$;
-
+-- ADD COLUMN) -- confirmado que o Postgres usou o padrão default
+-- "{tabela}_{coluna}_check", então dropa direto por esse nome (idempotente,
+-- funciona também se essa migration já tiver sido tentada antes e falhado
+-- no meio -- foi exatamente o que aconteceu na primeira tentativa: uma
+-- busca dinâmica no catálogo não achou o texto reescrito pelo Postgres
+-- ("IN (...)" vira "= ANY (ARRAY[...])" internamente) e a criação da
+-- constraint nova colidiu de nome com a antiga).
+alter table service_requests drop constraint if exists service_requests_causa_raiz_check;
 alter table service_requests add constraint service_requests_causa_raiz_check
   check (causa_raiz is null or causa_raiz in (
     'erro_conferencia', 'erro_motorista', 'erro_loja', 'erro_vendedor', 'erro_sac',
