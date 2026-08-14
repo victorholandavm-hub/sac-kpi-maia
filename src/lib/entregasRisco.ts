@@ -202,16 +202,38 @@ function toEntregaRiscoCarga(row: DeliveryCargaRow): EntregaRiscoCarga {
   };
 }
 
+// PostgREST devolve no máximo 1000 linhas por padrão, mesmo sem `.limit()`
+// pedir isso -- sem paginar de verdade, essa consulta ficava truncada
+// silenciosamente nas primeiras 1000 de totvs_deliveries (8399 linhas em
+// 14/08/2026 e crescendo todo dia via sync), escondendo a imensa maioria
+// dos pedidos não resolvidos da tela "Clientes em risco" sem nenhum aviso
+// (mesma armadilha que vendasProduto.ts já evita, ver fetchItensDoPeriodo).
+const DELIVERY_PAGE_SIZE = 1000;
+const DELIVERY_MAX_PAGINAS = 50;
+
+async function fetchAllDeliveryRows(admin: ReturnType<typeof getSupabaseAdmin>): Promise<DeliveryRow[]> {
+  const rows: DeliveryRow[] = [];
+  for (let pagina = 0; pagina < DELIVERY_MAX_PAGINAS; pagina++) {
+    const from = pagina * DELIVERY_PAGE_SIZE;
+    const { data, error } = await admin
+      .from("totvs_deliveries")
+      .select(DELIVERY_COLUMNS)
+      .range(from, from + DELIVERY_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const batch = (data ?? []) as unknown as DeliveryRow[];
+    rows.push(...batch);
+    if (batch.length < DELIVERY_PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
   const admin = getSupabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: deliveryRows, error } = await admin.from("totvs_deliveries").select(DELIVERY_COLUMNS);
-  if (error) throw new Error(error.message);
+  const deliveryRows = await fetchAllDeliveryRows(admin);
 
-  const deliveries = ((deliveryRows ?? []) as unknown as DeliveryRow[]).filter(
-    (d) => !RESOLVIDO_LABELS.includes(d.status_atual ?? "")
-  );
+  const deliveries = deliveryRows.filter((d) => !RESOLVIDO_LABELS.includes(d.status_atual ?? ""));
   if (deliveries.length === 0) return [];
 
   const invoices = [
@@ -219,18 +241,36 @@ export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
       deliveries.flatMap((d) => (d.totvs_delivery_cargas ?? []).map((c) => c.nota_fiscal).filter((v): v is string => !!v))
     ),
   ];
-  const { data: orderRows } = invoices.length
-    ? await admin.from("totvs_orders").select("invoice, serie, issue_date").in("invoice", invoices)
-    : { data: [] as { invoice: string; serie: string; issue_date: string }[] };
-  const ordersByInvoiceSerie = new Map((orderRows ?? []).map((o) => [`${o.invoice}|${o.serie}`, o.issue_date]));
+  const orderRows: { invoice: string; serie: string; issue_date: string }[] = [];
+  for (let pagina = 0; pagina < DELIVERY_MAX_PAGINAS && pagina * DELIVERY_PAGE_SIZE < invoices.length; pagina++) {
+    const from = pagina * DELIVERY_PAGE_SIZE;
+    const { data, error } = await admin
+      .from("totvs_orders")
+      .select("invoice, serie, issue_date")
+      .in("invoice", invoices)
+      .range(from, from + DELIVERY_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const batch = data ?? [];
+    orderRows.push(...batch);
+    if (batch.length < DELIVERY_PAGE_SIZE) break;
+  }
+  const ordersByInvoiceSerie = new Map(orderRows.map((o) => [`${o.invoice}|${o.serie}`, o.issue_date]));
 
   const pedidos = [...new Set(deliveries.map((d) => d.pedido))];
-  const { data: statusRows } = pedidos.length
-    ? await admin.from("entrega_risco_status").select("*").in("pedido", pedidos)
-    : { data: [] as ClassificacaoRow[] };
-  const statusByKey = new Map(
-    ((statusRows ?? []) as unknown as ClassificacaoRow[]).map((s) => [`${s.pedido}|${s.filial_venda}`, s])
-  );
+  const statusRows: ClassificacaoRow[] = [];
+  for (let pagina = 0; pagina < DELIVERY_MAX_PAGINAS && pagina * DELIVERY_PAGE_SIZE < pedidos.length; pagina++) {
+    const from = pagina * DELIVERY_PAGE_SIZE;
+    const { data, error } = await admin
+      .from("entrega_risco_status")
+      .select("*")
+      .in("pedido", pedidos)
+      .range(from, from + DELIVERY_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const batch = (data ?? []) as unknown as ClassificacaoRow[];
+    statusRows.push(...batch);
+    if (batch.length < DELIVERY_PAGE_SIZE) break;
+  }
+  const statusByKey = new Map(statusRows.map((s) => [`${s.pedido}|${s.filial_venda}`, s]));
 
   const items: EntregaRiscoItem[] = [];
   for (const d of deliveries) {
