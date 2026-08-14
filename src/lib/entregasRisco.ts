@@ -64,6 +64,19 @@ export type EntregaRiscoItem = {
   syncedAt: string;
 };
 
+// Verdadeiro se QUALQUER carga do pedido já foi entregue -- mesmo que outra
+// carga do mesmo pedido tenha sido cancelada/retirada depois (carga
+// duplicada/administrativa limpa no Protheus após a entrega real já ter
+// acontecido, por ex.). Extraída à parte pra ser reaproveitada tanto por
+// computeRiscoAutomatico quanto pelo gatilho de cancelamento em
+// listEntregasEmRisco -- ver bug real encontrado em produção 14/08/2026:
+// pedidos com uma carga "Entregue" e outra "Cancelada" ficavam presos em
+// "alerta" pra sempre, porque o gatilho da regra 4 sobrepunha o resultado
+// (null/sem risco) que computeRiscoAutomatico já calculava certo.
+function pedidoJaEntregue(cargas: EntregaRiscoCarga[]): boolean {
+  return cargas.some((c) => RESOLVIDO_LABELS.includes(c.statusEntrega ?? ""));
+}
+
 // Regras 1-3 do plano da feature: compara rótulos de status contra o prazo
 // de PRAZO_DIAS_UTEIS dias úteis após a data-base da venda. Retorna `null`
 // quando o pedido ainda está dentro do prazo sem carga -- não deve aparecer
@@ -83,7 +96,7 @@ export function computeRiscoAutomatico(
   // status_atual do pedido (checado pelo chamador antes de chegar aqui) não
   // cobre esse caso: pela documentação da TOTVS ele reflete só a carga mais
   // recente, não um resumo confiável de "já entregou alguma vez".
-  if (cargas.some((c) => RESOLVIDO_LABELS.includes(c.statusEntrega ?? ""))) {
+  if (pedidoJaEntregue(cargas)) {
     return null;
   }
 
@@ -281,8 +294,18 @@ export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
     let risco = computeRiscoAutomatico(cargas, baseline.data, today);
 
     // Regra 4: gatilho de cancelamento gravado pelo sync sempre sobrepõe uma
-    // classificação manual em snooze, desde que seja mais recente que ela.
-    const overrideAtivo = !!d.risk_trigger_at && (!classificacaoRow || d.risk_trigger_at > classificacaoRow.updated_at);
+    // classificação manual em snooze, desde que seja mais recente que ela --
+    // MAS nunca reabre um pedido que já foi entregue por outra carga (ver
+    // pedidoJaEntregue). Sem essa guarda, um pedido com uma carga "Entregue"
+    // e outra "Cancelada"/retirada depois ficava travado em "alerta" pra
+    // sempre: o risk_trigger_at gravado no momento do cancelamento nunca é
+    // limpo, então continuava sobrepondo o `null` (sem risco) que
+    // computeRiscoAutomatico já calculava certo. Bug real em produção,
+    // achado 14/08/2026.
+    const overrideAtivo =
+      !pedidoJaEntregue(cargas) &&
+      !!d.risk_trigger_at &&
+      (!classificacaoRow || d.risk_trigger_at > classificacaoRow.updated_at);
     if (overrideAtivo) {
       risco = { nivel: "alerta", motivo: d.risk_trigger_reason ?? "Carga cancelada ou pedido retirado da carga." };
     }

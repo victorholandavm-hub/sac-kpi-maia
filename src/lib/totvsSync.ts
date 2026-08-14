@@ -766,6 +766,19 @@ export function detectDeliveryRiskTrigger(
   existingCargas: ExistingDeliveryCarga[],
   incomingCargas: TotvsDeliveryCarga[]
 ): DeliveryRiskTrigger {
+  // Pedido já entregue por alguma carga não é risco, mesmo que outra carga
+  // do mesmo pedido apareça cancelada ou suma da lista depois -- caso comum
+  // de carga duplicada/administrativa sendo limpa no Protheus DEPOIS da
+  // entrega real já ter acontecido. Sem essa guarda, o gatilho abaixo
+  // gravava risk_trigger_at nesse pedido, e como esse campo nunca é limpo
+  // (só sobrescrito por um gatilho mais novo), o pedido ficava preso em
+  // "alerta" pra sempre em listEntregasEmRisco -- bug real em produção,
+  // achado 14/08/2026 (ver pedidoJaEntregue em entregasRisco.ts, mesma
+  // ideia, mas do lado da leitura).
+  if (incomingCargas.some((c) => DELIVERY_RESOLVIDO_LABELS.includes(c.statusEntrega ?? ""))) {
+    return null;
+  }
+
   const existingByCode = new Map(existingCargas.map((c) => [c.carga, c]));
   const incomingCodes = new Set(incomingCargas.map((c) => c.carga));
 
