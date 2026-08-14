@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { getProfile, redirectIfSac } from "@/lib/dal";
+import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { countRequestsOverview } from "@/lib/serviceRequests";
 import { countPartOrdersOverview } from "@/lib/partOrders";
 import { countPendingPayments } from "@/lib/payments";
 import { countSupplierReturnsOverview } from "@/lib/supplierReturns";
+import { OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: string }) {
@@ -52,8 +53,10 @@ function Card({
 export default async function InicioPage() {
   const profile = await getProfile();
   redirectIfSac(profile);
+  // Ver OWN_ASSEMBLER_STORE_IDS -- mesma exclusão da aba Solicitações.
+  const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const [requests, parts, pendingPayments, supplierReturns] = await Promise.all([
-    countRequestsOverview(),
+    countRequestsOverview(excludeOwnAssemblerStoreIds),
     countPartOrdersOverview(),
     countPendingPayments(),
     countSupplierReturnsOverview(),
