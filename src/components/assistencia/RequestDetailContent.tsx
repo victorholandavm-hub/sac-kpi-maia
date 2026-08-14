@@ -261,12 +261,13 @@ export function RequestDetailContent({
             </h3>
             <Row label="Motivo" value={request.reason} />
             {request.causaRaiz ? <Row label="Causa raiz" value={CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz} /> : null}
-            {request.causaRaiz === "erro_cd" ? (
+            {request.causaRaiz === "erro_conferencia" ? (
               <>
-                <Row label="Carga (erro do CD)" value={request.causaCarga} />
-                <Row label="Conferente (erro do CD)" value={request.causaConferente} />
+                <Row label="Carga (erro de conferência)" value={request.causaCarga} />
+                <Row label="Conferente (erro de conferência)" value={request.causaConferente} />
               </>
             ) : null}
+            {request.causaRaiz === "erro_motorista" ? <Row label="Carga (erro do motorista)" value={request.causaCarga} /> : null}
             <Row label="Restrição / observação" value={request.restrictionNote} />
             <Row label="Observações" value={request.notes} />
             <Row label="Solicitado por" value={request.requestedByName} />

@@ -465,8 +465,14 @@ export function SacCreateRequestForm({
           ) : null}
 
           {isDelivery ? (
-            <Field label="Motorista">
-              <input name="driver_name" list="sac-drivers" className="rounded border px-3 py-2" style={inputStyle} />
+            <Field label={type === "troca_produto" && causaRaiz === "erro_motorista" ? "Motorista *" : "Motorista"}>
+              <input
+                name="driver_name"
+                list="sac-drivers"
+                required={type === "troca_produto" && causaRaiz === "erro_motorista"}
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
               <datalist id="sac-drivers">
                 {drivers.map((d) => (
                   <option key={d} value={d} />
@@ -519,10 +525,10 @@ export function SacCreateRequestForm({
           </Field>
         ) : null}
 
-        {type === "troca_produto" && causaRaiz === "erro_cd" ? (
+        {type === "troca_produto" && causaRaiz === "erro_conferencia" ? (
           <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
             <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
-              Erro do CD -- precisa registrar qual carga e quem conferiu antes de seguir com a troca.
+              Erro de conferência -- precisa registrar qual carga e quem conferiu antes de seguir com a troca.
             </p>
             <Field label="Carga *">
               <input
@@ -549,6 +555,31 @@ export function SacCreateRequestForm({
                 className="rounded border px-3 py-2"
                 style={inputStyle}
               />
+            </Field>
+          </div>
+        ) : null}
+
+        {type === "troca_produto" && causaRaiz === "erro_motorista" ? (
+          <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
+            <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+              Erro do motorista -- precisa registrar qual carga, e o nome dele no campo &quot;Motorista&quot; lá em cima.
+            </p>
+            <Field label="Carga *">
+              <input
+                name="causa_carga"
+                list="sac-cargas"
+                required
+                placeholder="Ex: 000123"
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+              <datalist id="sac-cargas">
+                {cargas.map((c) => (
+                  <option key={c.carga} value={c.carga}>
+                    {c.label}
+                  </option>
+                ))}
+              </datalist>
             </Field>
           </div>
         ) : null}

@@ -269,14 +269,23 @@ export const ARSENAL_HIGHLIGHT_COLORS: Record<string, string> = {
 };
 
 // Causa raiz da troca de produto (SAC, troca_produto) -- quando é
-// "erro_cd", carga + conferente viram obrigatórios na criação (ver
-// createSacRequest e SacCreateRequestForm.tsx). Registrado à parte do
-// "Motivo" (texto livre): motivo é o que aconteceu em palavras, causa raiz é
-// pra quem apurar depois conseguir filtrar/cobrar por origem do erro.
+// "erro_conferencia", carga + conferente viram obrigatórios na criação;
+// quando é "erro_motorista", carga + motorista (ver createSacRequest e
+// SacCreateRequestForm.tsx). Registrado à parte do "Motivo" (texto livre):
+// motivo é o que aconteceu em palavras, causa raiz é pra quem apurar depois
+// conseguir filtrar/cobrar por origem do erro (loja/vendedor/SAC/
+// conferência/motorista/etc. -- ver relatório em /assistencia/relatorios).
+//
+// "erro_conferencia" e "erro_motorista" eram uma causa só ("erro_cd") até
+// 14/08/2026 -- separadas por pedido do usuário, pra dar pra medir as duas
+// coisas de forma independente (ver 0080_causa_raiz_conferencia_motorista.sql,
+// nenhuma linha existente usava "erro_cd" ainda, migration sem backfill).
 export const CAUSA_RAIZ_OPTIONS = [
-  "erro_cd",
+  "erro_conferencia",
+  "erro_motorista",
   "erro_loja",
   "erro_vendedor",
+  "erro_sac",
   "avaria_transporte",
   "defeito_fabricacao",
   "solicitacao_cliente",
@@ -284,9 +293,11 @@ export const CAUSA_RAIZ_OPTIONS = [
 ] as const;
 
 export const CAUSA_RAIZ_LABELS: Record<string, string> = {
-  erro_cd: "Erro do CD (produto errado/mal conferido saiu do centro de distribuição)",
+  erro_conferencia: "Erro de conferência (produto errado saiu do CD por má conferência)",
+  erro_motorista: "Erro do motorista",
   erro_loja: "Erro da loja",
   erro_vendedor: "Erro do vendedor",
+  erro_sac: "Erro do SAC",
   avaria_transporte: "Avaria no transporte",
   defeito_fabricacao: "Defeito de fabricação",
   solicitacao_cliente: "Solicitação do cliente (desistência/arrependimento)",
