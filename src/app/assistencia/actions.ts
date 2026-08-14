@@ -1793,8 +1793,13 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) return { error: "Informe o motivo." };
 
+  const driverNameInput = emptyToNull(formData.get("driver_name"));
+
   // Causa raiz só existe pra troca_produto -- os outros tipos (entrega,
-  // envio de peça, notificação, montagem) não passam por aqui.
+  // envio de peça, notificação, montagem) não passam por aqui. Erro de
+  // conferência e erro do motorista eram uma causa só ("erro_cd") até
+  // 14/08/2026 -- separadas por pedido do usuário, pra dar pra metrificar
+  // as duas coisas de forma independente (ver 0080_causa_raiz_conferencia_motorista.sql).
   let causaRaiz: string | null = null;
   let causaCarga: string | null = null;
   let causaConferente: string | null = null;
@@ -1803,11 +1808,16 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
       return { error: "Selecione a causa raiz da troca." };
     }
-    if (causaRaiz === "erro_cd") {
+    if (causaRaiz === "erro_conferencia") {
       causaCarga = String(formData.get("causa_carga") ?? "").trim();
       causaConferente = String(formData.get("causa_conferente") ?? "").trim();
-      if (!causaCarga) return { error: "Informe a carga (erro do CD precisa registrar qual foi)." };
-      if (!causaConferente) return { error: "Informe o conferente (erro do CD precisa registrar quem conferiu)." };
+      if (!causaCarga) return { error: "Informe a carga (erro de conferência precisa registrar qual foi)." };
+      if (!causaConferente) return { error: "Informe o conferente (erro de conferência precisa registrar quem conferiu)." };
+    }
+    if (causaRaiz === "erro_motorista") {
+      causaCarga = String(formData.get("causa_carga") ?? "").trim();
+      if (!causaCarga) return { error: "Informe a carga (erro do motorista precisa registrar qual foi)." };
+      if (!driverNameInput) return { error: "Informe o motorista (erro do motorista precisa registrar quem entregou)." };
     }
   }
 
@@ -1816,7 +1826,6 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     return { error: "Anexe uma foto ou PDF da notificação." };
   }
 
-  const driverNameInput = emptyToNull(formData.get("driver_name"));
   const urgent = formData.get("urgent") === "on";
   // Só faz sentido pra montagem -- mesma ideia de createQuickRequest, pedir
   // pra desmontar o móvel velho na mesma visita sem abrir um segundo chamado.

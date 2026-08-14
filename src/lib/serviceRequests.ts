@@ -162,8 +162,9 @@ export type ServiceRequestSummary = {
   // incrementa cada vez que o produto trocado volta com problema.
   exchangeRound: number;
   // Causa raiz da troca (troca_produto) -- ver CAUSA_RAIZ_LABELS. Quando
-  // "erro_cd", causaCarga/causaConferente são preenchimento obrigatório na
-  // criação (ver createSacRequest).
+  // "erro_conferencia", causaCarga/causaConferente são preenchimento
+  // obrigatório na criação; quando "erro_motorista", causaCarga + o
+  // driverName do chamado (ver createSacRequest).
   causaRaiz: string | null;
   causaCarga: string | null;
   causaConferente: string | null;
@@ -1280,6 +1281,9 @@ export type RequestsReport = {
   byStore: ReportRow[];
   bySeller: ReportRow[];
   byType: ReportRow[];
+  // Só troca_produto tem causa_raiz preenchida -- a agregação abaixo já
+  // ignora linha sem valor, então isso sai "de graça" sem filtrar por tipo.
+  byCausaRaiz: ReportRow[];
   totalRequests: number;
 };
 
@@ -1287,7 +1291,7 @@ export type RequestsReport = {
 // loja, vendedor; aqui é a mesma coisa, mas dentro do app.
 export async function getRequestsReport(opts: { dateFrom?: string; dateTo?: string } = {}): Promise<RequestsReport> {
   const admin = getSupabaseAdmin();
-  let query = admin.from("service_requests").select("store_id, seller_name, type, status, created_at, stores(name)");
+  let query = admin.from("service_requests").select("store_id, seller_name, type, status, causa_raiz, created_at, stores(name)");
 
   if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
   if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
@@ -1300,6 +1304,7 @@ export async function getRequestsReport(opts: { dateFrom?: string; dateTo?: stri
     seller_name: string | null;
     type: RequestType;
     status: RequestStatus;
+    causa_raiz: string | null;
     created_at: string;
     stores: { name: string } | null;
   };
@@ -1323,6 +1328,7 @@ export async function getRequestsReport(opts: { dateFrom?: string; dateTo?: stri
     byStore: aggregate((r) => r.stores?.name ?? r.store_id),
     bySeller: aggregate((r) => r.seller_name),
     byType: aggregate((r) => r.type),
+    byCausaRaiz: aggregate((r) => r.causa_raiz),
     totalRequests: rows.length,
   };
 }

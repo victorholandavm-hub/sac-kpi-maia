@@ -2,7 +2,7 @@ import { getProfile, redirectIfSac } from "@/lib/dal";
 import { getRequestsReport, getServiceTypeIndicators, type ReportRow } from "@/lib/serviceRequests";
 import { listPaymentItems, paymentStage } from "@/lib/payments";
 import { getSupplierReconciliation } from "@/lib/supplierReturns";
-import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
 import { StatTile } from "@/components/StatTile";
 
 const REQUEST_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
@@ -328,6 +328,13 @@ export default async function RelatoriosPage({
         rows={report.bySeller}
         keyLabel="Vendedor(a)"
         emptyMessage="Nenhuma solicitação com vendedor(a) preenchido nesse período — campo novo, só passa a existir dado a partir de agora."
+      />
+      <ReportTable
+        title="Trocas de produto por causa raiz"
+        rows={report.byCausaRaiz}
+        keyLabel="Causa raiz"
+        emptyMessage="Nenhuma troca de produto com causa raiz registrada nesse período."
+        labelFor={(key) => CAUSA_RAIZ_LABELS[key] ?? key}
       />
 
       <details className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
