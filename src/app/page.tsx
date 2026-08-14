@@ -20,6 +20,18 @@ export default async function Home() {
             Indicadores de atendimento do SAC.
           </p>
         </Link>
+        <Link
+          href="/clientes"
+          className="rounded-xl border p-6 flex flex-col gap-2"
+          style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
+        >
+          <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+            Clientes
+          </h2>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Perfil de compra/relacionamento — ativos, inativos e quem nunca comprou.
+          </p>
+        </Link>
       </div>
     </div>
   );
