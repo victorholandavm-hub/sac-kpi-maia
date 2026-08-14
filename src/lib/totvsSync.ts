@@ -927,10 +927,25 @@ async function syncStaleDeliveries(supabase: SupabaseAdmin): Promise<SyncResult>
   // vários pedidos podem compartilhar o mesmo CPF/CNPJ (mesmo cliente com
   // mais de uma venda) -- dedup por documento abaixo reduz antes de aplicar
   // o teto de chamadas à API.
+  //
+  // O filtro de "não encerrado" (DELIVERY_ENCERRADO_LABELS) precisa estar NA
+  // QUERY, não depois em JS -- bug real encontrado em produção 14/08/2026:
+  // com o filtro em JS, o banco escolhia "os 60 registros com synced_at mais
+  // antigo, ponto" e SÓ DEPOIS descartava os já resolvidos -- se os 60 mais
+  // antigos do banco inteiro (entregue no primeiro dia do sync, nunca mais
+  // tocados) já estavam TODOS entregues, a lista de candidatos zerava e essa
+  // função nunca achava nada pra re-sincronizar, mesmo com centenas de
+  // pedidos genuinamente pendentes/desatualizados na tabela (confirmado:
+  // deliveriesStale.checked ficou em 0 por dias seguidos no histórico de
+  // sync_runs, e um pedido específico -- 020510/202 -- ficou 10 dias sem
+  // atualizar, já entregue de verdade no Protheus mas ainda aparecendo como
+  // risco aqui). Filtrando antes, o ORDER BY + LIMIT já pega os 60 mais
+  // antigos DENTRE os não encerrados.
   const { data: rows, error: fetchError } = await supabase
     .from("totvs_deliveries")
     .select("pedido, client_cpf_cnpj, status_atual, synced_at")
     .not("client_cpf_cnpj", "is", null)
+    .not("status_atual", "in", `(${DELIVERY_ENCERRADO_LABELS.join(",")})`)
     .order("synced_at", { ascending: true })
     .limit(STALE_PRIORITY_LIMIT * 4);
   if (fetchError) {
@@ -938,9 +953,7 @@ async function syncStaleDeliveries(supabase: SupabaseAdmin): Promise<SyncResult>
     return { checked, upserted, errors };
   }
 
-  const candidates = ((rows ?? []) as StaleDeliveryCandidate[]).filter(
-    (r) => !DELIVERY_ENCERRADO_LABELS.includes(r.status_atual ?? "")
-  );
+  const candidates = (rows ?? []) as StaleDeliveryCandidate[];
   const documents = [...new Set(candidates.map((r) => r.client_cpf_cnpj).filter((v): v is string => !!v))].slice(
     0,
     STALE_PRIORITY_LIMIT
