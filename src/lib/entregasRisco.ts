@@ -236,6 +236,34 @@ function toEntregaRiscoCarga(row: DeliveryCargaRow): EntregaRiscoCarga {
 const DELIVERY_PAGE_SIZE = 1000;
 const DELIVERY_MAX_PAGINAS = 50;
 
+// PostgREST manda o `.in("col", valores)` inteiro na URL da requisição --
+// com muitos valores, a URL passa fácil dos ~16KB de limite de cabeçalho
+// HTTP e a chamada quebra com HeadersOverflowError. Erro real em produção
+// 14/08/2026 (achado numa consulta parecida em kpi.ts, mesma causa): a
+// correção de paginação de listEntregasEmRisco de hoje passou a olhar TODAS
+// as entregas em vez de só as primeiras 1000, e as listas de invoices/
+// pedidos derivadas cresceram junto -- ainda não estouravam o limite
+// (~4KB/~3KB hoje), mas cresceriam com o tempo. Lote pequeno o bastante pra
+// nunca chegar perto, buscado em paralelo.
+const IN_FILTER_BATCH_SIZE = 200;
+
+async function fetchInBatches<T>(
+  values: string[],
+  fetchBatch: (batch: string[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+): Promise<T[]> {
+  const batches: string[][] = [];
+  for (let i = 0; i < values.length; i += IN_FILTER_BATCH_SIZE) {
+    batches.push(values.slice(i, i + IN_FILTER_BATCH_SIZE));
+  }
+  const responses = await Promise.all(batches.map(fetchBatch));
+  const result: T[] = [];
+  for (const { data, error } of responses) {
+    if (error) throw new Error(error.message);
+    result.push(...(data ?? []));
+  }
+  return result;
+}
+
 async function fetchAllDeliveryRows(admin: ReturnType<typeof getSupabaseAdmin>): Promise<DeliveryRow[]> {
   const rows: DeliveryRow[] = [];
   for (let pagina = 0; pagina < DELIVERY_MAX_PAGINAS; pagina++) {
@@ -266,35 +294,15 @@ export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
       deliveries.flatMap((d) => (d.totvs_delivery_cargas ?? []).map((c) => c.nota_fiscal).filter((v): v is string => !!v))
     ),
   ];
-  const orderRows: { invoice: string; serie: string; issue_date: string }[] = [];
-  for (let pagina = 0; pagina < DELIVERY_MAX_PAGINAS && pagina * DELIVERY_PAGE_SIZE < invoices.length; pagina++) {
-    const from = pagina * DELIVERY_PAGE_SIZE;
-    const { data, error } = await admin
-      .from("totvs_orders")
-      .select("invoice, serie, issue_date")
-      .in("invoice", invoices)
-      .range(from, from + DELIVERY_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const batch = data ?? [];
-    orderRows.push(...batch);
-    if (batch.length < DELIVERY_PAGE_SIZE) break;
-  }
+  const orderRows = await fetchInBatches<{ invoice: string; serie: string; issue_date: string }>(invoices, (batch) =>
+    admin.from("totvs_orders").select("invoice, serie, issue_date").in("invoice", batch)
+  );
   const ordersByInvoiceSerie = new Map(orderRows.map((o) => [`${o.invoice}|${o.serie}`, o.issue_date]));
 
   const pedidos = [...new Set(deliveries.map((d) => d.pedido))];
-  const statusRows: ClassificacaoRow[] = [];
-  for (let pagina = 0; pagina < DELIVERY_MAX_PAGINAS && pagina * DELIVERY_PAGE_SIZE < pedidos.length; pagina++) {
-    const from = pagina * DELIVERY_PAGE_SIZE;
-    const { data, error } = await admin
-      .from("entrega_risco_status")
-      .select("*")
-      .in("pedido", pedidos)
-      .range(from, from + DELIVERY_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const batch = (data ?? []) as unknown as ClassificacaoRow[];
-    statusRows.push(...batch);
-    if (batch.length < DELIVERY_PAGE_SIZE) break;
-  }
+  const statusRows = await fetchInBatches<ClassificacaoRow>(pedidos, (batch) =>
+    admin.from("entrega_risco_status").select("*").in("pedido", batch)
+  );
   const statusByKey = new Map(statusRows.map((s) => [`${s.pedido}|${s.filial_venda}`, s]));
 
   const items: EntregaRiscoItem[] = [];
