@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getProfile } from "@/lib/dal";
+import { getProfile, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { signOut } from "@/app/assistencia/actions";
 import { listRequests, countMontagensOverview, listRecentlyHandledBySac } from "@/lib/serviceRequests";
 import { countEntregasEmRiscoOverview } from "@/lib/entregasRisco";
 import { countPedidosEncomendaSolicitados } from "@/lib/pedidosEncomenda";
-import { REQUEST_TYPE_LABELS, ROLE_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, ROLE_LABELS, SAC_MANAGED_TYPES, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
@@ -27,6 +27,10 @@ export default async function SacHomePage({
   const { view } = await searchParams;
   const showCompleted = view === "concluidas";
 
+  // Ver OWN_ASSEMBLER_STORE_IDS -- mesma exclusão da fila/inicio, aplicada
+  // aqui pro stat "Montagens abertas" não denunciar loja com montador
+  // próprio que a SAC não devia nem saber que tem chamado pendente.
+  const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const [{ items }, riscos, montagensAbertas, encomendasSolicitadas, recentlyHandled] = await Promise.all([
     listRequests({
       // Envio de peça (gerido pela assistência) sai no mesmo carro/rota do
@@ -37,7 +41,7 @@ export default async function SacHomePage({
       status: showCompleted ? "concluida" : undefined,
     }),
     countEntregasEmRiscoOverview(),
-    countMontagensOverview(),
+    countMontagensOverview(excludeOwnAssemblerStoreIds),
     countPedidosEncomendaSolicitados(),
     listRecentlyHandledBySac(profile.id),
   ]);

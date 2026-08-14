@@ -1134,28 +1134,44 @@ export type RequestsOverview = {
 };
 
 // Contagens rápidas ("o que precisa de mim agora") pra tela inicial —
-// sem trazer as linhas inteiras, só o total de cada uma.
-export async function countRequestsOverview(): Promise<RequestsOverview> {
+// sem trazer as linhas inteiras, só o total de cada uma. `excludeOwnAssemblerStoreIds`
+// (ver applyOwnAssemblerStoreExclusion) evita que o badge da aba
+// "Solicitações"/o resumo da inicial denuncie, só pelo número, que tem
+// montagem/desmontagem/vistoria pendente de loja com montador próprio pra
+// quem não devia nem saber que ela existe.
+export async function countRequestsOverview(excludeOwnAssemblerStoreIds?: string[]): Promise<RequestsOverview> {
   const admin = getSupabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
 
-  const openQuery = admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "aberta");
-  const deadlineQuery = admin
-    .from("service_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("deadline_status", "pendente")
-    .not("status", "in", "(concluida,cancelada)");
-  const todayQuery = admin
-    .from("service_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("scheduled_date", today);
-  const remarcarQuery = admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "remarcar");
-  const completedTodayQuery = admin
-    .from("service_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "concluida")
-    .gte("completed_at", `${today}T00:00:00`)
-    .lte("completed_at", `${today}T23:59:59`);
+  const openQuery = applyOwnAssemblerStoreExclusion(
+    admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "aberta"),
+    excludeOwnAssemblerStoreIds
+  );
+  const deadlineQuery = applyOwnAssemblerStoreExclusion(
+    admin
+      .from("service_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("deadline_status", "pendente")
+      .not("status", "in", "(concluida,cancelada)"),
+    excludeOwnAssemblerStoreIds
+  );
+  const todayQuery = applyOwnAssemblerStoreExclusion(
+    admin.from("service_requests").select("id", { count: "exact", head: true }).eq("scheduled_date", today),
+    excludeOwnAssemblerStoreIds
+  );
+  const remarcarQuery = applyOwnAssemblerStoreExclusion(
+    admin.from("service_requests").select("id", { count: "exact", head: true }).eq("status", "remarcar"),
+    excludeOwnAssemblerStoreIds
+  );
+  const completedTodayQuery = applyOwnAssemblerStoreExclusion(
+    admin
+      .from("service_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "concluida")
+      .gte("completed_at", `${today}T00:00:00`)
+      .lte("completed_at", `${today}T23:59:59`),
+    excludeOwnAssemblerStoreIds
+  );
 
   const [openRes, deadlineRes, todayRes, remarcarRes, completedTodayRes] = await Promise.all([
     openQuery,
@@ -1176,13 +1192,17 @@ export async function countRequestsOverview(): Promise<RequestsOverview> {
 
 // Badge do card "Montagens e serviços" no painel do SAC -- mesmo espírito
 // de countRequestsOverview/countPedidosEncomendaSolicitados.
-export async function countMontagensOverview(): Promise<number> {
+export async function countMontagensOverview(excludeOwnAssemblerStoreIds?: string[]): Promise<number> {
   const admin = getSupabaseAdmin();
-  const { count, error } = await admin
-    .from("service_requests")
-    .select("id", { count: "exact", head: true })
-    .in("type", [...ASSISTENCIA_MANAGED_TYPES])
-    .not("status", "in", "(concluida,cancelada)");
+  const query = applyOwnAssemblerStoreExclusion(
+    admin
+      .from("service_requests")
+      .select("id", { count: "exact", head: true })
+      .in("type", [...ASSISTENCIA_MANAGED_TYPES])
+      .not("status", "in", "(concluida,cancelada)"),
+    excludeOwnAssemblerStoreIds
+  );
+  const { count, error } = await query;
   if (error) throw new Error(error.message);
   return count ?? 0;
 }

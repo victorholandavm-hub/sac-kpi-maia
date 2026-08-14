@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getProfile } from "@/lib/dal";
-import { ROLE_LABELS } from "@/lib/assistenciaLabels";
+import { getProfile, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
+import { ROLE_LABELS, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { signOut } from "@/app/assistencia/actions";
 import { countRequestsOverview } from "@/lib/serviceRequests";
 import { countPedidosEncomendaSolicitados } from "@/lib/pedidosEncomenda";
@@ -21,10 +21,14 @@ export default async function AssistenciaAppLayout({
   const isSac = profile.role === "sac";
 
   // Contagem pra badge nas abas Solicitações/Encomendas -- só quando faz
-  // sentido pro papel (SAC nem mostra essa navegação, ver abaixo).
+  // sentido pro papel (SAC nem mostra essa navegação, ver abaixo). Exclui
+  // montagem/desmontagem/vistoria de loja com montador próprio de quem não
+  // tem visibilidade sobre elas (ver OWN_ASSEMBLER_STORE_IDS) -- sem isso o
+  // número do badge denunciava chamado pendente que a lista já esconde.
+  const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const [requestsOverview, pedidosSolicitados] = isSac
     ? [null, 0]
-    : await Promise.all([countRequestsOverview(), countPedidosEncomendaSolicitados()]);
+    : await Promise.all([countRequestsOverview(excludeOwnAssemblerStoreIds), countPedidosEncomendaSolicitados()]);
   const counts = {
     solicitacoes: requestsOverview?.openNoContact ?? 0,
     encomendas: pedidosSolicitados,
