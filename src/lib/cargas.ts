@@ -83,18 +83,33 @@ const CARGA_COLUMNS =
   "totvs_deliveries!inner(pedido, filial_venda, loja, client_name, client_id, client_cpf_cnpj), " +
   "carga_problemas(id, description, reported_by_name, created_at)";
 
+// PostgREST devolve no máximo 1000 linhas por padrão, mesmo sem `.limit()`
+// pedir isso -- sem paginar de verdade, essa consulta ficava truncada
+// silenciosamente (1.411 linhas casavam o filtro em 14/08/2026, só as
+// primeiras 1000 apareciam na tela, sem nenhum aviso -- mesma armadilha
+// corrigida em listEntregasEmRisco/src/lib/entregasRisco.ts). A ordem do
+// fetch não importa: o resultado final é reordenado em memória no fim da
+// função de qualquer forma.
+const CARGA_PAGE_SIZE = 1000;
+const CARGA_MAX_PAGINAS = 50;
+
 export async function listCargasRecentes(): Promise<CargaGroup[]> {
   const admin = getSupabaseAdmin();
   const cutoff = new Date(Date.now() - DIAS_RETROATIVOS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const { data, error } = await admin
-    .from("totvs_delivery_cargas")
-    .select(CARGA_COLUMNS)
-    .or(`dt_previsao.gte.${cutoff},dt_previsao.is.null`)
-    .order("dt_previsao", { ascending: false });
-  if (error) throw new Error(error.message);
-
-  const rows = (data ?? []) as unknown as CargaRow[];
+  const rows: CargaRow[] = [];
+  for (let pagina = 0; pagina < CARGA_MAX_PAGINAS; pagina++) {
+    const from = pagina * CARGA_PAGE_SIZE;
+    const { data, error } = await admin
+      .from("totvs_delivery_cargas")
+      .select(CARGA_COLUMNS)
+      .or(`dt_previsao.gte.${cutoff},dt_previsao.is.null`)
+      .range(from, from + CARGA_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const batch = (data ?? []) as unknown as CargaRow[];
+    rows.push(...batch);
+    if (batch.length < CARGA_PAGE_SIZE) break;
+  }
   const groups = new Map<string, CargaGroup>();
 
   for (const row of rows) {
