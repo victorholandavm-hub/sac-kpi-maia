@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getProfile } from "@/lib/dal";
+import { getProfile, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { listRequests } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, ROLE_LABELS, ASSISTENCIA_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, ROLE_LABELS, ASSISTENCIA_MANAGED_TYPES, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
@@ -28,9 +28,13 @@ export default async function SacMontagensPage({
   const { view } = await searchParams;
   const showCompleted = view === "concluidas";
 
+  // Ver OWN_ASSEMBLER_STORE_IDS -- SAC também não enxerga montagem/
+  // desmontagem/vistoria de Mamanguape/Campina Grande (exceto se for admin).
+  const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const { items } = await listRequests({
     types: [...ASSISTENCIA_MANAGED_TYPES],
     status: showCompleted ? "concluida" : undefined,
+    excludeOwnAssemblerStoreIds,
   });
   const requests = showCompleted ? items : items.filter((r) => r.status !== "concluida" && r.status !== "cancelada");
 

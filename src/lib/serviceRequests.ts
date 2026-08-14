@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
-import { ASSISTENCIA_MANAGED_TYPES } from "./assistenciaLabels";
+import { ASSISTENCIA_MANAGED_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES } from "./assistenciaLabels";
 
 export type RequestType =
   | "montagem"
@@ -280,6 +280,22 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
   };
 }
 
+// Alguns chamados de montagem/desmontagem/vistoria são de lojas com
+// montador próprio (ver OWN_ASSEMBLER_STORE_IDS em assistenciaLabels.ts) e
+// não devem aparecer pra quem não tem visibilidade sobre elas (ver
+// canSeeOwnAssemblerStoreRequests em dal.ts). `excludeStoreIds` é a lista
+// de lojas restritas que ESSE chamador específico não pode ver -- pode ser
+// as duas, uma só (o gerente da outra, olhando "todas as lojas"), ou
+// nenhuma (admin/Antonio) -- ver fila/page.tsx e loja/page.tsx. Só afasta a
+// linha se ela for das duas coisas ao mesmo tempo (loja restrita E tipo
+// restrito) -- recolhimento/troca de peça/envio de peça dessas lojas
+// continuam visíveis normalmente, são atendimento central de qualquer jeito.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyOwnAssemblerStoreExclusion(query: any, excludeStoreIds: string[] | undefined) {
+  if (!excludeStoreIds || excludeStoreIds.length === 0) return query;
+  return query.or(`store_id.not.in.(${excludeStoreIds.join(",")}),type.not.in.(${OWN_ASSEMBLER_RESTRICTED_TYPES.join(",")})`);
+}
+
 export const REQUESTS_PAGE_SIZE = 100;
 
 export type ListRequestsResult = {
@@ -301,6 +317,8 @@ export async function listRequests(
     // filtra por created_at, sempre no fuso de João Pessoa (ver formatDateTime.ts).
     dateFrom?: string;
     dateTo?: string;
+    // Ver applyOwnAssemblerStoreExclusion acima.
+    excludeOwnAssemblerStoreIds?: string[];
   } = {}
 ): Promise<ListRequestsResult> {
   const admin = getSupabaseAdmin();
@@ -344,6 +362,7 @@ export async function listRequests(
   if (opts.dateTo && /^\d{4}-\d{2}-\d{2}$/.test(opts.dateTo)) {
     query = query.lte("created_at", `${opts.dateTo}T23:59:59-03:00`);
   }
+  query = applyOwnAssemblerStoreExclusion(query, opts.excludeOwnAssemblerStoreIds);
 
   const q = opts.q?.trim();
   if (q) {
@@ -523,7 +542,14 @@ const OPEN_LOJA_LIMIT = 200;
 // pra bater com o que a assistência já vê na fila (mesmo cliente, mesma
 // necessidade de identificar sem abrir cada chamado).
 export async function listOpenRequestsForLoja(
-  opts: { storeId?: string; storeIds?: string[]; types?: readonly RequestType[]; onlyCompleted?: boolean } = {}
+  opts: {
+    storeId?: string;
+    storeIds?: string[];
+    types?: readonly RequestType[];
+    onlyCompleted?: boolean;
+    // Ver applyOwnAssemblerStoreExclusion acima.
+    excludeOwnAssemblerStoreIds?: string[];
+  } = {}
 ): Promise<OpenRequestForLoja[]> {
   const admin = getSupabaseAdmin();
   let query = admin
@@ -548,6 +574,8 @@ export async function listOpenRequestsForLoja(
   if (opts.types) {
     query = query.in("type", opts.types as string[]);
   }
+
+  query = applyOwnAssemblerStoreExclusion(query, opts.excludeOwnAssemblerStoreIds);
 
   const { data, error } = await query;
 

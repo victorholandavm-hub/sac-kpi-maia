@@ -1,7 +1,8 @@
-import { getProfile } from "@/lib/dal";
+import { redirect } from "next/navigation";
+import { getProfile, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { getRequestDetail } from "@/lib/serviceRequests";
 import { listAssemblersForStores, listDrivers } from "@/lib/payments";
-import { SAC_MANAGED_TYPES, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
+import { SAC_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_STORE_IDS, OWN_ASSEMBLER_RESTRICTED_TYPES } from "@/lib/assistenciaLabels";
 import { getRotaWeekdayConfig, getNextRotaDates, ROTAS, type Rota } from "@/lib/rotas";
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { RequestDetailContent } from "@/components/assistencia/RequestDetailContent";
@@ -11,6 +12,19 @@ export const dynamic = "force-dynamic";
 export default async function SolicitacaoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [profile, result] = await Promise.all([getProfile(), getRequestDetail(id)]);
+
+  // Montagem/desmontagem/vistoria de loja com montador próprio (ver
+  // OWN_ASSEMBLER_STORE_IDS) -- mesma regra da fila, mas checada aqui
+  // também: sem isso, dava pra contornar o filtro da lista só sabendo o
+  // link direto do chamado.
+  if (
+    result &&
+    (OWN_ASSEMBLER_STORE_IDS as readonly string[]).includes(result.request.storeId) &&
+    (OWN_ASSEMBLER_RESTRICTED_TYPES as readonly string[]).includes(result.request.type) &&
+    !canSeeOwnAssemblerStoreRequests(profile)
+  ) {
+    redirect("/assistencia/fila");
+  }
 
   const isSacType = result ? (SAC_MANAGED_TYPES as readonly string[]).includes(result.request.type) : false;
   const canManage =
