@@ -44,6 +44,7 @@ function ItemsFields({
   onRemove,
   onLookup,
   namePrefix,
+  codeRequired,
 }: {
   items: Item[];
   lookupStatus: Record<number, ProductLookupStatus>;
@@ -52,6 +53,10 @@ function ItemsFields({
   onRemove: (index: number) => void;
   onLookup: (index: number, code: string) => void;
   namePrefix: string;
+  // Montagem/desmontagem exige o código (pedido do Victor 15/08/2026); os
+  // outros tipos continuam com o código opcional, só como atalho pra
+  // autopreencher o nome do produto.
+  codeRequired?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -63,6 +68,7 @@ function ItemsFields({
               value={item.code}
               onChange={(e) => onUpdate(i, { code: e.target.value })}
               onBlur={(e) => onLookup(i, e.target.value)}
+              required={codeRequired}
               placeholder="Código"
               className="w-28 rounded border px-2 py-2"
               style={inputStyle}
@@ -144,6 +150,10 @@ export function QuickCreateRequestForm({
   const [storeId, setStoreId] = useState("");
   const isManoelOnly = (MANOEL_ONLY_TYPES as readonly string[]).includes(type);
   const showCombo = type === "montagem" || type === "desmontagem";
+  // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
+  // pra montagem/desmontagem -- validado de novo no servidor (ver
+  // createQuickRequest), isso aqui é só o feedback imediato no navegador.
+  const codeRequired = showCombo;
   // Mesmos tipos de EditRequestForm.tsx -- só quem passa por montador/técnico.
   const showMontadorInstruction = ASSISTENCIA_TYPES.includes(type as (typeof ASSISTENCIA_TYPES)[number]);
   // Montador da loja escolhida + globais/legado (store_id nulo) -- a loja só
@@ -544,7 +554,11 @@ export function QuickCreateRequestForm({
       <FormSection
         title={combo ? `Produtos a ${type === "montagem" ? "montar" : "desmontar"} (pagamento)` : "Produtos (pagamento)"}
         number={4}
-        hint="Digite o código do produto pra preencher o nome automaticamente (se souber). Valor é opcional — dá pra definir depois em Pagamentos."
+        hint={
+          codeRequired
+            ? "Código do produto obrigatório. Valor é opcional — dá pra definir depois em Pagamentos."
+            : "Digite o código do produto pra preencher o nome automaticamente (se souber). Valor é opcional — dá pra definir depois em Pagamentos."
+        }
       >
         <ItemsFields
           items={items}
@@ -554,11 +568,16 @@ export function QuickCreateRequestForm({
           onRemove={itemHandlers.remove}
           onLookup={itemHandlers.lookup}
           namePrefix="item"
+          codeRequired={codeRequired}
         />
       </FormSection>
 
       {combo ? (
-        <FormSection title={`Produtos a ${type === "montagem" ? "desmontar" : "montar"} (pagamento)`} number={5}>
+        <FormSection
+          title={`Produtos a ${type === "montagem" ? "desmontar" : "montar"} (pagamento)`}
+          number={5}
+          hint={codeRequired ? "Código do produto obrigatório." : undefined}
+        >
           <ItemsFields
             items={secondaryItems}
             lookupStatus={secondaryLookupStatus}
@@ -567,6 +586,7 @@ export function QuickCreateRequestForm({
             onRemove={secondaryHandlers.remove}
             onLookup={secondaryHandlers.lookup}
             namePrefix="item_secondary"
+            codeRequired={codeRequired}
           />
         </FormSection>
       ) : null}

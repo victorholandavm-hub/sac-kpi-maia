@@ -53,6 +53,7 @@ function ItemsFields({
   onLookup,
   namePrefix,
   productLabel,
+  codeRequired,
 }: {
   items: Item[];
   lookupStatus: Record<number, ProductLookupStatus>;
@@ -62,6 +63,10 @@ function ItemsFields({
   onLookup: (index: number, code: string) => void;
   namePrefix: string;
   productLabel: string;
+  // Montagem exige o código (pedido do Victor 15/08/2026); os outros tipos
+  // continuam com o código opcional, só como atalho pra autopreencher o
+  // nome do produto.
+  codeRequired?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -73,6 +78,7 @@ function ItemsFields({
               value={item.code}
               onChange={(e) => onUpdate(i, { code: e.target.value })}
               onBlur={(e) => onLookup(i, e.target.value)}
+              required={codeRequired}
               placeholder="Código"
               className="w-28 rounded border px-2 py-2"
               style={inputStyle}
@@ -438,7 +444,11 @@ export function SacCreateRequestForm({
         <FormSection
           title={type === "montagem" ? (combo ? "Móveis a montar" : "Móvel(is) a montar") : "Produto(s) e entrega"}
           number={3}
-          hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
+          hint={
+            type === "montagem"
+              ? "Código do produto obrigatório."
+              : "Digite o código do produto pra preencher o nome automaticamente (se souber)."
+          }
         >
           <ItemsFields
             items={items}
@@ -449,6 +459,7 @@ export function SacCreateRequestForm({
             onLookup={itemHandlers.lookup}
             namePrefix="item"
             productLabel="Ex: Super Box Confort Mola Ensacada"
+            codeRequired={type === "montagem"}
           />
 
           {type === "montagem" ? (
@@ -484,7 +495,7 @@ export function SacCreateRequestForm({
       ) : null}
 
       {combo ? (
-        <FormSection title="Móveis a desmontar" number={4}>
+        <FormSection title="Móveis a desmontar" number={4} hint="Código do produto obrigatório.">
           <ItemsFields
             items={secondaryItems}
             lookupStatus={secondaryLookupStatus}
@@ -494,6 +505,7 @@ export function SacCreateRequestForm({
             onLookup={secondaryHandlers.lookup}
             namePrefix="item_secondary"
             productLabel="Ex: Roupeiro antigo"
+            codeRequired
           />
         </FormSection>
       ) : null}

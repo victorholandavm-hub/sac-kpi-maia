@@ -52,6 +52,7 @@ function ProductItemsFields({
   onRemove,
   onLookup,
   namePrefix,
+  codeRequired,
 }: {
   items: Item[];
   lookupStatus: Record<number, ProductLookupStatus>;
@@ -60,6 +61,10 @@ function ProductItemsFields({
   onRemove: (index: number) => void;
   onLookup: (index: number, code: string) => void;
   namePrefix: string;
+  // Montagem/desmontagem exige o código (pedido do Victor 15/08/2026); os
+  // outros tipos continuam com o código opcional, só como atalho pra
+  // autopreencher o nome do produto.
+  codeRequired?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -71,6 +76,7 @@ function ProductItemsFields({
               value={item.code}
               onChange={(e) => onUpdate(i, { code: e.target.value })}
               onBlur={(e) => onLookup(i, e.target.value)}
+              required={codeRequired}
               placeholder="Código"
               className="w-28 rounded border px-3 py-2"
               style={inputStyle}
@@ -261,6 +267,10 @@ export function PublicRequestForm({
     (type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria");
   const showAddressNumber = !isStoreTarget && (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
   const showItems = type !== "notificacao_externa";
+  // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
+  // pra montagem/desmontagem -- validado de novo no servidor (ver
+  // createPublicRequest), isso aqui é só o feedback imediato no navegador.
+  const codeRequired = type === "montagem" || type === "desmontagem";
   const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
   const showCombo = type === "montagem" || type === "desmontagem";
   const showAssembler = (type === "montagem" || type === "desmontagem") && ownAssemblers.length > 0;
@@ -577,7 +587,11 @@ export function PublicRequestForm({
         <FormSection
           title={combo ? `Produtos a ${type === "montagem" ? "montar" : "desmontar"}` : "Produtos"}
           number={5}
-          hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
+          hint={
+            codeRequired
+              ? "Código do produto obrigatório."
+              : "Digite o código do produto pra preencher o nome automaticamente (se souber)."
+          }
         >
           <ProductItemsFields
             items={items}
@@ -587,18 +601,24 @@ export function PublicRequestForm({
             onRemove={primaryHandlers.remove}
             onLookup={primaryHandlers.lookup}
             namePrefix="item"
+            codeRequired={codeRequired}
           />
         </FormSection>
       ) : null}
 
       {showItems && combo ? (
-        <FormSection title={`Produtos a ${type === "montagem" ? "desmontar" : "montar"}`} number={6}>
+        <FormSection
+          title={`Produtos a ${type === "montagem" ? "desmontar" : "montar"}`}
+          number={6}
+          hint={codeRequired ? "Código do produto obrigatório." : undefined}
+        >
           <ProductItemsFields
             items={secondaryItems}
             lookupStatus={secondaryProductLookupStatus}
             onUpdate={secondaryHandlers.update}
             onAdd={secondaryHandlers.add}
             onRemove={secondaryHandlers.remove}
+            codeRequired={codeRequired}
             onLookup={secondaryHandlers.lookup}
             namePrefix="item_secondary"
           />

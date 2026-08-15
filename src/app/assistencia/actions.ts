@@ -450,6 +450,13 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       error: `Informe pelo menos um produto pra ${secondaryAction === "montar" ? "montar" : "desmontar"} (a outra ação da visita combo).`,
     };
   }
+  // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
+  // pra montagem/desmontagem -- antes era só uma sugestão pra autopreencher
+  // o nome (ver hint em PublicRequestForm.tsx).
+  if (type === "montagem" || type === "desmontagem") {
+    const semCodigo = items.find((item) => !item.partCode);
+    if (semCodigo) return { error: `Informe o código do produto "${semCodigo.product}".` };
+  }
 
   const admin = getSupabaseAdmin();
 
@@ -1678,6 +1685,14 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   }
   const items = [...primaryItems, ...secondaryItems];
 
+  // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
+  // pra montagem/desmontagem -- antes era só uma sugestão pra autopreencher
+  // o nome (ver hint em QuickCreateRequestForm.tsx).
+  if (type === "montagem" || type === "desmontagem") {
+    const semCodigo = items.find((item) => !item.partCode);
+    if (semCodigo) return { error: `Informe o código do produto "${semCodigo.product}".` };
+  }
+
   const admin = getSupabaseAdmin();
 
   if (assemblerName) {
@@ -1854,6 +1869,14 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     return { error: "Informe pelo menos um móvel pra desmontar (a outra ação da visita combo)." };
   }
   const items = [...primaryItems, ...secondaryItems];
+
+  // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
+  // pra montagem (e pro móvel a desmontar, no combo) -- antes era só uma
+  // sugestão pra autopreencher o nome (ver hint em SacCreateRequestForm.tsx).
+  if (type === "montagem") {
+    const semCodigo = items.find((item) => !item.partCode);
+    if (semCodigo) return { error: `Informe o código do produto "${semCodigo.product}".` };
+  }
 
   const admin = getSupabaseAdmin();
   const driverName = driverNameInput ? await resolveDriverName(driverNameInput) : null;
