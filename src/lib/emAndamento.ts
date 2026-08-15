@@ -57,7 +57,14 @@ export async function getEmAndamentoList(): Promise<EmAndamentoRow[]> {
     latestByConversation.set(row.conversation_id, row);
   }
 
-  const emAndamento = [...latestByConversation.values()].filter((r) => r.tag === "status-andamento");
+  // Pedido do Victor 15/08/2026: só mostrar quem entrou em "andamento" nos
+  // últimos 7 dias -- atendimento muito mais antigo que isso normalmente é
+  // conversa parada/esquecida (sem tag de resolvido aplicada), não um
+  // atendimento realmente em curso, e só polui a lista.
+  const seteDiasAtras = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const emAndamento = [...latestByConversation.values()].filter(
+    (r) => r.tag === "status-andamento" && new Date(r.event_at).getTime() >= seteDiasAtras
+  );
   if (emAndamento.length === 0) return [];
 
   // Ver supabaseBatch.ts: `.in()` com lista grande estoura o limite de

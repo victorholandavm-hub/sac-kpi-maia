@@ -30,7 +30,7 @@ export default async function EmAndamentoPage() {
           Atendimentos em andamento
         </h1>
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Clientes com a tag &quot;Em andamento&quot; agora, atualiza sozinho a cada 15s.
+          Clientes com a tag &quot;Em andamento&quot; agora, abertos nos últimos 7 dias — atualiza sozinho a cada 15s.
         </p>
       </div>
 
