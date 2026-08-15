@@ -797,8 +797,11 @@ function buildCategoryTicketsMap(rows: TicketRow[]): Record<string, StoreBreakdo
 // decide se investiga. Limiar de "concentração" (topCategoryPct) e de
 // "volume mínimo" (total de chamados da loja) evita disparar sugestão em
 // cima de amostra pequena (ex.: 1 chamado de dúvida em 2 no total já dá 50%).
-const ALERT_MIN_TOTAL = 5;
-const ALERT_RULES: { tag: string; minPct: number; signal: string }[] = [
+// Exportado pra kpiInsights.ts reaproveitar a mesma taxonomia de causa
+// provável no insight de "categoria dominante" (nível geral, não só por
+// loja) -- em vez de duplicar o mapeamento categoria -> causa.
+export const ALERT_MIN_TOTAL = 5;
+export const ALERT_RULES: { tag: string; minPct: number; signal: string }[] = [
   { tag: "cat-duvida", minPct: 40, signal: "Falta de treinamento de produto na equipe de vendas" },
   { tag: "cat-errovendedor", minPct: 30, signal: "Vendedor(es) passando informação incorreta na venda -- reforçar treinamento comercial" },
   { tag: "cat-informacaoincorreta", minPct: 30, signal: "Atendimento da loja passando informação incorreta -- reforçar treinamento" },

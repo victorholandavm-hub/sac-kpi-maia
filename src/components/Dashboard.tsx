@@ -17,6 +17,8 @@ import { AgentStatsTable } from "./AgentStatsTable";
 import { PerformanceReportButton } from "./PerformanceReportButton";
 import { NpsCard, NPS_INDEX_TARGET, indexColor } from "./NpsCard";
 import { CategoryTicketsModal } from "./CategoryTicketsModal";
+import { InsightGrid } from "./InsightCard";
+import { buildHeadlineInsights, buildPerformanceInsights, buildGargalosInsights } from "@/lib/kpiInsights";
 import { categoryLabel, storeLabel, productLabel } from "@/lib/labels";
 
 const NPS_SCORE_LABELS: Record<number, string> = {
@@ -61,6 +63,13 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
   const npsDistribution = [...data.npsSummary.distribution]
     .sort((a, b) => b.score - a.score)
     .map((d) => ({ label: NPS_SCORE_LABELS[d.score], count: d.count }));
+
+  // Insights "tipo Clarity" -- explicação + ação por trás de cada número,
+  // não só o número cru (ver src/lib/kpiInsights.ts). Calculados no cliente
+  // porque são função pura de `data`, que já veio pronto do servidor.
+  const headlineInsights = buildHeadlineInsights(data);
+  const performanceInsights = buildPerformanceInsights(data);
+  const gargalosInsights = buildGargalosInsights(data);
 
   return (
     <div className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
@@ -116,6 +125,8 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           valueColor={data.highUrgencyOpenCount > 0 ? "var(--status-critical)" : undefined}
         />
       </section>
+
+      <InsightGrid insights={headlineInsights} />
 
       {/* Abas -- cada uma monta só o conteúdo dela (sem manter as outras
           fora de tela) pra não pagar o custo de renderizar tudo de uma vez;
@@ -184,6 +195,8 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
             aproximação nossa e pode não bater exatamente com o relatório nativo do GHL.
           </p>
 
+          <InsightGrid insights={performanceInsights} />
+
           <NpsCard data={data.npsSummary} detractors={data.npsDetractors} />
           <BarRanking
             title="Distribuição das notas (enquete GHL)"
@@ -224,6 +237,8 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
             coverage={data.categoryCoverage}
             onSelect={openCategoryDrilldown}
           />
+
+          <InsightGrid insights={gargalosInsights} />
 
           <BacklogTrendChart data={data.backlogOverTime} />
           <StoreBreakdownTable data={data.storeBreakdown} />
