@@ -16,7 +16,6 @@ import { ProdutoVendaCurvaChart } from "@/components/assistencia/ProdutoVendaCur
 import { VendasPorCategoriaList } from "@/components/assistencia/VendasPorCategoriaList";
 import { ProdutoRankingList } from "@/components/assistencia/ProdutoRankingList";
 import { CategoriaEvolucaoChart } from "@/components/assistencia/CategoriaEvolucaoChart";
-import { VendidoDespachadoChart } from "@/components/assistencia/VendidoDespachadoChart";
 import { StatTile } from "@/components/StatTile";
 
 export const dynamic = "force-dynamic";
@@ -84,7 +83,7 @@ export default async function VendasProdutoPage({
     }
   }
 
-  const [{ ranking, categorias, evolucaoFamilia: evolucao, vendidoDespachado }, earliestSyncedDate] = await Promise.all([
+  const [{ ranking, categorias, evolucaoFamilia: evolucao }, earliestSyncedDate] = await Promise.all([
     getVendasPeriodoResumo(range, RANKING_LIMIT, categoriaAtiva),
     getEarliestSyncedOrderDate(),
   ]);
@@ -271,8 +270,6 @@ export default async function VendasProdutoPage({
       ) : null}
 
       <CategoriaEvolucaoChart semanas={evolucao.semanas} categorias={evolucao.familias} />
-
-      <VendidoDespachadoChart semanas={vendidoDespachado} />
 
       <VendasPorCategoriaList categorias={categorias} baseHref={rankingBaseHref} categoriaAtiva={categoriaAtiva} />
 

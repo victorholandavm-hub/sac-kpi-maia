@@ -554,166 +554,28 @@ export async function listVendasPorFamiliaLogisticaPorSemana(
   return aggregateVendasPorFamiliaLogisticaPorSemana(rows, range);
 }
 
-export type VendidoDespachadoSemana = { semanaInicio: string; vendido: number; despachado: number };
-
-const DESPACHO_PAGE_SIZE = 1000;
-const DESPACHO_MAX_PAGINAS = 30;
-
-// "Despachado" = cargas com status_entrega "Entregue" (entrega concluída) --
-// o sync do Protheus não guarda nenhum evento de "saiu do CD", "Entregue" é
-// o sinal mais próximo disponível (decisão confirmada com o usuário
-// 12/08/2026). "Entregue Parcial" fica de fora de propósito: não temos a
-// quantidade real entregue nessa carga, só do pedido inteiro -- contar como
-// se fosse total superestimaria o despacho.
-async function buildDespachoPorSemana(range: DateRange): Promise<Map<string, number>> {
-  const admin = getSupabaseAdmin();
-  const resultado = new Map<string, number>();
-
-  const cargas: { notaFiscal: string; serie: string; semana: string }[] = [];
-  for (let pagina = 0; pagina < DESPACHO_MAX_PAGINAS; pagina++) {
-    const from = pagina * DESPACHO_PAGE_SIZE;
-    const { data, error } = await admin
-      .from("totvs_delivery_cargas")
-      .select("nota_fiscal, serie, dt_retorno")
-      .eq("status_entrega", "Entregue")
-      .not("nota_fiscal", "is", null)
-      .not("serie", "is", null)
-      .gte("dt_retorno", range.from)
-      .lte("dt_retorno", range.to)
-      .range(from, from + DESPACHO_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const batch = data ?? [];
-    for (const row of batch) {
-      if (!row.nota_fiscal || !row.serie || !row.dt_retorno) continue;
-      cargas.push({ notaFiscal: row.nota_fiscal, serie: row.serie, semana: segundaFeiraDe(row.dt_retorno) });
-    }
-    if (batch.length < DESPACHO_PAGE_SIZE) break;
-  }
-  if (cargas.length === 0) return resultado;
-
-  // Sem FK física entre totvs_delivery_cargas e totvs_orders (syncs
-  // independentes, mesmo motivo de sempre) -- join em código, mesmo padrão
-  // já usado no resto do arquivo.
-  const notasFiscais = [...new Set(cargas.map((c) => c.notaFiscal))];
-  const { data: ordersData, error: ordersError } = await admin
-    .from("totvs_orders")
-    .select("id, invoice, serie")
-    .in("invoice", notasFiscais);
-  if (ordersError) throw new Error(ordersError.message);
-
-  const orderIdPorNotaSerie = new Map<string, string>();
-  for (const o of ordersData ?? []) {
-    orderIdPorNotaSerie.set(`${o.invoice}|${o.serie}`, o.id);
-  }
-
-  // Dedup por pedido -- um pedido pode ter mais de uma carga (múltiplas
-  // tentativas de entrega), mas a quantidade dele só pode contar UMA vez;
-  // fica na semana da entrega concluída mais recente.
-  const semanaPorOrderId = new Map<string, string>();
-  for (const carga of cargas) {
-    const orderId = orderIdPorNotaSerie.get(`${carga.notaFiscal}|${carga.serie}`);
-    if (!orderId) continue;
-    const atual = semanaPorOrderId.get(orderId);
-    if (!atual || carga.semana > atual) semanaPorOrderId.set(orderId, carga.semana);
-  }
-  const orderIds = [...semanaPorOrderId.keys()];
-  if (orderIds.length === 0) return resultado;
-
-  const qtdPorOrderId = new Map<string, number>();
-  for (let pagina = 0; pagina < DESPACHO_MAX_PAGINAS; pagina++) {
-    const from = pagina * DESPACHO_PAGE_SIZE;
-    const { data, error } = await admin
-      .from("totvs_order_items")
-      .select("order_id, quantity")
-      .in("order_id", orderIds)
-      .range(from, from + DESPACHO_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const batch = data ?? [];
-    for (const row of batch) {
-      qtdPorOrderId.set(row.order_id, (qtdPorOrderId.get(row.order_id) ?? 0) + row.quantity);
-    }
-    if (batch.length < DESPACHO_PAGE_SIZE) break;
-  }
-
-  for (const [orderId, semana] of semanaPorOrderId) {
-    const qtd = qtdPorOrderId.get(orderId) ?? 0;
-    resultado.set(semana, (resultado.get(semana) ?? 0) + qtd);
-  }
-  return resultado;
-}
-
-function aggregateVendidoPorSemana(rows: ItemRankingRow[]): Map<string, number> {
-  const vendidoPorSemana = new Map<string, number>();
-  for (const row of rows) {
-    if (!row.totvs_orders) continue;
-    const semana = segundaFeiraDe(row.totvs_orders.issue_date);
-    vendidoPorSemana.set(semana, (vendidoPorSemana.get(semana) ?? 0) + row.quantity);
-  }
-  return vendidoPorSemana;
-}
-
-// Vendido (totvs_order_items pela data de emissão) vs. Despachado (ver
-// buildDespachoPorSemana) por semana -- a diferença entre as duas barras é
-// o backlog que a logística ainda precisa carregar/entregar. Falha
-// isolada (mesmo espírito de listSaldoEstoqueProdutos): se o cruzamento de
-// despacho der erro, o gráfico ainda mostra o "vendido" sozinho em vez de
-// derrubar a tela inteira.
-export async function listVendidoVsDespachadoPorSemana(range: DateRange): Promise<VendidoDespachadoSemana[]> {
-  const itensVendidos = await fetchItensDoPeriodo(range);
-  const vendidoPorSemana = aggregateVendidoPorSemana(itensVendidos);
-
-  let despachoPorSemana = new Map<string, number>();
-  try {
-    despachoPorSemana = await buildDespachoPorSemana(range);
-  } catch (err) {
-    console.error("listVendidoVsDespachadoPorSemana (despacho):", (err as Error).message);
-  }
-
-  return segundasNoPeriodo(range).map((semanaIso) => ({
-    semanaInicio: semanaIso,
-    vendido: vendidoPorSemana.get(semanaIso) ?? 0,
-    despachado: despachoPorSemana.get(semanaIso) ?? 0,
-  }));
-}
-
 export type VendasPeriodoResumo = {
   ranking: ProdutoRankingItem[];
   categorias: CategoriaResumo[];
   evolucaoFamilia: { semanas: CategoriaEvolucaoSemana[]; familias: { key: FamiliaLogisticaKey; label: string }[] };
-  vendidoDespachado: VendidoDespachadoSemana[];
 };
 
-// Ranking, resumo por categoria, evolução por família logística e vendido-x-
-// despachado dependiam TODOS do mesmo `fetchItensDoPeriodo(range)` -- até
-// aqui, cada função buscava esse conjunto de novo (4 idas ao banco pro MESMO
-// dado, em paralelo mas ainda assim 4x o trabalho), o maior gargalo de
-// carregamento da tela "Vendas por produto" (identificado 2026-08-13). Busca
-// uma vez só e agrega os 4 jeitos em memória; o fetch de despacho continua
-// separado (tabela diferente, totvs_delivery_cargas, não depende dos itens)
-// e roda em paralelo com o fetch dos itens.
+// Ranking, resumo por categoria e evolução por família logística dependiam
+// TODOS do mesmo `fetchItensDoPeriodo(range)` -- até aqui, cada função
+// buscava esse conjunto de novo (idas ao banco pro MESMO dado, em paralelo
+// mas ainda assim trabalho repetido), o maior gargalo de carregamento da
+// tela "Vendas por produto" (identificado 2026-08-13). Busca uma vez só e
+// agrega os 3 jeitos em memória.
 export async function getVendasPeriodoResumo(
   range: DateRange,
   rankingLimit: number,
   categoriaFiltro?: ProdutoCategoriaKey
 ): Promise<VendasPeriodoResumo> {
-  const [rows, despachoPorSemana] = await Promise.all([
-    fetchItensDoPeriodo(range),
-    buildDespachoPorSemana(range).catch((err) => {
-      console.error("getVendasPeriodoResumo (despacho):", (err as Error).message);
-      return new Map<string, number>();
-    }),
-  ]);
-
-  const vendidoPorSemana = aggregateVendidoPorSemana(rows);
+  const rows = await fetchItensDoPeriodo(range);
 
   return {
     ranking: aggregateRankingProdutos(rows, rankingLimit, categoriaFiltro),
     categorias: aggregateVendasPorCategoria(rows),
     evolucaoFamilia: aggregateVendasPorFamiliaLogisticaPorSemana(rows, range),
-    vendidoDespachado: segundasNoPeriodo(range).map((semanaIso) => ({
-      semanaInicio: semanaIso,
-      vendido: vendidoPorSemana.get(semanaIso) ?? 0,
-      despachado: despachoPorSemana.get(semanaIso) ?? 0,
-    })),
   };
 }
