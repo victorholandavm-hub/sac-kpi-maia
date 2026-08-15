@@ -38,9 +38,6 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) {
-  const resolvedPct =
-    data.totalTickets > 0 ? Math.round((data.resolvedCount / data.totalTickets) * 100) : 0;
-
   // `tag` preserva o valor cru ("cat-duvida") por trás do label traduzido --
   // usado pra abrir o drill-down (data.categoryTickets é indexado pela tag).
   const byCategory = data.byCategory.map((c) => ({ ...c, tag: c.label, label: categoryLabel(c.label) }));
@@ -149,10 +146,12 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         <div className="flex flex-col gap-6">
           <PreviousWeekCard data={data.previousWeek} />
 
-          <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatTile label="Em aberto" value={data.openCount} />
-            <StatTile label="Resolvidos" value={`${resolvedPct}%`} />
-          </section>
+          {/* "Em aberto"/"Resolvidos" saíram do painel por enquanto -- dependem
+              da tag de status que o time ainda não aplica de forma consistente
+              em toda conversa resolvida, então o número ficava sistematicamente
+              inflado pra "em aberto" (chamado resolvido de fato mas sem a tag
+              continua contando como aberto). Voltam quando a adoção da tag
+              melhorar. */}
 
           {data.paretoSummary ? (
             <p className="text-sm" style={{ color: "var(--text-primary)" }}>
