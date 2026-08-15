@@ -354,6 +354,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Posição</th>
                   <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Nome</th>
                   <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Nível</th>
                   <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Compras</th>
@@ -364,6 +365,9 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
                 {pageItems.map((c: ClienteNivelInfo) => (
                   <tr key={c.clientId}>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                      {c.posicaoNoNivel}º
+                    </td>
                     <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
                       {c.nome ?? c.clientId}
                     </td>

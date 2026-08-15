@@ -234,7 +234,29 @@ export type ClienteNivelInfo = {
   primeiraCompra: string | null;
   mesesRelacionamento: number | null;
   nivel: ClienteNivel;
+  // 1º, 2º... por gasto acumulado dentro do próprio nível -- ver
+  // atribuição em listClientesPorNivel. Fixo (não muda com busca/filtro na
+  // tela), pra sempre refletir a posição real do cliente na categoria.
+  posicaoNoNivel: number;
 };
+
+// Pedido do Victor 15/08/2026: "LOJAS AIAM..." e "CONSUMIDOR FINAL" não são
+// clientes de verdade -- são a própria empresa (raiz de CNPJ compartilhada
+// entre as 4 filiais/CD que aparecem como "comprador" no Protheus por causa
+// de transferência interna de mercadoria registrada como venda) e o
+// placeholder genérico de venda balcão sem cliente identificado. Confirmado
+// via dados reais (script descartável) que só existe UMA raiz de CNPJ da
+// empresa aparecendo assim (39537682) -- outras empresas com CNPJ que
+// compram de verdade (ex.: "CG3 ENGENHARIA LTDA") têm raiz diferente e
+// continuam contando normalmente.
+const COMPANY_CNPJ_ROOT = "39537682";
+const NOMES_CLIENTE_INTERNO = new Set(["CONSUMIDOR FINAL"]);
+
+function isClienteInterno(nome: string | null, cpfCnpj: string | null): boolean {
+  if (cpfCnpj && cpfCnpj.startsWith(COMPANY_CNPJ_ROOT)) return true;
+  if (nome && NOMES_CLIENTE_INTERNO.has(nome.trim().toUpperCase())) return true;
+  return false;
+}
 
 const ORDER_PAGE_SIZE = 1000;
 const ORDER_MAX_PAGINAS = 200;
@@ -274,6 +296,7 @@ export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
   const porCliente = new Map<string, Acc>();
   for (const r of rows) {
     if (!r.client_id) continue;
+    if (isClienteInterno(r.client_name, r.client_cpf_cnpj)) continue;
     const acc = porCliente.get(r.client_id) ?? { nome: null, cpfCnpj: null, compras: 0, gasto: 0, primeira: null };
     if (r.type === "Venda") {
       acc.compras += 1;
@@ -300,7 +323,25 @@ export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
       primeiraCompra: acc.primeira,
       mesesRelacionamento: meses,
       nivel: calcularNivel(acc.compras, acc.gasto, meses),
+      posicaoNoNivel: 0, // preenchido abaixo, depois que todo o nível está montado
     });
   }
+
+  // Posição (1º, 2º...) por gasto acumulado dentro do próprio nível --
+  // precisa do nível já calculado pra cada cliente, por isso é um segundo
+  // passo em vez de dar pra fazer junto do loop acima.
+  const porNivelParaRank = new Map<ClienteNivel, ClienteNivelInfo[]>();
+  for (const c of resultado) {
+    const lista = porNivelParaRank.get(c.nivel) ?? [];
+    lista.push(c);
+    porNivelParaRank.set(c.nivel, lista);
+  }
+  for (const lista of porNivelParaRank.values()) {
+    lista.sort((a, b) => b.gastoAcumulado - a.gastoAcumulado);
+    lista.forEach((c, i) => {
+      c.posicaoNoNivel = i + 1;
+    });
+  }
+
   return resultado;
 }
