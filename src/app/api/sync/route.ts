@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { businessMinutesBetween } from "@/lib/businessHours";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
-import { fetchGhlMessages } from "@/lib/ghlClient";
+import { fetchGhlMessages, type GhlMessage } from "@/lib/ghlClient";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -79,12 +79,23 @@ async function fetchRecentConversations(sinceMs: number): Promise<{ conversation
   return { conversations: conversations.filter((c) => (c.dateUpdated ?? 0) >= sinceMs), error };
 }
 
+// Só conta como "resposta" mensagem de atendente humano de verdade
+// (`source: "app"` + `userId` preenchido) -- excluindo tanto a mensagem
+// automática de recepção (`source: "workflow"`) quanto eventos de sistema
+// do GHL (ex.: "Opportunity created"), que também chegam com
+// `direction: "outbound"` mas não são atendimento nenhum.
+function isHumanReply(m: GhlMessage): boolean {
+  return m.source === "app" && Boolean(m.userId);
+}
+
 async function firstResponseMinutes(ghlConversationId: string): Promise<number | null> {
   const msgs = await fetchGhlMessages(ghlConversationId);
   if (!msgs) return null;
   const firstInbound = msgs.find((m) => m.direction === "inbound");
   if (!firstInbound) return null;
-  const firstOutbound = msgs.find((m) => m.direction === "outbound" && m.dateAdded > firstInbound.dateAdded);
+  const firstOutbound = msgs.find(
+    (m) => m.direction === "outbound" && m.dateAdded > firstInbound.dateAdded && isHumanReply(m)
+  );
   if (!firstOutbound) return null;
 
   const minutes = businessMinutesBetween(new Date(firstInbound.dateAdded), new Date(firstOutbound.dateAdded));

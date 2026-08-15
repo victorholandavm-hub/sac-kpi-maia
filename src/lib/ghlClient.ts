@@ -4,6 +4,14 @@ export type GhlMessage = {
   direction: "inbound" | "outbound";
   dateAdded: string;
   body?: string;
+  // Usados só pra distinguir mensagem de atendente humano de mensagem
+  // automática -- ver firstResponseMinutes em api/sync/route.ts.
+  // `source: "workflow"` é automação (ex.: saudação automática) e não tem
+  // `userId`; eventos de sistema do GHL (ex.: "Opportunity created") também
+  // vêm com `direction: "outbound"` mas sem `userId`. Confirmado inspecionando
+  // ~700 mensagens reais via API antes de escrever esse filtro.
+  source?: string;
+  userId?: string;
 };
 
 function ghlHeaders() {
