@@ -109,7 +109,7 @@ export default async function VendasProdutoPage({
   const rankingBaseHref = customRange ? buildHref({ from: range.from, to: range.to }) : buildHref({});
 
   return (
-    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+    <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader
         title="Vendas por produto"
         subtitle={`${actor.name} — curva de venda, ranking e tipo de produto`}
@@ -271,19 +271,25 @@ export default async function VendasProdutoPage({
 
       <CategoriaEvolucaoChart semanas={evolucao.semanas} categorias={evolucao.familias} />
 
-      <VendasPorCategoriaList categorias={categorias} baseHref={rankingBaseHref} categoriaAtiva={categoriaAtiva} />
+      {/* Lado a lado a partir de md -- tipo de produto (mais curta) serve de
+          filtro pro ranking ao lado, faz sentido ver as duas juntas em vez
+          de rolar a página pra comparar. Empilha no mobile (sem espaço
+          horizontal pra duas colunas úteis). */}
+      <div className="grid md:grid-cols-2 gap-4 items-start">
+        <VendasPorCategoriaList categorias={categorias} baseHref={rankingBaseHref} categoriaAtiva={categoriaAtiva} />
 
-      <ProdutoRankingList
-        items={ranking}
-        tendencias={tendencias}
-        saldos={saldos}
-        title={
-          categoriaAtiva
-            ? `Mais vendidos — ${categorias.find((c) => c.key === categoriaAtiva)?.label ?? categoriaAtiva} — ${periodoLabel}`
-            : `Mais vendidos — ${periodoLabel}`
-        }
-        productHref={(code) => buildHref({ q: code, from: customRange ? range.from : undefined, to: customRange ? range.to : undefined })}
-      />
+        <ProdutoRankingList
+          items={ranking}
+          tendencias={tendencias}
+          saldos={saldos}
+          title={
+            categoriaAtiva
+              ? `Mais vendidos — ${categorias.find((c) => c.key === categoriaAtiva)?.label ?? categoriaAtiva} — ${periodoLabel}`
+              : `Mais vendidos — ${periodoLabel}`
+          }
+          productHref={(code) => buildHref({ q: code, from: customRange ? range.from : undefined, to: customRange ? range.to : undefined })}
+        />
+      </div>
 
       <Link href={backHref} className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
         ← Voltar
