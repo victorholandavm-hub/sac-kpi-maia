@@ -32,7 +32,7 @@ function formatBRL(value: number): string {
 
 function buildHref(params: { view?: string; q?: string; status?: string; nivel?: string; page?: number }): string {
   const sp = new URLSearchParams();
-  if (params.view && params.view !== "status") sp.set("view", params.view);
+  if (params.view && params.view !== "nivel") sp.set("view", params.view);
   if (params.q) sp.set("q", params.q);
   if (params.status) sp.set("status", params.status);
   if (params.nivel) sp.set("nivel", params.nivel);
@@ -48,7 +48,9 @@ export default async function ClientesPage({
 }) {
   await requireDashboardAuth();
   const { view: viewParam, q, status, nivel, page: pageParam } = await searchParams;
-  const view = viewParam === "nivel" ? "nivel" : "status";
+  // Nível de relacionamento é a aba de aterrissagem (pedido do Victor
+  // 15/08/2026) -- "status" só aparece quando pedido explicitamente na URL.
+  const view = viewParam === "status" ? "status" : "nivel";
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
   return (
@@ -360,6 +362,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                   <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Compras</th>
                   <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Gasto acumulado</th>
                   <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Cliente desde</th>
+                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Última compra</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -387,6 +390,9 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {formatDateOnly(c.primeiraCompra)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {formatDateOnly(c.ultimaCompra)}
                     </td>
                   </tr>
                 ))}

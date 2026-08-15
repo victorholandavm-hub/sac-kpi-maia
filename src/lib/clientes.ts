@@ -232,6 +232,7 @@ export type ClienteNivelInfo = {
   compras: number;
   gastoAcumulado: number;
   primeiraCompra: string | null;
+  ultimaCompra: string | null;
   mesesRelacionamento: number | null;
   nivel: ClienteNivel;
   // 1º, 2º... por gasto acumulado dentro do próprio nível -- ver
@@ -292,16 +293,17 @@ export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
     if (batch.length < ORDER_PAGE_SIZE) break;
   }
 
-  type Acc = { nome: string | null; cpfCnpj: string | null; compras: number; gasto: number; primeira: string | null };
+  type Acc = { nome: string | null; cpfCnpj: string | null; compras: number; gasto: number; primeira: string | null; ultima: string | null };
   const porCliente = new Map<string, Acc>();
   for (const r of rows) {
     if (!r.client_id) continue;
     if (isClienteInterno(r.client_name, r.client_cpf_cnpj)) continue;
-    const acc = porCliente.get(r.client_id) ?? { nome: null, cpfCnpj: null, compras: 0, gasto: 0, primeira: null };
+    const acc = porCliente.get(r.client_id) ?? { nome: null, cpfCnpj: null, compras: 0, gasto: 0, primeira: null, ultima: null };
     if (r.type === "Venda") {
       acc.compras += 1;
       acc.gasto += r.invoice_total;
       if (!acc.primeira || r.issue_date < acc.primeira) acc.primeira = r.issue_date;
+      if (!acc.ultima || r.issue_date > acc.ultima) acc.ultima = r.issue_date;
     } else if (r.type === "Devolucao") {
       acc.gasto -= r.invoice_total;
     }
@@ -321,6 +323,7 @@ export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
       compras: acc.compras,
       gastoAcumulado: acc.gasto,
       primeiraCompra: acc.primeira,
+      ultimaCompra: acc.ultima,
       mesesRelacionamento: meses,
       nivel: calcularNivel(acc.compras, acc.gasto, meses),
       posicaoNoNivel: 0, // preenchido abaixo, depois que todo o nível está montado
