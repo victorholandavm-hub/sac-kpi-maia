@@ -12,7 +12,7 @@ import { CATEGORY_LABELS, STORE_LABELS } from "./labels";
 export const CLASSIFICATION_METHOD = "heuristic-keywords-v1";
 
 export type TicketClassification = {
-  category: string;
+  category: string | null;
   product: string | null;
   storeTag: string | null;
   confidence: "alta" | "media" | "baixa";
@@ -146,6 +146,29 @@ export function pickStore(transcript: string): string | null {
   return `loja-${matches[0].number}`;
 }
 
+// Categoria, produto e loja são independentes entre si -- a conversa pode
+// não bater em nenhuma palavra-chave de categoria e ainda assim mencionar
+// um produto claramente (ex.: "só queria saber se a cadeira tem garantia").
+// Antes, um `pickCategory` sem match descartava a classificação inteira e
+// derrubava junto o produto/loja que tinham sido encontrados -- por isso
+// "Chamados por produto" ficava praticamente zerado (pedido do Victor
+// 16/08/2026). Só retorna null quando NENHUM dos três achou nada.
+export function classifyTranscript(transcript: string): TicketClassification | null {
+  const categoryResult = pickCategory(transcript);
+  const product = pickProduct(transcript);
+  const storeTag = pickStore(transcript);
+  if (!categoryResult && !product && !storeTag) return null;
+
+  return {
+    category: categoryResult?.category ?? null,
+    product,
+    storeTag,
+    // Sem categoria batida, "media" é a mesma confiança de 1 keyword só
+    // batendo em pickCategory -- não é uma alta confiança inventada.
+    confidence: categoryResult?.confidence ?? "media",
+  };
+}
+
 // Classificação por conversa -- o mesmo `ghl_conversation_id` cobre
 // categoria/produto/loja de uma vez. Retorna null quando não há mensagens
 // com texto suficiente pra tentar (quem chama trata como "não mexe no que
@@ -157,13 +180,5 @@ export async function classifyConversation(ghlConversationId: string): Promise<T
   const transcript = buildTranscript(messages);
   if (!transcript) return null;
 
-  const categoryResult = pickCategory(transcript);
-  if (!categoryResult) return null;
-
-  return {
-    category: categoryResult.category,
-    product: pickProduct(transcript),
-    storeTag: pickStore(transcript),
-    confidence: categoryResult.confidence,
-  };
+  return classifyTranscript(transcript);
 }

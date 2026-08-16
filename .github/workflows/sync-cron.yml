@@ -13,3 +13,7 @@ jobs:
         run: |
           curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://sac-kpi-maia.vercel.app/api/sync"
+      - name: Chamar /api/sync-ai-classify
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://sac-kpi-maia.vercel.app/api/sync-ai-classify"

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pickCategory, pickProduct, pickStore } from "./ticketClassification";
+import { pickCategory, pickProduct, pickStore, classifyTranscript } from "./ticketClassification";
 
 describe("pickCategory", () => {
   it("identifica atraso na entrega", () => {
@@ -57,5 +57,24 @@ describe("pickStore", () => {
 
   it("retorna null quando nenhuma loja é mencionada", () => {
     expect(pickStore("Preciso de ajuda com meu pedido")).toBeNull();
+  });
+});
+
+describe("classifyTranscript", () => {
+  it("acha produto mesmo sem nenhuma categoria bater", () => {
+    const result = classifyTranscript("Estou pensando em comprar uma cadeira de escritório, qual o preço?");
+    expect(result?.category).toBeNull();
+    expect(result?.product).toBe("Cadeira");
+    expect(result?.confidence).toBe("media");
+  });
+
+  it("acha categoria e produto juntos quando os dois batem", () => {
+    const result = classifyTranscript("O sofá chegou todo riscado e com um defeito na costura");
+    expect(result?.category).toBe("cat-avaria");
+    expect(result?.product).toBe("Sofá");
+  });
+
+  it("retorna null quando categoria, produto e loja não batem nada", () => {
+    expect(classifyTranscript("Bom dia, tudo bem?")).toBeNull();
   });
 });
