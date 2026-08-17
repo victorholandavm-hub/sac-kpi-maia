@@ -6,6 +6,7 @@ import Link from "next/link";
 // página renderiza esse componente informando qual aba é a sua.
 const TABS = [
   { key: "solicitacoes", label: "Solicitações", href: "/assistencia/sac" },
+  { key: "notificacoes", label: "Notificação de Assistência", href: "/assistencia/sac/notificacoes" },
   { key: "encomendas", label: "Minhas encomendas", href: "/assistencia/encomendas/sac" },
   { key: "montagens", label: "Montagens e serviços", href: "/assistencia/sac/montagens" },
   { key: "cargas", label: "Cargas", href: "/assistencia/sac/cargas" },

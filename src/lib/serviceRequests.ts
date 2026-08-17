@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
-import { ASSISTENCIA_MANAGED_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES } from "./assistenciaLabels";
+import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES } from "./assistenciaLabels";
 
 export type RequestType =
   | "montagem"
@@ -1210,6 +1210,22 @@ export async function countMontagensOverview(excludeOwnAssemblerStoreIds?: strin
     excludeOwnAssemblerStoreIds
   );
   const { count, error } = await query;
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+// Badge da aba "Notificação de Assistência" no painel do SAC -- mesmo
+// espírito de countMontagensOverview, pros tipos que saíram de
+// "Solicitações" pra essa aba própria (ver /assistencia/sac/notificacoes,
+// 17/08/2026). Sem exclusão de loja com montador próprio -- isso é regra
+// só de montagem/desmontagem/vistoria, não de entrega.
+export async function countEntregasOverview(): Promise<number> {
+  const admin = getSupabaseAdmin();
+  const { count, error } = await admin
+    .from("service_requests")
+    .select("id", { count: "exact", head: true })
+    .in("type", [...DELIVERY_REQUEST_TYPES])
+    .not("status", "in", "(concluida,cancelada)");
   if (error) throw new Error(error.message);
   return count ?? 0;
 }

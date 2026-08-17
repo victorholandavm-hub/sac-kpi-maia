@@ -2,10 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfile, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { signOut } from "@/app/assistencia/actions";
-import { listRequests, countMontagensOverview, listRecentlyHandledBySac } from "@/lib/serviceRequests";
+import { listRequests, countMontagensOverview, countEntregasOverview, listRecentlyHandledBySac } from "@/lib/serviceRequests";
 import { countEntregasEmRiscoOverview } from "@/lib/entregasRisco";
 import { countPedidosEncomendaSolicitados } from "@/lib/pedidosEncomenda";
-import { REQUEST_TYPE_LABELS, ROLE_LABELS, SAC_MANAGED_TYPES, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, ROLE_LABELS, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { NotificationBell } from "@/components/assistencia/NotificationBell";
@@ -33,17 +33,18 @@ export default async function SacHomePage({
   // aqui pro stat "Montagens abertas" não denunciar loja com montador
   // próprio que a SAC não devia nem saber que tem chamado pendente.
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
-  const [{ items }, riscos, montagensAbertas, encomendasSolicitadas, recentlyHandled] = await Promise.all([
+  const [{ items }, riscos, montagensAbertas, entregasAbertas, encomendasSolicitadas, recentlyHandled] = await Promise.all([
+    // Troca/entrega de produto e envio de peça saíram daqui 17/08/2026 --
+    // ganharam aba própria (ver /assistencia/sac/notificacoes), pra não
+    // duplicar o mesmo chamado em duas abas. Só sobra notificação externa
+    // (prazo legal/protocolo, sem motorista/rota -- natureza diferente).
     listRequests({
-      // Envio de peça (gerido pela assistência) sai no mesmo carro/rota do
-      // dia que troca/entrega de produto do SAC -- mostra aqui também, pra
-      // quem monta a rota ver tudo que vai naquele carro, mesmo sem poder
-      // editar o que não é seu (canManage barra a ação, não a visão).
-      types: [...SAC_MANAGED_TYPES, "envio_peca"],
+      types: ["notificacao_externa"],
       status: showCompleted ? "concluida" : undefined,
     }),
     countEntregasEmRiscoOverview(),
     countMontagensOverview(excludeOwnAssemblerStoreIds),
+    countEntregasOverview(),
     countPedidosEncomendaSolicitados(),
     listRecentlyHandledBySac(profile.id),
   ]);
@@ -94,8 +95,11 @@ export default async function SacHomePage({
 
       {/* Indicadores numéricos -- desktop mostra 4 colunas lado a lado,
           mobile colapsa pra 2 (mesma convenção de sm: do resto do app). */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <StatTile label="Solicitações abertas" value={requests.length} />
+        <Link href="/assistencia/sac/notificacoes" className="block">
+          <StatTile label="Notificação de Assistência" value={entregasAbertas} />
+        </Link>
         <StatTile
           label="Entregas — acompanhamento"
           value={riscos.acompanhamento}
@@ -161,7 +165,7 @@ export default async function SacHomePage({
         recentlyHandled.length > 0 ? (
           <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}>
             <p className="text-xs px-4 pt-3" style={{ color: "var(--text-muted)" }}>
-              {showCompleted ? "Nenhuma solicitação concluída ainda." : "Nenhuma notificação ou troca em aberto no momento."}
+              {showCompleted ? "Nenhuma solicitação concluída ainda." : "Nenhuma notificação externa em aberto no momento."}
               {" "}Últimos chamados que você mexeu:
             </p>
             <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -195,7 +199,7 @@ export default async function SacHomePage({
         ) : (
           <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              {showCompleted ? "Nenhuma solicitação concluída ainda." : "Nenhuma notificação ou troca em aberto no momento."}
+              {showCompleted ? "Nenhuma solicitação concluída ainda." : "Nenhuma notificação externa em aberto no momento."}
             </p>
           </div>
         )
