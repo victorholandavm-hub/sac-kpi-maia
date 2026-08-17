@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
+import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto, hasProofPhoto } from "@/lib/servicePhotos";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
@@ -211,6 +211,14 @@ export async function driverCompleteRequest(requestId: string): Promise<void> {
   }
   if (request.status === "concluida" || request.status === "cancelada") {
     throw new Error("Esse chamado já foi encerrado.");
+  }
+
+  // Só está concluída quando o cliente assina -- pedido do Victor
+  // 17/08/2026. Checado aqui (servidor), não só escondendo o botão na tela:
+  // sem isso um motorista com o app desatualizado em cache ainda conseguiria
+  // concluir sem nunca ter enviado o comprovante.
+  if (!(await hasProofPhoto(requestId))) {
+    throw new Error("Envie a foto do comprovante assinado pelo cliente antes de concluir.");
   }
 
   const { data: updated, error: updateError } = await admin

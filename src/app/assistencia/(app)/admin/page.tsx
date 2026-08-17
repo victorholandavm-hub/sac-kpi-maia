@@ -2,6 +2,7 @@ import { getProfile } from "@/lib/dal";
 import { listStores } from "@/lib/serviceRequests";
 import { listGerentesWithPinStatus } from "@/lib/gerentes";
 import { listAssemblersWithPinStatus, listDriversWithPinStatus } from "@/lib/payments";
+import { listTecnicosWithPinStatus } from "@/lib/tecnicos";
 import { listSuppliers } from "@/lib/partOrders";
 import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
 import { listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
@@ -15,6 +16,7 @@ import { AddGerenteForm } from "@/components/assistencia/AddGerenteForm";
 import { AddCaixaForm } from "@/components/assistencia/AddCaixaForm";
 import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
 import { DriverPinField } from "@/components/assistencia/DriverPinField";
+import { TecnicoPinField } from "@/components/assistencia/TecnicoPinField";
 import { GerentePinField } from "@/components/assistencia/GerentePinField";
 import { ProdutoEncomendaAdmin } from "@/components/assistencia/ProdutoEncomendaAdmin";
 import { CaixaPinField } from "@/components/assistencia/CaixaPinField";
@@ -71,6 +73,7 @@ export default async function AdminPage() {
     gerentes,
     assemblers,
     drivers,
+    tecnicos,
     suppliers,
     produtosEncomenda,
     caixas,
@@ -84,6 +87,7 @@ export default async function AdminPage() {
     listGerentesWithPinStatus(),
     listAssemblersWithPinStatus(),
     listDriversWithPinStatus(),
+    listTecnicosWithPinStatus(),
     listSuppliers(),
     listProdutosEncomenda(),
     listCaixasWithPinStatus(),
@@ -159,6 +163,22 @@ export default async function AdminPage() {
             ))}
           </ul>
           <AddSimpleEntryForm kind="driver" />
+        </AdminSection>
+
+        <AdminSection title="Equipe técnica" count={tecnicos.length}>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Defina um PIN de {PIN_LENGTH} números pra cada um acessar a própria área em{" "}
+            <span className="font-mono">/assistencia/tecnico</span> -- quem recebe o motorista na volta da rota e
+            dá destino ao produto (fábrica, estoque, conserto ou sem condições).
+          </p>
+          <ul className="flex flex-col gap-2">
+            {tecnicos.map((t) => (
+              <li key={t.name}>
+                <TecnicoPinField name={t.name} hasPin={t.hasPin} />
+              </li>
+            ))}
+          </ul>
+          <AddSimpleEntryForm kind="tecnico" />
         </AdminSection>
 
         <AdminSection title="Fornecedores" count={suppliers.length}>
