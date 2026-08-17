@@ -122,7 +122,7 @@ export default async function AssistenciaQueuePage({
     listStores(),
     listAssemblers(),
     showPecas ? listDrivers() : Promise.resolve([]),
-    showPecas ? getRotaDriverAssignments(today) : Promise.resolve({ praia: null, sul: null, centro: null }),
+    showPecas ? getRotaDriverAssignments(today) : Promise.resolve({ primary: null, extras: [] }),
   ]);
   const groups = groupByDate(requests);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
