@@ -2,10 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { listRequests } from "@/lib/serviceRequests";
+import { listDrivers } from "@/lib/payments";
+import { getRotaDriverAssignments } from "@/lib/rotas";
 import { REQUEST_TYPE_LABELS, ROLE_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
+import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +30,16 @@ export default async function SacNotificacoesPage({
 
   const { view } = await searchParams;
   const showCompleted = view === "concluidas";
+  const today = new Date().toISOString().slice(0, 10);
 
-  const { items } = await listRequests({
-    types: [...DELIVERY_REQUEST_TYPES],
-    status: showCompleted ? "concluida" : undefined,
-  });
+  const [{ items }, drivers, rotaAssignments] = await Promise.all([
+    listRequests({
+      types: [...DELIVERY_REQUEST_TYPES],
+      status: showCompleted ? "concluida" : undefined,
+    }),
+    listDrivers(),
+    getRotaDriverAssignments(today),
+  ]);
   const requests = showCompleted ? items : items.filter((r) => r.status !== "concluida" && r.status !== "cancelada");
 
   return (
@@ -39,6 +47,13 @@ export default async function SacNotificacoesPage({
       <AssistenciaHeader title="Notificação de Assistência" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`} />
 
       <SacTabs active="notificacoes" />
+
+      {/* Mesmo painel de /assistencia/fila (aba Entregas) -- SAC não
+          alcança a fila da assistência (redirectIfSac), então precisa
+          desse atalho aqui também pra não depender de pedir pra
+          assistência mudar o motorista do dia (pedido do Victor
+          17/08/2026). */}
+      <RotaMotoristaDoDia initialDate={today} initialAssignments={rotaAssignments} drivers={drivers} />
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">

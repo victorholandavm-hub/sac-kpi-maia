@@ -1348,7 +1348,13 @@ export async function setRotaDriverAssignment(
   driverName: string
 ): Promise<{ updatedCount: number }> {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  // SAC também mexe no motorista do dia desde 17/08/2026 -- o painel agora
+  // aparece na aba "Notificação de Assistência" do SAC também, não só na
+  // fila da assistência. Sem restrição por tipo aqui de propósito: rota é
+  // o carro físico do dia, carrega troca/entrega de produto (SAC) e envio
+  // de peça (assistência) juntos -- quem redefine o motorista da rota
+  // mexe no carro inteiro, os dois lados já esperam isso.
+  requireRole(profile, "assistencia", "admin", "sac");
   if (!isRota(rota)) throw new Error("Rota inválida.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Data inválida.");
   const typedName = driverName.trim();
@@ -1393,7 +1399,7 @@ export async function setRotaDriverAssignment(
 // "use server", não dá pra chamar direto de um componente client.
 export async function getRotaDriverAssignmentsAction(date: string) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Data inválida.");
   return getRotaDriverAssignments(date);
 }
@@ -1407,7 +1413,15 @@ export async function setSchedule(
   rotaExceptionNote?: string
 ) {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  // SAC também agenda rota/data dos próprios chamados (troca/entrega de
+  // produto) desde 17/08/2026 -- antes só assistência/admin passavam daqui,
+  // mesmo o SAC já gerenciando esses tipos em todo o resto da tela
+  // (DeliveryRequestDetailContent mostrava o campo editável, mas salvar
+  // sempre falhava com "ação não permitida"). requireManageAccess logo
+  // abaixo já restringe por tipo (SAC só mexe no que SAC_MANAGED_TYPES
+  // cobre -- envio de peça continua exclusivo da assistência), então abrir
+  // aqui não dá acesso a mais do que o SAC já tinha em outros campos.
+  requireRole(profile, "assistencia", "admin", "sac");
   if (shift && !SHIFTS.includes(shift as (typeof SHIFTS)[number])) {
     throw new Error("Turno inválido.");
   }
