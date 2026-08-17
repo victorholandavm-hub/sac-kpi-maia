@@ -39,6 +39,28 @@ export async function listAdminNotificationsAction(): Promise<Notification[]> {
   return listNotifications("admin", null);
 }
 
+export async function listSacNotificationsAction(): Promise<Notification[]> {
+  const profile = await safeAdminProfile();
+  if (!profile || profile.role !== "sac") return [];
+  return listNotifications("sac", null);
+}
+
+// Sino da equipe assistência ((app)/layout.tsx, cobre fila/agenda/admin
+// etc.) -- admin também gerencia esse lado, então vê os dois tipos juntos
+// (kind "assistencia" + os alertas de admin que já existiam, ex.: falha de
+// sync em syncRuns.ts) num sino só, em vez de dois sinos separados. Quem é
+// só "assistencia" (não-admin) vê só o próprio.
+export async function listAssistenciaTeamNotificationsAction(): Promise<Notification[]> {
+  const profile = await safeAdminProfile();
+  if (!profile) return [];
+  if (profile.role === "admin") {
+    const [admin, assistencia] = await Promise.all([listNotifications("admin", null), listNotifications("assistencia", null)]);
+    return [...admin, ...assistencia].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 20);
+  }
+  if (profile.role === "assistencia") return listNotifications("assistencia", null);
+  return [];
+}
+
 // Cobre tanto /assistencia/loja (gerente) quanto /assistencia/encomendas/caixa
 // (caixa ou gerente) -- resolveEncomendaRequester já tenta as duas sessões.
 export async function listLojaNotificationsAction(): Promise<Notification[]> {

@@ -8,7 +8,7 @@ import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/ser
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
-import { notifyLoja } from "@/lib/notifications";
+import { notifyLoja, notifyAssistencia } from "@/lib/notifications";
 import {
   MONTADOR_COOKIE_NAME,
   MONTADOR_SESSION_MAX_AGE,
@@ -184,7 +184,7 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id")
+    .select("assembler_name, status, store_id, ticket_number")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -214,7 +214,9 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
     note,
   });
 
-  await notifyLoja(request.store_id, { type: "status_changed", title: "Solicitação: Remarcar", message: note, link: `/assistencia/${requestId}` });
+  const link = `/assistencia/${requestId}`;
+  await notifyLoja(request.store_id, { type: "status_changed", title: "Solicitação: Remarcar", message: note, link });
+  await notifyAssistencia({ type: "status_changed", title: "Precisa remarcar", message: `Chamado #${request.ticket_number} — ${note}`, link });
 
   revalidatePath("/assistencia/montador");
   revalidatePath(`/assistencia/montador/${requestId}`);
@@ -236,7 +238,7 @@ export async function montadorCompletePartially(requestId: string, completedItem
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id")
+    .select("assembler_name, status, store_id, ticket_number")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -284,12 +286,9 @@ export async function montadorCompletePartially(requestId: string, completedItem
     note: eventNote,
   });
 
-  await notifyLoja(request.store_id, {
-    type: "status_changed",
-    title: "Solicitação: Concluída parcialmente",
-    message: eventNote,
-    link: `/assistencia/${requestId}`,
-  });
+  const link = `/assistencia/${requestId}`;
+  await notifyLoja(request.store_id, { type: "status_changed", title: "Solicitação: Concluída parcialmente", message: eventNote, link });
+  await notifyAssistencia({ type: "status_changed", title: "Precisa remarcar", message: `Chamado #${request.ticket_number} — ${eventNote}`, link });
 
   revalidatePath("/assistencia/montador");
   revalidatePath(`/assistencia/montador/${requestId}`);

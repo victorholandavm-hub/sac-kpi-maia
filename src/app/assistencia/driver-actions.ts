@@ -8,7 +8,9 @@ import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/ser
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
-import { notifyLoja } from "@/lib/notifications";
+import { notifyLoja, notifySac, notifyAssistencia } from "@/lib/notifications";
+import { SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import type { RequestType } from "@/lib/serviceRequests";
 import {
   DRIVER_COOKIE_NAME,
   DRIVER_SESSION_MAX_AGE,
@@ -16,6 +18,14 @@ import {
   verifyDriverSession,
   verifyPin,
 } from "@/lib/driverAuth";
+
+// Troca/entrega de produto são solicitadas pelo SAC -- envio de peça é
+// solicitado pela própria assistência (peça que ela pediu pro CD/fábrica
+// mandar pro cliente). Roteia o alerta de "precisa remarcar" pra quem abriu
+// o chamado, não sempre pro mesmo lugar.
+function notifyRemarcarOwner(type: RequestType, opts: Parameters<typeof notifySac>[0]): Promise<void> {
+  return (SAC_MANAGED_TYPES as readonly string[]).includes(type) ? notifySac(opts) : notifyAssistencia(opts);
+}
 
 export type DriverFormState = { error?: string } | undefined;
 
@@ -245,7 +255,7 @@ export async function driverReportIssue(requestId: string, reason: string): Prom
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("driver_name, status, store_id")
+    .select("driver_name, status, store_id, type, ticket_number")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.driver_name !== driverName) {
@@ -275,7 +285,9 @@ export async function driverReportIssue(requestId: string, reason: string): Prom
     note,
   });
 
-  await notifyLoja(request.store_id, { type: "status_changed", title: "Solicitação: Remarcar", message: note, link: `/assistencia/${requestId}` });
+  const link = `/assistencia/${requestId}`;
+  await notifyLoja(request.store_id, { type: "status_changed", title: "Solicitação: Remarcar", message: note, link });
+  await notifyRemarcarOwner(request.type, { type: "status_changed", title: "Precisa remarcar", message: `Chamado #${request.ticket_number} — ${note}`, link });
 
   revalidatePath("/assistencia/motorista");
   revalidatePath("/assistencia/fila");

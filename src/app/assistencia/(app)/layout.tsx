@@ -9,7 +9,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { MobileNav } from "@/components/assistencia/MobileNav";
 import { NotificationBell } from "@/components/assistencia/NotificationBell";
-import { listAdminNotificationsAction } from "@/app/assistencia/notifications-actions";
+import { listAssistenciaTeamNotificationsAction } from "@/app/assistencia/notifications-actions";
 
 export default async function AssistenciaAppLayout({
   children,
@@ -19,6 +19,11 @@ export default async function AssistenciaAppLayout({
   const profile = await getProfile();
   const isAdmin = profile.role === "admin";
   const isSac = profile.role === "sac";
+  // Sino de "precisa remarcar" (e outros alertas de admin, ex.: falha de
+  // sync) -- antes só admin via, mas o alerta de remarcação também precisa
+  // chegar pro resto da equipe assistência (role "assistencia"), não só
+  // admin (ver notifySac/notifyAssistencia em notifications.ts).
+  const showTeamBell = isAdmin || profile.role === "assistencia";
 
   // Contagem pra badge nas abas Solicitações/Encomendas -- só quando faz
   // sentido pro papel (SAC nem mostra essa navegação, ver abaixo). Exclui
@@ -43,7 +48,7 @@ export default async function AssistenciaAppLayout({
             subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}${profile.storeId ? ` · Loja ${profile.storeId}` : ""}`}
           >
             <div className="flex items-center gap-3">
-              {isAdmin ? <NotificationBell fetchAction={listAdminNotificationsAction} storageKey="admin" /> : null}
+              {showTeamBell ? <NotificationBell fetchAction={listAssistenciaTeamNotificationsAction} storageKey="assistencia-team" /> : null}
               {/* Fora da fila de abas que rola horizontal (AssistenciaNav) de
                   propósito -- "Admin" ficava quase invisível no fim de uma
                   fileira de 11 abas sem indicação nenhuma de que dava pra
