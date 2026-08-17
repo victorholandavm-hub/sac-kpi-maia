@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
-import { listAssemblers } from "@/lib/payments";
+import { listAssemblers, listDrivers } from "@/lib/payments";
+import { getRotaDriverAssignments } from "@/lib/rotas";
 import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
+import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 
 // listRequests só ordena por created_at (ver comentário lá) -- a ordem
 // manual (assistencia_order) só faz sentido DENTRO de um grupo do mesmo dia
@@ -114,10 +116,13 @@ export default async function AssistenciaQueuePage({
   // OWN_ASSEMBLER_STORE_IDS). Sem efeito na aba "Entregas", que nunca tem
   // esses tipos.
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
-  const [{ items: requests, total, pageSize }, stores, assemblers] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10);
+  const [{ items: requests, total, pageSize }, stores, assemblers, drivers, rotaAssignments] = await Promise.all([
     listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: effectiveAssembler, types, dateFrom, dateTo, excludeOwnAssemblerStoreIds }),
     listStores(),
     listAssemblers(),
+    showPecas ? listDrivers() : Promise.resolve([]),
+    showPecas ? getRotaDriverAssignments(today) : Promise.resolve({ praia: null, sul: null, centro: null }),
   ]);
   const groups = groupByDate(requests);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -156,6 +161,9 @@ export default async function AssistenciaQueuePage({
           Entregas
         </Link>
       </div>
+
+      {showPecas ? <RotaMotoristaDoDia initialDate={today} initialAssignments={rotaAssignments} drivers={drivers} /> : null}
+
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
           {FILTERS.map((f) => {

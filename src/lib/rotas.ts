@@ -49,6 +49,22 @@ export async function setRotaWeekday(weekday: number, rota: Rota | null): Promis
   if (error) throw new Error(error.message);
 }
 
+// Quem dirige cada rota numa data específica -- ver setRotaDriverAssignment
+// (actions.ts). null = ninguém definido ainda pra essa rota nesse dia.
+export type RotaDriverAssignments = Record<Rota, string | null>;
+
+export async function getRotaDriverAssignments(date: string): Promise<RotaDriverAssignments> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("rota_driver_assignments").select("rota, driver_name").eq("assignment_date", date);
+  if (error) throw new Error(error.message);
+
+  const result: RotaDriverAssignments = { praia: null, sul: null, centro: null };
+  for (const row of data ?? []) {
+    if (isRota(row.rota)) result[row.rota] = row.driver_name as string;
+  }
+  return result;
+}
+
 // Função pura — recebe a data já como string YYYY-MM-DD pra não depender de
 // timezone do servidor (new Date("YYYY-MM-DD") é sempre UTC meia-noite).
 export function getRotaForDate(dateStr: string, config: RotaWeekdayConfig): Rota | null {
