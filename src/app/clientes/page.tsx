@@ -270,7 +270,11 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
   const todos = await listClientesPorNivel();
 
   const porNivel = new Map<string, number>();
-  for (const c of todos) porNivel.set(c.nivel, (porNivel.get(c.nivel) ?? 0) + 1);
+  const inativosPorNivel = new Map<string, number>();
+  for (const c of todos) {
+    porNivel.set(c.nivel, (porNivel.get(c.nivel) ?? 0) + 1);
+    if (c.inativoRecente) inativosPorNivel.set(c.nivel, (inativosPorNivel.get(c.nivel) ?? 0) + 1);
+  }
 
   const qLower = q?.trim().toLowerCase();
   let filtrados = todos;
@@ -314,6 +318,16 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
             <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
               {CLIENTE_NIVEL_LABELS[n]}
             </span>
+            {/* Nível é histórico acumulado e nunca esfria sozinho -- esse
+                sub-contador é o que avisa quando o número acima está inflado
+                por gente que não compra há 180+ dias (ver DIAS_INATIVO_RECENTE
+                em clientes.ts). Só aparece quando tem pelo menos 1, senão
+                polui todo card com "0 inativos". */}
+            {inativosPorNivel.get(n) ? (
+              <span className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+                ⚠ {inativosPorNivel.get(n)} sem comprar há 180+ dias
+              </span>
+            ) : null}
           </Link>
         ))}
       </div>
@@ -363,6 +377,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                   <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Gasto acumulado</th>
                   <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Cliente desde</th>
                   <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Última compra</th>
+                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Dias sem comprar</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -375,12 +390,23 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                       {c.nome ?? c.clientId}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
-                      <span
-                        className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
-                        style={{ color: CLIENTE_NIVEL_COLORS[c.nivel], borderColor: CLIENTE_NIVEL_COLORS[c.nivel] }}
-                      >
-                        {CLIENTE_NIVEL_LABELS[c.nivel]}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
+                          style={{ color: CLIENTE_NIVEL_COLORS[c.nivel], borderColor: CLIENTE_NIVEL_COLORS[c.nivel] }}
+                        >
+                          {CLIENTE_NIVEL_LABELS[c.nivel]}
+                        </span>
+                        {c.inativoRecente ? (
+                          <span
+                            className="text-xs font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                            style={{ color: "#fff", background: "var(--status-critical)" }}
+                            title="Sem comprar há 180 dias ou mais -- nível é histórico acumulado, não reflete isso sozinho"
+                          >
+                            ⚠ inativo
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.compras}
@@ -393,6 +419,12 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {formatDateOnly(c.ultimaCompra)}
+                    </td>
+                    <td
+                      className="text-right px-4 py-2 whitespace-nowrap"
+                      style={{ color: c.inativoRecente ? "var(--status-critical)" : "var(--text-secondary)" }}
+                    >
+                      {c.diasSemComprar ?? "—"}
                     </td>
                   </tr>
                 ))}
