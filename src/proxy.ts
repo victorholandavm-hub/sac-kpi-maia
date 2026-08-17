@@ -15,6 +15,7 @@ const PASSTHROUGH_PREFIXES = [
   "/api/totvs-sync",
   "/api/montador/upload-photo",
   "/api/motorista/upload-photo",
+  "/api/avaliar",
   "/_next/static",
   "/_next/image",
   "/favicon.ico",

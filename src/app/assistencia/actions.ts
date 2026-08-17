@@ -21,14 +21,7 @@ import {
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
 import { resolveDriverName, listOwnStoreAssemblers } from "@/lib/payments";
-import {
-  saveRequestPhoto,
-  getPhotoForAuth,
-  deleteRequestPhoto,
-  uploadPendingRequestPhoto,
-  attachPendingRequestPhoto,
-  discardPendingRequestPhoto,
-} from "@/lib/servicePhotos";
+import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { randomUUID } from "crypto";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
@@ -1851,11 +1844,11 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/agenda");
   revalidatePath("/assistencia/pagamentos");
-  // Direto pro despacho (não pro detalhe) -- pedido do Victor 17/08/2026:
-  // precisa imprimir (ou salvar em PDF, o botão já abre o diálogo nativo do
-  // navegador que oferece as duas opções) na hora de criar, pro cliente
-  // assinar. Link de volta pro detalhe completo já fica na própria página.
-  redirect(`/assistencia/${data.id}/despacho`);
+  // Volta a cair no detalhe (não no despacho) -- redirecionar direto pra
+  // impressão na criação foi revertido 17/08/2026: a solicitação em si já é
+  // o registro, "Imprimir despacho" fica disponível no chamado sempre que
+  // precisar de verdade, não precisa ser forçado no momento de salvar.
+  redirect(`/assistencia/${data.id}`);
 }
 
 const SAC_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa", "montagem"] as const;
@@ -1933,9 +1926,27 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     }
   }
 
-  const photo = formData.get("photo");
-  if (!(photo instanceof File) || photo.size === 0) {
-    return { error: "Anexe uma foto ou PDF da notificação." };
+  const scheduledDate = String(formData.get("scheduled_date") ?? "").trim();
+  const scheduledTime = String(formData.get("scheduled_time") ?? "").trim();
+  const rotaInput = String(formData.get("rota") ?? "").trim();
+  const rotaExceptionNoteInput = String(formData.get("rota_exception_note") ?? "").trim();
+
+  // Mesma validação de setSchedule (edição do chamado já criado) -- rota
+  // fora do dia esperado exige motivo, senão vira encaixe silencioso sem
+  // registro nenhum do porquê.
+  let rotaValue: string | null = null;
+  let rotaExceptionNote: string | null = null;
+  if (scheduledDate && rotaInput) {
+    if (!isRota(rotaInput)) return { error: "Rota inválida." };
+    const rotaConfig = await getRotaWeekdayConfig();
+    const expectedRota = getRotaForDate(scheduledDate, rotaConfig);
+    const isRotaException = expectedRota !== rotaInput;
+    if (isRotaException && !rotaExceptionNoteInput) {
+      const expectedLabel = expectedRota ? ROTA_LABELS[expectedRota] : "nenhuma rota";
+      return { error: `Essa data é de ${expectedLabel}, não de ${ROTA_LABELS[rotaInput]} — informe o motivo do encaixe fora da rota.` };
+    }
+    rotaValue = rotaInput;
+    rotaExceptionNote = isRotaException ? rotaExceptionNoteInput : null;
   }
 
   const urgent = formData.get("urgent") === "on";
@@ -1976,23 +1987,22 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   }
 
   const admin = getSupabaseAdmin();
-  const driverName = driverNameInput ? await resolveDriverName(driverNameInput) : null;
+  let driverName = driverNameInput ? await resolveDriverName(driverNameInput) : null;
+  // Sem motorista digitado, mas com rota+data escolhidas: puxa o motorista
+  // do dia daquela rota, mesmo auto-preenchimento de setSchedule (ScheduleField).
+  if (!driverName && rotaValue && scheduledDate) {
+    const assignments = await getRotaDriverAssignments(scheduledDate);
+    driverName = assignments[rotaValue as Rota] ?? null;
+  }
   if (driverName) {
     await admin.from("drivers").upsert({ name: driverName }, { onConflict: "name" });
   }
 
-  // Anexo é obrigatório -- sobe o arquivo ANTES de criar o ticket (o path só
-  // depende do id, gerado aqui antecipadamente, não da linha existir de
-  // fato). Se o upload falhar, nenhum ticket chega a ser criado, então não
-  // sobra chamado "válido" sem anexo por causa de uma falha no meio do
-  // caminho.
+  // Sem anexo aqui -- pedido do Victor 17/08/2026: só o motorista precisa
+  // tirar foto (o comprovante assinado, obrigatório pra concluir a rota,
+  // ver driverCompleteRequest). A solicitação em si já vira o despacho pra
+  // imprimir, não precisa de nada anexado na hora de criar.
   const requestId = randomUUID();
-  let photoPath: string;
-  try {
-    photoPath = await uploadPendingRequestPhoto(requestId, photo);
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Não foi possível enviar o anexo." };
-  }
 
   const { data, error } = await admin
     .from("service_requests")
@@ -2013,6 +2023,10 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       reason: reason,
       restriction_note: emptyToNull(formData.get("restriction_note")),
       driver_name: driverName,
+      scheduled_date: scheduledDate || null,
+      scheduled_time: scheduledTime || null,
+      rota: rotaValue,
+      rota_exception_note: rotaExceptionNote,
       shift: urgent ? "urgencia" : null,
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
       causa_raiz: causaRaiz,
@@ -2026,7 +2040,6 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     .single();
 
   if (error || !data) {
-    await discardPendingRequestPhoto(photoPath);
     return { error: `Não foi possível criar: ${error?.message ?? "erro desconhecido"}` };
   }
 
@@ -2061,19 +2074,8 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     to_status: "aberta",
   });
 
-  try {
-    await attachPendingRequestPhoto({ requestId: data.id, path: photoPath, uploadedBy: profile.fullName });
-  } catch {
-    // O arquivo já subiu, mas não deu pra associar ao ticket -- como o
-    // anexo é obrigatório, desfaz o ticket inteiro (cascade cuida de
-    // item/evento já criados) em vez de deixar um chamado "válido" sem
-    // anexo. O usuário só precisa tentar de novo.
-    await admin.from("service_requests").delete().eq("id", data.id);
-    return { error: "Não foi possível concluir o anexo da solicitação. Tente de novo." };
-  }
-
   revalidatePath("/assistencia/sac");
-  redirect(`/assistencia/${data.id}/despacho`);
+  redirect(`/assistencia/${data.id}`);
 }
 
 // Chamada a partir do painel da loja (/assistencia/loja, protegido por login

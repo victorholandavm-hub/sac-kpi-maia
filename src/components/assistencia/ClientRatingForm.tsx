@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { verifyClientRatingAccess, submitClientRating } from "@/app/assistencia/avaliar/actions";
+import type { ClientRatingAccess } from "@/app/assistencia/avaliar/actions";
 import { RatingScale } from "./RatingScale";
 
 const REASON_MESSAGES: Record<string, string> = {
@@ -15,6 +15,30 @@ const REASON_MESSAGES: Record<string, string> = {
 
 type Step = { kind: "cpf" } | { kind: "rating"; label: "montagem" | "entrega" } | { kind: "done" };
 
+// POST comum (fetch pra /api/avaliar/*) em vez de Server Action chamada
+// direto -- o cliente abre esse link quase sempre escaneando o QR de
+// dentro de um navegador embutido (câmera do celular, WhatsApp), com o
+// mesmo bug já documentado pro upload de foto de montador/motorista: Server
+// Actions dependem de resposta RSC em stream, que esses navegadores
+// restritos não suportam bem -- o clique simplesmente não fazia nada, sem
+// erro nenhum visível (17/08/2026).
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  // Lê como texto primeiro -- se não vier JSON válido é sinal de que a
+  // resposta nem chegou na nossa rota (proxy/erro genérico), não um erro
+  // de negócio -- mesmo cuidado de MontadorPhotoUpload.tsx.
+  const raw = await res.text();
+  try {
+    return raw ? JSON.parse(raw) : ({} as T);
+  } catch {
+    throw new Error(`Não foi possível conectar (erro ${res.status}). Tente de novo.`);
+  }
+}
+
 export function ClientRatingForm({ requestId }: { requestId: string }) {
   const [step, setStep] = useState<Step>({ kind: "cpf" });
   const [cpf, setCpf] = useState("");
@@ -26,12 +50,16 @@ export function ClientRatingForm({ requestId }: { requestId: string }) {
   function confirmCpf() {
     setError(null);
     startTransition(async () => {
-      const access = await verifyClientRatingAccess(requestId, cpf);
-      if (!access.ok) {
-        setError(REASON_MESSAGES[access.reason] ?? "Não foi possível confirmar. Tente de novo.");
-        return;
+      try {
+        const access = await postJson<ClientRatingAccess>("/api/avaliar/verify", { requestId, cpf });
+        if (!access.ok) {
+          setError(REASON_MESSAGES[access.reason] ?? "Não foi possível confirmar. Tente de novo.");
+          return;
+        }
+        setStep({ kind: "rating", label: access.kind });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erro inesperado. Tente de novo.");
       }
-      setStep({ kind: "rating", label: access.kind });
     });
   }
 
@@ -43,7 +71,16 @@ export function ClientRatingForm({ requestId }: { requestId: string }) {
     setError(null);
     startTransition(async () => {
       try {
-        await submitClientRating(requestId, cpf, deliveryRating, resolutionRating);
+        const result = await postJson<{ ok?: boolean; error?: string }>("/api/avaliar/submit", {
+          requestId,
+          cpf,
+          deliveryRating,
+          resolutionRating,
+        });
+        if (!result.ok) {
+          setError(result.error || "Não foi possível enviar. Tente de novo.");
+          return;
+        }
         setStep({ kind: "done" });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erro inesperado. Tente de novo.");
