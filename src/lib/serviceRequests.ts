@@ -760,6 +760,7 @@ export type AssemblerRequestView = {
   completedAt: string | null;
   comboMontagemDesmontagem: boolean;
   montadorInstruction: string | null;
+  deliveryRating: number | null;
 };
 
 // Montagem/desmontagem raramente passa pelo "agendar" (ScheduleField) --
@@ -784,7 +785,7 @@ const ASSEMBLER_VIEW_LIMIT = 200;
 // escreve (ver setMontadorInstruction em actions.ts), pensado justamente
 // pra aparecer aqui -- não tem o mesmo risco do Motivo do gerente.
 const ASSEMBLER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, order_code, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, montador_instruction, stores(name), items:service_request_items(id, product, quantity, item_action, completed)";
+  "id, ticket_number, type, status, order_code, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, montador_instruction, delivery_rating, stores(name), items:service_request_items(id, product, quantity, item_action, completed)";
 
 type AssemblerViewRow = {
   id: string;
@@ -808,6 +809,7 @@ type AssemblerViewRow = {
   completed_at: string | null;
   combo_montagem_desmontagem: boolean;
   montador_instruction: string | null;
+  delivery_rating: number | null;
   stores: { name: string } | null;
   items: { id: string; product: string; quantity: number; item_action: string | null; completed: boolean }[] | null;
 };
@@ -844,6 +846,7 @@ function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
     completedAt: row.completed_at,
     comboMontagemDesmontagem: row.combo_montagem_desmontagem,
     montadorInstruction: row.montador_instruction,
+    deliveryRating: row.delivery_rating,
   };
 }
 
@@ -938,11 +941,12 @@ export type DriverRequestView = {
   rota: Rota | null;
   rotaExceptionNote: string | null;
   driverOrder: number | null;
+  deliveryRating: number | null;
 };
 
 const DRIVER_VIEW_LIMIT = 200;
 const DRIVER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, stores(name), items:service_request_items(product)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, stores(name), items:service_request_items(product)";
 
 type DriverViewRow = {
   id: string;
@@ -969,6 +973,7 @@ type DriverViewRow = {
   rota: Rota | null;
   rota_exception_note: string | null;
   driver_order: number | null;
+  delivery_rating: number | null;
   stores: { name: string } | null;
   items: { product: string }[] | null;
 };
@@ -1001,6 +1006,7 @@ function toDriverView(row: DriverViewRow): DriverRequestView {
     rota: row.rota,
     rotaExceptionNote: row.rota_exception_note,
     driverOrder: row.driver_order,
+    deliveryRating: row.delivery_rating,
   };
 }
 

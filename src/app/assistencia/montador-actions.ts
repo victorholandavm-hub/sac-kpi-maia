@@ -118,17 +118,12 @@ export async function montadorDeletePhoto(photoId: string): Promise<void> {
   revalidatePath(`/assistencia/montador/${info.requestId}`);
 }
 
-function validRating(value: number | null): number | null {
-  if (value === null) return null;
-  if (!Number.isInteger(value) || value < 0 || value > 10) throw new Error("Nota inválida.");
-  return value;
-}
-
-export async function montadorCompleteRequest(
-  requestId: string,
-  deliveryRating: number | null = null,
-  resolutionRating: number | null = null
-): Promise<void> {
+// A nota do cliente não entra mais aqui -- desde 17/08/2026 é coletada
+// depois, numa tela pública separada (QR code que aparece na hora de
+// concluir, ver RatingQrCode.tsx / avaliar/actions.ts). Antes o montador
+// pedia a nota na hora ("vire o celular pro cliente avaliar"), o que dava
+// pra ele mesmo preencher a nota sem o cliente participar de verdade.
+export async function montadorCompleteRequest(requestId: string): Promise<void> {
   const assemblerName = await getMontadorSession();
   if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
 
@@ -147,12 +142,7 @@ export async function montadorCompleteRequest(
 
   const { data: updated, error: updateError } = await admin
     .from("service_requests")
-    .update({
-      status: "concluida",
-      completed_at: new Date().toISOString(),
-      delivery_rating: validRating(deliveryRating),
-      resolution_rating: validRating(resolutionRating),
-    })
+    .update({ status: "concluida", completed_at: new Date().toISOString() })
     .eq("id", requestId)
     .eq("status", request.status)
     .select("id")
@@ -160,17 +150,13 @@ export async function montadorCompleteRequest(
   if (updateError) throw new Error(updateError.message);
   if (!updated) throw new Error("Esse chamado já foi atualizado por outra pessoa. Recarregue a página e tente de novo.");
 
-  const ratingNote =
-    deliveryRating !== null || resolutionRating !== null
-      ? ` Avaliação do cliente — montagem: ${deliveryRating ?? "—"}, resolução: ${resolutionRating ?? "—"}.`
-      : "";
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: null,
     event_type: "status_changed",
     from_status: request.status,
     to_status: "concluida",
-    note: `Concluído pelo montador ${assemblerName}.${ratingNote}`,
+    note: `Concluído pelo montador ${assemblerName}.`,
   });
 
   await notifyLoja(request.store_id, {

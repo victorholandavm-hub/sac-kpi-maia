@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
 import { MontadorPhotoUpload } from "@/components/assistencia/MontadorPhotoUpload";
 import { MontadorRequestActions } from "@/components/assistencia/MontadorRequestActions";
+import { RatingQrCode } from "@/components/assistencia/RatingQrCode";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { telHref, whatsappHref } from "@/lib/phone";
@@ -48,6 +49,11 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
 
   const photos = await listRequestPhotos(request.id);
   const showCompleted = request.status === "concluida" || request.status === "cancelada";
+  // QR de avaliação só faz sentido pra chamado real de cliente, já concluído
+  // e ainda sem nota -- mostruário fica de fora (avaliação é do gerente da
+  // loja, ver LojaGerenteRatingPrompt.tsx / loja/page.tsx).
+  const needsClientRatingQr =
+    request.status === "concluida" && request.deliveryRating === null && !isMostruarioRequest(request.orderCode, request.clientName);
   const montadorDate = montadorEffectiveDate(request);
   const mapsQuery = [request.clientAddress, request.clientAddressNumber, request.clientNeighborhood].filter(Boolean).join(", ");
 
@@ -197,11 +203,17 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               Ações
             </h3>
-            <MontadorRequestActions
-              requestId={request.id}
-              items={request.items}
-              isMostruario={isMostruarioRequest(request.orderCode, request.clientName)}
-            />
+            <MontadorRequestActions requestId={request.id} items={request.items} />
+          </div>
+        ) : needsClientRatingQr ? (
+          <div
+            className="rounded-lg p-4 flex flex-col gap-3"
+            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          >
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              Avaliação do cliente
+            </h3>
+            <RatingQrCode requestId={request.id} />
           </div>
         ) : null}
       </div>
