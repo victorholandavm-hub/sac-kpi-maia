@@ -41,7 +41,11 @@ export default async function AssistenciaAppLayout({
 
   return (
     <ToastProvider>
-      <div className="max-w-5xl mx-auto px-6 pt-6 pb-24 sm:pb-6 flex flex-col gap-6 w-full min-w-0">
+      {/* print:p-0 -- o resto do padding some junto com o cabeçalho/nav
+          (print:hidden), mas o espaço reservado (pt-6/pb-24, pensado pra
+          rolagem na tela) continuava sendo impresso vazio -- empurrava o
+          despacho pra baixo o bastante pra vazar pra segunda folha. */}
+      <div className="max-w-5xl mx-auto px-6 pt-6 pb-24 sm:pb-6 print:p-0 flex flex-col gap-6 w-full min-w-0">
         <div className="flex flex-col gap-3 print:hidden">
           <AssistenciaHeader
             title="Assistência — Lojas Maia"

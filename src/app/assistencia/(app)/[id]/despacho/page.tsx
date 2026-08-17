@@ -1,22 +1,41 @@
-import { getProfile } from "@/lib/dal";
-import { getRequestDetail, formatFullAddress, type ServiceRequestDetail } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
-import { PrintButton } from "@/components/assistencia/PrintButton";
 import Link from "next/link";
+import Image from "next/image";
+import { getProfile } from "@/lib/dal";
+import { getRequestDetail, formatFullAddress } from "@/lib/serviceRequests";
+import { CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
+import { PrintButton } from "@/components/assistencia/PrintButton";
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+      <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
         {label}
       </span>
-      <span className="text-base" style={{ color: "var(--text-primary)" }}>
+      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
         {value || "—"}
       </span>
     </div>
   );
 }
 
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="px-3 py-1 text-xs font-semibold uppercase tracking-wide"
+      style={{ background: "var(--text-primary)", color: "var(--surface-1)" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Papel físico de hoje (pedido do Victor 17/08/2026): logo + título no
+// topo, tudo numa folha só, na ordem — dados do cliente, descrição do
+// produto, descrição da solicitação (quem autorizou/problema/quem errou/
+// observação), relatório logístico (texto livre) e por fim a assinatura.
+// Um template só pra todo tipo (antes tinha um branch à parte só pra
+// troca_produto) -- tamanho de fonte/espaçamento pequenos de propósito,
+// pensados pra caber numa folha A4 sem estourar pra segunda página.
 export default async function DespachoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const profile = await getProfile();
@@ -49,13 +68,21 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
   }
 
   const isUrgente = request.shift === "urgencia";
+  const enderecoCompleto = [formatFullAddress(request), request.clientNeighborhood].filter(Boolean).join(" — ");
 
-  if (request.type === "troca_produto") {
-    return <TrocaProdutoDespacho request={request} isUrgente={isUrgente} />;
-  }
+  const causaRaizLine =
+    request.causaRaiz === "erro_conferencia"
+      ? [request.causaCarga ? `Carga: ${request.causaCarga}` : null, request.causaConferente ? `Conferente: ${request.causaConferente}` : null]
+          .filter(Boolean)
+          .join(" · ")
+      : request.causaRaiz === "erro_motorista"
+        ? [request.causaCarga ? `Carga: ${request.causaCarga}` : null, request.driverName ? `Motorista: ${request.driverName}` : null]
+            .filter(Boolean)
+            .join(" · ")
+        : null;
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex flex-col gap-4 max-w-2xl despacho-print">
       <div className="flex items-center justify-between gap-3 print:hidden">
         <Link href={`/assistencia/${request.id}`} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
           ← Ver chamado completo
@@ -63,156 +90,72 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
         <PrintButton />
       </div>
 
+      {/* @page/margin aqui mesmo (não no CSS global) -- só essa página
+          precisa desse ajuste, o resto do sistema nunca é impresso. */}
+      <style>{`
+        @page { size: A4; margin: 10mm; }
+        @media print {
+          html, body { height: auto !important; }
+        }
+      `}</style>
+
       <div
-        className="rounded-lg border p-6 flex flex-col gap-4"
+        className="rounded-lg border overflow-hidden flex flex-col text-sm"
         style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
       >
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold" style={{ color: "var(--brand-green)" }}>
-              Relatório Logístico
-            </h1>
-            <span className="text-sm font-mono" style={{ color: "var(--text-muted)" }}>
-              Chamado #{request.ticketNumber}
-            </span>
+            <Image src="/logo.png" alt="Lojas Maia" width={112} height={112} className="h-12 w-12 object-contain shrink-0" />
+            <div className="flex flex-col">
+              <h1 className="text-base font-bold leading-tight" style={{ color: "var(--brand-green)" }}>
+                Notificação de Assistência
+              </h1>
+              <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                Chamado #{request.ticketNumber} · {request.storeName}
+              </span>
+            </div>
           </div>
           {isUrgente ? (
-            <span
-              className="text-sm font-bold px-3 py-1 rounded-full"
-              style={{ color: "#fff", background: "var(--status-critical)" }}
-            >
+            <span className="text-sm font-bold px-2 py-1 rounded" style={{ color: "#fff", background: "var(--status-critical)" }}>
               URGENTE!
             </span>
           ) : null}
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Cliente" value={request.clientName} />
+        <SectionTitle>Dados do cliente</SectionTitle>
+        <div className="grid sm:grid-cols-2 gap-3 px-4 py-3">
+          <Field label="Nome" value={request.clientName} />
           <Field label="Telefone" value={request.clientPhone} />
-          <Field label="Endereço" value={formatFullAddress(request)} />
-          <Field label="Bairro" value={request.clientNeighborhood} />
-          <Field label="Loja / solicitado por" value={`${request.storeName} · ${request.requestedByName ?? "—"}`} />
-          <Field label="Tipo" value={REQUEST_TYPE_LABELS[request.type] ?? request.type} />
-          {request.shift ? <Field label="Turno" value={SHIFT_LABELS[request.shift]} /> : null}
-          {request.scheduledDate ? <Field label="Data agendada" value={request.scheduledDate.split("-").reverse().join("/")} /> : null}
-          {request.scheduledTime ? <Field label="Hora agendada" value={request.scheduledTime.slice(0, 5)} /> : null}
+          <Field label="Endereço" value={enderecoCompleto} />
         </div>
 
-        {request.items.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            <span className="text-xs uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-              Itens
-            </span>
-            <table className="w-full text-sm">
-              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {request.items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="py-1" style={{ color: "var(--text-primary)" }}>
-                      {item.quantity > 1 ? `${item.quantity}x ` : ""}
-                      {item.product}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-
-        <Field label="Instrução / motivo" value={request.reason} />
-        {request.restrictionNote ? <Field label="Restrição / observação" value={request.restrictionNote} /> : null}
-      </div>
-    </div>
-  );
-}
-
-function TrocaProdutoDespacho({
-  request,
-  isUrgente,
-}: {
-  request: ServiceRequestDetail;
-  isUrgente: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-6 max-w-2xl">
-      <div className="flex items-center justify-between gap-3 print:hidden">
-        <Link href={`/assistencia/${request.id}`} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-          ← Ver chamado completo
-        </Link>
-        <PrintButton />
-      </div>
-
-      <div
-        className="rounded-lg border overflow-hidden flex flex-col"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
-        <div className="flex items-center justify-between gap-3 border-b px-4 py-2" style={{ borderColor: "var(--border)" }}>
-          <span className="text-sm font-mono" style={{ color: "var(--text-muted)" }}>
-            Chamado #{request.ticketNumber}
-          </span>
-          {isUrgente ? (
-            <span className="text-base font-bold" style={{ color: "var(--status-critical)" }}>
-              Urgente!
-            </span>
-          ) : null}
-        </div>
-
+        <SectionTitle>Descrição do produto</SectionTitle>
         <table className="w-full text-sm border-collapse">
-          <tbody>
-            <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-              <td className="px-3 py-2 font-semibold w-28 border-r align-top" style={{ borderColor: "var(--border)" }}>
-                Nome
-              </td>
-              <td className="px-3 py-2" style={{ color: "var(--text-primary)" }}>
-                {request.clientName || "—"}
-              </td>
-              <td className="px-3 py-2 border-l align-top w-40" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-                Solicitado por: {request.requestedByName ?? "—"}
-              </td>
-            </tr>
-            <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-              <td className="px-3 py-2 font-semibold border-r align-top" style={{ borderColor: "var(--border)" }}>
-                Endereço
-              </td>
-              <td className="px-3 py-2" colSpan={2} style={{ color: "var(--text-primary)" }}>
-                {request.clientAddress || "—"}
-              </td>
-            </tr>
-            <tr>
-              <td className="px-3 py-2 font-semibold border-r align-top" style={{ borderColor: "var(--border)" }}>
-                Bairro
-              </td>
-              <td className="px-3 py-2 border-r" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
-                {request.clientNeighborhood || "—"}
-              </td>
-              <td className="px-3 py-2" style={{ color: "var(--text-primary)" }}>
-                Tel: {request.clientPhone || "—"}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <table className="w-full text-sm border-collapse border-t" style={{ borderColor: "var(--border)" }}>
           <thead>
             <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
-              <th className="px-3 py-2 text-left font-semibold">Descrição</th>
-              <th className="px-3 py-2 text-right font-semibold w-16">Qtd</th>
+              <th className="px-3 py-1 text-left font-semibold w-24">Código</th>
+              <th className="px-3 py-1 text-left font-semibold">Produto</th>
+              <th className="px-3 py-1 text-right font-semibold w-14">Qtd</th>
             </tr>
           </thead>
           <tbody>
             {request.items.length > 0 ? (
               request.items.map((item) => (
                 <tr key={item.id} className="border-b" style={{ borderColor: "var(--border)" }}>
-                  <td className="px-3 py-2" style={{ color: "var(--text-primary)" }}>
+                  <td className="px-3 py-1" style={{ color: "var(--text-secondary)" }}>
+                    {item.partCode || "—"}
+                  </td>
+                  <td className="px-3 py-1" style={{ color: "var(--text-primary)" }}>
                     {item.product}
                   </td>
-                  <td className="px-3 py-2 text-right" style={{ color: "var(--text-primary)" }}>
+                  <td className="px-3 py-1 text-right" style={{ color: "var(--text-primary)" }}>
                     {item.quantity}
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td className="px-3 py-2" style={{ color: "var(--text-muted)" }} colSpan={2}>
+                <td className="px-3 py-1" style={{ color: "var(--text-muted)" }} colSpan={3}>
                   —
                 </td>
               </tr>
@@ -220,42 +163,28 @@ function TrocaProdutoDespacho({
           </tbody>
         </table>
 
-        <div className="border-t" style={{ borderColor: "var(--border)" }}>
-          <div
-            className="px-3 py-1 text-sm font-semibold uppercase tracking-wide"
-            style={{ background: "var(--text-primary)", color: "var(--surface-1)" }}
-          >
-            Descrição
-          </div>
-          <div className="px-3 py-3 flex flex-col gap-1 items-center text-center">
-            <span className="text-sm font-bold uppercase" style={{ color: "var(--text-primary)" }}>
-              Troca
-            </span>
-            <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-              {request.restrictionNote || request.reason || "—"}
-            </span>
+        <SectionTitle>Descrição da solicitação</SectionTitle>
+        <div className="flex flex-col gap-2 px-4 py-3">
+          <Field label="Autorizado por" value={request.requestedByName} />
+          <Field label="Problema" value={request.reason} />
+          <Field label="Quem errou" value={request.causaRaiz ? (CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz) : null} />
+          {causaRaizLine ? <Field label="Detalhe" value={causaRaizLine} /> : null}
+          <Field label="Observação" value={request.restrictionNote || request.notes} />
+        </div>
+
+        <SectionTitle>Relatório logístico</SectionTitle>
+        <div className="px-4 py-3 flex flex-col gap-4">
+          <Field label="Motorista / montador" value={request.driverName || request.assemblerName} />
+          <div className="flex flex-col gap-3 pt-1">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="border-b" style={{ borderColor: "var(--border)", height: "1rem" }} />
+            ))}
           </div>
         </div>
 
-        <div className="border-t" style={{ borderColor: "var(--border)" }}>
-          <div
-            className="px-3 py-1 text-sm font-semibold uppercase tracking-wide"
-            style={{ background: "var(--text-primary)", color: "var(--surface-1)" }}
-          >
-            Relatório Logístico
-          </div>
-          <div className="px-4 py-4 flex flex-col gap-3">
-            <Field label="Motorista" value={request.driverName} />
-            <div className="flex flex-col gap-4 pt-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="border-b" style={{ borderColor: "var(--border)", height: "1.25rem" }} />
-              ))}
-            </div>
-            <div className="flex justify-center pt-6">
-              <div className="border-t w-56 text-center text-xs pt-1" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
-                Assinatura do cliente
-              </div>
-            </div>
+        <div className="flex justify-center pb-4 pt-2">
+          <div className="border-t w-56 text-center text-xs pt-1" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+            Assinatura do cliente
           </div>
         </div>
       </div>

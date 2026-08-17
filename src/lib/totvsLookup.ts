@@ -62,18 +62,50 @@ export async function findTotvsClientByCode(code: string): Promise<TotvsClientMa
     .eq("protheus_code", trimmed)
     .maybeSingle();
 
-  if (!data) return null;
+  if (data) {
+    return {
+      protheusCode: data.protheus_code,
+      name: data.name,
+      cpfCnpj: data.cpf_cnpj,
+      phone1: data.phone1,
+      addressStreet: data.address_street,
+      addressNumber: data.address_number,
+      addressComplement: data.address_complement,
+      addressNeighborhood: data.address_neighborhood,
+      addressCity: data.address_city,
+      addressState: data.address_state,
+    };
+  }
+
+  // Cadastro completo (totvs_clientes) só cobre uma fração de quem já
+  // comprou -- mesmo gap já confirmado em clientes.ts/avaliar/actions.ts
+  // (24.584 códigos distintos aparecem como comprador em algum pedido, só
+  // 3.760 têm cadastro sincronizado). Sem esse fallback, buscar um código
+  // de cliente real (ex.: 106044/FABIO GOMES, tem pedido mas não tem
+  // cadastro) simplesmente não achava nada -- confirmado em produção
+  // 17/08/2026. totvs_orders não tem telefone/endereço, só nome e CPF, mas
+  // já evita a pessoa ter que digitar tudo à mão de novo.
+  const { data: order } = await admin
+    .from("totvs_orders")
+    .select("client_name, client_cpf_cnpj")
+    .eq("client_id", trimmed)
+    .not("client_name", "is", null)
+    .order("issue_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!order?.client_name) return null;
+
   return {
-    protheusCode: data.protheus_code,
-    name: data.name,
-    cpfCnpj: data.cpf_cnpj,
-    phone1: data.phone1,
-    addressStreet: data.address_street,
-    addressNumber: data.address_number,
-    addressComplement: data.address_complement,
-    addressNeighborhood: data.address_neighborhood,
-    addressCity: data.address_city,
-    addressState: data.address_state,
+    protheusCode: trimmed,
+    name: order.client_name,
+    cpfCnpj: order.client_cpf_cnpj ?? "",
+    phone1: null,
+    addressStreet: null,
+    addressNumber: null,
+    addressComplement: null,
+    addressNeighborhood: null,
+    addressCity: null,
+    addressState: null,
   };
 }
 
