@@ -1,37 +1,22 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/dal";
 import { formatFullAddress, type ServiceRequestDetail, type RequestEvent } from "@/lib/serviceRequests";
-import {
-  REQUEST_TYPE_LABELS,
-  STATUS_LABELS,
-  DEADLINE_STATUS_LABELS,
-  SHIFT_LABELS,
-  SAC_CATEGORY_LABELS,
-  SAC_MANAGED_TYPES,
-  PAYMENTS_CONTROLLER_NAME,
-  REQUEST_STATUS_STEPS,
-  CAUSA_RAIZ_LABELS,
-} from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, STATUS_LABELS, SAC_MANAGED_TYPES, REQUEST_STATUS_STEPS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
 import { StatusStepper } from "./StatusStepper";
 import { RequestActions } from "./RequestActions";
 import { MobileActionSheet } from "./MobileActionSheet";
-import { DeadlineActions } from "./DeadlineActions";
-import { AssemblerNameField } from "./AssemblerNameField";
-import { MontadorInstructionField } from "./MontadorInstructionField";
-import { ComboMontagemDesmontagemField } from "./ComboMontagemDesmontagemField";
+import { DriverNameField } from "./DriverNameField";
 import { ScheduleField } from "./ScheduleField";
-import { type Rota } from "@/lib/rotas";
 import { RequestItemsTable } from "./RequestItemsTable";
-import { SacCategoryField } from "./SacCategoryField";
-import { LegalDeadlineField } from "./LegalDeadlineField";
-import { EscalationRiskToggle } from "./EscalationRiskToggle";
 import { RealtimeQueueRefresher } from "./RealtimeQueueRefresher";
 import { PhotoGallery } from "./PhotoGallery";
 import { RequestPhotoUpload } from "./RequestPhotoUpload";
 import type { RequestPhoto } from "@/lib/servicePhotos";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { RequestHistoryTimeline } from "./RequestHistoryTimeline";
+import { PAYMENTS_CONTROLLER_NAME } from "@/lib/assistenciaLabels";
+import { ROTA_LABELS, type Rota } from "@/lib/rotas";
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -47,14 +32,6 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   );
 }
 
-function formatDateOnly(value: string | null | undefined) {
-  if (!value) return null;
-  const [y, m, d] = value.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-// Só a ação, sem o nome do autor -- o nome fica em negrito, separado, na
-// renderização (ver Histórico), não amassado dentro da frase.
 function eventAction(event: { eventType: string; fromStatus: string | null; toStatus: string | null }) {
   switch (event.eventType) {
     case "created":
@@ -68,10 +45,6 @@ function eventAction(event: { eventType: string; fromStatus: string | null; toSt
     }
     case "note_added":
       return "adicionou uma nota.";
-    case "deadline_approved":
-      return "aprovou o prazo pedido.";
-    case "deadline_rejected":
-      return "recusou o prazo e propôs outra data.";
     case "edited":
       return "corrigiu os dados da solicitação.";
     default:
@@ -79,25 +52,29 @@ function eventAction(event: { eventType: string; fromStatus: string | null; toSt
   }
 }
 
-// Tela de detalhe pra montagem/desmontagem/recolhimento/troca de peça/
-// vistoria/notificação externa -- visitas de montador (+ notificação, que
-// não tem motorista nem montador, só prazo legal/protocolo). Troca de
-// produto, entrega de produto e envio de peça (DELIVERY_REQUEST_TYPES) têm
-// componente próprio (ver DeliveryRequestDetailContent.tsx) desde
-// 17/08/2026 -- antes dividiam esse arquivo aqui a golpe de `isDeliveryType
-// ? ... : ...` espalhado pela tela inteira, cada vez mais difícil de mexer
-// sem quebrar a outra família sem querer. [id]/page.tsx decide qual dos
-// dois renderizar pelo tipo do chamado.
-export function RequestDetailContent({
+// Tela de detalhe pra troca de produto, entrega de produto e envio de peça
+// (DELIVERY_REQUEST_TYPES) -- separada de RequestDetailContent de propósito
+// (pedido do Victor 17/08/2026): antes esses três tipos dividiam o mesmo
+// componente com montagem/desmontagem/vistoria a golpe de `isDeliveryType ?
+// ... : ...` espalhado pela tela inteira -- cada ajuste novo virava mais um
+// `if`, e o resultado juntava campo de montador, stepper de prazo (que não
+// existe pra esses tipos, ver comentário removido de lá) e outras coisas
+// que não pertencem a essa família. Aqui não tem NADA disso: sem prazo,
+// sem montador, sem instrução de montagem, sem combo montagem/desmontagem
+// -- só o que troca/entrega/envio de peça realmente usa. Estrutura
+// deliberadamente na mesma ordem do despacho impresso (ver despacho/page.tsx):
+// cliente, produto, descrição da solicitação, rota/motorista, ações,
+// histórico, fotos.
+export function DeliveryRequestDetailContent({
   profile,
   result,
-  assemblers,
+  drivers,
   photos,
   nextDatesByRota,
 }: {
   profile: Profile;
   result: { request: ServiceRequestDetail; events: RequestEvent[] } | null;
-  assemblers: string[];
+  drivers: string[];
   photos: RequestPhoto[];
   nextDatesByRota: Record<Rota, string[]>;
 }) {
@@ -111,10 +88,18 @@ export function RequestDetailContent({
 
   const { request, events } = result;
   const isSacType = (SAC_MANAGED_TYPES as readonly string[]).includes(request.type);
-  const canManage =
-    profile.role === "admin" ||
-    (profile.role === "assistencia" && !isSacType) ||
-    (profile.role === "sac" && isSacType);
+  const canManage = profile.role === "admin" || (profile.role === "assistencia" && !isSacType) || (profile.role === "sac" && isSacType);
+
+  const causaRaizDetail =
+    request.causaRaiz === "erro_conferencia"
+      ? [request.causaCarga ? `Carga: ${request.causaCarga}` : null, request.causaConferente ? `Conferente: ${request.causaConferente}` : null]
+          .filter(Boolean)
+          .join(" · ")
+      : request.causaRaiz === "erro_motorista"
+        ? [request.causaCarga ? `Carga: ${request.causaCarga}` : null, request.driverName ? `Motorista: ${request.driverName}` : null]
+            .filter(Boolean)
+            .join(" · ")
+        : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -125,6 +110,18 @@ export function RequestDetailContent({
             Chamado #{request.ticketNumber}
           </span>
           <StatusBadge status={request.status} />
+          {request.type === "troca_produto" ? (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+              style={
+                request.exchangeRound > 1
+                  ? { background: "var(--status-warning)", color: "#fff" }
+                  : { color: "var(--text-secondary)", background: "color-mix(in srgb, var(--text-secondary) 15%, var(--surface-1))" }
+              }
+            >
+              {request.exchangeRound}ª troca
+            </span>
+          ) : null}
           <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             {REQUEST_TYPE_LABELS[request.type] ?? request.type} · {request.storeName}
           </h2>
@@ -162,10 +159,6 @@ export function RequestDetailContent({
         <StatusStepper steps={REQUEST_STATUS_STEPS} currentKey={request.status === "remarcar" ? "em_andamento" : request.status} />
       ) : null}
 
-      {/* 2 colunas no desktop -- esquerda é leitura (cliente/pedido/produtos/
-          detalhes), direita é ação/acompanhamento (responsável, prazo, ações,
-          histórico). Empilha normal (uma coluna só) até "lg", igual sempre
-          foi no celular/tablet. */}
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         <div className="flex flex-col gap-4">
           <div
@@ -173,7 +166,7 @@ export function RequestDetailContent({
             style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
           >
             <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
-              Pedido e cliente
+              Dados do cliente
             </h3>
             <Row label="Código do pedido/venda" value={request.orderCode} />
             <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
@@ -205,26 +198,6 @@ export function RequestDetailContent({
               <ul className="flex flex-col gap-1">
                 {request.items.map((item) => (
                   <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
-                    {item.completed ? (
-                      <span
-                        className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
-                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-good) 35%, var(--surface-1))" }}
-                      >
-                        ✓ Feito
-                      </span>
-                    ) : null}
-                    {item.action ? (
-                      <span
-                        className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
-                        style={{
-                          color: item.action === "montar" ? "var(--brand-green-ink)" : "var(--text-primary)",
-                          background:
-                            item.action === "montar" ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))",
-                        }}
-                      >
-                        {item.action === "montar" ? "Montar" : "Desmontar"}
-                      </span>
-                    ) : null}
                     {item.quantity > 1 ? `${item.quantity}x ` : ""}
                     {item.product}
                     {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
@@ -239,75 +212,22 @@ export function RequestDetailContent({
             style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
           >
             <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
-              Atendimento — o que a assistência precisa acompanhar
+              Descrição da solicitação
             </h3>
-            <Row label="Motivo" value={request.reason} />
-            {request.causaRaiz ? <Row label="Causa raiz" value={CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz} /> : null}
-            {request.causaRaiz === "erro_conferencia" ? (
-              <>
-                <Row label="Carga (erro de conferência)" value={request.causaCarga} />
-                <Row label="Conferente (erro de conferência)" value={request.causaConferente} />
-              </>
-            ) : null}
-            {request.causaRaiz === "erro_motorista" ? <Row label="Carga (erro do motorista)" value={request.causaCarga} /> : null}
+            <Row label="Autorizado por" value={request.requestedByName} />
+            <Row label="Motivo / problema" value={request.reason} />
+            <Row label="Quem errou" value={request.causaRaiz ? (CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz) : null} />
+            {causaRaizDetail ? <Row label="Detalhe" value={causaRaizDetail} /> : null}
             <Row label="Restrição / observação" value={request.restrictionNote} />
             <Row label="Observações" value={request.notes} />
-            <Row label="Solicitado por" value={request.requestedByName} />
-            <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
-            {(request.type === "montagem" || request.type === "desmontagem") && !canManage ? (
-              <Row
-                label={request.type === "montagem" ? "Também precisa desmontar o antigo?" : "Também precisa montar o novo?"}
-                value={request.comboMontagemDesmontagem ? "Sim" : "Não"}
-              />
+            {request.type === "troca_produto" ? (
+              <Row label="Produto recolhido?" value={request.pickupCompleted ? "Sim" : "Ainda não"} />
             ) : null}
-            {request.type === "montagem" && request.deliveryRating !== null ? (
-              <Row label="Nota do cliente — montagem" value={`${request.deliveryRating}/10`} />
-            ) : null}
-            {request.type === "montagem" && request.resolutionRating !== null ? (
+            {request.deliveryRating !== null ? <Row label="Nota do cliente — entrega" value={`${request.deliveryRating}/10`} /> : null}
+            {request.resolutionRating !== null ? (
               <Row label="Nota do cliente — resolução do problema" value={`${request.resolutionRating}/10`} />
             ) : null}
-            {canManage ? (
-              <ScheduleField
-                requestId={request.id}
-                scheduledDate={request.scheduledDate}
-                scheduledTime={request.scheduledTime}
-                shift={request.shift}
-                rota={null}
-                rotaExceptionNote={null}
-                nextDatesByRota={nextDatesByRota}
-                showRota={false}
-              />
-            ) : (
-              <Row
-                label="Visita agendada"
-                value={
-                  request.scheduledDate
-                    ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}`
-                    : null
-                }
-              />
-            )}
-            <Row label="Prazo pedido" value={formatDateOnly(request.requestedDeadline)} />
-            <Row label="Status do prazo" value={DEADLINE_STATUS_LABELS[request.deadlineStatus]} />
-            <Row
-              label={request.deadlineStatus === "recusado" ? "Nova data proposta" : "Prazo aprovado"}
-              value={formatDateOnly(request.approvedDeadline)}
-            />
-            {request.type === "notificacao_externa" ? (
-              <>
-                <Row label="Protocolo" value={request.protocolNumber} />
-                {canManage ? (
-                  <SacCategoryField requestId={request.id} value={request.sacCategory} />
-                ) : (
-                  <Row label="Categoria SAC" value={request.sacCategory ? SAC_CATEGORY_LABELS[request.sacCategory] : null} />
-                )}
-                {canManage ? (
-                  <LegalDeadlineField requestId={request.id} legalDeadline={request.legalDeadline} />
-                ) : (
-                  <Row label="Prazo legal" value={formatDateOnly(request.legalDeadline)} />
-                )}
-              </>
-            ) : null}
+            <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
             <Row label="Criada em" value={formatDateTimeBr(request.createdAt)} />
             {request.completedAt ? <Row label="Encerrada em" value={formatDateTimeBr(request.completedAt)} /> : null}
           </div>
@@ -315,30 +235,39 @@ export function RequestDetailContent({
 
         <div className="flex flex-col gap-4">
           <div
-            className="rounded-lg p-4 flex flex-col gap-2"
+            className="rounded-lg p-4 flex flex-col gap-3"
             style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
           >
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-              Responsável pelo atendimento
+              Rota e motorista
             </h3>
             {canManage ? (
-              <>
-                <AssemblerNameField requestId={request.id} requestType={request.type} value={request.assemblerName} assemblers={assemblers} />
-                <MontadorInstructionField requestId={request.id} value={request.montadorInstruction} />
-              </>
+              <ScheduleField
+                requestId={request.id}
+                scheduledDate={request.scheduledDate}
+                scheduledTime={request.scheduledTime}
+                shift={request.shift}
+                rota={request.rota}
+                rotaExceptionNote={request.rotaExceptionNote}
+                nextDatesByRota={nextDatesByRota}
+                showRota
+              />
             ) : (
-              <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
+              <Row
+                label="Visita agendada"
+                value={
+                  request.scheduledDate
+                    ? `${request.scheduledDate.split("-").reverse().join("/")}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.rota ? ` · rota ${ROTA_LABELS[request.rota]}` : ""}`
+                    : null
+                }
+              />
+            )}
+            {canManage ? (
+              <DriverNameField requestId={request.id} value={request.driverName} drivers={drivers} />
+            ) : (
+              <Row label="Nome do motorista" value={request.driverName ?? "Não definido"} />
             )}
           </div>
-
-          {canManage ? (
-            <DeadlineActions
-              requestId={request.id}
-              requestedDeadline={request.requestedDeadline}
-              deadlineStatus={request.deadlineStatus}
-              approvedDeadline={request.approvedDeadline}
-            />
-          ) : null}
 
           {canManage ? (
             <MobileActionSheet>
@@ -347,19 +276,11 @@ export function RequestDetailContent({
                 requestType={request.type}
                 status={request.status}
                 isAssignedToMe={request.assignedToId === profile.id}
-                hasAssignee={!!request.assemblerName}
-                assigneeLabel="o montador"
+                hasAssignee={!!request.driverName}
+                assigneeLabel="o motorista"
                 hideClaim={isSacType}
               />
             </MobileActionSheet>
-          ) : null}
-
-          {canManage && (request.type === "montagem" || request.type === "desmontagem") ? (
-            <ComboMontagemDesmontagemField requestId={request.id} type={request.type} value={request.comboMontagemDesmontagem} />
-          ) : null}
-
-          {canManage && request.type === "notificacao_externa" ? (
-            <EscalationRiskToggle requestId={request.id} atRisk={request.escalationRisk} />
           ) : null}
 
           <div

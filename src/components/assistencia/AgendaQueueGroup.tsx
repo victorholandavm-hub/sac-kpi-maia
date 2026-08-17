@@ -173,7 +173,8 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
               <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
                 {/* Troca/entrega de produto e envio de peça saem de motorista,
                     o resto (montagem/vistoria/etc.) é montador -- mesma
-                    distinção de isDeliveryType em RequestDetailContent. */}
+                    distinção que separa DeliveryRequestDetailContent de
+                    RequestDetailContent. */}
                 {(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type) ? (
                   <span>{r.driverName ? `Motorista: ${r.driverName}` : "Sem motorista definido"}</span>
                 ) : (
