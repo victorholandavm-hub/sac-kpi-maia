@@ -5,6 +5,7 @@ export function StatTile({
   accent = "var(--brand-green)",
   size = "md",
   valueColor,
+  badge,
 }: {
   label: string;
   value: string | number;
@@ -14,6 +15,10 @@ export function StatTile({
   // números precisam ser lidos à distância/de relance.
   size?: "md" | "lg";
   valueColor?: string;
+  // Selo pequeno abaixo do valor (ex.: "Volume alto" vs. referência de
+  // mercado) -- `title` vira tooltip nativo do navegador com a explicação/
+  // metodologia, pra não esconder a ressalva mas também não poluir a tela.
+  badge?: { label: string; color: string; title?: string };
 }) {
   return (
     <div
@@ -38,6 +43,15 @@ export function StatTile({
           </span>
         ) : null}
       </span>
+      {badge ? (
+        <span
+          title={badge.title}
+          className="text-xs font-medium rounded-full px-2 py-0.5 self-start cursor-help"
+          style={{ background: badge.color, color: "#fff" }}
+        >
+          {badge.label}
+        </span>
+      ) : null}
     </div>
   );
 }
