@@ -16,19 +16,50 @@ type RatingRequestRow = {
   status: string;
   order_code: string | null;
   client_name: string | null;
-  client_cpf: string | null;
+  // CPF efetivo pra conferir -- não é sempre client_cpf direto (ver abaixo).
+  effective_cpf: string | null;
   delivery_rating: number | null;
   store_id: string;
 };
 
+// client_cpf só vem preenchido quando o chamado foi aberto pela loja
+// (PublicRequestForm, CPF obrigatório). Quando é o SAC que abre (nova
+// solicitação, createSacRequest em actions.ts), CPF é OPCIONAL -- código do
+// cliente já resolve sozinho -- então client_cpf fica null mesmo pra
+// chamado de cliente real. Conferido em produção 17/08/2026 (motorista/
+// montador reportando QR "sem funcionar"): 100 dos 126 chamados sem
+// client_cpf, mas 56 deles tinham client_protheus_code -- caía sempre em
+// "no_cpf_on_file" à toa quando dava pra confirmar mesmo assim, só que via
+// tabela de cadastro (totvs_clientes) em vez do campo direto no chamado.
 async function loadRatingRequest(requestId: string): Promise<RatingRequestRow | null> {
   const admin = getSupabaseAdmin();
   const { data } = await admin
     .from("service_requests")
-    .select("id, type, status, order_code, client_name, client_cpf, delivery_rating, store_id")
+    .select("id, type, status, order_code, client_name, client_cpf, client_protheus_code, delivery_rating, store_id")
     .eq("id", requestId)
     .maybeSingle();
-  return data as RatingRequestRow | null;
+  if (!data) return null;
+
+  let effectiveCpf = data.client_cpf as string | null;
+  if (!effectiveCpf && data.client_protheus_code) {
+    const { data: cliente } = await admin
+      .from("totvs_clientes")
+      .select("cpf_cnpj")
+      .eq("protheus_code", data.client_protheus_code)
+      .maybeSingle();
+    effectiveCpf = (cliente?.cpf_cnpj as string | null) ?? null;
+  }
+
+  return {
+    id: data.id,
+    type: data.type,
+    status: data.status,
+    order_code: data.order_code,
+    client_name: data.client_name,
+    effective_cpf: effectiveCpf,
+    delivery_rating: data.delivery_rating,
+    store_id: data.store_id,
+  };
 }
 
 // Sem side-effect (não grava tentativa falha) -- usado tanto pela checagem
@@ -44,8 +75,8 @@ function resolveAccess(request: RatingRequestRow | null, cpf: string): ClientRat
   if (isMostruarioRequest(request.order_code, request.client_name)) return { ok: false, reason: "not_found" };
   if (request.status !== "concluida") return { ok: false, reason: "not_completed" };
   if (request.delivery_rating !== null) return { ok: false, reason: "already_rated" };
-  if (!request.client_cpf) return { ok: false, reason: "no_cpf_on_file" };
-  if (!cpfMatches(cpf, request.client_cpf)) return { ok: false, reason: "wrong_cpf" };
+  if (!request.effective_cpf) return { ok: false, reason: "no_cpf_on_file" };
+  if (!cpfMatches(cpf, request.effective_cpf)) return { ok: false, reason: "wrong_cpf" };
 
   return { ok: true, kind: ratingKind(request.type) };
 }
