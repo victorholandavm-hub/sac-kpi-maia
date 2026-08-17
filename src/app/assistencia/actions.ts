@@ -27,7 +27,7 @@ import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 import { checkIpRateLimit, recordFailedIpAttempt } from "@/lib/ipRateLimit";
-import { isRota, getRotaWeekdayConfig, getRotaForDate, getRotaDriverAssignments, ROTA_LABELS, type Rota } from "@/lib/rotas";
+import { isRota, getRotaWeekdayConfig, getRotaForDate, getRotaDriverAssignments, findDriverForRota, ROTA_LABELS, type Rota } from "@/lib/rotas";
 import { sanitizeOrFilterValue } from "@/lib/searchFilter";
 import { findTotvsClientByCode, findTotvsProductByCode, type TotvsClientMatch, type TotvsProductMatch } from "@/lib/totvsLookup";
 import {
@@ -1329,14 +1329,21 @@ export async function setDriverName(requestId: string, driverName: string) {
   revalidatePath(`/assistencia/${requestId}`);
 }
 
-// "Motorista do dia" de uma rota inteira -- pedido do Victor 17/08/2026:
-// hoje o motorista era digitado chamado por chamado; isso marca de uma vez
-// "hoje, rota X = Fulano" e reatribui quem ainda estiver no motorista
-// padrão anterior (ou sem motorista nenhum). NÃO mexe em quem já foi movido
-// manualmente pra outro carro (DriverNameField) -- isso é decisão
-// deliberada de outra pessoa, uma troca de motorista da rota não desfaz.
-// Chamados novos, daqui pra frente, puxam esse nome sozinhos ao serem
-// agendados (ver setSchedule acima).
+// "Motorista do dia" -- pedido do Victor 17/08/2026: hoje o motorista era
+// digitado chamado por chamado; isso marca de uma vez "hoje, rota X =
+// Fulano" e reatribui quem ainda estiver no motorista padrão anterior (ou
+// sem motorista nenhum). NÃO mexe em quem já foi movido manualmente pra
+// outro carro (DriverNameField) -- isso é decisão deliberada de outra
+// pessoa, uma troca de motorista da rota não desfaz. Chamados novos, daqui
+// pra frente, puxam esse nome sozinhos ao serem agendados (ver setSchedule
+// acima).
+//
+// Só existe UMA rota principal por dia (índice único parcial no banco, ver
+// migration 0085) -- diferente de antes (17/08/2026, mesma tarde), quando
+// dava pra editar praia/sul/centro como 3 slots independentes pro mesmo
+// dia. Trocar a rota aqui SUBSTITUI a principal anterior (pode mudar de
+// região, ex: era praia, passa a ser sul), nunca cria uma segunda linha
+// principal -- pra um carro a mais no mesmo dia, ver addRotaExtra.
 export async function setRotaDriverAssignment(
   date: string,
   rota: string,
@@ -1359,18 +1366,21 @@ export async function setRotaDriverAssignment(
   const name = await resolveDriverName(typedName);
   await admin.from("drivers").upsert({ name }, { onConflict: "name" });
 
-  const { data: existing } = await admin
+  const { data: existingPrimary } = await admin
     .from("rota_driver_assignments")
-    .select("driver_name")
+    .select("id, driver_name")
     .eq("assignment_date", date)
-    .eq("rota", rota)
+    .eq("is_extra", false)
     .maybeSingle();
-  const oldDriverName = existing?.driver_name as string | undefined;
+  const oldDriverName = existingPrimary?.driver_name as string | undefined;
 
-  const { error: upsertError } = await admin
-    .from("rota_driver_assignments")
-    .upsert({ assignment_date: date, rota, driver_name: name, updated_at: new Date().toISOString() }, { onConflict: "assignment_date,rota" });
-  if (upsertError) throw new Error(upsertError.message);
+  const { error: writeError } = existingPrimary
+    ? await admin
+        .from("rota_driver_assignments")
+        .update({ rota, driver_name: name, updated_at: new Date().toISOString() })
+        .eq("id", existingPrimary.id as string)
+    : await admin.from("rota_driver_assignments").insert({ assignment_date: date, rota, driver_name: name, is_extra: false });
+  if (writeError) throw new Error(writeError.message);
 
   let query = admin
     .from("service_requests")
@@ -1387,6 +1397,55 @@ export async function setRotaDriverAssignment(
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/sac");
   return { updatedCount: updated?.length ?? 0 };
+}
+
+// Carro(s) a mais saindo no mesmo dia, além da rota principal -- pedido do
+// Victor 17/08/2026 ("só uma rota por dia, mas pode ter rota extra").
+// Diferente da principal, não tem limite de quantidade nem some ao trocar
+// outra rota extra -- cada uma é uma linha própria (ver removeRotaExtra
+// pra tirar).
+export async function addRotaExtra(date: string, rota: string, driverName: string): Promise<{ updatedCount: number }> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin", "sac");
+  if (!isRota(rota)) throw new Error("Rota inválida.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Data inválida.");
+  const typedName = driverName.trim();
+  if (!typedName) throw new Error("Informe o motorista.");
+
+  const admin = getSupabaseAdmin();
+  const name = await resolveDriverName(typedName);
+  await admin.from("drivers").upsert({ name }, { onConflict: "name" });
+
+  const { error: insertError } = await admin
+    .from("rota_driver_assignments")
+    .insert({ assignment_date: date, rota, driver_name: name, is_extra: true });
+  if (insertError) throw new Error(insertError.message);
+
+  // Só pega chamado ainda sem motorista -- rota extra nunca "rouba" quem já
+  // tinha sido atribuído pela principal ou por outra extra.
+  const { data: updated, error: updateError } = await admin
+    .from("service_requests")
+    .update({ driver_name: name })
+    .eq("rota", rota)
+    .eq("scheduled_date", date)
+    .is("driver_name", null)
+    .not("status", "in", "(concluida,cancelada)")
+    .select("id");
+  if (updateError) throw new Error(updateError.message);
+
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/sac");
+  return { updatedCount: updated?.length ?? 0 };
+}
+
+export async function removeRotaExtra(id: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin", "sac");
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("rota_driver_assignments").delete().eq("id", id).eq("is_extra", true);
+  if (error) throw new Error(error.message);
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/sac");
 }
 
 // Wrapper "use server" pro widget RotaMotoristaDoDia buscar de novo ao trocar
@@ -1468,7 +1527,7 @@ export async function setSchedule(
   let autoDriverName: string | undefined;
   if (rotaValue && scheduledDate && !current.driver_name) {
     const assignments = await getRotaDriverAssignments(scheduledDate);
-    autoDriverName = assignments[rotaValue as Rota] ?? undefined;
+    autoDriverName = findDriverForRota(assignments, rotaValue as Rota) ?? undefined;
   }
 
   const { error } = await admin
@@ -1992,7 +2051,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   // do dia daquela rota, mesmo auto-preenchimento de setSchedule (ScheduleField).
   if (!driverName && rotaValue && scheduledDate) {
     const assignments = await getRotaDriverAssignments(scheduledDate);
-    driverName = assignments[rotaValue as Rota] ?? null;
+    driverName = findDriverForRota(assignments, rotaValue as Rota);
   }
   if (driverName) {
     await admin.from("drivers").upsert({ name: driverName }, { onConflict: "name" });

@@ -50,19 +50,39 @@ export async function setRotaWeekday(weekday: number, rota: Rota | null): Promis
 }
 
 // Quem dirige cada rota numa data específica -- ver setRotaDriverAssignment
-// (actions.ts). null = ninguém definido ainda pra essa rota nesse dia.
-export type RotaDriverAssignments = Record<Rota, string | null>;
+// (actions.ts). Só existe UMA rota "principal" por dia (o carro de sempre,
+// pode trocar de região dia a dia) -- carro(s) a mais no mesmo dia entram
+// como "extra" (addRotaExtra), sem limite de quantidade. primary null =
+// ninguém definido ainda pra essa data.
+export type RotaDriverAssignmentEntry = { id: string; rota: Rota; driverName: string };
+export type RotaDriverAssignments = { primary: RotaDriverAssignmentEntry | null; extras: RotaDriverAssignmentEntry[] };
 
 export async function getRotaDriverAssignments(date: string): Promise<RotaDriverAssignments> {
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("rota_driver_assignments").select("rota, driver_name").eq("assignment_date", date);
+  const { data, error } = await admin
+    .from("rota_driver_assignments")
+    .select("id, rota, driver_name, is_extra")
+    .eq("assignment_date", date)
+    .order("updated_at", { ascending: true });
   if (error) throw new Error(error.message);
 
-  const result: RotaDriverAssignments = { praia: null, sul: null, centro: null };
+  let primary: RotaDriverAssignmentEntry | null = null;
+  const extras: RotaDriverAssignmentEntry[] = [];
   for (const row of data ?? []) {
-    if (isRota(row.rota)) result[row.rota] = row.driver_name as string;
+    if (!isRota(row.rota)) continue;
+    const entry: RotaDriverAssignmentEntry = { id: row.id as string, rota: row.rota, driverName: row.driver_name as string };
+    if (row.is_extra) extras.push(entry);
+    else primary = entry; // só deve existir uma linha não-extra por data (índice único parcial no banco)
   }
-  return result;
+  return { primary, extras };
+}
+
+// Acha o motorista do dia pra uma rota específica -- principal primeiro,
+// senão procura entre as extras (ex: chamado é de "sul" mas a rota
+// principal do dia é "praia" -- só acha se tiver uma extra de "sul").
+export function findDriverForRota(assignments: RotaDriverAssignments, rota: Rota): string | null {
+  if (assignments.primary?.rota === rota) return assignments.primary.driverName;
+  return assignments.extras.find((e) => e.rota === rota)?.driverName ?? null;
 }
 
 // Função pura — recebe a data já como string YYYY-MM-DD pra não depender de
