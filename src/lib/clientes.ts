@@ -206,6 +206,20 @@ function mesesEntre(dataIso: string, hoje: Date): number {
   return (hoje.getFullYear() - d.getFullYear()) * 12 + (hoje.getMonth() - d.getMonth());
 }
 
+function diasEntre(dataIso: string, hoje: Date): number {
+  const d = new Date(`${dataIso}T00:00:00`);
+  return Math.floor((hoje.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+// Mesmo corte que já divide "Inativo" na aba Status (ver FAIXAS_DIAS acima,
+// faixa "180+ dias") -- reaproveitado aqui pra sinalizar quando um nível
+// (Bronze/Prata/Ouro/Diamante) está "frio": calcularNivel nunca esfria
+// sozinho (é histórico acumulado, não decai), então sem esse sinal um
+// cliente que gastou muito há anos e nunca mais voltou aparece pra sempre
+// como Diamante, igual a quem comprou esse mês -- pedido do Victor
+// 17/08/2026 depois de eu levantar isso como ponto fraco do critério atual.
+export const DIAS_INATIVO_RECENTE = 180;
+
 // Cada nível é "basta um destes" (OR entre os 2-3 critérios) -- checado do
 // nível mais alto pro mais baixo, o primeiro que bater vence. Sem compra
 // nenhuma não é "Bronze" (Bronze exige "1ª compra") -- fica de fora, num
@@ -239,6 +253,12 @@ export type ClienteNivelInfo = {
   // atribuição em listClientesPorNivel. Fixo (não muda com busca/filtro na
   // tela), pra sempre refletir a posição real do cliente na categoria.
   posicaoNoNivel: number;
+  diasSemComprar: number | null;
+  // Nível "frio" -- ver DIAS_INATIVO_RECENTE. Não muda o nível em si (o
+  // cálculo de calcularNivel continua igual, é histórico acumulado), só
+  // sinaliza pra tela não confundir "Diamante de anos atrás, sumiu" com
+  // "Diamante comprando até mês passado".
+  inativoRecente: boolean;
 };
 
 // Pedido do Victor 15/08/2026: "LOJAS AIAM..." e "CONSUMIDOR FINAL" não são
@@ -316,6 +336,7 @@ export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
   const resultado: ClienteNivelInfo[] = [];
   for (const [clientId, acc] of porCliente) {
     const meses = acc.primeira ? mesesEntre(acc.primeira, hoje) : null;
+    const dias = acc.ultima ? diasEntre(acc.ultima, hoje) : null;
     resultado.push({
       clientId,
       nome: acc.nome,
@@ -327,6 +348,8 @@ export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
       mesesRelacionamento: meses,
       nivel: calcularNivel(acc.compras, acc.gasto, meses),
       posicaoNoNivel: 0, // preenchido abaixo, depois que todo o nível está montado
+      diasSemComprar: dias,
+      inativoRecente: dias !== null && dias >= DIAS_INATIVO_RECENTE,
     });
   }
 
