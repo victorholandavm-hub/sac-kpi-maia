@@ -1,7 +1,8 @@
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail, formatFullAddress, type ServiceRequestDetail } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { PrintButton } from "@/components/assistencia/PrintButton";
+import Link from "next/link";
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -31,10 +32,14 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
 
   const { request } = result;
 
-  const canView =
-    profile.role === "assistencia" ||
-    profile.role === "admin" ||
-    (profile.role === "sac" && (SAC_MANAGED_TYPES as readonly string[]).includes(request.type));
+  // Antes travava SAC em SAC_MANAGED_TYPES (só troca/entrega de produto e
+  // notificação externa) -- mas createSacRequest (actions.ts) deixa o SAC
+  // criar montagem e envio de peça também, e a tela de detalhe normal
+  // (ver [id]/page.tsx) já deixa qualquer papel VER qualquer chamado
+  // (só a EDIÇÃO é restrita por tipo). Sem esse alinhamento, o SAC caía em
+  // "Acesso restrito" ao tentar imprimir o despacho de um chamado que ele
+  // mesmo acabou de criar (redirect direto pra cá desde 17/08/2026).
+  const canView = profile.role === "assistencia" || profile.role === "admin" || profile.role === "sac";
   if (!canView) {
     return (
       <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -51,7 +56,12 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
-      <PrintButton />
+      <div className="flex items-center justify-between gap-3 print:hidden">
+        <Link href={`/assistencia/${request.id}`} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+          ← Ver chamado completo
+        </Link>
+        <PrintButton />
+      </div>
 
       <div
         className="rounded-lg border p-6 flex flex-col gap-4"
@@ -124,7 +134,12 @@ function TrocaProdutoDespacho({
 }) {
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
-      <PrintButton />
+      <div className="flex items-center justify-between gap-3 print:hidden">
+        <Link href={`/assistencia/${request.id}`} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+          ← Ver chamado completo
+        </Link>
+        <PrintButton />
+      </div>
 
       <div
         className="rounded-lg border overflow-hidden flex flex-col"

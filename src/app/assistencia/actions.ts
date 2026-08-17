@@ -34,7 +34,8 @@ import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 import { checkIpRateLimit, recordFailedIpAttempt } from "@/lib/ipRateLimit";
-import { isRota, getRotaWeekdayConfig, getRotaForDate, ROTA_LABELS } from "@/lib/rotas";
+import { isRota, getRotaWeekdayConfig, getRotaForDate, getRotaDriverAssignments, ROTA_LABELS, type Rota } from "@/lib/rotas";
+import { sanitizeOrFilterValue } from "@/lib/searchFilter";
 import { findTotvsClientByCode, findTotvsProductByCode, type TotvsClientMatch, type TotvsProductMatch } from "@/lib/totvsLookup";
 import {
   ASSISTENCIA_TEAM_COOKIE_NAME,
@@ -1333,6 +1334,70 @@ export async function setDriverName(requestId: string, driverName: string) {
   revalidatePath(`/assistencia/${requestId}`);
 }
 
+// "Motorista do dia" de uma rota inteira -- pedido do Victor 17/08/2026:
+// hoje o motorista era digitado chamado por chamado; isso marca de uma vez
+// "hoje, rota X = Fulano" e reatribui quem ainda estiver no motorista
+// padrão anterior (ou sem motorista nenhum). NÃO mexe em quem já foi movido
+// manualmente pra outro carro (DriverNameField) -- isso é decisão
+// deliberada de outra pessoa, uma troca de motorista da rota não desfaz.
+// Chamados novos, daqui pra frente, puxam esse nome sozinhos ao serem
+// agendados (ver setSchedule acima).
+export async function setRotaDriverAssignment(
+  date: string,
+  rota: string,
+  driverName: string
+): Promise<{ updatedCount: number }> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  if (!isRota(rota)) throw new Error("Rota inválida.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Data inválida.");
+  const typedName = driverName.trim();
+  if (!typedName) throw new Error("Informe o motorista.");
+
+  const admin = getSupabaseAdmin();
+  const name = await resolveDriverName(typedName);
+  await admin.from("drivers").upsert({ name }, { onConflict: "name" });
+
+  const { data: existing } = await admin
+    .from("rota_driver_assignments")
+    .select("driver_name")
+    .eq("assignment_date", date)
+    .eq("rota", rota)
+    .maybeSingle();
+  const oldDriverName = existing?.driver_name as string | undefined;
+
+  const { error: upsertError } = await admin
+    .from("rota_driver_assignments")
+    .upsert({ assignment_date: date, rota, driver_name: name, updated_at: new Date().toISOString() }, { onConflict: "assignment_date,rota" });
+  if (upsertError) throw new Error(upsertError.message);
+
+  let query = admin
+    .from("service_requests")
+    .update({ driver_name: name })
+    .eq("rota", rota)
+    .eq("scheduled_date", date)
+    .not("status", "in", "(concluida,cancelada)");
+  query = oldDriverName
+    ? query.or(`driver_name.is.null,driver_name.eq.${sanitizeOrFilterValue(oldDriverName)}`)
+    : query.is("driver_name", null);
+  const { data: updated, error: updateError } = await query.select("id");
+  if (updateError) throw new Error(updateError.message);
+
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/sac");
+  return { updatedCount: updated?.length ?? 0 };
+}
+
+// Wrapper "use server" pro widget RotaMotoristaDoDia buscar de novo ao trocar
+// de data -- getRotaDriverAssignments (rotas.ts) é só leitura, sem
+// "use server", não dá pra chamar direto de um componente client.
+export async function getRotaDriverAssignmentsAction(date: string) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Data inválida.");
+  return getRotaDriverAssignments(date);
+}
+
 export async function setSchedule(
   requestId: string,
   scheduledDate: string,
@@ -1348,7 +1413,7 @@ export async function setSchedule(
   }
 
   const admin = getSupabaseAdmin();
-  const { data: current } = await admin.from("service_requests").select("type, status").eq("id", requestId).single();
+  const { data: current } = await admin.from("service_requests").select("type, status, driver_name").eq("id", requestId).single();
   if (!current) throw new Error("Solicitação não encontrada.");
   requireManageAccess(profile, current.type);
 
@@ -1386,6 +1451,17 @@ export async function setSchedule(
     exceptionNote = isException ? rotaExceptionNote?.trim() || null : null;
   }
 
+  // Preenche o motorista sozinho a partir do "motorista do dia" daquela
+  // rota (ver setRotaDriverAssignment mais abaixo) -- só quando o chamado
+  // ainda não tem motorista nenhum. Nunca sobrescreve uma escolha manual já
+  // feita (ver DriverNameField): isso é o caminho de mandar ESSE chamado
+  // específico pra um motorista "extra", fora da rota do dia.
+  let autoDriverName: string | undefined;
+  if (rotaValue && scheduledDate && !current.driver_name) {
+    const assignments = await getRotaDriverAssignments(scheduledDate);
+    autoDriverName = assignments[rotaValue as Rota] ?? undefined;
+  }
+
   const { error } = await admin
     .from("service_requests")
     .update({
@@ -1394,6 +1470,7 @@ export async function setSchedule(
       scheduled_time: scheduledTime || null,
       rota: rotaValue,
       rota_exception_note: exceptionNote,
+      ...(autoDriverName ? { driver_name: autoDriverName } : {}),
       ...(clearingRemarcar ? { status: "em_andamento" } : {}),
     })
     .eq("id", requestId);
@@ -1758,7 +1835,11 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/agenda");
   revalidatePath("/assistencia/pagamentos");
-  redirect(`/assistencia/${data.id}`);
+  // Direto pro despacho (não pro detalhe) -- pedido do Victor 17/08/2026:
+  // precisa imprimir (ou salvar em PDF, o botão já abre o diálogo nativo do
+  // navegador que oferece as duas opções) na hora de criar, pro cliente
+  // assinar. Link de volta pro detalhe completo já fica na própria página.
+  redirect(`/assistencia/${data.id}/despacho`);
 }
 
 const SAC_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa", "montagem"] as const;
@@ -1976,7 +2057,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   }
 
   revalidatePath("/assistencia/sac");
-  redirect(`/assistencia/${data.id}`);
+  redirect(`/assistencia/${data.id}/despacho`);
 }
 
 // Chamada a partir do painel da loja (/assistencia/loja, protegido por login
