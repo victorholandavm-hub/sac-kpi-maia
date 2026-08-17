@@ -311,12 +311,25 @@ export function RequestDetailContent({
                 }
               />
             )}
-            <Row label="Prazo pedido" value={formatDateOnly(request.requestedDeadline)} />
-            <Row label="Status do prazo" value={DEADLINE_STATUS_LABELS[request.deadlineStatus]} />
-            <Row
-              label={request.deadlineStatus === "recusado" ? "Nova data proposta" : "Prazo aprovado"}
-              value={formatDateOnly(request.approvedDeadline)}
-            />
+            {/* Prazo (pedido/aprovado/negociação) é coisa de chamado que a
+                LOJA abre e pede uma data pra assistência aprovar -- troca/
+                entrega de produto e envio de peça nunca passam por isso
+                (PublicRequestForm.tsx nem oferece esses tipos pra loja
+                abrir; só SAC/assistência cria, já com deadline_status
+                "aprovado" fixo, ver createSacRequest). Mostrar aqui era
+                "tela de prazos" sem nenhum prazo de verdade pra mostrar --
+                pedido do Victor 17/08/2026 depois de ver isso confundindo
+                o SAC numa troca de produto recém-criada. */}
+            {!isDeliveryType ? (
+              <>
+                <Row label="Prazo pedido" value={formatDateOnly(request.requestedDeadline)} />
+                <Row label="Status do prazo" value={DEADLINE_STATUS_LABELS[request.deadlineStatus]} />
+                <Row
+                  label={request.deadlineStatus === "recusado" ? "Nova data proposta" : "Prazo aprovado"}
+                  value={formatDateOnly(request.approvedDeadline)}
+                />
+              </>
+            ) : null}
             {request.type === "notificacao_externa" ? (
               <>
                 <Row label="Protocolo" value={request.protocolNumber} />
@@ -361,7 +374,7 @@ export function RequestDetailContent({
             )}
           </div>
 
-          {canManage ? (
+          {canManage && !isDeliveryType ? (
             <DeadlineActions
               requestId={request.id}
               requestedDeadline={request.requestedDeadline}
