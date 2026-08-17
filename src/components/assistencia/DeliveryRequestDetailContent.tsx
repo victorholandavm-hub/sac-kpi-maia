@@ -8,14 +8,13 @@ import { RequestActions } from "./RequestActions";
 import { MobileActionSheet } from "./MobileActionSheet";
 import { DriverNameField } from "./DriverNameField";
 import { ScheduleField } from "./ScheduleField";
-import { RequestItemsTable } from "./RequestItemsTable";
+import { DeliveryItemsTable } from "./DeliveryItemsTable";
 import { RealtimeQueueRefresher } from "./RealtimeQueueRefresher";
 import { PhotoGallery } from "./PhotoGallery";
 import { RequestPhotoUpload } from "./RequestPhotoUpload";
 import type { RequestPhoto } from "@/lib/servicePhotos";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { RequestHistoryTimeline } from "./RequestHistoryTimeline";
-import { PAYMENTS_CONTROLLER_NAME } from "@/lib/assistenciaLabels";
 import { ROTA_LABELS, type Rota } from "@/lib/rotas";
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
@@ -135,15 +134,6 @@ export function DeliveryRequestDetailContent({
             >
               Editar e salvar alterações
             </Link>
-            {profile.role !== "sac" ? (
-              <Link
-                href={`/assistencia/pecas/nova?service_request_id=${request.id}`}
-                className="text-sm font-medium rounded-lg border px-3 py-1.5"
-                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-              >
-                Solicitar peça
-              </Link>
-            ) : null}
             <Link
               href={`/assistencia/${request.id}/despacho`}
               className="text-sm font-medium rounded-lg border px-3 py-1.5"
@@ -178,34 +168,7 @@ export function DeliveryRequestDetailContent({
             <Row label="Bairro" value={request.clientNeighborhood} />
           </div>
 
-          {canManage ? (
-            <RequestItemsTable
-              items={request.items}
-              requestId={request.id}
-              requestStatus={request.status}
-              requestType={request.type}
-              canEditValues={profile.fullName === PAYMENTS_CONTROLLER_NAME}
-              canEditItems={profile.role === "admin" || profile.role === "assistencia"}
-            />
-          ) : request.items.length > 0 ? (
-            <div
-              className="rounded-lg p-4 flex flex-col gap-2"
-              style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-            >
-              <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-                Produtos
-              </span>
-              <ul className="flex flex-col gap-1">
-                {request.items.map((item) => (
-                  <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
-                    {item.quantity > 1 ? `${item.quantity}x ` : ""}
-                    {item.product}
-                    {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+          <DeliveryItemsTable items={request.items} requestId={request.id} canEditItems={canManage} />
 
           <div
             className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"

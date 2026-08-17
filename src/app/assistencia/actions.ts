@@ -1212,7 +1212,9 @@ export async function addRequestItemByStaff(
   input: { product: string; partCode?: string; quantity: number; action?: "montar" | "desmontar" | null }
 ): Promise<void> {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  // SAC também ajusta item dos próprios chamados de entrega desde
+  // 17/08/2026 -- requireManageAccess abaixo já restringe por tipo.
+  requireRole(profile, "assistencia", "admin", "sac");
   const admin = getSupabaseAdmin();
 
   const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
@@ -1244,7 +1246,7 @@ export async function addRequestItemByStaff(
 
 export async function removeRequestItemByStaff(requestId: string, itemId: string): Promise<void> {
   const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  requireRole(profile, "assistencia", "admin", "sac");
   const admin = getSupabaseAdmin();
 
   const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
