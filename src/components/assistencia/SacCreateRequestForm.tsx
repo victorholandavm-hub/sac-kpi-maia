@@ -13,6 +13,7 @@ import {
   CAUSA_RAIZ_LABELS,
 } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
+import { ROTAS, ROTA_LABELS, type Rota } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -138,10 +139,12 @@ export function SacCreateRequestForm({
   stores,
   drivers,
   cargas,
+  nextDatesByRota,
 }: {
   stores: Store[];
   drivers: string[];
   cargas: { carga: string; label: string }[];
+  nextDatesByRota: Record<Rota, string[]>;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
   const [type, setType] = useState<SacType>("troca_produto");
@@ -162,6 +165,18 @@ export function SacCreateRequestForm({
   const [isApartment, setIsApartment] = useState(false);
   const [addressComplement, setAddressComplement] = useState("");
   const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  // Rota/data já na criação -- pedido do Victor 17/08/2026: antes só dava
+  // pra agendar depois, editando o chamado (ScheduleField). Mesma lógica de
+  // lá: rota + data sugerida pro dia certo, ou encaixe fora da rota com
+  // motivo -- validado de novo no servidor (createSacRequest espelha
+  // setSchedule), nunca confia só nisso aqui.
+  const [selectedRota, setSelectedRota] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [rotaException, setRotaException] = useState(false);
+  const [rotaExceptionNote, setRotaExceptionNote] = useState("");
+  const validDatesForRota = selectedRota ? nextDatesByRota[selectedRota as Rota] ?? [] : [];
   // Só montagem envolve entrar num prédio de verdade -- SAC nem oferece
   // desmontagem isolada (ver SacType acima).
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
@@ -476,20 +491,104 @@ export function SacCreateRequestForm({
           ) : null}
 
           {isDelivery ? (
-            <Field label={type === "troca_produto" && causaRaiz === "erro_motorista" ? "Motorista *" : "Motorista"}>
-              <input
-                name="driver_name"
-                list="sac-drivers"
-                required={type === "troca_produto" && causaRaiz === "erro_motorista"}
-                className="rounded border px-3 py-2"
-                style={inputStyle}
-              />
-              <datalist id="sac-drivers">
-                {drivers.map((d) => (
-                  <option key={d} value={d} />
-                ))}
-              </datalist>
-            </Field>
+            <>
+              <Field label="Rota">
+                <select
+                  name="rota"
+                  value={selectedRota}
+                  onChange={(e) => setSelectedRota(e.target.value)}
+                  className="rounded border px-3 py-2"
+                  style={inputStyle}
+                >
+                  <option value="">Sem rota</option>
+                  {ROTAS.map((r) => (
+                    <option key={r} value={r}>
+                      {ROTA_LABELS[r]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              {selectedRota && validDatesForRota.length > 0 ? (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {validDatesForRota.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setScheduledDate(d)}
+                      className="text-xs rounded-full px-2 py-1 border whitespace-nowrap"
+                      style={
+                        scheduledDate === d
+                          ? { background: "var(--brand-green)", color: "var(--brand-green-ink)", borderColor: "var(--brand-green)" }
+                          : { borderColor: "var(--border)", color: "var(--text-secondary)" }
+                      }
+                    >
+                      {d.split("-").reverse().join("/")}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <Field label="Data agendada">
+                  <input
+                    name="scheduled_date"
+                    type="date"
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    disabled={!rotaException && !!selectedRota}
+                    className="rounded border px-3 py-2 disabled:opacity-60"
+                    style={inputStyle}
+                  />
+                </Field>
+                <Field label="Hora (opcional)">
+                  <input
+                    name="scheduled_time"
+                    type="time"
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                    className="rounded border px-3 py-2"
+                    style={inputStyle}
+                  />
+                </Field>
+              </div>
+
+              {selectedRota ? (
+                <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <input type="checkbox" checked={rotaException} onChange={(e) => setRotaException(e.target.checked)} className="rounded" />
+                  Encaixar fora da rota do dia (data que não é de {ROTA_LABELS[selectedRota as Rota]})
+                </label>
+              ) : null}
+
+              {selectedRota && rotaException ? (
+                <Field label="Motivo do encaixe fora da rota">
+                  <textarea
+                    name="rota_exception_note"
+                    value={rotaExceptionNote}
+                    onChange={(e) => setRotaExceptionNote(e.target.value)}
+                    rows={2}
+                    placeholder="Ex: único dia que o cliente recebe, cliente Procon urgente…"
+                    className="rounded border px-3 py-2"
+                    style={{ borderColor: "var(--status-warning)" }}
+                  />
+                </Field>
+              ) : null}
+
+              <Field label={type === "troca_produto" && causaRaiz === "erro_motorista" ? "Motorista *" : "Motorista"}>
+                <input
+                  name="driver_name"
+                  list="sac-drivers"
+                  required={type === "troca_produto" && causaRaiz === "erro_motorista"}
+                  className="rounded border px-3 py-2"
+                  style={inputStyle}
+                />
+                <datalist id="sac-drivers">
+                  {drivers.map((d) => (
+                    <option key={d} value={d} />
+                  ))}
+                </datalist>
+              </Field>
+            </>
           ) : null}
         </FormSection>
       ) : null}
@@ -608,16 +707,6 @@ export function SacCreateRequestForm({
           </Field>
         ) : null}
 
-        <Field label="Foto ou PDF da notificação *">
-          <input
-            name="photo"
-            type="file"
-            required
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
-            className="rounded border px-3 py-2 text-sm"
-            style={inputStyle}
-          />
-        </Field>
       </FormSection>
 
       {state?.error ? (

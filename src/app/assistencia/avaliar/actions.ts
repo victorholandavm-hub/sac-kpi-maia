@@ -1,5 +1,10 @@
-"use server";
-
+// Sem "use server" -- essas funções não são mais chamadas direto do client
+// (ver /api/avaliar/verify e /api/avaliar/submit, POST comum em vez de
+// Server Action: o cliente abre o link do QR quase sempre de dentro de um
+// navegador embutido -- WhatsApp, câmera do celular -- com o mesmo bug já
+// documentado pro upload de foto de montador/motorista, ver
+// /api/montador/upload-photo/route.ts). Continuam exportadas, só que
+// chamadas server-to-server pelas rotas de API, não como RPC de client.
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
