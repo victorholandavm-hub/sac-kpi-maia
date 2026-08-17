@@ -8,29 +8,15 @@ import {
   montadorCompletePartially,
 } from "@/app/assistencia/montador-actions";
 import { useQuickAction } from "./useQuickAction";
-import { RatingScale } from "./RatingScale";
 import type { AssemblerRequestItem } from "@/lib/serviceRequests";
 
-type Mode = null | "complete" | "rating" | "issue" | "partial";
+type Mode = null | "complete" | "issue" | "partial";
 
-export function MontadorRequestActions({
-  requestId,
-  items,
-  isMostruario,
-}: {
-  requestId: string;
-  items: AssemblerRequestItem[];
-  // Mostruário é item de exposição da própria loja -- não tem cliente pra
-  // virar o celular. A avaliação, nesse caso, fica pro gerente que pediu
-  // fazer depois, na própria tela dele (ver loja/page.tsx), não aqui.
-  isMostruario: boolean;
-}) {
+export function MontadorRequestActions({ requestId, items }: { requestId: string; items: AssemblerRequestItem[] }) {
   const { pending, run, showToast } = useQuickAction();
   const [mode, setMode] = useState<Mode>(null);
   const [issueReason, setIssueReason] = useState("");
   const [note, setNote] = useState("");
-  const [deliveryRating, setDeliveryRating] = useState<number | null>(null);
-  const [resolutionRating, setResolutionRating] = useState<number | null>(null);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [partialNote, setPartialNote] = useState("");
 
@@ -46,9 +32,9 @@ export function MontadorRequestActions({
     }, "Chamado marcado pra remarcar.");
   }
 
-  function finishComplete(withRating: boolean) {
+  function finishComplete() {
     run(async () => {
-      await montadorCompleteRequest(requestId, withRating ? deliveryRating : null, withRating ? resolutionRating : null);
+      await montadorCompleteRequest(requestId);
       setMode(null);
     }, "Chamado marcado como concluído.");
   }
@@ -135,7 +121,7 @@ export function MontadorRequestActions({
           <div className="flex items-center gap-2">
             <button
               disabled={pending}
-              onClick={() => (isMostruario ? finishComplete(false) : setMode("rating"))}
+              onClick={finishComplete}
               className="text-sm rounded-lg px-3 py-2.5 font-medium disabled:opacity-60 flex-1"
               style={{ background: "var(--status-good)", color: "#fff" }}
             >
@@ -145,39 +131,6 @@ export function MontadorRequestActions({
               cancelar
             </button>
           </div>
-        </div>
-      ) : null}
-
-      {mode === "rating" ? (
-        <div
-          className="flex flex-col gap-4 rounded-lg p-4"
-          style={{ border: "2px solid var(--status-good)", background: "color-mix(in srgb, var(--status-good) 8%, var(--surface-1))" }}
-        >
-          <div className="rounded-lg py-3 px-2 text-center" style={{ background: "var(--status-good)" }}>
-            <p className="text-lg font-bold" style={{ color: "#fff" }}>
-              📱 Vire o celular pro cliente avaliar!
-            </p>
-          </div>
-          <RatingScale label="Nota pra montagem" value={deliveryRating} onChange={setDeliveryRating} />
-          <RatingScale label="Nota pra resolução do problema" value={resolutionRating} onChange={setResolutionRating} />
-          <div className="flex items-center gap-2">
-            <button
-              disabled={pending || deliveryRating === null || resolutionRating === null}
-              onClick={() => finishComplete(true)}
-              className="text-sm rounded-lg px-3 py-2.5 font-medium disabled:opacity-60 flex-1"
-              style={{ background: "var(--status-good)", color: "#fff" }}
-            >
-              Enviar avaliação e concluir
-            </button>
-          </div>
-          <button
-            disabled={pending}
-            onClick={() => finishComplete(false)}
-            className="text-sm underline self-start disabled:opacity-60"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Cliente não quis avaliar — concluir sem avaliação
-          </button>
         </div>
       ) : null}
 

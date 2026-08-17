@@ -182,17 +182,11 @@ export async function driverMarkPickupCompleted(requestId: string): Promise<void
   revalidatePath(`/assistencia/${requestId}`);
 }
 
-function validRating(value: number | null): number | null {
-  if (value === null) return null;
-  if (!Number.isInteger(value) || value < 0 || value > 10) throw new Error("Nota inválida.");
-  return value;
-}
-
-export async function driverCompleteRequest(
-  requestId: string,
-  deliveryRating: number | null = null,
-  resolutionRating: number | null = null
-): Promise<void> {
+// A nota do cliente não entra mais aqui -- desde 17/08/2026 é coletada
+// depois, numa tela pública separada (QR code que aparece na hora de
+// concluir, ver RatingQrCode.tsx / avaliar/actions.ts). Mesma mudança de
+// montadorCompleteRequest, ver comentário lá.
+export async function driverCompleteRequest(requestId: string): Promise<void> {
   const driverName = await getDriverSession();
   if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
 
@@ -211,13 +205,7 @@ export async function driverCompleteRequest(
 
   const { data: updated, error: updateError } = await admin
     .from("service_requests")
-    .update({
-      status: "concluida",
-      completed_at: new Date().toISOString(),
-      pickup_completed: true,
-      delivery_rating: validRating(deliveryRating),
-      resolution_rating: validRating(resolutionRating),
-    })
+    .update({ status: "concluida", completed_at: new Date().toISOString(), pickup_completed: true })
     .eq("id", requestId)
     .eq("status", request.status)
     .select("id")
@@ -225,17 +213,13 @@ export async function driverCompleteRequest(
   if (updateError) throw new Error(updateError.message);
   if (!updated) throw new Error("Esse chamado já foi atualizado por outra pessoa. Recarregue a página e tente de novo.");
 
-  const ratingNote =
-    deliveryRating !== null || resolutionRating !== null
-      ? ` Avaliação do cliente — entrega: ${deliveryRating ?? "—"}, resolução: ${resolutionRating ?? "—"}.`
-      : "";
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: null,
     event_type: "status_changed",
     from_status: request.status,
     to_status: "concluida",
-    note: `Concluído pelo motorista ${driverName}.${ratingNote}`,
+    note: `Concluído pelo motorista ${driverName}.`,
   });
 
   await notifyLoja(request.store_id, {
