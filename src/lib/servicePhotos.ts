@@ -53,13 +53,17 @@ export type RequestPhoto = {
   uploadedBy: string | null;
   caption: string | null;
   createdAt: string;
+  // Comprovante de entrega assinado (motorista) -- distingue da foto comum
+  // (observação, avaria etc.). Ver driverCompleteRequest (driver-actions.ts),
+  // que exige pelo menos uma com isProof antes de concluir.
+  isProof: boolean;
 };
 
 export async function listRequestPhotos(requestId: string): Promise<RequestPhoto[]> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("service_request_photos")
-    .select("id, storage_path, uploaded_by, caption, created_at")
+    .select("id, storage_path, uploaded_by, caption, created_at, is_proof")
     .eq("request_id", requestId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
@@ -75,9 +79,24 @@ export async function listRequestPhotos(requestId: string): Promise<RequestPhoto
         uploadedBy: row.uploaded_by as string | null,
         caption: row.caption as string | null,
         createdAt: row.created_at as string,
+        isProof: !!row.is_proof,
       };
     })
   );
+}
+
+// Usado só por driverCompleteRequest pra checar a exigência sem precisar
+// gerar URL assinada pra toda foto do chamado (listRequestPhotos faz uma
+// chamada de storage por foto -- desnecessário só pra saber se existe 1).
+export async function hasProofPhoto(requestId: string): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+  const { count, error } = await admin
+    .from("service_request_photos")
+    .select("id", { count: "exact", head: true })
+    .eq("request_id", requestId)
+    .eq("is_proof", true);
+  if (error) throw new Error(error.message);
+  return (count ?? 0) > 0;
 }
 
 async function uploadPhotoBytes(requestId: string, file: File): Promise<string> {
@@ -112,6 +131,7 @@ async function insertPhotoMetadata(opts: {
   path: string;
   uploadedBy: string | null;
   caption?: string | null;
+  isProof?: boolean;
 }): Promise<void> {
   const admin = getSupabaseAdmin();
   const caption = opts.caption?.trim() || null;
@@ -120,6 +140,7 @@ async function insertPhotoMetadata(opts: {
     storage_path: opts.path,
     uploaded_by: opts.uploadedBy,
     caption,
+    is_proof: !!opts.isProof,
   });
   if (insertError) {
     console.error("insertPhotoMetadata failed:", insertError.message);
@@ -133,9 +154,10 @@ export async function saveRequestPhoto(opts: {
   file: File;
   uploadedBy: string | null;
   caption?: string | null;
+  isProof?: boolean;
 }): Promise<void> {
   const path = await uploadPhotoBytes(opts.requestId, opts.file);
-  await insertPhotoMetadata({ requestId: opts.requestId, path, uploadedBy: opts.uploadedBy, caption: opts.caption });
+  await insertPhotoMetadata({ requestId: opts.requestId, path, uploadedBy: opts.uploadedBy, caption: opts.caption, isProof: opts.isProof });
 }
 
 // Pra fluxos onde o anexo é obrigatório (ex.: createSacRequest) e o ticket

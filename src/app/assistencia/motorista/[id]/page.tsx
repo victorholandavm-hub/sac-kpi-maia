@@ -47,6 +47,8 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
   }
 
   const photos = await listRequestPhotos(request.id);
+  const proofPhotos = photos.filter((p) => p.isProof);
+  const otherPhotos = photos.filter((p) => !p.isProof);
   const showCompleted = request.status === "concluida" || request.status === "cancelada";
   // Motorista não tem caso "mostruário" (sempre tem cliente de verdade na
   // outra ponta), diferente do montador -- QR aparece sempre que concluído
@@ -138,12 +140,28 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
 
         <div
           className="rounded-lg p-4 flex flex-col gap-3"
+          style={{ background: "color-mix(in srgb, var(--status-warning) 8%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
+        >
+          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+            📝 Comprovante assinado {showCompleted ? "" : "(obrigatório antes de concluir)"}
+          </h3>
+          {!showCompleted ? (
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+              Só está concluída quando o cliente assina — foto do papel impresso com a assinatura.
+            </p>
+          ) : null}
+          <PhotoGallery photos={proofPhotos} deleteMode="driver" currentActor={driverName} />
+          {!showCompleted ? <MotoristaPhotoUpload requestId={request.id} proof /> : null}
+        </div>
+
+        <div
+          className="rounded-lg p-4 flex flex-col gap-3"
           style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
         >
           <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Fotos
           </h3>
-          <PhotoGallery photos={photos} deleteMode="driver" currentActor={driverName} />
+          <PhotoGallery photos={otherPhotos} deleteMode="driver" currentActor={driverName} />
           <MotoristaPhotoUpload requestId={request.id} />
         </div>
 

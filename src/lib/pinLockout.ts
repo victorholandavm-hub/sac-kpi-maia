@@ -7,6 +7,7 @@ export type PinTable =
   | "assemblers"
   | "gerentes"
   | "drivers"
+  | "tecnicos"
   | "cd_operadores"
   | "fabrica_operadores"
   | "encomenda_caixa_pins"

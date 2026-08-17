@@ -82,6 +82,20 @@ export function ShieldIcon({ color }: { color: string }) {
   );
 }
 
+export function ClipboardCheckIcon({ color }: { color: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>
+      <path
+        d="M9 4.5h6a1 1 0 0 1 1 1V6h1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1v-.5a1 1 0 0 1 1-1ZM9 12l2 2 4-4.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function TruckIcon({ color }: { color: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>

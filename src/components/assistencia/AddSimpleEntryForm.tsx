@@ -1,12 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import { addAssembler, addSupplier, addDriver, addCdOperador, addFabricaOperador, type FormState } from "@/app/assistencia/admin-actions";
+import { addAssembler, addSupplier, addDriver, addTecnico, addCdOperador, addFabricaOperador, type FormState } from "@/app/assistencia/admin-actions";
 import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 
 const ACTIONS = {
   assembler: addAssembler,
   driver: addDriver,
+  tecnico: addTecnico,
   supplier: addSupplier,
   cd: addCdOperador,
   fabrica: addFabricaOperador,
@@ -15,6 +16,7 @@ const ACTIONS = {
 const PLACEHOLDERS = {
   assembler: "Novo montador",
   driver: "Novo motorista",
+  tecnico: "Novo técnico",
   supplier: "Novo fornecedor",
   cd: "Novo operador do CD",
   fabrica: "Novo operador da fábrica",

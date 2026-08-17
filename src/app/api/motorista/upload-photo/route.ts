@@ -51,9 +51,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Selecione uma foto." }, { status: 400 });
     }
     const caption = String(formData.get("caption") ?? "");
+    const isProof = String(formData.get("isProof") ?? "") === "1";
 
     try {
-      await saveRequestPhoto({ requestId, file, uploadedBy: driverName, caption });
+      await saveRequestPhoto({ requestId, file, uploadedBy: driverName, caption, isProof });
     } catch (err) {
       console.error("[motorista-upload] saveRequestPhoto falhou", err);
       return NextResponse.json({ error: (err as Error).message }, { status: 500 });

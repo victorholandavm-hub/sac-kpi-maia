@@ -1,6 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
-import { StoreIcon, WrenchIcon, HeadsetIcon, HardHatIcon, TruckIcon, BoxIcon, ShieldIcon } from "@/components/assistencia/RoleIcons";
+import {
+  StoreIcon,
+  WrenchIcon,
+  HeadsetIcon,
+  HardHatIcon,
+  TruckIcon,
+  BoxIcon,
+  ShieldIcon,
+  ClipboardCheckIcon,
+} from "@/components/assistencia/RoleIcons";
 
 // Nunca servir isso de cache estático/CDN — sempre gerar fresco a cada request.
 export const dynamic = "force-dynamic";
@@ -105,6 +114,14 @@ export default function AssistenciaHomePage() {
             borderColor="var(--brand-green)"
             title="Motorista"
             subtitle="Minhas rotas"
+          />
+          <RoleCard
+            href="/assistencia/tecnico/login"
+            icon={<ClipboardCheckIcon color="var(--brand-orange)" />}
+            iconBg="var(--brand-orange-soft)"
+            borderColor="var(--brand-orange)"
+            title="Equipe técnica"
+            subtitle="Destino do produto"
           />
           <RoleCard
             href="/assistencia/login"
