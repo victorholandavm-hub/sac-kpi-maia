@@ -8,6 +8,8 @@ import { countPedidosEncomendaSolicitados } from "@/lib/pedidosEncomenda";
 import { REQUEST_TYPE_LABELS, ROLE_LABELS, SAC_MANAGED_TYPES, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { NotificationBell } from "@/components/assistencia/NotificationBell";
+import { listSacNotificationsAction } from "@/app/assistencia/notifications-actions";
 import { SacTabs } from "@/components/assistencia/SacTabs";
 import { StatTile } from "@/components/StatTile";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
@@ -50,11 +52,14 @@ export default async function SacHomePage({
   return (
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="SAC — Lojas Maia" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`}>
-        <form action={signOut}>
-          <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-            Sair
-          </button>
-        </form>
+        <div className="flex items-center gap-3">
+          <NotificationBell fetchAction={listSacNotificationsAction} storageKey="sac" />
+          <form action={signOut}>
+            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              Sair
+            </button>
+          </form>
+        </div>
       </AssistenciaHeader>
 
       <SacTabs active="solicitacoes" />

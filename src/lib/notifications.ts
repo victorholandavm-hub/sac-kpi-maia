@@ -3,7 +3,7 @@
 // `node --env-file` -- mesma nota em totvsSync.ts/syncRuns.ts.
 import { getSupabaseAdmin } from "./supabaseAdmin.ts";
 
-export type NotificationRecipientKind = "admin" | "loja" | "fabrica" | "cd";
+export type NotificationRecipientKind = "admin" | "loja" | "fabrica" | "cd" | "sac" | "assistencia";
 
 type CreateNotificationInput = {
   recipientKind: NotificationRecipientKind;
@@ -51,6 +51,18 @@ export async function notifyCd(opts: NotifyOpts): Promise<void> {
 
 export async function notifyAdmin(opts: NotifyOpts): Promise<void> {
   await createNotification({ recipientKind: "admin", recipientKey: null, ...opts });
+}
+
+// "sac"/"assistencia": sem recipientKey (broadcast pro papel inteiro, igual
+// admin/cd) -- diferente de "loja", que é por loja específica. Usado hoje só
+// pelo alerta de "precisa remarcar" (driver-actions.ts/montador-actions.ts),
+// roteado por tipo de chamado (ver SAC_MANAGED_TYPES em assistenciaLabels.ts).
+export async function notifySac(opts: NotifyOpts): Promise<void> {
+  await createNotification({ recipientKind: "sac", recipientKey: null, ...opts });
+}
+
+export async function notifyAssistencia(opts: NotifyOpts): Promise<void> {
+  await createNotification({ recipientKind: "assistencia", recipientKey: null, ...opts });
 }
 
 export type Notification = {
