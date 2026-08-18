@@ -4,12 +4,12 @@ import { getDriverSession, driverSignOut } from "@/app/assistencia/driver-action
 import { listRequestsForDriver, type DriverRequestView } from "@/lib/serviceRequests";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { DriverRouteGroup } from "@/components/assistencia/DriverRouteGroup";
-import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, DATE_BUCKET_DEFAULT_OPEN, groupByDateBucket } from "@/lib/dateBuckets";
+import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, groupByDateBucket } from "@/lib/dateBuckets";
 import { ROTAS, ROTA_LABELS, type Rota } from "@/lib/rotas";
 
-// Dentro de cada dia, sub-agrupa por rota -- pedido do usuário depois de
-// perceber que várias entregas do mesmo dia/rota apareciam soltas, uma
-// embaixo da outra, sem nada juntando visualmente quem é do mesmo trajeto.
+// Rota por fora, data por dentro -- pedido do Victor 18/08/2026: mesma
+// ordem de hierarquia da fila da assistência (ver groupByRota em
+// fila/page.tsx). Antes era o contrário (data por fora, rota por dentro).
 const NO_ROTA = "sem_rota" as const;
 type RotaGroupKey = Rota | typeof NO_ROTA;
 const ROTA_GROUP_ORDER: RotaGroupKey[] = [...ROTAS, NO_ROTA];
@@ -42,7 +42,7 @@ export default async function MotoristaHomePage({
   const showCompleted = view === "concluidas";
 
   const requests = await listRequestsForDriver(driverName, { onlyCompleted: showCompleted });
-  const buckets = !showCompleted ? groupByDateBucket(requests, (r) => r.scheduledDate) : null;
+  const rotaGroups = !showCompleted ? groupByRota(requests) : null;
 
   return (
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
@@ -92,25 +92,31 @@ export default async function MotoristaHomePage({
             {showCompleted ? "Nenhuma rota concluída ainda." : "Nenhuma rota em aberto no momento."}
           </p>
         </div>
-      ) : buckets ? (
-        DATE_BUCKET_ORDER.filter((key) => (buckets.get(key)?.length ?? 0) > 0).map((key) => {
-          const rotaGroups = groupByRota(buckets.get(key)!);
+      ) : rotaGroups ? (
+        ROTA_GROUP_ORDER.filter((rotaKey) => (rotaGroups.get(rotaKey)?.length ?? 0) > 0).map((rotaKey) => {
+          const items = rotaGroups.get(rotaKey)!;
+          const buckets = groupByDateBucket(items, (r) => r.scheduledDate);
+          // Abre sozinho quando tem algo atrasado ou de hoje -- é o que
+          // precisa de atenção imediata (mesmo critério que antes decidia
+          // abrir o balde de data; agora é a rota que abre/fecha).
+          const hasUrgent = (buckets.get("atrasado")?.length ?? 0) > 0 || (buckets.get("hoje")?.length ?? 0) > 0;
+          const bucketKeysPresent = DATE_BUCKET_ORDER.filter((k) => (buckets.get(k)?.length ?? 0) > 0);
           return (
-            <details key={key} open={DATE_BUCKET_DEFAULT_OPEN[key]}>
+            <details key={rotaKey} open={hasUrgent}>
               <summary className="text-base font-bold cursor-pointer py-1" style={{ color: "var(--text-primary)" }}>
-                {DATE_BUCKET_LABELS[key]} ({buckets.get(key)!.length})
+                Rota: {ROTA_GROUP_LABELS[rotaKey]} ({items.length})
               </summary>
               <div className="flex flex-col gap-3 mt-2">
-                {ROTA_GROUP_ORDER.filter((rotaKey) => (rotaGroups.get(rotaKey)?.length ?? 0) > 0).map((rotaKey) => (
-                  <div key={rotaKey}>
-                    {/* Só vale a pena rotular quando dá pra diferenciar de outro grupo no mesmo dia -- uma rota
-                        sozinha no dia não precisa de rótulo repetindo o óbvio. */}
-                    {rotaGroups.size > 1 ? (
+                {bucketKeysPresent.map((bucketKey) => (
+                  <div key={bucketKey}>
+                    {/* Só vale a pena rotular quando dá pra diferenciar de outro balde na mesma rota -- uma data
+                        sozinha na rota não precisa de rótulo repetindo o óbvio. */}
+                    {bucketKeysPresent.length > 1 ? (
                       <p className="text-xs font-semibold uppercase tracking-wide px-1 pb-1" style={{ color: "var(--text-secondary)" }}>
-                        Rota: {ROTA_GROUP_LABELS[rotaKey]} ({rotaGroups.get(rotaKey)!.length})
+                        {DATE_BUCKET_LABELS[bucketKey]} ({buckets.get(bucketKey)!.length})
                       </p>
                     ) : null}
-                    <DriverRouteGroup items={rotaGroups.get(rotaKey)!} showCompleted={showCompleted} reorderable />
+                    <DriverRouteGroup items={buckets.get(bucketKey)!} showCompleted={showCompleted} reorderable />
                   </div>
                 ))}
               </div>

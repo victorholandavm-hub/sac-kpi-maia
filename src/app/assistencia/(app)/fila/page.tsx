@@ -2,21 +2,31 @@ import Link from "next/link";
 import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
-import { getRotaWeekOverview, startOfRotaWeek } from "@/lib/rotas";
+import { getRotaWeekOverview, startOfRotaWeek, ROTAS, ROTA_LABELS, ROTA_COLORS } from "@/lib/rotas";
 import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 
-// listRequests só ordena por created_at (ver comentário lá) -- a ordem
-// manual (assistencia_order) só faz sentido DENTRO de um grupo do mesmo dia
-// (é onde reordenar aparece na tela), então aplica aqui, por grupo, depois de
-// já ter separado por data. Grupos em si vêm sempre do mais novo pro mais
-// antigo, direto pela dateKey (string YYYY-MM-DD ordena igual data).
-function groupByDate(requests: ServiceRequestSummary[]) {
-  const groups: { dateKey: string; label: string; items: ServiceRequestSummary[] }[] = [];
-  for (const r of requests) {
+type QueueDateSubgroup = { dateKey: string; label: string; items: ServiceRequestSummary[] };
+type QueueGroup = {
+  key: string;
+  label: string;
+  headerBg: string;
+  headerText: string;
+  borderColor: string;
+  items: ServiceRequestSummary[];
+  // Só a aba Entregas usa isso (ver groupByRota) -- dentro da rota, sub-
+  // divide por data de criação com um rótulo próprio, mais discreto que o
+  // cabeçalho da rota. Pedido do Victor 18/08/2026: "no agrupamento da
+  // rota, deve aparecer sim a data ao lado".
+  dateSubgroups?: QueueDateSubgroup[];
+};
+
+function groupByDateKey(items: ServiceRequestSummary[]): QueueDateSubgroup[] {
+  const groups: QueueDateSubgroup[] = [];
+  for (const r of items) {
     const date = new Date(r.createdAt);
     const dateKey = date.toISOString().slice(0, 10);
     let group = groups.find((g) => g.dateKey === dateKey);
@@ -28,15 +38,62 @@ function groupByDate(requests: ServiceRequestSummary[]) {
     group.items.push(r);
   }
   groups.sort((a, b) => (a.dateKey < b.dateKey ? 1 : a.dateKey > b.dateKey ? -1 : 0));
-  for (const group of groups) {
-    group.items.sort((a, b) => {
-      if (a.assistenciaOrder !== null && b.assistenciaOrder !== null) return a.assistenciaOrder - b.assistenciaOrder;
-      if (a.assistenciaOrder !== null) return -1;
-      if (b.assistenciaOrder !== null) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-  }
+  for (const group of groups) sortGroupItems(group.items);
   return groups;
+}
+
+// Dentro de cada grupo, mesma prioridade de sempre: ordem manual
+// (assistencia_order) primeiro, senão mais recente primeiro.
+function sortGroupItems(items: ServiceRequestSummary[]) {
+  items.sort((a, b) => {
+    if (a.assistenciaOrder !== null && b.assistenciaOrder !== null) return a.assistenciaOrder - b.assistenciaOrder;
+    if (a.assistenciaOrder !== null) return -1;
+    if (b.assistenciaOrder !== null) return 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+// Aba "Visitas" -- agrupado por data de criação, mais novo pro mais antigo.
+function groupByDate(requests: ServiceRequestSummary[]): QueueGroup[] {
+  const groups: QueueGroup[] = [];
+  for (const r of requests) {
+    const date = new Date(r.createdAt);
+    const dateKey = date.toISOString().slice(0, 10);
+    let group = groups.find((g) => g.key === dateKey);
+    if (!group) {
+      const label = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+      group = { key: dateKey, label, headerBg: "var(--brand-green)", headerText: "var(--brand-green-ink)", borderColor: "var(--brand-green)", items: [] };
+      groups.push(group);
+    }
+    group.items.push(r);
+  }
+  groups.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
+  for (const group of groups) sortGroupItems(group.items);
+  return groups;
+}
+
+// Aba "Entregas" -- agrupado por rota, não por data de criação (pedido do
+// Victor 18/08/2026: quem gerencia entrega pensa em "quem tá na rota Sul",
+// não em "o que foi criado ontem"). A data de criação vira só um detalhe
+// dentro de cada card (ver AssistenciaQueueGroup, prop showCreatedDate).
+// Ordem fixa Praia/Sul/Centro + "Sem rota definida" por último, só grupos
+// com algo dentro.
+function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
+  const order: Omit<QueueGroup, "items">[] = [
+    ...ROTAS.map((r) => ({ key: r, label: `Rota ${ROTA_LABELS[r]}`, headerBg: ROTA_COLORS[r], headerText: "#fff", borderColor: ROTA_COLORS[r] })),
+    { key: "sem_rota", label: "Sem rota definida", headerBg: "var(--surface-2)", headerText: "var(--text-secondary)", borderColor: "var(--border)" },
+  ];
+  const groups: QueueGroup[] = order.map((o) => ({ ...o, items: [] }));
+  for (const r of requests) {
+    const key = r.rota ?? "sem_rota";
+    groups.find((g) => g.key === key)?.items.push(r);
+  }
+  const nonEmpty = groups.filter((g) => g.items.length > 0);
+  for (const group of nonEmpty) {
+    sortGroupItems(group.items);
+    group.dateSubgroups = groupByDateKey(group.items);
+  }
+  return nonEmpty;
 }
 
 // Isolado numa função à parte (não direto no corpo do componente) --
@@ -124,7 +181,7 @@ export default async function AssistenciaQueuePage({
     showPecas ? listDrivers() : Promise.resolve([]),
     showPecas ? getRotaWeekOverview(startOfRotaWeek(today), 14) : Promise.resolve([]),
   ]);
-  const groups = groupByDate(requests);
+  const groups = showPecas ? groupByRota(requests) : groupByDate(requests);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   // Calculado uma vez aqui (Server Component, sem hooks) e repassado pra
   // AssistenciaQueueGroup -- lá dentro é "use client" com hooks, onde
@@ -280,14 +337,29 @@ export default async function AssistenciaQueuePage({
         </div>
       ) : (
         groups.map((group) => (
-          <div key={group.dateKey} className="rounded-xl border" style={{ borderColor: "var(--brand-green)" }}>
-            <div className="px-4 py-2 rounded-t-xl" style={{ background: "var(--brand-green)" }}>
-              <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--brand-green-ink)" }}>
+          <div key={group.key} className="rounded-xl" style={{ border: `2px solid ${group.borderColor}` }}>
+            <div className="px-4 py-2 rounded-t-xl" style={{ background: group.headerBg }}>
+              <span className="text-sm font-bold uppercase tracking-wide" style={{ color: group.headerText }}>
                 {group.label}
               </span>
             </div>
             <div style={{ background: "var(--surface-1)" }}>
-              <AssistenciaQueueGroup items={group.items} reorderable now={now} />
+              {group.dateSubgroups ? (
+                <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
+                  {group.dateSubgroups.map((sub) => (
+                    <div key={sub.dateKey}>
+                      <div className="px-4 py-1.5" style={{ background: "var(--surface-2)" }}>
+                        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+                          {sub.label}
+                        </span>
+                      </div>
+                      <AssistenciaQueueGroup items={sub.items} reorderable now={now} showCreatedDate />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <AssistenciaQueueGroup items={group.items} reorderable now={now} />
+              )}
             </div>
           </div>
         ))

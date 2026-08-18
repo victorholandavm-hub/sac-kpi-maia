@@ -42,7 +42,10 @@ export function RotaMotoristaDoDia({
   const visibleOverview = expanded ? overview : overview.slice(todayIndex, todayIndex + 2);
 
   return (
-    <div className="rounded-lg border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+    <div
+      className="rounded-lg p-4 flex flex-col gap-1"
+      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+    >
       <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
         Motorista do dia
       </h3>
@@ -58,8 +61,8 @@ export function RotaMotoristaDoDia({
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="text-xs underline self-start mt-2"
-        style={{ color: "var(--text-secondary)" }}
+        className="text-xs rounded px-3 py-1.5 border font-medium self-start mt-2"
+        style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
       >
         {expanded ? "Mostrar menos" : "Mostrar mais rotas (semana atual + seguinte)"}
       </button>
@@ -224,8 +227,8 @@ function RotaDayRow({
         <button
           type="button"
           onClick={rotaEditOpen ? cancelRotaEdit : () => setRotaEditOpen(true)}
-          className="text-[11px] underline shrink-0"
-          style={{ color: "var(--text-muted)" }}
+          className="text-[11px] rounded px-2 py-1 border font-medium shrink-0"
+          style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
         >
           {rotaEditOpen ? "cancelar" : "editar rota do dia"}
         </button>
@@ -298,8 +301,8 @@ function RotaDayRow({
               <button
                 type="button"
                 onClick={() => setExtraOpen(false)}
-                className="text-[11px] underline shrink-0"
-                style={{ color: "var(--text-muted)" }}
+                className="text-[11px] rounded px-2 py-1 border font-medium shrink-0"
+                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
               >
                 cancelar
               </button>
@@ -308,8 +311,8 @@ function RotaDayRow({
             <button
               type="button"
               onClick={() => setExtraOpen(true)}
-              className="text-[11px] underline self-start"
-              style={{ color: "var(--text-muted)" }}
+              className="text-[11px] rounded px-2 py-1 border font-medium self-start"
+              style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
             >
               + rota extra
             </button>
@@ -320,8 +323,8 @@ function RotaDayRow({
           <button
             type="button"
             onClick={() => setExtraOpen(true)}
-            className="text-[11px] underline"
-            style={{ color: "var(--text-muted)" }}
+            className="text-[11px] rounded px-2 py-1 border font-medium"
+            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
           >
             + rota extra
           </button>

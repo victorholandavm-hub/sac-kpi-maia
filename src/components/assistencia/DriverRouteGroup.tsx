@@ -5,6 +5,7 @@ import Link from "next/link";
 import { setDriverOrderAction } from "@/app/assistencia/driver-actions";
 import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
+import { DriverNotificationModalButton } from "./DriverNotificationModalButton";
 import type { DriverRequestView } from "@/lib/serviceRequests";
 
 function formatDateOnly(value: string | null): string | null {
@@ -162,13 +163,16 @@ export function DriverRouteGroup({
                   </p>
                 ) : null}
               </div>
-              <Link
-                href={`/assistencia/motorista/${r.id}`}
-                className="text-sm rounded-lg px-3 py-2 font-medium shrink-0"
-                style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-              >
-                Ver rota
-              </Link>
+              <div className="flex items-center gap-2 shrink-0">
+                <DriverNotificationModalButton item={r} />
+                <Link
+                  href={`/assistencia/motorista/${r.id}`}
+                  className="text-sm rounded-lg px-3 py-2 font-medium shrink-0"
+                  style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+                >
+                  Ver rota
+                </Link>
+              </div>
             </div>
           </div>
         ))}
