@@ -75,7 +75,7 @@ export default async function AssistenciaAppLayout({
             </Link>
           ) : (
             <div className="hidden sm:block">
-              <AssistenciaNav isAdmin={isAdmin} counts={counts} />
+              <AssistenciaNav counts={counts} />
             </div>
           )}
         </div>
@@ -83,7 +83,7 @@ export default async function AssistenciaAppLayout({
       </div>
       {isSac ? null : (
         <div className="print:hidden">
-          <MobileNav isAdmin={isAdmin} counts={counts} />
+          <MobileNav counts={counts} />
         </div>
       )}
     </ToastProvider>

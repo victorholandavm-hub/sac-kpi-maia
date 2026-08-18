@@ -21,7 +21,6 @@ import { AssemblerNameField } from "./AssemblerNameField";
 import { MontadorInstructionField } from "./MontadorInstructionField";
 import { ComboMontagemDesmontagemField } from "./ComboMontagemDesmontagemField";
 import { ScheduleField } from "./ScheduleField";
-import { type Rota } from "@/lib/rotas";
 import { RequestItemsTable } from "./RequestItemsTable";
 import { SacCategoryField } from "./SacCategoryField";
 import { LegalDeadlineField } from "./LegalDeadlineField";
@@ -93,13 +92,11 @@ export function RequestDetailContent({
   result,
   assemblers,
   photos,
-  nextDatesByRota,
 }: {
   profile: Profile;
   result: { request: ServiceRequestDetail; events: RequestEvent[] } | null;
   assemblers: string[];
   photos: RequestPhoto[];
-  nextDatesByRota: Record<Rota, string[]>;
 }) {
   if (!result) {
     return (
@@ -274,7 +271,6 @@ export function RequestDetailContent({
                 shift={request.shift}
                 rota={null}
                 rotaExceptionNote={null}
-                nextDatesByRota={nextDatesByRota}
                 showRota={false}
               />
             ) : (

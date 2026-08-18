@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireVendasActor } from "@/lib/vendasAuth";
+import { requireDashboardAuth } from "@/lib/dashboardSession";
 import {
   getVendaCurvaProduto,
   searchProdutosVenda,
@@ -11,7 +11,7 @@ import {
   type ProdutoCategoriaKey,
   type DateRange,
 } from "@/lib/vendasProduto";
-import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { AppHeader } from "@/components/AppHeader";
 import { ProdutoVendaCurvaChart } from "@/components/assistencia/ProdutoVendaCurvaChart";
 import { VendasPorCategoriaList } from "@/components/assistencia/VendasPorCategoriaList";
 import { ProdutoRankingList } from "@/components/assistencia/ProdutoRankingList";
@@ -47,19 +47,23 @@ function buildHref(params: { q?: string; from?: string; to?: string; categoria?:
   if (params.to) sp.set("to", params.to);
   if (params.categoria) sp.set("categoria", params.categoria);
   const qs = sp.toString();
-  return qs ? `/assistencia/vendas?${qs}` : "/assistencia/vendas";
+  return qs ? `/vendas?${qs}` : "/vendas";
 }
 
+// Movida de /assistencia/vendas pra cá 18/08/2026 (pedido do Victor): "essa
+// aba de vendas deve sair desse sistema e ir para o painel de kpis" -- agora
+// mora ao lado de KPIs e Clientes, com o mesmo login (senha do painel, ver
+// AppHeader/dashboardSession.ts) em vez do login por papel (CD/admin) que
+// tinha antes em vendasAuth.ts (removido, sem outros usos).
 export default async function VendasProdutoPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; from?: string; to?: string; categoria?: string }>;
 }) {
-  const actor = await requireVendasActor();
+  await requireDashboardAuth();
   const { q, from, to, categoria } = await searchParams;
   const query = (q ?? "").trim();
   const categoriaAtiva = (categoria as ProdutoCategoriaKey | undefined) || undefined;
-  const backHref = actor.role === "cd" ? "/assistencia/encomendas/fila" : "/assistencia/inicio";
 
   // Data exata (from+to) tem prioridade sobre o atalho de semanas -- só cai
   // no padrão (12 semanas) quando nem um nem outro foi informado.
@@ -109,11 +113,17 @@ export default async function VendasProdutoPage({
   const rankingBaseHref = customRange ? buildHref({ from: range.from, to: range.to }) : buildHref({});
 
   return (
-    <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-      <AssistenciaHeader
-        title="Vendas por produto"
-        subtitle={`${actor.name} — curva de venda, ranking e tipo de produto`}
-      />
+    <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
+      <AppHeader />
+
+      <div>
+        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+          Vendas por produto
+        </h1>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          Curva de venda, ranking e tipo de produto.
+        </p>
+      </div>
 
       {/* Período -- controla curva, ranking, resumo por tipo e evolução,
           todos juntos (mesmo período pra tudo, evita confusão de "de qual
@@ -145,7 +155,7 @@ export default async function VendasProdutoPage({
 
         <span className="h-5 w-px shrink-0" style={{ background: "var(--gridline)" }} />
 
-        <form action="/assistencia/vendas" method="GET" className="flex items-center gap-2 flex-nowrap shrink-0">
+        <form action="/vendas" method="GET" className="flex items-center gap-2 flex-nowrap shrink-0">
           {query ? <input type="hidden" name="q" value={query} /> : null}
           {categoriaAtiva ? <input type="hidden" name="categoria" value={categoriaAtiva} /> : null}
           <label className="flex items-center gap-1.5 text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
@@ -173,7 +183,7 @@ export default async function VendasProdutoPage({
         </p>
       ) : null}
 
-      <form action="/assistencia/vendas" method="GET" className="flex items-center gap-2 flex-wrap">
+      <form action="/vendas" method="GET" className="flex items-center gap-2 flex-wrap">
         {customRange ? <input type="hidden" name="from" value={range.from} /> : null}
         {customRange ? <input type="hidden" name="to" value={range.to} /> : null}
         <input
@@ -290,10 +300,6 @@ export default async function VendasProdutoPage({
           productHref={(code) => buildHref({ q: code, from: customRange ? range.from : undefined, to: customRange ? range.to : undefined })}
         />
       </div>
-
-      <Link href={backHref} className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
-        ← Voltar
-      </Link>
     </div>
   );
 }

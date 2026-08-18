@@ -111,18 +111,17 @@ function NavDot({ count }: { count: number }) {
 }
 
 export function MobileNav({
-  isAdmin,
   counts,
 }: {
-  isAdmin: boolean;
   counts?: { solicitacoes?: number; encomendas?: number };
 }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
-  // "Vendas" só pra admin, mesmo motivo do AssistenciaNav (desktop). "Admin"
-  // não entra mais aqui -- virou link fixo no cabeçalho (layout.tsx), visível
-  // em mobile também (o cabeçalho não é escondido em telas pequenas).
-  const moreTabs = isAdmin ? [...MORE_TABS, { label: "Vendas", href: "/assistencia/vendas" }] : MORE_TABS;
+  // "Vendas" saiu daqui 18/08/2026, mesmo motivo do AssistenciaNav (desktop)
+  // -- agora mora no painel de KPIs (/vendas). "Admin" não entra mais aqui --
+  // virou link fixo no cabeçalho (layout.tsx), visível em mobile também (o
+  // cabeçalho não é escondido em telas pequenas).
+  const moreTabs = MORE_TABS;
   const moreActive = moreTabs.some((t) => pathname.startsWith(t.href));
   const solicitacoesCount = counts?.solicitacoes ?? 0;
   const encomendasCount = counts?.encomendas ?? 0;

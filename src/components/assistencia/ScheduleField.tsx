@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { setSchedule } from "@/app/assistencia/actions";
+import { useEffect, useState } from "react";
+import { setSchedule, getAvailableRotasForDateAction } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
 import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { SHIFTS, type Shift } from "@/lib/serviceRequests";
@@ -41,7 +41,6 @@ export function ScheduleField({
   shift,
   rota,
   rotaExceptionNote,
-  nextDatesByRota,
   showRota,
 }: {
   requestId: string;
@@ -49,24 +48,52 @@ export function ScheduleField({
   scheduledTime: string | null;
   shift: Shift | null;
   rota: Rota | null;
+  // Nota de encaixe fora da rota -- só existe em registros de antes
+  // 18/08/2026 (ver setSchedule/actions.ts); fica só de leitura, não dá mais
+  // pra criar uma nova (a escolha de rota já vem restrita às disponíveis).
   rotaExceptionNote: string | null;
-  nextDatesByRota: Record<Rota, string[]>;
   // Rota (praia/sul/centro) é só pro motorista de entrega/recolhimento --
   // montagem, desmontagem, vistoria e troca de peça são visita de montador
   // e não têm rota nenhuma (ver isDeliveryType em RequestDetailContent).
   showRota: boolean;
 }) {
-  const { pending, run, showToast } = useQuickAction();
+  const { pending, run } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [date, setDate] = useState(scheduledDate ?? "");
   const [time, setTime] = useState(formatTimeOnly(scheduledTime) ?? "");
   const [selectedShift, setSelectedShift] = useState<string>(shift ?? "");
   const [selectedRota, setSelectedRota] = useState<string>(rota ?? "");
-  // Começa marcado quando já existe uma nota de exceção -- senão o textarea
-  // fica escondido e dá pra reabrir a edição sem nem ver que tem uma nota
-  // antiga ali (e sem conseguir limpá-la).
-  const [exception, setException] = useState(!!rotaExceptionNote);
-  const [exceptionNote, setExceptionNote] = useState(rotaExceptionNote ?? "");
+  // Rota só pode ser uma das disponíveis pra data escolhida (pedido do
+  // Victor 18/08/2026) -- busca de novo toda vez que a data muda, em vez de
+  // deixar escolher livre entre praia/sul/centro com aviso de exceção
+  // depois (ver getAvailableRotasForDate em rotas.ts). Mesmo desenho do
+  // getDayLoadAction em QuickCreateRequestForm.tsx: setState só dentro do
+  // timer, nunca síncrono no corpo do efeito (regra do React Compiler).
+  const [availableRotas, setAvailableRotas] = useState<Rota[]>([]);
+  const [loadingRotas, setLoadingRotas] = useState(false);
+  const hasDateContext = editing && showRota && !!date;
+
+  useEffect(() => {
+    if (!hasDateContext) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setLoadingRotas(true);
+      getAvailableRotasForDateAction(date)
+        .then((rotas) => {
+          setAvailableRotas(rotas);
+          // Rota que tinha sido escolhida pode não valer mais pra data nova
+          // -- nunca deixa uma rota fora da lista disponível "presa" no select.
+          setSelectedRota((prev) => (prev && !rotas.includes(prev as Rota) ? "" : prev));
+        })
+        .catch(() => setAvailableRotas([]))
+        .finally(() => setLoadingRotas(false));
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [hasDateContext, date]);
+
+  const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
+  const effectiveLoadingRotas = hasDateContext && loadingRotas;
 
   if (!editing) {
     return (
@@ -98,59 +125,18 @@ export function ScheduleField({
     );
   }
 
-  const validDatesForRota = selectedRota ? nextDatesByRota[selectedRota as Rota] ?? [] : [];
-
   return (
     <div className="flex flex-col gap-2">
       <span className="text-xs" style={{ color: "var(--text-muted)" }}>
         Visita agendada
       </span>
 
-      {showRota ? (
-        <div className="flex items-center gap-2 flex-wrap">
-          <RotaBadge rota={(selectedRota as Rota) || null} />
-          <select
-            value={selectedRota}
-            onChange={(e) => setSelectedRota(e.target.value)}
-            className="rounded border px-2 py-1 text-sm"
-            style={{ borderColor: "var(--border)" }}
-          >
-            <option value="">Sem rota</option>
-            {(Object.keys(ROTA_LABELS) as Rota[]).map((r) => (
-              <option key={r} value={r}>
-                {ROTA_LABELS[r]}
-              </option>
-            ))}
-          </select>
-          {selectedRota && validDatesForRota.length > 0 ? (
-            <div className="flex items-center gap-1 flex-wrap">
-              {validDatesForRota.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDate(d)}
-                  className="text-xs rounded-full px-2 py-1 border whitespace-nowrap"
-                  style={
-                    date === d
-                      ? { background: "var(--brand-green)", color: "var(--brand-green-ink)", borderColor: "var(--brand-green)" }
-                      : { borderColor: "var(--border)", color: "var(--text-secondary)" }
-                  }
-                >
-                  {formatDateOnly(d)}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
       <div className="flex items-center gap-2 flex-wrap">
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          disabled={!exception && !!selectedRota}
-          className="rounded border px-2 py-1 text-sm disabled:opacity-60"
+          className="rounded border px-2 py-1 text-sm"
           style={{ borderColor: "var(--border)" }}
           autoFocus
         />
@@ -176,34 +162,45 @@ export function ScheduleField({
         </select>
       </div>
 
-      {selectedRota ? (
-        <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
-          <input type="checkbox" checked={exception} onChange={(e) => setException(e.target.checked)} className="rounded" />
-          Encaixar fora da rota do dia (data que não é de {ROTA_LABELS[selectedRota as Rota]})
-        </label>
-      ) : null}
-
-      {selectedRota && exception ? (
-        <textarea
-          value={exceptionNote}
-          onChange={(e) => setExceptionNote(e.target.value)}
-          rows={2}
-          placeholder="Motivo do encaixe — ex: único dia que o cliente recebe, cliente Procon urgente…"
-          className="rounded border px-2 py-1 text-sm"
-          style={{ borderColor: "var(--status-warning)" }}
-        />
+      {showRota ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <RotaBadge rota={(selectedRota as Rota) || null} />
+          <select
+            value={selectedRota}
+            onChange={(e) => setSelectedRota(e.target.value)}
+            disabled={!date || effectiveLoadingRotas}
+            className="rounded border px-2 py-1 text-sm disabled:opacity-60"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <option value="">Sem rota</option>
+            {effectiveAvailableRotas.map((r) => (
+              <option key={r} value={r}>
+                {ROTA_LABELS[r]}
+              </option>
+            ))}
+          </select>
+          {!date ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Escolha a data pra ver as rotas disponíveis.
+            </span>
+          ) : effectiveLoadingRotas ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Carregando rotas…
+            </span>
+          ) : effectiveAvailableRotas.length === 0 ? (
+            <span className="text-xs" style={{ color: "var(--status-warning)" }}>
+              Nenhuma rota disponível pra essa data.
+            </span>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="flex items-center gap-2">
         <button
           disabled={pending}
           onClick={() => {
-            if (selectedRota && exception && !exceptionNote.trim()) {
-              showToast("Informe o motivo do encaixe fora da rota.", "error");
-              return;
-            }
             run(async () => {
-              await setSchedule(requestId, date, selectedShift, time, selectedRota || undefined, exceptionNote || undefined);
+              await setSchedule(requestId, date, selectedShift, time, selectedRota || undefined);
               setEditing(false);
             }, "Agenda atualizada.");
           }}
@@ -218,8 +215,6 @@ export function ScheduleField({
             setTime(formatTimeOnly(scheduledTime) ?? "");
             setSelectedShift(shift ?? "");
             setSelectedRota(rota ?? "");
-            setException(!!rotaExceptionNote);
-            setExceptionNote(rotaExceptionNote ?? "");
             setEditing(false);
           }}
           className="text-xs underline"

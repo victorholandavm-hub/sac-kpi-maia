@@ -27,7 +27,7 @@ import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 import { checkIpRateLimit, recordFailedIpAttempt } from "@/lib/ipRateLimit";
-import { isRota, getRotaWeekdayConfig, getRotaForDate, getRotaDriverAssignments, findDriverForRota, ROTA_LABELS, type Rota } from "@/lib/rotas";
+import { isRota, getRotaDriverAssignments, getAvailableRotasForDate, findDriverForRota, ROTA_LABELS, type Rota } from "@/lib/rotas";
 import { sanitizeOrFilterValue } from "@/lib/searchFilter";
 import { findTotvsClientByCode, findTotvsProductByCode, type TotvsClientMatch, type TotvsProductMatch } from "@/lib/totvsLookup";
 import {
@@ -1458,13 +1458,24 @@ export async function getRotaDriverAssignmentsAction(date: string) {
   return getRotaDriverAssignments(date);
 }
 
+// Wrapper "use server" pro ScheduleField/SacCreateRequestForm buscarem as
+// rotas disponíveis pra uma data assim que ela é escolhida -- pedido do
+// Victor 18/08/2026: a escolha de rota tem que vir de dentro das disponíveis
+// pra aquele dia, não mais livre com aviso de exceção depois (ver
+// getAvailableRotasForDate em rotas.ts).
+export async function getAvailableRotasForDateAction(date: string): Promise<Rota[]> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin", "sac");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+  return getAvailableRotasForDate(date);
+}
+
 export async function setSchedule(
   requestId: string,
   scheduledDate: string,
   shift: string,
   scheduledTime: string,
-  rota?: string,
-  rotaExceptionNote?: string
+  rota?: string
 ) {
   const profile = await getProfile();
   // SAC também agenda rota/data dos próprios chamados (troca/entrega de
@@ -1501,23 +1512,19 @@ export async function setSchedule(
   const rotaInput = isDeliveryType ? rota : undefined;
 
   let rotaValue: string | null = null;
-  let exceptionNote: string | null = null;
   if (scheduledDate && rotaInput) {
     if (!isRota(rotaInput)) throw new Error("Rota inválida.");
-    const config = await getRotaWeekdayConfig();
-    const expectedRota = getRotaForDate(scheduledDate, config);
-    const isException = expectedRota !== rotaInput;
-    if (isException && !rotaExceptionNote?.trim()) {
-      const expectedLabel = expectedRota ? ROTA_LABELS[expectedRota] : "nenhuma rota";
-      throw new Error(`Essa data é de ${expectedLabel}, não de ${ROTA_LABELS[rotaInput]} — informe o motivo do encaixe fora da rota.`);
+    const availableRotas = await getAvailableRotasForDate(scheduledDate);
+    if (!availableRotas.includes(rotaInput)) {
+      throw new Error(`${ROTA_LABELS[rotaInput]} não tem carro saindo em ${scheduledDate.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.`);
     }
     rotaValue = rotaInput;
-    // Só grava a nota quando a data realmente diverge da rota esperada --
-    // senão uma nota antiga "gruda" mesmo depois do chamado ser reagendado
-    // pra um dia normal da rota, e o motorista continua vendo o aviso de
-    // exceção sem mais fazer sentido.
-    exceptionNote = isException ? rotaExceptionNote?.trim() || null : null;
   }
+  // Não escreve mais nota de exceção -- a escolha já vem restrita às rotas
+  // disponíveis pra data (ver acima), então não existe mais "fora da rota"
+  // pra justificar. Uma nota antiga (de antes dessa mudança) "gruda" até o
+  // chamado ser reagendado de novo; aqui ela é sempre limpa.
+  const exceptionNote: string | null = null;
 
   // Preenche o motorista sozinho a partir do "motorista do dia" daquela
   // rota (ver setRotaDriverAssignment mais abaixo) -- só quando o chamado
@@ -1545,7 +1552,7 @@ export async function setSchedule(
   if (error) throw new Error(error.message);
 
   const shiftLabel = SHIFT_LABELS[shift] ?? shift;
-  const rotaNote = rotaValue ? ` · rota ${ROTA_LABELS[rotaValue as keyof typeof ROTA_LABELS]}${exceptionNote ? ` (encaixe: ${exceptionNote})` : ""}` : "";
+  const rotaNote = rotaValue ? ` · rota ${ROTA_LABELS[rotaValue as keyof typeof ROTA_LABELS]}` : "";
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: profile.id,
@@ -1997,25 +2004,20 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const scheduledDate = String(formData.get("scheduled_date") ?? "").trim();
   const scheduledTime = String(formData.get("scheduled_time") ?? "").trim();
   const rotaInput = String(formData.get("rota") ?? "").trim();
-  const rotaExceptionNoteInput = String(formData.get("rota_exception_note") ?? "").trim();
 
-  // Mesma validação de setSchedule (edição do chamado já criado) -- rota
-  // fora do dia esperado exige motivo, senão vira encaixe silencioso sem
-  // registro nenhum do porquê.
+  // Mesma validação de setSchedule (edição do chamado já criado) -- rota só
+  // pode ser uma das disponíveis pra data escolhida (pedido do Victor
+  // 18/08/2026), sem mais encaixe livre com justificativa.
   let rotaValue: string | null = null;
-  let rotaExceptionNote: string | null = null;
   if (scheduledDate && rotaInput) {
     if (!isRota(rotaInput)) return { error: "Rota inválida." };
-    const rotaConfig = await getRotaWeekdayConfig();
-    const expectedRota = getRotaForDate(scheduledDate, rotaConfig);
-    const isRotaException = expectedRota !== rotaInput;
-    if (isRotaException && !rotaExceptionNoteInput) {
-      const expectedLabel = expectedRota ? ROTA_LABELS[expectedRota] : "nenhuma rota";
-      return { error: `Essa data é de ${expectedLabel}, não de ${ROTA_LABELS[rotaInput]} — informe o motivo do encaixe fora da rota.` };
+    const availableRotas = await getAvailableRotasForDate(scheduledDate);
+    if (!availableRotas.includes(rotaInput)) {
+      return { error: `${ROTA_LABELS[rotaInput]} não tem carro saindo em ${scheduledDate.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.` };
     }
     rotaValue = rotaInput;
-    rotaExceptionNote = isRotaException ? rotaExceptionNoteInput : null;
   }
+  const rotaExceptionNote: string | null = null;
 
   const urgent = formData.get("urgent") === "on";
   // Só faz sentido pra montagem -- mesma ideia de createQuickRequest, pedir

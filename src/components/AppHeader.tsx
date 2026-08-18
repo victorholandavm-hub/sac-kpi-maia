@@ -9,6 +9,7 @@ const TABS = [
   { key: "home", label: "Início", href: "/" },
   { key: "kpis", label: "KPIs", href: "/kpis" },
   { key: "clientes", label: "Clientes", href: "/clientes" },
+  { key: "vendas", label: "Vendas", href: "/vendas" },
 ];
 
 export function AppHeader() {

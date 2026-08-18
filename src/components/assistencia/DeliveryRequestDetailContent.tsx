@@ -15,7 +15,6 @@ import { RequestPhotoUpload } from "./RequestPhotoUpload";
 import type { RequestPhoto } from "@/lib/servicePhotos";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { RequestHistoryTimeline } from "./RequestHistoryTimeline";
-import type { Rota } from "@/lib/rotas";
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -69,13 +68,11 @@ export function DeliveryRequestDetailContent({
   result,
   drivers,
   photos,
-  nextDatesByRota,
 }: {
   profile: Profile;
   result: { request: ServiceRequestDetail; events: RequestEvent[] } | null;
   drivers: string[];
   photos: RequestPhoto[];
-  nextDatesByRota: Record<Rota, string[]>;
 }) {
   if (!result) {
     return (
@@ -212,7 +209,6 @@ export function DeliveryRequestDetailContent({
                 shift={request.shift}
                 rota={request.rota}
                 rotaExceptionNote={request.rotaExceptionNote}
-                nextDatesByRota={nextDatesByRota}
                 showRota
               />
             ) : (
