@@ -45,6 +45,7 @@ const REQUEST_TYPES = [
   "montagem",
   "desmontagem",
   "recolhimento",
+  "envio_peca",
   "troca_peca",
   "vistoria",
   "notificacao_externa",
@@ -2054,7 +2055,15 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   redirect(`/assistencia/${data.id}`);
 }
 
-const SAC_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa", "montagem", "desmontagem"] as const;
+const SAC_REQUEST_TYPES = [
+  "troca_produto",
+  "entrega_produto",
+  "envio_peca",
+  "recolhimento_produto",
+  "notificacao_externa",
+  "montagem",
+  "desmontagem",
+] as const;
 
 // Criação de chamado pelo SAC — troca de produto (recolher o errado/avariado
 // e entregar o correto numa rota só, ver src/lib/driverAuth.ts), entrega de

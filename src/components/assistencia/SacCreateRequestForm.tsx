@@ -26,13 +26,18 @@ const inputStyle = { borderColor: "var(--border)" };
 // "Nova entrega" do SAC -- pedido do Victor 18/08/2026: aba de entregas
 // separada da aba de visitas, cada uma com formulário próprio. Montagem
 // saiu daqui (é visita, não entrega) -- tem formulário próprio, ver
-// SacNovaVisitaForm.tsx.
-type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "notificacao_externa";
+// SacNovaVisitaForm.tsx. "recolhimento" (de peça) NÃO entra aqui -- só a
+// Assistência cria (ver NovaEntregaAssistenciaForm.tsx). "recolhimento_produto"
+// entrou em 18/08/2026: SAC recolhe o produto do cliente sem entregar nada
+// no lugar (ex.: devolução/cancelamento) -- diferente de troca_produto
+// (recolhe E entrega) e de "recolhimento" (que é de PEÇA, não produto).
+type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "recolhimento_produto" | "notificacao_externa";
 
 // Tipos que envolvem entrega pelo motorista (produto/peça + quem vai levar).
-// "O que recolher" só se aplica a troca_produto — os outros dois não têm
-// recolhimento nenhum.
-const DELIVERY_TYPES: SacType[] = ["troca_produto", "entrega_produto", "envio_peca"];
+// "O que recolher" só se aplica a troca_produto — os outros não têm
+// recolhimento embutido no mesmo chamado (recolhimento_produto é só
+// recolher, sem entregar nada -- já é auto-explicativo pelos itens listados).
+const DELIVERY_TYPES: SacType[] = ["troca_produto", "entrega_produto", "envio_peca", "recolhimento_produto"];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -284,6 +289,7 @@ export function SacCreateRequestForm({
             <option value="troca_produto">{REQUEST_TYPE_LABELS.troca_produto} (recolher + entregar)</option>
             <option value="entrega_produto">{REQUEST_TYPE_LABELS.entrega_produto} (sem recolhimento)</option>
             <option value="envio_peca">{REQUEST_TYPE_LABELS.envio_peca}</option>
+            <option value="recolhimento_produto">{REQUEST_TYPE_LABELS.recolhimento_produto} (sem entrega)</option>
             <option value="notificacao_externa">Notificação externa (sem troca de produto)</option>
           </select>
         </Field>

@@ -5,17 +5,23 @@ import { setRotaDriverAssignment, addRotaExtra, removeRotaExtra, getRotaDriverAs
 import { useQuickAction } from "./useQuickAction";
 import { ROTAS, ROTA_LABELS, ROTA_COLORS, WEEKDAY_LABELS, type Rota, type RotaDayOverview } from "@/lib/rotas";
 
-// "Motorista do dia" -- painel de 2 semanas (semana atual + seguinte) com a
+// "Motorista do dia" -- painel de calendário (semana atual + seguinte) com a
 // rota já pré-preenchida pelo padrão semanal (rota_weekday_config): no dia a
 // dia só falta escolher o motorista. Mudar a rota em si (exceção pro padrão)
-// fica atrás de "editar rota do dia", pra não competir visualmente com o que
-// é escolhido toda hora (pedido do Victor 18/08/2026 -- antes o formulário
-// de edição ficava sempre aberto e salvar não deixava claro o que tinha
-// ficado gravado).
+// fica atrás do lápis, pra não competir visualmente com o que é escolhido
+// toda hora.
+//
+// Virou grade de calendário (pedido do Victor 18/08/2026 -- antes era uma
+// lista vertical de linhas, uma por dia, ocupando muito mais altura pra
+// mostrar a mesma informação). `overview` já vem sempre começando numa
+// segunda-feira (ver startOfRotaWeek/getRotaWeekOverview), então dá pra
+// fatiar direto em duas semanas de 7 dias sem recalcular nada.
 //
 // Só existe UMA rota principal por dia (pedido do Victor 17/08/2026 -- antes
 // dava pra editar praia/sul/centro como 3 slots independentes pro mesmo
 // dia). Rota extra não tem limite de quantidade.
+const WEEKDAY_SHORT = WEEKDAY_LABELS.map((w) => w.slice(0, 3));
+
 export function RotaMotoristaDoDia({
   today,
   initialOverview,
@@ -26,51 +32,63 @@ export function RotaMotoristaDoDia({
   drivers: string[];
 }) {
   const [overview, setOverview] = useState<RotaDayOverview[]>(initialOverview);
-  // Fechado por padrão -- só hoje + amanhã (pedido do Victor 18/08/2026: as
-  // 2 semanas inteiras tomavam a tela toda). "Mostrar mais rotas" abre a
-  // semana atual + seguinte completas, com opção de recuar de novo.
+  // Fechado por padrão -- só a semana atual (pedido do Victor 18/08/2026: as
+  // 2 semanas inteiras tomavam espaço demais). "Mostrar mais rotas" abre a
+  // semana seguinte também.
   const [expanded, setExpanded] = useState(false);
 
   function updateDay(updated: RotaDayOverview) {
     setOverview((prev) => prev.map((d) => (d.date === updated.date ? updated : d)));
   }
 
-  const todayIndex = Math.max(
-    overview.findIndex((d) => d.date === today),
-    0
-  );
-  const visibleOverview = expanded ? overview : overview.slice(todayIndex, todayIndex + 2);
+  const week1 = overview.slice(0, 7);
+  const week2 = overview.slice(7, 14);
+  const weeks = expanded ? [week1, week2] : [week1];
 
   return (
     <div
-      className="rounded-lg p-4 flex flex-col gap-1"
+      className="rounded-lg p-4 flex flex-col gap-2"
       style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
     >
       <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
         Motorista do dia
       </h3>
-      <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-        A rota segue o padrão da semana -- só escolha o motorista. Pra mudar a rota de um dia específico, clique em
-        &quot;editar rota do dia&quot;.
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        A rota segue o padrão da semana -- só escolha o motorista. Clique no lápis pra mudar a rota de um dia
+        específico.
       </p>
-      <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
-        {visibleOverview.map((day) => (
-          <RotaDayRow key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} />
+
+      <div className="hidden sm:grid grid-cols-7 gap-1.5">
+        {week1.map((day) => (
+          <span key={day.date} className="text-[11px] font-semibold text-center" style={{ color: "var(--text-muted)" }}>
+            {WEEKDAY_SHORT[day.weekday]}
+          </span>
         ))}
       </div>
+
+      <div className="flex flex-col gap-1.5">
+        {weeks.map((week, i) => (
+          <div key={i} className="grid grid-cols-2 sm:grid-cols-7 gap-1.5">
+            {week.map((day) => (
+              <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} />
+            ))}
+          </div>
+        ))}
+      </div>
+
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="text-xs rounded px-3 py-1.5 border font-medium self-start mt-2"
+        className="text-xs rounded px-3 py-1.5 border font-medium self-start mt-1"
         style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
       >
-        {expanded ? "Mostrar menos" : "Mostrar mais rotas (semana atual + seguinte)"}
+        {expanded ? "Mostrar só essa semana" : "Mostrar semana seguinte também"}
       </button>
     </div>
   );
 }
 
-function RotaDayRow({
+function RotaDayCell({
   day,
   today,
   drivers,
@@ -98,7 +116,7 @@ function RotaDayRow({
     month: "2-digit",
     timeZone: "UTC",
   });
-  const weekdayLabel = WEEKDAY_LABELS[day.weekday].slice(0, 3);
+  const weekdayLabel = WEEKDAY_SHORT[day.weekday];
   const dirty = rotaValue !== (savedRota ?? "") || driverValue.trim() !== savedDriver;
 
   function cancelRotaEdit() {
@@ -161,23 +179,36 @@ function RotaDayRow({
   }
 
   return (
-    <div className="py-2 flex flex-col gap-1" style={isToday ? { background: "var(--surface-2)", margin: "0 -0.5rem", padding: "0.5rem", borderRadius: "0.375rem" } : undefined}>
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="w-14 shrink-0">
-          <div className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
-            {weekdayLabel}
-          </div>
-          <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            {dateLabel}
-            {isToday ? " · hoje" : ""}
-          </div>
-        </div>
+    <div
+      className="rounded-md p-1.5 flex flex-col gap-1 min-w-0"
+      style={{
+        border: "1px solid var(--gridline)",
+        background: isToday ? "var(--surface-2)" : "transparent",
+      }}
+    >
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-[11px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+          <span className="sm:hidden">{weekdayLabel} </span>
+          {dateLabel}
+          {isToday ? " · hoje" : ""}
+        </span>
+        <button
+          type="button"
+          onClick={rotaEditOpen ? cancelRotaEdit : () => setRotaEditOpen(true)}
+          aria-label={rotaEditOpen ? "Cancelar edição da rota" : "Editar rota do dia"}
+          className="text-xs leading-none shrink-0 rounded px-1 py-0.5"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          {rotaEditOpen ? "✕" : "✏️"}
+        </button>
+      </div>
 
-        {rotaEditOpen ? (
+      {rotaEditOpen ? (
+        <div className="flex flex-col gap-1">
           <select
             value={rotaValue}
             onChange={(e) => setRotaValue(e.target.value as Rota)}
-            className="rounded border px-2 py-1 text-sm shrink-0"
+            className="rounded border px-1.5 py-1 text-xs w-full"
             style={{ borderColor: "var(--border)" }}
             disabled={pending}
           >
@@ -188,147 +219,133 @@ function RotaDayRow({
               </option>
             ))}
           </select>
-        ) : (
+          <input
+            value={driverValue}
+            onChange={(e) => setDriverValue(e.target.value)}
+            placeholder="Motorista…"
+            list={`motoristas-${day.date}`}
+            className="rounded border px-1.5 py-1 text-xs w-full"
+            style={{ borderColor: "var(--border)" }}
+            disabled={pending}
+          />
+          <datalist id={`motoristas-${day.date}`}>
+            {drivers.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+          {dirty ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={save}
+              className="text-xs rounded px-2 py-1 font-medium disabled:opacity-60"
+              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            >
+              Salvar
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <>
           <span
-            className="text-xs font-medium rounded-full px-2 py-1 shrink-0"
+            className="text-[11px] font-medium rounded-full px-1.5 py-0.5 self-start truncate max-w-full"
             style={{ background: rotaValue ? ROTA_COLORS[rotaValue] : "var(--surface-2)", color: rotaValue ? "#fff" : "var(--text-muted)" }}
           >
             {rotaValue ? ROTA_LABELS[rotaValue] : "Sem rota"}
           </span>
-        )}
+          <span className="text-xs truncate" style={{ color: driverValue ? "var(--text-primary)" : "var(--text-muted)" }}>
+            {driverValue || "Sem motorista"}
+          </span>
+        </>
+      )}
 
-        <input
-          value={driverValue}
-          onChange={(e) => setDriverValue(e.target.value)}
-          placeholder="Motorista…"
-          list={`motoristas-${day.date}`}
-          className="rounded border px-2 py-1 text-sm flex-1 min-w-[120px]"
-          style={{ borderColor: "var(--border)" }}
-          disabled={pending}
-        />
-        <datalist id={`motoristas-${day.date}`}>
-          {drivers.map((d) => (
-            <option key={d} value={d} />
-          ))}
-        </datalist>
-
-        {dirty ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={save}
-            className="text-xs rounded px-2 py-1 font-medium disabled:opacity-60 shrink-0"
-            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-          >
-            Salvar
-          </button>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={rotaEditOpen ? cancelRotaEdit : () => setRotaEditOpen(true)}
-          className="text-[11px] rounded px-2 py-1 border font-medium shrink-0"
-          style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
-        >
-          {rotaEditOpen ? "cancelar" : "editar rota do dia"}
-        </button>
-      </div>
-
-      {day.assignments.extras.length || extraOpen ? (
-        <div className="pl-16 flex flex-col gap-1">
+      {day.assignments.extras.length > 0 ? (
+        <div className="flex flex-col gap-0.5 pt-0.5" style={{ borderTop: "1px solid var(--gridline)" }}>
           {day.assignments.extras.map((extra) => (
-            <div key={extra.id} className="flex items-center gap-2 flex-wrap">
+            <div key={extra.id} className="flex items-center gap-1 min-w-0">
               <span
-                className="text-[11px] rounded-full px-2 py-0.5 shrink-0"
+                className="text-[10px] rounded-full px-1.5 py-0.5 shrink-0"
                 style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}
               >
                 {ROTA_LABELS[extra.rota]}
               </span>
-              <span className="text-xs flex-1 min-w-0" style={{ color: "var(--text-primary)" }}>
+              <span className="text-[11px] truncate flex-1 min-w-0" style={{ color: "var(--text-primary)" }}>
                 {extra.driverName}
               </span>
               <button
                 type="button"
                 disabled={pending}
                 onClick={() => removeExtra(extra.id)}
-                className="text-[11px] underline shrink-0"
+                aria-label="Remover rota extra"
+                className="text-[10px] shrink-0"
                 style={{ color: "var(--status-critical)" }}
               >
-                remover
+                ✕
               </button>
             </div>
           ))}
+        </div>
+      ) : null}
 
-          {extraOpen ? (
-            <div className="flex items-center gap-2 flex-wrap">
-              <select
-                value={extraRota}
-                onChange={(e) => setExtraRota(e.target.value as Rota)}
-                className="rounded border px-2 py-1 text-xs"
-                style={{ borderColor: "var(--border)" }}
-                disabled={pending}
-              >
-                <option value="">Rota…</option>
-                {ROTAS.map((r) => (
-                  <option key={r} value={r}>
-                    {ROTA_LABELS[r]}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={extraDriver}
-                onChange={(e) => setExtraDriver(e.target.value)}
-                placeholder="Motorista…"
-                list={`motoristas-extra-${day.date}`}
-                className="rounded border px-2 py-1 text-xs flex-1 min-w-[120px]"
-                style={{ borderColor: "var(--border)" }}
-                disabled={pending}
-              />
-              <datalist id={`motoristas-extra-${day.date}`}>
-                {drivers.map((d) => (
-                  <option key={d} value={d} />
-                ))}
-              </datalist>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={addExtra}
-                className="text-[11px] rounded px-2 py-1 font-medium disabled:opacity-60 shrink-0"
-                style={{ background: "var(--surface-2)", border: "1px solid", borderColor: "var(--border)", color: "var(--text-primary)" }}
-              >
-                salvar
-              </button>
-              <button
-                type="button"
-                onClick={() => setExtraOpen(false)}
-                className="text-[11px] rounded px-2 py-1 border font-medium shrink-0"
-                style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
-              >
-                cancelar
-              </button>
-            </div>
-          ) : (
+      {extraOpen ? (
+        <div className="flex flex-col gap-1 pt-0.5" style={{ borderTop: "1px solid var(--gridline)" }}>
+          <select
+            value={extraRota}
+            onChange={(e) => setExtraRota(e.target.value as Rota)}
+            className="rounded border px-1.5 py-1 text-xs w-full"
+            style={{ borderColor: "var(--border)" }}
+            disabled={pending}
+          >
+            <option value="">Rota…</option>
+            {ROTAS.map((r) => (
+              <option key={r} value={r}>
+                {ROTA_LABELS[r]}
+              </option>
+            ))}
+          </select>
+          <input
+            value={extraDriver}
+            onChange={(e) => setExtraDriver(e.target.value)}
+            placeholder="Motorista…"
+            list={`motoristas-extra-${day.date}`}
+            className="rounded border px-1.5 py-1 text-xs w-full"
+            style={{ borderColor: "var(--border)" }}
+            disabled={pending}
+          />
+          <datalist id={`motoristas-extra-${day.date}`}>
+            {drivers.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setExtraOpen(true)}
-              className="text-[11px] rounded px-2 py-1 border font-medium self-start"
+              disabled={pending}
+              onClick={addExtra}
+              className="text-[11px] rounded px-2 py-1 font-medium disabled:opacity-60 flex-1"
+              style={{ background: "var(--surface-2)", border: "1px solid", borderColor: "var(--border)", color: "var(--text-primary)" }}
+            >
+              salvar
+            </button>
+            <button
+              type="button"
+              onClick={() => setExtraOpen(false)}
+              className="text-[11px] rounded px-2 py-1 border font-medium"
               style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
             >
-              + rota extra
+              cancelar
             </button>
-          )}
+          </div>
         </div>
       ) : (
-        <div className="pl-16">
-          <button
-            type="button"
-            onClick={() => setExtraOpen(true)}
-            className="text-[11px] rounded px-2 py-1 border font-medium"
-            style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
-          >
-            + rota extra
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setExtraOpen(true)}
+          className="text-[10px] rounded px-1.5 py-0.5 border font-medium self-start"
+          style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+        >
+          + extra
+        </button>
       )}
     </div>
   );
