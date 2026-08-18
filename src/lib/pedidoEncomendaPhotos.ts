@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { getCachedSignedUrl } from "./signedPhotoUrl";
 
 // Mesmo bucket de src/lib/servicePhotos.ts (privado, só URL assinada) — só
 // muda o prefixo do path, pra não colidir com fotos de service_requests.
@@ -27,7 +28,7 @@ export async function listEncomendaPhotos(pedidoId: string): Promise<EncomendaPh
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("pedido_encomenda_photos")
-    .select("id, storage_path, uploaded_by, caption, created_at")
+    .select("id, storage_path, uploaded_by, caption, created_at, signed_url, signed_url_expires_at")
     .eq("pedido_id", pedidoId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
@@ -35,10 +36,19 @@ export async function listEncomendaPhotos(pedidoId: string): Promise<EncomendaPh
   const rows = data ?? [];
   return Promise.all(
     rows.map(async (row) => {
-      const { data: signed } = await admin.storage.from(BUCKET).createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS);
+      const url = await getCachedSignedUrl({
+        admin,
+        bucket: BUCKET,
+        table: "pedido_encomenda_photos",
+        id: row.id as string,
+        storagePath: row.storage_path as string,
+        cachedUrl: row.signed_url as string | null,
+        cachedExpiresAt: row.signed_url_expires_at as string | null,
+        ttlSeconds: SIGNED_URL_TTL_SECONDS,
+      });
       return {
         id: row.id as string,
-        url: signed?.signedUrl ?? "",
+        url,
         uploadedBy: row.uploaded_by as string | null,
         caption: row.caption as string | null,
         createdAt: row.created_at as string,
@@ -56,16 +66,25 @@ export async function listEncomendaPhotosForPedidos(pedidoIds: string[]): Promis
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("pedido_encomenda_photos")
-    .select("id, pedido_id, storage_path, uploaded_by, caption, created_at")
+    .select("id, pedido_id, storage_path, uploaded_by, caption, created_at, signed_url, signed_url_expires_at")
     .in("pedido_id", pedidoIds)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
 
   for (const row of data ?? []) {
-    const { data: signed } = await admin.storage.from(BUCKET).createSignedUrl(row.storage_path as string, SIGNED_URL_TTL_SECONDS);
+    const url = await getCachedSignedUrl({
+      admin,
+      bucket: BUCKET,
+      table: "pedido_encomenda_photos",
+      id: row.id as string,
+      storagePath: row.storage_path as string,
+      cachedUrl: row.signed_url as string | null,
+      cachedExpiresAt: row.signed_url_expires_at as string | null,
+      ttlSeconds: SIGNED_URL_TTL_SECONDS,
+    });
     const photo: EncomendaPhoto = {
       id: row.id as string,
-      url: signed?.signedUrl ?? "",
+      url,
       uploadedBy: row.uploaded_by as string | null,
       caption: row.caption as string | null,
       createdAt: row.created_at as string,

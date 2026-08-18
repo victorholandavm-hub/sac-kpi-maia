@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { getCachedSignedUrl } from "./signedPhotoUrl";
 
 const BUCKET = "service-request-photos";
 const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hora — tempo suficiente pra abrir a página e ver as fotos
@@ -63,7 +64,7 @@ export async function listRequestPhotos(requestId: string): Promise<RequestPhoto
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("service_request_photos")
-    .select("id, storage_path, uploaded_by, caption, created_at, is_proof")
+    .select("id, storage_path, uploaded_by, caption, created_at, is_proof, signed_url, signed_url_expires_at")
     .eq("request_id", requestId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
@@ -71,10 +72,19 @@ export async function listRequestPhotos(requestId: string): Promise<RequestPhoto
   const rows = data ?? [];
   return Promise.all(
     rows.map(async (row) => {
-      const { data: signed } = await admin.storage.from(BUCKET).createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS);
+      const url = await getCachedSignedUrl({
+        admin,
+        bucket: BUCKET,
+        table: "service_request_photos",
+        id: row.id as string,
+        storagePath: row.storage_path as string,
+        cachedUrl: row.signed_url as string | null,
+        cachedExpiresAt: row.signed_url_expires_at as string | null,
+        ttlSeconds: SIGNED_URL_TTL_SECONDS,
+      });
       return {
         id: row.id as string,
-        url: signed?.signedUrl ?? "",
+        url,
         isPdf: (row.storage_path as string).toLowerCase().endsWith(".pdf"),
         uploadedBy: row.uploaded_by as string | null,
         caption: row.caption as string | null,
