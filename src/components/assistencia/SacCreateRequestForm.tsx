@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useActionState } from "react";
-import { createSacRequest, lookupTotvsClientForTeam, lookupTotvsProductForTeam, type FormState } from "@/app/assistencia/actions";
+import {
+  createSacRequest,
+  lookupTotvsClientForTeam,
+  lookupTotvsProductForTeam,
+  getAvailableRotasForDateAction,
+  type FormState,
+} from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
 import {
   SAC_CATEGORIES,
@@ -13,7 +19,7 @@ import {
   CAUSA_RAIZ_LABELS,
 } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
-import { ROTAS, ROTA_LABELS, type Rota } from "@/lib/rotas";
+import { ROTA_LABELS, type Rota } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -139,12 +145,10 @@ export function SacCreateRequestForm({
   stores,
   drivers,
   cargas,
-  nextDatesByRota,
 }: {
   stores: Store[];
   drivers: string[];
   cargas: { carga: string; label: string }[];
-  nextDatesByRota: Record<Rota, string[]>;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
   const [type, setType] = useState<SacType>("troca_produto");
@@ -168,15 +172,41 @@ export function SacCreateRequestForm({
 
   // Rota/data já na criação -- pedido do Victor 17/08/2026: antes só dava
   // pra agendar depois, editando o chamado (ScheduleField). Mesma lógica de
-  // lá: rota + data sugerida pro dia certo, ou encaixe fora da rota com
-  // motivo -- validado de novo no servidor (createSacRequest espelha
-  // setSchedule), nunca confia só nisso aqui.
+  // lá (18/08/2026): a rota só pode ser uma das disponíveis pra data
+  // escolhida -- busca de novo toda vez que a data muda, validado de novo no
+  // servidor (createSacRequest espelha setSchedule), nunca confia só nisso
+  // aqui.
   const [selectedRota, setSelectedRota] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
-  const [rotaException, setRotaException] = useState(false);
-  const [rotaExceptionNote, setRotaExceptionNote] = useState("");
-  const validDatesForRota = selectedRota ? nextDatesByRota[selectedRota as Rota] ?? [] : [];
+  // Só valem enquanto isDelivery/scheduledDate se mantiverem verdadeiros --
+  // ver hasDateContext abaixo, que mascara os dois quando a condição já não
+  // bate mais. Mesmo desenho do getDayLoadAction logo abaixo: setState só
+  // dentro do timer, nunca síncrono no corpo do efeito (regra do React
+  // Compiler).
+  const [availableRotas, setAvailableRotas] = useState<Rota[]>([]);
+  const [loadingRotas, setLoadingRotas] = useState(false);
+  const hasDateContext = isDelivery && !!scheduledDate;
+
+  useEffect(() => {
+    if (!hasDateContext) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setLoadingRotas(true);
+      getAvailableRotasForDateAction(scheduledDate)
+        .then((rotas) => {
+          setAvailableRotas(rotas);
+          setSelectedRota((prev) => (prev && !rotas.includes(prev as Rota) ? "" : prev));
+        })
+        .catch(() => setAvailableRotas([]))
+        .finally(() => setLoadingRotas(false));
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [hasDateContext, scheduledDate]);
+
+  const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
+  const effectiveLoadingRotas = hasDateContext && loadingRotas;
   // Só montagem envolve entrar num prédio de verdade -- SAC nem oferece
   // desmontagem isolada (ver SacType acima).
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
@@ -492,43 +522,6 @@ export function SacCreateRequestForm({
 
           {isDelivery ? (
             <>
-              <Field label="Rota">
-                <select
-                  name="rota"
-                  value={selectedRota}
-                  onChange={(e) => setSelectedRota(e.target.value)}
-                  className="rounded border px-3 py-2"
-                  style={inputStyle}
-                >
-                  <option value="">Sem rota</option>
-                  {ROTAS.map((r) => (
-                    <option key={r} value={r}>
-                      {ROTA_LABELS[r]}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              {selectedRota && validDatesForRota.length > 0 ? (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {validDatesForRota.map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setScheduledDate(d)}
-                      className="text-xs rounded-full px-2 py-1 border whitespace-nowrap"
-                      style={
-                        scheduledDate === d
-                          ? { background: "var(--brand-green)", color: "var(--brand-green-ink)", borderColor: "var(--brand-green)" }
-                          : { borderColor: "var(--border)", color: "var(--text-secondary)" }
-                      }
-                    >
-                      {d.split("-").reverse().join("/")}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
               <div className="flex items-center gap-2 flex-wrap">
                 <Field label="Data agendada">
                   <input
@@ -536,8 +529,7 @@ export function SacCreateRequestForm({
                     type="date"
                     value={scheduledDate}
                     onChange={(e) => setScheduledDate(e.target.value)}
-                    disabled={!rotaException && !!selectedRota}
-                    className="rounded border px-3 py-2 disabled:opacity-60"
+                    className="rounded border px-3 py-2"
                     style={inputStyle}
                   />
                 </Field>
@@ -553,25 +545,35 @@ export function SacCreateRequestForm({
                 </Field>
               </div>
 
-              {selectedRota ? (
-                <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
-                  <input type="checkbox" checked={rotaException} onChange={(e) => setRotaException(e.target.checked)} className="rounded" />
-                  Encaixar fora da rota do dia (data que não é de {ROTA_LABELS[selectedRota as Rota]})
-                </label>
-              ) : null}
-
-              {selectedRota && rotaException ? (
-                <Field label="Motivo do encaixe fora da rota">
-                  <textarea
-                    name="rota_exception_note"
-                    value={rotaExceptionNote}
-                    onChange={(e) => setRotaExceptionNote(e.target.value)}
-                    rows={2}
-                    placeholder="Ex: único dia que o cliente recebe, cliente Procon urgente…"
-                    className="rounded border px-3 py-2"
-                    style={{ borderColor: "var(--status-warning)" }}
-                  />
-                </Field>
+              <Field label="Rota">
+                <select
+                  name="rota"
+                  value={selectedRota}
+                  onChange={(e) => setSelectedRota(e.target.value)}
+                  disabled={!scheduledDate || effectiveLoadingRotas}
+                  className="rounded border px-3 py-2 disabled:opacity-60"
+                  style={inputStyle}
+                >
+                  <option value="">Sem rota</option>
+                  {effectiveAvailableRotas.map((r) => (
+                    <option key={r} value={r}>
+                      {ROTA_LABELS[r]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {!scheduledDate ? (
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Escolha a data agendada pra ver as rotas disponíveis.
+                </p>
+              ) : effectiveLoadingRotas ? (
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Carregando rotas…
+                </p>
+              ) : effectiveAvailableRotas.length === 0 ? (
+                <p className="text-xs" style={{ color: "var(--status-warning)" }}>
+                  Nenhuma rota disponível pra essa data.
+                </p>
               ) : null}
 
               <Field label={type === "troca_produto" && causaRaiz === "erro_motorista" ? "Motorista *" : "Motorista"}>

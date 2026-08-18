@@ -53,10 +53,11 @@ export async function cdSignIn(_state: CdFormState, formData: FormData): Promise
   cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia" });
 
   // path "/assistencia" (não só "/assistencia/encomendas") -- descoberto em
-  // 2026-08-11: /assistencia/vendas (fora de encomendas) precisa ler essa
-  // sessão também, e um cookie com path estreito não chega em rotas irmãs
-  // fora do prefixo (mesma armadilha de LOJA_GERENTE_COOKIE_NAME, que já
-  // usa "/assistencia" por esse motivo -- ver getGerenteStoreIds/loja-actions.ts).
+  // 2026-08-11: /assistencia/fornecedores (fora de encomendas) precisa ler
+  // essa sessão também (ver fornecedorPedidoAuth.ts), e um cookie com path
+  // estreito não chega em rotas irmãs fora do prefixo (mesma armadilha de
+  // LOJA_GERENTE_COOKIE_NAME, que já usa "/assistencia" por esse motivo --
+  // ver getGerenteStoreIds/loja-actions.ts).
   cookieStore.set(CD_COOKIE_NAME, signCdSession(data.name), {
     httpOnly: true,
     secure: true,

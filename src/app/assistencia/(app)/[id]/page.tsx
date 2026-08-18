@@ -3,7 +3,6 @@ import { getProfile, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { getRequestDetail } from "@/lib/serviceRequests";
 import { listAssemblersForStores, listDrivers } from "@/lib/payments";
 import { SAC_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_STORE_IDS, OWN_ASSEMBLER_RESTRICTED_TYPES } from "@/lib/assistenciaLabels";
-import { getRotaWeekdayConfig, getNextRotaDates, ROTAS, type Rota } from "@/lib/rotas";
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { RequestDetailContent } from "@/components/assistencia/RequestDetailContent";
 import { DeliveryRequestDetailContent } from "@/components/assistencia/DeliveryRequestDetailContent";
@@ -37,24 +36,15 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
   // (DeliveryRequestDetailContent) desde 17/08/2026 -- ver comentário lá.
   const isDeliveryType = !!result && (DELIVERY_REQUEST_TYPES as readonly string[]).includes(result.request.type);
 
-  const [assemblers, drivers, photos, rotaConfig] = await Promise.all([
+  const [assemblers, drivers, photos] = await Promise.all([
     canManage && result && !isDeliveryType ? listAssemblersForStores([result.request.storeId]) : Promise.resolve([]),
     canManage && isDeliveryType ? listDrivers() : Promise.resolve([]),
     result ? listRequestPhotos(result.request.id) : Promise.resolve([]),
-    canManage ? getRotaWeekdayConfig() : Promise.resolve(null),
   ]);
 
-  const nextDatesByRota = rotaConfig
-    ? (Object.fromEntries(ROTAS.map((r) => [r, getNextRotaDates(r, rotaConfig)])) as Record<Rota, string[]>)
-    : ({ praia: [], sul: [], centro: [] } as Record<Rota, string[]>);
-
   if (isDeliveryType) {
-    return (
-      <DeliveryRequestDetailContent profile={profile} result={result} drivers={drivers} photos={photos} nextDatesByRota={nextDatesByRota} />
-    );
+    return <DeliveryRequestDetailContent profile={profile} result={result} drivers={drivers} photos={photos} />;
   }
 
-  return (
-    <RequestDetailContent profile={profile} result={result} assemblers={assemblers} photos={photos} nextDatesByRota={nextDatesByRota} />
-  );
+  return <RequestDetailContent profile={profile} result={result} assemblers={assemblers} photos={photos} />;
 }

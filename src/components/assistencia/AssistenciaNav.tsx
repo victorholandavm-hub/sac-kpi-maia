@@ -28,22 +28,18 @@ function NavBadge({ count, active }: { count: number; active: boolean }) {
 }
 
 export function AssistenciaNav({
-  isAdmin,
   counts,
 }: {
-  isAdmin: boolean;
   counts?: { solicitacoes?: number; encomendas?: number };
 }) {
   const pathname = usePathname();
-  // "Vendas" (curva de venda por produto + ranking) é admin/CD só, por
-  // pedido explícito -- não entra na lista geral porque "assistencia"
-  // também veria esse tab (mesma lista de TABS pros dois papéis), e a
-  // página em si barra quem não é admin/CD de qualquer forma (ver
-  // src/lib/vendasAuth.ts) -- aqui é só pra não mostrar link morto.
+  // "Vendas" (curva de venda por produto + ranking) saiu daqui 18/08/2026 --
+  // pedido do Victor: agora mora no painel de KPIs (/vendas, fora do sistema
+  // de assistência), ao lado de KPIs e Clientes.
   // "Admin" NÃO entra mais aqui -- virou link fixo no cabeçalho (ver
   // layout.tsx), porque ficava perdido no fim de uma fileira que rola sem
   // indicação visual nenhuma de que tem mais coisa pra ver.
-  const tabs = isAdmin ? [...TABS, { label: "Vendas", href: "/assistencia/vendas" }] : TABS;
+  const tabs = TABS;
 
   function badgeCountFor(label: string): number {
     if (label === "Solicitações") return counts?.solicitacoes ?? 0;

@@ -92,20 +92,22 @@ export function getRotaForDate(dateStr: string, config: RotaWeekdayConfig): Rota
   return config[weekday] ?? null;
 }
 
-// Próximas `count` datas (a partir de hoje, inclusive) cujo dia da semana
-// está configurado pra essa rota — usado pra sugerir datas válidas na hora
-// de agendar, sem precisar de cadastro dia a dia.
-export function getNextRotaDates(rota: Rota, config: RotaWeekdayConfig, count = 4): string[] {
-  const dates: string[] = [];
-  const cursor = new Date();
-  cursor.setUTCHours(0, 0, 0, 0);
+// Rotas que uma solicitação pode escolher pra uma data -- pedido do Victor
+// 18/08/2026: "a escolha tem que ser baseada nas rotas disponiveis", não
+// mais livre entre praia/sul/centro com aviso de exceção depois. Union do
+// que já está registrado como "motorista do dia" (principal + extras) pra
+// essa data; sem nada registrado ainda, cai no padrão da semana (só domingo
+// fica vazio de verdade).
+export async function getAvailableRotasForDate(dateStr: string): Promise<Rota[]> {
+  const [config, assignments] = await Promise.all([getRotaWeekdayConfig(), getRotaDriverAssignments(dateStr)]);
 
-  for (let i = 0; dates.length < count && i < 60; i++) {
-    const dateStr = cursor.toISOString().slice(0, 10);
-    if (config[cursor.getUTCDay()] === rota) dates.push(dateStr);
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return dates;
+  const registered = new Set<Rota>();
+  if (assignments.primary) registered.add(assignments.primary.rota);
+  for (const extra of assignments.extras) registered.add(extra.rota);
+  if (registered.size > 0) return [...registered];
+
+  const expected = getRotaForDate(dateStr, config);
+  return expected ? [expected] : [];
 }
 
 // Segunda-feira da semana de `dateStr` (formato YYYY-MM-DD) -- ponto de
