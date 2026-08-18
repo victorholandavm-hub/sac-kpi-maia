@@ -178,10 +178,10 @@ export function DriverRouteGroup({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="underline"
-                        style={{ color: "var(--brand-green)" }}
+                        className="text-xs font-medium rounded-full px-2.5 py-1"
+                        style={{ background: "color-mix(in srgb, var(--brand-green) 12%, transparent)", color: "var(--brand-green)" }}
                       >
-                        Ver no mapa
+                        🗺️ Ver no mapa
                       </a>
                     ) : null}
                   </p>
@@ -191,8 +191,8 @@ export function DriverRouteGroup({
                     <a
                       href={telHref(r.clientPhone)}
                       onClick={(e) => e.stopPropagation()}
-                      className="underline"
-                      style={{ color: "var(--brand-green)" }}
+                      className="text-xs font-medium rounded-full px-2.5 py-1"
+                      style={{ background: "color-mix(in srgb, var(--brand-green) 12%, transparent)", color: "var(--brand-green)" }}
                     >
                       📞 {r.clientPhone}
                     </a>
@@ -201,8 +201,8 @@ export function DriverRouteGroup({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="underline"
-                      style={{ color: "#1da851" }}
+                      className="text-xs font-medium rounded-full px-2.5 py-1"
+                      style={{ background: "color-mix(in srgb, #25d366 18%, transparent)", color: "#1da851" }}
                     >
                       💬 WhatsApp
                     </a>
