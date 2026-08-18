@@ -591,7 +591,7 @@ export function SacCreateRequestForm({
                   acima). Só continua digitável pra "erro do motorista", que
                   precisa registrar explicitamente quem entregou o item com
                   defeito. */}
-              {type === "troca_produto" && causaRaiz === "erro_motorista" ? (
+              {causaRaiz === "erro_motorista" ? (
                 <Field label="Motorista que entregou (erro) *">
                   <input
                     name="driver_name"
@@ -645,8 +645,8 @@ export function SacCreateRequestForm({
           </Field>
         ) : null}
 
-        {type === "troca_produto" ? (
-          <Field label="Causa raiz *">
+        {isDelivery ? (
+          <Field label="Quem errou (controle interno) *">
             <select
               name="causa_raiz"
               required
@@ -667,10 +667,10 @@ export function SacCreateRequestForm({
           </Field>
         ) : null}
 
-        {type === "troca_produto" && causaRaiz === "erro_conferencia" ? (
+        {isDelivery && causaRaiz === "erro_conferencia" ? (
           <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
             <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
-              Erro de conferência -- precisa registrar qual carga e quem conferiu antes de seguir com a troca.
+              Erro de conferência -- precisa registrar qual carga e quem conferiu antes de seguir.
             </p>
             <Field label="Carga *">
               <input
@@ -701,7 +701,7 @@ export function SacCreateRequestForm({
           </div>
         ) : null}
 
-        {type === "troca_produto" && causaRaiz === "erro_motorista" ? (
+        {causaRaiz === "erro_motorista" ? (
           <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
             <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
               Erro do motorista -- precisa registrar qual carga, e o nome dele no campo &quot;Motorista&quot; lá em cima.

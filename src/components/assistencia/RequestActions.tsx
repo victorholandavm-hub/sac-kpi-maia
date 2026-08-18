@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { claimRequest, updateStatus, addNote, requestNewExchange } from "@/app/assistencia/actions";
+import { useRouter } from "next/navigation";
+import { claimRequest, updateStatus, addNote, createExchangeChild } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
-import { STATUS_LABELS, STATUS_COLORS } from "@/lib/assistenciaLabels";
+import { STATUS_LABELS, STATUS_COLORS, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
 
 // Cor de cada botão de avanço reflete o status de destino (mesma cor do
 // badge que a solicitação vai ganhar) — "cancelada" some pro cinza no badge
@@ -54,6 +55,7 @@ export function RequestActions({
   hasAssignee,
   assigneeLabel = "o montador",
   hideClaim = false,
+  hasChildExchange = false,
 }: {
   requestId: string;
   requestType: string;
@@ -62,29 +64,63 @@ export function RequestActions({
   hasAssignee: boolean;
   assigneeLabel?: string;
   hideClaim?: boolean;
+  // Só um filho por chamado (ver createExchangeChild) -- uma vez que a
+  // próxima rodada já existe, o botão some daqui; "Nova troca" de novo só
+  // depois que ELA também concluir (aí ele passa a aparecer lá).
+  hasChildExchange?: boolean;
 }) {
+  const router = useRouter();
   const { pending, run, showToast } = useQuickAction();
   const [note, setNote] = useState("");
   const [remarcarReason, setRemarcarReason] = useState("");
   const [askingRemarcarReason, setAskingRemarcarReason] = useState(false);
-  const [novaTrocaReason, setNovaTrocaReason] = useState("");
-  const [askingNovaTroca, setAskingNovaTroca] = useState(false);
 
-  // Produto trocado pode voltar com defeito de novo -- em vez de abrir outro
-  // chamado do zero, reabre esse mesmo pra uma nova rodada (ver
-  // requestNewExchange no servidor).
-  const canRequestNewExchange = requestType === "troca_produto" && status === "concluida";
+  const [askingNovaTroca, setAskingNovaTroca] = useState(false);
+  const [sameProduct, setSameProduct] = useState<boolean | null>(null);
+  const [novaTrocaReason, setNovaTrocaReason] = useState("");
+  const [novaTrocaCausaRaiz, setNovaTrocaCausaRaiz] = useState("");
+  const [novaTrocaCarga, setNovaTrocaCarga] = useState("");
+  const [novaTrocaConferente, setNovaTrocaConferente] = useState("");
+  const [novaTrocaDriverName, setNovaTrocaDriverName] = useState("");
+
+  function resetNovaTroca() {
+    setAskingNovaTroca(false);
+    setSameProduct(null);
+    setNovaTrocaReason("");
+    setNovaTrocaCausaRaiz("");
+    setNovaTrocaCarga("");
+    setNovaTrocaConferente("");
+    setNovaTrocaDriverName("");
+  }
+
+  // Produto trocado pode voltar com defeito de novo -- em vez de reabrir o
+  // mesmo chamado (perdia a 1ª troca), cria um chamado novo ligado a esse
+  // (ver createExchangeChild no servidor). Ao confirmar, navega pro chamado
+  // novo -- é ele que passa a ser o "atual" da conversa com o cliente.
+  const canRequestNewExchange = requestType === "troca_produto" && status === "concluida" && !hasChildExchange;
 
   function confirmNovaTroca() {
     if (!novaTrocaReason.trim()) {
-      showToast("Informe o motivo da nova troca.", "error");
+      showToast("Informe o que aconteceu.", "error");
       return;
     }
+    if (!novaTrocaCausaRaiz) {
+      showToast("Selecione quem errou.", "error");
+      return;
+    }
+    if (sameProduct === null) return;
     run(async () => {
-      await requestNewExchange(requestId, novaTrocaReason);
-      setNovaTrocaReason("");
-      setAskingNovaTroca(false);
-    }, "Nova troca solicitada.");
+      const child = await createExchangeChild(requestId, {
+        reason: novaTrocaReason,
+        sameProduct,
+        causaRaiz: novaTrocaCausaRaiz,
+        causaCarga: novaTrocaCarga,
+        causaConferente: novaTrocaConferente,
+        driverNameForError: novaTrocaDriverName,
+      });
+      resetNovaTroca();
+      router.push(`/assistencia/${child.id}`);
+    }, "Nova troca criada.");
   }
 
   function confirmRemarcar() {
@@ -186,37 +222,108 @@ export function RequestActions({
         </button>
       ) : null}
 
-      {askingNovaTroca ? (
+      {askingNovaTroca && sameProduct === null ? (
         <div className="flex flex-col gap-2 rounded border p-3" style={{ borderColor: "var(--status-warning)" }}>
           <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-            O que aconteceu com o produto trocado?
+            A nova troca é pelo mesmo produto ou o cliente quer outro?
+          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setSameProduct(true)}
+              className="text-sm rounded px-3 py-2"
+              style={{ background: "var(--status-warning)", color: "#fff" }}
+            >
+              Mesmo produto
+            </button>
+            <button
+              onClick={() => setSameProduct(false)}
+              className="text-sm rounded px-3 py-2 border"
+              style={{ borderColor: "var(--status-warning)", color: "var(--text-primary)" }}
+            >
+              Outro produto
+            </button>
+            <button onClick={resetNovaTroca} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              cancelar
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {askingNovaTroca && sameProduct !== null ? (
+        <div className="flex flex-col gap-2 rounded border p-3" style={{ borderColor: "var(--status-warning)" }}>
+          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+            {sameProduct ? "Mesmo produto" : "Outro produto"} — o que aconteceu com o produto trocado?
           </span>
           <textarea
             value={novaTrocaReason}
             onChange={(e) => setNovaTrocaReason(e.target.value)}
             rows={2}
-            placeholder="Ex: veio com a mesma avaria, cor errada de novo…"
+            placeholder="Ex: veio com a mesma avaria, cliente decidiu trocar de modelo…"
             className="rounded border px-3 py-2 text-sm"
             style={{ borderColor: "var(--border)" }}
             autoFocus
           />
+          <select
+            value={novaTrocaCausaRaiz}
+            onChange={(e) => setNovaTrocaCausaRaiz(e.target.value)}
+            className="rounded border px-3 py-2 text-sm"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <option value="" disabled>
+              Quem errou (controle interno) *
+            </option>
+            {CAUSA_RAIZ_OPTIONS.map((c) => (
+              <option key={c} value={c}>
+                {CAUSA_RAIZ_LABELS[c]}
+              </option>
+            ))}
+          </select>
+          {novaTrocaCausaRaiz === "erro_conferencia" ? (
+            <div className="grid sm:grid-cols-2 gap-2">
+              <input
+                value={novaTrocaCarga}
+                onChange={(e) => setNovaTrocaCarga(e.target.value)}
+                placeholder="Carga *"
+                className="rounded border px-3 py-2 text-sm"
+                style={{ borderColor: "var(--border)" }}
+              />
+              <input
+                value={novaTrocaConferente}
+                onChange={(e) => setNovaTrocaConferente(e.target.value)}
+                placeholder="Conferente *"
+                className="rounded border px-3 py-2 text-sm"
+                style={{ borderColor: "var(--border)" }}
+              />
+            </div>
+          ) : null}
+          {novaTrocaCausaRaiz === "erro_motorista" ? (
+            <div className="grid sm:grid-cols-2 gap-2">
+              <input
+                value={novaTrocaCarga}
+                onChange={(e) => setNovaTrocaCarga(e.target.value)}
+                placeholder="Carga *"
+                className="rounded border px-3 py-2 text-sm"
+                style={{ borderColor: "var(--border)" }}
+              />
+              <input
+                value={novaTrocaDriverName}
+                onChange={(e) => setNovaTrocaDriverName(e.target.value)}
+                placeholder="Motorista que entregou (erro) *"
+                className="rounded border px-3 py-2 text-sm"
+                style={{ borderColor: "var(--border)" }}
+              />
+            </div>
+          ) : null}
           <div className="flex items-center gap-2">
             <button
-              disabled={pending || !novaTrocaReason.trim()}
+              disabled={pending || !novaTrocaReason.trim() || !novaTrocaCausaRaiz}
               onClick={confirmNovaTroca}
               className="text-sm rounded px-3 py-2 disabled:opacity-60"
               style={{ background: "var(--status-warning)", color: "#fff" }}
             >
               Confirmar nova troca
             </button>
-            <button
-              onClick={() => {
-                setAskingNovaTroca(false);
-                setNovaTrocaReason("");
-              }}
-              className="text-sm underline"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <button onClick={resetNovaTroca} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
               cancelar
             </button>
           </div>

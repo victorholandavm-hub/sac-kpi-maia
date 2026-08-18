@@ -144,6 +144,21 @@ export function DeliveryRequestDetailContent({
         ) : null}
       </div>
 
+      {request.parentExchange || request.childExchange ? (
+        <div className="flex items-center gap-3 flex-wrap text-sm" style={{ color: "var(--text-secondary)" }}>
+          {request.parentExchange ? (
+            <Link href={`/assistencia/${request.parentExchange.id}`} className="underline" style={{ color: "var(--brand-green)" }}>
+              ↩ Troca anterior: #{request.parentExchange.ticketNumber} ({STATUS_LABELS[request.parentExchange.status] ?? request.parentExchange.status})
+            </Link>
+          ) : null}
+          {request.childExchange ? (
+            <Link href={`/assistencia/${request.childExchange.id}`} className="underline" style={{ color: "var(--brand-green)" }}>
+              → Gerou nova troca: #{request.childExchange.ticketNumber} ({STATUS_LABELS[request.childExchange.status] ?? request.childExchange.status})
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+
       {request.status !== "cancelada" ? (
         <StatusStepper steps={REQUEST_STATUS_STEPS} currentKey={request.status === "remarcar" ? "em_andamento" : request.status} />
       ) : null}
@@ -257,6 +272,7 @@ export function DeliveryRequestDetailContent({
                 hasAssignee={!!request.driverName}
                 assigneeLabel="o motorista"
                 hideClaim={isSacType}
+                hasChildExchange={!!request.childExchange}
               />
             </MobileActionSheet>
           ) : null}

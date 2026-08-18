@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { setDriverOrderAction } from "@/app/assistencia/driver-actions";
-import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { SHIFT_LABELS, DRIVER_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
 import { DriverNotificationModalButton } from "./DriverNotificationModalButton";
 import { formatFullAddress, type DriverRequestView } from "@/lib/serviceRequests";
@@ -126,6 +126,20 @@ export function DriverRouteGroup({
                     #{r.ticketNumber}
                   </span>
                   <StatusBadge status={r.status} />
+                  <span
+                    className="text-xs font-medium px-2 py-0.5 rounded-full"
+                    style={{ color: "var(--text-primary)", background: "var(--surface-2)" }}
+                  >
+                    {DRIVER_TYPE_LABELS[r.type] ?? r.type}
+                  </span>
+                  {r.exchangeRound > 1 ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ color: "#fff", background: "var(--status-warning)" }}
+                    >
+                      {r.exchangeRound}ª troca
+                    </span>
+                  ) : null}
                   {showDriverName ? (
                     <span
                       className="text-xs font-medium px-2 py-0.5 rounded-full"

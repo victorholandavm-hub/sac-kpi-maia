@@ -981,61 +981,158 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   revalidatePath(`/assistencia/${requestId}`);
 }
 
-// Produto trocado pode vir errado/avariado de novo -- em vez de a loja abrir
-// um chamado novo do zero (perdendo o histórico do primeiro), reabre esse
-// mesmo chamado de troca_produto pra uma nova rodada: volta pra "em
-// andamento" e zera pickup_completed, senão o motorista não veria a etapa de
-// recolher o produto (de novo defeituoso) como pendente -- ver
-// driverMarkPickupCompleted/driverCompleteRequest em driver-actions.ts, que
-// tratam entrega e recolhimento como pernas independentes da mesma rota.
-export async function requestNewExchange(requestId: string, reason: string): Promise<void> {
+// Produto trocado pode vir errado/avariado de novo -- em vez de reabrir o
+// MESMO chamado (como era até 18/08/2026, e apagava a 1ª troca: itens, fotos
+// e data de conclusão ficavam sobrescritos pela rodada seguinte), cria um
+// chamado NOVO, com número próprio, ligado ao original via
+// parent_request_id (ver 0090_exchange_parent_request.sql). O original fica
+// congelado como está -- "concluída" pra sempre, com o que foi de fato
+// entregue/recolhido naquela rodada. Agenda (data/hora/turno/rota/motorista)
+// vem copiada da rodada anterior como sugestão -- pedido do Victor
+// 18/08/2026 ("tem que vir sugerido na mesma rota da notificação anterior"):
+// o sistema não tem o conceito de "rota sem data" (a lista de disponíveis
+// sempre depende de uma data), então copiar só a rota não bastava -- ao
+// trocar a data pro dia real da nova visita, a validação normal de
+// rota-por-dia (getAvailableRotasForDate) entra em ação do mesmo jeito que
+// em qualquer edição.
+export async function createExchangeChild(
+  requestId: string,
+  opts: {
+    reason: string;
+    sameProduct: boolean;
+    causaRaiz: string;
+    causaCarga?: string;
+    causaConferente?: string;
+    driverNameForError?: string;
+  }
+): Promise<{ id: string; ticketNumber: number }> {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");
-  const reasonTrimmed = reason.trim();
-  if (!reasonTrimmed) throw new Error("Informe o motivo da nova troca.");
+  const reasonTrimmed = opts.reason.trim();
+  if (!reasonTrimmed) throw new Error("Informe o que aconteceu.");
+  if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(opts.causaRaiz)) {
+    throw new Error("Selecione quem errou.");
+  }
 
   const admin = getSupabaseAdmin();
-  const { data: current, error: fetchError } = await admin
+  const { data: parent, error: fetchError } = await admin
     .from("service_requests")
-    .select("status, type, store_id, exchange_round")
+    .select(
+      "ticket_number, status, type, store_id, exchange_round, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, client_protheus_code, order_code, invoice_number, seller_name, authorized_by, restriction_note, scheduled_date, scheduled_time, shift, rota, driver_name"
+    )
     .eq("id", requestId)
     .single();
-  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
-  requireManageAccess(profile, current.type);
-  if (current.type !== "troca_produto") throw new Error("Nova troca só se aplica a chamados de troca de produto.");
-  if (current.status !== "concluida") throw new Error("Só dá pra pedir uma nova troca depois que a troca anterior foi concluída.");
+  if (fetchError || !parent) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, parent.type);
+  if (parent.type !== "troca_produto") throw new Error("Nova troca só se aplica a chamados de troca de produto.");
+  if (parent.status !== "concluida") throw new Error("Só dá pra pedir uma nova troca depois que a troca anterior foi concluída.");
 
-  const nextRound = (current.exchange_round ?? 1) + 1;
+  let causaCarga: string | null = null;
+  let causaConferente: string | null = null;
+  let driverNameForError: string | null = null;
+  if (opts.causaRaiz === "erro_conferencia") {
+    causaCarga = (opts.causaCarga ?? "").trim();
+    causaConferente = (opts.causaConferente ?? "").trim();
+    if (!causaCarga) throw new Error("Informe a carga (erro de conferência precisa registrar qual foi).");
+    if (!causaConferente) throw new Error("Informe o conferente (erro de conferência precisa registrar quem conferiu).");
+  }
+  if (opts.causaRaiz === "erro_motorista") {
+    causaCarga = (opts.causaCarga ?? "").trim();
+    const typedDriverName = (opts.driverNameForError ?? "").trim();
+    if (!causaCarga) throw new Error("Informe a carga (erro do motorista precisa registrar qual foi).");
+    if (!typedDriverName) throw new Error("Informe o motorista (erro do motorista precisa registrar quem entregou).");
+    driverNameForError = await resolveDriverName(typedDriverName);
+  }
 
-  const { data: updated, error } = await admin
+  const nextRound = (parent.exchange_round ?? 1) + 1;
+  const childId = randomUUID();
+
+  const { data: items } = opts.sameProduct
+    ? await admin.from("service_request_items").select("product, part_code, quantity, item_action").eq("request_id", requestId)
+    : { data: [] as { product: string; part_code: string | null; quantity: number; item_action: string | null }[] };
+
+  const { data: child, error } = await admin
     .from("service_requests")
-    .update({ status: "em_andamento", completed_at: null, pickup_completed: false, exchange_round: nextRound })
-    .eq("id", requestId)
-    .eq("status", "concluida")
-    .select("id")
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!updated) throw new Error("Essa solicitação já foi atualizada por outra pessoa. Recarregue a página e tente de novo.");
+    .insert({
+      id: childId,
+      type: "troca_produto",
+      store_id: parent.store_id,
+      requested_by: profile.id,
+      client_name: parent.client_name,
+      client_phone: parent.client_phone,
+      client_cpf: parent.client_cpf,
+      client_address: parent.client_address,
+      client_address_number: parent.client_address_number,
+      client_is_apartment: parent.client_is_apartment,
+      client_address_complement: parent.client_address_complement,
+      client_neighborhood: parent.client_neighborhood,
+      client_protheus_code: parent.client_protheus_code,
+      order_code: parent.order_code,
+      invoice_number: parent.invoice_number,
+      seller_name: parent.seller_name,
+      reason: reasonTrimmed,
+      authorized_by: parent.authorized_by,
+      restriction_note: parent.restriction_note,
+      driver_name: driverNameForError ?? parent.driver_name,
+      scheduled_date: parent.scheduled_date,
+      scheduled_time: parent.scheduled_time,
+      shift: parent.shift,
+      rota: parent.rota,
+      causa_raiz: opts.causaRaiz,
+      causa_carga: causaCarga,
+      causa_conferente: causaConferente,
+      exchange_round: nextRound,
+      parent_request_id: requestId,
+      deadline_status: "aprovado",
+    })
+    .select("id, ticket_number")
+    .single();
+  if (error?.code === "23505") {
+    throw new Error("Essa troca já tem uma nova rodada criada por outra pessoa. Recarregue a página.");
+  }
+  if (error || !child) throw new Error(`Não foi possível criar a nova troca: ${error?.message ?? "erro desconhecido"}`);
 
-  await admin.from("service_request_events").insert({
-    request_id: requestId,
-    actor_id: profile.id,
-    event_type: "status_changed",
-    from_status: "concluida",
-    to_status: "em_andamento",
-    note: `${nextRound}ª troca solicitada -- produto trocado anteriormente apresentou problema: ${reasonTrimmed}`,
-  });
+  if (items && items.length > 0) {
+    const { error: itemsError } = await admin.from("service_request_items").insert(
+      items.map((item) => ({
+        request_id: childId,
+        product: item.product,
+        part_code: item.part_code,
+        quantity: item.quantity,
+        item_action: item.item_action,
+      }))
+    );
+    if (itemsError) throw new Error(`Troca criada (#${child.ticket_number}), mas falhou ao copiar os itens: ${itemsError.message}`);
+  }
 
-  await notifyLoja(current.store_id, {
+  await admin.from("service_request_events").insert([
+    {
+      request_id: requestId,
+      actor_id: profile.id,
+      event_type: "note_added",
+      note: `Gerou nova troca (${nextRound}ª rodada, chamado #${child.ticket_number}) -- produto trocado anteriormente apresentou problema: ${reasonTrimmed}`,
+    },
+    {
+      request_id: childId,
+      actor_id: profile.id,
+      event_type: "created",
+      to_status: "aberta",
+      note: `${nextRound}ª troca, ligada ao chamado #${parent.ticket_number} -- ${reasonTrimmed}`,
+    },
+  ]);
+
+  await notifyLoja(parent.store_id, {
     type: "status_changed",
     title: "Solicitação: nova troca necessária",
     message: reasonTrimmed,
-    link: `/assistencia/${requestId}`,
+    link: `/assistencia/${childId}`,
   });
 
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/sac");
   revalidatePath(`/assistencia/${requestId}`);
+
+  return { id: child.id, ticketNumber: child.ticket_number };
 }
 
 export async function addNote(requestId: string, note: string) {
@@ -1460,7 +1557,11 @@ export async function setSchedule(
   }
 
   const admin = getSupabaseAdmin();
-  const { data: current } = await admin.from("service_requests").select("type, status").eq("id", requestId).single();
+  const { data: current } = await admin
+    .from("service_requests")
+    .select("type, status, scheduled_date, rota, driver_name")
+    .eq("id", requestId)
+    .single();
   if (!current) throw new Error("Solicitação não encontrada.");
   requireManageAccess(profile, current.type);
 
@@ -1490,11 +1591,17 @@ export async function setSchedule(
     if (!isRota(rotaInput)) throw new Error("Rota inválida.");
     const availableRotas = await getAvailableRotasForDate(scheduledDate);
     const match = availableRotas.find((r) => r.rota === rotaInput);
-    if (!match) {
+    // Mantém a rota que o chamado já tinha pra essa mesma data mesmo se ela
+    // não estiver mais na lista de disponíveis (achado 18/08/2026: sem essa
+    // exceção, salvar qualquer outro campo -- turno, hora -- de um chamado
+    // com rota "fora do padrão" apagava a rota sozinho, sem o usuário nem
+    // ter mexido nela).
+    const isCurrentAssignment = scheduledDate === current.scheduled_date && rotaInput === current.rota;
+    if (!match && !isCurrentAssignment) {
       throw new Error(`${ROTA_LABELS[rotaInput]} não tem carro saindo em ${scheduledDate.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.`);
     }
     rotaValue = rotaInput;
-    driverNameForRota = match.driverName;
+    driverNameForRota = match?.driverName ?? (isCurrentAssignment ? current.driver_name : null);
   }
   // Não escreve mais nota de exceção -- a escolha já vem restrita às rotas
   // disponíveis pra data (ver acima), então não existe mais "fora da rota"
@@ -1943,20 +2050,23 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
 
   const driverNameInput = emptyToNull(formData.get("driver_name"));
 
-  // Causa raiz só existe pra troca_produto -- os outros tipos (entrega,
-  // envio de peça, notificação, montagem) não passam por aqui. Erro de
-  // conferência e erro do motorista eram uma causa só ("erro_cd") até
-  // 14/08/2026 -- separadas por pedido do usuário, pra dar pra metrificar
-  // as duas coisas de forma independente (ver 0080_causa_raiz_conferencia_motorista.sql).
+  // Causa raiz ("quem errou") passou a ser obrigatória pra todo tipo de
+  // entrega (pedido do Victor 18/08/2026), não só troca_produto -- só os
+  // campos extras de erro_conferencia/erro_motorista (carga, conferente)
+  // continuam exclusivos de troca_produto, que é o único com recolhimento
+  // de verdade. Erro de conferência e erro do motorista eram uma causa só
+  // ("erro_cd") até 14/08/2026 -- separadas por pedido do usuário, pra dar
+  // pra metrificar as duas coisas de forma independente (ver
+  // 0080_causa_raiz_conferencia_motorista.sql).
   let causaRaiz: string | null = null;
   let causaCarga: string | null = null;
   let causaConferente: string | null = null;
-  if (type === "troca_produto") {
+  if (isDeliveryTypeCreate) {
     causaRaiz = String(formData.get("causa_raiz") ?? "").trim();
     if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
-      return { error: "Selecione a causa raiz da troca." };
+      return { error: "Selecione quem errou." };
     }
-    if (causaRaiz === "erro_conferencia") {
+    if (type === "troca_produto" && causaRaiz === "erro_conferencia") {
       causaCarga = String(formData.get("causa_carga") ?? "").trim();
       causaConferente = String(formData.get("causa_conferente") ?? "").trim();
       if (!causaCarga) return { error: "Informe a carga (erro de conferência precisa registrar qual foi)." };
