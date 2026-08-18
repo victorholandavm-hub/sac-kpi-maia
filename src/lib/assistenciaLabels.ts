@@ -10,6 +10,18 @@ export const REQUEST_TYPE_LABELS: Record<string, string> = {
   envio_peca: "Envio de peça",
 };
 
+// Rótulo específico pra tela do motorista -- pedido do Victor 18/08/2026:
+// mais claro do que o genérico REQUEST_TYPE_LABELS pra quem tá decidindo o
+// que fazer na porta do cliente. Troca sempre envolve recolher o produto
+// com defeito junto (só troca_produto tem recolhimento de verdade); envio
+// de peça pode ser tanto recolher a peça com problema quanto entregar a
+// nova, por isso os dois nomes juntos.
+export const DRIVER_TYPE_LABELS: Record<string, string> = {
+  troca_produto: "Troca com recolhimento",
+  entrega_produto: "Entrega",
+  envio_peca: "Recolhimento ou entrega de peça",
+};
+
 // Cor suave por tipo de visita -- só usado na agenda (ver AgendaQueueGroup),
 // pra diferenciar a natureza do serviço batendo o olho, sem precisar ler o
 // texto do tipo.

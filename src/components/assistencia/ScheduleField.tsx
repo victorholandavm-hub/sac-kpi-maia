@@ -83,16 +83,33 @@ export function ScheduleField({
         .then((rotas) => {
           setAvailableRotas(rotas);
           // Rota que tinha sido escolhida pode não valer mais pra data nova
-          // -- nunca deixa uma rota fora da lista disponível "presa" no select.
-          setSelectedRota((prev) => (prev && !rotas.some((r) => r.rota === prev) ? "" : prev));
+          // -- nunca deixa uma rota fora da lista disponível "presa" no
+          // select. EXCETO a rota que o chamado já tinha pra ESSA MESMA data
+          // (bug achado 18/08/2026: chamado com rota "praia" numa terça, cujo
+          // padrão da semana é "sul" -- sem essa exceção, só abrir "editar" e
+          // salvar qualquer outro campo (turno, hora) apagava a rota
+          // sozinho, porque "praia" não estava na lista de disponíveis
+          // daquela data e o select resetava pra vazio).
+          const isOriginalAssignment = date === scheduledDate && rota;
+          setSelectedRota((prev) => {
+            if (prev === rota && isOriginalAssignment) return prev;
+            return prev && !rotas.some((r) => r.rota === prev) ? "" : prev;
+          });
         })
         .catch(() => setAvailableRotas([]))
         .finally(() => setLoadingRotas(false));
     }, 0);
     return () => clearTimeout(timer);
-  }, [hasDateContext, date]);
+  }, [hasDateContext, date, scheduledDate, rota]);
 
-  const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
+  // Mesma exceção acima, refletida na lista mostrada no <select> -- a rota
+  // original do chamado sempre aparece como opção enquanto a data não mudar,
+  // mesmo que "oficialmente" não esteja mais disponível pra esse dia.
+  const effectiveAvailableRotas = hasDateContext
+    ? date === scheduledDate && rota && !availableRotas.some((r) => r.rota === rota)
+      ? [...availableRotas, { rota, driverName: null }]
+      : availableRotas
+    : [];
   const effectiveLoadingRotas = hasDateContext && loadingRotas;
   // Motorista da rota escolhida -- pedido do Victor 18/08/2026: "quando eu
   // escolho a rota, ele ja deve preencher o motorista daquela rota". Só

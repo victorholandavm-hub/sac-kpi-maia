@@ -196,6 +196,14 @@ export function AssistenciaQueueGroup({
                     #{r.ticketNumber}
                   </span>
                   <StatusBadge status={r.status} />
+                  {r.type === "troca_produto" && r.exchangeRound > 1 ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ color: "#fff", background: "var(--status-warning)" }}
+                    >
+                      {r.exchangeRound}ª troca
+                    </span>
+                  ) : null}
                   {staleOpen ? (
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"

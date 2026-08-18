@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail, formatFullAddress } from "@/lib/serviceRequests";
-import { CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
 import { PrintButton } from "@/components/assistencia/PrintButton";
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
@@ -31,11 +30,14 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 // Papel físico de hoje (pedido do Victor 17/08/2026): logo + título no
 // topo, tudo numa folha só, na ordem — dados do cliente, descrição do
-// produto, descrição da solicitação (quem autorizou/problema/quem errou/
-// observação), relatório logístico (texto livre) e por fim a assinatura.
-// Um template só pra todo tipo (antes tinha um branch à parte só pra
-// troca_produto) -- tamanho de fonte/espaçamento pequenos de propósito,
-// pensados pra caber numa folha A4 sem estourar pra segunda página.
+// produto, descrição da solicitação (quem autorizou/problema/observação),
+// relatório logístico (texto livre) e por fim a assinatura. "Quem errou"
+// (causa raiz) NÃO entra aqui -- pedido do Victor 18/08/2026, é controle
+// interno só, não vai pro papel que o cliente/motorista veem (fica visível
+// na tela do chamado, ver DeliveryRequestDetailContent.tsx). Um template só
+// pra todo tipo (antes tinha um branch à parte só pra troca_produto) --
+// tamanho de fonte/espaçamento pequenos de propósito, pensados pra caber
+// numa folha A4 sem estourar pra segunda página.
 export default async function DespachoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const profile = await getProfile();
@@ -69,17 +71,6 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
 
   const isUrgente = request.shift === "urgencia";
   const enderecoCompleto = [formatFullAddress(request), request.clientNeighborhood].filter(Boolean).join(" — ");
-
-  const causaRaizLine =
-    request.causaRaiz === "erro_conferencia"
-      ? [request.causaCarga ? `Carga: ${request.causaCarga}` : null, request.causaConferente ? `Conferente: ${request.causaConferente}` : null]
-          .filter(Boolean)
-          .join(" · ")
-      : request.causaRaiz === "erro_motorista"
-        ? [request.causaCarga ? `Carga: ${request.causaCarga}` : null, request.driverName ? `Motorista: ${request.driverName}` : null]
-            .filter(Boolean)
-            .join(" · ")
-        : null;
 
   return (
     <div className="flex flex-col gap-4 max-w-2xl despacho-print">
@@ -172,8 +163,6 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
         <div className="flex flex-col gap-2 px-4 py-3">
           <Field label="Autorizado por" value={request.authorizedBy} />
           <Field label="Problema" value={request.reason} />
-          <Field label="Quem errou" value={request.causaRaiz ? (CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz) : null} />
-          {causaRaizLine ? <Field label="Detalhe" value={causaRaizLine} /> : null}
           <Field label="Observação" value={request.restrictionNote || request.notes} />
         </div>
 

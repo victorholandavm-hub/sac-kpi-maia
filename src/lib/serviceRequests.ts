@@ -158,8 +158,10 @@ export type ServiceRequestSummary = {
   comboMontagemDesmontagem: boolean;
   assistenciaOrder: number | null;
   montadorInstruction: string | null;
-  // Só relevante pra troca_produto (ver requestNewExchange) -- 1 na criação,
-  // incrementa cada vez que o produto trocado volta com problema.
+  // Só relevante pra troca_produto (ver createExchangeChild em actions.ts)
+  // -- 1 na 1ª troca, N na posição N da cadeia (chamado próprio pra cada
+  // rodada desde 18/08/2026, ligados por parentExchange/childExchange em
+  // ServiceRequestDetail).
   exchangeRound: number;
   // Causa raiz da troca (troca_produto) -- ver CAUSA_RAIZ_LABELS. Quando
   // "erro_conferencia", causaCarga/causaConferente são preenchimento
@@ -419,7 +421,16 @@ export type ServiceRequestDetail = ServiceRequestSummary & {
   // cria o chamado (não é o requestedByName, que é quem criou o chamado no
   // sistema, ver serviceRequests.ts). Só relevante pra DELIVERY_REQUEST_TYPES.
   authorizedBy: string | null;
+  // Cadeia de trocas ligadas (ver createExchangeChild em actions.ts e
+  // 0090_exchange_parent_request.sql) -- parentExchange é a troca de onde
+  // esse chamado nasceu (null se for a 1ª troca); childExchange é a próxima
+  // rodada, se já foi criada (só existe um filho por chamado -- uma vez que
+  // existe, o botão "Nova troca" some daqui e passa a valer no filho).
+  parentExchange: LinkedExchangeRef | null;
+  childExchange: LinkedExchangeRef | null;
 };
+
+export type LinkedExchangeRef = { id: string; ticketNumber: number; status: RequestStatus };
 
 export type RequestEvent = {
   id: string;
@@ -450,6 +461,7 @@ type DetailRow = SummaryRow & {
   delivery_rating: number | null;
   resolution_rating: number | null;
   authorized_by: string | null;
+  parent_request_id: string | null;
 };
 
 type EventRow = {
@@ -463,16 +475,23 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  // rota/rota_exception_note faltavam aqui (bug real, achado 18/08/2026) --
+  // SUMMARY_COLUMNS (fila) sempre teve, mas essa lista (chamado, editar,
+  // despacho) nunca selecionava as duas colunas: request.rota vinha sempre
+  // undefined nessas telas, mesmo com a rota gravada certinha no banco --
+  // é provavelmente a causa raiz de verdade do "Sem rota" que aparecia na
+  // tela do chamado (mais fundamental que o bug de ScheduleField.tsx
+  // corrigido antes hoje, que só evitava apagar a rota ao SALVAR).
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 export async function getRequestDetail(
   id: string
 ): Promise<{ request: ServiceRequestDetail; events: RequestEvent[] } | null> {
   const admin = getSupabaseAdmin();
-  // As duas consultas são independentes (nenhuma depende do resultado da
-  // outra) -- rodar em paralelo em vez de uma atrás da outra economiza uma
-  // ida e volta ao banco, e essa função é chamada por 4 telas diferentes
-  // (chamado, editar, despacho, editar da loja).
+  // As duas consultas principais são independentes (nenhuma depende do
+  // resultado da outra) -- rodar em paralelo em vez de uma atrás da outra
+  // economiza uma ida e volta ao banco, e essa função é chamada por 4 telas
+  // diferentes (chamado, editar, despacho, editar da loja).
   const [{ data, error }, { data: eventRows }] = await Promise.all([
     admin.from("service_requests").select(DETAIL_COLUMNS).eq("id", id).single(),
     admin
@@ -495,6 +514,24 @@ export async function getRequestDetail(
     actorName: e.actor?.full_name ?? null,
   }));
 
+  // Cadeia de trocas ligadas (ver createExchangeChild em actions.ts) -- só
+  // busca depois de saber o parent_request_id (a troca anterior), e sempre
+  // busca o filho (a próxima rodada) por parent_request_id apontando pra cá.
+  // Só um filho existe por chamado (o botão "Nova troca" some assim que um
+  // já foi criado), então .maybeSingle() é seguro.
+  const [{ data: parentRow }, { data: childRow }] = await Promise.all([
+    row.parent_request_id
+      ? admin.from("service_requests").select("id, ticket_number, status").eq("id", row.parent_request_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    admin.from("service_requests").select("id, ticket_number, status").eq("parent_request_id", id).maybeSingle(),
+  ]);
+  const parentExchange: LinkedExchangeRef | null = parentRow
+    ? { id: parentRow.id, ticketNumber: parentRow.ticket_number, status: parentRow.status }
+    : null;
+  const childExchange: LinkedExchangeRef | null = childRow
+    ? { id: childRow.id, ticketNumber: childRow.ticket_number, status: childRow.status }
+    : null;
+
   const request: ServiceRequestDetail = {
     ...toSummary(row),
     clientCpf: row.client_cpf,
@@ -508,6 +545,8 @@ export async function getRequestDetail(
     authorizedBy: row.authorized_by,
     deliveryRating: row.delivery_rating,
     resolutionRating: row.resolution_rating,
+    parentExchange,
+    childExchange,
   };
 
   return { request, events };
@@ -951,11 +990,14 @@ export type DriverRequestView = {
   // Só usado no modo "ver todas as rotas" (ver DISPATCH_SUPERVISOR_DRIVER) --
   // pro motorista comum é sempre o próprio nome, óbvio demais pra mostrar.
   driverName: string | null;
+  // Ver createExchangeChild em actions.ts -- 1 quando é a 1ª troca, 2+
+  // quando é uma rodada seguinte de uma cadeia (mostra badge "Nª troca").
+  exchangeRound: number;
 };
 
 const DRIVER_VIEW_LIMIT = 200;
 const DRIVER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, stores(name), items:service_request_items(product)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, stores(name), items:service_request_items(product)";
 
 type DriverViewRow = {
   id: string;
@@ -984,6 +1026,7 @@ type DriverViewRow = {
   driver_order: number | null;
   delivery_rating: number | null;
   driver_name: string | null;
+  exchange_round: number;
   stores: { name: string } | null;
   items: { product: string }[] | null;
 };
@@ -1018,6 +1061,7 @@ function toDriverView(row: DriverViewRow): DriverRequestView {
     driverOrder: row.driver_order,
     deliveryRating: row.delivery_rating,
     driverName: row.driver_name,
+    exchangeRound: row.exchange_round,
   };
 }
 

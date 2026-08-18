@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { getDriverSession } from "@/app/assistencia/driver-actions";
 import { getDriverRequestDetail, formatFullAddress } from "@/lib/serviceRequests";
 import { listRequestPhotos } from "@/lib/servicePhotos";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS, DISPATCH_SUPERVISOR_DRIVER } from "@/lib/assistenciaLabels";
+import { DRIVER_TYPE_LABELS, SHIFT_LABELS, DISPATCH_SUPERVISOR_DRIVER } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
 import { MotoristaPhotoUpload } from "@/components/assistencia/MotoristaPhotoUpload";
@@ -67,7 +67,7 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
   return (
     <ToastProvider>
       <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-        <AssistenciaHeader title={`Chamado #${request.ticketNumber}`} subtitle={`${REQUEST_TYPE_LABELS[request.type] ?? request.type} · ${request.storeName}`}>
+        <AssistenciaHeader title={`Chamado #${request.ticketNumber}`} subtitle={`${DRIVER_TYPE_LABELS[request.type] ?? request.type} · ${request.storeName}`}>
           <Link href="/assistencia/motorista" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             ← Voltar
           </Link>
