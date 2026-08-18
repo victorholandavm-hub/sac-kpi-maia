@@ -9,12 +9,18 @@ import {
   type FormState,
 } from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
-import { SHIFT_LABELS, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
 import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
 import { ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
+
+// Assistência cria os dois tipos de peça que vão por motorista -- troca de
+// peça continua sendo visita de montador, não entra aqui (pedido do Victor
+// 18/08/2026, confirmado depois de eu ter classificado errado).
+const ENTREGA_TYPES = ["recolhimento", "envio_peca"] as const;
+type EntregaType = (typeof ENTREGA_TYPES)[number];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -29,11 +35,12 @@ type Item = { product: string; quantity: number; code: string };
 type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
 const blankItem = (): Item => ({ product: "", quantity: 1, code: "" });
 
-// "Nova entrega" da Assistência -- só recolhimento de peça (pedido do Victor
-// 18/08/2026: aba de entregas separada da aba de visitas, cada uma com seu
-// próprio formulário; sem nada de montador/pagamento por item, que é coisa
-// de visita). Igual ao envio de peça do SAC (SacCreateRequestForm.tsx), sem
-// seletor de tipo porque só existe esse aqui pra Assistência criar.
+// "Nova entrega" da Assistência -- recolhimento e envio de peça (pedido do
+// Victor 18/08/2026: aba de entregas separada da aba de visitas, cada uma
+// com seu próprio formulário; sem nada de montador/pagamento por item, que
+// é coisa de visita). Mesmo tratamento do envio de peça no SAC
+// (SacCreateRequestForm.tsx) -- os dois tipos usam os mesmos campos daqui
+// pra frente, só o rótulo do produto muda.
 export function NovaEntregaAssistenciaForm({
   stores,
   drivers,
@@ -44,7 +51,7 @@ export function NovaEntregaAssistenciaForm({
   cargas: { carga: string; label: string }[];
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createQuickRequest, undefined);
-  const type = "recolhimento" as const;
+  const [type, setType] = useState<EntregaType>("recolhimento");
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
 
   const [clientCode, setClientCode] = useState("");
@@ -150,9 +157,23 @@ export function NovaEntregaAssistenciaForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
-      <input type="hidden" name="type" value={type} />
+      <FormSection title="Tipo e loja" number={1}>
+        <Field label="Tipo">
+          <select
+            name="type"
+            value={type}
+            onChange={(e) => setType(e.target.value as EntregaType)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          >
+            {ENTREGA_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {REQUEST_TYPE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+        </Field>
 
-      <FormSection title="Loja" number={1}>
         <Field label="Loja *">
           <select name="store_id" required defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
             <option value="" disabled>
@@ -290,7 +311,11 @@ export function NovaEntregaAssistenciaForm({
         ) : null}
       </FormSection>
 
-      <FormSection title="Peça a recolher" number={3} hint="Digite o código do produto pra preencher o nome automaticamente (se souber).">
+      <FormSection
+        title={type === "recolhimento" ? "Peça a recolher" : "Peça a enviar"}
+        number={3}
+        hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
+      >
         <div className="flex flex-col gap-2">
           {items.map((item, i) => (
             <div key={i} className="flex flex-col gap-1">

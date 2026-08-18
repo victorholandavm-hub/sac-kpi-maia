@@ -23,8 +23,8 @@ export default async function NovaEntregaPage() {
           Nova entrega
         </h2>
         <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-          Recolhimento de peça — vai pelo motorista, na rota. Depois dá pra completar os outros dados na própria
-          solicitação.
+          Recolhimento ou envio de peça — vai pelo motorista, na rota. Depois dá pra completar os outros dados na
+          própria solicitação.
         </p>
         <Link href="/assistencia/nova-rapida" className="text-sm underline mt-1 inline-block" style={{ color: "var(--text-secondary)" }}>
           Precisa de montagem, desmontagem, troca de peça ou vistoria? Vá pra Nova visita →

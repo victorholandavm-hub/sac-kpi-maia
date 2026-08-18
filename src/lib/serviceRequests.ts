@@ -12,7 +12,8 @@ export type RequestType =
   | "notificacao_externa"
   | "troca_produto"
   | "entrega_produto"
-  | "envio_peca";
+  | "envio_peca"
+  | "recolhimento_produto";
 export type RequestStatus = "aberta" | "em_contato" | "em_andamento" | "remarcar" | "concluida" | "cancelada";
 export type DeadlineStatus = "pendente" | "aprovado" | "recusado";
 export type Shift = "manha" | "tarde" | "dia" | "urgencia";
@@ -63,6 +64,7 @@ export const ADDRESS_NUMBER_REQUIRED_TYPES: RequestType[] = [
   "troca_produto",
   "entrega_produto",
   "envio_peca",
+  "recolhimento_produto",
 ];
 
 // Usado em toda tela que exibe o endereço (detalhe do chamado, montador,

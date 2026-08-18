@@ -8,6 +8,7 @@ export const REQUEST_TYPE_LABELS: Record<string, string> = {
   troca_produto: "Troca de produto",
   entrega_produto: "Entrega de produto",
   envio_peca: "Envio de peça",
+  recolhimento_produto: "Recolhimento de produto",
 };
 
 // Rótulo específico pra tela do motorista -- pedido do Victor 18/08/2026:
@@ -21,6 +22,7 @@ export const DRIVER_TYPE_LABELS: Record<string, string> = {
   entrega_produto: "Entrega",
   envio_peca: "Recolhimento ou entrega de peça",
   recolhimento: "Recolhimento de peça",
+  recolhimento_produto: "Recolhimento de produto",
 };
 
 // Cor suave por tipo de visita -- só usado na agenda (ver AgendaQueueGroup),
@@ -163,11 +165,15 @@ export const PEDIDO_FORNECEDOR_STATUS_COLORS: Record<string, string> = {
 
 // Únicos tipos de chamado que o papel SAC pode gerenciar (ver dal.ts
 // requireManageAccess) — o resto da fila (montagem, envio de peça etc.)
-// continua exclusivo de assistência/admin. Envio de peça é criado pelo SAC
-// como intake (ver SAC_REQUEST_TYPES em actions.ts, mesmo padrão de
-// montagem), mas quem executa e gerencia depois é a assistência -- é ela
-// quem manda a peça, com motorista e rota, só que o pedido nasce no SAC.
-export const SAC_MANAGED_TYPES = ["troca_produto", "entrega_produto", "notificacao_externa"] as const;
+// continua exclusivo de assistência/admin. Envio de peça (e recolhimento de
+// peça) são criados pelo SAC ou pela assistência como intake (ver
+// SAC_REQUEST_TYPES/REQUEST_TYPES em actions.ts), mas quem executa e
+// gerencia depois é sempre a assistência -- é ela quem manda a peça, com
+// motorista e rota. "recolhimento_produto" (18/08/2026: SAC recolhe o
+// produto do cliente sem entregar nada no lugar, ex.: devolução/
+// cancelamento -- diferente de "recolhimento", que é de PEÇA) é só do SAC,
+// nasce e é gerenciado por ele, mesmo padrão de troca_produto/entrega_produto.
+export const SAC_MANAGED_TYPES = ["troca_produto", "entrega_produto", "recolhimento_produto", "notificacao_externa"] as const;
 
 // Complemento de SAC_MANAGED_TYPES — únicos tipos que o papel "assistencia"
 // gerencia (admin continua com acesso total aos dois grupos, como supervisão).
@@ -209,7 +215,13 @@ export function manageableTypesForRole(role: string): readonly string[] {
 // não tem montador nenhum -- se depois de recolhida a peça for preciso um
 // montador pra instalar/trocar algo, isso é um chamado à parte (montagem ou
 // troca de peça), não uma etapa deste.
-export const DELIVERY_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "recolhimento"] as const;
+export const DELIVERY_REQUEST_TYPES = [
+  "troca_produto",
+  "entrega_produto",
+  "envio_peca",
+  "recolhimento",
+  "recolhimento_produto",
+] as const;
 
 // Vistoria e troca de peça exigem confiança/qualificação que só um
 // funcionário de verdade tem — hoje só o Manoel; os outros montadores são
