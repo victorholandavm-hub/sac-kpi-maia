@@ -27,7 +27,7 @@ import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 import { checkIpRateLimit, recordFailedIpAttempt } from "@/lib/ipRateLimit";
-import { isRota, getRotaDriverAssignments, getAvailableRotasForDate, findDriverForRota, ROTA_LABELS, type Rota } from "@/lib/rotas";
+import { isRota, getRotaDriverAssignments, getAvailableRotasForDate, ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
 import { sanitizeOrFilterValue } from "@/lib/searchFilter";
 import { findTotvsClientByCode, findTotvsProductByCode, type TotvsClientMatch, type TotvsProductMatch } from "@/lib/totvsLookup";
 import {
@@ -1297,38 +1297,6 @@ export async function setComboMontagemDesmontagem(requestId: string, value: bool
   revalidatePath(`/assistencia/${requestId}`);
 }
 
-export async function setDriverName(requestId: string, driverName: string) {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin", "sac");
-  const trimmed = driverName.trim();
-  if (!trimmed) throw new Error("Informe o nome do motorista.");
-
-  const admin = getSupabaseAdmin();
-  const { data: current, error: fetchError } = await admin
-    .from("service_requests")
-    .select("type")
-    .eq("id", requestId)
-    .single();
-  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
-  requireManageAccess(profile, current.type);
-
-  const name = await resolveDriverName(trimmed);
-  await admin.from("drivers").upsert({ name }, { onConflict: "name" });
-
-  const { error } = await admin.from("service_requests").update({ driver_name: name }).eq("id", requestId);
-  if (error) throw new Error(error.message);
-
-  await admin.from("service_request_events").insert({
-    request_id: requestId,
-    actor_id: profile.id,
-    event_type: "note_added",
-    note: `Motorista definido: ${name}`,
-  });
-
-  revalidatePath("/assistencia/fila");
-  revalidatePath(`/assistencia/${requestId}`);
-}
-
 // "Motorista do dia" -- pedido do Victor 17/08/2026: hoje o motorista era
 // digitado chamado por chamado; isso marca de uma vez "hoje, rota X =
 // Fulano" e reatribui quem ainda estiver no motorista padrão anterior (ou
@@ -1463,7 +1431,7 @@ export async function getRotaDriverAssignmentsAction(date: string) {
 // Victor 18/08/2026: a escolha de rota tem que vir de dentro das disponíveis
 // pra aquele dia, não mais livre com aviso de exceção depois (ver
 // getAvailableRotasForDate em rotas.ts).
-export async function getAvailableRotasForDateAction(date: string): Promise<Rota[]> {
+export async function getAvailableRotasForDateAction(date: string): Promise<AvailableRota[]> {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
@@ -1492,7 +1460,7 @@ export async function setSchedule(
   }
 
   const admin = getSupabaseAdmin();
-  const { data: current } = await admin.from("service_requests").select("type, status, driver_name").eq("id", requestId).single();
+  const { data: current } = await admin.from("service_requests").select("type, status").eq("id", requestId).single();
   if (!current) throw new Error("Solicitação não encontrada.");
   requireManageAccess(profile, current.type);
 
@@ -1512,30 +1480,27 @@ export async function setSchedule(
   const rotaInput = isDeliveryType ? rota : undefined;
 
   let rotaValue: string | null = null;
+  // Motorista não é mais um campo à parte da solicitação (pedido do Victor
+  // 18/08/2026: "a rota e o motorista são ligados um ao outro") -- vem
+  // sempre junto da rota escolhida (ver getAvailableRotasForDate), null se
+  // aquela rota/data ainda não tem motorista definido no painel "Motorista
+  // do dia". Só muda de verdade lá, nunca digitando aqui.
+  let driverNameForRota: string | null = null;
   if (scheduledDate && rotaInput) {
     if (!isRota(rotaInput)) throw new Error("Rota inválida.");
     const availableRotas = await getAvailableRotasForDate(scheduledDate);
-    if (!availableRotas.includes(rotaInput)) {
+    const match = availableRotas.find((r) => r.rota === rotaInput);
+    if (!match) {
       throw new Error(`${ROTA_LABELS[rotaInput]} não tem carro saindo em ${scheduledDate.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.`);
     }
     rotaValue = rotaInput;
+    driverNameForRota = match.driverName;
   }
   // Não escreve mais nota de exceção -- a escolha já vem restrita às rotas
   // disponíveis pra data (ver acima), então não existe mais "fora da rota"
   // pra justificar. Uma nota antiga (de antes dessa mudança) "gruda" até o
   // chamado ser reagendado de novo; aqui ela é sempre limpa.
   const exceptionNote: string | null = null;
-
-  // Preenche o motorista sozinho a partir do "motorista do dia" daquela
-  // rota (ver setRotaDriverAssignment mais abaixo) -- só quando o chamado
-  // ainda não tem motorista nenhum. Nunca sobrescreve uma escolha manual já
-  // feita (ver DriverNameField): isso é o caminho de mandar ESSE chamado
-  // específico pra um motorista "extra", fora da rota do dia.
-  let autoDriverName: string | undefined;
-  if (rotaValue && scheduledDate && !current.driver_name) {
-    const assignments = await getRotaDriverAssignments(scheduledDate);
-    autoDriverName = findDriverForRota(assignments, rotaValue as Rota) ?? undefined;
-  }
 
   const { error } = await admin
     .from("service_requests")
@@ -1545,7 +1510,10 @@ export async function setSchedule(
       scheduled_time: scheduledTime || null,
       rota: rotaValue,
       rota_exception_note: exceptionNote,
-      ...(autoDriverName ? { driver_name: autoDriverName } : {}),
+      // Só toca no motorista pra tipo de entrega -- montagem/desmontagem/
+      // vistoria/troca de peça usam montador, não motorista (ver
+      // isDeliveryType acima), e nunca deviam ter essa coluna mexida aqui.
+      ...(isDeliveryType ? { driver_name: driverNameForRota } : {}),
       ...(clearingRemarcar ? { status: "em_andamento" } : {}),
     })
     .eq("id", requestId);
@@ -2007,15 +1975,21 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
 
   // Mesma validação de setSchedule (edição do chamado já criado) -- rota só
   // pode ser uma das disponíveis pra data escolhida (pedido do Victor
-  // 18/08/2026), sem mais encaixe livre com justificativa.
+  // 18/08/2026), sem mais encaixe livre com justificativa. Motorista vem
+  // junto da rota escolhida (mesmo pedido: "a rota e o motorista são
+  // ligados um ao outro") -- null se aquela rota/data ainda não tem
+  // motorista definido no painel "Motorista do dia".
   let rotaValue: string | null = null;
+  let driverNameForRota: string | null = null;
   if (scheduledDate && rotaInput) {
     if (!isRota(rotaInput)) return { error: "Rota inválida." };
     const availableRotas = await getAvailableRotasForDate(scheduledDate);
-    if (!availableRotas.includes(rotaInput)) {
+    const match = availableRotas.find((r) => r.rota === rotaInput);
+    if (!match) {
       return { error: `${ROTA_LABELS[rotaInput]} não tem carro saindo em ${scheduledDate.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.` };
     }
     rotaValue = rotaInput;
+    driverNameForRota = match.driverName;
   }
   const rotaExceptionNote: string | null = null;
 
@@ -2057,13 +2031,11 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   }
 
   const admin = getSupabaseAdmin();
-  let driverName = driverNameInput ? await resolveDriverName(driverNameInput) : null;
-  // Sem motorista digitado, mas com rota+data escolhidas: puxa o motorista
-  // do dia daquela rota, mesmo auto-preenchimento de setSchedule (ScheduleField).
-  if (!driverName && rotaValue && scheduledDate) {
-    const assignments = await getRotaDriverAssignments(scheduledDate);
-    driverName = findDriverForRota(assignments, rotaValue as Rota);
-  }
+  // Motorista não é mais um campo livre na criação (pedido do Victor
+  // 18/08/2026) -- só continua digitável pra "erro do motorista" (precisa
+  // registrar explicitamente quem entregou o item com defeito). Fora esse
+  // caso, vem sempre da rota escolhida (ver acima).
+  const driverName = driverNameInput ? await resolveDriverName(driverNameInput) : driverNameForRota;
   if (driverName) {
     await admin.from("drivers").upsert({ name: driverName }, { onConflict: "name" });
   }

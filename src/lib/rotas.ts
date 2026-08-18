@@ -92,22 +92,30 @@ export function getRotaForDate(dateStr: string, config: RotaWeekdayConfig): Rota
   return config[weekday] ?? null;
 }
 
+export type AvailableRota = { rota: Rota; driverName: string | null };
+
 // Rotas que uma solicitação pode escolher pra uma data -- pedido do Victor
 // 18/08/2026: "a escolha tem que ser baseada nas rotas disponiveis", não
 // mais livre entre praia/sul/centro com aviso de exceção depois. Union do
 // que já está registrado como "motorista do dia" (principal + extras) pra
 // essa data; sem nada registrado ainda, cai no padrão da semana (só domingo
-// fica vazio de verdade).
-export async function getAvailableRotasForDate(dateStr: string): Promise<Rota[]> {
+// fica vazio de verdade). Já vem com o motorista de cada rota (ou null, se
+// a rota ainda não tem motorista definido) -- rota e motorista são a mesma
+// coisa vista de dois jeitos (pedido do Victor 18/08/2026), então quem
+// escolhe a rota já sabe/recebe o motorista junto, sem digitar nada à parte.
+export async function getAvailableRotasForDate(dateStr: string): Promise<AvailableRota[]> {
   const [config, assignments] = await Promise.all([getRotaWeekdayConfig(), getRotaDriverAssignments(dateStr)]);
 
   const registered = new Set<Rota>();
   if (assignments.primary) registered.add(assignments.primary.rota);
   for (const extra of assignments.extras) registered.add(extra.rota);
-  if (registered.size > 0) return [...registered];
 
-  const expected = getRotaForDate(dateStr, config);
-  return expected ? [expected] : [];
+  const rotas = registered.size > 0 ? [...registered] : (() => {
+    const expected = getRotaForDate(dateStr, config);
+    return expected ? [expected] : [];
+  })();
+
+  return rotas.map((rota) => ({ rota, driverName: findDriverForRota(assignments, rota) }));
 }
 
 // Segunda-feira da semana de `dateStr` (formato YYYY-MM-DD) -- ponto de

@@ -135,28 +135,31 @@ export default async function AssistenciaQueuePage({
     <div className="flex flex-col gap-4">
       <RealtimeQueueRefresher notifyOnInsert="Nova solicitação recebida!" />
 
+      {/* Pílulas cheias em vez de contorno fino -- pedido do Victor
+          18/08/2026: a troca entre Visitas/Entregas é a navegação mais
+          importante da tela (decide a tela inteira embaixo) e precisa ser a
+          primeira coisa que salta aos olhos, não competir visualmente com
+          os filtros de status logo abaixo. */}
       <div className="flex items-center gap-2">
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo })}
-          className="text-sm px-3 py-1.5 rounded-full border"
-          style={{
-            borderColor: "var(--border)",
-            background: !showPecas ? "var(--surface-1)" : "transparent",
-            color: !showPecas ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: !showPecas ? 600 : 400,
-          }}
+          className="text-base font-bold px-4 py-2 rounded-full"
+          style={
+            !showPecas
+              ? { background: "var(--brand-green)", color: "var(--brand-green-ink)" }
+              : { border: "2px solid var(--border)", color: "var(--text-secondary)" }
+          }
         >
           Visitas
         </Link>
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas" })}
-          className="text-sm px-3 py-1.5 rounded-full border"
-          style={{
-            borderColor: "var(--border)",
-            background: showPecas ? "var(--surface-1)" : "transparent",
-            color: showPecas ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: showPecas ? 600 : 400,
-          }}
+          className="text-base font-bold px-4 py-2 rounded-full"
+          style={
+            showPecas
+              ? { background: "var(--brand-green)", color: "var(--brand-green-ink)" }
+              : { border: "2px solid var(--border)", color: "var(--text-secondary)" }
+          }
         >
           Entregas
         </Link>
