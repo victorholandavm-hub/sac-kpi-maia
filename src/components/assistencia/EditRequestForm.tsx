@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { updateRequestDetails, type FormState } from "@/app/assistencia/actions";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type ServiceRequestDetail, type Store } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -39,6 +39,7 @@ export function EditRequestForm({
   // (sem montador pra instruir) e notificação externa não tem visita
   // nenhuma.
   const showMontadorInstruction = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"].includes(type);
+  const showAuthorizedBy = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -149,6 +150,18 @@ export function EditRequestForm({
       <Field label="Motivo">
         <textarea name="reason" defaultValue={request.reason ?? ""} rows={2} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
+
+      {showAuthorizedBy ? (
+        <Field label="Autorizado por">
+          <input
+            name="authorized_by"
+            defaultValue={request.authorizedBy ?? ""}
+            placeholder="Nome de quem autorizou (gerente, supervisor…)"
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+        </Field>
+      ) : null}
 
       {showMontadorInstruction ? (
         <Field label="Instrução pro montador (visível pra ele, separado do Motivo acima)">

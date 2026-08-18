@@ -415,6 +415,10 @@ export type ServiceRequestDetail = ServiceRequestSummary & {
   notes: string | null;
   deliveryRating: number | null;
   resolutionRating: number | null;
+  // Quem autorizou a troca/entrega/envio -- texto livre, digitado por quem
+  // cria o chamado (não é o requestedByName, que é quem criou o chamado no
+  // sistema, ver serviceRequests.ts). Só relevante pra DELIVERY_REQUEST_TYPES.
+  authorizedBy: string | null;
 };
 
 export type RequestEvent = {
@@ -445,6 +449,7 @@ type DetailRow = SummaryRow & {
   notes: string | null;
   delivery_rating: number | null;
   resolution_rating: number | null;
+  authorized_by: string | null;
 };
 
 type EventRow = {
@@ -458,7 +463,7 @@ type EventRow = {
 };
 
 const DETAIL_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 export async function getRequestDetail(
   id: string
@@ -500,6 +505,7 @@ export async function getRequestDetail(
     clientNeighborhood: row.client_neighborhood,
     restrictionNote: row.restriction_note,
     notes: row.notes,
+    authorizedBy: row.authorized_by,
     deliveryRating: row.delivery_rating,
     resolutionRating: row.resolution_rating,
   };

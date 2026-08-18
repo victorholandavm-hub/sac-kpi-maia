@@ -7,7 +7,7 @@ import { StatusStepper } from "./StatusStepper";
 import { RequestActions } from "./RequestActions";
 import { MobileActionSheet } from "./MobileActionSheet";
 import { DriverNameField } from "./DriverNameField";
-import { ScheduleField } from "./ScheduleField";
+import { ScheduleField, RotaBadge } from "./ScheduleField";
 import { DeliveryItemsTable } from "./DeliveryItemsTable";
 import { RealtimeQueueRefresher } from "./RealtimeQueueRefresher";
 import { PhotoGallery } from "./PhotoGallery";
@@ -15,7 +15,7 @@ import { RequestPhotoUpload } from "./RequestPhotoUpload";
 import type { RequestPhoto } from "@/lib/servicePhotos";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { RequestHistoryTimeline } from "./RequestHistoryTimeline";
-import { ROTA_LABELS, type Rota } from "@/lib/rotas";
+import type { Rota } from "@/lib/rotas";
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -177,7 +177,7 @@ export function DeliveryRequestDetailContent({
             <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
               Descrição da solicitação
             </h3>
-            <Row label="Autorizado por" value={request.requestedByName} />
+            <Row label="Autorizado por" value={request.authorizedBy} />
             <Row label="Motivo / problema" value={request.reason} />
             <Row label="Quem errou" value={request.causaRaiz ? (CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz) : null} />
             {causaRaizDetail ? <Row label="Detalhe" value={causaRaizDetail} /> : null}
@@ -216,14 +216,19 @@ export function DeliveryRequestDetailContent({
                 showRota
               />
             ) : (
-              <Row
-                label="Visita agendada"
-                value={
-                  request.scheduledDate
-                    ? `${request.scheduledDate.split("-").reverse().join("/")}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.rota ? ` · rota ${ROTA_LABELS[request.rota]}` : ""}`
-                    : null
-                }
-              />
+              <div className="flex flex-col gap-1">
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Visita agendada
+                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <RotaBadge rota={request.rota} />
+                  <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+                    {request.scheduledDate
+                      ? `${request.scheduledDate.split("-").reverse().join("/")}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}`
+                      : "Não agendada"}
+                  </span>
+                </div>
+              </div>
             )}
             {canManage ? (
               <DriverNameField requestId={request.id} value={request.driverName} drivers={drivers} />
