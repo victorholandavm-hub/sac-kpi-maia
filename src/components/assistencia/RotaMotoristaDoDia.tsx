@@ -62,7 +62,7 @@ export function RotaMotoristaDoDia({
         type="button"
         onClick={() => setExpanded((e) => !e)}
         className="text-xs rounded px-3 py-1.5 border font-medium self-start mt-2"
-        style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+        style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
       >
         {expanded ? "Mostrar menos" : "Mostrar mais rotas (semana atual + seguinte)"}
       </button>
@@ -228,7 +228,7 @@ function RotaDayRow({
           type="button"
           onClick={rotaEditOpen ? cancelRotaEdit : () => setRotaEditOpen(true)}
           className="text-[11px] rounded px-2 py-1 border font-medium shrink-0"
-          style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+          style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
         >
           {rotaEditOpen ? "cancelar" : "editar rota do dia"}
         </button>
@@ -294,7 +294,7 @@ function RotaDayRow({
                 disabled={pending}
                 onClick={addExtra}
                 className="text-[11px] rounded px-2 py-1 font-medium disabled:opacity-60 shrink-0"
-                style={{ border: "1px solid", borderColor: "var(--border)", color: "var(--text-primary)" }}
+                style={{ background: "var(--surface-2)", border: "1px solid", borderColor: "var(--border)", color: "var(--text-primary)" }}
               >
                 salvar
               </button>
@@ -302,7 +302,7 @@ function RotaDayRow({
                 type="button"
                 onClick={() => setExtraOpen(false)}
                 className="text-[11px] rounded px-2 py-1 border font-medium shrink-0"
-                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
               >
                 cancelar
               </button>
@@ -312,7 +312,7 @@ function RotaDayRow({
               type="button"
               onClick={() => setExtraOpen(true)}
               className="text-[11px] rounded px-2 py-1 border font-medium self-start"
-              style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+              style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
             >
               + rota extra
             </button>
@@ -324,7 +324,7 @@ function RotaDayRow({
             type="button"
             onClick={() => setExtraOpen(true)}
             className="text-[11px] rounded px-2 py-1 border font-medium"
-            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+            style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
           >
             + rota extra
           </button>

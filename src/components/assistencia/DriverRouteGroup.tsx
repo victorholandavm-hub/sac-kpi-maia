@@ -6,7 +6,13 @@ import { setDriverOrderAction } from "@/app/assistencia/driver-actions";
 import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
 import { DriverNotificationModalButton } from "./DriverNotificationModalButton";
-import type { DriverRequestView } from "@/lib/serviceRequests";
+import { formatFullAddress, type DriverRequestView } from "@/lib/serviceRequests";
+
+function mapsHref(item: DriverRequestView): string | null {
+  const address = [formatFullAddress(item), item.clientNeighborhood].filter(Boolean).join(" — ");
+  if (!address) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
 
 function formatDateOnly(value: string | null): string | null {
   if (!value) return null;
@@ -163,14 +169,26 @@ export function DriverRouteGroup({
                   </p>
                 ) : null}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                {mapsHref(r) ? (
+                  <a
+                    href={mapsHref(r)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-sm rounded-lg px-3 py-2 font-medium shrink-0"
+                    style={{ background: "var(--surface-2)", border: "2px solid var(--border)", color: "var(--text-primary)" }}
+                  >
+                    📍 Ver no mapa
+                  </a>
+                ) : null}
                 <DriverNotificationModalButton item={r} />
                 <Link
                   href={`/assistencia/motorista/${r.id}`}
                   className="text-sm rounded-lg px-3 py-2 font-medium shrink-0"
                   style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
                 >
-                  Ver rota
+                  Ver notificação
                 </Link>
               </div>
             </div>

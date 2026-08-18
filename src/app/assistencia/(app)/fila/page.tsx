@@ -17,11 +17,6 @@ type QueueGroup = {
   headerText: string;
   borderColor: string;
   items: ServiceRequestSummary[];
-  // Só a aba Entregas usa isso (ver groupByRota) -- dentro da rota, sub-
-  // divide por data de criação com um rótulo próprio, mais discreto que o
-  // cabeçalho da rota. Pedido do Victor 18/08/2026: "no agrupamento da
-  // rota, deve aparecer sim a data ao lado".
-  dateSubgroups?: QueueDateSubgroup[];
 };
 
 function groupByDateKey(items: ServiceRequestSummary[]): QueueDateSubgroup[] {
@@ -72,28 +67,35 @@ function groupByDate(requests: ServiceRequestSummary[]): QueueGroup[] {
   return groups;
 }
 
-// Aba "Entregas" -- agrupado por rota, não por data de criação (pedido do
-// Victor 18/08/2026: quem gerencia entrega pensa em "quem tá na rota Sul",
-// não em "o que foi criado ontem"). A data de criação vira só um detalhe
-// dentro de cada card (ver AssistenciaQueueGroup, prop showCreatedDate).
-// Ordem fixa Praia/Sul/Centro + "Sem rota definida" por último, só grupos
-// com algo dentro.
+// Aba "Entregas" -- agrupado por rota, com a data ao lado no mesmo
+// cabeçalho (pedido do Victor 18/08/2026: "a data... tem que aparecer ao
+// lado da rota, não dentro" -- cada grupo é um par rota+data, não uma rota
+// com sub-grupos de data aninhados). Ordem fixa Praia/Sul/Centro + "Sem
+// rota definida" por último; dentro de cada rota, data mais recente
+// primeiro. A data de criação também continua no card de cada solicitação
+// (ver AssistenciaQueueGroup, prop showCreatedDate).
 function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
-  const order: Omit<QueueGroup, "items">[] = [
-    ...ROTAS.map((r) => ({ key: r, label: `Rota ${ROTA_LABELS[r]}`, headerBg: ROTA_COLORS[r], headerText: "#fff", borderColor: ROTA_COLORS[r] })),
-    { key: "sem_rota", label: "Sem rota definida", headerBg: "var(--surface-2)", headerText: "var(--text-secondary)", borderColor: "var(--border)" },
+  const rotaOrder: (Omit<QueueGroup, "items" | "label"> & { rotaLabel: string })[] = [
+    ...ROTAS.map((r) => ({ key: r, rotaLabel: `Rota ${ROTA_LABELS[r]}`, headerBg: ROTA_COLORS[r], headerText: "#fff", borderColor: ROTA_COLORS[r] })),
+    { key: "sem_rota", rotaLabel: "Sem rota definida", headerBg: "var(--surface-2)", headerText: "var(--text-secondary)", borderColor: "var(--border)" },
   ];
-  const groups: QueueGroup[] = order.map((o) => ({ ...o, items: [] }));
-  for (const r of requests) {
-    const key = r.rota ?? "sem_rota";
-    groups.find((g) => g.key === key)?.items.push(r);
+
+  const groups: QueueGroup[] = [];
+  for (const rotaInfo of rotaOrder) {
+    const rotaItems = requests.filter((r) => (r.rota ?? "sem_rota") === rotaInfo.key);
+    if (rotaItems.length === 0) continue;
+    for (const sub of groupByDateKey(rotaItems)) {
+      groups.push({
+        key: `${rotaInfo.key}_${sub.dateKey}`,
+        label: `${rotaInfo.rotaLabel} · ${sub.label}`,
+        headerBg: rotaInfo.headerBg,
+        headerText: rotaInfo.headerText,
+        borderColor: rotaInfo.borderColor,
+        items: sub.items,
+      });
+    }
   }
-  const nonEmpty = groups.filter((g) => g.items.length > 0);
-  for (const group of nonEmpty) {
-    sortGroupItems(group.items);
-    group.dateSubgroups = groupByDateKey(group.items);
-  }
-  return nonEmpty;
+  return groups;
 }
 
 // Isolado numa função à parte (não direto no corpo do componente) --
@@ -344,22 +346,7 @@ export default async function AssistenciaQueuePage({
               </span>
             </div>
             <div style={{ background: "var(--surface-1)" }}>
-              {group.dateSubgroups ? (
-                <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
-                  {group.dateSubgroups.map((sub) => (
-                    <div key={sub.dateKey}>
-                      <div className="px-4 py-1.5" style={{ background: "var(--surface-2)" }}>
-                        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-                          {sub.label}
-                        </span>
-                      </div>
-                      <AssistenciaQueueGroup items={sub.items} reorderable now={now} showCreatedDate />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <AssistenciaQueueGroup items={group.items} reorderable now={now} />
-              )}
+              <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate={showPecas} />
             </div>
           </div>
         ))
