@@ -11,6 +11,7 @@ import { MotoristaRequestActions } from "@/components/assistencia/MotoristaReque
 import { RatingQrCode } from "@/components/assistencia/RatingQrCode";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { telHref, whatsappHref } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -133,11 +134,22 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
         <div className="flex items-center gap-2 flex-wrap">
           {request.clientPhone ? (
             <a
-              href={`tel:${request.clientPhone.replace(/\D/g, "")}`}
+              href={telHref(request.clientPhone)}
               className="text-sm font-medium rounded-lg px-3 py-2.5"
               style={{ background: "color-mix(in srgb, var(--brand-green) 12%, transparent)", color: "var(--brand-green)" }}
             >
               📞 {request.clientPhone}
+            </a>
+          ) : null}
+          {request.clientPhone ? (
+            <a
+              href={whatsappHref(request.clientPhone)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium rounded-lg px-3 py-2.5"
+              style={{ background: "color-mix(in srgb, #25d366 18%, transparent)", color: "#1da851" }}
+            >
+              💬 WhatsApp
             </a>
           ) : null}
           {mapsQuery ? (

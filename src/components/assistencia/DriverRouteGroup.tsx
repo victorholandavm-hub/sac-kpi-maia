@@ -7,6 +7,7 @@ import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
 import { DriverNotificationModalButton } from "./DriverNotificationModalButton";
 import { formatFullAddress, type DriverRequestView } from "@/lib/serviceRequests";
+import { telHref, whatsappHref } from "@/lib/phone";
 
 function mapsHref(item: DriverRequestView): string | null {
   const address = [formatFullAddress(item), item.clientNeighborhood].filter(Boolean).join(" — ");
@@ -169,6 +170,28 @@ export function DriverRouteGroup({
                         Ver no mapa
                       </a>
                     ) : null}
+                  </p>
+                ) : null}
+                {r.clientPhone ? (
+                  <p className="text-xs font-medium flex items-center gap-1.5 flex-wrap">
+                    <a
+                      href={telHref(r.clientPhone)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="underline"
+                      style={{ color: "var(--brand-green)" }}
+                    >
+                      📞 {r.clientPhone}
+                    </a>
+                    <a
+                      href={whatsappHref(r.clientPhone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="underline"
+                      style={{ color: "#1da851" }}
+                    >
+                      💬 WhatsApp
+                    </a>
                   </p>
                 ) : null}
                 {r.productSummary ? (
