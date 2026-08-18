@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { listRequests } from "@/lib/serviceRequests";
 import { listDrivers } from "@/lib/payments";
-import { getRotaDriverAssignments } from "@/lib/rotas";
+import { getRotaWeekOverview, startOfRotaWeek } from "@/lib/rotas";
 import { REQUEST_TYPE_LABELS, ROLE_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -32,13 +32,13 @@ export default async function SacNotificacoesPage({
   const showCompleted = view === "concluidas";
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ items }, drivers, rotaAssignments] = await Promise.all([
+  const [{ items }, drivers, rotaOverview] = await Promise.all([
     listRequests({
       types: [...DELIVERY_REQUEST_TYPES],
       status: showCompleted ? "concluida" : undefined,
     }),
     listDrivers(),
-    getRotaDriverAssignments(today),
+    getRotaWeekOverview(startOfRotaWeek(today), 14),
   ]);
   const requests = showCompleted ? items : items.filter((r) => r.status !== "concluida" && r.status !== "cancelada");
 
@@ -53,7 +53,7 @@ export default async function SacNotificacoesPage({
           desse atalho aqui também pra não depender de pedir pra
           assistência mudar o motorista do dia (pedido do Victor
           17/08/2026). */}
-      <RotaMotoristaDoDia initialDate={today} initialAssignments={rotaAssignments} drivers={drivers} />
+      <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} />
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">

@@ -107,3 +107,62 @@ export function getNextRotaDates(rota: Rota, config: RotaWeekdayConfig, count = 
   }
   return dates;
 }
+
+// Segunda-feira da semana de `dateStr` (formato YYYY-MM-DD) -- ponto de
+// partida da visão de 2 semanas do painel "Motorista do dia" (pedido do
+// Victor 18/08/2026: rotas da semana atual + semana seguinte sempre
+// visíveis, não só o dia escolhido).
+export function startOfRotaWeek(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const daysSinceMonday = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - daysSinceMonday);
+  return d.toISOString().slice(0, 10);
+}
+
+export type RotaDayOverview = {
+  date: string;
+  weekday: number;
+  // Rota esperada pelo padrão da semana (rota_weekday_config) -- null só no
+  // domingo, por padrão. Quem edita "rota do dia" pode fugir disso pra um
+  // dia específico (exceção), sem mexer no padrão da semana toda.
+  expectedRota: Rota | null;
+  assignments: RotaDriverAssignments;
+};
+
+// Visão de várias datas seguidas (painel "Motorista do dia") -- uma query só
+// pro intervalo inteiro em vez de uma por dia. `days` normalmente é 14 (semana
+// atual + semana seguinte).
+export async function getRotaWeekOverview(fromDate: string, days: number): Promise<RotaDayOverview[]> {
+  const config = await getRotaWeekdayConfig();
+  const admin = getSupabaseAdmin();
+
+  const dates: string[] = [];
+  const cursor = new Date(`${fromDate}T00:00:00Z`);
+  for (let i = 0; i < days; i++) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  const { data, error } = await admin
+    .from("rota_driver_assignments")
+    .select("id, assignment_date, rota, driver_name, is_extra")
+    .in("assignment_date", dates)
+    .order("updated_at", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const byDate = new Map<string, RotaDriverAssignments>();
+  for (const date of dates) byDate.set(date, { primary: null, extras: [] });
+  for (const row of data ?? []) {
+    if (!isRota(row.rota)) continue;
+    const bucket = byDate.get(row.assignment_date as string);
+    if (!bucket) continue;
+    const entry: RotaDriverAssignmentEntry = { id: row.id as string, rota: row.rota, driverName: row.driver_name as string };
+    if (row.is_extra) bucket.extras.push(entry);
+    else bucket.primary = entry;
+  }
+
+  return dates.map((date) => {
+    const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+    return { date, weekday, expectedRota: config[weekday] ?? null, assignments: byDate.get(date)! };
+  });
+}
