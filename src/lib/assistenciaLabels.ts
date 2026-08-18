@@ -20,6 +20,7 @@ export const DRIVER_TYPE_LABELS: Record<string, string> = {
   troca_produto: "Troca com recolhimento",
   entrega_produto: "Entrega",
   envio_peca: "Recolhimento ou entrega de peça",
+  recolhimento: "Recolhimento de peça",
 };
 
 // Cor suave por tipo de visita -- só usado na agenda (ver AgendaQueueGroup),
@@ -194,12 +195,21 @@ export function manageableTypesForRole(role: string): readonly string[] {
 }
 
 // Tipos que saem de fato com motorista, em rota (praia/sul/centro) --
-// cruza os dois grupos acima (troca/entrega de produto são SAC, envio de
-// peça é assistência, mas os três usam motorista e rota do mesmo jeito).
-// Montagem/desmontagem/vistoria/troca de peça são visita de montador e não
-// têm rota -- são dois mundos que não se comunicam, mesmo os dois tendo
-// "data agendada".
-export const DELIVERY_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca"] as const;
+// cruza os dois grupos acima (troca/entrega de produto são SAC, envio e
+// recolhimento de peça são assistência, mas os quatro usam motorista e rota
+// do mesmo jeito). Montagem/desmontagem/vistoria/troca de peça são visita de
+// montador e não têm rota -- são dois mundos que não se comunicam, mesmo os
+// dois tendo "data agendada".
+//
+// "recolhimento" entrou aqui em 18/08/2026 (pedido do Victor: "primeiro
+// enviamos a peça pelo motorista e só depois que entra o montador") -- antes
+// ficava com montagem/desmontagem/vistoria/troca_peça (visita de montador),
+// mas na prática é o motorista quem vai buscar a peça na casa do cliente.
+// Igual a envio_peca (mesmo padrão do SAC): o chamado de recolhimento em si
+// não tem montador nenhum -- se depois de recolhida a peça for preciso um
+// montador pra instalar/trocar algo, isso é um chamado à parte (montagem ou
+// troca de peça), não uma etapa deste.
+export const DELIVERY_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "recolhimento"] as const;
 
 // Vistoria e troca de peça exigem confiança/qualificação que só um
 // funcionário de verdade tem — hoje só o Manoel; os outros montadores são

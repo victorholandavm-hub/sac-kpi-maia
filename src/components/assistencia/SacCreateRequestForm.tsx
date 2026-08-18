@@ -14,7 +14,6 @@ import {
   SAC_CATEGORIES,
   SAC_CATEGORY_LABELS,
   REQUEST_TYPE_LABELS,
-  DELIVERY_REQUEST_TYPES,
   CAUSA_RAIZ_OPTIONS,
   CAUSA_RAIZ_LABELS,
 } from "@/lib/assistenciaLabels";
@@ -26,10 +25,14 @@ const inputStyle = { borderColor: "var(--border)" };
 
 type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "notificacao_externa" | "montagem";
 
-// Tipos que envolvem entrega pelo motorista (produto/peça + quem vai levar).
-// "O que recolher" só se aplica a troca_produto — os outros dois não têm
-// recolhimento nenhum.
-const DELIVERY_TYPES: SacType[] = [...DELIVERY_REQUEST_TYPES];
+// Tipos que envolvem entrega pelo motorista (produto/peça + quem vai levar),
+// dos que o SAC de fato cria (ver SacType acima) -- "recolhimento" entrou em
+// DELIVERY_REQUEST_TYPES em 18/08/2026, mas quem cria esse tipo é só a
+// Assistência (QuickCreateRequestForm.tsx), não o SAC, então fica de fora
+// daqui explicitamente (sem cast/filter -- lista fixa mesmo, casa com
+// SacType). "O que recolher" só se aplica a troca_produto — os outros dois
+// não têm recolhimento nenhum.
+const DELIVERY_TYPES: SacType[] = ["troca_produto", "entrega_produto", "envio_peca"];
 
 // Montagem também tem produto (o móvel a montar), mas sem motorista -- quem
 // vai até o cliente é um montador, atribuído depois por assistência/admin

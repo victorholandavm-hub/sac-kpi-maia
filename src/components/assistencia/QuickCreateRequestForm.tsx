@@ -6,11 +6,21 @@ import {
   lookupTotvsClientForTeam,
   lookupTotvsProductForTeam,
   getDayLoadAction,
+  getAvailableRotasForDateAction,
   type FormState,
 } from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
+import {
+  REQUEST_TYPE_LABELS,
+  SHIFT_LABELS,
+  MANOEL_ONLY_TYPES,
+  MANOEL_ONLY_ASSEMBLER,
+  DELIVERY_REQUEST_TYPES,
+  CAUSA_RAIZ_OPTIONS,
+  CAUSA_RAIZ_LABELS,
+} from "@/lib/assistenciaLabels";
 import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
+import { ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 
 const ASSISTENCIA_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"] as const;
@@ -138,10 +148,14 @@ function ItemsFields({
 export function QuickCreateRequestForm({
   stores,
   assemblers,
+  drivers,
+  cargas,
   includeSacTypes,
 }: {
   stores: Store[];
   assemblers: { name: string; storeId: string | null }[];
+  drivers: string[];
+  cargas: { carga: string; label: string }[];
   includeSacTypes: boolean;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createQuickRequest, undefined);
@@ -154,8 +168,17 @@ export function QuickCreateRequestForm({
   // pra montagem/desmontagem -- validado de novo no servidor (ver
   // createQuickRequest), isso aqui é só o feedback imediato no navegador.
   const codeRequired = showCombo;
-  // Mesmos tipos de EditRequestForm.tsx -- só quem passa por montador/técnico.
-  const showMontadorInstruction = ASSISTENCIA_TYPES.includes(type as (typeof ASSISTENCIA_TYPES)[number]);
+  // Recolhimento de peça saiu daqui (pedido do Victor 18/08/2026): não tem
+  // nada a ver com montador na criação -- primeiro vai o motorista buscar a
+  // peça, o montador (se precisar de um) é assunto de um chamado à parte
+  // depois (ver DELIVERY_REQUEST_TYPES em assistenciaLabels.ts). Os outros
+  // (montagem/desmontagem/troca de peça/vistoria) continuam mostrando aqui
+  // -- são visita de montador de verdade desde o início.
+  const showMontadorInstruction = type !== "recolhimento" && ASSISTENCIA_TYPES.includes(type as (typeof ASSISTENCIA_TYPES)[number]);
+  // Mesmo tratamento do envio de peça no SAC (SacCreateRequestForm.tsx) --
+  // rota/motorista automático, autorizado por e quem errou obrigatórios.
+  const isDelivery = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
+  const [causaRaiz, setCausaRaiz] = useState("");
   // Montador da loja escolhida + globais/legado (store_id nulo) -- a loja só
   // é escolhida aqui no formulário, então o filtro é no cliente.
   const visibleAssemblers = assemblers.filter((a) => a.storeId === null || a.storeId === storeId);
@@ -230,6 +253,34 @@ export function QuickCreateRequestForm({
     }, 300);
     return () => clearTimeout(timer);
   }, [scheduledDate]);
+
+  // Rota/motorista -- só pra tipo de entrega (hoje só recolhimento chega
+  // até aqui, ver isDelivery acima). Mesmo desenho de SacCreateRequestForm.tsx.
+  const [selectedRota, setSelectedRota] = useState("");
+  const [availableRotas, setAvailableRotas] = useState<AvailableRota[]>([]);
+  const [loadingRotas, setLoadingRotas] = useState(false);
+  const hasDateContext = isDelivery && !!scheduledDate;
+
+  useEffect(() => {
+    if (!hasDateContext) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setLoadingRotas(true);
+      getAvailableRotasForDateAction(scheduledDate)
+        .then((rotas) => {
+          setAvailableRotas(rotas);
+          setSelectedRota((prev) => (prev && !rotas.some((r) => r.rota === prev) ? "" : prev));
+        })
+        .catch(() => setAvailableRotas([]))
+        .finally(() => setLoadingRotas(false));
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [hasDateContext, scheduledDate]);
+
+  const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
+  const effectiveLoadingRotas = hasDateContext && loadingRotas;
+  const previewDriverName = effectiveAvailableRotas.find((r) => r.rota === selectedRota)?.driverName ?? null;
 
   // Sem combo, "item" é a lista única de sempre. Com combo, "item" continua
   // sendo os produtos do type principal e "item_secondary" os da ação oposta
@@ -471,6 +522,87 @@ export function QuickCreateRequestForm({
             />
           </Field>
         ) : null}
+
+        {isDelivery ? (
+          <>
+            <Field label="Autorizado por *">
+              <input
+                name="authorized_by"
+                required
+                placeholder="Nome de quem autorizou (gerente, supervisor…)"
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+            </Field>
+
+            <Field label="Quem errou (controle interno) *">
+              <select
+                name="causa_raiz"
+                required
+                value={causaRaiz}
+                onChange={(e) => setCausaRaiz(e.target.value)}
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              >
+                <option value="" disabled>
+                  Selecione…
+                </option>
+                {CAUSA_RAIZ_OPTIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {CAUSA_RAIZ_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            {causaRaiz === "erro_conferencia" ? (
+              <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
+                <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+                  Erro de conferência -- precisa registrar qual carga e quem conferiu antes de seguir.
+                </p>
+                <Field label="Carga *">
+                  <input name="causa_carga" list="quick-cargas" required placeholder="Ex: 000123" className="rounded border px-3 py-2" style={inputStyle} />
+                  <datalist id="quick-cargas">
+                    {cargas.map((c) => (
+                      <option key={c.carga} value={c.carga}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </datalist>
+                </Field>
+                <Field label="Conferente *">
+                  <input name="causa_conferente" required placeholder="Nome de quem conferiu a carga" className="rounded border px-3 py-2" style={inputStyle} />
+                </Field>
+              </div>
+            ) : null}
+
+            {causaRaiz === "erro_motorista" ? (
+              <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
+                <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+                  Erro do motorista -- precisa registrar qual carga e quem foi.
+                </p>
+                <Field label="Carga *">
+                  <input name="causa_carga" list="quick-cargas" required placeholder="Ex: 000123" className="rounded border px-3 py-2" style={inputStyle} />
+                  <datalist id="quick-cargas">
+                    {cargas.map((c) => (
+                      <option key={c.carga} value={c.carga}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </datalist>
+                </Field>
+                <Field label="Motorista (erro) *">
+                  <input name="driver_name" list="quick-drivers" required className="rounded border px-3 py-2" style={inputStyle} />
+                  <datalist id="quick-drivers">
+                    {drivers.map((d) => (
+                      <option key={d} value={d} />
+                    ))}
+                  </datalist>
+                </Field>
+              </div>
+            ) : null}
+          </>
+        ) : null}
       </FormSection>
 
       <FormSection title="Agendamento e responsável" number={3}>
@@ -498,27 +630,68 @@ export function QuickCreateRequestForm({
               ))}
             </select>
           </Field>
-          <Field label="Técnico/montador">
-            {isManoelOnly ? (
-              <input
-                name="assembler_name"
-                value={MANOEL_ONLY_ASSEMBLER}
-                readOnly
-                className="rounded border px-3 py-2"
-                style={{ ...inputStyle, background: "var(--gridline)", color: "var(--text-secondary)" }}
-              />
-            ) : (
-              <>
-                <input name="assembler_name" list="quick-assemblers" className="rounded border px-3 py-2" style={inputStyle} />
-                <datalist id="quick-assemblers">
-                  {visibleAssemblers.map((a) => (
-                    <option key={a.name} value={a.name} />
-                  ))}
-                </datalist>
-              </>
-            )}
-          </Field>
+          {showMontadorInstruction ? (
+            <Field label="Técnico/montador">
+              {isManoelOnly ? (
+                <input
+                  name="assembler_name"
+                  value={MANOEL_ONLY_ASSEMBLER}
+                  readOnly
+                  className="rounded border px-3 py-2"
+                  style={{ ...inputStyle, background: "var(--gridline)", color: "var(--text-secondary)" }}
+                />
+              ) : (
+                <>
+                  <input name="assembler_name" list="quick-assemblers" className="rounded border px-3 py-2" style={inputStyle} />
+                  <datalist id="quick-assemblers">
+                    {visibleAssemblers.map((a) => (
+                      <option key={a.name} value={a.name} />
+                    ))}
+                  </datalist>
+                </>
+              )}
+            </Field>
+          ) : null}
+          {isDelivery ? (
+            <Field label="Rota">
+              <select
+                name="rota"
+                value={selectedRota}
+                onChange={(e) => setSelectedRota(e.target.value)}
+                disabled={!scheduledDate || effectiveLoadingRotas}
+                className="rounded border px-3 py-2 disabled:opacity-60"
+                style={inputStyle}
+              >
+                <option value="">Sem rota</option>
+                {effectiveAvailableRotas.map((r) => (
+                  <option key={r.rota} value={r.rota}>
+                    {ROTA_LABELS[r.rota]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
         </div>
+
+        {isDelivery ? (
+          !scheduledDate ? (
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Escolha a data agendada pra ver as rotas disponíveis.
+            </p>
+          ) : effectiveLoadingRotas ? (
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Carregando rotas…
+            </p>
+          ) : effectiveAvailableRotas.length === 0 ? (
+            <p className="text-xs" style={{ color: "var(--status-warning)" }}>
+              Nenhuma rota disponível pra essa data.
+            </p>
+          ) : selectedRota ? (
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Motorista: {previewDriverName ?? "nenhum escolhido ainda"}
+            </p>
+          ) : null
+        ) : null}
 
         {scheduledDate ? (
           <div className="rounded-lg p-3 flex flex-col gap-1.5" style={{ background: "var(--gridline)" }}>

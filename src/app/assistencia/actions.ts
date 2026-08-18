@@ -323,7 +323,15 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
   if (!requestedDeadline) return { error: "Informe o prazo desejado." };
 
   const type = String(formData.get("type") ?? "");
-  if (!REQUEST_TYPES.includes(type as (typeof REQUEST_TYPES)[number])) {
+  // Loja/gerente só pede montagem e desmontagem (pedido do Victor
+  // 18/08/2026: "recolhimento de peça, entrega/envio de peça, troca de
+  // peça, vistoria e notificação externa são notificações de assistência,
+  // só Assistência e SAC pedem, nunca a loja") -- já não são oferecidos no
+  // <select> de PublicRequestForm.tsx, isso aqui é a mesma trava do lado do
+  // servidor, pra um POST direto (fora da tela) não conseguir criar um
+  // mesmo assim. Mais restrito que REQUEST_TYPES (que ainda vale pra
+  // createQuickRequest, usado pela assistência).
+  if (type !== "montagem" && type !== "desmontagem") {
     return { error: "Tipo de solicitação inválido." };
   }
 
@@ -436,7 +444,7 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     : [];
   const items = [...primaryItems, ...secondaryItems];
 
-  if (type !== "notificacao_externa" && items.length === 0) {
+  if (items.length === 0) {
     return { error: "Informe pelo menos um produto." };
   }
   if (comboMontagemDesmontagem && secondaryItems.length === 0) {
@@ -479,7 +487,6 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
       notes: emptyToNull(formData.get("notes")),
       seller_name: emptyToNull(sellerName),
       invoice_number: emptyToNull(invoiceNumber),
-      sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
       assembler_name: assemblerName,
     })
@@ -505,17 +512,6 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     if (itemsError) {
       return { error: `Solicitação criada, mas falhou ao salvar os itens: ${itemsError.message}` };
     }
-  }
-
-  // Notificação SAC: gera um protocolo pro cliente e um prazo legal padrão
-  // (30 dias, ajustável depois pela assistência).
-  if (type === "notificacao_externa") {
-    const protocolNumber = `SAC-${new Date().getFullYear()}-${data.id.slice(0, 8).toUpperCase()}`;
-    const legalDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    await admin
-      .from("service_requests")
-      .update({ protocol_number: protocolNumber, legal_deadline: legalDeadline })
-      .eq("id", data.id);
   }
 
   await admin.from("service_request_events").insert({
@@ -941,11 +937,17 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   requireManageAccess(profile, current.type);
 
   // Só avança pra "em andamento" com alguém de fato definido — sem isso, fica
-  // em "em contato" até alguém assumir. Chamado de troca de produto usa
-  // motorista em vez de montador.
-  const hasAssignee = current.type === "troca_produto" ? !!current.driver_name : !!current.assembler_name;
+  // em "em contato" até alguém assumir. Os 3 tipos de entrega (troca/entrega
+  // de produto, envio de peça) usam motorista; o resto (montagem/
+  // desmontagem/recolhimento/troca de peça/vistoria) usa montador (bug real
+  // achado 18/08/2026: só checava troca_produto, então entrega_produto e
+  // envio_peca caíam no ramo de montador -- pedia "Defina o montador" e
+  // olhava assembler_name num chamado que nunca teve montador nenhum,
+  // travava mesmo com o motorista já definido).
+  const isDeliveryType = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(current.type);
+  const hasAssignee = isDeliveryType ? !!current.driver_name : !!current.assembler_name;
   if (newStatus === "em_andamento" && !hasAssignee) {
-    const who = current.type === "troca_produto" ? "o motorista" : "o montador";
+    const who = isDeliveryType ? "o motorista" : "o montador";
     throw new Error(`Defina ${who} antes de marcar como Em andamento.`);
   }
 
@@ -1822,6 +1824,7 @@ export async function updateRequestDetails(
 export async function createQuickRequest(_state: FormState, formData: FormData): Promise<FormState> {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin");
+  const admin = getSupabaseAdmin();
 
   const storeId = String(formData.get("store_id") ?? "").trim();
   if (!storeId) return { error: "Selecione a loja." };
@@ -1863,6 +1866,60 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   const assemblerName = emptyToNull(formData.get("assembler_name"));
   if (assemblerName && (MANOEL_ONLY_TYPES as readonly string[]).includes(type) && assemblerName !== MANOEL_ONLY_ASSEMBLER) {
     return { error: `Só ${MANOEL_ONLY_ASSEMBLER} pode ser responsável por ${REQUEST_TYPE_LABELS[type]?.toLowerCase() ?? type}.` };
+  }
+
+  // Recolhimento de peça é o único tipo de entrega (usa motorista/rota, não
+  // montador) que passa por essa action -- os outros 3 (troca/entrega de
+  // produto, envio de peça) só nascem via createSacRequest. Mesma validação
+  // de lá: "Autorizado por" e "Quem errou" obrigatórios, rota restrita às
+  // disponíveis pra data escolhida (pedido do Victor 18/08/2026: "revise e
+  // veja se ficou igual ao do sac pra essa modalidade").
+  const isDelivery = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
+  const authorizedBy = String(formData.get("authorized_by") ?? "").trim();
+  if (isDelivery && !authorizedBy) return { error: "Informe quem autorizou." };
+
+  let causaRaiz: string | null = null;
+  let causaCarga: string | null = null;
+  let causaConferente: string | null = null;
+  let driverNameForError: string | null = null;
+  if (isDelivery) {
+    causaRaiz = String(formData.get("causa_raiz") ?? "").trim();
+    if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
+      return { error: "Selecione quem errou." };
+    }
+    if (causaRaiz === "erro_conferencia") {
+      causaCarga = String(formData.get("causa_carga") ?? "").trim();
+      causaConferente = String(formData.get("causa_conferente") ?? "").trim();
+      if (!causaCarga) return { error: "Informe a carga (erro de conferência precisa registrar qual foi)." };
+      if (!causaConferente) return { error: "Informe o conferente (erro de conferência precisa registrar quem conferiu)." };
+    }
+    if (causaRaiz === "erro_motorista") {
+      causaCarga = String(formData.get("causa_carga") ?? "").trim();
+      const typedDriverName = String(formData.get("driver_name") ?? "").trim();
+      if (!causaCarga) return { error: "Informe a carga (erro do motorista precisa registrar qual foi)." };
+      if (!typedDriverName) return { error: "Informe o motorista (erro do motorista precisa registrar quem entregou)." };
+      driverNameForError = await resolveDriverName(typedDriverName);
+    }
+  }
+
+  const scheduledDateInput = String(formData.get("scheduled_date") ?? "").trim();
+  const rotaInput = String(formData.get("rota") ?? "").trim();
+  let rotaValue: string | null = null;
+  let driverNameForRota: string | null = null;
+  if (isDelivery && scheduledDateInput && rotaInput) {
+    if (!isRota(rotaInput)) return { error: "Rota inválida." };
+    const availableRotas = await getAvailableRotasForDate(scheduledDateInput);
+    const match = availableRotas.find((r) => r.rota === rotaInput);
+    if (!match) {
+      return {
+        error: `${ROTA_LABELS[rotaInput]} não tem carro saindo em ${scheduledDateInput.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.`,
+      };
+    }
+    rotaValue = rotaInput;
+    driverNameForRota = match.driverName;
+  }
+  if (driverNameForRota) {
+    await admin.from("drivers").upsert({ name: driverNameForRota }, { onConflict: "name" });
   }
   // Só faz sentido pra montagem/desmontagem — pedir os dois numa visita só,
   // sem precisar abrir dois chamados separados pro mesmo cliente.
@@ -1921,8 +1978,6 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     if (semCodigo) return { error: `Informe o código do produto "${semCodigo.product}".` };
   }
 
-  const admin = getSupabaseAdmin();
-
   if (assemblerName) {
     await admin.from("assemblers").upsert({ name: assemblerName }, { onConflict: "name" });
   }
@@ -1942,6 +1997,12 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       client_address_complement: emptyToNull(addressNumberFields.complement),
       client_protheus_code: emptyToNull(clientProtheusCode),
       reason: reason,
+      authorized_by: emptyToNull(authorizedBy),
+      driver_name: driverNameForError ?? driverNameForRota,
+      rota: rotaValue,
+      causa_raiz: causaRaiz,
+      causa_carga: causaCarga,
+      causa_conferente: causaConferente,
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
       scheduled_time: emptyToNull(formData.get("scheduled_time")),
