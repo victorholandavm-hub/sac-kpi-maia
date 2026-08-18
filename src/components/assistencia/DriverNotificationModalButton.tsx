@@ -25,11 +25,11 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   );
 }
 
-// Resumo rápido, só leitura -- pedido do Victor 18/08/2026: "um botão onde
-// ele clica em ver notificação e já abre a notificação num modal", pra não
-// precisar sair da lista da rota só pra conferir cliente/endereço/produto.
-// Ações de verdade (concluir, foto) continuam exclusivas da tela cheia ("Ver
-// rota", link já existente) -- mesmo desenho de ProductsModalButton.tsx.
+// Resumo rápido, só leitura -- pedido do Victor 18/08/2026: "ver resumo e
+// ele vai para o modal", pra não precisar sair da lista da rota só pra
+// conferir cliente/endereço/produto. Ações de verdade (concluir, foto)
+// continuam exclusivas da tela cheia ("Ver notificação", link já
+// existente) -- mesmo desenho de ProductsModalButton.tsx.
 export function DriverNotificationModalButton({ item }: { item: DriverRequestView }) {
   const [open, setOpen] = useState(false);
 
@@ -43,9 +43,9 @@ export function DriverNotificationModalButton({ item }: { item: DriverRequestVie
           setOpen(true);
         }}
         className="text-sm rounded-lg px-3 py-2 font-medium shrink-0"
-        style={{ border: "2px solid var(--brand-green)", color: "var(--brand-green)" }}
+        style={{ background: "var(--surface-2)", border: "2px solid var(--brand-green)", color: "var(--brand-green)" }}
       >
-        Ver notificação
+        Ver resumo
       </button>
 
       {open ? (
