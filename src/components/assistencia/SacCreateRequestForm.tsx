@@ -23,21 +23,16 @@ import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
 
-type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "notificacao_externa" | "montagem";
+// "Nova entrega" do SAC -- pedido do Victor 18/08/2026: aba de entregas
+// separada da aba de visitas, cada uma com formulário próprio. Montagem
+// saiu daqui (é visita, não entrega) -- tem formulário próprio, ver
+// SacNovaVisitaForm.tsx.
+type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "notificacao_externa";
 
-// Tipos que envolvem entrega pelo motorista (produto/peça + quem vai levar),
-// dos que o SAC de fato cria (ver SacType acima) -- "recolhimento" entrou em
-// DELIVERY_REQUEST_TYPES em 18/08/2026, mas quem cria esse tipo é só a
-// Assistência (QuickCreateRequestForm.tsx), não o SAC, então fica de fora
-// daqui explicitamente (sem cast/filter -- lista fixa mesmo, casa com
-// SacType). "O que recolher" só se aplica a troca_produto — os outros dois
-// não têm recolhimento nenhum.
+// Tipos que envolvem entrega pelo motorista (produto/peça + quem vai levar).
+// "O que recolher" só se aplica a troca_produto — os outros dois não têm
+// recolhimento nenhum.
 const DELIVERY_TYPES: SacType[] = ["troca_produto", "entrega_produto", "envio_peca"];
-
-// Montagem também tem produto (o móvel a montar), mas sem motorista -- quem
-// vai até o cliente é um montador, atribuído depois por assistência/admin
-// (o SAC só faz o intake, ver createSacRequest).
-const PRODUCT_TYPES: SacType[] = [...DELIVERY_TYPES, "montagem"];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -52,8 +47,6 @@ type Item = { product: string; quantity: number; code: string };
 type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
 const blankItem = (): Item => ({ product: "", quantity: 1, code: "" });
 
-// Compartilhado entre a lista normal e a segunda lista do combo (montar +
-// desmontar na mesma visita) -- mesmo desenho de PublicRequestForm.tsx.
 function ItemsFields({
   items,
   lookupStatus,
@@ -63,7 +56,6 @@ function ItemsFields({
   onLookup,
   namePrefix,
   productLabel,
-  codeRequired,
 }: {
   items: Item[];
   lookupStatus: Record<number, ProductLookupStatus>;
@@ -73,10 +65,6 @@ function ItemsFields({
   onLookup: (index: number, code: string) => void;
   namePrefix: string;
   productLabel: string;
-  // Montagem exige o código (pedido do Victor 15/08/2026); os outros tipos
-  // continuam com o código opcional, só como atalho pra autopreencher o
-  // nome do produto.
-  codeRequired?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -88,7 +76,6 @@ function ItemsFields({
               value={item.code}
               onChange={(e) => onUpdate(i, { code: e.target.value })}
               onBlur={(e) => onLookup(i, e.target.value)}
-              required={codeRequired}
               placeholder="Código"
               className="w-28 rounded border px-2 py-2"
               style={inputStyle}
@@ -156,7 +143,7 @@ export function SacCreateRequestForm({
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
   const [type, setType] = useState<SacType>("troca_produto");
   const isDelivery = DELIVERY_TYPES.includes(type);
-  const showProduct = PRODUCT_TYPES.includes(type);
+  const showProduct = isDelivery;
   // Só existe pra troca_produto -- controla se carga/conferente aparecem
   // como obrigatórios (ver "Detalhes" abaixo e a validação espelhada em
   // createSacRequest).
@@ -184,9 +171,9 @@ export function SacCreateRequestForm({
   const [scheduledTime, setScheduledTime] = useState("");
   // Só valem enquanto isDelivery/scheduledDate se mantiverem verdadeiros --
   // ver hasDateContext abaixo, que mascara os dois quando a condição já não
-  // bate mais. Mesmo desenho do getDayLoadAction logo abaixo: setState só
-  // dentro do timer, nunca síncrono no corpo do efeito (regra do React
-  // Compiler).
+  // bate mais. Mesmo desenho do getDayLoadAction em QuickCreateRequestForm.tsx:
+  // setState só dentro do timer, nunca síncrono no corpo do efeito (regra do
+  // React Compiler).
   const [availableRotas, setAvailableRotas] = useState<AvailableRota[]>([]);
   const [loadingRotas, setLoadingRotas] = useState(false);
   const hasDateContext = isDelivery && !!scheduledDate;
@@ -212,60 +199,40 @@ export function SacCreateRequestForm({
   const effectiveLoadingRotas = hasDateContext && loadingRotas;
   // Motorista da rota escolhida -- pedido do Victor 18/08/2026: "quando eu
   // escolho a rota, ele ja deve preencher o motorista daquela rota". Só
-  // preview aqui; createSacRequest já grava isso sozinho ao criar (ver
-  // actions.ts), exceto no caso de "erro do motorista" (digitado à parte,
-  // ver Detalhes abaixo).
+  // preview aqui (setSchedule já grava isso sozinho ao salvar, ver
+  // actions.ts); não dá pra digitar/trocar nesse campo.
   const previewDriverName = effectiveAvailableRotas.find((r) => r.rota === selectedRota)?.driverName ?? null;
-  // Só montagem envolve entrar num prédio de verdade -- SAC nem oferece
-  // desmontagem isolada (ver SacType acima).
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
 
-  // Combo só existe pra montagem -- SAC nem oferece desmontagem isolada (ver
-  // SacType). "item" é a lista principal (produtos a entregar, ou a montar
-  // quando o type é montagem); "item_secondary" só existe com o combo
-  // marcado, e é sempre "a desmontar" (não tem o inverso, já que SAC não
-  // cria desmontagem sozinha).
-  const [combo, setCombo] = useState(false);
   const [items, setItems] = useState<Item[]>([blankItem()]);
   const [itemsLookupStatus, setItemsLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
-  const [secondaryItems, setSecondaryItems] = useState<Item[]>([blankItem()]);
-  const [secondaryLookupStatus, setSecondaryLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
 
-  function makeItemHandlers(
-    setList: React.Dispatch<React.SetStateAction<Item[]>>,
-    setStatus: React.Dispatch<React.SetStateAction<Record<number, ProductLookupStatus>>>
-  ) {
-    function update(index: number, patch: Partial<Item>) {
-      setList((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
-    }
-    function add() {
-      setList((prev) => [...prev, blankItem()]);
-    }
-    function remove(index: number) {
-      setList((prev) => prev.filter((_, i) => i !== index));
-    }
-    function lookup(index: number, code: string) {
-      if (!code.trim()) {
-        setStatus((prev) => ({ ...prev, [index]: "idle" }));
-        return;
-      }
-      setStatus((prev) => ({ ...prev, [index]: "loading" }));
-      withRetry(() => lookupTotvsProductForTeam(code))
-        .then((match) => {
-          if (!match || !match.description) {
-            setStatus((prev) => ({ ...prev, [index]: "not_found" }));
-            return;
-          }
-          update(index, { product: match.description! });
-          setStatus((prev) => ({ ...prev, [index]: "found" }));
-        })
-        .catch(() => setStatus((prev) => ({ ...prev, [index]: "not_found" })));
-    }
-    return { update, add, remove, lookup };
+  function update(index: number, patch: Partial<Item>) {
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   }
-
-  const itemHandlers = makeItemHandlers(setItems, setItemsLookupStatus);
-  const secondaryHandlers = makeItemHandlers(setSecondaryItems, setSecondaryLookupStatus);
+  function add() {
+    setItems((prev) => [...prev, blankItem()]);
+  }
+  function remove(index: number) {
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  }
+  function lookup(index: number, code: string) {
+    if (!code.trim()) {
+      setItemsLookupStatus((prev) => ({ ...prev, [index]: "idle" }));
+      return;
+    }
+    setItemsLookupStatus((prev) => ({ ...prev, [index]: "loading" }));
+    withRetry(() => lookupTotvsProductForTeam(code))
+      .then((match) => {
+        if (!match || !match.description) {
+          setItemsLookupStatus((prev) => ({ ...prev, [index]: "not_found" }));
+          return;
+        }
+        update(index, { product: match.description! });
+        setItemsLookupStatus((prev) => ({ ...prev, [index]: "found" }));
+      })
+      .catch(() => setItemsLookupStatus((prev) => ({ ...prev, [index]: "not_found" })));
+  }
 
   // Extraído do effect abaixo pra também poder ser chamado pelo botão
   // "Tentar de novo" (aparece quando não encontrou -- ver clientLookupStatus
@@ -310,11 +277,7 @@ export function SacCreateRequestForm({
           <select
             name="type"
             value={type}
-            onChange={(e) => {
-              const next = e.target.value as SacType;
-              setType(next);
-              if (next !== "montagem") setCombo(false);
-            }}
+            onChange={(e) => setType(e.target.value as SacType)}
             className="rounded border px-3 py-2"
             style={inputStyle}
           >
@@ -322,7 +285,6 @@ export function SacCreateRequestForm({
             <option value="entrega_produto">{REQUEST_TYPE_LABELS.entrega_produto} (sem recolhimento)</option>
             <option value="envio_peca">{REQUEST_TYPE_LABELS.envio_peca}</option>
             <option value="notificacao_externa">Notificação externa (sem troca de produto)</option>
-            <option value="montagem">{REQUEST_TYPE_LABELS.montagem}</option>
           </select>
         </Field>
 
@@ -495,39 +457,17 @@ export function SacCreateRequestForm({
       </FormSection>
 
       {showProduct ? (
-        <FormSection
-          title={type === "montagem" ? (combo ? "Móveis a montar" : "Móvel(is) a montar") : "Produto(s) e entrega"}
-          number={3}
-          hint={
-            type === "montagem"
-              ? "Código do produto obrigatório."
-              : "Digite o código do produto pra preencher o nome automaticamente (se souber)."
-          }
-        >
+        <FormSection title="Produto(s) e entrega" number={3} hint="Digite o código do produto pra preencher o nome automaticamente (se souber).">
           <ItemsFields
             items={items}
             lookupStatus={itemsLookupStatus}
-            onUpdate={itemHandlers.update}
-            onAdd={itemHandlers.add}
-            onRemove={itemHandlers.remove}
-            onLookup={itemHandlers.lookup}
+            onUpdate={update}
+            onAdd={add}
+            onRemove={remove}
+            onLookup={lookup}
             namePrefix="item"
             productLabel="Ex: Super Box Confort Mola Ensacada"
-            codeRequired={type === "montagem"}
           />
-
-          {type === "montagem" ? (
-            <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
-              <input
-                type="checkbox"
-                name="combo_montagem_desmontagem"
-                checked={combo}
-                onChange={(e) => setCombo(e.target.checked)}
-                className="rounded"
-              />
-              Também precisa desmontar o móvel antigo
-            </label>
-          ) : null}
 
           {isDelivery ? (
             <>
@@ -615,23 +555,7 @@ export function SacCreateRequestForm({
         </FormSection>
       ) : null}
 
-      {combo ? (
-        <FormSection title="Móveis a desmontar" number={4} hint="Código do produto obrigatório.">
-          <ItemsFields
-            items={secondaryItems}
-            lookupStatus={secondaryLookupStatus}
-            onUpdate={secondaryHandlers.update}
-            onAdd={secondaryHandlers.add}
-            onRemove={secondaryHandlers.remove}
-            onLookup={secondaryHandlers.lookup}
-            namePrefix="item_secondary"
-            productLabel="Ex: Roupeiro antigo"
-            codeRequired
-          />
-        </FormSection>
-      ) : null}
-
-      <FormSection title="Detalhes" number={5} hint="Conte o que aconteceu, com o máximo de detalhe que puder.">
+      <FormSection title="Detalhes" number={4} hint="Conte o que aconteceu, com o máximo de detalhe que puder.">
         <Field label="Motivo *">
           <textarea name="reason" rows={2} required placeholder="Ex: produto entregue com avaria" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>

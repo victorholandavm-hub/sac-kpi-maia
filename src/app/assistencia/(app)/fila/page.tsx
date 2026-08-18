@@ -263,11 +263,11 @@ export default async function AssistenciaQueuePage({
           })}
         </div>
         <Link
-          href="/assistencia/nova-rapida"
+          href={showPecas ? "/assistencia/nova-entrega" : "/assistencia/nova-rapida"}
           className="text-sm px-3 py-2 rounded font-medium"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
         >
-          + Nova solicitação
+          + Nova {showPecas ? "entrega" : "visita"}
         </Link>
       </div>
 
