@@ -13,6 +13,13 @@
   --foreground: #0b0b0b;
 
   --surface-1: #ffffff;
+  /* Nunca tinha sido definida (bug real, achado 18/08/2026) -- todo
+     `background: var(--surface-2)` no app (badges, cabeçalhos de
+     sub-grupo, botões) vinha renderizando transparente/invisível hà
+     tempos, sem quebrar layout nenhum, só sem o contraste que devia ter.
+     Um tom só um passo abaixo de --surface-1 (branco), pra continuar
+     discreto onde já era usado como fundo de selo/pílula. */
+  --surface-2: #f0f0ec;
   --text-primary: #0b0b0b;
   --text-secondary: #52514e;
   --text-muted: #6e6c66;

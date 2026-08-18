@@ -195,6 +195,14 @@ export const DELIVERY_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envi
 export const MANOEL_ONLY_TYPES = ["vistoria", "troca_peca"] as const;
 export const MANOEL_ONLY_ASSEMBLER = "Manoel";
 
+// Everton manda na expedição dos carros/produtos -- pedido do Victor
+// 18/08/2026: login de motorista dele vê TODAS as rotas/solicitações
+// (não só as próprias), com o motorista de cada uma visível, pra ele
+// acompanhar a expedição inteira. Só visualização -- concluir/subir foto/
+// reorganizar continuam exclusivos de quem está de fato na rota (ver
+// driver-actions.ts, cada ação já trava por driver_name === quem chamou).
+export const DISPATCH_SUPERVISOR_DRIVER = "Everton";
+
 // Definir valor unitário, autorizar e liberar pagamento de montagem,
 // desmontagem, vistoria e afins é exclusivo dessa pessoa -- nem outro admin
 // consegue, por pedido explícito do Victor (dono do sistema).
