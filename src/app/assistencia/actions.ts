@@ -2054,7 +2054,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   redirect(`/assistencia/${data.id}`);
 }
 
-const SAC_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa", "montagem"] as const;
+const SAC_REQUEST_TYPES = ["troca_produto", "entrega_produto", "envio_peca", "notificacao_externa", "montagem", "desmontagem"] as const;
 
 // Criação de chamado pelo SAC — troca de produto (recolher o errado/avariado
 // e entregar o correto numa rota só, ver src/lib/driverAuth.ts), entrega de
@@ -2165,9 +2165,12 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const rotaExceptionNote: string | null = null;
 
   const urgent = formData.get("urgent") === "on";
-  // Só faz sentido pra montagem -- mesma ideia de createQuickRequest, pedir
-  // pra desmontar o móvel velho na mesma visita sem abrir um segundo chamado.
-  const comboMontagemDesmontagem = type === "montagem" && formData.get("combo_montagem_desmontagem") === "on";
+  // Vale pra montagem e desmontagem (pedido do Victor 18/08/2026: "SAC
+  // também faz desmontagem", antes só existia como perna do combo de
+  // montagem) -- mesma ideia de createQuickRequest, pedir a ação oposta na
+  // mesma visita sem abrir um segundo chamado.
+  const isVisitaType = type === "montagem" || type === "desmontagem";
+  const comboMontagemDesmontagem = isVisitaType && formData.get("combo_montagem_desmontagem") === "on";
 
   function parseItems(prefix: string): { product: string; quantity: number; partCode: string | null }[] {
     const products = formData.getAll(prefix + "_product").map((v) => String(v).trim());
@@ -2181,22 +2184,29 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       .filter((item) => item.product.length > 0);
   }
 
-  // "item" é a lista principal (produto a entregar, ou a montar quando o
-  // type é montagem); "item_secondary" só existe com o combo marcado, e é
-  // sempre "a desmontar" (SAC não cria desmontagem isolada).
-  const primaryItems = parseItems("item").map((item) => ({ ...item, action: comboMontagemDesmontagem ? ("montar" as const) : null }));
+  // "item" é a lista principal (produto a entregar, ou a montar/desmontar
+  // quando o type é montagem/desmontagem); "item_secondary" só existe com o
+  // combo marcado, e é sempre a ação oposta à do type principal. Fora do
+  // combo, o próprio type já diz o que fazer com cada item -- sem tag por
+  // item (mesmo padrão de createQuickRequest).
+  const primaryAction: "montar" | "desmontar" | null = comboMontagemDesmontagem ? (type === "montagem" ? "montar" : "desmontar") : null;
+  const secondaryAction: "montar" | "desmontar" = primaryAction === "montar" ? "desmontar" : "montar";
+  const primaryItems = parseItems("item").map((item) => ({ ...item, action: primaryAction }));
   const secondaryItems = comboMontagemDesmontagem
-    ? parseItems("item_secondary").map((item) => ({ ...item, action: "desmontar" as const }))
+    ? parseItems("item_secondary").map((item) => ({ ...item, action: secondaryAction }))
     : [];
   if (comboMontagemDesmontagem && secondaryItems.length === 0) {
-    return { error: "Informe pelo menos um móvel pra desmontar (a outra ação da visita combo)." };
+    return {
+      error: `Informe pelo menos um móvel pra ${secondaryAction === "montar" ? "montar" : "desmontar"} (a outra ação da visita combo).`,
+    };
   }
   const items = [...primaryItems, ...secondaryItems];
 
   // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
-  // pra montagem (e pro móvel a desmontar, no combo) -- antes era só uma
-  // sugestão pra autopreencher o nome (ver hint em SacCreateRequestForm.tsx).
-  if (type === "montagem") {
+  // pra montagem/desmontagem (e pro móvel da ação oposta, no combo) -- antes
+  // era só uma sugestão pra autopreencher o nome (ver hint em
+  // SacNovaVisitaForm.tsx).
+  if (isVisitaType) {
     const semCodigo = items.find((item) => !item.partCode);
     if (semCodigo) return { error: `Informe o código do produto "${semCodigo.product}".` };
   }

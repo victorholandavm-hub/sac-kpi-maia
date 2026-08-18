@@ -26,11 +26,15 @@ export default async function SacNovaSolicitacaoPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-      <AssistenciaHeader title="Nova solicitação" subtitle="Notificação externa ou troca de produto.">
+      <AssistenciaHeader title="Nova entrega" subtitle="Troca/entrega de produto, envio de peça ou notificação externa.">
         <Link href="/assistencia/sac" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
           ← Voltar
         </Link>
       </AssistenciaHeader>
+
+      <Link href="/assistencia/sac/nova-visita" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
+        Precisa de montagem ou desmontagem? Vá pra Nova visita →
+      </Link>
 
       <SacCreateRequestForm stores={stores} drivers={drivers} cargas={cargas} />
     </div>

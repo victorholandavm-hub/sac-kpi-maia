@@ -1,0 +1,33 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getProfile } from "@/lib/dal";
+import { listStores } from "@/lib/serviceRequests";
+import { SacNovaVisitaForm } from "@/components/assistencia/SacNovaVisitaForm";
+import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+
+export const dynamic = "force-dynamic";
+
+export default async function SacNovaVisitaPage() {
+  const profile = await getProfile();
+  if (profile.role !== "sac" && profile.role !== "admin") {
+    redirect("/assistencia/inicio");
+  }
+
+  const stores = await listStores();
+
+  return (
+    <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+      <AssistenciaHeader title="Nova visita" subtitle="Montagem ou desmontagem — só o intake, a assistência atribui o montador depois.">
+        <Link href="/assistencia/sac" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+          ← Voltar
+        </Link>
+      </AssistenciaHeader>
+
+      <Link href="/assistencia/sac/nova" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
+        Precisa de troca/entrega de produto, envio de peça ou notificação externa? Vá pra Nova entrega →
+      </Link>
+
+      <SacNovaVisitaForm stores={stores} />
+    </div>
+  );
+}

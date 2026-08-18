@@ -119,7 +119,14 @@ export default async function SacHomePage({
           className="text-sm px-4 py-2.5 rounded font-medium text-center whitespace-nowrap"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
         >
-          + Nova solicitação
+          + Nova entrega
+        </Link>
+        <Link
+          href="/assistencia/sac/nova-visita"
+          className="text-sm px-4 py-2.5 rounded font-medium text-center whitespace-nowrap border"
+          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+        >
+          + Nova visita
         </Link>
         <Link
           href="/assistencia/encomendas/solicitar"
