@@ -56,6 +56,7 @@ export function AssistenciaQueueGroup({
   items,
   reorderable,
   now,
+  showCreatedDate,
 }: {
   items: ServiceRequestSummary[];
   reorderable: boolean;
@@ -63,6 +64,10 @@ export function AssistenciaQueueGroup({
   // esse componente usa hooks ("use client"), e chamar função impura direto
   // no corpo do render quebra a regra de pureza do React Compiler.
   now: number;
+  // Grupo por data (aba Visitas) já deixa a data óbvia no cabeçalho do
+  // grupo -- só repete aqui (dentro do card) quando o agrupamento é por
+  // outra coisa, ex. rota (aba Entregas), pedido do Victor 18/08/2026.
+  showCreatedDate?: boolean;
 }) {
   const [order, setOrder] = useState(items);
   const [saving, setSaving] = useState(false);
@@ -267,7 +272,10 @@ export function AssistenciaQueueGroup({
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                <span>Aberta às {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                <span>
+                  Aberta {showCreatedDate ? `em ${new Date(r.createdAt).toLocaleDateString("pt-BR")} ` : ""}às{" "}
+                  {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </span>
                 {r.completedAt ? <span>Concluída em {formatDateTimeBr(r.completedAt)}</span> : null}
                 <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
                 {r.assemblerName ? <span>Montador: {r.assemblerName}</span> : null}
