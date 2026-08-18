@@ -614,6 +614,18 @@ export function SacCreateRequestForm({
           <textarea name="reason" rows={2} required placeholder="Ex: produto entregue com avaria" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
 
+        {isDelivery ? (
+          <Field label="Autorizado por *">
+            <input
+              name="authorized_by"
+              required
+              placeholder="Nome de quem autorizou (gerente, supervisor…)"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+          </Field>
+        ) : null}
+
         {type === "troca_produto" ? (
           <Field label="Causa raiz *">
             <select

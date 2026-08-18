@@ -26,10 +26,20 @@ export function RotaMotoristaDoDia({
   drivers: string[];
 }) {
   const [overview, setOverview] = useState<RotaDayOverview[]>(initialOverview);
+  // Fechado por padrão -- só hoje + amanhã (pedido do Victor 18/08/2026: as
+  // 2 semanas inteiras tomavam a tela toda). "Mostrar mais rotas" abre a
+  // semana atual + seguinte completas, com opção de recuar de novo.
+  const [expanded, setExpanded] = useState(false);
 
   function updateDay(updated: RotaDayOverview) {
     setOverview((prev) => prev.map((d) => (d.date === updated.date ? updated : d)));
   }
+
+  const todayIndex = Math.max(
+    overview.findIndex((d) => d.date === today),
+    0
+  );
+  const visibleOverview = expanded ? overview : overview.slice(todayIndex, todayIndex + 2);
 
   return (
     <div className="rounded-lg border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
@@ -41,10 +51,18 @@ export function RotaMotoristaDoDia({
         &quot;editar rota do dia&quot;.
       </p>
       <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
-        {overview.map((day) => (
+        {visibleOverview.map((day) => (
           <RotaDayRow key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} />
         ))}
       </div>
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="text-xs underline self-start mt-2"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        {expanded ? "Mostrar menos" : "Mostrar mais rotas (semana atual + seguinte)"}
+      </button>
     </div>
   );
 }

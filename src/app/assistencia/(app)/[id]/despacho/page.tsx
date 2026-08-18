@@ -91,11 +91,16 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
       </div>
 
       {/* @page/margin aqui mesmo (não no CSS global) -- só essa página
-          precisa desse ajuste, o resto do sistema nunca é impresso. */}
+          precisa desse ajuste, o resto do sistema nunca é impresso. Sem
+          print-color-adjust, o navegador some com o fundo preto das
+          SectionTitle na impressão (economia de tinta por padrão) e a folha
+          sai toda branca -- pedido do Victor 18/08/2026: as listras pretas
+          têm que sair pretas de verdade, igual a notificação física. */}
       <style>{`
         @page { size: A4; margin: 10mm; }
         @media print {
           html, body { height: auto !important; }
+          * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
         }
       `}</style>
 
@@ -165,7 +170,7 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
 
         <SectionTitle>Descrição da solicitação</SectionTitle>
         <div className="flex flex-col gap-2 px-4 py-3">
-          <Field label="Autorizado por" value={request.requestedByName} />
+          <Field label="Autorizado por" value={request.authorizedBy} />
           <Field label="Problema" value={request.reason} />
           <Field label="Quem errou" value={request.causaRaiz ? (CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz) : null} />
           {causaRaizLine ? <Field label="Detalhe" value={causaRaizLine} /> : null}

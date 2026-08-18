@@ -1707,6 +1707,7 @@ export async function updateRequestDetails(
       client_address_complement: emptyToNull(addressNumberFields.complement),
       client_neighborhood: emptyToNull(formData.get("client_neighborhood")),
       reason: emptyToNull(formData.get("reason")),
+      authorized_by: emptyToNull(formData.get("authorized_by")),
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
       restriction_note: emptyToNull(formData.get("restriction_note")),
       notes: emptyToNull(formData.get("notes")),
@@ -1957,6 +1958,14 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) return { error: "Informe o motivo." };
 
+  // Quem autorizou a troca/entrega/envio -- campo livre, não é quem está
+  // preenchendo o formulário (pedido do Victor 18/08/2026: antes o
+  // despacho impresso mostrava o nome de quem criou o chamado no sistema
+  // como se fosse quem autorizou, o que quase nunca é a mesma pessoa).
+  const isDeliveryTypeCreate = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
+  const authorizedBy = String(formData.get("authorized_by") ?? "").trim();
+  if (isDeliveryTypeCreate && !authorizedBy) return { error: "Informe quem autorizou." };
+
   const driverNameInput = emptyToNull(formData.get("driver_name"));
 
   // Causa raiz só existe pra troca_produto -- os outros tipos (entrega,
@@ -2080,6 +2089,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       client_protheus_code: emptyToNull(clientProtheusCode),
       client_cpf: emptyToNull(clientCpf),
       reason: reason,
+      authorized_by: emptyToNull(authorizedBy),
       restriction_note: emptyToNull(formData.get("restriction_note")),
       driver_name: driverName,
       scheduled_date: scheduledDate || null,

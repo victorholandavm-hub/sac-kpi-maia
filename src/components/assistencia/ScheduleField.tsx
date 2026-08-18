@@ -5,7 +5,23 @@ import { setSchedule } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
 import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { SHIFTS, type Shift } from "@/lib/serviceRequests";
-import { ROTA_LABELS, type Rota } from "@/lib/rotas";
+import { ROTA_LABELS, ROTA_COLORS, type Rota } from "@/lib/rotas";
+
+// Selo colorido de rota -- igual ao usado no painel "Motorista do dia"
+// (RotaMotoristaDoDia). Pedido do Victor 18/08/2026: a rota do chamado
+// ficava só um texto pequeno grudado no fim da linha de data/turno, fácil
+// de passar despercebido; agora é a primeira coisa que aparece, com cor
+// própria por região.
+export function RotaBadge({ rota }: { rota: Rota | null }) {
+  return (
+    <span
+      className="text-xs font-medium rounded-full px-2 py-1 shrink-0"
+      style={{ background: rota ? ROTA_COLORS[rota] : "var(--surface-2)", color: rota ? "#fff" : "var(--text-muted)" }}
+    >
+      {rota ? `Rota ${ROTA_LABELS[rota]}` : "Sem rota"}
+    </span>
+  );
+}
 
 function formatDateOnly(value: string | null): string | null {
   if (!value) return null;
@@ -54,14 +70,15 @@ export function ScheduleField({
 
   if (!editing) {
     return (
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-1">
         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
           Visita agendada
         </span>
         <div className="flex items-center gap-2 flex-wrap">
+          {showRota ? <RotaBadge rota={rota} /> : null}
           <span className="text-sm" style={{ color: "var(--text-primary)" }}>
             {scheduledDate
-              ? `${formatDateOnly(scheduledDate)}${formatTimeOnly(scheduledTime) ? ` às ${formatTimeOnly(scheduledTime)}` : ""}${shift ? ` · ${SHIFT_LABELS[shift]}` : ""}${showRota && rota ? ` · rota ${ROTA_LABELS[rota]}` : ""}`
+              ? `${formatDateOnly(scheduledDate)}${formatTimeOnly(scheduledTime) ? ` às ${formatTimeOnly(scheduledTime)}` : ""}${shift ? ` · ${SHIFT_LABELS[shift]}` : ""}`
               : "Não agendada"}
           </span>
           <button
@@ -91,6 +108,7 @@ export function ScheduleField({
 
       {showRota ? (
         <div className="flex items-center gap-2 flex-wrap">
+          <RotaBadge rota={(selectedRota as Rota) || null} />
           <select
             value={selectedRota}
             onChange={(e) => setSelectedRota(e.target.value)}
