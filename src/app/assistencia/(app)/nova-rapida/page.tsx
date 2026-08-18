@@ -1,12 +1,25 @@
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listStores } from "@/lib/serviceRequests";
-import { listAllAssemblersWithStoreId } from "@/lib/payments";
+import { listAllAssemblersWithStoreId, listDrivers } from "@/lib/payments";
+import { listCargasRecentes } from "@/lib/cargas";
 import { QuickCreateRequestForm } from "@/components/assistencia/QuickCreateRequestForm";
 
 export default async function NovaRapidaPage() {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const [stores, assemblers] = await Promise.all([listStores(), listAllAssemblersWithStoreId()]);
+  const [stores, assemblers, drivers, cargasRecentes] = await Promise.all([
+    listStores(),
+    listAllAssemblersWithStoreId(),
+    listDrivers(),
+    listCargasRecentes(),
+  ]);
+  // Mesmo resumo de sac/nova/page.tsx -- só o código da carga + um resumo
+  // curto pra reconhecer qual é qual (ver Quem errou/erro_motorista no form,
+  // agora que Recolhimento de peça também usa causa raiz).
+  const cargas = cargasRecentes.map((c) => ({
+    carga: c.carga,
+    label: `${c.carga}${c.dtPrevisao ? ` — ${c.dtPrevisao}` : ""}${c.motoristaNome ? ` — ${c.motoristaNome}` : ""}`,
+  }));
 
   return (
     <div className="flex flex-col gap-4">
@@ -20,7 +33,13 @@ export default async function NovaRapidaPage() {
           solicitação.
         </p>
       </div>
-      <QuickCreateRequestForm stores={stores} assemblers={assemblers} includeSacTypes={profile.role === "admin"} />
+      <QuickCreateRequestForm
+        stores={stores}
+        assemblers={assemblers}
+        drivers={drivers}
+        cargas={cargas}
+        includeSacTypes={profile.role === "admin"}
+      />
     </div>
   );
 }

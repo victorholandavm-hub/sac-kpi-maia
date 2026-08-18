@@ -2,11 +2,15 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createPublicRequest, lookupTotvsClient, lookupTotvsProduct, type FormState } from "@/app/assistencia/actions";
-import { REQUEST_TYPE_LABELS, SAC_CATEGORIES, SAC_CATEGORY_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
 import { FormSection } from "./FormSection";
 
-const TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
+// Loja/gerente só pede montagem e desmontagem (pedido do Victor 18/08/2026)
+// -- recolhimento/envio de peça, troca de peça, vistoria e notificação
+// externa são "notificações de assistência": só Assistência e SAC pedem,
+// nunca a loja (ver QuickCreateRequestForm.tsx e SacCreateRequestForm.tsx).
+const TYPES = ["montagem", "desmontagem"] as const;
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -134,9 +138,7 @@ type Snapshot = {
   orderCode: string;
   invoiceNumber: string;
   sellerName: string;
-  sacCategory: string;
   reason: string;
-  restrictionNote: string;
   notes: string;
   assemblerName: string;
 };
@@ -262,18 +264,19 @@ export function PublicRequestForm({
     return () => clearTimeout(timer);
   }, [clientCode]);
 
-  const showAddress =
-    !isStoreTarget &&
-    (type === "montagem" || type === "desmontagem" || type === "recolhimento" || type === "troca_peca" || type === "vistoria");
+  // Só montagem/desmontagem chegam aqui (ver TYPES acima), então essas
+  // flags que antes dependiam do type viraram constantes -- mantidas como
+  // variáveis mesmo assim (não como `true` cru) porque ainda documentam a
+  // intenção de cada campo, e ficam prontas caso outro tipo volte aqui um
+  // dia.
+  const showAddress = !isStoreTarget;
   const showAddressNumber = !isStoreTarget && (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
-  const showItems = type !== "notificacao_externa";
   // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
   // pra montagem/desmontagem -- validado de novo no servidor (ver
   // createPublicRequest), isso aqui é só o feedback imediato no navegador.
-  const codeRequired = type === "montagem" || type === "desmontagem";
-  const showRestriction = type === "recolhimento" || type === "troca_peca" || type === "vistoria";
-  const showCombo = type === "montagem" || type === "desmontagem";
-  const showAssembler = (type === "montagem" || type === "desmontagem") && ownAssemblers.length > 0;
+  const codeRequired = true;
+  const showCombo = true;
+  const showAssembler = ownAssemblers.length > 0;
   const [assemblerName, setAssemblerName] = useState("");
 
   // Não envia nada ainda -- só valida (mesma validação nativa do navegador
@@ -288,7 +291,6 @@ export function PublicRequestForm({
     const fd = new FormData(form);
     const storeId = String(fd.get("store_id") ?? "");
     const storeName = stores.length === 1 ? stores[0].name : (stores.find((s) => s.id === storeId)?.name ?? storeId);
-    const sacCategoryValue = String(fd.get("sac_category") ?? "");
 
     setSnapshot({
       storeName,
@@ -296,9 +298,7 @@ export function PublicRequestForm({
       orderCode: String(fd.get("order_code") ?? "").trim(),
       invoiceNumber: String(fd.get("invoice_number") ?? "").trim(),
       sellerName: String(fd.get("seller_name") ?? "").trim(),
-      sacCategory: sacCategoryValue ? (SAC_CATEGORY_LABELS[sacCategoryValue] ?? sacCategoryValue) : "",
       reason: String(fd.get("reason") ?? "").trim(),
-      restrictionNote: String(fd.get("restriction_note") ?? "").trim(),
       notes: String(fd.get("notes") ?? "").trim(),
       assemblerName: String(fd.get("assembler_name") ?? "").trim(),
     });
@@ -414,20 +414,6 @@ export function PublicRequestForm({
           </Field>
         ) : null}
 
-        {type === "notificacao_externa" ? (
-          <Field label="Categoria da notificação *">
-            <select name="sac_category" required defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
-              <option value="" disabled>
-                Selecione…
-              </option>
-              {SAC_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {SAC_CATEGORY_LABELS[c]}
-                </option>
-              ))}
-            </select>
-          </Field>
-        ) : null}
       </FormSection>
 
       {!isStoreTarget ? (
@@ -583,30 +569,24 @@ export function PublicRequestForm({
       </FormSection>
       )}
 
-      {showItems ? (
-        <FormSection
-          title={combo ? `Produtos a ${type === "montagem" ? "montar" : "desmontar"}` : "Produtos"}
-          number={5}
-          hint={
-            codeRequired
-              ? "Código do produto obrigatório."
-              : "Digite o código do produto pra preencher o nome automaticamente (se souber)."
-          }
-        >
-          <ProductItemsFields
-            items={items}
-            lookupStatus={productLookupStatus}
-            onUpdate={primaryHandlers.update}
-            onAdd={primaryHandlers.add}
-            onRemove={primaryHandlers.remove}
-            onLookup={primaryHandlers.lookup}
-            namePrefix="item"
-            codeRequired={codeRequired}
-          />
-        </FormSection>
-      ) : null}
+      <FormSection
+        title={combo ? `Produtos a ${type === "montagem" ? "montar" : "desmontar"}` : "Produtos"}
+        number={5}
+        hint="Código do produto obrigatório."
+      >
+        <ProductItemsFields
+          items={items}
+          lookupStatus={productLookupStatus}
+          onUpdate={primaryHandlers.update}
+          onAdd={primaryHandlers.add}
+          onRemove={primaryHandlers.remove}
+          onLookup={primaryHandlers.lookup}
+          namePrefix="item"
+          codeRequired={codeRequired}
+        />
+      </FormSection>
 
-      {showItems && combo ? (
+      {combo ? (
         <FormSection
           title={`Produtos a ${type === "montagem" ? "desmontar" : "montar"}`}
           number={6}
@@ -629,17 +609,6 @@ export function PublicRequestForm({
         <Field label="Motivo *">
           <textarea name="reason" rows={2} required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
-
-        {showRestriction ? (
-          <Field label="Restrição de horário / observação de recolhimento">
-            <input
-              name="restriction_note"
-              placeholder="Ex: restrição após 15h, cliente já remarcada 2 vezes…"
-              className="rounded border px-3 py-2"
-              style={inputStyle}
-            />
-          </Field>
-        ) : null}
 
         <Field label="Observações">
           <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
@@ -701,26 +670,23 @@ export function PublicRequestForm({
                 <SummaryRow label="Vendedor(a)" value={snapshot.sellerName} />
               </>
             )}
-            <SummaryRow label="Categoria da notificação" value={snapshot.sacCategory} />
             {showAssembler ? <SummaryRow label="Montador" value={snapshot.assemblerName || "A definir depois"} /> : null}
-            {showItems ? (
-              <div className="flex flex-col gap-0.5">
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Produtos{combo ? ` a ${type === "montagem" ? "montar" : "desmontar"}` : ""}
-                </span>
-                <ul className="text-sm flex flex-col gap-0.5" style={{ color: "var(--text-primary)" }}>
-                  {items
-                    .filter((i) => i.product.trim())
-                    .map((i, idx) => (
-                      <li key={idx}>
-                        {i.quantity}x {i.product}
-                        {i.code ? ` (${i.code})` : ""}
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            ) : null}
-            {showItems && combo ? (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Produtos{combo ? ` a ${type === "montagem" ? "montar" : "desmontar"}` : ""}
+              </span>
+              <ul className="text-sm flex flex-col gap-0.5" style={{ color: "var(--text-primary)" }}>
+                {items
+                  .filter((i) => i.product.trim())
+                  .map((i, idx) => (
+                    <li key={idx}>
+                      {i.quantity}x {i.product}
+                      {i.code ? ` (${i.code})` : ""}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+            {combo ? (
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                   Produtos a {type === "montagem" ? "desmontar" : "montar"}
@@ -738,7 +704,6 @@ export function PublicRequestForm({
               </div>
             ) : null}
             <SummaryRow label="Motivo" value={snapshot.reason} />
-            <SummaryRow label="Restrição" value={snapshot.restrictionNote} />
             <SummaryRow label="Observações" value={snapshot.notes} />
           </div>
 

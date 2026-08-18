@@ -138,13 +138,17 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Canceladas", value: "cancelada" },
 ];
 
-// Troca/entrega de produto (SAC) e envio de peça (assistência) saem no
-// mesmo carro, na mesma rota do dia -- por isso ficam juntos numa aba só,
-// visível tanto daqui quanto de /assistencia/sac (ver lá), cada lado vendo
-// a rota inteira mesmo só gerenciando o que é seu (canManage já cuida
+// Troca/entrega de produto (SAC) e envio/recolhimento de peça (assistência)
+// saem no mesmo carro, na mesma rota do dia -- por isso ficam juntos numa
+// aba só, visível tanto daqui quanto de /assistencia/sac (ver lá), cada lado
+// vendo a rota inteira mesmo só gerenciando o que é seu (canManage já cuida
 // disso). Não tem nada a ver com visita de montador (montagem/desmontagem/
-// recolhimento/troca de peça/vistoria), que fica exclusiva na outra aba.
-const VISITA_TYPES: RequestType[] = ASSISTENCIA_MANAGED_TYPES.filter((t) => t !== "envio_peca");
+// troca de peça/vistoria), que fica exclusiva na outra aba -- "recolhimento"
+// mudou de lado em 18/08/2026 (era visita de montador, virou entrega de
+// motorista, ver DELIVERY_REQUEST_TYPES).
+const VISITA_TYPES: RequestType[] = ASSISTENCIA_MANAGED_TYPES.filter(
+  (t) => !(DELIVERY_REQUEST_TYPES as readonly string[]).includes(t)
+);
 const ENTREGA_TYPES: RequestType[] = [...DELIVERY_REQUEST_TYPES];
 
 export default async function AssistenciaQueuePage({

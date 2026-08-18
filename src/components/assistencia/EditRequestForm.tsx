@@ -35,10 +35,11 @@ export function EditRequestForm({
   const [type, setType] = useState<string>(request.type);
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
   const [isApartment, setIsApartment] = useState(request.clientIsApartment);
-  // Só tipos que passam por montador/técnico -- entrega é sempre motorista
-  // (sem montador pra instruir) e notificação externa não tem visita
-  // nenhuma.
-  const showMontadorInstruction = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria"].includes(type);
+  // Só tipos que passam por montador/técnico -- os 4 tipos de entrega
+  // (troca/entrega de produto, envio/recolhimento de peça) são sempre
+  // motorista, sem montador pra instruir, e notificação externa não tem
+  // visita nenhuma.
+  const showMontadorInstruction = ["montagem", "desmontagem", "troca_peca", "vistoria"].includes(type);
   const showAuthorizedBy = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
 
   return (
