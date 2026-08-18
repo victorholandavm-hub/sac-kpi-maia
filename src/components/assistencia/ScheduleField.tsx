@@ -5,7 +5,7 @@ import { setSchedule, getAvailableRotasForDateAction } from "@/app/assistencia/a
 import { useQuickAction } from "./useQuickAction";
 import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { SHIFTS, type Shift } from "@/lib/serviceRequests";
-import { ROTA_LABELS, ROTA_COLORS, type Rota } from "@/lib/rotas";
+import { ROTA_LABELS, ROTA_COLORS, type Rota, type AvailableRota } from "@/lib/rotas";
 
 // Selo colorido de rota -- igual ao usado no painel "Motorista do dia"
 // (RotaMotoristaDoDia). Pedido do Victor 18/08/2026: a rota do chamado
@@ -69,7 +69,7 @@ export function ScheduleField({
   // depois (ver getAvailableRotasForDate em rotas.ts). Mesmo desenho do
   // getDayLoadAction em QuickCreateRequestForm.tsx: setState só dentro do
   // timer, nunca síncrono no corpo do efeito (regra do React Compiler).
-  const [availableRotas, setAvailableRotas] = useState<Rota[]>([]);
+  const [availableRotas, setAvailableRotas] = useState<AvailableRota[]>([]);
   const [loadingRotas, setLoadingRotas] = useState(false);
   const hasDateContext = editing && showRota && !!date;
 
@@ -84,7 +84,7 @@ export function ScheduleField({
           setAvailableRotas(rotas);
           // Rota que tinha sido escolhida pode não valer mais pra data nova
           // -- nunca deixa uma rota fora da lista disponível "presa" no select.
-          setSelectedRota((prev) => (prev && !rotas.includes(prev as Rota) ? "" : prev));
+          setSelectedRota((prev) => (prev && !rotas.some((r) => r.rota === prev) ? "" : prev));
         })
         .catch(() => setAvailableRotas([]))
         .finally(() => setLoadingRotas(false));
@@ -94,6 +94,11 @@ export function ScheduleField({
 
   const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
   const effectiveLoadingRotas = hasDateContext && loadingRotas;
+  // Motorista da rota escolhida -- pedido do Victor 18/08/2026: "quando eu
+  // escolho a rota, ele ja deve preencher o motorista daquela rota". Só
+  // preview aqui (setSchedule já grava isso sozinho ao salvar, ver
+  // actions.ts); não dá pra digitar/trocar nesse campo.
+  const previewDriverName = effectiveAvailableRotas.find((r) => r.rota === selectedRota)?.driverName ?? null;
 
   if (!editing) {
     return (
@@ -174,8 +179,8 @@ export function ScheduleField({
           >
             <option value="">Sem rota</option>
             {effectiveAvailableRotas.map((r) => (
-              <option key={r} value={r}>
-                {ROTA_LABELS[r]}
+              <option key={r.rota} value={r.rota}>
+                {ROTA_LABELS[r.rota]}
               </option>
             ))}
           </select>
@@ -190,6 +195,10 @@ export function ScheduleField({
           ) : effectiveAvailableRotas.length === 0 ? (
             <span className="text-xs" style={{ color: "var(--status-warning)" }}>
               Nenhuma rota disponível pra essa data.
+            </span>
+          ) : selectedRota ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Motorista: {previewDriverName ?? "nenhum escolhido ainda"}
             </span>
           ) : null}
         </div>

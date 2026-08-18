@@ -19,7 +19,7 @@ import {
   CAUSA_RAIZ_LABELS,
 } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
-import { ROTA_LABELS, type Rota } from "@/lib/rotas";
+import { ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -184,7 +184,7 @@ export function SacCreateRequestForm({
   // bate mais. Mesmo desenho do getDayLoadAction logo abaixo: setState só
   // dentro do timer, nunca síncrono no corpo do efeito (regra do React
   // Compiler).
-  const [availableRotas, setAvailableRotas] = useState<Rota[]>([]);
+  const [availableRotas, setAvailableRotas] = useState<AvailableRota[]>([]);
   const [loadingRotas, setLoadingRotas] = useState(false);
   const hasDateContext = isDelivery && !!scheduledDate;
 
@@ -197,7 +197,7 @@ export function SacCreateRequestForm({
       getAvailableRotasForDateAction(scheduledDate)
         .then((rotas) => {
           setAvailableRotas(rotas);
-          setSelectedRota((prev) => (prev && !rotas.includes(prev as Rota) ? "" : prev));
+          setSelectedRota((prev) => (prev && !rotas.some((r) => r.rota === prev) ? "" : prev));
         })
         .catch(() => setAvailableRotas([]))
         .finally(() => setLoadingRotas(false));
@@ -207,6 +207,12 @@ export function SacCreateRequestForm({
 
   const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
   const effectiveLoadingRotas = hasDateContext && loadingRotas;
+  // Motorista da rota escolhida -- pedido do Victor 18/08/2026: "quando eu
+  // escolho a rota, ele ja deve preencher o motorista daquela rota". Só
+  // preview aqui; createSacRequest já grava isso sozinho ao criar (ver
+  // actions.ts), exceto no caso de "erro do motorista" (digitado à parte,
+  // ver Detalhes abaixo).
+  const previewDriverName = effectiveAvailableRotas.find((r) => r.rota === selectedRota)?.driverName ?? null;
   // Só montagem envolve entrar num prédio de verdade -- SAC nem oferece
   // desmontagem isolada (ver SacType acima).
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
@@ -556,8 +562,8 @@ export function SacCreateRequestForm({
                 >
                   <option value="">Sem rota</option>
                   {effectiveAvailableRotas.map((r) => (
-                    <option key={r} value={r}>
-                      {ROTA_LABELS[r]}
+                    <option key={r.rota} value={r.rota}>
+                      {ROTA_LABELS[r.rota]}
                     </option>
                   ))}
                 </select>
@@ -574,22 +580,33 @@ export function SacCreateRequestForm({
                 <p className="text-xs" style={{ color: "var(--status-warning)" }}>
                   Nenhuma rota disponível pra essa data.
                 </p>
+              ) : selectedRota ? (
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Motorista: {previewDriverName ?? "nenhum escolhido ainda"}
+                </p>
               ) : null}
 
-              <Field label={type === "troca_produto" && causaRaiz === "erro_motorista" ? "Motorista *" : "Motorista"}>
-                <input
-                  name="driver_name"
-                  list="sac-drivers"
-                  required={type === "troca_produto" && causaRaiz === "erro_motorista"}
-                  className="rounded border px-3 py-2"
-                  style={inputStyle}
-                />
-                <datalist id="sac-drivers">
-                  {drivers.map((d) => (
-                    <option key={d} value={d} />
-                  ))}
-                </datalist>
-              </Field>
+              {/* Motorista não é mais um campo livre (pedido do Victor
+                  18/08/2026) -- vem sempre da rota escolhida (preview logo
+                  acima). Só continua digitável pra "erro do motorista", que
+                  precisa registrar explicitamente quem entregou o item com
+                  defeito. */}
+              {type === "troca_produto" && causaRaiz === "erro_motorista" ? (
+                <Field label="Motorista que entregou (erro) *">
+                  <input
+                    name="driver_name"
+                    list="sac-drivers"
+                    required
+                    className="rounded border px-3 py-2"
+                    style={inputStyle}
+                  />
+                  <datalist id="sac-drivers">
+                    {drivers.map((d) => (
+                      <option key={d} value={d} />
+                    ))}
+                  </datalist>
+                </Field>
+              ) : null}
             </>
           ) : null}
         </FormSection>

@@ -6,7 +6,6 @@ import { StatusBadge } from "./StatusBadge";
 import { StatusStepper } from "./StatusStepper";
 import { RequestActions } from "./RequestActions";
 import { MobileActionSheet } from "./MobileActionSheet";
-import { DriverNameField } from "./DriverNameField";
 import { ScheduleField, RotaBadge } from "./ScheduleField";
 import { DeliveryItemsTable } from "./DeliveryItemsTable";
 import { RealtimeQueueRefresher } from "./RealtimeQueueRefresher";
@@ -66,12 +65,10 @@ function eventAction(event: { eventType: string; fromStatus: string | null; toSt
 export function DeliveryRequestDetailContent({
   profile,
   result,
-  drivers,
   photos,
 }: {
   profile: Profile;
   result: { request: ServiceRequestDetail; events: RequestEvent[] } | null;
-  drivers: string[];
   photos: RequestPhoto[];
 }) {
   if (!result) {
@@ -85,6 +82,11 @@ export function DeliveryRequestDetailContent({
   const { request, events } = result;
   const isSacType = (SAC_MANAGED_TYPES as readonly string[]).includes(request.type);
   const canManage = profile.role === "admin" || (profile.role === "assistencia" && !isSacType) || (profile.role === "sac" && isSacType);
+  // Onde o motorista da rota é escolhido de verdade -- pedido do Victor
+  // 18/08/2026: motorista não edita mais aqui, só no painel "Motorista do
+  // dia" (RotaMotoristaDoDia), que existe em dois lugares dependendo de
+  // quem gerencia esse tipo de chamado.
+  const motoristaDoDiaHref = isSacType ? "/assistencia/sac/notificacoes" : "/assistencia/fila?tab=pecas";
 
   const causaRaizDetail =
     request.causaRaiz === "erro_conferencia"
@@ -226,11 +228,23 @@ export function DeliveryRequestDetailContent({
                 </div>
               </div>
             )}
-            {canManage ? (
-              <DriverNameField requestId={request.id} value={request.driverName} drivers={drivers} />
-            ) : (
-              <Row label="Nome do motorista" value={request.driverName ?? "Não definido"} />
-            )}
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Motorista
+              </span>
+              <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+                {request.driverName ?? "Nenhum motorista escolhido ainda"}
+              </span>
+              {canManage ? (
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Vem da rota do dia -- pra trocar, use o painel{" "}
+                  <Link href={motoristaDoDiaHref} className="underline">
+                    Motorista do dia
+                  </Link>
+                  .
+                </span>
+              ) : null}
+            </div>
           </div>
 
           {canManage ? (

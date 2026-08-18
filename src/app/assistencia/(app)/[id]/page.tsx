@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getProfile, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { getRequestDetail } from "@/lib/serviceRequests";
-import { listAssemblersForStores, listDrivers } from "@/lib/payments";
+import { listAssemblersForStores } from "@/lib/payments";
 import { SAC_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_STORE_IDS, OWN_ASSEMBLER_RESTRICTED_TYPES } from "@/lib/assistenciaLabels";
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { RequestDetailContent } from "@/components/assistencia/RequestDetailContent";
@@ -36,14 +36,13 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
   // (DeliveryRequestDetailContent) desde 17/08/2026 -- ver comentário lá.
   const isDeliveryType = !!result && (DELIVERY_REQUEST_TYPES as readonly string[]).includes(result.request.type);
 
-  const [assemblers, drivers, photos] = await Promise.all([
+  const [assemblers, photos] = await Promise.all([
     canManage && result && !isDeliveryType ? listAssemblersForStores([result.request.storeId]) : Promise.resolve([]),
-    canManage && isDeliveryType ? listDrivers() : Promise.resolve([]),
     result ? listRequestPhotos(result.request.id) : Promise.resolve([]),
   ]);
 
   if (isDeliveryType) {
-    return <DeliveryRequestDetailContent profile={profile} result={result} drivers={drivers} photos={photos} />;
+    return <DeliveryRequestDetailContent profile={profile} result={result} photos={photos} />;
   }
 
   return <RequestDetailContent profile={profile} result={result} assemblers={assemblers} photos={photos} />;
