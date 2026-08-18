@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
-import { getRotaDriverAssignments } from "@/lib/rotas";
+import { getRotaWeekOverview, startOfRotaWeek } from "@/lib/rotas";
 import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -117,12 +117,12 @@ export default async function AssistenciaQueuePage({
   // esses tipos.
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const today = new Date().toISOString().slice(0, 10);
-  const [{ items: requests, total, pageSize }, stores, assemblers, drivers, rotaAssignments] = await Promise.all([
+  const [{ items: requests, total, pageSize }, stores, assemblers, drivers, rotaOverview] = await Promise.all([
     listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: effectiveAssembler, types, dateFrom, dateTo, excludeOwnAssemblerStoreIds }),
     listStores(),
     listAssemblers(),
     showPecas ? listDrivers() : Promise.resolve([]),
-    showPecas ? getRotaDriverAssignments(today) : Promise.resolve({ primary: null, extras: [] }),
+    showPecas ? getRotaWeekOverview(startOfRotaWeek(today), 14) : Promise.resolve([]),
   ]);
   const groups = groupByDate(requests);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -162,7 +162,7 @@ export default async function AssistenciaQueuePage({
         </Link>
       </div>
 
-      {showPecas ? <RotaMotoristaDoDia initialDate={today} initialAssignments={rotaAssignments} drivers={drivers} /> : null}
+      {showPecas ? <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} /> : null}
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
