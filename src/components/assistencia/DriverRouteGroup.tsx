@@ -30,10 +30,14 @@ export function DriverRouteGroup({
   items,
   showCompleted,
   reorderable,
+  showDriverName,
 }: {
   items: DriverRequestView[];
   showCompleted: boolean;
   reorderable: boolean;
+  // Modo "ver todas as rotas" (DISPATCH_SUPERVISOR_DRIVER) -- mostra de quem
+  // é cada entrega, já que aqui não é sempre "a minha própria".
+  showDriverName?: boolean;
 }) {
   const [order, setOrder] = useState(items);
   const [saving, setSaving] = useState(false);
@@ -121,6 +125,14 @@ export function DriverRouteGroup({
                     #{r.ticketNumber}
                   </span>
                   <StatusBadge status={r.status} />
+                  {showDriverName ? (
+                    <span
+                      className="text-xs font-medium px-2 py-0.5 rounded-full"
+                      style={{ color: "var(--text-primary)", background: "var(--brand-green-soft)" }}
+                    >
+                      🚚 {r.driverName ?? "Sem motorista"}
+                    </span>
+                  ) : null}
                   {r.shift === "urgencia" ? (
                     <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ color: "#fff", background: "var(--status-critical)" }}>
                       Urgente!
@@ -142,9 +154,21 @@ export function DriverRouteGroup({
                 <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
                   {r.clientName ?? "Sem nome de cliente"}
                 </p>
-                {r.clientNeighborhood ? (
-                  <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                    📍 {r.clientNeighborhood}
+                {r.clientNeighborhood || mapsHref(r) ? (
+                  <p className="text-xs font-medium flex items-center gap-1.5 flex-wrap" style={{ color: "var(--text-secondary)" }}>
+                    {r.clientNeighborhood ? <span>📍 {r.clientNeighborhood}</span> : null}
+                    {mapsHref(r) ? (
+                      <a
+                        href={mapsHref(r)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="underline"
+                        style={{ color: "var(--brand-green)" }}
+                      >
+                        Ver no mapa
+                      </a>
+                    ) : null}
                   </p>
                 ) : null}
                 {r.productSummary ? (
@@ -170,18 +194,6 @@ export function DriverRouteGroup({
                 ) : null}
               </div>
               <div className="flex items-center gap-2 flex-wrap shrink-0">
-                {mapsHref(r) ? (
-                  <a
-                    href={mapsHref(r)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-sm rounded-lg px-3 py-2 font-medium shrink-0"
-                    style={{ background: "var(--surface-2)", border: "2px solid var(--border)", color: "var(--text-primary)" }}
-                  >
-                    📍 Ver no mapa
-                  </a>
-                ) : null}
                 <DriverNotificationModalButton item={r} />
                 <Link
                   href={`/assistencia/motorista/${r.id}`}

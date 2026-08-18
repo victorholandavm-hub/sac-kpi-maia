@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { getDriverSession } from "@/app/assistencia/driver-actions";
 import { getDriverRequestDetail, formatFullAddress } from "@/lib/serviceRequests";
 import { listRequestPhotos } from "@/lib/servicePhotos";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS, DISPATCH_SUPERVISOR_DRIVER } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
 import { MotoristaPhotoUpload } from "@/components/assistencia/MotoristaPhotoUpload";
@@ -41,10 +41,16 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
   }
 
   const { id } = await params;
-  const request = await getDriverRequestDetail(driverName, id);
+  const isSupervisor = driverName === DISPATCH_SUPERVISOR_DRIVER;
+  const request = await getDriverRequestDetail(driverName, id, { viewAll: isSupervisor });
   if (!request) {
     notFound();
   }
+  // Everton (expedição) pode abrir o chamado de qualquer motorista, mas só
+  // visualiza -- concluir/foto continuam exclusivos de quem tá na rota (as
+  // actions em driver-actions.ts já travam isso de qualquer forma; aqui é
+  // só pra não oferecer botão que ia dar erro "não é seu").
+  const isOwnTicket = request.driverName === driverName;
 
   const photos = await listRequestPhotos(request.id);
   const proofPhotos = photos.filter((p) => p.isProof);
@@ -65,6 +71,15 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
             ← Voltar
           </Link>
         </AssistenciaHeader>
+
+        {!isOwnTicket ? (
+          <p
+            className="text-xs font-medium rounded-lg px-3 py-2"
+            style={{ background: "var(--brand-green-soft)", color: "var(--text-primary)" }}
+          >
+            🚚 Motorista responsável: {request.driverName ?? "nenhum ainda"} — você só está visualizando.
+          </p>
+        ) : null}
 
         <div className="flex items-center gap-2 flex-wrap">
           <StatusBadge status={request.status} />
@@ -151,7 +166,7 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
             </p>
           ) : null}
           <PhotoGallery photos={proofPhotos} deleteMode="driver" currentActor={driverName} />
-          {!showCompleted ? <MotoristaPhotoUpload requestId={request.id} proof /> : null}
+          {!showCompleted && isOwnTicket ? <MotoristaPhotoUpload requestId={request.id} proof /> : null}
         </div>
 
         <div
@@ -162,10 +177,10 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
             Fotos
           </h3>
           <PhotoGallery photos={otherPhotos} deleteMode="driver" currentActor={driverName} />
-          <MotoristaPhotoUpload requestId={request.id} />
+          {isOwnTicket ? <MotoristaPhotoUpload requestId={request.id} /> : null}
         </div>
 
-        {!showCompleted ? (
+        {!showCompleted && isOwnTicket ? (
           <div
             className="rounded-lg p-4 flex flex-col gap-3"
             style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}

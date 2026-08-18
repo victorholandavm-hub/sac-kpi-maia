@@ -948,11 +948,14 @@ export type DriverRequestView = {
   rotaExceptionNote: string | null;
   driverOrder: number | null;
   deliveryRating: number | null;
+  // Só usado no modo "ver todas as rotas" (ver DISPATCH_SUPERVISOR_DRIVER) --
+  // pro motorista comum é sempre o próprio nome, óbvio demais pra mostrar.
+  driverName: string | null;
 };
 
 const DRIVER_VIEW_LIMIT = 200;
 const DRIVER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, stores(name), items:service_request_items(product)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, stores(name), items:service_request_items(product)";
 
 type DriverViewRow = {
   id: string;
@@ -980,6 +983,7 @@ type DriverViewRow = {
   rota_exception_note: string | null;
   driver_order: number | null;
   delivery_rating: number | null;
+  driver_name: string | null;
   stores: { name: string } | null;
   items: { product: string }[] | null;
 };
@@ -1013,18 +1017,29 @@ function toDriverView(row: DriverViewRow): DriverRequestView {
     rotaExceptionNote: row.rota_exception_note,
     driverOrder: row.driver_order,
     deliveryRating: row.delivery_rating,
+    driverName: row.driver_name,
   };
 }
 
 // Portal do motorista (login por nome + PIN, ver src/lib/driverAuth.ts): só as
 // próprias rotas de troca de produto (recolher o errado/avariado, entregar o
-// correto).
+// correto) -- exceto com `viewAll` (DISPATCH_SUPERVISOR_DRIVER, ver
+// assistenciaLabels.ts), que traz de TODOS os motoristas pra acompanhar a
+// expedição inteira.
 export async function listRequestsForDriver(
   driverName: string,
-  opts: { onlyCompleted?: boolean } = {}
+  opts: { onlyCompleted?: boolean; viewAll?: boolean } = {}
 ): Promise<DriverRequestView[]> {
   const admin = getSupabaseAdmin();
-  let query = admin.from("service_requests").select(DRIVER_VIEW_COLUMNS).eq("driver_name", driverName).limit(DRIVER_VIEW_LIMIT);
+  let query = admin.from("service_requests").select(DRIVER_VIEW_COLUMNS).limit(DRIVER_VIEW_LIMIT);
+  if (opts.viewAll) {
+    // Sem o filtro por driver_name, precisa restringir por tipo na mão --
+    // era o driver_name (só preenchido em tipo de entrega) que limitava
+    // implicitamente antes.
+    query = query.in("type", [...DELIVERY_REQUEST_TYPES]);
+  } else {
+    query = query.eq("driver_name", driverName);
+  }
 
   if (opts.onlyCompleted) {
     query = query.eq("status", "concluida").order("completed_at", { ascending: false });
@@ -1046,14 +1061,20 @@ export async function listRequestsForDriver(
   return ((data ?? []) as unknown as DriverViewRow[]).map(toDriverView);
 }
 
-export async function getDriverRequestDetail(driverName: string, requestId: string): Promise<DriverRequestView | null> {
+// `viewAll` (DISPATCH_SUPERVISOR_DRIVER) deixa ver o chamado de QUALQUER
+// motorista -- só visualização, as ações (concluir/foto/etc.) continuam
+// travadas por driver_name real em driver-actions.ts, não daqui.
+export async function getDriverRequestDetail(
+  driverName: string,
+  requestId: string,
+  opts: { viewAll?: boolean } = {}
+): Promise<DriverRequestView | null> {
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin
-    .from("service_requests")
-    .select(DRIVER_VIEW_COLUMNS)
-    .eq("id", requestId)
-    .eq("driver_name", driverName)
-    .maybeSingle();
+  let query = admin.from("service_requests").select(DRIVER_VIEW_COLUMNS).eq("id", requestId);
+  if (!opts.viewAll) {
+    query = query.eq("driver_name", driverName);
+  }
+  const { data, error } = await query.maybeSingle();
 
   if (error || !data) return null;
   return toDriverView(data as unknown as DriverViewRow);

@@ -6,6 +6,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { DriverRouteGroup } from "@/components/assistencia/DriverRouteGroup";
 import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, groupByDateBucket } from "@/lib/dateBuckets";
 import { ROTAS, ROTA_LABELS, type Rota } from "@/lib/rotas";
+import { DISPATCH_SUPERVISOR_DRIVER } from "@/lib/assistenciaLabels";
 
 // Rota e data no mesmo cabeçalho, lado a lado -- pedido do Victor
 // 18/08/2026: "a data... tem que aparecer ao lado da rota, não dentro".
@@ -53,13 +54,20 @@ export default async function MotoristaHomePage({
 
   const { view } = await searchParams;
   const showCompleted = view === "concluidas";
+  // Everton (expedição) vê a rota de todo mundo, não só a própria -- ver
+  // DISPATCH_SUPERVISOR_DRIVER (assistenciaLabels.ts). Sem reordenar (não é
+  // ele quem tá na rua) e com o nome do motorista de cada uma visível.
+  const isSupervisor = driverName === DISPATCH_SUPERVISOR_DRIVER;
 
-  const requests = await listRequestsForDriver(driverName, { onlyCompleted: showCompleted });
+  const requests = await listRequestsForDriver(driverName, { onlyCompleted: showCompleted, viewAll: isSupervisor });
   const groups = !showCompleted ? groupByRotaAndBucket(requests) : null;
 
   return (
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-      <AssistenciaHeader title={`Olá, ${driverName}`} subtitle="Suas rotas de troca/entrega de produto e envio de peça.">
+      <AssistenciaHeader
+        title={`Olá, ${driverName}`}
+        subtitle={isSupervisor ? "Todas as rotas de troca/entrega de produto e envio de peça." : "Suas rotas de troca/entrega de produto e envio de peça."}
+      >
         <div className="flex items-center gap-4">
           <Link href="/assistencia" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             ← Voltar
@@ -112,12 +120,12 @@ export default async function MotoristaHomePage({
               {group.label} ({group.items.length})
             </summary>
             <div className="mt-2">
-              <DriverRouteGroup items={group.items} showCompleted={showCompleted} reorderable />
+              <DriverRouteGroup items={group.items} showCompleted={showCompleted} reorderable={!isSupervisor} showDriverName={isSupervisor} />
             </div>
           </details>
         ))
       ) : (
-        <DriverRouteGroup items={requests} showCompleted={showCompleted} reorderable={false} />
+        <DriverRouteGroup items={requests} showCompleted={showCompleted} reorderable={false} showDriverName={isSupervisor} />
       )}
     </div>
   );
