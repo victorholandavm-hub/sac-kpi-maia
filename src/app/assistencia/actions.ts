@@ -1658,6 +1658,44 @@ export async function setSchedule(
   revalidatePath(`/assistencia/${requestId}`);
 }
 
+// Colocar várias notificações na mesma rota de uma vez (pedido do Victor
+// 19/08/2026: "preciso selecionar em bloco pra colocar todas em uma rota")
+// -- reaproveita setSchedule pra cada id, mesma validação/log de evento/
+// revalidate de sempre, só preservando o turno/hora que cada chamado já
+// tinha (bulk é só sobre rota+data, não deve apagar o resto). Não falha
+// tudo se um item der erro -- devolve quantos deram certo + a lista de
+// erros pra UI mostrar o que precisa de atenção manual.
+export async function bulkSetRotaAction(
+  requestIds: string[],
+  scheduledDate: string,
+  rota: string
+): Promise<{ successCount: number; errors: string[] }> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin", "sac");
+  if (requestIds.length === 0) throw new Error("Selecione pelo menos uma solicitação.");
+  if (!scheduledDate) throw new Error("Escolha uma data.");
+  if (!isRota(rota)) throw new Error("Rota inválida.");
+
+  const admin = getSupabaseAdmin();
+  const { data: rows, error } = await admin
+    .from("service_requests")
+    .select("id, ticket_number, shift, scheduled_time")
+    .in("id", requestIds);
+  if (error) throw new Error(error.message);
+
+  const errors: string[] = [];
+  let successCount = 0;
+  for (const row of rows ?? []) {
+    try {
+      await setSchedule(row.id, scheduledDate, row.shift ?? "", row.scheduled_time ?? "", rota);
+      successCount++;
+    } catch (e) {
+      errors.push(`#${row.ticket_number}: ${e instanceof Error ? e.message : "erro desconhecido"}`);
+    }
+  }
+  return { successCount, errors };
+}
+
 export async function setSacCategory(requestId: string, category: string) {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");

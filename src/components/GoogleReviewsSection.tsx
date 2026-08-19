@@ -12,6 +12,15 @@ function formatDate(value: unknown) {
   return `${d}/${m}`;
 }
 
+// Ouro/prata/bronze pro pódio, resto tudo igual (pedido do Victor
+// 19/08/2026) -- cores fixas (não são var(--...) do tema) porque são as
+// cores "universais" de medalha, não precisam variar com claro/escuro.
+const RANK_COLORS: Record<number, string> = {
+  1: "#D4AF37",
+  2: "#A8A9AD",
+  3: "#CD7F32",
+};
+
 // Avaliações do Google por loja -- puxadas manualmente uma vez por semana
 // (pedido do Victor 18/08/2026: o Google não deixa automatizar de forma
 // confiável, ver src/lib/googleReviews.ts). Usado na página /avaliacoes
@@ -111,6 +120,10 @@ function GoogleReviewRow({ store, rank, onSaved }: { store: StoreGoogleReviews; 
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [urlValue, setUrlValue] = useState(store.googleMapsUrl ?? "");
+  // Link escondido por padrão (pedido do Victor 19/08/2026: "não precisa
+  // deixar a mostra os links") -- só aparece o campo pra editar quando
+  // clicado; sem input a mais poluindo a linha do ranking.
+  const [editingUrl, setEditingUrl] = useState(false);
   const [ratingInput, setRatingInput] = useState(store.latest ? String(store.latest.rating) : "");
   const [countInput, setCountInput] = useState(store.latest ? String(store.latest.reviewCount) : "");
 
@@ -155,20 +168,35 @@ function GoogleReviewRow({ store, rank, onSaved }: { store: StoreGoogleReviews; 
 
   return (
     <tr className="border-b" style={{ borderColor: "var(--gridline)" }}>
-      <td className="px-3 py-2 align-top text-right font-semibold" style={{ color: rank && rank <= 3 ? "var(--brand-orange)" : "var(--text-muted)" }}>
+      <td className="px-3 py-2 align-top text-right font-semibold" style={{ color: rank && RANK_COLORS[rank] ? RANK_COLORS[rank] : "var(--text-muted)" }}>
         {rank ?? "—"}
       </td>
       <td className="px-3 py-2 align-top" style={{ color: "var(--text-primary)" }}>
         {store.storeName}
-        <input
-          value={urlValue}
-          onChange={(e) => setUrlValue(e.target.value)}
-          onBlur={saveUrl}
-          disabled={pending}
-          placeholder="Link do Google…"
-          className="mt-1 block w-full rounded border px-2 py-1 text-xs"
-          style={{ borderColor: "var(--border)" }}
-        />
+        {editingUrl ? (
+          <input
+            value={urlValue}
+            onChange={(e) => setUrlValue(e.target.value)}
+            onBlur={() => {
+              saveUrl();
+              setEditingUrl(false);
+            }}
+            disabled={pending}
+            placeholder="Link do Google…"
+            autoFocus
+            className="mt-1 block w-full rounded border px-2 py-1 text-xs"
+            style={{ borderColor: "var(--border)" }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingUrl(true)}
+            className="mt-0.5 block text-xs underline"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {store.googleMapsUrl ? "editar link" : "+ adicionar link"}
+          </button>
+        )}
       </td>
       <td className="px-3 py-2 align-top">
         <span className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>

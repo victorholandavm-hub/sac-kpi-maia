@@ -4,11 +4,11 @@ import { getProfile } from "@/lib/dal";
 import { listRequests } from "@/lib/serviceRequests";
 import { listDrivers } from "@/lib/payments";
 import { getRotaWeekOverview, startOfRotaWeek } from "@/lib/rotas";
-import { REQUEST_TYPE_LABELS, ROLE_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
-import { StatusBadge } from "@/components/assistencia/StatusBadge";
+import { ROLE_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
+import { NotificacoesList } from "@/components/assistencia/NotificacoesList";
 
 export const dynamic = "force-dynamic";
 
@@ -98,36 +98,7 @@ export default async function SacNotificacoesPage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-            {requests.map((r) => (
-              <Link
-                key={r.id}
-                href={`/assistencia/${r.id}`}
-                className="flex items-center justify-between gap-3 p-4 flex-wrap hover:opacity-80"
-              >
-                <div className="flex flex-col gap-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                      #{r.ticketNumber}
-                    </span>
-                    <StatusBadge status={r.status} />
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                      {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                    </span>
-                  </div>
-                  <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
-                    {r.clientName ?? "Sem nome de cliente"}
-                  </p>
-                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    {r.storeName}
-                    {r.driverName ? ` · Motorista: ${r.driverName}` : ""}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
+        <NotificacoesList requests={requests} selectable={!showCompleted} />
       )}
     </div>
   );
