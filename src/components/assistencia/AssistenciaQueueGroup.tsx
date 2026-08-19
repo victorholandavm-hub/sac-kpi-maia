@@ -58,6 +58,7 @@ export function AssistenciaQueueGroup({
   reorderable,
   now,
   showCreatedDate,
+  printable,
 }: {
   items: ServiceRequestSummary[];
   reorderable: boolean;
@@ -69,12 +70,28 @@ export function AssistenciaQueueGroup({
   // grupo -- só repete aqui (dentro do card) quando o agrupamento é por
   // outra coisa, ex. rota (aba Entregas), pedido do Victor 18/08/2026.
   showCreatedDate?: boolean;
+  // Seleção em bloco pra imprimir vários despachos de uma vez -- só na aba
+  // Entregas (pedido do Victor 19/08/2026: "estenda pra aba entregas",
+  // mesma seleção que já existia em NotificacoesList.tsx, ver PR #108).
+  // Seleção fica por grupo (cada grupo já é uma rota+data aqui, ver
+  // groupByRota em fila/page.tsx), não precisa atravessar grupos.
+  printable?: boolean;
 }) {
   const [order, setOrder] = useState(items);
   const [saving, setSaving] = useState(false);
   const [syncedItems, setSyncedItems] = useState(items);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const nodeRefs = useRef(new Map<string, HTMLDivElement>());
   const prevRects = useRef<Map<string, DOMRect> | null>(null);
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // Mesmo ajuste-durante-render de DriverRouteGroup.tsx: RealtimeQueueRefresher
   // traz dado novo do Server Component pai sem remontar este client component.
@@ -129,7 +146,31 @@ export function AssistenciaQueueGroup({
   }
 
   return (
-    <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+    <div className="flex flex-col gap-2">
+      {printable && selected.size > 0 ? (
+        <div className="flex items-center gap-2 flex-wrap px-4 pt-2">
+          <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+            {selected.size} selecionada{selected.size === 1 ? "" : "s"}
+          </span>
+          <Link
+            href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
+            target="_blank"
+            className="text-xs rounded-full px-3 py-1.5 font-medium border"
+            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+          >
+            🖨️ Imprimir selecionadas
+          </Link>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="text-xs underline"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            limpar seleção
+          </button>
+        </div>
+      ) : null}
+      <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
       {order.map((r, i) => {
         const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
         // Só scheduledDate (ScheduleField) ou approvedDeadline
@@ -164,6 +205,15 @@ export function AssistenciaQueueGroup({
             style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
           >
           <div className="flex items-center gap-2 flex-wrap">
+            {printable ? (
+              <input
+                type="checkbox"
+                checked={selected.has(r.id)}
+                onChange={() => toggleSelected(r.id)}
+                className="rounded shrink-0"
+                aria-label={`Selecionar #${r.ticketNumber}`}
+              />
+            ) : null}
             {reorderable ? (
               <div className="flex flex-col items-center gap-0.5 shrink-0">
                 <button
@@ -325,6 +375,7 @@ export function AssistenciaQueueGroup({
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
