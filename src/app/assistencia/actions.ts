@@ -1072,6 +1072,12 @@ export async function createExchangeChild(
       type: "troca_produto",
       store_id: parent.store_id,
       requested_by: profile.id,
+      // Responsável já entra quem criou -- pedido do Victor 19/08/2026:
+      // "tem que ficar como responsável quem fez a solicitação, sempre".
+      // Antes só virava responsável quem clicasse "assumir" depois (ver
+      // claimRequest) -- sem isso a nova troca nascia "sem responsável"
+      // mesmo tendo sido criada por alguém específico.
+      assigned_to: profile.id,
       client_name: parent.client_name,
       client_phone: parent.client_phone,
       client_cpf: parent.client_cpf,
@@ -2047,6 +2053,9 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       type,
       store_id: storeId,
       requested_by: profile.id,
+      // Responsável já entra quem criou (pedido do Victor 19/08/2026: "tem
+      // que ficar como responsável quem fez a solicitação, sempre").
+      assigned_to: profile.id,
       client_name: clientName,
       client_cpf: clientCpf,
       client_phone: clientPhone,
@@ -2303,6 +2312,9 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       type,
       store_id: storeId,
       requested_by: profile.id,
+      // Responsável já entra quem criou (pedido do Victor 19/08/2026: "tem
+      // que ficar como responsável quem fez a solicitação, sempre").
+      assigned_to: profile.id,
       client_name: clientName,
       client_phone: clientPhone,
       client_address: clientAddress,
