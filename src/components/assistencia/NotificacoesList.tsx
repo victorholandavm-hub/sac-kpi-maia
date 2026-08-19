@@ -5,16 +5,83 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { bulkSetRotaAction, getAvailableRotasForDateAction } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
-import { ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
+import { ROTAS, ROTA_LABELS, ROTA_COLORS, type AvailableRota, type Rota } from "@/lib/rotas";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
-import { StatusBadge } from "./StatusBadge";
+
+// Agrupado por rota, mesma ordem/rótulo fixo de groupByRota em fila/page.tsx
+// (Praia/Sul/Centro, "Sem rota definida" por último) -- pedido do Victor
+// 19/08/2026: "ainda não aparece o agrupamento por rota". Sem sub-grupo de
+// data aqui de propósito (fila/page.tsx tem, mas essa lista raramente passa
+// de umas dezenas de itens -- um nível a mais só atrapalharia).
+const NO_ROTA = "sem_rota" as const;
+type RotaGroupKey = Rota | typeof NO_ROTA;
+const ROTA_GROUP_ORDER: RotaGroupKey[] = [...ROTAS, NO_ROTA];
+const ROTA_GROUP_LABELS: Record<RotaGroupKey, string> = {
+  ...ROTA_LABELS,
+  [NO_ROTA]: "Sem rota definida",
+};
+const ROTA_GROUP_COLORS: Record<RotaGroupKey, string> = {
+  ...ROTA_COLORS,
+  [NO_ROTA]: "var(--text-muted)",
+};
+
+function groupByRota(requests: ServiceRequestSummary[]): { key: RotaGroupKey; items: ServiceRequestSummary[] }[] {
+  return ROTA_GROUP_ORDER.map((key) => ({ key, items: requests.filter((r) => (r.rota ?? NO_ROTA) === key) })).filter(
+    (g) => g.items.length > 0
+  );
+}
+
+// Status de montagem/desmontagem (aberta/em_contato/em_andamento/remarcar)
+// não dizem nada de útil aqui -- essas solicitações não passam por
+// negociação de agenda como uma visita, só saem numa rota e acabou (pedido
+// do Victor 19/08/2026: "não faz muito sentido ter os mesmos status de
+// montagem, precisa só saber se já está programado [tem rota+data] e
+// concluído"). Derivado dos campos que já existem (scheduledDate/rota),
+// sem mexer no status real por trás -- outras telas (detalhe do chamado,
+// KPIs) continuam usando o status de verdade normalmente.
+function DeliveryStatusBadge({ request }: { request: ServiceRequestSummary }) {
+  if (request.status === "concluida") {
+    return (
+      <span
+        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{ color: "#fff", background: "var(--status-good)" }}
+      >
+        Concluído
+      </span>
+    );
+  }
+  if (request.status === "cancelada") {
+    return (
+      <span
+        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{ color: "var(--text-secondary)", background: "var(--surface-2)" }}
+      >
+        Cancelada
+      </span>
+    );
+  }
+  const scheduled = !!request.scheduledDate && !!request.rota;
+  return (
+    <span
+      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+      style={{
+        color: scheduled ? "#fff" : "var(--text-primary)",
+        background: scheduled ? "var(--brand-green)" : "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))",
+      }}
+    >
+      {scheduled ? "Programado" : "Não programado"}
+    </span>
+  );
+}
 
 // Lista de notificações com seleção em bloco (pedido do Victor 19/08/2026:
 // "preciso selecionar em bloco pra colocar todas em uma rota") -- cada
 // linha continua um <Link> pro detalhe, só ganhou um checkbox do lado que
 // não interfere na navegação (para propagação, não é o mesmo alvo de
 // clique). Sem seleção habilitada na aba "Concluídas" -- não faz sentido
-// remarcar rota de chamado já fechado.
+// remarcar rota de chamado já fechado. Seleção fica no componente pai (não
+// por grupo de rota) -- "selecionar todas" precisa valer pra lista inteira,
+// atravessando os grupos.
 export function NotificacoesList({
   requests,
   selectable,
@@ -25,6 +92,7 @@ export function NotificacoesList({
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const allSelected = selectable && requests.length > 0 && selected.size === requests.length;
+  const groups = groupByRota(requests);
 
   function toggleAll() {
     setSelected(allSelected ? new Set() : new Set(requests.map((r) => r.id)));
@@ -64,44 +132,57 @@ export function NotificacoesList({
         </div>
       ) : null}
 
-      <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-        <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-          {requests.map((r) => (
-            <div key={r.id} className="flex items-center gap-2 p-4">
-              {selectable ? (
-                <input
-                  type="checkbox"
-                  checked={selected.has(r.id)}
-                  onChange={() => toggleOne(r.id)}
-                  className="rounded shrink-0"
-                  aria-label={`Selecionar #${r.ticketNumber}`}
-                />
-              ) : null}
-              <Link href={`/assistencia/${r.id}`} className="flex-1 min-w-0 flex items-center justify-between gap-3 flex-wrap hover:opacity-80">
-                <div className="flex flex-col gap-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                      #{r.ticketNumber}
-                    </span>
-                    <StatusBadge status={r.status} />
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                      {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                    </span>
-                  </div>
-                  <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
-                    {r.clientName ?? "Sem nome de cliente"}
-                  </p>
-                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    {r.storeName}
-                    {r.driverName ? ` · Motorista: ${r.driverName}` : ""}
-                    {r.rota ? ` · Rota ${ROTA_LABELS[r.rota]}` : ""}
-                  </p>
+      {groups.map((group) => (
+        <div key={group.key} className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2 px-1">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ROTA_GROUP_COLORS[group.key] }} />
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              {group.key === NO_ROTA ? "" : "Rota "}
+              {ROTA_GROUP_LABELS[group.key]}
+            </h3>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              ({group.items.length})
+            </span>
+          </div>
+          <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+            <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+              {group.items.map((r) => (
+                <div key={r.id} className="flex items-center gap-2 p-4">
+                  {selectable ? (
+                    <input
+                      type="checkbox"
+                      checked={selected.has(r.id)}
+                      onChange={() => toggleOne(r.id)}
+                      className="rounded shrink-0"
+                      aria-label={`Selecionar #${r.ticketNumber}`}
+                    />
+                  ) : null}
+                  <Link href={`/assistencia/${r.id}`} className="flex-1 min-w-0 flex items-center justify-between gap-3 flex-wrap hover:opacity-80">
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                          #{r.ticketNumber}
+                        </span>
+                        <DeliveryStatusBadge request={r} />
+                        <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                          {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+                        </span>
+                      </div>
+                      <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                        {r.clientName ?? "Sem nome de cliente"}
+                      </p>
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        {r.storeName}
+                        {r.driverName ? ` · Motorista: ${r.driverName}` : ""}
+                      </p>
+                    </div>
+                  </Link>
                 </div>
-              </Link>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }
