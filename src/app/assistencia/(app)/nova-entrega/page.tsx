@@ -29,6 +29,17 @@ export default async function NovaEntregaPage() {
         <Link href="/assistencia/nova-rapida" className="text-sm underline mt-1 inline-block" style={{ color: "var(--text-secondary)" }}>
           Precisa de montagem, desmontagem, troca de peça ou vistoria? Vá pra Nova visita →
         </Link>
+        {/* Troca/entrega/recolhimento de PRODUTO e notificação externa são
+            domínio do SAC (ver assistenciaLabels.ts) -- só admin tem
+            supervisão dos dois times, então só admin ganha esse atalho pra
+            não fazer todo mundo pensar que devia estar preenchendo isso
+            aqui (pedido do Victor 19/08/2026: "como admin preciso poder
+            fazer tudo"). */}
+        {profile.role === "admin" ? (
+          <Link href="/assistencia/sac/nova" className="text-sm underline mt-1 inline-block" style={{ color: "var(--text-secondary)" }}>
+            Precisa de troca/entrega de produto ou notificação externa? Vá pra Nova entrega do SAC →
+          </Link>
+        ) : null}
       </div>
       <NovaEntregaAssistenciaForm stores={stores} drivers={drivers} cargas={cargas} />
     </div>
