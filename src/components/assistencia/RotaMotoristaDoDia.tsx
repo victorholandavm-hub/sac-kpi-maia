@@ -1,9 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { setRotaDriverAssignment, addRotaExtra, removeRotaExtra, getRotaDriverAssignmentsAction } from "@/app/assistencia/actions";
+import {
+  setRotaDriverAssignment as assistenciaSetRotaDriverAssignment,
+  addRotaExtra as assistenciaAddRotaExtra,
+  removeRotaExtra as assistenciaRemoveRotaExtra,
+  getRotaDriverAssignmentsAction as assistenciaGetRotaDriverAssignments,
+} from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
-import { ROTAS, ROTA_LABELS, ROTA_COLORS, WEEKDAY_LABELS, type Rota, type RotaDayOverview } from "@/lib/rotas";
+import { ROTAS, ROTA_LABELS, ROTA_COLORS, WEEKDAY_LABELS, type Rota, type RotaDayOverview, type RotaDriverAssignments } from "@/lib/rotas";
+
+type RotaActions = {
+  setRotaDriverAssignment: (date: string, rota: string, driverName: string) => Promise<{ updatedCount: number }>;
+  addRotaExtra: (date: string, rota: string, driverName: string) => Promise<{ updatedCount: number }>;
+  removeRotaExtra: (id: string) => Promise<void>;
+  getRotaDriverAssignments: (date: string) => Promise<RotaDriverAssignments>;
+};
+
+// Ações padrão = assistência/SAC/admin (getProfile). Everton (expedição, ver
+// DISPATCH_SUPERVISOR_DRIVER) reaproveita esse mesmo componente a partir do
+// app do motorista (pedido do Victor 19/08/2026), passando as versões
+// autenticadas por sessão de PIN em vez de Supabase Auth (ver
+// driver-actions.ts) via a prop `actions` -- resto do componente idêntico,
+// só troca de onde vem a permissão.
+const DEFAULT_ACTIONS: RotaActions = {
+  setRotaDriverAssignment: assistenciaSetRotaDriverAssignment,
+  addRotaExtra: assistenciaAddRotaExtra,
+  removeRotaExtra: assistenciaRemoveRotaExtra,
+  getRotaDriverAssignments: assistenciaGetRotaDriverAssignments,
+};
 
 // "Motorista do dia" -- painel de calendário (semana atual + seguinte) com a
 // rota já pré-preenchida pelo padrão semanal (rota_weekday_config): no dia a
@@ -26,10 +51,12 @@ export function RotaMotoristaDoDia({
   today,
   initialOverview,
   drivers,
+  actions = DEFAULT_ACTIONS,
 }: {
   today: string;
   initialOverview: RotaDayOverview[];
   drivers: string[];
+  actions?: RotaActions;
 }) {
   const [overview, setOverview] = useState<RotaDayOverview[]>(initialOverview);
   // Fechado por padrão -- só a semana atual (pedido do Victor 18/08/2026: as
@@ -70,7 +97,7 @@ export function RotaMotoristaDoDia({
         {weeks.map((week, i) => (
           <div key={i} className="grid grid-cols-2 sm:grid-cols-7 gap-1.5">
             {week.map((day) => (
-              <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} />
+              <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} />
             ))}
           </div>
         ))}
@@ -93,11 +120,13 @@ function RotaDayCell({
   today,
   drivers,
   onChange,
+  actions,
 }: {
   day: RotaDayOverview;
   today: string;
   drivers: string[];
   onChange: (day: RotaDayOverview) => void;
+  actions: RotaActions;
 }) {
   const { pending, run, showToast } = useQuickAction();
   const savedRota = day.assignments.primary?.rota ?? day.expectedRota;
@@ -136,7 +165,7 @@ function RotaDayCell({
     }
     const rota = rotaValue;
     run(async () => {
-      const result = await setRotaDriverAssignment(day.date, rota, name);
+      const result = await actions.setRotaDriverAssignment(day.date, rota, name);
       onChange({ ...day, assignments: { ...day.assignments, primary: { id: day.assignments.primary?.id ?? "", rota, driverName: name } } });
       setRotaEditOpen(false);
       showToast(
@@ -158,8 +187,8 @@ function RotaDayCell({
     }
     const rota = extraRota;
     run(async () => {
-      const result = await addRotaExtra(day.date, rota, name);
-      const assignments = await getRotaDriverAssignmentsAction(day.date);
+      const result = await actions.addRotaExtra(day.date, rota, name);
+      const assignments = await actions.getRotaDriverAssignments(day.date);
       onChange({ ...day, assignments });
       setExtraRota("");
       setExtraDriver("");
@@ -173,7 +202,7 @@ function RotaDayCell({
 
   function removeExtra(id: string) {
     run(async () => {
-      await removeRotaExtra(id);
+      await actions.removeRotaExtra(id);
       onChange({ ...day, assignments: { ...day.assignments, extras: day.assignments.extras.filter((e) => e.id !== id) } });
     }, "Rota extra removida.");
   }

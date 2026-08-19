@@ -1,11 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getDriverSession, driverSignOut } from "@/app/assistencia/driver-actions";
+import {
+  getDriverSession,
+  driverSignOut,
+  driverSetRotaDriverAssignment,
+  driverAddRotaExtra,
+  driverRemoveRotaExtra,
+  driverGetRotaDriverAssignments,
+} from "@/app/assistencia/driver-actions";
 import { listRequestsForDriver, type DriverRequestView } from "@/lib/serviceRequests";
+import { listDrivers } from "@/lib/payments";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { DriverRouteGroup } from "@/components/assistencia/DriverRouteGroup";
+import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, groupByDateBucket } from "@/lib/dateBuckets";
-import { ROTAS, ROTA_LABELS, type Rota } from "@/lib/rotas";
+import { ROTAS, ROTA_LABELS, getRotaWeekOverview, startOfRotaWeek, type Rota } from "@/lib/rotas";
 import { DISPATCH_SUPERVISOR_DRIVER } from "@/lib/assistenciaLabels";
 
 // Rota e data no mesmo cabeçalho, lado a lado -- pedido do Victor
@@ -62,6 +71,16 @@ export default async function MotoristaHomePage({
   const requests = await listRequestsForDriver(driverName, { onlyCompleted: showCompleted, viewAll: isSupervisor });
   const groups = !showCompleted ? groupByRotaAndBucket(requests) : null;
 
+  // Painel "Motorista do dia" (mesmo componente de /assistencia/sac/notificacoes,
+  // ver RotaMotoristaDoDia.tsx) + seleção em bloco pra trocar rota (ver
+  // DriverRouteGroup) -- só pro Everton, pedido do Victor 19/08/2026:
+  // "conseguir trocar uma notificação de uma rota pra outra" e "adicionar
+  // rota e colocar o motorista pra aquela rota extra".
+  const today = new Date().toISOString().slice(0, 10);
+  const [rotaOverview, drivers] = isSupervisor
+    ? await Promise.all([getRotaWeekOverview(startOfRotaWeek(today), 14), listDrivers()])
+    : [null, []];
+
   return (
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader
@@ -79,6 +98,20 @@ export default async function MotoristaHomePage({
           </form>
         </div>
       </AssistenciaHeader>
+
+      {isSupervisor && rotaOverview ? (
+        <RotaMotoristaDoDia
+          today={today}
+          initialOverview={rotaOverview}
+          drivers={drivers}
+          actions={{
+            setRotaDriverAssignment: driverSetRotaDriverAssignment,
+            addRotaExtra: driverAddRotaExtra,
+            removeRotaExtra: driverRemoveRotaExtra,
+            getRotaDriverAssignments: driverGetRotaDriverAssignments,
+          }}
+        />
+      ) : null}
 
       <div className="flex items-center gap-2">
         <Link
@@ -120,12 +153,24 @@ export default async function MotoristaHomePage({
               {group.label} ({group.items.length})
             </summary>
             <div className="mt-2">
-              <DriverRouteGroup items={group.items} showCompleted={showCompleted} reorderable={!isSupervisor} showDriverName={isSupervisor} />
+              <DriverRouteGroup
+                items={group.items}
+                showCompleted={showCompleted}
+                reorderable={!isSupervisor}
+                showDriverName={isSupervisor}
+                canMoveRota={isSupervisor}
+              />
             </div>
           </details>
         ))
       ) : (
-        <DriverRouteGroup items={requests} showCompleted={showCompleted} reorderable={false} showDriverName={isSupervisor} />
+        <DriverRouteGroup
+          items={requests}
+          showCompleted={showCompleted}
+          reorderable={false}
+          showDriverName={isSupervisor}
+          canMoveRota={isSupervisor}
+        />
       )}
     </div>
   );
