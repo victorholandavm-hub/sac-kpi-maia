@@ -166,9 +166,20 @@ function GoogleReviewRow({ store, rank, onSaved }: { store: StoreGoogleReviews; 
     }
   }
 
+  const rankColor = rank ? RANK_COLORS[rank] : undefined;
+
   return (
-    <tr className="border-b" style={{ borderColor: "var(--gridline)" }}>
-      <td className="px-3 py-2 align-top text-right font-semibold" style={{ color: rank && RANK_COLORS[rank] ? RANK_COLORS[rank] : "var(--text-muted)" }}>
+    <tr
+      className="border-b"
+      style={{
+        borderColor: "var(--gridline)",
+        // Retângulo inteiro da linha colorido pro pódio, não só o número
+        // (pedido do Victor 19/08/2026) -- mix com a cor de fundo padrão pra
+        // não estourar o contraste do texto por cima.
+        background: rankColor ? `color-mix(in srgb, ${rankColor} 22%, var(--surface-1))` : undefined,
+      }}
+    >
+      <td className="px-3 py-2 align-top text-right font-semibold" style={{ color: rankColor ?? "var(--text-muted)" }}>
         {rank ?? "—"}
       </td>
       <td className="px-3 py-2 align-top" style={{ color: "var(--text-primary)" }}>
