@@ -129,6 +129,8 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
           <Row label="Bairro" value={request.clientNeighborhood} />
           <Row label="Motivo" value={request.reason} />
           <Row label="O que recolher / observação" value={request.restrictionNote} />
+          <Row label="Autorizado por" value={request.authorizedBy} />
+          <Row label="Criado por" value={request.requestedByName} />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

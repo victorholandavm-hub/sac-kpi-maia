@@ -110,6 +110,8 @@ export function DriverNotificationModalButton({ item }: { item: DriverRequestVie
               <Row label="Produtos" value={item.productSummary} />
               <Row label="Motivo" value={item.reason} />
               <Row label="Restrição / observação" value={item.restrictionNote} />
+              <Row label="Autorizado por" value={item.authorizedBy} />
+              <Row label="Criado por" value={item.requestedByName} />
             </div>
           </div>
         </>
