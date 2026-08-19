@@ -211,8 +211,11 @@ function RotaDayCell({
     <div
       className="rounded-md p-1.5 flex flex-col gap-1 min-w-0"
       style={{
-        border: "1px solid var(--gridline)",
-        background: isToday ? "var(--surface-2)" : "transparent",
+        // "Hoje" precisa se destacar de verdade no calendário -- pedido do
+        // Victor 19/08/2026 ("cor um pouco mais forte na rota do dia"),
+        // var(--surface-2) sozinho era sutil demais pra bater o olho.
+        border: isToday ? "2px solid var(--brand-green)" : "1px solid var(--gridline)",
+        background: isToday ? "color-mix(in srgb, var(--brand-green) 14%, var(--surface-1))" : "transparent",
       }}
     >
       <div className="flex items-center justify-between gap-1">
