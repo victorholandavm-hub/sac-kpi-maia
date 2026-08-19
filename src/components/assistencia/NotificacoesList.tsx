@@ -79,13 +79,23 @@ export function NotificacoesList({
             Selecionar todas
           </label>
           {selected.size > 0 ? (
-            <BulkRotaBar
-              selectedIds={[...selected]}
-              count={selected.size}
-              onDone={clearAfterApply}
-              onPartialProgress={() => router.refresh()}
-              onCancel={() => setSelected(new Set())}
-            />
+            <>
+              <Link
+                href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
+                target="_blank"
+                className="text-xs rounded-full px-3 py-1.5 font-medium border"
+                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+              >
+                🖨️ Imprimir selecionadas
+              </Link>
+              <BulkRotaBar
+                selectedIds={[...selected]}
+                count={selected.size}
+                onDone={clearAfterApply}
+                onPartialProgress={() => router.refresh()}
+                onCancel={() => setSelected(new Set())}
+              />
+            </>
           ) : null}
         </div>
       ) : null}
