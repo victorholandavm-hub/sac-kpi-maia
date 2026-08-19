@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { getDriverSession } from "@/app/assistencia/driver-actions";
 import { getDriverRequestDetail, formatFullAddress } from "@/lib/serviceRequests";
 import { listRequestPhotos } from "@/lib/servicePhotos";
-import { DRIVER_TYPE_LABELS, SHIFT_LABELS, DISPATCH_SUPERVISOR_DRIVER } from "@/lib/assistenciaLabels";
+import { DRIVER_TYPE_LABELS, SHIFT_LABELS, DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
 import { MotoristaPhotoUpload } from "@/components/assistencia/MotoristaPhotoUpload";
@@ -42,7 +42,7 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
   }
 
   const { id } = await params;
-  const isSupervisor = driverName === DISPATCH_SUPERVISOR_DRIVER;
+  const isSupervisor = DISPATCH_SUPERVISOR_DRIVERS.includes(driverName);
   const request = await getDriverRequestDetail(driverName, id, { viewAll: isSupervisor });
   if (!request) {
     notFound();

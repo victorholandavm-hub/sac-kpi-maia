@@ -18,7 +18,7 @@ type RotaActions = {
 };
 
 // Ações padrão = assistência/SAC/admin (getProfile). Everton (expedição, ver
-// DISPATCH_SUPERVISOR_DRIVER) reaproveita esse mesmo componente a partir do
+// DISPATCH_SUPERVISOR_DRIVERS) reaproveita esse mesmo componente a partir do
 // app do motorista (pedido do Victor 19/08/2026), passando as versões
 // autenticadas por sessão de PIN em vez de Supabase Auth (ver
 // driver-actions.ts) via a prop `actions` -- resto do componente idêntico,

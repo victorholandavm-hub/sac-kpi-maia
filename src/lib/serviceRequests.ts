@@ -989,7 +989,7 @@ export type DriverRequestView = {
   rotaExceptionNote: string | null;
   driverOrder: number | null;
   deliveryRating: number | null;
-  // Só usado no modo "ver todas as rotas" (ver DISPATCH_SUPERVISOR_DRIVER) --
+  // Só usado no modo "ver todas as rotas" (ver DISPATCH_SUPERVISOR_DRIVERS) --
   // pro motorista comum é sempre o próprio nome, óbvio demais pra mostrar.
   driverName: string | null;
   // Ver createExchangeChild em actions.ts -- 1 quando é a 1ª troca, 2+
@@ -1118,7 +1118,7 @@ export async function listRequestsForDriver(
   return ((data ?? []) as unknown as DriverViewRow[]).map(toDriverView);
 }
 
-// `viewAll` (DISPATCH_SUPERVISOR_DRIVER) deixa ver o chamado de QUALQUER
+// `viewAll` (DISPATCH_SUPERVISOR_DRIVERS) deixa ver o chamado de QUALQUER
 // motorista -- só visualização, as ações (concluir/foto/etc.) continuam
 // travadas por driver_name real em driver-actions.ts, não daqui.
 export async function getDriverRequestDetail(
