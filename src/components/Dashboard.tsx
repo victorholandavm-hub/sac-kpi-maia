@@ -18,8 +18,12 @@ import { PerformanceReportButton } from "./PerformanceReportButton";
 import { NpsCard, NPS_INDEX_TARGET, indexColor } from "./NpsCard";
 import { CategoryTicketsModal } from "./CategoryTicketsModal";
 import { InsightGrid } from "./InsightCard";
+import { NpsTrendChart } from "./NpsTrendChart";
+import { GoogleReviewsSection } from "./GoogleReviewsSection";
 import { buildHeadlineInsights, buildPerformanceInsights, buildGargalosInsights } from "@/lib/kpiInsights";
 import { categoryLabel, storeLabel, productLabel } from "@/lib/labels";
+import type { StoreGoogleReviews } from "@/lib/googleReviews";
+import type { NpsWeekPoint } from "@/lib/npsTrend";
 
 // Selo de volume de chamados contra referência de mercado (ver
 // getMarketVolume em kpi.ts) -- pedido do Victor 17/08/2026. null quando
@@ -48,10 +52,21 @@ const TABS = [
   { id: "geral", label: "Geral e Volumetria" },
   { id: "performance", label: "Performance da Equipe" },
   { id: "gargalos", label: "Gargalos e Logística" },
+  { id: "avaliacoes", label: "Avaliações" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
-export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) {
+export function Dashboard({
+  data,
+  range,
+  googleReviews,
+  npsTrend,
+}: {
+  data: KpiData;
+  range: DateRange;
+  googleReviews: StoreGoogleReviews[];
+  npsTrend: NpsWeekPoint[];
+}) {
   // `tag` preserva o valor cru ("cat-duvida") por trás do label traduzido --
   // usado pra abrir o drill-down (data.categoryTickets é indexado pela tag).
   const byCategory = data.byCategory.map((c) => ({ ...c, tag: c.label, label: categoryLabel(c.label) }));
@@ -259,6 +274,33 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
             <EscalationBreakdown data={data.escalations.byTarget} />
             <EscalationByStoreTable data={data.escalationByStore} />
           </section>
+        </div>
+      ) : null}
+
+      {activeTab === "avaliacoes" ? (
+        <div className="flex flex-col gap-6">
+          <NpsCard data={data.npsSummary} detractors={data.npsDetractors} />
+          <BarRanking
+            title="Distribuição das notas (enquete GHL)"
+            data={npsDistribution}
+            coverage={{ withValue: data.npsSummary.responseCount, total: data.npsSummary.eligibleCount, pct: data.npsSummary.responseRatePct ?? 0 }}
+          />
+          <NpsTrendChart data={npsTrend} />
+
+          <h3 className="text-sm font-bold -mb-2" style={{ color: "var(--text-primary)" }}>
+            Avaliações do Google por loja
+          </h3>
+          <p className="text-xs -mt-4" style={{ color: "var(--text-muted)" }}>
+            Puxado manualmente uma vez por semana (o Google não deixa automatizar de forma confiável) -- peça pra
+            atualizar quando precisar.
+          </p>
+          {googleReviews.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              Nenhuma loja com link do Google configurado ainda.
+            </p>
+          ) : (
+            <GoogleReviewsSection stores={googleReviews} />
+          )}
         </div>
       ) : null}
 
