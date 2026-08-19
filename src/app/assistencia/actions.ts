@@ -1791,6 +1791,9 @@ export async function updateRequestDetails(
 
   const clientName = String(formData.get("client_name") ?? "").trim();
   if (!clientName) return { error: "Informe o nome do cliente." };
+  // CPF obrigatório em toda solicitação (pedido do Victor 19/08/2026).
+  const clientCpf = String(formData.get("client_cpf") ?? "").trim();
+  if (!clientCpf) return { error: "Informe o CPF do cliente." };
   const storeId = String(formData.get("store_id") ?? "").trim();
   if (!storeId) return { error: "Selecione a loja." };
 
@@ -1833,7 +1836,7 @@ export async function updateRequestDetails(
       store_id: storeId,
       order_code: emptyToNull(formData.get("order_code")),
       client_name: clientName,
-      client_cpf: emptyToNull(formData.get("client_cpf")),
+      client_cpf: clientCpf,
       client_phone: emptyToNull(formData.get("client_phone")),
       client_address: emptyToNull(formData.get("client_address")),
       client_address_number: emptyToNull(addressNumberFields.number),
@@ -1892,6 +1895,12 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
 
   const clientProtheusCode = String(formData.get("client_protheus_code") ?? "").trim();
   if (!clientProtheusCode) return { error: "Informe o código do cliente." };
+
+  // CPF obrigatório em toda solicitação (pedido do Victor 19/08/2026) --
+  // identifica o cliente de verdade, independente de ter código do
+  // Protheus certo ou não.
+  const clientCpf = String(formData.get("client_cpf") ?? "").trim();
+  if (!clientCpf) return { error: "Informe o CPF do cliente." };
 
   const clientPhone = String(formData.get("client_phone") ?? "").trim();
   if (!clientPhone) return { error: "Informe o telefone." };
@@ -2039,6 +2048,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       store_id: storeId,
       requested_by: profile.id,
       client_name: clientName,
+      client_cpf: clientCpf,
       client_phone: clientPhone,
       client_address: clientAddress,
       client_neighborhood: clientNeighborhood,
@@ -2139,10 +2149,11 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   if (!clientName) return { error: "Informe o nome do cliente." };
 
   const clientProtheusCode = String(formData.get("client_protheus_code") ?? "").trim();
+  // CPF obrigatório em toda solicitação (pedido do Victor 19/08/2026) --
+  // código do cliente continua opcional (só serve pra autopreencher o
+  // resto), CPF é que identifica o cliente de verdade.
   const clientCpf = String(formData.get("client_cpf") ?? "").trim();
-  if (!clientProtheusCode && !clientCpf) {
-    return { error: "Informe o código do cliente ou o CPF." };
-  }
+  if (!clientCpf) return { error: "Informe o CPF do cliente." };
 
   const clientPhone = String(formData.get("client_phone") ?? "").trim();
   if (!clientPhone) return { error: "Informe o telefone." };

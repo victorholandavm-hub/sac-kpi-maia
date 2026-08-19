@@ -257,14 +257,13 @@ export function SacNovaVisitaForm({ stores }: { stores: Store[] }) {
       <FormSection
         title="Dados do cliente"
         number={2}
-        hint="Digite o código do cliente pra preencher o resto automaticamente (se souber). É obrigatório informar o código do cliente ou o CPF (pelo menos um)."
+        hint="Digite o código do cliente pra preencher o resto automaticamente (se souber). CPF é sempre obrigatório."
       >
-        <Field label={`Código do cliente${clientCpf.trim() ? "" : " *"}`}>
+        <Field label="Código do cliente">
           <input
             name="client_protheus_code"
             value={clientCode}
             onChange={(e) => setClientCode(e.target.value)}
-            required={!clientCpf.trim()}
             className="rounded border px-3 py-2"
             style={inputStyle}
           />
@@ -291,12 +290,12 @@ export function SacNovaVisitaForm({ stores }: { stores: Store[] }) {
           ) : null}
         </Field>
 
-        <Field label={`CPF do cliente${clientCode.trim() ? "" : " *"}`}>
+        <Field label="CPF do cliente *">
           <input
             name="client_cpf"
             value={clientCpf}
             onChange={(e) => setClientCpf(e.target.value)}
-            required={!clientCode.trim()}
+            required
             className="rounded border px-3 py-2"
             style={inputStyle}
           />

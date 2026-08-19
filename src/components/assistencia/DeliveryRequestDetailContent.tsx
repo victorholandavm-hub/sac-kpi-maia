@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/dal";
 import { formatFullAddress, type ServiceRequestDetail, type RequestEvent } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, STATUS_LABELS, SAC_MANAGED_TYPES, REQUEST_STATUS_STEPS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
-import { StatusBadge } from "./StatusBadge";
+import { REQUEST_TYPE_LABELS, STATUS_LABELS, SAC_MANAGED_TYPES, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
+import { DeliveryStatusBadge, isDeliveryScheduled } from "./DeliveryStatusBadge";
 import { StatusStepper } from "./StatusStepper";
 import { RequestActions } from "./RequestActions";
 import { MobileActionSheet } from "./MobileActionSheet";
@@ -14,6 +14,13 @@ import { RequestPhotoUpload } from "./RequestPhotoUpload";
 import type { RequestPhoto } from "@/lib/servicePhotos";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { RequestHistoryTimeline } from "./RequestHistoryTimeline";
+
+// Substitui REQUEST_STATUS_STEPS (aberta/em_contato/em_andamento/concluída,
+// vocabulário de visita de montagem) só nessa tela -- ver DeliveryStatusBadge.tsx.
+const DELIVERY_STATUS_STEPS = [
+  { key: "programado", label: "Programado" },
+  { key: "concluida", label: "Concluída" },
+];
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -107,7 +114,7 @@ export function DeliveryRequestDetailContent({
           <span className="text-sm font-mono" style={{ color: "var(--text-muted)" }}>
             Chamado #{request.ticketNumber}
           </span>
-          <StatusBadge status={request.status} />
+          <DeliveryStatusBadge status={request.status} scheduledDate={request.scheduledDate} rota={request.rota} />
           {request.type === "troca_produto" ? (
             <span
               className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
@@ -159,8 +166,19 @@ export function DeliveryRequestDetailContent({
         </div>
       ) : null}
 
+      {/* Só Programado/Concluído aqui -- pedido do Victor 19/08/2026: "não faz
+          muito sentido ter os mesmos status de montagem, precisa apenas
+          saber se já está programado e concluído". Nenhum passo aceso
+          ainda quando não tem rota+data (ver isDeliveryScheduled) --
+          currentKey some não bate com nenhum step, então os dois ficam
+          cinza (equivalente a "ainda não começou"). */}
       {request.status !== "cancelada" ? (
-        <StatusStepper steps={REQUEST_STATUS_STEPS} currentKey={request.status === "remarcar" ? "em_andamento" : request.status} />
+        <StatusStepper
+          steps={DELIVERY_STATUS_STEPS}
+          currentKey={
+            request.status === "concluida" ? "concluida" : isDeliveryScheduled(request.scheduledDate, request.rota) ? "programado" : ""
+          }
+        />
       ) : null}
 
       <div className="grid lg:grid-cols-2 gap-4 items-start">
