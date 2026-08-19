@@ -10,6 +10,7 @@ const TABS = [
   { key: "kpis", label: "KPIs", href: "/kpis" },
   { key: "clientes", label: "Clientes", href: "/clientes" },
   { key: "vendas", label: "Vendas", href: "/vendas" },
+  { key: "avaliacoes", label: "Avaliações", href: "/avaliacoes" },
 ];
 
 export function AppHeader() {

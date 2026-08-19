@@ -13,6 +13,17 @@ export function indexColor(value: number | null): string {
   return "var(--status-critical)";
 }
 
+// Ordem invertida (5 no topo) -- fica mais intuitivo no gráfico de barras
+// horizontal ver "muito satisfeito" em cima. Exportado pra não duplicar em
+// Dashboard.tsx e na aba /avaliacoes, que mostram a mesma distribuição.
+export const NPS_SCORE_LABELS: Record<number, string> = {
+  5: "5 - Muito satisfeito",
+  4: "4 - Satisfeito",
+  3: "3 - Indiferente",
+  2: "2 - Insatisfeito",
+  1: "1 - Muito insatisfeito",
+};
+
 export function NpsCard({ data, detractors }: { data: NpsSummary; detractors: NpsDetractor[] }) {
   return (
     <div
