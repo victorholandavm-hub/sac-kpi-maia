@@ -133,8 +133,8 @@ export function NotificacoesList({
       ) : null}
 
       {groups.map((group) => (
-        <div key={group.key} className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2 px-1">
+        <details key={group.key} className="flex flex-col gap-1.5" open>
+          <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ROTA_GROUP_COLORS[group.key] }} />
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               {group.key === NO_ROTA ? "" : "Rota "}
@@ -143,7 +143,7 @@ export function NotificacoesList({
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
               ({group.items.length})
             </span>
-          </div>
+          </summary>
           <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
             <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
               {group.items.map((r) => (
@@ -181,7 +181,7 @@ export function NotificacoesList({
               ))}
             </div>
           </div>
-        </div>
+        </details>
       ))}
     </div>
   );
