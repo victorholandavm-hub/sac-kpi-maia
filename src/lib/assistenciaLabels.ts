@@ -235,7 +235,9 @@ export const MANOEL_ONLY_ASSEMBLER = "Manoel";
 // acompanhar a expedição inteira. Só visualização -- concluir/subir foto/
 // reorganizar continuam exclusivos de quem está de fato na rota (ver
 // driver-actions.ts, cada ação já trava por driver_name === quem chamou).
-export const DISPATCH_SUPERVISOR_DRIVER = "Everton";
+// Samuel entrou 19/08/2026 (pedido do Victor: "mesmo nível de acesso do
+// Everton") -- mesma lista, mesmas regras, sem distinção entre os dois.
+export const DISPATCH_SUPERVISOR_DRIVERS = ["Everton", "Samuel"];
 
 // Definir valor unitário, autorizar e liberar pagamento de montagem,
 // desmontagem, vistoria e afins é exclusivo dessa pessoa -- nem outro admin

@@ -39,7 +39,7 @@ export function DriverRouteGroup({
   items: DriverRequestView[];
   showCompleted: boolean;
   reorderable: boolean;
-  // Modo "ver todas as rotas" (DISPATCH_SUPERVISOR_DRIVER) -- mostra de quem
+  // Modo "ver todas as rotas" (DISPATCH_SUPERVISOR_DRIVERS) -- mostra de quem
   // é cada entrega, já que aqui não é sempre "a minha própria".
   showDriverName?: boolean;
   // Só o Everton (expedição) -- pedido do Victor 19/08/2026: "conseguir

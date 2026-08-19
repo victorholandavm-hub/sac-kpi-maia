@@ -15,7 +15,7 @@ import { DriverRouteGroup } from "@/components/assistencia/DriverRouteGroup";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, groupByDateBucket } from "@/lib/dateBuckets";
 import { ROTAS, ROTA_LABELS, getRotaWeekOverview, startOfRotaWeek, type Rota } from "@/lib/rotas";
-import { DISPATCH_SUPERVISOR_DRIVER } from "@/lib/assistenciaLabels";
+import { DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
 
 // Rota e data no mesmo cabeçalho, lado a lado -- pedido do Victor
 // 18/08/2026: "a data... tem que aparecer ao lado da rota, não dentro".
@@ -63,10 +63,11 @@ export default async function MotoristaHomePage({
 
   const { view } = await searchParams;
   const showCompleted = view === "concluidas";
-  // Everton (expedição) vê a rota de todo mundo, não só a própria -- ver
-  // DISPATCH_SUPERVISOR_DRIVER (assistenciaLabels.ts). Sem reordenar (não é
-  // ele quem tá na rua) e com o nome do motorista de cada uma visível.
-  const isSupervisor = driverName === DISPATCH_SUPERVISOR_DRIVER;
+  // Everton/Samuel (expedição) veem a rota de todo mundo, não só a própria --
+  // ver DISPATCH_SUPERVISOR_DRIVERS (assistenciaLabels.ts). Sem reordenar
+  // (não são eles quem tá na rua) e com o nome do motorista de cada uma
+  // visível.
+  const isSupervisor = DISPATCH_SUPERVISOR_DRIVERS.includes(driverName);
 
   const requests = await listRequestsForDriver(driverName, { onlyCompleted: showCompleted, viewAll: isSupervisor });
   const groups = !showCompleted ? groupByRotaAndBucket(requests) : null;

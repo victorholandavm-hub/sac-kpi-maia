@@ -9,7 +9,7 @@ import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import { notifyLoja, notifySac, notifyAssistencia } from "@/lib/notifications";
-import { SAC_MANAGED_TYPES, DISPATCH_SUPERVISOR_DRIVER } from "@/lib/assistenciaLabels";
+import { SAC_MANAGED_TYPES, DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
 import type { RequestType } from "@/lib/serviceRequests";
 import { resolveDriverName } from "@/lib/payments";
 import { isRota, getAvailableRotasForDate, getRotaDriverAssignments, ROTA_LABELS, type Rota } from "@/lib/rotas";
@@ -329,12 +329,13 @@ export async function driverAddNote(requestId: string, note: string): Promise<vo
   revalidatePath(`/assistencia/${requestId}`);
 }
 
-// A partir daqui: ações só do Everton (expedição, ver DISPATCH_SUPERVISOR_DRIVER
-// em assistenciaLabels.ts) -- pedido do Victor 19/08/2026, "conseguir trocar
-// uma notificação de uma rota pra outra" e "adicionar rota e colocar o
-// motorista pra aquela rota extra". Ele já enxerga a rota de todo mundo
-// (isSupervisor em listRequestsForDriver/motorista/page.tsx); essas ações dão
-// o mesmo controle que assistência/SAC/admin têm em
+// A partir daqui: ações só de Everton/Samuel (expedição, ver
+// DISPATCH_SUPERVISOR_DRIVERS em assistenciaLabels.ts) -- pedido do Victor
+// 19/08/2026, "conseguir trocar uma notificação de uma rota pra outra" e
+// "adicionar rota e colocar o motorista pra aquela rota extra". Eles já
+// enxergam a rota de todo mundo (isSupervisor em
+// listRequestsForDriver/motorista/page.tsx); essas ações dão o mesmo
+// controle que assistência/SAC/admin têm em
 // setRotaDriverAssignment/addRotaExtra/removeRotaExtra (actions.ts), só que
 // autenticado pela sessão de PIN do motorista (getDriverSession) em vez de
 // getProfile() -- não dá pra chamar aquelas direto (elas exigem Supabase
@@ -343,7 +344,7 @@ export async function driverAddNote(requestId: string, note: string): Promise<vo
 // pra toda ação de motorista/montador (reverificar sessão + posse, nunca
 // confiar só em RLS).
 function requireDispatchSupervisor(driverName: string): void {
-  if (driverName !== DISPATCH_SUPERVISOR_DRIVER) {
+  if (!DISPATCH_SUPERVISOR_DRIVERS.includes(driverName)) {
     throw new Error("Só quem organiza a expedição pode mudar a rota de outros motoristas.");
   }
 }
