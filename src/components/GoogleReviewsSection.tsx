@@ -102,8 +102,14 @@ function GoogleReviewRow({ store, onSaved }: { store: StoreGoogleReviews; onSave
     setPending(true);
     setError(null);
     try {
+      // Sem onSaved()/router.refresh() aqui de propósito -- salvar só o
+      // link não muda nada visível na tabela (o input já reflete o valor
+      // digitado), e um refresh nesse meio-tempo reflui a página bem na
+      // hora que a pessoa ainda está preenchendo nota/nº ao lado, fazendo
+      // o próximo clique cair fora do lugar (achado ao puxar as avaliações
+      // pela primeira vez -- um refresh no meio da sequência mandou o
+      // clique seguinte pra um link sem relação nenhuma).
       await setStoreGoogleMapsUrl(store.storeId, urlValue);
-      onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao salvar o link.");
     } finally {
