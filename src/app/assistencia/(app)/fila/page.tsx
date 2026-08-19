@@ -369,7 +369,7 @@ export default async function AssistenciaQueuePage({
               </span>
             </div>
             <div style={{ background: "var(--surface-1)" }}>
-              <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate={showPecas} />
+              <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate={showPecas} printable={showPecas} />
             </div>
           </div>
         ))

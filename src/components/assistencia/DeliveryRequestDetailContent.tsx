@@ -94,6 +94,11 @@ export function DeliveryRequestDetailContent({
   // dia" (RotaMotoristaDoDia), que existe em dois lugares dependendo de
   // quem gerencia esse tipo de chamado.
   const motoristaDoDiaHref = isSacType ? "/assistencia/sac/notificacoes" : "/assistencia/fila?tab=pecas";
+  // Atalho pra criar a próxima sem precisar navegar de volta -- pedido do
+  // Victor 19/08/2026: "deixe disponível um botão 'criar nova notificação'
+  // assim que for criado uma notificação" (fica logo aqui, na tela de
+  // detalhe onde a criação já redireciona depois de salvar).
+  const novaNotificacaoHref = isSacType ? "/assistencia/sac/nova" : "/assistencia/nova-entrega";
 
   const causaRaizDetail =
     request.causaRaiz === "erro_conferencia"
@@ -133,6 +138,13 @@ export function DeliveryRequestDetailContent({
         </div>
         {canManage ? (
           <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href={novaNotificacaoHref}
+              className="text-sm font-medium rounded-lg px-3 py-1.5"
+              style={{ background: "var(--brand-orange)", color: "#fff" }}
+            >
+              + Criar nova notificação
+            </Link>
             <Link
               href={`/assistencia/${request.id}/editar`}
               className="text-sm font-medium rounded-lg px-3 py-1.5"

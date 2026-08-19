@@ -112,6 +112,12 @@ export function RequestDetailContent({
     profile.role === "admin" ||
     (profile.role === "assistencia" && !isSacType) ||
     (profile.role === "sac" && isSacType);
+  // Atalho pra criar a próxima sem precisar navegar de volta -- pedido do
+  // Victor 19/08/2026: "deixe disponível um botão 'criar nova notificação'
+  // assim que for criado uma notificação". Só notificação externa é SAC
+  // aqui (o resto -- montagem/desmontagem/troca de peça/vistoria -- é
+  // sempre visita de montador, formulário próprio).
+  const novaNotificacaoHref = isSacType ? "/assistencia/sac/nova" : "/assistencia/nova-rapida";
 
   return (
     <div className="flex flex-col gap-4">
@@ -128,6 +134,13 @@ export function RequestDetailContent({
         </div>
         {canManage ? (
           <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href={novaNotificacaoHref}
+              className="text-sm font-medium rounded-lg px-3 py-1.5"
+              style={{ background: "var(--brand-orange)", color: "#fff" }}
+            >
+              + Criar nova notificação
+            </Link>
             <Link
               href={`/assistencia/${request.id}/editar`}
               className="text-sm font-medium rounded-lg px-3 py-1.5"
