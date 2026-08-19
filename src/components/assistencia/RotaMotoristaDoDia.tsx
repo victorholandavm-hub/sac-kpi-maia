@@ -251,20 +251,7 @@ function RotaDayCell({
               </option>
             ))}
           </select>
-          <input
-            value={driverValue}
-            onChange={(e) => setDriverValue(e.target.value)}
-            placeholder="Motorista…"
-            list={`motoristas-${day.date}`}
-            className="rounded border px-1.5 py-1 text-xs w-full"
-            style={{ borderColor: "var(--border)" }}
-            disabled={pending}
-          />
-          <datalist id={`motoristas-${day.date}`}>
-            {drivers.map((d) => (
-              <option key={d} value={d} />
-            ))}
-          </datalist>
+          <DriverPicker value={driverValue} onChange={setDriverValue} drivers={drivers} disabled={pending} />
           {dirty ? (
             <button
               type="button"
@@ -335,20 +322,7 @@ function RotaDayCell({
               </option>
             ))}
           </select>
-          <input
-            value={extraDriver}
-            onChange={(e) => setExtraDriver(e.target.value)}
-            placeholder="Motorista…"
-            list={`motoristas-extra-${day.date}`}
-            className="rounded border px-1.5 py-1 text-xs w-full"
-            style={{ borderColor: "var(--border)" }}
-            disabled={pending}
-          />
-          <datalist id={`motoristas-extra-${day.date}`}>
-            {drivers.map((d) => (
-              <option key={d} value={d} />
-            ))}
-          </datalist>
+          <DriverPicker value={extraDriver} onChange={setExtraDriver} drivers={drivers} disabled={pending} />
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -380,5 +354,84 @@ function RotaDayCell({
         </button>
       )}
     </div>
+  );
+}
+
+// Era um <input list="..."> + <datalist> -- funciona bem no desktop, mas
+// datalist não abre sugestão nenhuma ao tocar em boa parte dos navegadores
+// mobile (achado 19/08/2026: Everton reportou "não aparece a lista de
+// motoristas" ao tocar no campo, pelo celular). Um <select> nativo sempre
+// abre a lista completa ao tocar, em qualquer navegador -- perde a busca por
+// texto que o datalist dava no desktop, mas ganha em confiabilidade, que é o
+// que importa pra quem usa isso na rua. "+ novo motorista" cai pro campo de
+// texto de sempre, pra continuar dando pra cadastrar alguém que ainda não
+// está na lista.
+function DriverPicker({
+  value,
+  onChange,
+  drivers,
+  disabled,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  drivers: string[];
+  disabled?: boolean;
+}) {
+  const [customMode, setCustomMode] = useState(value !== "" && !drivers.includes(value));
+
+  if (customMode) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Nome do motorista…"
+          autoFocus
+          className="rounded border px-1.5 py-1 text-xs w-full"
+          style={{ borderColor: "var(--border)" }}
+          disabled={disabled}
+        />
+        {drivers.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => {
+              setCustomMode(false);
+              onChange("");
+            }}
+            className="text-[10px] underline shrink-0"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            lista
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => {
+        if (e.target.value === "__novo__") {
+          setCustomMode(true);
+          onChange("");
+        } else {
+          onChange(e.target.value);
+        }
+      }}
+      className="rounded border px-1.5 py-1 text-xs w-full"
+      style={{ borderColor: "var(--border)" }}
+      disabled={disabled}
+    >
+      <option value="" disabled>
+        Motorista…
+      </option>
+      {drivers.map((d) => (
+        <option key={d} value={d}>
+          {d}
+        </option>
+      ))}
+      <option value="__novo__">+ novo motorista</option>
+    </select>
   );
 }
