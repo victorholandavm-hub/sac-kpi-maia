@@ -23,6 +23,21 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
   const [selectedStoreId, setSelectedStoreId] = useState<string>(stores[0]?.storeId ?? "");
   const selectedStore = stores.find((s) => s.storeId === selectedStoreId) ?? null;
 
+  // Ranking por nota atual, maior pra menor -- pedido do Victor 19/08/2026.
+  // Quem ainda não tem leitura fica sem posição, no fim da lista (não dá
+  // pra ranquear o que não tem nota ainda). Empate na nota desempata por
+  // quem tem mais avaliações (nota mais "confiável").
+  const rankedStores = useMemo(() => {
+    const withRating = stores.filter((s) => s.latest !== null);
+    const withoutRating = stores.filter((s) => s.latest === null);
+    withRating.sort((a, b) => {
+      const byRating = b.latest!.rating - a.latest!.rating;
+      if (byRating !== 0) return byRating;
+      return b.latest!.reviewCount - a.latest!.reviewCount;
+    });
+    return [...withRating, ...withoutRating];
+  }, [stores]);
+
   const chartData = useMemo(
     () => (selectedStore?.history ?? []).map((p) => ({ date: p.capturedAt, rating: p.rating })),
     [selectedStore]
@@ -34,6 +49,7 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
         <table className="w-full text-sm border-collapse min-w-[640px]">
           <thead>
             <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
+              <th className="px-3 py-2 text-right font-semibold">#</th>
               <th className="px-3 py-2 text-left font-semibold">Loja</th>
               <th className="px-3 py-2 text-left font-semibold">Nota atual</th>
               <th className="px-3 py-2 text-left font-semibold">Avaliações</th>
@@ -42,8 +58,8 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
             </tr>
           </thead>
           <tbody>
-            {stores.map((s) => (
-              <GoogleReviewRow key={s.storeId} store={s} onSaved={() => router.refresh()} />
+            {rankedStores.map((s, i) => (
+              <GoogleReviewRow key={s.storeId} store={s} rank={s.latest ? i + 1 : null} onSaved={() => router.refresh()} />
             ))}
           </tbody>
         </table>
@@ -91,7 +107,7 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
   );
 }
 
-function GoogleReviewRow({ store, onSaved }: { store: StoreGoogleReviews; onSaved: () => void }) {
+function GoogleReviewRow({ store, rank, onSaved }: { store: StoreGoogleReviews; rank: number | null; onSaved: () => void }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [urlValue, setUrlValue] = useState(store.googleMapsUrl ?? "");
@@ -139,6 +155,9 @@ function GoogleReviewRow({ store, onSaved }: { store: StoreGoogleReviews; onSave
 
   return (
     <tr className="border-b" style={{ borderColor: "var(--gridline)" }}>
+      <td className="px-3 py-2 align-top text-right font-semibold" style={{ color: rank && rank <= 3 ? "var(--brand-orange)" : "var(--text-muted)" }}>
+        {rank ?? "—"}
+      </td>
       <td className="px-3 py-2 align-top" style={{ color: "var(--text-primary)" }}>
         {store.storeName}
         <input
