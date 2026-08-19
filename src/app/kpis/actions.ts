@@ -2,16 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { getProfile, requireRole } from "@/lib/dal";
+import { requireDashboardAuth } from "@/lib/dashboardSession";
 
 // Avaliações do Google -- puxadas manualmente uma vez por semana (ver
-// src/lib/googleReviews.ts). Quem grava precisa estar logado como
-// admin/assistência/SAC, mesmo a tela de KPIs em si não tendo gate de
-// login hoje -- escrever dado histórico de avaliação não deveria ficar
-// aberto igual a leitura.
+// src/lib/googleReviews.ts). O painel de KPIs do SAC usa login próprio
+// (senha única do time, ver dashboardSession.ts) -- é diferente do login
+// da Assistência (Supabase Auth, getProfile em @/lib/dal). Usar o helper
+// errado aqui redirecionava pro login da Assistência ao salvar (achado ao
+// puxar as avaliações pela primeira vez -- corrigido).
 export async function setStoreGoogleMapsUrl(storeId: string, url: string): Promise<void> {
-  const profile = await getProfile();
-  requireRole(profile, "admin", "assistencia", "sac");
+  await requireDashboardAuth();
   const trimmed = url.trim();
   if (!trimmed) throw new Error("Informe o link do Google.");
 
@@ -26,8 +26,7 @@ export async function saveGoogleReviewSnapshot(
   storeId: string,
   opts: { rating: number; reviewCount: number; capturedAt?: string }
 ): Promise<void> {
-  const profile = await getProfile();
-  requireRole(profile, "admin", "assistencia", "sac");
+  await requireDashboardAuth();
 
   if (!Number.isFinite(opts.rating) || opts.rating < 0 || opts.rating > 5) {
     throw new Error("Nota inválida (0 a 5).");
@@ -40,7 +39,8 @@ export async function saveGoogleReviewSnapshot(
   const capturedAt = opts.capturedAt ?? new Date().toISOString().slice(0, 10);
   // Upsert por (store_id, captured_at) -- rodar a mesma leitura duas vezes
   // no mesmo dia atualiza em vez de duplicar (ver constraint unique em
-  // 0092_store_google_reviews.sql).
+  // 0092_store_google_reviews.sql). Sem captured_by -- login do painel de
+  // KPIs é senha única do time, sem usuário individual pra registrar.
   const { error } = await admin
     .from("store_google_reviews")
     .upsert(
@@ -49,7 +49,6 @@ export async function saveGoogleReviewSnapshot(
         captured_at: capturedAt,
         rating: opts.rating,
         review_count: opts.reviewCount,
-        captured_by: profile.id,
       },
       { onConflict: "store_id,captured_at" }
     );
