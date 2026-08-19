@@ -19,6 +19,8 @@ type QueueGroup = {
   items: ServiceRequestSummary[];
 };
 
+// Só usado por groupByRota (aba Entregas) -- ver sortGroupItemsByScheduledDate
+// abaixo, diferente do sortGroupItems usado por groupByDate (aba Visitas).
 function groupByDateKey(items: ServiceRequestSummary[]): QueueDateSubgroup[] {
   const groups: QueueDateSubgroup[] = [];
   for (const r of items) {
@@ -33,7 +35,7 @@ function groupByDateKey(items: ServiceRequestSummary[]): QueueDateSubgroup[] {
     group.items.push(r);
   }
   groups.sort((a, b) => (a.dateKey < b.dateKey ? 1 : a.dateKey > b.dateKey ? -1 : 0));
-  for (const group of groups) sortGroupItems(group.items);
+  for (const group of groups) sortGroupItemsByScheduledDate(group.items);
   return groups;
 }
 
@@ -44,6 +46,28 @@ function sortGroupItems(items: ServiceRequestSummary[]) {
     if (a.assistenciaOrder !== null && b.assistenciaOrder !== null) return a.assistenciaOrder - b.assistenciaOrder;
     if (a.assistenciaOrder !== null) return -1;
     if (b.assistenciaOrder !== null) return 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+// Só pra aba "Entregas" (pedido do Victor 19/08/2026: "a data mais atual
+// tem que aparecer primeiro") -- dentro do grupo rota+data-de-criação, quem
+// tem entrega agendada mais próxima (📅, scheduledDate/approvedDeadline,
+// mesmo campo mostrado no card -- ver effectiveDate em
+// AssistenciaQueueGroup.tsx) aparece primeiro, não quem foi criado mais
+// recentemente. Ordem manual (assistencia_order) continua tendo prioridade
+// quando definida. Quem ainda não tem data agendada vai pro fim (não dá pra
+// ordenar o que não tem data).
+function sortGroupItemsByScheduledDate(items: ServiceRequestSummary[]) {
+  items.sort((a, b) => {
+    if (a.assistenciaOrder !== null && b.assistenciaOrder !== null) return a.assistenciaOrder - b.assistenciaOrder;
+    if (a.assistenciaOrder !== null) return -1;
+    if (b.assistenciaOrder !== null) return 1;
+    const aDate = a.scheduledDate ?? a.approvedDeadline;
+    const bDate = b.scheduledDate ?? b.approvedDeadline;
+    if (aDate && bDate) return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
+    if (aDate) return -1;
+    if (bDate) return 1;
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 }
@@ -69,11 +93,13 @@ function groupByDate(requests: ServiceRequestSummary[]): QueueGroup[] {
 
 // Aba "Entregas" -- agrupado por rota, com a data ao lado no mesmo
 // cabeçalho (pedido do Victor 18/08/2026: "a data... tem que aparecer ao
-// lado da rota, não dentro" -- cada grupo é um par rota+data, não uma rota
-// com sub-grupos de data aninhados). Ordem fixa Praia/Sul/Centro + "Sem
-// rota definida" por último; dentro de cada rota, data mais recente
-// primeiro. A data de criação também continua no card de cada solicitação
-// (ver AssistenciaQueueGroup, prop showCreatedDate).
+// lado da rota, não dentro" -- cada grupo é um par rota+data-de-criação,
+// não uma rota com sub-grupos de data aninhados). Ordem fixa Praia/Sul/
+// Centro + "Sem rota definida" por último; dentro de cada rota+data, quem
+// tem entrega agendada mais próxima aparece primeiro (ver
+// sortGroupItemsByScheduledDate -- pedido do Victor 19/08/2026). A data de
+// criação também continua no card de cada solicitação (ver
+// AssistenciaQueueGroup, prop showCreatedDate).
 function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
   const rotaOrder: (Omit<QueueGroup, "items" | "label"> & { rotaLabel: string })[] = [
     ...ROTAS.map((r) => ({ key: r, rotaLabel: `Rota ${ROTA_LABELS[r]}`, headerBg: ROTA_COLORS[r], headerText: "#fff", borderColor: ROTA_COLORS[r] })),
