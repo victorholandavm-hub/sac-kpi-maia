@@ -35,6 +35,15 @@ export default async function SacNovaSolicitacaoPage() {
       <Link href="/assistencia/sac/nova-visita" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
         Precisa de montagem ou desmontagem? Vá pra Nova visita →
       </Link>
+      {/* Recolhimento de PEÇA é domínio da Assistência (ver
+          assistenciaLabels.ts) -- único tipo que falta aqui. Só admin
+          (supervisão dos dois times) ganha esse atalho, espelhando o de
+          /assistencia/nova-entrega (pedido do Victor 19/08/2026). */}
+      {profile.role === "admin" ? (
+        <Link href="/assistencia/nova-entrega" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
+          Precisa de recolhimento de peça? Vá pra Nova entrega da Assistência →
+        </Link>
+      ) : null}
 
       <SacCreateRequestForm stores={stores} drivers={drivers} cargas={cargas} />
     </div>
