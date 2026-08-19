@@ -3,8 +3,9 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { setAssistenciaOrderAction } from "@/app/assistencia/actions";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
+import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
@@ -195,7 +196,16 @@ export function AssistenciaQueueGroup({
                   <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
                     #{r.ticketNumber}
                   </span>
-                  <StatusBadge status={r.status} />
+                  {/* Troca/entrega/envio de peça usam o status simplificado
+                      (Programado/Concluído) desde o pedido do Victor
+                      19/08/2026 -- montagem/desmontagem/vistoria/troca de
+                      peça (aba Visitas) continuam com o status detalhado,
+                      onde as etapas fazem sentido de verdade. */}
+                  {(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type) ? (
+                    <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+                  ) : (
+                    <StatusBadge status={r.status} />
+                  )}
                   {r.type === "troca_produto" && r.exchangeRound > 1 ? (
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
