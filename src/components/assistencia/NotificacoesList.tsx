@@ -7,6 +7,7 @@ import { bulkSetRotaAction, getAvailableRotasForDateAction } from "@/app/assiste
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { ROTAS, ROTA_LABELS, ROTA_COLORS, type AvailableRota, type Rota } from "@/lib/rotas";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
+import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 
 // Agrupado por rota, mesma ordem/rótulo fixo de groupByRota em fila/page.tsx
 // (Praia/Sul/Centro, "Sem rota definida" por último) -- pedido do Victor
@@ -28,49 +29,6 @@ const ROTA_GROUP_COLORS: Record<RotaGroupKey, string> = {
 function groupByRota(requests: ServiceRequestSummary[]): { key: RotaGroupKey; items: ServiceRequestSummary[] }[] {
   return ROTA_GROUP_ORDER.map((key) => ({ key, items: requests.filter((r) => (r.rota ?? NO_ROTA) === key) })).filter(
     (g) => g.items.length > 0
-  );
-}
-
-// Status de montagem/desmontagem (aberta/em_contato/em_andamento/remarcar)
-// não dizem nada de útil aqui -- essas solicitações não passam por
-// negociação de agenda como uma visita, só saem numa rota e acabou (pedido
-// do Victor 19/08/2026: "não faz muito sentido ter os mesmos status de
-// montagem, precisa só saber se já está programado [tem rota+data] e
-// concluído"). Derivado dos campos que já existem (scheduledDate/rota),
-// sem mexer no status real por trás -- outras telas (detalhe do chamado,
-// KPIs) continuam usando o status de verdade normalmente.
-function DeliveryStatusBadge({ request }: { request: ServiceRequestSummary }) {
-  if (request.status === "concluida") {
-    return (
-      <span
-        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-        style={{ color: "#fff", background: "var(--status-good)" }}
-      >
-        Concluído
-      </span>
-    );
-  }
-  if (request.status === "cancelada") {
-    return (
-      <span
-        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-        style={{ color: "var(--text-secondary)", background: "var(--surface-2)" }}
-      >
-        Cancelada
-      </span>
-    );
-  }
-  const scheduled = !!request.scheduledDate && !!request.rota;
-  return (
-    <span
-      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-      style={{
-        color: scheduled ? "#fff" : "var(--text-primary)",
-        background: scheduled ? "var(--brand-green)" : "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))",
-      }}
-    >
-      {scheduled ? "Programado" : "Não programado"}
-    </span>
   );
 }
 
@@ -133,8 +91,15 @@ export function NotificacoesList({
       ) : null}
 
       {groups.map((group) => (
-        <details key={group.key} className="flex flex-col gap-1.5" open>
+        <details key={group.key} className="group flex flex-col gap-1.5" open>
           <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <span
+              className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
+              style={{ color: "var(--text-muted)" }}
+              aria-hidden="true"
+            >
+              ▶
+            </span>
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ROTA_GROUP_COLORS[group.key] }} />
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               {group.key === NO_ROTA ? "" : "Rota "}
@@ -163,7 +128,7 @@ export function NotificacoesList({
                         <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
                           #{r.ticketNumber}
                         </span>
-                        <DeliveryStatusBadge request={r} />
+                        <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
                         <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                           {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                         </span>

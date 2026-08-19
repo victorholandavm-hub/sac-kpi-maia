@@ -55,6 +55,7 @@ export function NovaEntregaAssistenciaForm({
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
 
   const [clientCode, setClientCode] = useState("");
+  const [clientCpf, setClientCpf] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientAddress, setClientAddress] = useState("");
@@ -223,6 +224,17 @@ export function NovaEntregaAssistenciaForm({
               </button>
             </span>
           ) : null}
+        </Field>
+
+        <Field label="CPF do cliente *">
+          <input
+            name="client_cpf"
+            value={clientCpf}
+            onChange={(e) => setClientCpf(e.target.value)}
+            required
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
         </Field>
 
         <Field label="Nome do cliente *">

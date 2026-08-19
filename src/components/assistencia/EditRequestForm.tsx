@@ -93,8 +93,8 @@ export function EditRequestForm({
       </Field>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="CPF">
-          <input name="client_cpf" defaultValue={request.clientCpf ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
+        <Field label="CPF *">
+          <input name="client_cpf" defaultValue={request.clientCpf ?? ""} required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
         <Field label="Telefone">
           <input name="client_phone" defaultValue={request.clientPhone ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
