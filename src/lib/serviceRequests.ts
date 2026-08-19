@@ -995,11 +995,17 @@ export type DriverRequestView = {
   // Ver createExchangeChild em actions.ts -- 1 quando é a 1ª troca, 2+
   // quando é uma rodada seguinte de uma cadeia (mostra badge "Nª troca").
   exchangeRound: number;
+  // Quem autorizou e quem criou a notificação -- pedido do Victor
+  // 18/08/2026: só aparecem no "Ver resumo"/"Ver notificação completa", não
+  // na lista compacta da rota (ver DriverNotificationModalButton.tsx e
+  // motorista/[id]/page.tsx).
+  authorizedBy: string | null;
+  requestedByName: string | null;
 };
 
 const DRIVER_VIEW_LIMIT = 200;
 const DRIVER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, stores(name), items:service_request_items(product)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, authorized_by, requested_by_name, stores(name), requester:profiles!requested_by(full_name), items:service_request_items(product)";
 
 type DriverViewRow = {
   id: string;
@@ -1029,7 +1035,10 @@ type DriverViewRow = {
   delivery_rating: number | null;
   driver_name: string | null;
   exchange_round: number;
+  authorized_by: string | null;
+  requested_by_name: string | null;
   stores: { name: string } | null;
+  requester: { full_name: string } | null;
   items: { product: string }[] | null;
 };
 
@@ -1064,6 +1073,8 @@ function toDriverView(row: DriverViewRow): DriverRequestView {
     deliveryRating: row.delivery_rating,
     driverName: row.driver_name,
     exchangeRound: row.exchange_round,
+    authorizedBy: row.authorized_by,
+    requestedByName: row.requester?.full_name ?? row.requested_by_name ?? null,
   };
 }
 
