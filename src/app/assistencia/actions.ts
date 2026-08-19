@@ -931,7 +931,7 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("status, type, assembler_name, driver_name, store_id")
+    .select("status, type, assembler_name, driver_name, store_id, deadline_status")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
@@ -954,9 +954,20 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
 
   const completedAt = newStatus === "concluida" || newStatus === "cancelada" ? new Date().toISOString() : null;
 
+  // Prazo não pode ficar "pendente de aprovação" pra sempre num chamado já
+  // concluído (pedido do Victor 18/08/2026, achado em montagem/desmontagem/
+  // vistoria -- criado pela loja com prazo pedido, mas a assistência nunca
+  // chegou a aprovar/recusar antes de já resolver o chamado direto). Concluir
+  // aprova implicitamente com a data de hoje -- não faz sentido pedir mais
+  // aprovação de prazo pra algo que já terminou.
+  const deadlineFields =
+    newStatus === "concluida" && current.deadline_status === "pendente"
+      ? { deadline_status: "aprovado" as const, approved_deadline: (completedAt as string).slice(0, 10) }
+      : {};
+
   const { data: updated, error } = await admin
     .from("service_requests")
-    .update({ status: newStatus, completed_at: completedAt })
+    .update({ status: newStatus, completed_at: completedAt, ...deadlineFields })
     .eq("id", requestId)
     .eq("status", current.status)
     .select("id")

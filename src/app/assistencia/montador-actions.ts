@@ -130,7 +130,7 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id")
+    .select("assembler_name, status, store_id, deadline_status")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -140,9 +140,18 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
     throw new Error("Esse chamado já foi encerrado.");
   }
 
+  const completedAt = new Date().toISOString();
+  // Prazo não pode ficar "pendente de aprovação" pra sempre num chamado já
+  // concluído (pedido do Victor 18/08/2026) -- concluir aprova
+  // implicitamente com a data de hoje, mesma regra de updateStatus em
+  // actions.ts (que cobre a assistência marcando concluído; aqui é o
+  // montador concluindo direto, sem passar por lá).
+  const deadlineFields =
+    request.deadline_status === "pendente" ? { deadline_status: "aprovado" as const, approved_deadline: completedAt.slice(0, 10) } : {};
+
   const { data: updated, error: updateError } = await admin
     .from("service_requests")
-    .update({ status: "concluida", completed_at: new Date().toISOString() })
+    .update({ status: "concluida", completed_at: completedAt, ...deadlineFields })
     .eq("id", requestId)
     .eq("status", request.status)
     .select("id")
