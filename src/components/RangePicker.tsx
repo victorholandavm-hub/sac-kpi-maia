@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { DateRange } from "@/lib/dateRange";
 
-const PRESETS: { key: DateRange["preset"]; label: string; href: string }[] = [
-  { key: "7d", label: "7 dias", href: "/kpis?range=7d" },
-  { key: "month", label: "Este mês", href: "/kpis?range=month" },
-  { key: "year", label: "Este ano", href: "/kpis?range=year" },
-  { key: "all", label: "Tudo", href: "/kpis?range=all" },
+const PRESETS: { key: DateRange["preset"]; label: string }[] = [
+  { key: "7d", label: "7 dias" },
+  { key: "month", label: "Este mês" },
+  { key: "year", label: "Este ano" },
+  { key: "all", label: "Tudo" },
 ];
 
 function pillStyle(active: boolean) {
@@ -16,13 +16,16 @@ function pillStyle(active: boolean) {
   };
 }
 
-export function RangePicker({ range }: { range: DateRange }) {
+// `basePath` -- reaproveitado em /avaliacoes (pedido do Victor 19/08/2026:
+// nova aba própria com o NPS "duplicado" do SAC), default "/kpis" pra não
+// quebrar o uso original.
+export function RangePicker({ range, basePath = "/kpis" }: { range: DateRange; basePath?: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {PRESETS.map((p) => (
         <Link
           key={p.key}
-          href={p.href}
+          href={`${basePath}?range=${p.key}`}
           className="text-sm px-3 py-1 rounded-full"
           style={pillStyle(range.preset === p.key)}
         >

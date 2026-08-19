@@ -14,9 +14,10 @@ function formatDate(value: unknown) {
 
 // Avaliações do Google por loja -- puxadas manualmente uma vez por semana
 // (pedido do Victor 18/08/2026: o Google não deixa automatizar de forma
-// confiável, ver src/lib/googleReviews.ts). Cada linha tem a nota/qtd atual
-// + um mini-formulário pra registrar a leitura de hoje; abaixo, um seletor
-// de loja mostra a evolução em gráfico.
+// confiável, ver src/lib/googleReviews.ts). Usado na página /avaliacoes
+// (aba própria, fora do painel de KPIs -- pedido do Victor 19/08/2026).
+// Cada linha tem a nota/qtd atual + um mini-formulário pra registrar a
+// leitura de hoje; abaixo, um seletor de loja mostra a evolução em gráfico.
 export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] }) {
   const router = useRouter();
   const [selectedStoreId, setSelectedStoreId] = useState<string>(stores[0]?.storeId ?? "");

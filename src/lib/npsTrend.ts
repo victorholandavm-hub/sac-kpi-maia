@@ -17,8 +17,8 @@ function startOfWeek(date: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Evolução do NPS (aba Avaliações, ver AvaliacoesTab.tsx) -- só
-// nps_score/nps_answered_at de `conversations`, igual à segunda varredura
+// Evolução do NPS (página /avaliacoes) -- só nps_score/nps_answered_at de
+// `conversations`, igual à segunda varredura
 // de getKpiData (kpi.ts), mas sem buscar a base inteira de chamados (que
 // só serve pra calcular taxa de resposta, não pro índice em si) -- refazer
 // isso pra cada semana do período saía caro demais só pra uma linha do

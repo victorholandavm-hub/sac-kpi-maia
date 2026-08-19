@@ -19,7 +19,7 @@ export async function setStoreGoogleMapsUrl(storeId: string, url: string): Promi
   const { error } = await admin.from("stores").update({ google_maps_url: trimmed }).eq("id", storeId);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/kpis");
+  revalidatePath("/avaliacoes");
 }
 
 export async function saveGoogleReviewSnapshot(
@@ -54,5 +54,5 @@ export async function saveGoogleReviewSnapshot(
     );
   if (error) throw new Error(error.message);
 
-  revalidatePath("/kpis");
+  revalidatePath("/avaliacoes");
 }
