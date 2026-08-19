@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { setDriverOrderAction } from "@/app/assistencia/driver-actions";
+import { useRouter } from "next/navigation";
+import { setDriverOrderAction, driverBulkSetRota, driverGetAvailableRotasForDate } from "@/app/assistencia/driver-actions";
 import { SHIFT_LABELS, DRIVER_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import { ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
 import { StatusBadge } from "./StatusBadge";
 import { DriverNotificationModalButton } from "./DriverNotificationModalButton";
 import { formatFullAddress, type DriverRequestView } from "@/lib/serviceRequests";
@@ -32,6 +34,7 @@ export function DriverRouteGroup({
   showCompleted,
   reorderable,
   showDriverName,
+  canMoveRota,
 }: {
   items: DriverRequestView[];
   showCompleted: boolean;
@@ -39,10 +42,26 @@ export function DriverRouteGroup({
   // Modo "ver todas as rotas" (DISPATCH_SUPERVISOR_DRIVER) -- mostra de quem
   // é cada entrega, já que aqui não é sempre "a minha própria".
   showDriverName?: boolean;
+  // Só o Everton (expedição) -- pedido do Victor 19/08/2026: "conseguir
+  // trocar uma notificação de uma rota pra outra". Seleção fica dentro
+  // deste grupo (mesma rota+dia); mover pra outra rota tira o item daqui na
+  // próxima renderização (o servidor já refletiu, ver router.refresh()).
+  canMoveRota?: boolean;
 }) {
+  const router = useRouter();
   const [order, setOrder] = useState(items);
   const [saving, setSaving] = useState(false);
   const [syncedItems, setSyncedItems] = useState(items);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // A tela usa polling (RealtimeQueueRefresher, a cada 15s) pra trazer
   // chamado novo/status mudado -- sem isso, a lista congelava até o
@@ -81,10 +100,31 @@ export function DriverRouteGroup({
   }
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-      <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-        {order.map((r, i) => (
+    <div className="flex flex-col gap-2">
+      {canMoveRota && !showCompleted && selected.size > 0 ? (
+        <MoveRotaBar
+          selectedIds={[...selected]}
+          count={selected.size}
+          onDone={() => {
+            setSelected(new Set());
+            router.refresh();
+          }}
+          onCancel={() => setSelected(new Set())}
+        />
+      ) : null}
+      <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+        <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+          {order.map((r, i) => (
           <div key={r.id} className="flex items-center gap-2 p-4 flex-wrap">
+            {canMoveRota && !showCompleted ? (
+              <input
+                type="checkbox"
+                checked={selected.has(r.id)}
+                onChange={() => toggleSelected(r.id)}
+                className="rounded shrink-0"
+                aria-label={`Selecionar #${r.ticketNumber}`}
+              />
+            ) : null}
             {reorderable ? (
               <div className="flex items-center gap-1 shrink-0">
                 <span
@@ -242,8 +282,163 @@ export function DriverRouteGroup({
               </div>
             </div>
           </div>
-        ))}
+          ))}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function MoveRotaBar({
+  selectedIds,
+  count,
+  onDone,
+  onCancel,
+}: {
+  selectedIds: string[];
+  count: number;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState("");
+  const [rota, setRota] = useState("");
+  const [availableRotas, setAvailableRotas] = useState<AvailableRota[]>([]);
+  const [loadingRotas, setLoadingRotas] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState<{ successCount: number; errors: string[] } | null>(null);
+  const hasDateContext = !!date;
+
+  useEffect(() => {
+    if (!hasDateContext) return;
+    const timer = setTimeout(() => {
+      setLoadingRotas(true);
+      driverGetAvailableRotasForDate(date)
+        .then((rotas) => {
+          setAvailableRotas(rotas);
+          setRota((prev) => (prev && !rotas.some((r) => r.rota === prev) ? "" : prev));
+        })
+        .catch(() => setAvailableRotas([]))
+        .finally(() => setLoadingRotas(false));
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [hasDateContext, date]);
+
+  const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
+
+  async function apply() {
+    setPending(true);
+    setResult(null);
+    try {
+      const r = await driverBulkSetRota(selectedIds, date, rota);
+      setResult(r);
+      if (r.errors.length === 0) {
+        setOpen(false);
+        onDone();
+      }
+    } catch (e) {
+      setResult({ successCount: 0, errors: [e instanceof Error ? e.message : "Erro inesperado."] });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+          {count} selecionada{count === 1 ? "" : "s"}
+        </span>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-xs rounded-full px-3 py-1.5 font-medium"
+          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+        >
+          Mover pra outra rota
+        </button>
+        <button type="button" onClick={onCancel} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+          limpar seleção
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: "var(--brand-green)", background: "var(--surface-1)" }}>
+      <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+        Mover {count} notificaç{count === 1 ? "ão" : "ões"} pra outra rota
+      </span>
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="rounded border px-2 py-1 text-sm"
+          style={{ borderColor: "var(--border)" }}
+          autoFocus
+        />
+        <select
+          value={rota}
+          onChange={(e) => setRota(e.target.value)}
+          disabled={!date || loadingRotas}
+          className="rounded border px-2 py-1 text-sm disabled:opacity-60"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <option value="">Selecione a rota…</option>
+          {effectiveAvailableRotas.map((r) => (
+            <option key={r.rota} value={r.rota}>
+              {ROTA_LABELS[r.rota]}
+              {r.driverName ? ` — ${r.driverName}` : ""}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={pending || !date || !rota}
+          onClick={apply}
+          className="text-xs rounded px-3 py-1.5 font-medium disabled:opacity-60"
+          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+        >
+          {pending ? "Aplicando…" : "Aplicar"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setResult(null);
+          }}
+          className="text-xs underline"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          cancelar
+        </button>
+      </div>
+      {!date ? null : loadingRotas ? (
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Carregando rotas…
+        </span>
+      ) : effectiveAvailableRotas.length === 0 ? (
+        <span className="text-xs" style={{ color: "var(--status-warning)" }}>
+          Nenhuma rota disponível pra essa data.
+        </span>
+      ) : null}
+      {result ? (
+        <div className="flex flex-col gap-1">
+          {result.successCount > 0 ? (
+            <span className="text-xs" style={{ color: "var(--status-good)" }}>
+              {result.successCount} movida{result.successCount === 1 ? "" : "s"} com sucesso.
+            </span>
+          ) : null}
+          {result.errors.length > 0 ? (
+            <div className="text-xs" style={{ color: "var(--status-critical)" }}>
+              {result.errors.map((e) => (
+                <p key={e}>{e}</p>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

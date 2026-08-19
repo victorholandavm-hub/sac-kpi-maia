@@ -9,8 +9,11 @@ import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import { notifyLoja, notifySac, notifyAssistencia } from "@/lib/notifications";
-import { SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
+import { SAC_MANAGED_TYPES, DISPATCH_SUPERVISOR_DRIVER } from "@/lib/assistenciaLabels";
 import type { RequestType } from "@/lib/serviceRequests";
+import { resolveDriverName } from "@/lib/payments";
+import { isRota, getAvailableRotasForDate, getRotaDriverAssignments, ROTA_LABELS, type Rota } from "@/lib/rotas";
+import { sanitizeOrFilterValue } from "@/lib/searchFilter";
 import {
   DRIVER_COOKIE_NAME,
   DRIVER_SESSION_MAX_AGE,
@@ -324,4 +327,203 @@ export async function driverAddNote(requestId: string, note: string): Promise<vo
 
   revalidatePath("/assistencia/motorista");
   revalidatePath(`/assistencia/${requestId}`);
+}
+
+// A partir daqui: ações só do Everton (expedição, ver DISPATCH_SUPERVISOR_DRIVER
+// em assistenciaLabels.ts) -- pedido do Victor 19/08/2026, "conseguir trocar
+// uma notificação de uma rota pra outra" e "adicionar rota e colocar o
+// motorista pra aquela rota extra". Ele já enxerga a rota de todo mundo
+// (isSupervisor em listRequestsForDriver/motorista/page.tsx); essas ações dão
+// o mesmo controle que assistência/SAC/admin têm em
+// setRotaDriverAssignment/addRotaExtra/removeRotaExtra (actions.ts), só que
+// autenticado pela sessão de PIN do motorista (getDriverSession) em vez de
+// getProfile() -- não dá pra chamar aquelas direto (elas exigem Supabase
+// Auth, que o motorista não tem). Mesma lógica de negócio replicada aqui de
+// propósito, não importada: é o mesmo padrão já usado no resto deste arquivo
+// pra toda ação de motorista/montador (reverificar sessão + posse, nunca
+// confiar só em RLS).
+function requireDispatchSupervisor(driverName: string): void {
+  if (driverName !== DISPATCH_SUPERVISOR_DRIVER) {
+    throw new Error("Só quem organiza a expedição pode mudar a rota de outros motoristas.");
+  }
+}
+
+export async function driverGetRotaDriverAssignments(date: string) {
+  const driverName = await getDriverSession();
+  if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
+  requireDispatchSupervisor(driverName);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Data inválida.");
+  return getRotaDriverAssignments(date);
+}
+
+export async function driverGetAvailableRotasForDate(date: string) {
+  const driverName = await getDriverSession();
+  if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
+  requireDispatchSupervisor(driverName);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+  return getAvailableRotasForDate(date);
+}
+
+// Mesma regra de setRotaDriverAssignment (actions.ts): só existe uma rota
+// principal por dia, trocar aqui substitui a anterior (nunca cria uma
+// segunda linha principal -- pra um carro a mais, ver driverAddRotaExtra).
+export async function driverSetRotaDriverAssignment(date: string, rota: string, driverNameInput: string): Promise<{ updatedCount: number }> {
+  const driverName = await getDriverSession();
+  if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
+  requireDispatchSupervisor(driverName);
+  if (!isRota(rota)) throw new Error("Rota inválida.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Data inválida.");
+  const typedName = driverNameInput.trim();
+  if (!typedName) throw new Error("Informe o motorista.");
+
+  const admin = getSupabaseAdmin();
+  const name = await resolveDriverName(typedName);
+  await admin.from("drivers").upsert({ name }, { onConflict: "name" });
+
+  const { data: existingPrimary } = await admin
+    .from("rota_driver_assignments")
+    .select("id, driver_name")
+    .eq("assignment_date", date)
+    .eq("is_extra", false)
+    .maybeSingle();
+  const oldDriverName = existingPrimary?.driver_name as string | undefined;
+
+  const { error: writeError } = existingPrimary
+    ? await admin
+        .from("rota_driver_assignments")
+        .update({ rota, driver_name: name, updated_at: new Date().toISOString() })
+        .eq("id", existingPrimary.id as string)
+    : await admin.from("rota_driver_assignments").insert({ assignment_date: date, rota, driver_name: name, is_extra: false });
+  if (writeError) throw new Error(writeError.message);
+
+  let query = admin
+    .from("service_requests")
+    .update({ driver_name: name })
+    .eq("rota", rota)
+    .eq("scheduled_date", date)
+    .not("status", "in", "(concluida,cancelada)");
+  query = oldDriverName
+    ? query.or(`driver_name.is.null,driver_name.eq.${sanitizeOrFilterValue(oldDriverName)}`)
+    : query.is("driver_name", null);
+  const { data: updated, error: updateError } = await query.select("id");
+  if (updateError) throw new Error(updateError.message);
+
+  revalidatePath("/assistencia/motorista");
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/sac");
+  return { updatedCount: updated?.length ?? 0 };
+}
+
+// Carro extra saindo no mesmo dia -- pedido do Victor 19/08/2026 ("adicionar
+// rota e colocar o motorista pra aquela rota extra"). Só pega chamado ainda
+// sem motorista, igual addRotaExtra (actions.ts).
+export async function driverAddRotaExtra(date: string, rota: string, driverNameInput: string): Promise<{ updatedCount: number }> {
+  const driverName = await getDriverSession();
+  if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
+  requireDispatchSupervisor(driverName);
+  if (!isRota(rota)) throw new Error("Rota inválida.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Data inválida.");
+  const typedName = driverNameInput.trim();
+  if (!typedName) throw new Error("Informe o motorista.");
+
+  const admin = getSupabaseAdmin();
+  const name = await resolveDriverName(typedName);
+  await admin.from("drivers").upsert({ name }, { onConflict: "name" });
+
+  const { error: insertError2 } = await admin
+    .from("rota_driver_assignments")
+    .insert({ assignment_date: date, rota, driver_name: name, is_extra: true });
+  if (insertError2) throw new Error(insertError2.message);
+
+  const { data: updated, error: updateError } = await admin
+    .from("service_requests")
+    .update({ driver_name: name })
+    .eq("rota", rota)
+    .eq("scheduled_date", date)
+    .is("driver_name", null)
+    .not("status", "in", "(concluida,cancelada)")
+    .select("id");
+  if (updateError) throw new Error(updateError.message);
+
+  revalidatePath("/assistencia/motorista");
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/sac");
+  return { updatedCount: updated?.length ?? 0 };
+}
+
+export async function driverRemoveRotaExtra(id: string): Promise<void> {
+  const driverName = await getDriverSession();
+  if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
+  requireDispatchSupervisor(driverName);
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("rota_driver_assignments").delete().eq("id", id).eq("is_extra", true);
+  if (error) throw new Error(error.message);
+  revalidatePath("/assistencia/motorista");
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/sac");
+}
+
+// Mover uma ou mais notificações pra outra rota/data -- pedido do Victor
+// 19/08/2026 ("conseguir trocar uma notificação de assistência de uma rota
+// pra outra"). Mesma validação de setSchedule/bulkSetRotaAction (rota
+// precisa ter carro saindo pra aquela data, ou ser a que o chamado já
+// tinha) -- não mexe em turno/hora/status, só data+rota+motorista, então
+// não precisa reaproveitar o setSchedule inteiro (que cobre mais campo do
+// que uma troca de rota mexe). Não falha o lote inteiro se um item der
+// erro -- devolve quantos deram certo + a lista de erros.
+export async function driverBulkSetRota(
+  requestIds: string[],
+  scheduledDate: string,
+  rota: string
+): Promise<{ successCount: number; errors: string[] }> {
+  const driverName = await getDriverSession();
+  if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
+  requireDispatchSupervisor(driverName);
+  if (requestIds.length === 0) throw new Error("Selecione pelo menos uma notificação.");
+  if (!scheduledDate) throw new Error("Escolha uma data.");
+  if (!isRota(rota)) throw new Error("Rota inválida.");
+
+  const admin = getSupabaseAdmin();
+  const availableRotas = await getAvailableRotasForDate(scheduledDate);
+  const match = availableRotas.find((r) => r.rota === rota);
+
+  const { data: rows, error } = await admin
+    .from("service_requests")
+    .select("id, ticket_number, scheduled_date, rota, status")
+    .in("id", requestIds);
+  if (error) throw new Error(error.message);
+
+  const errors: string[] = [];
+  let successCount = 0;
+  for (const row of rows ?? []) {
+    if (row.status === "concluida" || row.status === "cancelada") {
+      errors.push(`#${row.ticket_number}: já foi encerrado.`);
+      continue;
+    }
+    const isCurrentAssignment = scheduledDate === row.scheduled_date && rota === row.rota;
+    if (!match && !isCurrentAssignment) {
+      errors.push(`#${row.ticket_number}: ${ROTA_LABELS[rota as Rota]} não tem carro saindo em ${scheduledDate.split("-").reverse().join("/")}.`);
+      continue;
+    }
+    const updatePayload: Record<string, unknown> = { scheduled_date: scheduledDate, rota };
+    if (match) updatePayload.driver_name = match.driverName ?? null;
+    const { error: updateError } = await admin.from("service_requests").update(updatePayload).eq("id", row.id);
+    if (updateError) {
+      errors.push(`#${row.ticket_number}: ${updateError.message}`);
+      continue;
+    }
+    await admin.from("service_request_events").insert({
+      request_id: row.id,
+      actor_id: null,
+      event_type: "note_added",
+      note: `${driverName} (expedição) moveu pra rota ${ROTA_LABELS[rota as Rota]} em ${scheduledDate}.`,
+    });
+    successCount++;
+  }
+
+  revalidatePath("/assistencia/motorista");
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/sac");
+  return { successCount, errors };
 }
