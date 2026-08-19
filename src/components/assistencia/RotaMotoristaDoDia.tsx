@@ -52,16 +52,25 @@ export function RotaMotoristaDoDia({
   initialOverview,
   drivers,
   actions = DEFAULT_ACTIONS,
+  compact,
 }: {
   today: string;
   initialOverview: RotaDayOverview[];
   drivers: string[];
   actions?: RotaActions;
+  // Everton/Samuel (expedição) não precisam da semana inteira, só hoje +
+  // amanhã (pedido do Victor 19/08/2026) -- sem grade de calendário nem
+  // "mostrar semana seguinte", só 2 células bem maiores (o pedido era
+  // justamente deixar os botões de editar/rota extra maiores, e menos
+  // células no mesmo espaço já resolve isso sozinho). `initialOverview` já
+  // vem só com os 2 dias nesse modo (ver motorista/page.tsx).
+  compact?: boolean;
 }) {
   const [overview, setOverview] = useState<RotaDayOverview[]>(initialOverview);
   // Fechado por padrão -- só a semana atual (pedido do Victor 18/08/2026: as
   // 2 semanas inteiras tomavam espaço demais). "Mostrar mais rotas" abre a
-  // semana seguinte também.
+  // semana seguinte também. Não existe em modo compact (não tem semana pra
+  // expandir).
   const [expanded, setExpanded] = useState(false);
 
   function updateDay(updated: RotaDayOverview) {
@@ -85,32 +94,42 @@ export function RotaMotoristaDoDia({
         específico.
       </p>
 
-      <div className="hidden sm:grid grid-cols-7 gap-1.5">
-        {week1.map((day) => (
-          <span key={day.date} className="text-[11px] font-semibold text-center" style={{ color: "var(--text-muted)" }}>
-            {WEEKDAY_SHORT[day.weekday]}
-          </span>
-        ))}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        {weeks.map((week, i) => (
-          <div key={i} className="grid grid-cols-2 sm:grid-cols-7 gap-1.5">
-            {week.map((day) => (
-              <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} />
+      {compact ? (
+        <div className="grid grid-cols-2 gap-2">
+          {overview.map((day) => (
+            <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} compact />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="hidden sm:grid grid-cols-7 gap-1.5">
+            {week1.map((day) => (
+              <span key={day.date} className="text-[11px] font-semibold text-center" style={{ color: "var(--text-muted)" }}>
+                {WEEKDAY_SHORT[day.weekday]}
+              </span>
             ))}
           </div>
-        ))}
-      </div>
 
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className="text-xs rounded px-3 py-1.5 border font-medium self-start mt-1"
-        style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
-      >
-        {expanded ? "Mostrar só essa semana" : "Mostrar semana seguinte também"}
-      </button>
+          <div className="flex flex-col gap-1.5">
+            {weeks.map((week, i) => (
+              <div key={i} className="grid grid-cols-2 sm:grid-cols-7 gap-1.5">
+                {week.map((day) => (
+                  <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} />
+                ))}
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            className="text-xs rounded px-3 py-1.5 border font-medium self-start mt-1"
+            style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+          >
+            {expanded ? "Mostrar só essa semana" : "Mostrar semana seguinte também"}
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -121,12 +140,14 @@ function RotaDayCell({
   drivers,
   onChange,
   actions,
+  compact,
 }: {
   day: RotaDayOverview;
   today: string;
   drivers: string[];
   onChange: (day: RotaDayOverview) => void;
   actions: RotaActions;
+  compact?: boolean;
 }) {
   const { pending, run, showToast } = useQuickAction();
   const savedRota = day.assignments.primary?.rota ?? day.expectedRota;
@@ -207,9 +228,35 @@ function RotaDayCell({
     }, "Rota extra removida.");
   }
 
+  // Modo compact (Everton/Samuel, ver RotaMotoristaDoDia acima): só 2
+  // células na tela em vez de 7/14, então dá pra deixar tudo maior -- era
+  // justamente o pedido do Victor 19/08/2026 ("deixar os botões de edição e
+  // rota extra maiores").
+  const cellPadding = compact ? "p-3" : "p-1.5";
+  const headerTextClass = compact ? "text-sm font-semibold" : "text-[11px] font-semibold";
+  const editButtonClass = compact ? "text-xl leading-none shrink-0 rounded px-2 py-1" : "text-xs leading-none shrink-0 rounded px-1 py-0.5";
+  const selectClass = compact ? "rounded border px-3 py-2 text-sm w-full" : "rounded border px-1.5 py-1 text-xs w-full";
+  const saveButtonClass = compact
+    ? "text-sm rounded px-4 py-2.5 font-medium disabled:opacity-60"
+    : "text-xs rounded px-2 py-1 font-medium disabled:opacity-60";
+  const rotaBadgeClass = compact
+    ? "text-sm font-medium rounded-full px-3 py-1.5 self-start truncate max-w-full"
+    : "text-[11px] font-medium rounded-full px-1.5 py-0.5 self-start truncate max-w-full";
+  const driverTextClass = compact ? "text-sm truncate" : "text-xs truncate";
+  const extraChipClass = compact ? "text-xs rounded-full px-2.5 py-1 shrink-0" : "text-[10px] rounded-full px-1.5 py-0.5 shrink-0";
+  const extraDriverTextClass = compact ? "text-sm truncate flex-1 min-w-0" : "text-[11px] truncate flex-1 min-w-0";
+  const extraRemoveClass = compact ? "text-base shrink-0 px-1" : "text-[10px] shrink-0";
+  const extraActionButtonClass = compact
+    ? "text-sm rounded px-4 py-2.5 font-medium disabled:opacity-60 flex-1"
+    : "text-[11px] rounded px-2 py-1 font-medium disabled:opacity-60 flex-1";
+  const extraCancelButtonClass = compact ? "text-sm rounded px-4 py-2.5 border font-medium" : "text-[11px] rounded px-2 py-1 border font-medium";
+  const addExtraButtonClass = compact
+    ? "text-sm rounded px-3 py-2 border font-medium self-start"
+    : "text-[10px] rounded px-1.5 py-0.5 border font-medium self-start";
+
   return (
     <div
-      className="rounded-md p-1.5 flex flex-col gap-1 min-w-0"
+      className={`rounded-md ${cellPadding} flex flex-col gap-1 min-w-0`}
       style={{
         // "Hoje" precisa se destacar de verdade no calendário -- pedido do
         // Victor 19/08/2026 ("cor um pouco mais forte na rota do dia"),
@@ -219,8 +266,8 @@ function RotaDayCell({
       }}
     >
       <div className="flex items-center justify-between gap-1">
-        <span className="text-[11px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-          <span className="sm:hidden">{weekdayLabel} </span>
+        <span className={`${headerTextClass} truncate`} style={{ color: "var(--text-primary)" }}>
+          <span className={compact ? "" : "sm:hidden"}>{weekdayLabel} </span>
           {dateLabel}
           {isToday ? " · hoje" : ""}
         </span>
@@ -228,7 +275,7 @@ function RotaDayCell({
           type="button"
           onClick={rotaEditOpen ? cancelRotaEdit : () => setRotaEditOpen(true)}
           aria-label={rotaEditOpen ? "Cancelar edição da rota" : "Editar rota do dia"}
-          className="text-xs leading-none shrink-0 rounded px-1 py-0.5"
+          className={editButtonClass}
           style={{ color: "var(--text-secondary)" }}
         >
           {rotaEditOpen ? "✕" : "✏️"}
@@ -240,7 +287,7 @@ function RotaDayCell({
           <select
             value={rotaValue}
             onChange={(e) => setRotaValue(e.target.value as Rota)}
-            className="rounded border px-1.5 py-1 text-xs w-full"
+            className={selectClass}
             style={{ borderColor: "var(--border)" }}
             disabled={pending}
           >
@@ -251,15 +298,9 @@ function RotaDayCell({
               </option>
             ))}
           </select>
-          <DriverPicker value={driverValue} onChange={setDriverValue} drivers={drivers} disabled={pending} />
+          <DriverPicker value={driverValue} onChange={setDriverValue} drivers={drivers} disabled={pending} compact={compact} />
           {dirty ? (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={save}
-              className="text-xs rounded px-2 py-1 font-medium disabled:opacity-60"
-              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-            >
+            <button type="button" disabled={pending} onClick={save} className={saveButtonClass} style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
               Salvar
             </button>
           ) : null}
@@ -267,12 +308,12 @@ function RotaDayCell({
       ) : (
         <>
           <span
-            className="text-[11px] font-medium rounded-full px-1.5 py-0.5 self-start truncate max-w-full"
+            className={rotaBadgeClass}
             style={{ background: rotaValue ? ROTA_COLORS[rotaValue] : "var(--surface-2)", color: rotaValue ? "#fff" : "var(--text-muted)" }}
           >
             {rotaValue ? ROTA_LABELS[rotaValue] : "Sem rota"}
           </span>
-          <span className="text-xs truncate" style={{ color: driverValue ? "var(--text-primary)" : "var(--text-muted)" }}>
+          <span className={driverTextClass} style={{ color: driverValue ? "var(--text-primary)" : "var(--text-muted)" }}>
             {driverValue || "Sem motorista"}
           </span>
         </>
@@ -282,13 +323,10 @@ function RotaDayCell({
         <div className="flex flex-col gap-0.5 pt-0.5" style={{ borderTop: "1px solid var(--gridline)" }}>
           {day.assignments.extras.map((extra) => (
             <div key={extra.id} className="flex items-center gap-1 min-w-0">
-              <span
-                className="text-[10px] rounded-full px-1.5 py-0.5 shrink-0"
-                style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}
-              >
+              <span className={extraChipClass} style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
                 {ROTA_LABELS[extra.rota]}
               </span>
-              <span className="text-[11px] truncate flex-1 min-w-0" style={{ color: "var(--text-primary)" }}>
+              <span className={extraDriverTextClass} style={{ color: "var(--text-primary)" }}>
                 {extra.driverName}
               </span>
               <button
@@ -296,7 +334,7 @@ function RotaDayCell({
                 disabled={pending}
                 onClick={() => removeExtra(extra.id)}
                 aria-label="Remover rota extra"
-                className="text-[10px] shrink-0"
+                className={extraRemoveClass}
                 style={{ color: "var(--status-critical)" }}
               >
                 ✕
@@ -311,7 +349,7 @@ function RotaDayCell({
           <select
             value={extraRota}
             onChange={(e) => setExtraRota(e.target.value as Rota)}
-            className="rounded border px-1.5 py-1 text-xs w-full"
+            className={selectClass}
             style={{ borderColor: "var(--border)" }}
             disabled={pending}
           >
@@ -322,13 +360,13 @@ function RotaDayCell({
               </option>
             ))}
           </select>
-          <DriverPicker value={extraDriver} onChange={setExtraDriver} drivers={drivers} disabled={pending} />
+          <DriverPicker value={extraDriver} onChange={setExtraDriver} drivers={drivers} disabled={pending} compact={compact} />
           <div className="flex items-center gap-1">
             <button
               type="button"
               disabled={pending}
               onClick={addExtra}
-              className="text-[11px] rounded px-2 py-1 font-medium disabled:opacity-60 flex-1"
+              className={extraActionButtonClass}
               style={{ background: "var(--surface-2)", border: "1px solid", borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
               salvar
@@ -336,7 +374,7 @@ function RotaDayCell({
             <button
               type="button"
               onClick={() => setExtraOpen(false)}
-              className="text-[11px] rounded px-2 py-1 border font-medium"
+              className={extraCancelButtonClass}
               style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
             >
               cancelar
@@ -347,7 +385,7 @@ function RotaDayCell({
         <button
           type="button"
           onClick={() => setExtraOpen(true)}
-          className="text-[10px] rounded px-1.5 py-0.5 border font-medium self-start"
+          className={addExtraButtonClass}
           style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
         >
           + extra
@@ -371,13 +409,16 @@ function DriverPicker({
   onChange,
   drivers,
   disabled,
+  compact,
 }: {
   value: string;
   onChange: (value: string) => void;
   drivers: string[];
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const [customMode, setCustomMode] = useState(value !== "" && !drivers.includes(value));
+  const fieldClass = compact ? "rounded border px-3 py-2 text-sm w-full" : "rounded border px-1.5 py-1 text-xs w-full";
 
   if (customMode) {
     return (
@@ -387,7 +428,7 @@ function DriverPicker({
           onChange={(e) => onChange(e.target.value)}
           placeholder="Nome do motorista…"
           autoFocus
-          className="rounded border px-1.5 py-1 text-xs w-full"
+          className={fieldClass}
           style={{ borderColor: "var(--border)" }}
           disabled={disabled}
         />
@@ -398,7 +439,7 @@ function DriverPicker({
               setCustomMode(false);
               onChange("");
             }}
-            className="text-[10px] underline shrink-0"
+            className={compact ? "text-xs underline shrink-0" : "text-[10px] underline shrink-0"}
             style={{ color: "var(--text-secondary)" }}
           >
             lista
@@ -419,7 +460,7 @@ function DriverPicker({
           onChange(e.target.value);
         }
       }}
-      className="rounded border px-1.5 py-1 text-xs w-full"
+      className={fieldClass}
       style={{ borderColor: "var(--border)" }}
       disabled={disabled}
     >

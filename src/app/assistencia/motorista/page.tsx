@@ -14,7 +14,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { DriverRouteGroup } from "@/components/assistencia/DriverRouteGroup";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, groupByDateBucket } from "@/lib/dateBuckets";
-import { ROTAS, ROTA_LABELS, getRotaWeekOverview, startOfRotaWeek, type Rota } from "@/lib/rotas";
+import { ROTAS, ROTA_LABELS, getRotaWeekOverview, type Rota } from "@/lib/rotas";
 import { DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
 
 // Rota e data no mesmo cabeçalho, lado a lado -- pedido do Victor
@@ -74,13 +74,15 @@ export default async function MotoristaHomePage({
 
   // Painel "Motorista do dia" (mesmo componente de /assistencia/sac/notificacoes,
   // ver RotaMotoristaDoDia.tsx) + seleção em bloco pra trocar rota (ver
-  // DriverRouteGroup) -- só pro Everton, pedido do Victor 19/08/2026:
-  // "conseguir trocar uma notificação de uma rota pra outra" e "adicionar
-  // rota e colocar o motorista pra aquela rota extra".
+  // DriverRouteGroup) -- só pra quem organiza a expedição, pedido do Victor
+  // 19/08/2026: "conseguir trocar uma notificação de uma rota pra outra" e
+  // "adicionar rota e colocar o motorista pra aquela rota extra". Só hoje +
+  // amanhã aqui (pedido do Victor, mesma data: "não precisa aparecer todas
+  // as rotas da semana... pra deixar os botões maiores") -- diferente da
+  // versão cheia (semana + seguinte) que assistência/SAC continuam vendo em
+  // /assistencia/fila e /assistencia/sac/notificacoes.
   const today = new Date().toISOString().slice(0, 10);
-  const [rotaOverview, drivers] = isSupervisor
-    ? await Promise.all([getRotaWeekOverview(startOfRotaWeek(today), 14), listDrivers()])
-    : [null, []];
+  const [rotaOverview, drivers] = isSupervisor ? await Promise.all([getRotaWeekOverview(today, 2), listDrivers()]) : [null, []];
 
   return (
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
@@ -105,6 +107,7 @@ export default async function MotoristaHomePage({
           today={today}
           initialOverview={rotaOverview}
           drivers={drivers}
+          compact
           actions={{
             setRotaDriverAssignment: driverSetRotaDriverAssignment,
             addRotaExtra: driverAddRotaExtra,
