@@ -1,13 +1,11 @@
 import { randomUUID } from "crypto";
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { getCachedSignedUrl } from "./signedPhotoUrl";
+import { savePhotoFile, deletePhotoFile, deletePhotoFiles, photoPublicUrl } from "./localPhotoStorage";
 
-const BUCKET = "service-request-photos";
-const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hora — tempo suficiente pra abrir a página e ver as fotos
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // Allowlist explícita de formatos de foto real — nunca SVG (pode conter script
-// embutido e roda quando alguém abre a URL assinada direto no navegador).
+// embutido e roda quando alguém abre a URL da foto direto no navegador).
 const ALLOWED_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -64,40 +62,25 @@ export async function listRequestPhotos(requestId: string): Promise<RequestPhoto
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("service_request_photos")
-    .select("id, storage_path, uploaded_by, caption, created_at, is_proof, signed_url, signed_url_expires_at")
+    .select("id, storage_path, uploaded_by, caption, created_at, is_proof")
     .eq("request_id", requestId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
 
-  const rows = data ?? [];
-  return Promise.all(
-    rows.map(async (row) => {
-      const url = await getCachedSignedUrl({
-        admin,
-        bucket: BUCKET,
-        table: "service_request_photos",
-        id: row.id as string,
-        storagePath: row.storage_path as string,
-        cachedUrl: row.signed_url as string | null,
-        cachedExpiresAt: row.signed_url_expires_at as string | null,
-        ttlSeconds: SIGNED_URL_TTL_SECONDS,
-      });
-      return {
-        id: row.id as string,
-        url,
-        isPdf: (row.storage_path as string).toLowerCase().endsWith(".pdf"),
-        uploadedBy: row.uploaded_by as string | null,
-        caption: row.caption as string | null,
-        createdAt: row.created_at as string,
-        isProof: !!row.is_proof,
-      };
-    })
-  );
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    url: photoPublicUrl(row.storage_path as string),
+    isPdf: (row.storage_path as string).toLowerCase().endsWith(".pdf"),
+    uploadedBy: row.uploaded_by as string | null,
+    caption: row.caption as string | null,
+    createdAt: row.created_at as string,
+    isProof: !!row.is_proof,
+  }));
 }
 
 // Usado só por driverCompleteRequest pra checar a exigência sem precisar
-// gerar URL assinada pra toda foto do chamado (listRequestPhotos faz uma
-// chamada de storage por foto -- desnecessário só pra saber se existe 1).
+// montar a URL pública de toda foto do chamado (listRequestPhotos monta uma
+// por foto -- desnecessário só pra saber se existe 1).
 export async function hasProofPhoto(requestId: string): Promise<boolean> {
   const admin = getSupabaseAdmin();
   const { count, error } = await admin
@@ -123,14 +106,12 @@ async function uploadPhotoBytes(requestId: string, file: File): Promise<string> 
     throw new Error("O conteúdo do arquivo não bate com o formato declarado. Envie uma foto ou PDF de verdade.");
   }
 
-  const admin = getSupabaseAdmin();
   const path = `${requestId}/${randomUUID()}.${ext}`;
 
-  const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, buffer, {
-    contentType: file.type,
-  });
-  if (uploadError) {
-    console.error("uploadPhotoBytes upload failed:", uploadError.message);
+  try {
+    await savePhotoFile(path, buffer);
+  } catch (err) {
+    console.error("uploadPhotoBytes upload failed:", err);
     throw new Error("Não foi possível enviar a foto agora. Tente de novo em instantes.");
   }
   return path;
@@ -154,7 +135,7 @@ async function insertPhotoMetadata(opts: {
   });
   if (insertError) {
     console.error("insertPhotoMetadata failed:", insertError.message);
-    await admin.storage.from(BUCKET).remove([opts.path]);
+    await deletePhotoFile(opts.path);
     throw new Error("Não foi possível salvar a foto agora. Tente de novo em instantes.");
   }
 }
@@ -191,8 +172,7 @@ export async function attachPendingRequestPhoto(opts: {
 }
 
 export async function discardPendingRequestPhoto(path: string): Promise<void> {
-  const admin = getSupabaseAdmin();
-  await admin.storage.from(BUCKET).remove([path]);
+  await deletePhotoFile(path);
 }
 
 export async function getPhotoForAuth(
@@ -213,7 +193,7 @@ export async function deleteRequestPhoto(photoId: string): Promise<void> {
   const { data, error } = await admin.from("service_request_photos").select("storage_path").eq("id", photoId).maybeSingle();
   if (error || !data) throw new Error("Foto não encontrada.");
 
-  await admin.storage.from(BUCKET).remove([data.storage_path as string]);
+  await deletePhotoFile(data.storage_path as string);
 
   const { error: delError } = await admin.from("service_request_photos").delete().eq("id", photoId);
   if (delError) throw new Error(delError.message);
@@ -221,7 +201,7 @@ export async function deleteRequestPhoto(photoId: string): Promise<void> {
 
 // Chame antes de apagar uma solicitação manualmente (não há tela no app pra
 // isso hoje — só acontece via limpeza administrativa direta no banco) pra não
-// deixar arquivo órfão no Storage: o ON DELETE CASCADE da tabela só apaga a
+// deixar arquivo órfão no disco: o ON DELETE CASCADE da tabela só apaga a
 // linha, nunca o arquivo de fato.
 export async function deleteRequestPhotos(requestId: string): Promise<void> {
   const admin = getSupabaseAdmin();
@@ -231,6 +211,6 @@ export async function deleteRequestPhotos(requestId: string): Promise<void> {
     .eq("request_id", requestId);
   if (error) throw new Error(error.message);
   if (rows && rows.length > 0) {
-    await admin.storage.from(BUCKET).remove(rows.map((r) => r.storage_path as string));
+    await deletePhotoFiles(rows.map((r) => r.storage_path as string));
   }
 }

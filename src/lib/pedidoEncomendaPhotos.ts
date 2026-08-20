@@ -1,11 +1,11 @@
 import { randomUUID } from "crypto";
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { getCachedSignedUrl } from "./signedPhotoUrl";
+import { savePhotoFile, deletePhotoFile, photoPublicUrl } from "./localPhotoStorage";
 
-// Mesmo bucket de src/lib/servicePhotos.ts (privado, só URL assinada) — só
-// muda o prefixo do path, pra não colidir com fotos de service_requests.
-const BUCKET = "service-request-photos";
-const SIGNED_URL_TTL_SECONDS = 60 * 60;
+// Mesmo diretório local de src/lib/servicePhotos.ts (ver localPhotoStorage.ts
+// -- fotos saíram do Supabase Storage pro disco do VPS, pedido do Victor
+// 20/08/2026) — só muda o prefixo do path, pra não colidir com fotos de
+// service_requests.
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 const ALLOWED_TYPES: Record<string, string> = {
@@ -28,33 +28,18 @@ export async function listEncomendaPhotos(pedidoId: string): Promise<EncomendaPh
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("pedido_encomenda_photos")
-    .select("id, storage_path, uploaded_by, caption, created_at, signed_url, signed_url_expires_at")
+    .select("id, storage_path, uploaded_by, caption, created_at")
     .eq("pedido_id", pedidoId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
 
-  const rows = data ?? [];
-  return Promise.all(
-    rows.map(async (row) => {
-      const url = await getCachedSignedUrl({
-        admin,
-        bucket: BUCKET,
-        table: "pedido_encomenda_photos",
-        id: row.id as string,
-        storagePath: row.storage_path as string,
-        cachedUrl: row.signed_url as string | null,
-        cachedExpiresAt: row.signed_url_expires_at as string | null,
-        ttlSeconds: SIGNED_URL_TTL_SECONDS,
-      });
-      return {
-        id: row.id as string,
-        url,
-        uploadedBy: row.uploaded_by as string | null,
-        caption: row.caption as string | null,
-        createdAt: row.created_at as string,
-      };
-    })
-  );
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    url: photoPublicUrl(row.storage_path as string),
+    uploadedBy: row.uploaded_by as string | null,
+    caption: row.caption as string | null,
+    createdAt: row.created_at as string,
+  }));
 }
 
 // Batched pra tela da caixa, que lista vários pedidos de uma vez (mesma razão
@@ -66,25 +51,15 @@ export async function listEncomendaPhotosForPedidos(pedidoIds: string[]): Promis
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("pedido_encomenda_photos")
-    .select("id, pedido_id, storage_path, uploaded_by, caption, created_at, signed_url, signed_url_expires_at")
+    .select("id, pedido_id, storage_path, uploaded_by, caption, created_at")
     .in("pedido_id", pedidoIds)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
 
   for (const row of data ?? []) {
-    const url = await getCachedSignedUrl({
-      admin,
-      bucket: BUCKET,
-      table: "pedido_encomenda_photos",
-      id: row.id as string,
-      storagePath: row.storage_path as string,
-      cachedUrl: row.signed_url as string | null,
-      cachedExpiresAt: row.signed_url_expires_at as string | null,
-      ttlSeconds: SIGNED_URL_TTL_SECONDS,
-    });
     const photo: EncomendaPhoto = {
       id: row.id as string,
-      url,
+      url: photoPublicUrl(row.storage_path as string),
       uploadedBy: row.uploaded_by as string | null,
       caption: row.caption as string | null,
       createdAt: row.created_at as string,
@@ -115,11 +90,10 @@ export async function saveEncomendaPhoto(opts: {
   const path = `encomenda/${opts.pedidoId}/${randomUUID()}.${ext}`;
 
   const buffer = Buffer.from(await opts.file.arrayBuffer());
-  const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, buffer, {
-    contentType: opts.file.type,
-  });
-  if (uploadError) {
-    console.error("saveEncomendaPhoto upload failed:", uploadError.message);
+  try {
+    await savePhotoFile(path, buffer);
+  } catch (err) {
+    console.error("saveEncomendaPhoto upload failed:", err);
     throw new Error("Não foi possível enviar a foto agora. Tente de novo em instantes.");
   }
 
@@ -132,7 +106,7 @@ export async function saveEncomendaPhoto(opts: {
   });
   if (insertError) {
     console.error("saveEncomendaPhoto insert failed:", insertError.message);
-    await admin.storage.from(BUCKET).remove([path]);
+    await deletePhotoFile(path);
     throw new Error("Não foi possível salvar a foto agora. Tente de novo em instantes.");
   }
 }
