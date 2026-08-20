@@ -167,9 +167,15 @@ export default async function TecnicoHomePage({
                           Concluído {formatDateTime(r.completedAt)} · {r.driverName ?? "—"}
                         </span>
                       </div>
-                      <p className="text-xs px-4 pt-2" style={{ color: "var(--text-muted)" }}>
-                        Solicitado por: {r.requestedByName ?? "—"}
-                      </p>
+                      <div className="flex flex-col gap-0.5 px-4 pt-2">
+                        <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                          Cliente: {r.clientName ?? "—"}
+                          {r.clientProtheusCode ? ` (${r.clientProtheusCode})` : ""}
+                        </p>
+                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          Solicitado por: {r.requestedByName ?? "—"}
+                        </p>
+                      </div>
                       <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
                         {r.items
                           .filter((i) => (showClassificados ? i.destino !== null : i.destino === null))

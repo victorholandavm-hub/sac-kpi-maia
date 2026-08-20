@@ -63,6 +63,9 @@ export type TecnicoRequestView = {
   type: RequestType;
   storeName: string;
   clientName: string | null;
+  // Código do cliente no Protheus -- pedido do Victor 20/08/2026: "precisa
+  // aparecer também o nome e o código do cliente".
+  clientProtheusCode: string | null;
   driverName: string | null;
   completedAt: string | null;
   // Quem abriu a notificação -- pedido do Victor 20/08/2026: "precisa ter
@@ -77,13 +80,14 @@ export type TecnicoRequestView = {
 
 const TECNICO_VIEW_LIMIT = 200;
 const TECNICO_VIEW_COLUMNS =
-  "id, ticket_number, type, store_id, client_name, driver_name, completed_at, requested_by_name, requester:profiles!requested_by(full_name), stores(name), items:service_request_items(id, product, part_code, quantity, destino, destino_definido_por, destino_definido_em)";
+  "id, ticket_number, type, store_id, client_name, client_protheus_code, driver_name, completed_at, requested_by_name, requester:profiles!requested_by(full_name), stores(name), items:service_request_items(id, product, part_code, quantity, destino, destino_definido_por, destino_definido_em)";
 
 type TecnicoViewRow = {
   id: string;
   ticket_number: number;
   type: RequestType;
   client_name: string | null;
+  client_protheus_code: string | null;
   driver_name: string | null;
   completed_at: string | null;
   requested_by_name: string | null;
@@ -107,6 +111,7 @@ function toTecnicoView(row: TecnicoViewRow): TecnicoRequestView {
     type: row.type,
     storeName: row.stores?.name ?? "—",
     clientName: row.client_name,
+    clientProtheusCode: row.client_protheus_code,
     driverName: row.driver_name,
     completedAt: row.completed_at,
     requestedByName: row.requester?.full_name ?? row.requested_by_name ?? null,
