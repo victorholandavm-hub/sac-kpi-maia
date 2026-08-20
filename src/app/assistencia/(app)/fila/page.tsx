@@ -109,10 +109,17 @@ function groupByDate(requests: ServiceRequestSummary[]): QueueGroup[] {
 // aparece em cada notificação (pedido do Victor 18 e 19/08/2026: "a data...
 // tem que aparecer ao lado da rota, não dentro" + "eu não devo ter ao lado
 // a data de criação, mas sim a data da rota"). Cada grupo é um par
-// rota+data-agendada, não uma rota com sub-grupos aninhados. Ordem fixa
-// Praia/Sul/Centro + "Sem rota definida" por último; dentro de cada rota, a
-// data de hoje vem primeiro, a de amanhã logo abaixo, e por aí (ver
-// groupByScheduledDate).
+// rota+data-agendada.
+//
+// A DATA manda na ordem, não a rota -- pedido do Victor 20/08/2026: "eu
+// preciso que o primeiro seja a data do dia e abaixo as próximas... e só
+// depois disso, vem as datas que já passaram". Até 20/08/2026 o loop
+// externo era por rota (Praia, Sul, Centro, Sem rota) e só por dentro de
+// cada rota é que a data mandava -- isso fazia uma rota atrasada aparecer
+// ANTES de outra rota com entrega hoje, só porque "Praia" vem antes de
+// "Sul" na ordem fixa. Agora primeiro agrupa tudo por data (mesmo rank de
+// groupByScheduledDate: hoje, amanhã, depois, atrasado, sem_data) e só
+// dentro de cada data é que separa por rota.
 function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
   const rotaOrder: (Omit<QueueGroup, "items" | "label"> & { rotaLabel: string })[] = [
     ...ROTAS.map((r) => ({ key: r, rotaLabel: `Rota ${ROTA_LABELS[r]}`, headerBg: ROTA_COLORS[r], headerText: "#fff", borderColor: ROTA_COLORS[r] })),
@@ -120,17 +127,17 @@ function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
   ];
 
   const groups: QueueGroup[] = [];
-  for (const rotaInfo of rotaOrder) {
-    const rotaItems = requests.filter((r) => (r.rota ?? "sem_rota") === rotaInfo.key);
-    if (rotaItems.length === 0) continue;
-    for (const sub of groupByScheduledDate(rotaItems)) {
+  for (const dateGroup of groupByScheduledDate(requests)) {
+    for (const rotaInfo of rotaOrder) {
+      const items = dateGroup.items.filter((r) => (r.rota ?? "sem_rota") === rotaInfo.key);
+      if (items.length === 0) continue;
       groups.push({
-        key: `${rotaInfo.key}_${sub.dateKey}`,
-        label: `${rotaInfo.rotaLabel} · ${sub.label}`,
+        key: `${dateGroup.dateKey}_${rotaInfo.key}`,
+        label: `${rotaInfo.rotaLabel} · ${dateGroup.label}`,
         headerBg: rotaInfo.headerBg,
         headerText: rotaInfo.headerText,
         borderColor: rotaInfo.borderColor,
-        items: sub.items,
+        items,
       });
     }
   }
