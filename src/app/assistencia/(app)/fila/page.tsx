@@ -4,6 +4,7 @@ import { listRequests, listStores, isRequestStatus, type ServiceRequestSummary, 
 import { listAssemblers, listDrivers } from "@/lib/payments";
 import { getRotaWeekOverview, startOfRotaWeek, ROTAS, ROTA_LABELS, ROTA_COLORS } from "@/lib/rotas";
 import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
+import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
@@ -32,15 +33,31 @@ function sortGroupItems(items: ServiceRequestSummary[]) {
 
 const NO_SCHEDULED_DATE_KEY = "sem_data";
 
+// Hoje sempre em primeiro, não "a data mais antiga" -- achado 19/08/2026: a
+// primeira versão disso era só ordem ascendente de data, então uma rota
+// atrasada (ex.: 18/08, com hoje sendo 20/08) aparecia ANTES de hoje, porque
+// "18" < "20" como string. bucketByScheduledDate (dateBuckets.ts) já resolve
+// "hoje" de verdade, no fuso de João Pessoa (mesmo helper usado nas listas
+// de motorista/montador, com a mesma armadilha de fuso já corrigida lá --
+// ver comentário de BUSINESS_TZ_OFFSET_MS). Ordem aqui: hoje, amanhã, resto
+// do futuro (crescente), atrasado, sem data -- diferente da lista de
+// motorista (que abre "Atrasado" primeiro, por ser o que precisa de atenção
+// imediata pra QUEM VAI SAIR AGORA); aqui é o pedido explícito do Victor
+// ("a rota do dia sempre tem que ser a primeira de cima").
+const SCHEDULED_DATE_BUCKET_RANK: Record<DateBucketKey, number> = {
+  hoje: 0,
+  amanha: 1,
+  depois: 2,
+  atrasado: 3,
+  sem_data: 4,
+};
+
 // Só usado por groupByRota (aba Entregas) -- pedido do Victor 19/08/2026:
 // "no agrupamento de cada rota, eu não devo ter ao lado a data de criação,
 // mas sim a data da rota" (a de criação já aparece em cada notificação, ver
-// showCreatedDate em AssistenciaQueueGroup) "e a rota do dia sempre tem que
-// ser a primeira de cima, e a do dia seguinte, logo abaixo". Agrupa por
+// showCreatedDate em AssistenciaQueueGroup). Agrupa por
 // scheduledDate/approvedDeadline (o mesmo 📅 mostrado no card -- ver
-// effectiveDate em AssistenciaQueueGroup.tsx), não por createdAt; hoje
-// primeiro, depois amanhã, e por aí -- "sem data definida" sempre por
-// último (não dá pra encaixar num lugar certo da sequência sem data).
+// effectiveDate em AssistenciaQueueGroup.tsx), não por createdAt.
 function groupByScheduledDate(items: ServiceRequestSummary[]): QueueDateSubgroup[] {
   const groups: QueueDateSubgroup[] = [];
   for (const r of items) {
@@ -57,8 +74,11 @@ function groupByScheduledDate(items: ServiceRequestSummary[]): QueueDateSubgroup
     group.items.push(r);
   }
   groups.sort((a, b) => {
-    if (a.dateKey === NO_SCHEDULED_DATE_KEY) return 1;
-    if (b.dateKey === NO_SCHEDULED_DATE_KEY) return -1;
+    const rankA = SCHEDULED_DATE_BUCKET_RANK[bucketByScheduledDate(a.dateKey === NO_SCHEDULED_DATE_KEY ? null : a.dateKey)];
+    const rankB = SCHEDULED_DATE_BUCKET_RANK[bucketByScheduledDate(b.dateKey === NO_SCHEDULED_DATE_KEY ? null : b.dateKey)];
+    if (rankA !== rankB) return rankA - rankB;
+    // Dentro do mesmo balde ("depois" ou "atrasado" podem ter mais de uma
+    // data) -- crescente entre si.
     return a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0;
   });
   for (const group of groups) sortGroupItems(group.items);
