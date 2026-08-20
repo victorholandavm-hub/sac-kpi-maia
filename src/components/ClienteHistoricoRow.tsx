@@ -30,6 +30,12 @@ export function ClienteHistoricoRow({
   name,
   colSpan,
   leadingCells,
+  // Cor do status/nível dessa linha (ver CLIENTE_STATUS_COLORS/
+  // CLIENTE_NIVEL_COLORS) -- vira uma faixinha à esquerda do nome, pedido
+  // do Victor 20/08/2026: "deixe a lista de clientes mais viva com cor,
+  // borda... nada muito chamativo". Opcional pra não quebrar quem não
+  // passar (fica sem faixa, comportamento de antes).
+  accentColor,
   children,
 }: {
   clientId: string;
@@ -40,6 +46,7 @@ export function ClienteHistoricoRow({
   // Colunas ANTES do nome (ex.: "Posição" na visão Nível de relacionamento)
   // -- a maioria das tabelas não tem nenhuma, daí opcional.
   leadingCells?: React.ReactNode;
+  accentColor?: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -71,9 +78,15 @@ export function ClienteHistoricoRow({
 
   return (
     <>
-      <tr>
+      <tr className="transition-colors hover:bg-[var(--surface-2)]">
         {leadingCells}
-        <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
+        <td
+          className="px-4 py-2"
+          style={{
+            color: "var(--text-primary)",
+            boxShadow: accentColor ? `inset 3px 0 0 ${accentColor}` : undefined,
+          }}
+        >
           <button onClick={toggle} className="flex items-center gap-1.5 text-left underline decoration-dotted">
             <span
               className="text-xs shrink-0 transition-transform duration-150"
@@ -89,7 +102,11 @@ export function ClienteHistoricoRow({
       </tr>
       {open ? (
         <tr>
-          <td colSpan={colSpan} className="px-4 py-3" style={{ background: "var(--surface-2)" }}>
+          <td
+            colSpan={colSpan}
+            className="px-4 py-3"
+            style={{ background: "color-mix(in srgb, var(--brand-green) 6%, var(--surface-2))" }}
+          >
             {loading ? (
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                 Carregando…

@@ -71,9 +71,9 @@ export default async function ClientesPage({
       <div className="flex items-center gap-2">
         <Link
           href={buildHref({ view: "status" })}
-          className="text-sm px-3 py-1.5 rounded-full border"
+          className="text-sm px-3 py-1.5 rounded-full border transition-colors"
           style={{
-            borderColor: "var(--border)",
+            borderColor: view === "status" ? "var(--brand-orange)" : "var(--border)",
             background: view === "status" ? "var(--brand-orange)" : "transparent",
             color: view === "status" ? "#fff" : "var(--text-secondary)",
             fontWeight: view === "status" ? 600 : 400,
@@ -83,9 +83,9 @@ export default async function ClientesPage({
         </Link>
         <Link
           href={buildHref({ view: "nivel" })}
-          className="text-sm px-3 py-1.5 rounded-full border"
+          className="text-sm px-3 py-1.5 rounded-full border transition-colors"
           style={{
-            borderColor: "var(--border)",
+            borderColor: view === "nivel" ? "var(--brand-orange)" : "var(--border)",
             background: view === "nivel" ? "var(--brand-orange)" : "transparent",
             color: view === "nivel" ? "#fff" : "var(--text-secondary)",
             fontWeight: view === "nivel" ? 600 : 400,
@@ -131,10 +131,10 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
           <Link
             key={s}
             href={buildHref({ view: "status", q, status: filterStatus === s ? undefined : s })}
-            className="rounded-xl border p-5 flex flex-col gap-1"
+            className="rounded-xl border p-5 flex flex-col gap-1 transition-all hover:-translate-y-0.5 hover:shadow-md"
             style={{
-              background: "var(--surface-1)",
-              borderColor: filterStatus === s ? CLIENTE_STATUS_COLORS[s] : "var(--border)",
+              background: `color-mix(in srgb, ${CLIENTE_STATUS_COLORS[s]} ${filterStatus === s ? 10 : 5}%, var(--surface-1))`,
+              borderColor: `color-mix(in srgb, ${CLIENTE_STATUS_COLORS[s]} ${filterStatus === s ? 100 : 35}%, var(--border))`,
               borderTopWidth: 3,
               borderTopColor: CLIENTE_STATUS_COLORS[s],
             }}
@@ -192,26 +192,38 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
+        <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Nome</th>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Status</th>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Última compra</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Dias sem comprar</th>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Telefone</th>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Cidade</th>
+                <tr
+                  className="text-xs"
+                  style={{ color: "var(--text-secondary)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                >
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Status</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Dias sem comprar</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Telefone</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cidade</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
                 {listResult.items.map((c) => (
-                  <ClienteHistoricoRow key={c.protheusCode} clientId={c.protheusCode} name={c.name} colSpan={6}>
+                  <ClienteHistoricoRow
+                    key={c.protheusCode}
+                    clientId={c.protheusCode}
+                    name={c.name}
+                    colSpan={6}
+                    accentColor={CLIENTE_STATUS_COLORS[c.status]}
+                  >
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span
-                        className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
-                        style={{ color: CLIENTE_STATUS_COLORS[c.status], borderColor: CLIENTE_STATUS_COLORS[c.status] }}
+                        className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{
+                          color: CLIENTE_STATUS_COLORS[c.status],
+                          background: `color-mix(in srgb, ${CLIENTE_STATUS_COLORS[c.status]} 15%, transparent)`,
+                        }}
                       >
                         {CLIENTE_STATUS_LABELS[c.status]}
                       </span>
@@ -303,10 +315,10 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
           <Link
             key={n}
             href={buildHref({ view: "nivel", q, nivel: filterNivel === n ? undefined : n })}
-            className="rounded-xl border p-4 flex flex-col gap-1"
+            className="rounded-xl border p-4 flex flex-col gap-1 transition-all hover:-translate-y-0.5 hover:shadow-md"
             style={{
-              background: "var(--surface-1)",
-              borderColor: filterNivel === n ? CLIENTE_NIVEL_COLORS[n] : "var(--border)",
+              background: `color-mix(in srgb, ${CLIENTE_NIVEL_COLORS[n]} ${filterNivel === n ? 10 : 5}%, var(--surface-1))`,
+              borderColor: `color-mix(in srgb, ${CLIENTE_NIVEL_COLORS[n]} ${filterNivel === n ? 100 : 35}%, var(--border))`,
               borderTopWidth: 3,
               borderTopColor: CLIENTE_NIVEL_COLORS[n],
             }}
@@ -372,19 +384,22 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ borderColor: "var(--border)" }}>
+        <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Posição</th>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Nome</th>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Nível</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Compras</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Gasto acumulado</th>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Cliente desde</th>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Última compra</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Dias sem comprar</th>
+                <tr
+                  className="text-xs"
+                  style={{ color: "var(--text-secondary)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                >
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Posição</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nível</th>
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Gasto acumulado</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cliente desde</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Dias sem comprar</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -394,6 +409,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                     clientId={c.clientId}
                     name={c.nome ?? c.clientId}
                     colSpan={8}
+                    accentColor={CLIENTE_NIVEL_COLORS[c.nivel]}
                     leadingCells={
                       <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
                         {c.posicaoNoNivel}º
@@ -403,8 +419,11 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                     <td className="px-4 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span
-                          className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
-                          style={{ color: CLIENTE_NIVEL_COLORS[c.nivel], borderColor: CLIENTE_NIVEL_COLORS[c.nivel] }}
+                          className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                          style={{
+                            color: CLIENTE_NIVEL_COLORS[c.nivel],
+                            background: `color-mix(in srgb, ${CLIENTE_NIVEL_COLORS[c.nivel]} 15%, transparent)`,
+                          }}
                         >
                           {CLIENTE_NIVEL_LABELS[c.nivel]}
                         </span>
@@ -422,7 +441,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                     <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.compras}
                     </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--brand-green)" }}>
                       {formatBRL(c.gastoAcumulado)}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
