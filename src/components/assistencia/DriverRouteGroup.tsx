@@ -264,6 +264,11 @@ export function DriverRouteGroup({
                     Prazo: {formatDateOnly(r.approvedDeadline ?? r.requestedDeadline)}
                   </p>
                 ) : null}
+                {r.clientTimeRestriction ? (
+                  <p className="text-xs font-bold" style={{ color: "var(--status-warning)" }}>
+                    🕐 {r.clientTimeRestriction}
+                  </p>
+                ) : null}
                 {r.rotaExceptionNote ? (
                   <p className="text-xs font-medium" style={{ color: "var(--status-warning)" }}>
                     ⚠ Fora da rota do dia: {r.rotaExceptionNote}

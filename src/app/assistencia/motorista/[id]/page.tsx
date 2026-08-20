@@ -84,6 +84,14 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
 
         <div className="flex items-center gap-2 flex-wrap">
           <DeliveryStatusBadge status={request.status} scheduledDate={request.scheduledDate} rota={request.rota} />
+          {request.clientTimeRestriction ? (
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 40%, var(--surface-1))" }}
+            >
+              🕐 {request.clientTimeRestriction}
+            </span>
+          ) : null}
           {request.shift === "urgencia" ? (
             <span
               className="text-xs font-bold px-2 py-0.5 rounded-full"

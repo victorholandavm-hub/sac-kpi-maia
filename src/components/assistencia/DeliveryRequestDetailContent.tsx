@@ -226,6 +226,7 @@ export function DeliveryRequestDetailContent({
             <Row label="Quem errou" value={request.causaRaiz ? (CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz) : null} />
             {causaRaizDetail ? <Row label="Detalhe" value={causaRaizDetail} /> : null}
             <Row label="Restrição / observação" value={request.restrictionNote} />
+            <Row label="Restrição de horário do cliente" value={request.clientTimeRestriction} />
             <Row label="Observações" value={request.notes} />
             {request.type === "troca_produto" ? (
               <Row label="Produto recolhido?" value={request.pickupCompleted ? "Sim" : "Ainda não"} />

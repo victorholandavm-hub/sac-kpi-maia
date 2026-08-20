@@ -318,6 +318,14 @@ export function AssistenciaQueueGroup({
                       {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
                     </span>
                   ) : null}
+                  {r.clientTimeRestriction ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+                    >
+                      🕐 {r.clientTimeRestriction}
+                    </span>
+                  ) : null}
                   {paymentFlag ? (
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
