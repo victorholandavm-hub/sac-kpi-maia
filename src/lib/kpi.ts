@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import type { DateRange } from "./dateRange";
 import { fetchInBatches } from "./supabaseBatch";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
 export type TicketRow = {
   conversation_id: string;
@@ -940,19 +941,21 @@ export async function getKpiData(
   const supabase = getSupabaseAdmin();
 
   // PostgREST limita cada resposta (max_rows do projeto, normalmente 1000),
-  // entao paginamos com .range() ate esgotar os dados.
-  const allRows: TicketRow[] = [];
+  // entao paginamos com .range() ate esgotar os dados -- em PARALELO (ver
+  // fetchAllPagesParallel), não uma página esperando a anterior. Achado
+  // 19/08/2026 (perf, pedido do Victor): essa era sequencial, uma das
+  // maiores fatias dos 5,8s que /kpis chegou a demorar pra carregar.
   const pageSize = 1000;
-  for (let page = 0; ; page++) {
-    const { data: pageRows, error: ticketError } = await supabase
-      .from("v_ticket_enriched")
-      .select("*")
-      .order("opened_at", { ascending: false })
-      .range(page * pageSize, page * pageSize + pageSize - 1);
-    if (ticketError) throw ticketError;
-    allRows.push(...((pageRows ?? []) as TicketRow[]).map((r) => ({ ...r, nps_score: null as number | null })));
-    if (!pageRows || pageRows.length < pageSize) break;
-  }
+  const ticketRows = await fetchAllPagesParallel<TicketRow>(
+    (from, to) =>
+      supabase
+        .from("v_ticket_enriched")
+        .select("*", { count: "exact" })
+        .order("opened_at", { ascending: false })
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<TicketRow>>,
+    { pageSize }
+  );
+  const allRows: TicketRow[] = ticketRows.map((r) => ({ ...r, nps_score: null as number | null }));
 
   // nps_score não vem de v_ticket_enriched (view mantida direto no Supabase,
   // fora das migrations do repo) -- busca à parte em conversations e junta
@@ -967,36 +970,37 @@ export async function getKpiData(
   // tracked (tem linha em v_ticket_enriched) e untracked, pra depois buscar
   // nome/telefone em `contacts` numa query só (ver npsDetractors abaixo).
   const detractorCandidates: { conversationId: string; score: 1 | 2; answeredAt: string; contactId: string | null }[] = [];
-  for (let page = 0; ; page++) {
-    const { data: pageRows, error: npsError } = await supabase
-      .from("conversations")
-      .select("id, nps_score, nps_answered_at, contact_id")
-      .not("nps_score", "is", null)
-      .range(page * pageSize, page * pageSize + pageSize - 1);
-    if (npsError) throw npsError;
-    for (const row of pageRows ?? []) {
-      const conversationId = row.id as string;
-      const score = row.nps_score as number;
-      const answeredAt = row.nps_answered_at as string | null;
-      const match = rowsByConversationId.get(conversationId);
-      if (match) {
-        match.nps_score = score;
-      } else {
-        const answeredAtDate = answeredAt ? new Date(answeredAt) : null;
-        if (range.from && answeredAtDate && answeredAtDate < range.from) continue;
-        if (answeredAtDate && answeredAtDate > range.to) continue;
-        untrackedNpsScores.push(score);
-      }
-      if (score <= 2 && answeredAt) {
-        detractorCandidates.push({
-          conversationId,
-          score: score as 1 | 2,
-          answeredAt,
-          contactId: (row.contact_id as string | null) ?? match?.contact_id ?? null,
-        });
-      }
+  type NpsScoreRow = { id: string; nps_score: number; nps_answered_at: string | null; contact_id: string | null };
+  const npsScoreRows = await fetchAllPagesParallel<NpsScoreRow>(
+    (from, to) =>
+      supabase
+        .from("conversations")
+        .select("id, nps_score, nps_answered_at, contact_id", { count: "exact" })
+        .not("nps_score", "is", null)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<NpsScoreRow>>,
+    { pageSize }
+  );
+  for (const row of npsScoreRows) {
+    const conversationId = row.id;
+    const score = row.nps_score;
+    const answeredAt = row.nps_answered_at;
+    const match = rowsByConversationId.get(conversationId);
+    if (match) {
+      match.nps_score = score;
+    } else {
+      const answeredAtDate = answeredAt ? new Date(answeredAt) : null;
+      if (range.from && answeredAtDate && answeredAtDate < range.from) continue;
+      if (answeredAtDate && answeredAtDate > range.to) continue;
+      untrackedNpsScores.push(score);
     }
-    if (!pageRows || pageRows.length < pageSize) break;
+    if (score <= 2 && answeredAt) {
+      detractorCandidates.push({
+        conversationId,
+        score: score as 1 | 2,
+        answeredAt,
+        contactId: row.contact_id ?? match?.contact_id ?? null,
+      });
+    }
   }
 
   // Só entra na lista se a resposta caiu dentro do período selecionado --
@@ -1026,28 +1030,35 @@ export async function getKpiData(
   // faltando (ver src/lib/ticketClassification.ts e a rota /api/sync-ai-classify
   // que preenche essas colunas). Confiança "baixa" não é aplicada -- prefere
   // deixar "Dúvida"/sem produto a arriscar um chute ruim virando estatística.
-  for (let page = 0; ; page++) {
-    const { data: pageRows, error: aiError } = await supabase
-      .from("conversations")
-      .select("id, ai_category, ai_product, ai_store_tag, ai_confidence")
-      .not("ai_analyzed_at", "is", null)
-      .range(page * pageSize, page * pageSize + pageSize - 1);
-    if (aiError) throw aiError;
-    for (const row of pageRows ?? []) {
-      const match = rowsByConversationId.get(row.id as string);
-      if (!match) continue;
-      if (row.ai_confidence === "baixa") continue;
-      if ((!match.category || match.category === "cat-duvida") && row.ai_category) {
-        match.category = row.ai_category as string;
-      }
-      if (!match.product && row.ai_product) {
-        match.product = row.ai_product as string;
-      }
-      if (!match.store_tag && row.ai_store_tag) {
-        match.store_tag = row.ai_store_tag as string;
-      }
+  type AiClassificationRow = {
+    id: string;
+    ai_category: string | null;
+    ai_product: string | null;
+    ai_store_tag: string | null;
+    ai_confidence: string | null;
+  };
+  const aiRows = await fetchAllPagesParallel<AiClassificationRow>(
+    (from, to) =>
+      supabase
+        .from("conversations")
+        .select("id, ai_category, ai_product, ai_store_tag, ai_confidence", { count: "exact" })
+        .not("ai_analyzed_at", "is", null)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<AiClassificationRow>>,
+    { pageSize }
+  );
+  for (const row of aiRows) {
+    const match = rowsByConversationId.get(row.id);
+    if (!match) continue;
+    if (row.ai_confidence === "baixa") continue;
+    if ((!match.category || match.category === "cat-duvida") && row.ai_category) {
+      match.category = row.ai_category;
     }
-    if (!pageRows || pageRows.length < pageSize) break;
+    if (!match.product && row.ai_product) {
+      match.product = row.ai_product;
+    }
+    if (!match.store_tag && row.ai_store_tag) {
+      match.store_tag = row.ai_store_tag;
+    }
   }
 
   const rows = allRows.filter((r) => {
@@ -1059,25 +1070,20 @@ export async function getKpiData(
 
   const now = Date.now();
 
-  const allEscalationRows: EscalationRow[] = [];
-  for (let page = 0; ; page++) {
-    const { data: pageRows, error: escalationError } = await supabase
-      .from("v_escalations")
-      .select("*")
-      .order("asked_at", { ascending: false })
-      .range(page * pageSize, page * pageSize + pageSize - 1);
-    if (escalationError) throw escalationError;
-    allEscalationRows.push(
-      ...(pageRows ?? []).map(
-        (r): EscalationRow => ({
-          ...r,
-          waiting_hours_so_far:
-            r.wait_minutes === null ? Math.round(((now - new Date(r.asked_at).getTime()) / 3_600_000) * 10) / 10 : null,
-        })
-      )
-    );
-    if (!pageRows || pageRows.length < pageSize) break;
-  }
+  type RawEscalationRow = Omit<EscalationRow, "waiting_hours_so_far">;
+  const rawEscalationRows = await fetchAllPagesParallel<RawEscalationRow>(
+    (from, to) =>
+      supabase
+        .from("v_escalations")
+        .select("*", { count: "exact" })
+        .order("asked_at", { ascending: false })
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<RawEscalationRow>>,
+    { pageSize }
+  );
+  const allEscalationRows: EscalationRow[] = rawEscalationRows.map((r) => ({
+    ...r,
+    waiting_hours_so_far: r.wait_minutes === null ? Math.round(((now - new Date(r.asked_at).getTime()) / 3_600_000) * 10) / 10 : null,
+  }));
   const escalationRows = allEscalationRows.filter((r) => {
     const opened = new Date(r.ticket_opened_at).getTime();
     if (range.from && opened < range.from.getTime()) return false;

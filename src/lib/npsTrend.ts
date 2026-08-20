@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
 export type NpsWeekPoint = {
   weekStart: string; // YYYY-MM-DD, segunda-feira da semana
@@ -29,20 +30,21 @@ export async function getNpsTrend(weeksBack: number): Promise<NpsWeekPoint[]> {
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - weeksBack * 7);
 
-  const scores: { score: number; answeredAt: string }[] = [];
   const pageSize = 1000;
-  for (let page = 0; ; page++) {
-    const { data, error } = await admin
-      .from("conversations")
-      .select("nps_score, nps_answered_at")
-      .not("nps_score", "is", null)
-      .gte("nps_answered_at", since.toISOString())
-      .range(page * pageSize, page * pageSize + pageSize - 1);
-    if (error) throw new Error(error.message);
-    for (const row of data ?? []) {
-      if (row.nps_answered_at) scores.push({ score: row.nps_score as number, answeredAt: row.nps_answered_at as string });
-    }
-    if (!data || data.length < pageSize) break;
+  type NpsScoreRow = { nps_score: number | null; nps_answered_at: string | null };
+  const rows = await fetchAllPagesParallel<NpsScoreRow>(
+    (from, to) =>
+      admin
+        .from("conversations")
+        .select("nps_score, nps_answered_at", { count: "exact" })
+        .not("nps_score", "is", null)
+        .gte("nps_answered_at", since.toISOString())
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<NpsScoreRow>>,
+    { pageSize }
+  );
+  const scores: { score: number; answeredAt: string }[] = [];
+  for (const row of rows) {
+    if (row.nps_score !== null && row.nps_answered_at) scores.push({ score: row.nps_score, answeredAt: row.nps_answered_at });
   }
 
   const byWeek = new Map<string, number[]>();

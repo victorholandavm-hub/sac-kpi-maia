@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
 // Perfil de compra/relacionamento dos clientes -- pedido do Victor
 // 14/08/2026: "preciso classificar os clientes". A classificação por
@@ -280,38 +281,37 @@ function isClienteInterno(nome: string | null, cpfCnpj: string | null): boolean 
 }
 
 const ORDER_PAGE_SIZE = 1000;
-const ORDER_MAX_PAGINAS = 200;
+
+type ClientePedidoRow = {
+  client_id: string | null;
+  type: string;
+  invoice_total: number;
+  issue_date: string;
+  client_name: string | null;
+  client_cpf_cnpj: string | null;
+};
 
 // Busca o histórico de pedidos inteiro (paginado de verdade -- ver
 // convenção já usada em vendasProduto.ts/entregasRisco.ts) e agrega por
 // cliente. Gasto acumulado é líquido (Venda soma, Devolução subtrai,
 // mesma convenção de vendasProduto.ts pra quantidade vendida). Computa
 // tudo de uma vez -- cards e lista filtrável reaproveitam o mesmo array em
-// memória, sem repetir a varredura.
+// memória, sem repetir a varredura. Páginas em PARALELO (ver
+// fetchAllPagesParallel) -- achado 19/08/2026: era sequencial, até 200
+// páginas (38 mil pedidos reais), boa parte dos 15,8s que a tela de
+// Clientes chegou a demorar pra carregar.
 export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
   const admin = getSupabaseAdmin();
 
-  type Row = {
-    client_id: string | null;
-    type: string;
-    invoice_total: number;
-    issue_date: string;
-    client_name: string | null;
-    client_cpf_cnpj: string | null;
-  };
-  const rows: Row[] = [];
-  for (let pagina = 0; pagina < ORDER_MAX_PAGINAS; pagina++) {
-    const from = pagina * ORDER_PAGE_SIZE;
-    const { data, error } = await admin
-      .from("totvs_orders")
-      .select("client_id, type, invoice_total, issue_date, client_name, client_cpf_cnpj")
-      .not("client_id", "is", null)
-      .range(from, from + ORDER_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const batch = (data ?? []) as unknown as Row[];
-    rows.push(...batch);
-    if (batch.length < ORDER_PAGE_SIZE) break;
-  }
+  const rows = await fetchAllPagesParallel<ClientePedidoRow>(
+    (from, to) =>
+      admin
+        .from("totvs_orders")
+        .select("client_id, type, invoice_total, issue_date, client_name, client_cpf_cnpj", { count: "exact" })
+        .not("client_id", "is", null)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<ClientePedidoRow>>,
+    { pageSize: ORDER_PAGE_SIZE }
+  );
 
   type Acc = { nome: string | null; cpfCnpj: string | null; compras: number; gasto: number; primeira: string | null; ultima: string | null };
   const porCliente = new Map<string, Acc>();

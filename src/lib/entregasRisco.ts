@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { addBusinessDays } from "./businessDays";
 import { fetchInBatches } from "./supabaseBatch";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
 // A regra de negócio compara RÓTULOS texto ("Programada", "Entregue",
 // "Cancelada"), nunca os códigos numéricos do TOTVS: statusEntregaCodigo é
@@ -234,8 +235,10 @@ function toEntregaRiscoCarga(row: DeliveryCargaRow): EntregaRiscoCarga {
 // 14/08/2026 e crescendo todo dia via sync), escondendo a imensa maioria
 // dos pedidos não resolvidos da tela "Clientes em risco" sem nenhum aviso
 // (mesma armadilha que vendasProduto.ts já evita, ver fetchItensDoPeriodo).
+// Páginas buscadas em PARALELO desde 19/08/2026 (ver fetchAllPagesParallel)
+// -- era sequencial, até 50 páginas; sem teto de páginas agora (o count
+// exato já resolve quantas existem de verdade).
 const DELIVERY_PAGE_SIZE = 1000;
-const DELIVERY_MAX_PAGINAS = 50;
 
 // Listas de invoices/pedidos usadas em `.in()` mais abaixo podem crescer
 // bastante (a correção de paginação de hoje passou a olhar TODAS as
@@ -244,19 +247,13 @@ const DELIVERY_MAX_PAGINAS = 50;
 // 14/08/2026).
 
 async function fetchAllDeliveryRows(admin: ReturnType<typeof getSupabaseAdmin>): Promise<DeliveryRow[]> {
-  const rows: DeliveryRow[] = [];
-  for (let pagina = 0; pagina < DELIVERY_MAX_PAGINAS; pagina++) {
-    const from = pagina * DELIVERY_PAGE_SIZE;
-    const { data, error } = await admin
-      .from("totvs_deliveries")
-      .select(DELIVERY_COLUMNS)
-      .range(from, from + DELIVERY_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const batch = (data ?? []) as unknown as DeliveryRow[];
-    rows.push(...batch);
-    if (batch.length < DELIVERY_PAGE_SIZE) break;
-  }
-  return rows;
+  return fetchAllPagesParallel<DeliveryRow>(
+    (from, to) =>
+      admin.from("totvs_deliveries").select(DELIVERY_COLUMNS, { count: "exact" }).range(from, to) as unknown as PromiseLike<
+        PagedQueryResult<DeliveryRow>
+      >,
+    { pageSize: DELIVERY_PAGE_SIZE }
+  );
 }
 
 export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
