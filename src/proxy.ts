@@ -15,6 +15,16 @@ const PASSTHROUGH_PREFIXES = [
   "/api/totvs-sync",
   "/api/montador/upload-photo",
   "/api/motorista/upload-photo",
+  // Serve foto do disco local (ver src/lib/localPhotoStorage.ts) -- não
+  // começa com /assistencia, então sem isso caía no gate de auth do painel
+  // de KPIs do SAC (ou no redirect pra /assistencia no projeto exclusivo da
+  // assistência), quebrando toda foto de chamado (achado 20/08/2026, na
+  // verificação pós-deploy dessa mesma mudança -- nenhum usuário chegou a
+  // ver quebrado). Sem checagem de sessão própria de propósito -- a
+  // "autenticação" é o caminho em si (contém um UUID de 128 bits, não
+  // adivinhável), mesmo nível de proteção que a URL assinada do Supabase
+  // Storage que essa rota substituiu.
+  "/api/photos",
   "/api/avaliar",
   "/_next/static",
   "/_next/image",
