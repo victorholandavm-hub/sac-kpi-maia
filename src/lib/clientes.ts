@@ -319,13 +319,20 @@ export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
     if (!r.client_id) continue;
     if (isClienteInterno(r.client_name, r.client_cpf_cnpj)) continue;
     const acc = porCliente.get(r.client_id) ?? { nome: null, cpfCnpj: null, compras: 0, gasto: 0, primeira: null, ultima: null };
+    // invoice_total já vem líquido/assinado direto do Protheus -- negativo
+    // pra Devolução, tanto no pedido quanto em cada item dele (conferido
+    // direto no banco 20/08/2026). Bug achado no mesmo dia: a versão
+    // anterior fazia `gasto -= invoice_total` pro caso de devolução, o que
+    // DOBRA o efeito -- subtrair um valor que já é negativo soma de novo,
+    // em vez de descontar (ex.: cliente CG3 Engenharia, venda de R$17.994
+    // devolvida por inteiro aparecia com gasto acumulado de R$53.982, não
+    // os R$17.994 líquidos corretos). Soma sempre, sem inverter sinal por
+    // tipo -- mesmo padrão (sem branch) de vendasProduto.ts pra quantidade.
+    acc.gasto += r.invoice_total;
     if (r.type === "Venda") {
       acc.compras += 1;
-      acc.gasto += r.invoice_total;
       if (!acc.primeira || r.issue_date < acc.primeira) acc.primeira = r.issue_date;
       if (!acc.ultima || r.issue_date > acc.ultima) acc.ultima = r.issue_date;
-    } else if (r.type === "Devolucao") {
-      acc.gasto -= r.invoice_total;
     }
     if (!acc.nome && r.client_name) acc.nome = r.client_name;
     if (!acc.cpfCnpj && r.client_cpf_cnpj) acc.cpfCnpj = r.client_cpf_cnpj;
