@@ -37,18 +37,37 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
   // usado pra abrir o drill-down (data.categoryTickets é indexado pela tag).
   const byCategory = data.byCategory.map((c) => ({ ...c, tag: c.label, label: categoryLabel(c.label) }));
   const byStore = data.byStore.map((c) => ({ ...c, label: storeLabel(c.label) }));
-  const byProduct = data.byProduct.map((c) => ({ ...c, label: productLabel(c.label) }));
+  // Mesmo padrão de byCategory acima -- tag crua ("cadeira") preservada pra
+  // indexar data.productTickets, já que productLabel só capitaliza (não dá
+  // pra "desfazer" pra achar a chave de volta).
+  const byProduct = data.byProduct.map((c) => ({ ...c, tag: c.label, label: productLabel(c.label) }));
 
-  const [categoryModal, setCategoryModal] = useState<{ title: string; totalCount: number; tickets: StoreBreakdownTicket[] } | null>(
+  // Compartilhado entre "Chamados por categoria" e "Chamados por produto"
+  // (ver openCategoryDrilldown/openProductDrilldown abaixo) -- só um modal
+  // de drill-down faz sentido aberto por vez.
+  const [ticketListModal, setTicketListModal] = useState<{ title: string; totalCount: number; tickets: StoreBreakdownTicket[] } | null>(
     null
   );
   const [activeTab, setActiveTab] = useState<TabId>("geral");
   function openCategoryDrilldown(item: Count) {
     const tag = item.tag ?? item.label;
-    setCategoryModal({
+    setTicketListModal({
       title: item.label,
       totalCount: item.count,
       tickets: data.categoryTickets[tag] ?? [],
+    });
+  }
+  // "Colocar os modelos dos problemas" (pedido do Victor 20/08/2026) --
+  // classificador só sabe categoria genérica (não modelo específico), então
+  // em vez de contagem por modelo, clicar na barra abre os chamados
+  // daquela categoria de produto (resumo da IA de cada um costuma citar o
+  // modelo em texto livre, só não vem contado/agrupado).
+  function openProductDrilldown(item: Count) {
+    const tag = item.tag ?? item.label;
+    setTicketListModal({
+      title: item.label,
+      totalCount: item.count,
+      tickets: data.productTickets[tag] ?? [],
     });
   }
   // Ordem invertida (5 no topo) -- fica mais intuitivo no gráfico de barras
@@ -167,7 +186,7 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
 
           <section className="grid md:grid-cols-3 gap-4">
             <BarRanking title="Chamados por canal" data={data.byChannel} />
-            <BarRanking title="Chamados por produto" data={byProduct} coverage={data.productCoverage} />
+            <BarRanking title="Chamados por produto" data={byProduct} coverage={data.productCoverage} onSelect={openProductDrilldown} />
             <BarRanking title="Chamados por loja" data={byStore} coverage={data.storeCoverage} />
           </section>
         </div>
@@ -243,12 +262,12 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         </div>
       ) : null}
 
-      {categoryModal ? (
+      {ticketListModal ? (
         <CategoryTicketsModal
-          title={categoryModal.title}
-          totalCount={categoryModal.totalCount}
-          tickets={categoryModal.tickets}
-          onClose={() => setCategoryModal(null)}
+          title={ticketListModal.title}
+          totalCount={ticketListModal.totalCount}
+          tickets={ticketListModal.tickets}
+          onClose={() => setTicketListModal(null)}
         />
       ) : null}
     </div>
