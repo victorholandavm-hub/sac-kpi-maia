@@ -12,7 +12,9 @@ export default async function KpisPage({
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
   const params = await searchParams;
-  const range = resolveRange(params);
+  // Default "este mês" pedido do Victor 20/08/2026 -- só aqui (o painel de
+  // avaliações, que reaproveita o mesmo resolveRange, continua com "all").
+  const range = resolveRange(params, "month");
   const data = await getKpiData(range, { categoryLabel, storeLabel });
   return (
     <>

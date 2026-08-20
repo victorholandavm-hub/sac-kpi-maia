@@ -214,16 +214,8 @@ export type StoreBreakdown = {
   topCategoryTickets: StoreBreakdownTicket[];
 };
 
-export type MarketVolumeLevel = "baixo" | "medio" | "alto";
-export type MarketVolume = { level: MarketVolumeLevel; contactRatePct: number; orderCount: number };
-
 export type KpiData = {
   totalTickets: number;
-  // Classificação do volume de chamados do período contra uma referência
-  // de contact rate do varejo -- ver getMarketVolume mais abaixo. null
-  // quando não dá pra calcular (período "todo o histórico", sem venda
-  // sincronizada no período).
-  marketVolume: MarketVolume | null;
   resolvedCount: number;
   openCount: number;
   resolvedByTagCount: number;
@@ -883,54 +875,6 @@ async function fetchContactsByIds(
   return result;
 }
 
-// Referência de contact rate (chamados de SAC ÷ vendas do período) pro
-// varejo -- pedido do Victor 17/08/2026 ("baseado no mercado varejista
-// como um todo"). NÃO existe benchmark auditado publicado especificamente
-// pra varejo de móveis no Brasil -- uso a faixa mais próxima disponível de
-// fonte pública: Eightx, "Support tickets per 1.000 orders by vertical"
-// (2026), categoria "Home goods & decor" (ecommerce DTC, mercado
-// americano, a mais parecida em natureza de produto/entrega que existe
-// publicada) -- 200 a 350 chamados por 1.000 vendas no mercado em geral
-// (antes de automação), ou seja, 20% a 35% de contact rate. É uma
-// referência estimada, não um dado auditado pro nosso setor exato -- os
-// dois números abaixo são fáceis de ajustar se a operação de móveis +
-// entrega + montagem presencial pedir outra faixa.
-const MARKET_CONTACT_RATE_LOW_PCT = 20; // abaixo disso: volume baixo
-const MARKET_CONTACT_RATE_HIGH_PCT = 35; // acima disso: volume alto
-
-async function getMarketVolume(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  totalTickets: number,
-  range: DateRange
-): Promise<MarketVolume | null> {
-  // Sem `from` (período "todo o histórico") não existe uma taxa "do
-  // período" que faça sentido comparar contra mercado -- e a sincronização
-  // de vendas (totvs_orders) pode nem cobrir todo o histórico de chamados.
-  if (!range.from) return null;
-
-  const fromStr = range.from.toISOString().slice(0, 10);
-  const toStr = range.to.toISOString().slice(0, 10);
-  const { count, error } = await supabase
-    .from("totvs_orders")
-    .select("id", { count: "exact", head: true })
-    .eq("type", "Venda")
-    .gte("issue_date", fromStr)
-    .lte("issue_date", toStr);
-  if (error) throw new Error(error.message);
-
-  const orderCount = count ?? 0;
-  // Sem venda sincronizada nesse período (ex.: período bem recente, sync
-  // ainda não rodou) -- taxa ficaria infinita/sem sentido, melhor não
-  // mostrar selo nenhum do que mostrar "alto" errado.
-  if (orderCount === 0) return null;
-
-  const contactRatePct = Math.round((totalTickets / orderCount) * 1000) / 10;
-  const level: MarketVolumeLevel =
-    contactRatePct < MARKET_CONTACT_RATE_LOW_PCT ? "baixo" : contactRatePct > MARKET_CONTACT_RATE_HIGH_PCT ? "alto" : "medio";
-
-  return { level, contactRatePct, orderCount };
-}
-
 export async function getKpiData(
   range: DateRange,
   labelFns: {
@@ -1179,11 +1123,8 @@ export async function getKpiData(
     }
   }
 
-  const marketVolume = await getMarketVolume(supabase, rows.length, range);
-
   return {
     totalTickets: rows.length,
-    marketVolume,
     resolvedCount: resolvedRows.length,
     openCount: openRows.length,
     resolvedByTagCount: rows.filter((r) => r.resolved_by_tag).length,

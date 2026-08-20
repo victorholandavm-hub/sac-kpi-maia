@@ -49,11 +49,17 @@ export function VendasPorCategoriaList({
                     {c.quantidade} un · {formatBRL(c.valor)}
                   </span>
                 </div>
+                {/* Quantidade líquida (venda - devolução) pode ser negativa numa
+                    categoria com bastante devolução no período -- sem o
+                    Math.max(0, ...) aqui, isso virava um Math.max(4, negativo)
+                    = 4%, uma barrinha visível pra um valor que na verdade é
+                    negativo (achado 20/08/2026, revisão pedida pelo Victor).
+                    0% (sem barra) é o correto pra esse caso. */}
                 <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--gridline)" }}>
                   <div
                     className="h-full rounded-full"
                     style={{
-                      width: `${Math.max(4, (c.quantidade / max) * 100)}%`,
+                      width: `${c.quantidade <= 0 ? 0 : Math.max(4, (c.quantidade / max) * 100)}%`,
                       background: isActive ? "var(--brand-green)" : "color-mix(in srgb, var(--brand-green) 45%, var(--gridline))",
                     }}
                   />

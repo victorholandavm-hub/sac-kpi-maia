@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { KpiData, Count, StoreBreakdownTicket, MarketVolume } from "@/lib/kpi";
+import type { KpiData, Count, StoreBreakdownTicket } from "@/lib/kpi";
 import type { DateRange } from "@/lib/dateRange";
 import { StatTile } from "./StatTile";
 import { BarRanking } from "./BarRanking";
@@ -20,18 +20,6 @@ import { CategoryTicketsModal } from "./CategoryTicketsModal";
 import { InsightGrid } from "./InsightCard";
 import { buildHeadlineInsights, buildPerformanceInsights, buildGargalosInsights } from "@/lib/kpiInsights";
 import { categoryLabel, storeLabel, productLabel } from "@/lib/labels";
-
-// Selo de volume de chamados contra referência de mercado (ver
-// getMarketVolume em kpi.ts) -- pedido do Victor 17/08/2026. null quando
-// não dá pra calcular (período "todo o histórico" ou sem venda
-// sincronizada no período) -- some o selo em vez de mostrar algo errado.
-function marketVolumeBadge(mv: MarketVolume | null): { label: string; color: string; title: string } | undefined {
-  if (!mv) return undefined;
-  const title = `${mv.contactRatePct}% dos pedidos geraram chamado (${mv.orderCount} pedidos no período). Referência estimada de mercado (varejo, categoria mais próxima disponível) — não é um dado auditado pro nosso setor exato.`;
-  if (mv.level === "baixo") return { label: "Volume baixo p/ mercado", color: "var(--status-good)", title };
-  if (mv.level === "alto") return { label: "Volume alto p/ mercado", color: "var(--status-critical)", title };
-  return { label: "Volume na média do mercado", color: "var(--status-warning)", title };
-}
 
 // As 3 abas do painel -- separa "o que aconteceu" (volumetria), "quem
 // atendeu" (equipe) e "onde travou" (gargalos/logística) em vez de uma
@@ -102,7 +90,7 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           uma que demorou 10min certinho, mas são situações bem diferentes
           pro cliente no WhatsApp). */}
       <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <StatTile label="Total de chamados" value={data.totalTickets} size="lg" badge={marketVolumeBadge(data.marketVolume)} />
+        <StatTile label="Total de chamados" value={data.totalTickets} size="lg" />
         <StatTile
           label="Resposta no 1º contato"
           value={data.avgFirstResponseMinutes ?? "—"}
