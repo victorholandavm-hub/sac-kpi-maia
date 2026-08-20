@@ -46,6 +46,7 @@ function baseData(overrides: Partial<KpiData> = {}): KpiData {
     paretoSummary: null,
     storeBreakdown: [],
     categoryTickets: {},
+    productTickets: {},
     waitingCount: 0,
     waitingByType: [],
     waitingByStore: [],

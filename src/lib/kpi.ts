@@ -249,6 +249,10 @@ export type KpiData = {
   // "cat-duvida"), os chamados mais recentes daquela categoria no período
   // selecionado. Ver CategoryTicketsModal / BarRanking.
   categoryTickets: Record<string, StoreBreakdownTicket[]>;
+  // Mesma ideia, por produto (ver byProduct/buildProductTicketsMap) -- pedido
+  // do Victor 20/08/2026: "colocar os modelos dos problemas" -- clicar na
+  // barra abre a lista de chamados daquele produto genérico.
+  productTickets: Record<string, StoreBreakdownTicket[]>;
   waitingCount: number;
   waitingByType: Count[];
   waitingByStore: Count[];
@@ -791,6 +795,26 @@ function buildCategoryTicketsMap(rows: TicketRow[]): Record<string, StoreBreakdo
   return Object.fromEntries([...byCategoryRows.entries()].map(([category, catRows]) => [category, buildTicketList(catRows)]));
 }
 
+// Drill-down de byProduct (ver KpiData.productTickets) -- pedido do Victor
+// 20/08/2026: "tem como colocar os modelos dos problemas?" -- o
+// classificador (pickProduct em ticketClassification.ts) só reconhece
+// categoria genérica por palavra-chave ("cadeira", "sofá"...), não modelo
+// específico ("Helena Linho Bege"), então não dá pra mostrar contagem
+// agrupada por modelo direto. Em vez disso, clicar na barra abre a lista
+// dos chamados daquela categoria (mesmo padrão de buildCategoryTicketsMap)
+// -- o resumo da IA de cada chamado geralmente já menciona o modelo em
+// texto livre, só não vem agregado/contado.
+function buildProductTicketsMap(rows: TicketRow[]): Record<string, StoreBreakdownTicket[]> {
+  const byProductRows = new Map<string, TicketRow[]>();
+  for (const row of rows) {
+    if (!row.product) continue;
+    const list = byProductRows.get(row.product) ?? [];
+    list.push(row);
+    byProductRows.set(row.product, list);
+  }
+  return Object.fromEntries([...byProductRows.entries()].map(([product, prodRows]) => [product, buildTicketList(prodRows)]));
+}
+
 // Regras de negócio pra sugerir uma causa provável por trás da categoria
 // dominante de uma loja -- ex.: muita "Dúvida" concentrada numa loja é
 // sintoma comum de vendedor sem treinamento de produto. É heurística
@@ -1103,6 +1127,7 @@ export async function getKpiData(
 
   const storeBreakdown = buildStoreBreakdown(rows, labelFns.storeLabel, labelFns.categoryLabel);
   const categoryTickets = buildCategoryTicketsMap(rows);
+  const productTickets = buildProductTicketsMap(rows);
   const agentDrilldown = buildAgentDrilldown(rows);
   // Nome/telefone dos chamados por trás do "problema mais comum" (loja,
   // categoria geral e semana anterior) -- query em lote única (mesmo padrão
@@ -1110,6 +1135,7 @@ export async function getKpiData(
   const allBreakdownTickets = [
     ...storeBreakdown.flatMap((s) => s.topCategoryTickets),
     ...Object.values(categoryTickets).flat(),
+    ...Object.values(productTickets).flat(),
     ...previousWeek.topCategoryTickets,
     ...Object.values(agentDrilldown).flatMap((a) => [...a.pending, ...a.negative]),
   ];
@@ -1153,6 +1179,7 @@ export async function getKpiData(
     paretoSummary: buildParetoSummary(byCategory, rows.length, labelFns.categoryLabel),
     storeBreakdown,
     categoryTickets,
+    productTickets,
     waitingCount: waitingOpenRows.length,
     waitingByType,
     waitingByStore,
