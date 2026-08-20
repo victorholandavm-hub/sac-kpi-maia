@@ -45,7 +45,7 @@ export function MotoristaRequestActions({
     run(async () => {
       await driverCompleteRequest(requestId);
       setMode(null);
-    }, "Rota concluída.");
+    }, "Entrega concluída.");
   }
 
   return (
@@ -99,7 +99,7 @@ export function MotoristaRequestActions({
             className="text-sm rounded-lg px-3 py-3 font-medium disabled:opacity-60"
             style={{ background: "var(--status-good)", color: "#fff" }}
           >
-            Marcar rota como concluída
+            Marcar entrega como concluída
           </button>
           <button
             disabled={pending}
@@ -115,7 +115,7 @@ export function MotoristaRequestActions({
       {mode === "complete" ? (
         <div className="flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: "var(--status-good)" }}>
           <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-            Confirmar que a entrega foi feita e a rota está concluída?
+            Confirmar que essa entrega foi feita? (marca só essa notificação -- as outras da rota continuam em aberto)
           </span>
           <div className="flex items-center gap-2">
             <button

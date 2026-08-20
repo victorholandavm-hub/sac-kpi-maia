@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { setDriverOrderAction, driverBulkSetRota, driverGetAvailableRotasForDate } from "@/app/assistencia/driver-actions";
 import { SHIFT_LABELS, DRIVER_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
-import { StatusBadge } from "./StatusBadge";
+import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { DriverNotificationModalButton } from "./DriverNotificationModalButton";
 import { formatFullAddress, type DriverRequestView } from "@/lib/serviceRequests";
 import { telHref, whatsappHref } from "@/lib/phone";
@@ -165,7 +165,7 @@ export function DriverRouteGroup({
                   <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
                     #{r.ticketNumber}
                   </span>
-                  <StatusBadge status={r.status} />
+                  <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
                   <span
                     className="text-xs font-medium px-2 py-0.5 rounded-full"
                     style={{ color: "var(--text-primary)", background: "var(--surface-2)" }}
