@@ -161,6 +161,12 @@ function RotaDayCell({
   const [extraDriver, setExtraDriver] = useState("");
 
   const isToday = day.date === today;
+  // Dia já passado -- pedido do Victor 20/08/2026: "todas as datas que já
+  // passaram fiquem bem apagadas, continuem lá, mas quase transparentes
+  // para que não sejam confundidas" (com hoje/os próximos dias). Comparação
+  // de string funciona direto pra datas ISO (YYYY-MM-DD). Só visual --
+  // continua editável normalmente, não trava nada.
+  const isPast = day.date < today;
   const dateLabel = new Date(`${day.date}T00:00:00Z`).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -256,13 +262,14 @@ function RotaDayCell({
 
   return (
     <div
-      className={`rounded-md ${cellPadding} flex flex-col gap-1 min-w-0`}
+      className={`rounded-md ${cellPadding} flex flex-col gap-1 min-w-0 transition-opacity`}
       style={{
         // "Hoje" precisa se destacar de verdade no calendário -- pedido do
         // Victor 19/08/2026 ("cor um pouco mais forte na rota do dia"),
         // var(--surface-2) sozinho era sutil demais pra bater o olho.
         border: isToday ? "2px solid var(--brand-green)" : "1px solid var(--gridline)",
         background: isToday ? "color-mix(in srgb, var(--brand-green) 14%, var(--surface-1))" : "transparent",
+        opacity: isPast ? 0.3 : 1,
       }}
     >
       <div className="flex items-center justify-between gap-1">
