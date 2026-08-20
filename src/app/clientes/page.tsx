@@ -12,6 +12,7 @@ import {
   CLIENTE_NIVEIS,
   CLIENTE_NIVEL_LABELS,
   CLIENTE_NIVEL_COLORS,
+  CLIENTE_NIVEL_CRITERIA,
   type ClienteNivelInfo,
 } from "@/lib/clientes";
 import { AppHeader } from "@/components/AppHeader";
@@ -313,8 +314,16 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
             <span className="text-2xl font-bold" style={{ color: CLIENTE_NIVEL_COLORS[n] }}>
               {porNivel.get(n) ?? 0}
             </span>
-            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            <span className="text-sm font-medium flex items-center gap-1" style={{ color: "var(--text-primary)" }}>
               {CLIENTE_NIVEL_LABELS[n]}
+              <span
+                title={CLIENTE_NIVEL_CRITERIA[n]}
+                aria-label={`Como um cliente vira ${CLIENTE_NIVEL_LABELS[n]}: ${CLIENTE_NIVEL_CRITERIA[n]}`}
+                className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
+                style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
+              >
+                i
+              </span>
             </span>
             {/* Nível é histórico acumulado e nunca esfria sozinho -- esse
                 sub-contador é o que avisa quando o número acima está inflado
