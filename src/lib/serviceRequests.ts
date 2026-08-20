@@ -741,6 +741,11 @@ export type DayLoadItem = {
   scheduledTime: string | null;
 };
 
+// Visita (montador) -- exclui os tipos de entrega (motorista/rota, ver
+// DELIVERY_REQUEST_TYPES) de ASSISTENCIA_MANAGED_TYPES. Só usado por
+// listDayLoad logo abaixo.
+const VISITA_TYPES_FOR_DAY_LOAD = ASSISTENCIA_MANAGED_TYPES.filter((t) => !(DELIVERY_REQUEST_TYPES as readonly string[]).includes(t));
+
 // Visitas já agendadas pra um dia específico -- usado no momento de criar
 // uma solicitação nova (QuickCreateRequestForm) pra mostrar, assim que a
 // assistência escolhe a data, quantas e quais demandas já existem naquele
@@ -749,6 +754,13 @@ export type DayLoadItem = {
 // approved_deadline só quando não tem scheduled_date), expressa direto na
 // query porque aqui não dá pra trazer tudo e filtrar em JS como a agenda faz
 // (essa consulta roda a cada data digitada, precisa ser enxuta).
+//
+// Só tipo de VISITA (montagem/desmontagem/troca_peça/vistoria) -- achado
+// 20/08/2026 (pedido do Victor: "é so para aparecer as montagens ne"): sem
+// filtro de tipo, entrega/troca de produto (rota de motorista, sem nenhuma
+// relação com a agenda do montador) também aparecia aqui, misturado com as
+// visitas de verdade. QuickCreateRequestForm (único chamador) só cria
+// tipo de visita mesmo, então o filtro não tira nada que devesse aparecer.
 export async function listDayLoad(date: string): Promise<DayLoadItem[]> {
   // Validação estrita antes de interpolar na string do filtro -- `date` vem
   // de input do usuário (mesmo que o <input type="date"> do navegador já
@@ -760,6 +772,7 @@ export async function listDayLoad(date: string): Promise<DayLoadItem[]> {
   const { data, error } = await admin
     .from("service_requests")
     .select("id, ticket_number, type, client_name, client_neighborhood, shift, scheduled_time, stores(name)")
+    .in("type", [...VISITA_TYPES_FOR_DAY_LOAD])
     .or(`scheduled_date.eq.${date},and(scheduled_date.is.null,approved_deadline.eq.${date})`)
     .not("status", "eq", "cancelada")
     .order("scheduled_time", { ascending: true, nullsFirst: false });
