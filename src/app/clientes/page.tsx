@@ -15,6 +15,7 @@ import {
   type ClienteNivelInfo,
 } from "@/lib/clientes";
 import { AppHeader } from "@/components/AppHeader";
+import { ClienteHistoricoRow } from "@/components/ClienteHistoricoRow";
 
 export const dynamic = "force-dynamic";
 
@@ -205,12 +206,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
                 {listResult.items.map((c) => (
-                  <tr key={c.protheusCode}>
-                    <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                      <Link href={`/clientes/${encodeURIComponent(c.protheusCode)}`} className="underline">
-                        {c.name}
-                      </Link>
-                    </td>
+                  <ClienteHistoricoRow key={c.protheusCode} clientId={c.protheusCode} name={c.name} colSpan={6}>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span
                         className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
@@ -231,7 +227,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.city ? `${c.city}${c.state ? `/${c.state}` : ""}` : "—"}
                     </td>
-                  </tr>
+                  </ClienteHistoricoRow>
                 ))}
               </tbody>
             </table>
@@ -384,15 +380,17 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
                 {pageItems.map((c: ClienteNivelInfo) => (
-                  <tr key={c.clientId}>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                      {c.posicaoNoNivel}º
-                    </td>
-                    <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                      <Link href={`/clientes/${encodeURIComponent(c.clientId)}`} className="underline">
-                        {c.nome ?? c.clientId}
-                      </Link>
-                    </td>
+                  <ClienteHistoricoRow
+                    key={c.clientId}
+                    clientId={c.clientId}
+                    name={c.nome ?? c.clientId}
+                    colSpan={8}
+                    leadingCells={
+                      <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                        {c.posicaoNoNivel}º
+                      </td>
+                    }
+                  >
                     <td className="px-4 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span
@@ -430,7 +428,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                     >
                       {c.diasSemComprar ?? "—"}
                     </td>
-                  </tr>
+                  </ClienteHistoricoRow>
                 ))}
               </tbody>
             </table>
