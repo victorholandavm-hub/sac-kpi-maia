@@ -55,5 +55,10 @@ next-env.d.ts
 # log do sync do TOTVS rodando via Agendador de Tarefas
 /logs
 
+# fotos salvas localmente (ver src/lib/localPhotoStorage.ts) -- em produção
+# fica fora do repo por completo, via PHOTO_STORAGE_DIR; isso aqui só cobre
+# dev local, quando a env var não está definida.
+/.local-storage
+
 .vercel
 .env*
