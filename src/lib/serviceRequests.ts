@@ -151,6 +151,11 @@ export type ServiceRequestSummary = {
   shift: Shift | null;
   rota: Rota | null;
   rotaExceptionNote: string | null;
+  // Restrição de horário/turno do CLIENTE pra receber a entrega (ex.: "só de
+  // manhã", "14h às 17h") -- pedido do Victor 19/08/2026. Separado de
+  // restrictionNote/montadorInstruction, que são instrução pro
+  // motorista/montador, não limitação do cliente.
+  clientTimeRestriction: string | null;
   sellerName: string | null;
   invoiceNumber: string | null;
   sacCategory: string | null;
@@ -197,6 +202,7 @@ type SummaryRow = {
   shift: Shift | null;
   rota: Rota | null;
   rota_exception_note: string | null;
+  client_time_restriction: string | null;
   seller_name: string | null;
   invoice_number: string | null;
   sac_category: string | null;
@@ -221,7 +227,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -264,6 +270,7 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     shift: row.shift,
     rota: row.rota,
     rotaExceptionNote: row.rota_exception_note,
+    clientTimeRestriction: row.client_time_restriction,
     sellerName: row.seller_name,
     invoiceNumber: row.invoice_number,
     sacCategory: row.sac_category,
@@ -484,7 +491,7 @@ const DETAIL_COLUMNS =
   // é provavelmente a causa raiz de verdade do "Sem rota" que aparecia na
   // tela do chamado (mais fundamental que o bug de ScheduleField.tsx
   // corrigido antes hoje, que só evitava apagar a rota ao SALVAR).
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, rota, rota_exception_note, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 export async function getRequestDetail(
   id: string
@@ -977,6 +984,7 @@ export type DriverRequestView = {
   productSummary: string | null;
   reason: string | null;
   restrictionNote: string | null;
+  clientTimeRestriction: string | null;
   pickupCompleted: boolean;
   scheduledDate: string | null;
   scheduledTime: string | null;
@@ -1005,7 +1013,7 @@ export type DriverRequestView = {
 
 const DRIVER_VIEW_LIMIT = 200;
 const DRIVER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, authorized_by, requested_by_name, stores(name), requester:profiles!requested_by(full_name), items:service_request_items(product)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, client_time_restriction, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, authorized_by, requested_by_name, stores(name), requester:profiles!requested_by(full_name), items:service_request_items(product)";
 
 type DriverViewRow = {
   id: string;
@@ -1021,6 +1029,7 @@ type DriverViewRow = {
   client_neighborhood: string | null;
   reason: string | null;
   restriction_note: string | null;
+  client_time_restriction: string | null;
   pickup_completed: boolean;
   scheduled_date: string | null;
   scheduled_time: string | null;
@@ -1059,6 +1068,7 @@ function toDriverView(row: DriverViewRow): DriverRequestView {
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
     reason: row.reason,
     restrictionNote: row.restriction_note,
+    clientTimeRestriction: row.client_time_restriction,
     pickupCompleted: row.pickup_completed,
     scheduledDate: row.scheduled_date,
     scheduledTime: row.scheduled_time,

@@ -62,6 +62,7 @@ export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
         <Field label="Nome" value={request.clientName} />
         <Field label="Telefone" value={request.clientPhone} />
         <Field label="Endereço" value={enderecoCompleto} />
+        {request.clientTimeRestriction ? <Field label="⏰ Restrição de horário" value={request.clientTimeRestriction} /> : null}
       </div>
 
       <SectionTitle>Descrição do produto</SectionTitle>

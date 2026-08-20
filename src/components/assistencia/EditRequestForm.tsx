@@ -181,6 +181,18 @@ export function EditRequestForm({
         <input name="restriction_note" defaultValue={request.restrictionNote ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
+      {showAuthorizedBy ? (
+        <Field label="Restrição de horário do cliente">
+          <input
+            name="client_time_restriction"
+            defaultValue={request.clientTimeRestriction ?? ""}
+            placeholder="Ex: só de manhã, ou das 14h às 17h"
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+        </Field>
+      ) : null}
+
       <Field label="Observações">
         <textarea name="notes" defaultValue={request.notes ?? ""} rows={3} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>

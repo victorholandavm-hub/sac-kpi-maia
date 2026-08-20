@@ -1032,7 +1032,7 @@ export async function createExchangeChild(
   const { data: parent, error: fetchError } = await admin
     .from("service_requests")
     .select(
-      "ticket_number, status, type, store_id, exchange_round, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, client_protheus_code, order_code, invoice_number, seller_name, authorized_by, restriction_note, scheduled_date, scheduled_time, shift, rota, driver_name"
+      "ticket_number, status, type, store_id, exchange_round, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, client_protheus_code, order_code, invoice_number, seller_name, authorized_by, restriction_note, client_time_restriction, scheduled_date, scheduled_time, shift, rota, driver_name"
     )
     .eq("id", requestId)
     .single();
@@ -1093,6 +1093,7 @@ export async function createExchangeChild(
       reason: reasonTrimmed,
       authorized_by: parent.authorized_by,
       restriction_note: parent.restriction_note,
+      client_time_restriction: parent.client_time_restriction,
       driver_name: driverNameForError ?? parent.driver_name,
       scheduled_date: parent.scheduled_date,
       scheduled_time: parent.scheduled_time,
@@ -1853,6 +1854,7 @@ export async function updateRequestDetails(
       authorized_by: emptyToNull(formData.get("authorized_by")),
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
       restriction_note: emptyToNull(formData.get("restriction_note")),
+      client_time_restriction: emptyToNull(formData.get("client_time_restriction")),
       notes: emptyToNull(formData.get("notes")),
       seller_name: emptyToNull(formData.get("seller_name")),
       invoice_number: emptyToNull(formData.get("invoice_number")),
@@ -2073,6 +2075,10 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       causa_carga: causaCarga,
       causa_conferente: causaConferente,
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
+      // Restrição de horário/turno do cliente pra receber (pedido do Victor
+      // 19/08/2026) -- só faz sentido pra tipo de entrega, mas não custa
+      // salvar o texto se vier preenchido de qualquer forma.
+      client_time_restriction: isDelivery ? emptyToNull(formData.get("client_time_restriction")) : null,
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
       scheduled_time: emptyToNull(formData.get("scheduled_time")),
       shift: shift || null,
@@ -2327,6 +2333,10 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       reason: reason,
       authorized_by: emptyToNull(authorizedBy),
       restriction_note: emptyToNull(formData.get("restriction_note")),
+      // Restrição de horário/turno do cliente pra receber (pedido do Victor
+      // 19/08/2026: "só pode receber de manhã ou só a tarde e só recebe das
+      // 14h as 17h, algo assim") -- só faz sentido pra tipo de entrega.
+      client_time_restriction: isDeliveryTypeCreate ? emptyToNull(formData.get("client_time_restriction")) : null,
       driver_name: driverName,
       scheduled_date: scheduledDate || null,
       scheduled_time: scheduledTime || null,

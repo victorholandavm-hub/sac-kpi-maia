@@ -670,6 +670,17 @@ export function SacCreateRequestForm({
           </Field>
         ) : null}
 
+        {isDelivery ? (
+          <Field label="Restrição de horário do cliente">
+            <input
+              name="client_time_restriction"
+              placeholder="Ex: só de manhã, ou das 14h às 17h"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+          </Field>
+        ) : null}
+
       </FormSection>
 
       {state?.error ? (
