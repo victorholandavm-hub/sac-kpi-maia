@@ -202,6 +202,20 @@ export const CLIENTE_NIVEL_COLORS: Record<ClienteNivel, string> = {
   sem_compra: "var(--text-muted)",
 };
 
+// Texto do "i" de cada card de nível (pedido do Victor 20/08/2026: "preciso
+// de um 'i' em cada grupo... com a explicação de como os clientes são
+// classificados") -- espelha calcularNivel abaixo em português, na mesma
+// ordem (mais alto pro mais baixo, "basta um destes" bater). Se
+// calcularNivel mudar, atualizar aqui junto -- não tem como derivar o texto
+// automaticamente da função sem reescrever tudo em string.
+export const CLIENTE_NIVEL_CRITERIA: Record<ClienteNivel, string> = {
+  diamante: "Gastou mais de R$ 10.000 no total, OU é cliente há 24 meses ou mais e já comprou de novo pelo menos 2 vezes (3+ compras no total).",
+  ouro: "Já fez 3 ou mais compras, OU é cliente entre 12 e 24 meses e já comprou de novo pelo menos 1 vez, OU gastou entre R$ 5.000 e R$ 10.000 no total.",
+  prata: "Já fez 2 ou mais compras, OU é cliente entre 6 e 12 meses, OU gastou entre R$ 1.500 e R$ 5.000 no total.",
+  bronze: "Fez a 1ª compra, mas ainda não se encaixa em nenhum critério de Prata, Ouro ou Diamante.",
+  sem_compra: "Nunca fez uma compra (não tem nenhum pedido do tipo Venda no histórico do Protheus).",
+};
+
 function mesesEntre(dataIso: string, hoje: Date): number {
   const d = new Date(`${dataIso}T00:00:00`);
   return (hoje.getFullYear() - d.getFullYear()) * 12 + (hoje.getMonth() - d.getMonth());
