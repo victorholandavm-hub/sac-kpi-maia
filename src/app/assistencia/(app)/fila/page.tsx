@@ -3,7 +3,13 @@ import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/li
 import { listRequests, listStores, isRequestStatus, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
 import { getRotaWeekOverview, startOfRotaWeek, ROTAS, ROTA_LABELS, ROTA_COLORS } from "@/lib/rotas";
-import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
+import {
+  ASSISTENCIA_MANAGED_TYPES,
+  DELIVERY_REQUEST_TYPES,
+  SAC_MANAGED_TYPES,
+  STATUS_COLORS,
+  OWN_ASSEMBLER_STORE_IDS,
+} from "@/lib/assistenciaLabels";
 import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -161,6 +167,7 @@ function buildHref(params: {
   from?: string;
   to?: string;
   tab?: string;
+  origem?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -170,6 +177,7 @@ function buildHref(params: {
   if (params.from) sp.set("from", params.from);
   if (params.to) sp.set("to", params.to);
   if (params.tab) sp.set("tab", params.tab);
+  if (params.origem) sp.set("origem", params.origem);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
@@ -197,14 +205,41 @@ const VISITA_TYPES: RequestType[] = ASSISTENCIA_MANAGED_TYPES.filter(
 );
 const ENTREGA_TYPES: RequestType[] = [...DELIVERY_REQUEST_TYPES];
 
+// Filtro "SAC x Assistência" dentro da aba Entregas -- pedido do Victor
+// 20/08/2026: "preciso de um filtro na aba de entregas para conseguir
+// filtrar as notificações do sac e da assistencia". Os 5 tipos de
+// DELIVERY_REQUEST_TYPES se dividem nos dois grupos de sempre (mesma
+// divisão de SAC_MANAGED_TYPES/ASSISTENCIA_MANAGED_TYPES, ver
+// assistenciaLabels.ts) -- troca/entrega/recolhimento de PRODUTO nascem no
+// SAC, envio/recolhimento de PEÇA nascem na assistência, mesmo os dois
+// saindo juntos na mesma rota.
+const ENTREGA_TYPES_SAC: RequestType[] = ENTREGA_TYPES.filter((t) => (SAC_MANAGED_TYPES as readonly string[]).includes(t));
+const ENTREGA_TYPES_ASSISTENCIA: RequestType[] = ENTREGA_TYPES.filter((t) => (ASSISTENCIA_MANAGED_TYPES as readonly string[]).includes(t));
+
+const ORIGEM_FILTERS: { label: string; value: "sac" | "assistencia" | null }[] = [
+  { label: "Todas", value: null },
+  { label: "SAC", value: "sac" },
+  { label: "Assistência", value: "assistencia" },
+];
+
 export default async function AssistenciaQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; page?: string; store?: string; assembler?: string; from?: string; to?: string; tab?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    q?: string;
+    page?: string;
+    store?: string;
+    assembler?: string;
+    from?: string;
+    to?: string;
+    tab?: string;
+    origem?: string;
+  }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler, from, to, tab } = await searchParams;
+  const { status, q, page: pageParam, store, assembler, from, to, tab, origem } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
@@ -213,7 +248,17 @@ export default async function AssistenciaQueuePage({
   // aqui (SAC nunca chega, ver redirectIfSac acima; notificação externa
   // continua só em /assistencia/sac, não é entrega de rota).
   const showPecas = tab === "pecas";
-  const types = showPecas ? ENTREGA_TYPES : VISITA_TYPES;
+  // Filtro SAC x Assistência só existe dentro da aba Entregas -- ignora um
+  // valor de "origem" que tenha sobrado na URL de antes de trocar pra
+  // Visitas, mesmo padrão de effectiveAssembler logo abaixo.
+  const filterOrigem = showPecas && (origem === "sac" || origem === "assistencia") ? origem : undefined;
+  const types = showPecas
+    ? filterOrigem === "sac"
+      ? ENTREGA_TYPES_SAC
+      : filterOrigem === "assistencia"
+        ? ENTREGA_TYPES_ASSISTENCIA
+        : ENTREGA_TYPES
+    : VISITA_TYPES;
   // Entrega de peça não tem montador (é motorista) -- ignora um valor de
   // "assembler" que tenha sobrado na URL de antes de trocar de aba, senão
   // filtra por um campo que essas linhas nunca preenchem e a lista some
@@ -262,7 +307,7 @@ export default async function AssistenciaQueuePage({
           Visitas
         </Link>
         <Link
-          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas" })}
+          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem })}
           className="text-base font-bold px-4 py-2 rounded-full"
           style={
             showPecas
@@ -284,7 +329,16 @@ export default async function AssistenciaQueuePage({
             return (
               <Link
                 key={f.label}
-                href={buildHref({ status: f.value ?? undefined, q, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined })}
+                href={buildHref({
+                  status: f.value ?? undefined,
+                  q,
+                  store,
+                  assembler: effectiveAssembler,
+                  from: dateFrom,
+                  to: dateTo,
+                  tab: showPecas ? "pecas" : undefined,
+                  origem: filterOrigem,
+                })}
                 className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
                 style={
                   f.value
@@ -317,6 +371,32 @@ export default async function AssistenciaQueuePage({
         </Link>
       </div>
 
+      {showPecas ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Origem:
+          </span>
+          {ORIGEM_FILTERS.map((f) => {
+            const selected = (f.value ?? undefined) === filterOrigem;
+            return (
+              <Link
+                key={f.label}
+                href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, tab: "pecas", origem: f.value ?? undefined })}
+                className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+                style={{
+                  border: "1px solid var(--border)",
+                  background: selected ? "var(--brand-green)" : "transparent",
+                  color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                  fontWeight: selected ? 600 : 400,
+                }}
+              >
+                {f.label}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
         {total} solicitaç{total === 1 ? "ão" : "ões"} encontrada{total === 1 ? "" : "s"}
         {totalPages > 1 ? ` · página ${page} de ${totalPages}` : ""}
@@ -335,6 +415,7 @@ export default async function AssistenciaQueuePage({
         {store ? <input type="hidden" name="store" value={store} /> : null}
         {effectiveAssembler ? <input type="hidden" name="assembler" value={effectiveAssembler} /> : null}
         {showPecas ? <input type="hidden" name="tab" value="pecas" /> : null}
+        {filterOrigem ? <input type="hidden" name="origem" value={filterOrigem} /> : null}
         <input
           type="search"
           name="q"
@@ -372,7 +453,7 @@ export default async function AssistenciaQueuePage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, tab: showPecas ? "pecas" : undefined })}
+            href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, tab: showPecas ? "pecas" : undefined, origem: filterOrigem })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -426,7 +507,7 @@ export default async function AssistenciaQueuePage({
         <div className="flex items-center justify-center gap-4 pt-2">
           {page > 1 ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined })}
+              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
@@ -438,7 +519,7 @@ export default async function AssistenciaQueuePage({
           </span>
           {page < totalPages ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined })}
+              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
