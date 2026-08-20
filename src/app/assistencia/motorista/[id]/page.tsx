@@ -4,7 +4,7 @@ import { getDriverSession } from "@/app/assistencia/driver-actions";
 import { getDriverRequestDetail, formatFullAddress } from "@/lib/serviceRequests";
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { DRIVER_TYPE_LABELS, SHIFT_LABELS, DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
-import { StatusBadge } from "@/components/assistencia/StatusBadge";
+import { DeliveryStatusBadge } from "@/components/assistencia/DeliveryStatusBadge";
 import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
 import { MotoristaPhotoUpload } from "@/components/assistencia/MotoristaPhotoUpload";
 import { MotoristaRequestActions } from "@/components/assistencia/MotoristaRequestActions";
@@ -83,7 +83,7 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
         ) : null}
 
         <div className="flex items-center gap-2 flex-wrap">
-          <StatusBadge status={request.status} />
+          <DeliveryStatusBadge status={request.status} scheduledDate={request.scheduledDate} rota={request.rota} />
           {request.shift === "urgencia" ? (
             <span
               className="text-xs font-bold px-2 py-0.5 rounded-full"
