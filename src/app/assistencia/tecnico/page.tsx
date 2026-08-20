@@ -7,6 +7,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { TecnicoItemDestino } from "@/components/assistencia/TecnicoItemDestino";
+import { TecnicoNotificationModalButton } from "@/components/assistencia/TecnicoNotificationModalButton";
 
 export const dynamic = "force-dynamic";
 
@@ -167,14 +168,17 @@ export default async function TecnicoHomePage({
                           Concluído {formatDateTime(r.completedAt)} · {r.driverName ?? "—"}
                         </span>
                       </div>
-                      <div className="flex flex-col gap-0.5 px-4 pt-2">
-                        <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                          Cliente: {r.clientName ?? "—"}
-                          {r.clientProtheusCode ? ` (${r.clientProtheusCode})` : ""}
-                        </p>
-                        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                          Solicitado por: {r.requestedByName ?? "—"}
-                        </p>
+                      <div className="flex items-center justify-between gap-2 flex-wrap px-4 pt-2">
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                            Cliente: {r.clientName ?? "—"}
+                            {r.clientCpf ? ` (${r.clientCpf})` : ""}
+                          </p>
+                          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                            Solicitado por: {r.requestedByName ?? "—"}
+                          </p>
+                        </div>
+                        <TecnicoNotificationModalButton request={r} />
                       </div>
                       <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
                         {r.items
