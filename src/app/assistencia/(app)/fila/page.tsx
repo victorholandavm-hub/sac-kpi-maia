@@ -382,16 +382,36 @@ export default async function AssistenciaQueuePage({
         </div>
       ) : (
         groups.map((group) => (
-          <div key={group.key} className="rounded-xl" style={{ border: `2px solid ${group.borderColor}` }}>
-            <div className="px-4 py-2 rounded-t-xl" style={{ background: group.headerBg }}>
+          // Recolhível -- pedido do Victor 20/08/2026: "os agrupamentos por
+          // data (Entregas e Visitas) precisam poder ser recolhidos, e
+          // mostrar a quantidade de dentro quando estiver recolhido".
+          // <details> nativo, sem JS extra (mesmo padrão de NotificacoesList.tsx);
+          // aberto por padrão, então o comportamento de sempre não muda até
+          // alguém clicar pra recolher. A contagem fica sempre visível (não só
+          // quando recolhido) -- mais útil pra decidir o que vale a pena abrir.
+          <details key={group.key} className="group rounded-xl overflow-hidden" style={{ border: `2px solid ${group.borderColor}` }} open>
+            <summary
+              className="px-4 py-2 flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+              style={{ background: group.headerBg }}
+            >
+              <span
+                className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
+                style={{ color: group.headerText }}
+                aria-hidden="true"
+              >
+                ▶
+              </span>
               <span className="text-sm font-bold uppercase tracking-wide" style={{ color: group.headerText }}>
                 {group.label}
               </span>
-            </div>
+              <span className="text-xs font-semibold" style={{ color: group.headerText, opacity: 0.85 }}>
+                ({group.items.length})
+              </span>
+            </summary>
             <div style={{ background: "var(--surface-1)" }}>
               <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate={showPecas} printable={showPecas} />
             </div>
-          </div>
+          </details>
         ))
       )}
 

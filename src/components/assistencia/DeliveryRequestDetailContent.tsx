@@ -4,7 +4,7 @@ import { formatFullAddress, type ServiceRequestDetail, type RequestEvent } from 
 import { REQUEST_TYPE_LABELS, STATUS_LABELS, SAC_MANAGED_TYPES, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
 import { DeliveryStatusBadge, isDeliveryScheduled } from "./DeliveryStatusBadge";
 import { StatusStepper } from "./StatusStepper";
-import { RequestActions } from "./RequestActions";
+import { DeliveryRequestActions } from "./DeliveryRequestActions";
 import { MobileActionSheet } from "./MobileActionSheet";
 import { ScheduleField, RotaBadge } from "./ScheduleField";
 import { DeliveryItemsTable } from "./DeliveryItemsTable";
@@ -295,13 +295,11 @@ export function DeliveryRequestDetailContent({
 
           {canManage ? (
             <MobileActionSheet>
-              <RequestActions
+              <DeliveryRequestActions
                 requestId={request.id}
                 requestType={request.type}
                 status={request.status}
                 isAssignedToMe={request.assignedToId === profile.id}
-                hasAssignee={!!request.driverName}
-                assigneeLabel="o motorista"
                 hideClaim={isSacType}
                 hasChildExchange={!!request.childExchange}
               />
