@@ -6,11 +6,19 @@ export type DateRange = {
   to: Date;
 };
 
-export function resolveRange(searchParams: {
-  range?: string;
-  from?: string;
-  to?: string;
-}): DateRange {
+export function resolveRange(
+  searchParams: {
+    range?: string;
+    from?: string;
+    to?: string;
+  },
+  // Cada tela que reaproveita esse helper (kpis, avaliacoes) pode querer um
+  // ponto de partida diferente quando ninguém escolheu nada na URL ainda --
+  // pedido do Victor 20/08/2026: "no painel de kpis... deixe por padrão o
+  // tempo selecionado como 'este mês'". "all" continua sendo o default
+  // geral (comportamento de sempre) pra quem não passar nada explícito.
+  defaultPreset: RangePreset = "all"
+): DateRange {
   const now = new Date();
 
   if (searchParams.from) {
@@ -19,7 +27,7 @@ export function resolveRange(searchParams: {
     return { preset: "custom", from, to };
   }
 
-  const preset = (searchParams.range as RangePreset) ?? "all";
+  const preset = (searchParams.range as RangePreset) ?? defaultPreset;
 
   if (preset === "7d") {
     return { preset, from: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), to: now };

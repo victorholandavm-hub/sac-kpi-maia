@@ -171,23 +171,31 @@ type ItemComData = {
   totvs_orders: { issue_date: string } | null;
 };
 
-// Curva semanal de UM produto -- todas as linhas do período cabem numa
-// página só (um produto específico, período limitado, não precisa paginar).
+// Curva semanal de UM produto -- período de atalho (até 26 semanas) nunca
+// chega perto de 5000 linhas pro produto mais vendido (~1073 linhas
+// conferido direto no banco), mas o período CUSTOM (campos De/Até da tela)
+// não tem esse teto -- alguém pode escolher um intervalo de anos pra um
+// produto de saída constante e passar disso numa boa. `.limit(5000)` fixo
+// cortava silenciosamente nesse caso (achado 20/08/2026, revisão pedida
+// pelo Victor) -- paginado de verdade agora, mesmo padrão de
+// fetchItensDoPeriodo mais abaixo.
 export async function getVendaCurvaProduto(productCode: string, range: DateRange): Promise<ProdutoVendaCurva | null> {
   const trimmed = productCode.trim();
   if (!trimmed) return null;
 
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin
-    .from("totvs_order_items")
-    .select("quantity, total, description, totvs_orders!inner(issue_date)")
-    .eq("product", trimmed)
-    .gte("totvs_orders.issue_date", range.from)
-    .lte("totvs_orders.issue_date", range.to)
-    .limit(5000);
-  if (error) throw new Error(error.message);
+  const rows = await fetchAllPagesParallel<ItemComData>(
+    (from, to) =>
+      admin
+        .from("totvs_order_items")
+        .select("quantity, total, description, totvs_orders!inner(issue_date)", { count: "exact" })
+        .eq("product", trimmed)
+        .gte("totvs_orders.issue_date", range.from)
+        .lte("totvs_orders.issue_date", range.to)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemComData>>,
+    { pageSize: RANKING_PAGE_SIZE }
+  );
 
-  const rows = (data ?? []) as unknown as ItemComData[];
   let description: string | null = null;
   if (rows.length > 0) {
     description = rows[0].description;
@@ -461,9 +469,9 @@ export async function listVendasPorCategoria(range: DateRange): Promise<Categori
 
 // { semanaInicio: "2026-07-06", colchao: 12, roupeiro: 4, ... } -- uma linha
 // por semana, uma chave por categoria -- formato que o recharts espera pra
-// desenhar barras empilhadas com uma <Bar> por categoria (ver
-// CategoriaEvolucaoChart.tsx). Só entram categorias com pelo menos 1 venda
-// em ALGUMA semana do período, pra não empilhar série vazia.
+// desenhar uma <Line> por categoria (ver CategoriaEvolucaoChart.tsx). Só
+// entram categorias com pelo menos 1 venda em ALGUMA semana do período, pra
+// não desenhar série vazia.
 export type CategoriaEvolucaoSemana = { semanaInicio: string } & Record<string, number | string>;
 
 export async function listVendasPorCategoriaPorSemana(
