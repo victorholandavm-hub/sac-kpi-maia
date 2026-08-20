@@ -253,6 +253,11 @@ export type KpiData = {
   // do Victor 20/08/2026: "colocar os modelos dos problemas" -- clicar na
   // barra abre a lista de chamados daquele produto genérico.
   productTickets: Record<string, StoreBreakdownTicket[]>;
+  // Distribuição completa de categoria por loja (ver buildStoreCategoryMap)
+  // -- pedido do Victor 20/08/2026: "dentro dos chamados por loja, quais as
+  // categorias desses chamados". Diferente de StoreBreakdown.topCategory
+  // (só a dominante) -- aqui são todas.
+  storeCategories: Record<string, Count[]>;
   waitingCount: number;
   waitingByType: Count[];
   waitingByStore: Count[];
@@ -815,6 +820,30 @@ function buildProductTicketsMap(rows: TicketRow[]): Record<string, StoreBreakdow
   return Object.fromEntries([...byProductRows.entries()].map(([product, prodRows]) => [product, buildTicketList(prodRows)]));
 }
 
+// Drill-down de byStore (ver KpiData.storeCategories) -- pedido do Victor
+// 20/08/2026: "dá pra colocar dentro dos chamados por loja quais as
+// categorias desses chamados?". StoreBreakdown (mais abaixo) só guarda a
+// categoria DOMINANTE de cada loja (topCategory) -- aqui é a distribuição
+// completa, todas as categorias com pelo menos 1 chamado naquela loja.
+// Limite bem acima do total de tags que existem hoje (~21, ver
+// CATEGORY_LABELS em labels.ts) só por segurança, não deveria nunca cortar
+// de verdade.
+function buildStoreCategoryMap(rows: TicketRow[], categoryLabelFn: (tag: string) => string): Record<string, Count[]> {
+  const byStoreRows = new Map<string, TicketRow[]>();
+  for (const row of rows) {
+    if (!row.store_tag) continue;
+    const list = byStoreRows.get(row.store_tag) ?? [];
+    list.push(row);
+    byStoreRows.set(row.store_tag, list);
+  }
+  return Object.fromEntries(
+    [...byStoreRows.entries()].map(([store, storeRows]) => [
+      store,
+      topCounts(storeRows, "category", 30).map((c) => ({ ...c, label: categoryLabelFn(c.label) })),
+    ])
+  );
+}
+
 // Regras de negócio pra sugerir uma causa provável por trás da categoria
 // dominante de uma loja -- ex.: muita "Dúvida" concentrada numa loja é
 // sintoma comum de vendedor sem treinamento de produto. É heurística
@@ -1128,6 +1157,7 @@ export async function getKpiData(
   const storeBreakdown = buildStoreBreakdown(rows, labelFns.storeLabel, labelFns.categoryLabel);
   const categoryTickets = buildCategoryTicketsMap(rows);
   const productTickets = buildProductTicketsMap(rows);
+  const storeCategories = buildStoreCategoryMap(rows, labelFns.categoryLabel);
   const agentDrilldown = buildAgentDrilldown(rows);
   // Nome/telefone dos chamados por trás do "problema mais comum" (loja,
   // categoria geral e semana anterior) -- query em lote única (mesmo padrão
@@ -1180,6 +1210,7 @@ export async function getKpiData(
     storeBreakdown,
     categoryTickets,
     productTickets,
+    storeCategories,
     waitingCount: waitingOpenRows.length,
     waitingByType,
     waitingByStore,

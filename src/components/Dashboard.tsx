@@ -17,6 +17,7 @@ import { AgentStatsTable } from "./AgentStatsTable";
 import { PerformanceReportButton } from "./PerformanceReportButton";
 import { NpsCard, NPS_INDEX_TARGET, indexColor, NPS_SCORE_LABELS } from "./NpsCard";
 import { CategoryTicketsModal } from "./CategoryTicketsModal";
+import { CategoryBreakdownModal } from "./CategoryBreakdownModal";
 import { InsightGrid } from "./InsightCard";
 import { buildHeadlineInsights, buildPerformanceInsights, buildGargalosInsights } from "@/lib/kpiInsights";
 import { categoryLabel, storeLabel, productLabel } from "@/lib/labels";
@@ -36,7 +37,9 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
   // `tag` preserva o valor cru ("cat-duvida") por trás do label traduzido --
   // usado pra abrir o drill-down (data.categoryTickets é indexado pela tag).
   const byCategory = data.byCategory.map((c) => ({ ...c, tag: c.label, label: categoryLabel(c.label) }));
-  const byStore = data.byStore.map((c) => ({ ...c, label: storeLabel(c.label) }));
+  // tag crua preservada (mesmo padrão de byCategory) -- indexa
+  // data.storeCategories pra abrir a distribuição por categoria da loja.
+  const byStore = data.byStore.map((c) => ({ ...c, tag: c.label, label: storeLabel(c.label) }));
   // Mesmo padrão de byCategory acima -- tag crua ("cadeira") preservada pra
   // indexar data.productTickets, já que productLabel só capitaliza (não dá
   // pra "desfazer" pra achar a chave de volta).
@@ -68,6 +71,21 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
       title: item.label,
       totalCount: item.count,
       tickets: data.productTickets[tag] ?? [],
+    });
+  }
+
+  // "Dentro dos chamados por loja, quais as categorias desses chamados"
+  // (pedido do Victor 20/08/2026) -- diferente dos dois de cima, aqui é
+  // distribuição (contagem por categoria), não lista de chamados um a um.
+  const [storeCategoryModal, setStoreCategoryModal] = useState<{ title: string; totalCount: number; categories: Count[] } | null>(
+    null
+  );
+  function openStoreCategoryDrilldown(item: Count) {
+    const tag = item.tag ?? item.label;
+    setStoreCategoryModal({
+      title: item.label,
+      totalCount: item.count,
+      categories: data.storeCategories[tag] ?? [],
     });
   }
   // Ordem invertida (5 no topo) -- fica mais intuitivo no gráfico de barras
@@ -187,7 +205,7 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           <section className="grid md:grid-cols-3 gap-4">
             <BarRanking title="Chamados por canal" data={data.byChannel} />
             <BarRanking title="Chamados por produto" data={byProduct} coverage={data.productCoverage} onSelect={openProductDrilldown} />
-            <BarRanking title="Chamados por loja" data={byStore} coverage={data.storeCoverage} />
+            <BarRanking title="Chamados por loja" data={byStore} coverage={data.storeCoverage} onSelect={openStoreCategoryDrilldown} />
           </section>
         </div>
       ) : null}
@@ -268,6 +286,15 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           totalCount={ticketListModal.totalCount}
           tickets={ticketListModal.tickets}
           onClose={() => setTicketListModal(null)}
+        />
+      ) : null}
+
+      {storeCategoryModal ? (
+        <CategoryBreakdownModal
+          title={storeCategoryModal.title}
+          totalCount={storeCategoryModal.totalCount}
+          categories={storeCategoryModal.categories}
+          onClose={() => setStoreCategoryModal(null)}
         />
       ) : null}
     </div>
