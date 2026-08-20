@@ -207,7 +207,9 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                 {listResult.items.map((c) => (
                   <tr key={c.protheusCode}>
                     <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                      {c.name}
+                      <Link href={`/clientes/${encodeURIComponent(c.protheusCode)}`} className="underline">
+                        {c.name}
+                      </Link>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span
@@ -387,7 +389,9 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                       {c.posicaoNoNivel}º
                     </td>
                     <td className="px-4 py-2" style={{ color: "var(--text-primary)" }}>
-                      {c.nome ?? c.clientId}
+                      <Link href={`/clientes/${encodeURIComponent(c.clientId)}`} className="underline">
+                        {c.nome ?? c.clientId}
+                      </Link>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 flex-wrap">

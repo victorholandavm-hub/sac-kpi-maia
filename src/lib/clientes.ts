@@ -371,3 +371,62 @@ export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
 
   return resultado;
 }
+
+export type ClienteCompra = {
+  id: string;
+  invoice: string | null;
+  issueDate: string;
+  invoiceTotal: number;
+  type: string;
+  branch: string | null;
+  sellerName: string | null;
+};
+
+// Detalhe do cliente (clique no nome, tanto na aba Status quanto Nível de
+// relacionamento) -- pedido do Victor 20/08/2026: "ao clicar no nome do
+// cliente, aparecer as compras que ele já fez com data e valor de cada
+// uma". client_id de totvs_orders é o mesmo protheus_code de totvs_clientes
+// (chave já usada em listClientesPorNivel acima) -- funciona pros dois
+// pontos de entrada sem precisar de mais nenhuma tabela. Nome/CPF vêm do
+// próprio pedido (client_name/client_cpf_cnpj), não do cadastro
+// totvs_clientes -- 24.584 códigos de cliente aparecem como comprador, só
+// 3.760 têm cadastro completo sincronizado (mesmo motivo já documentado em
+// listClientesPorNivel).
+export async function listComprasDoCliente(
+  clientId: string
+): Promise<{ nome: string | null; cpfCnpj: string | null; compras: ClienteCompra[] }> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("totvs_orders")
+    .select("id, invoice, issue_date, invoice_total, type, branch, seller_name, client_name, client_cpf_cnpj")
+    .eq("client_id", clientId)
+    .order("issue_date", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  type Row = {
+    id: string;
+    invoice: string | null;
+    issue_date: string;
+    invoice_total: number;
+    type: string;
+    branch: string | null;
+    seller_name: string | null;
+    client_name: string | null;
+    client_cpf_cnpj: string | null;
+  };
+  const rows = (data ?? []) as unknown as Row[];
+
+  return {
+    nome: rows.find((r) => r.client_name)?.client_name ?? null,
+    cpfCnpj: rows.find((r) => r.client_cpf_cnpj)?.client_cpf_cnpj ?? null,
+    compras: rows.map((r) => ({
+      id: r.id,
+      invoice: r.invoice,
+      issueDate: r.issue_date,
+      invoiceTotal: r.invoice_total,
+      type: r.type,
+      branch: r.branch,
+      sellerName: r.seller_name,
+    })),
+  };
+}
