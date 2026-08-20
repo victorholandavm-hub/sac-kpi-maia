@@ -65,12 +65,19 @@ export type TecnicoRequestView = {
   clientName: string | null;
   driverName: string | null;
   completedAt: string | null;
+  // Quem abriu a notificação -- pedido do Victor 20/08/2026: "precisa ter
+  // também quem solicitou: sac ou assistencia e o nome da pessoa que fez a
+  // notificação". Mesmo fallback de ServiceRequestSummary.requestedByName
+  // (SummaryRow em serviceRequests.ts): nome do profile logado que criou
+  // (requester), senão o texto livre requested_by_name (chamado antigo, de
+  // antes do login por Supabase Auth).
+  requestedByName: string | null;
   items: TecnicoItem[];
 };
 
 const TECNICO_VIEW_LIMIT = 200;
 const TECNICO_VIEW_COLUMNS =
-  "id, ticket_number, type, store_id, client_name, driver_name, completed_at, stores(name), items:service_request_items(id, product, part_code, quantity, destino, destino_definido_por, destino_definido_em)";
+  "id, ticket_number, type, store_id, client_name, driver_name, completed_at, requested_by_name, requester:profiles!requested_by(full_name), stores(name), items:service_request_items(id, product, part_code, quantity, destino, destino_definido_por, destino_definido_em)";
 
 type TecnicoViewRow = {
   id: string;
@@ -79,6 +86,8 @@ type TecnicoViewRow = {
   client_name: string | null;
   driver_name: string | null;
   completed_at: string | null;
+  requested_by_name: string | null;
+  requester: { full_name: string } | null;
   stores: { name: string } | null;
   items: {
     id: string;
@@ -100,6 +109,7 @@ function toTecnicoView(row: TecnicoViewRow): TecnicoRequestView {
     clientName: row.client_name,
     driverName: row.driver_name,
     completedAt: row.completed_at,
+    requestedByName: row.requester?.full_name ?? row.requested_by_name ?? null,
     items: (row.items ?? []).map((i) => ({
       id: i.id,
       product: i.product,
