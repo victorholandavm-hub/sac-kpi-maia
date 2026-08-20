@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
 // Tela "Vendas por produto" (admin + CD, ver 0073_vendas_produto_rls.sql):
 // curva semanal de um produto, ranking dos mais vendidos e classificação por
@@ -257,31 +258,30 @@ type ItemRankingRow = {
 // Todo o histórico do período cabe em memória pra agregar (ranking geral,
 // por categoria E por categoria-por-semana) -- paginado de verdade (não
 // confia no default de 1000 linhas do PostgREST): num período de várias
-// semanas, o total de itens pode passar disso fácil. Corta em MAX_PAGINAS
-// por segurança (nunca deve bater nisso com o volume atual, mas evita loop
-// sem fim se um dia bater).
+// semanas, o total de itens pode passar disso fácil. Páginas buscadas em
+// PARALELO (ver fetchAllPagesParallel) -- achado 19/08/2026: essa função
+// sozinha, sequencial e com um teto de 30 páginas (30.000 linhas), já
+// truncava silenciosamente o período padrão de 12 semanas (34.206 linhas
+// reais) E ainda levava a maior parte dos 20s que a tela de Vendas chegou a
+// demorar pra carregar. Sem teto de páginas agora -- o count exato já
+// resolve quantas existem de verdade, não precisa mais de um limite
+// arbitrário "por segurança".
 const RANKING_PAGE_SIZE = 1000;
-const RANKING_MAX_PAGINAS = 30;
 
 async function fetchItensDoPeriodo(range: DateRange): Promise<ItemRankingRow[]> {
   const admin = getSupabaseAdmin();
 
-  const rows: ItemRankingRow[] = [];
-  for (let pagina = 0; pagina < RANKING_MAX_PAGINAS; pagina++) {
-    const from = pagina * RANKING_PAGE_SIZE;
-    const { data, error } = await admin
-      .from("totvs_order_items")
-      .select("product, description, quantity, total, totvs_orders!inner(issue_date)")
-      .gte("totvs_orders.issue_date", range.from)
-      .lte("totvs_orders.issue_date", range.to)
-      .not("product", "is", null)
-      .range(from, from + RANKING_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const batch = (data ?? []) as unknown as ItemRankingRow[];
-    rows.push(...batch);
-    if (batch.length < RANKING_PAGE_SIZE) break;
-  }
-  return rows;
+  return fetchAllPagesParallel<ItemRankingRow>(
+    (from, to) =>
+      admin
+        .from("totvs_order_items")
+        .select("product, description, quantity, total, totvs_orders!inner(issue_date)", { count: "exact" })
+        .gte("totvs_orders.issue_date", range.from)
+        .lte("totvs_orders.issue_date", range.to)
+        .not("product", "is", null)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemRankingRow>>,
+    { pageSize: RANKING_PAGE_SIZE }
+  );
 }
 
 // categoria opcional -- quando informada, filtra o ranking só pra produtos
@@ -343,22 +343,20 @@ export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<
         const inicio = isoDateSub(RUNWAY_DIAS_JANELA_VENDA);
         const fim = isoDateSub(0);
         const acc = new Map<string, number>();
-        for (let pagina = 0; pagina < RANKING_MAX_PAGINAS; pagina++) {
-          const from = pagina * RANKING_PAGE_SIZE;
-          const { data, error } = await admin
-            .from("totvs_order_items")
-            .select("product, quantity, totvs_orders!inner(issue_date)")
-            .in("product", productCodes)
-            .gte("totvs_orders.issue_date", inicio)
-            .lte("totvs_orders.issue_date", fim)
-            .range(from, from + RANKING_PAGE_SIZE - 1);
-          if (error) throw new Error(error.message);
-          const batch = (data ?? []) as unknown as { product: string | null; quantity: number }[];
-          for (const row of batch) {
-            if (!row.product) continue;
-            acc.set(row.product, (acc.get(row.product) ?? 0) + row.quantity);
-          }
-          if (batch.length < RANKING_PAGE_SIZE) break;
+        const rows = await fetchAllPagesParallel<{ product: string | null; quantity: number }>(
+          (from, to) =>
+            admin
+              .from("totvs_order_items")
+              .select("product, quantity, totvs_orders!inner(issue_date)", { count: "exact" })
+              .in("product", productCodes)
+              .gte("totvs_orders.issue_date", inicio)
+              .lte("totvs_orders.issue_date", fim)
+              .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ product: string | null; quantity: number }>>,
+          { pageSize: RANKING_PAGE_SIZE }
+        );
+        for (const row of rows) {
+          if (!row.product) continue;
+          acc.set(row.product, (acc.get(row.product) ?? 0) + row.quantity);
         }
         return acc;
       })(),
@@ -410,23 +408,22 @@ export async function listTendenciaProdutos(productCodes: string[]): Promise<Map
   const ultimasPorProduto = new Map<string, number>();
   const previasPorProduto = new Map<string, number>();
 
-  for (let pagina = 0; pagina < RANKING_MAX_PAGINAS; pagina++) {
-    const from = pagina * RANKING_PAGE_SIZE;
-    const { data, error } = await admin
-      .from("totvs_order_items")
-      .select("product, quantity, totvs_orders!inner(issue_date)")
-      .in("product", productCodes)
-      .gte("totvs_orders.issue_date", inicioPrevias)
-      .lte("totvs_orders.issue_date", fim)
-      .range(from, from + RANKING_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const batch = (data ?? []) as unknown as { product: string | null; quantity: number; totvs_orders: { issue_date: string } | null }[];
-    for (const row of batch) {
-      if (!row.product || !row.totvs_orders) continue;
-      const bucket = row.totvs_orders.issue_date >= inicioUltimas ? ultimasPorProduto : previasPorProduto;
-      bucket.set(row.product, (bucket.get(row.product) ?? 0) + row.quantity);
-    }
-    if (batch.length < RANKING_PAGE_SIZE) break;
+  type TendenciaRow = { product: string | null; quantity: number; totvs_orders: { issue_date: string } | null };
+  const rows = await fetchAllPagesParallel<TendenciaRow>(
+    (from, to) =>
+      admin
+        .from("totvs_order_items")
+        .select("product, quantity, totvs_orders!inner(issue_date)", { count: "exact" })
+        .in("product", productCodes)
+        .gte("totvs_orders.issue_date", inicioPrevias)
+        .lte("totvs_orders.issue_date", fim)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<TendenciaRow>>,
+    { pageSize: RANKING_PAGE_SIZE }
+  );
+  for (const row of rows) {
+    if (!row.product || !row.totvs_orders) continue;
+    const bucket = row.totvs_orders.issue_date >= inicioUltimas ? ultimasPorProduto : previasPorProduto;
+    bucket.set(row.product, (bucket.get(row.product) ?? 0) + row.quantity);
   }
 
   for (const code of productCodes) {

@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchInBatches } from "./supabaseBatch";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
 export type EmAndamentoRow = {
   conversationId: string;
@@ -38,19 +39,17 @@ type ContactRow = { id: string; name: string | null; phone: string | null };
 export async function getEmAndamentoList(): Promise<EmAndamentoRow[]> {
   const supabase = getSupabaseAdmin();
 
-  const statusRows: StatusTagRow[] = [];
   const pageSize = 1000;
-  for (let page = 0; ; page++) {
-    const { data, error } = await supabase
-      .from("v_conversation_tags")
-      .select("conversation_id, tag, event_at")
-      .eq("dimension", "status")
-      .order("event_at", { ascending: true })
-      .range(page * pageSize, page * pageSize + pageSize - 1);
-    if (error) throw error;
-    statusRows.push(...((data ?? []) as StatusTagRow[]));
-    if (!data || data.length < pageSize) break;
-  }
+  const statusRows = await fetchAllPagesParallel<StatusTagRow>(
+    (from, to) =>
+      supabase
+        .from("v_conversation_tags")
+        .select("conversation_id, tag, event_at", { count: "exact" })
+        .eq("dimension", "status")
+        .order("event_at", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<StatusTagRow>>,
+    { pageSize }
+  );
 
   const latestByConversation = new Map<string, StatusTagRow>();
   for (const row of statusRows) {

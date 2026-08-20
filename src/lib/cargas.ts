@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
 // Tela "Cargas" do SAC/admin (ver 0072_carga_conferente_e_problemas.sql):
 // lista as cargas sincronizadas do TOTVS dos últimos DIAS_RETROATIVOS dias,
@@ -89,27 +90,25 @@ const CARGA_COLUMNS =
 // primeiras 1000 apareciam na tela, sem nenhum aviso -- mesma armadilha
 // corrigida em listEntregasEmRisco/src/lib/entregasRisco.ts). A ordem do
 // fetch não importa: o resultado final é reordenado em memória no fim da
-// função de qualquer forma.
+// função de qualquer forma. Páginas buscadas em PARALELO desde 19/08/2026
+// (ver fetchAllPagesParallel) -- essa função é chamada nos formulários de
+// "Nova entrega"/"Nova visita" (causa_carga), então era sequencial ali
+// bem no meio do fluxo de criar uma notificação.
 const CARGA_PAGE_SIZE = 1000;
-const CARGA_MAX_PAGINAS = 50;
 
 export async function listCargasRecentes(): Promise<CargaGroup[]> {
   const admin = getSupabaseAdmin();
   const cutoff = new Date(Date.now() - DIAS_RETROATIVOS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const rows: CargaRow[] = [];
-  for (let pagina = 0; pagina < CARGA_MAX_PAGINAS; pagina++) {
-    const from = pagina * CARGA_PAGE_SIZE;
-    const { data, error } = await admin
-      .from("totvs_delivery_cargas")
-      .select(CARGA_COLUMNS)
-      .or(`dt_previsao.gte.${cutoff},dt_previsao.is.null`)
-      .range(from, from + CARGA_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const batch = (data ?? []) as unknown as CargaRow[];
-    rows.push(...batch);
-    if (batch.length < CARGA_PAGE_SIZE) break;
-  }
+  const rows = await fetchAllPagesParallel<CargaRow>(
+    (from, to) =>
+      admin
+        .from("totvs_delivery_cargas")
+        .select(CARGA_COLUMNS, { count: "exact" })
+        .or(`dt_previsao.gte.${cutoff},dt_previsao.is.null`)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<CargaRow>>,
+    { pageSize: CARGA_PAGE_SIZE }
+  );
   const groups = new Map<string, CargaGroup>();
 
   for (const row of rows) {
