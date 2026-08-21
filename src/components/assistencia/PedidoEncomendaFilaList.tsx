@@ -8,7 +8,56 @@ import { PedidoEncomendaStatusBadge } from "./PedidoEncomendaStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { prazoUrgencyStyle } from "@/lib/prazoStyle";
+import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 import type { PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
+
+// Agrupado por prazo (data que importa pra fila de verdade -- quando o
+// pedido é esperado, não quando foi criado) -- pedido do Victor 20/08/2026:
+// "deixe com a mesma organização que fizemos na tela dos admin... separado
+// por data e organizado por ordem cronológica. Passou a data? vai lá pra
+// baixo". Mesmo rank de sempre (hoje, amanhã, depois, atrasado, sem data)
+// já usado em fila/page.tsx (Entregas) e NotificacoesList.tsx (SAC).
+// "Prazo" aqui segue a mesma prioridade já exibida em cada card: prazo p/
+// loja (CD já confirmou) vence prazo p/ CD (fábrica ainda não despachou),
+// que vence "sem prazo nenhum".
+function effectiveDeadline(p: PedidoEncomendaSummary): string | null {
+  return p.prazoCdLoja ?? p.prazoFabricaCd ?? null;
+}
+
+const NO_DEADLINE_KEY = "sem_prazo";
+const DEADLINE_BUCKET_RANK: Record<DateBucketKey, number> = {
+  hoje: 0,
+  amanha: 1,
+  depois: 2,
+  atrasado: 3,
+  sem_data: 4,
+};
+
+type DeadlineGroup = { dateKey: string; label: string; pedidos: PedidoEncomendaSummary[] };
+
+function groupByDeadline(pedidos: PedidoEncomendaSummary[]): DeadlineGroup[] {
+  const groups: DeadlineGroup[] = [];
+  for (const p of pedidos) {
+    const deadline = effectiveDeadline(p);
+    const dateKey = deadline ?? NO_DEADLINE_KEY;
+    let group = groups.find((g) => g.dateKey === dateKey);
+    if (!group) {
+      const label = deadline
+        ? new Date(`${deadline}T00:00:00Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" })
+        : "Sem prazo definido";
+      group = { dateKey, label, pedidos: [] };
+      groups.push(group);
+    }
+    group.pedidos.push(p);
+  }
+  groups.sort((a, b) => {
+    const rankA = DEADLINE_BUCKET_RANK[bucketByScheduledDate(a.dateKey === NO_DEADLINE_KEY ? null : a.dateKey)];
+    const rankB = DEADLINE_BUCKET_RANK[bucketByScheduledDate(b.dateKey === NO_DEADLINE_KEY ? null : b.dateKey)];
+    if (rankA !== rankB) return rankA - rankB;
+    return a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0;
+  });
+  return groups;
+}
 
 // Único status de origem elegível pra seleção em lote hoje: fábrica termina a
 // produção de vários pedidos e marca todos como "enviado para o CD" de uma
@@ -63,119 +112,136 @@ export function PedidoEncomendaFilaList({
 
   return (
     <>
-      <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-        <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
-          {pedidos.map((p) => {
-            const needsAction = actionNeededIds.has(p.id);
-            const fornecedorLabel = p.fornecedorTipo === "fabrica_externa" ? `Externo: ${p.fornecedorExterno}` : p.fabricaNome;
-            const eligible = canBulkAdvance && p.status === BULK_ELIGIBLE_STATUS;
-            const position = positionMap.get(p.id);
-            return (
-              <div
-                key={p.id}
-                className="flex items-stretch"
-                style={needsAction ? { borderLeft: "4px solid var(--status-warning)" } : undefined}
-              >
-                {canBulkAdvance ? (
-                  <div className="flex items-center justify-center w-10 shrink-0">
-                    {eligible ? (
-                      <input
-                        type="checkbox"
-                        checked={selected.has(p.id)}
-                        onChange={() => toggle(p.id)}
-                        className="w-4 h-4 cursor-pointer"
-                        aria-label={`Selecionar pedido #${p.pedidoNumber}`}
-                      />
-                    ) : null}
-                  </div>
-                ) : null}
-                {/* Selo compacto e fixo à esquerda -- pista visual imediata da ordem da
-                    fila, sem depender de ler o resto do texto. */}
-                <div className="flex items-center justify-center w-9 shrink-0">
-                  {position ? (
+      <div className="flex flex-col gap-3">
+        {groupByDeadline(pedidos).map((group) => (
+          <details key={group.dateKey} className="group flex flex-col gap-1.5" open>
+            <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+              <span className="inline-block transition-transform group-open:rotate-90" style={{ color: "var(--text-muted)" }}>
+                ▶
+              </span>
+              <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                {group.label}
+              </span>
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                ({group.pedidos.length})
+              </span>
+            </summary>
+            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+              <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
+                {group.pedidos.map((p) => {
+                  const needsAction = actionNeededIds.has(p.id);
+                  const fornecedorLabel = p.fornecedorTipo === "fabrica_externa" ? `Externo: ${p.fornecedorExterno}` : p.fabricaNome;
+                  const eligible = canBulkAdvance && p.status === BULK_ELIGIBLE_STATUS;
+                  const position = positionMap.get(p.id);
+                  return (
                     <div
-                      className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none"
-                      style={{ background: "var(--brand-green)", color: "#fff" }}
+                      key={p.id}
+                      className="flex items-stretch"
+                      style={needsAction ? { borderLeft: "4px solid var(--status-warning)" } : undefined}
                     >
-                      <span className="text-sm font-bold">{position}º</span>
-                      <span className="text-[7px] font-semibold uppercase tracking-wide">na fila</span>
-                    </div>
-                  ) : null}
-                </div>
-                <Link
-                  href={`/assistencia/encomendas/fila/${p.id}`}
-                  className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80 flex-1 min-w-0"
-                >
-                  <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                        #{p.pedidoNumber}
-                      </span>
-                      <PedidoEncomendaStatusBadge status={p.status} />
-                      <NewSinceBadge createdAt={p.createdAt} storageKey="fila-encomendas-last-seen" />
-                      <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                        {p.storeName}
-                      </span>
-                      {fornecedorLabel ? (
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
-                          style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
-                        >
-                          {fornecedorLabel}
-                        </span>
+                      {canBulkAdvance ? (
+                        <div className="flex items-center justify-center w-10 shrink-0">
+                          {eligible ? (
+                            <input
+                              type="checkbox"
+                              checked={selected.has(p.id)}
+                              onChange={() => toggle(p.id)}
+                              className="w-4 h-4 cursor-pointer"
+                              aria-label={`Selecionar pedido #${p.pedidoNumber}`}
+                            />
+                          ) : null}
+                        </div>
                       ) : null}
+                      {/* Selo compacto e fixo à esquerda -- pista visual imediata da ordem da
+                          fila, sem depender de ler o resto do texto. */}
+                      <div className="flex items-center justify-center w-9 shrink-0">
+                        {position ? (
+                          <div
+                            className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none"
+                            style={{ background: "var(--brand-green)", color: "#fff" }}
+                          >
+                            <span className="text-sm font-bold">{position}º</span>
+                            <span className="text-[7px] font-semibold uppercase tracking-wide">na fila</span>
+                          </div>
+                        ) : null}
+                      </div>
+                      <Link
+                        href={`/assistencia/encomendas/fila/${p.id}`}
+                        className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80 flex-1 min-w-0"
+                      >
+                        <div className="flex flex-col gap-1 min-w-0 w-0 grow">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                              #{p.pedidoNumber}
+                            </span>
+                            <PedidoEncomendaStatusBadge status={p.status} />
+                            <NewSinceBadge createdAt={p.createdAt} storageKey="fila-encomendas-last-seen" />
+                            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                              {p.storeName}
+                            </span>
+                            {fornecedorLabel ? (
+                              <span
+                                className="text-xs px-2 py-0.5 rounded-full whitespace-nowrap"
+                                style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+                              >
+                                {fornecedorLabel}
+                              </span>
+                            ) : null}
+                          </div>
+                          {p.items.length > 1 ? (
+                            <ul className="text-sm list-disc pl-4" style={{ color: "var(--text-secondary)" }}>
+                              {p.items.map((i, idx) => (
+                                <li key={idx} className="truncate">
+                                  {i.quantidade}x {i.produtoDescricao}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
+                              {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
+                            </p>
+                          )}
+                          {p.clienteCodigo ? (
+                            <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+                              Cliente: {p.clienteCodigo}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                          <span className="font-bold" style={{ color: "var(--text-secondary)" }}>
+                            {new Date(p.createdAt).toLocaleString("pt-BR")}
+                          </span>
+                          <span>Pedido por {p.requestedByName}</span>
+                          {/* Prazo fábrica→CD continua valendo até o CD confirmar
+                              de verdade (botar em carga / marcar recebido) --
+                              "enviado para o CD" sozinho é só a fábrica dizendo
+                              que despachou, não prova que chegou. Só depois da
+                              confirmação do CD troca pela data real de chegada
+                              (fato, sem cor de urgência). */}
+                          {!CD_JA_CONFIRMOU.includes(p.status) && p.prazoFabricaCd ? (
+                            <span style={prazoUrgencyStyle(p.prazoFabricaCd)}>
+                              🕐 Prazo p/ CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
+                            </span>
+                          ) : null}
+                          {CD_JA_CONFIRMOU.includes(p.status) && chegadaCdByPedido[p.id] ? (
+                            <span>📦 Chegou no CD: {new Date(chegadaCdByPedido[p.id]).toLocaleDateString("pt-BR")}</span>
+                          ) : null}
+                          {p.prazoCdLoja ? (
+                            <span style={prazoUrgencyStyle(p.prazoCdLoja)}>
+                              🕐 Prazo p/ loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
+                            </span>
+                          ) : null}
+                          {p.carga ? <span>Carga {p.carga}</span> : null}
+                          {p.nfE ? <span>NF-e {p.nfE}</span> : null}
+                        </div>
+                      </Link>
                     </div>
-                    {p.items.length > 1 ? (
-                      <ul className="text-sm list-disc pl-4" style={{ color: "var(--text-secondary)" }}>
-                        {p.items.map((i, idx) => (
-                          <li key={idx} className="truncate">
-                            {i.quantidade}x {i.produtoDescricao}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                        {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
-                      </p>
-                    )}
-                    {p.clienteCodigo ? (
-                      <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-                        Cliente: {p.clienteCodigo}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                    <span className="font-bold" style={{ color: "var(--text-secondary)" }}>
-                      {new Date(p.createdAt).toLocaleString("pt-BR")}
-                    </span>
-                    <span>Pedido por {p.requestedByName}</span>
-                    {/* Prazo fábrica→CD continua valendo até o CD confirmar
-                        de verdade (botar em carga / marcar recebido) --
-                        "enviado para o CD" sozinho é só a fábrica dizendo
-                        que despachou, não prova que chegou. Só depois da
-                        confirmação do CD troca pela data real de chegada
-                        (fato, sem cor de urgência). */}
-                    {!CD_JA_CONFIRMOU.includes(p.status) && p.prazoFabricaCd ? (
-                      <span style={prazoUrgencyStyle(p.prazoFabricaCd)}>
-                        🕐 Prazo p/ CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
-                      </span>
-                    ) : null}
-                    {CD_JA_CONFIRMOU.includes(p.status) && chegadaCdByPedido[p.id] ? (
-                      <span>📦 Chegou no CD: {new Date(chegadaCdByPedido[p.id]).toLocaleDateString("pt-BR")}</span>
-                    ) : null}
-                    {p.prazoCdLoja ? (
-                      <span style={prazoUrgencyStyle(p.prazoCdLoja)}>
-                        🕐 Prazo p/ loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
-                      </span>
-                    ) : null}
-                    {p.carga ? <span>Carga {p.carga}</span> : null}
-                    {p.nfE ? <span>NF-e {p.nfE}</span> : null}
-                  </div>
-                </Link>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </details>
+        ))}
       </div>
 
       {selected.size > 0 ? (
