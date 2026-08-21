@@ -53,7 +53,8 @@ export default async function SacNotificacoesPage({
           desse atalho aqui também pra não depender de pedir pra
           assistência mudar o motorista do dia (pedido do Victor
           17/08/2026). */}
-      <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} />
+      {/* Junior como motorista padrão -- pedido do Victor 21/08/2026. */}
+      <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver="Junior" />
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
