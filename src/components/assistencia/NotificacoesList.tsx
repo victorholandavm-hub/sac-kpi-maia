@@ -8,7 +8,7 @@ import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { ROTAS, ROTA_LABELS, ROTA_COLORS, type AvailableRota, type Rota } from "@/lib/rotas";
 import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
-import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
+import { DeliveryStatusBadge, countByDeliveryStatus } from "./DeliveryStatusBadge";
 
 // Agrupado por DATA primeiro, rota dentro de cada data -- pedido do Victor
 // 20/08/2026: "na tela do sac também fique em ordem por data". Antes era só
@@ -165,9 +165,11 @@ export function NotificacoesList({
         </div>
       ) : null}
 
-      {groups.map((group) => (
+      {groups.map((group) => {
+        const statusCounts = countByDeliveryStatus(group.items);
+        return (
         <details key={group.key} className="group flex flex-col gap-1.5" open>
-          <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+          <summary className="flex items-center gap-2 px-1 cursor-pointer list-none flex-wrap [&::-webkit-details-marker]:hidden">
             <span
               className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
               style={{ color: "var(--text-muted)" }}
@@ -191,6 +193,11 @@ export function NotificacoesList({
             </h3>
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
               ({group.items.length})
+            </span>
+            <span className="flex items-center gap-2 text-[11px] font-medium ml-auto">
+              <span style={{ color: "var(--brand-green)" }}>Programado {statusCounts.programado}</span>
+              <span style={{ color: "var(--status-good)" }}>Concluído {statusCounts.concluido}</span>
+              <span style={{ color: "var(--text-secondary)" }}>Cancelado {statusCounts.cancelado}</span>
             </span>
           </summary>
           <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
@@ -239,7 +246,8 @@ export function NotificacoesList({
             </div>
           </div>
         </details>
-      ))}
+        );
+      })}
     </div>
   );
 }

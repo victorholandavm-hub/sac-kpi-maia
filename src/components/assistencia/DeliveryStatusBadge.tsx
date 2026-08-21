@@ -12,6 +12,25 @@ export function isDeliveryScheduled(scheduledDate: string | null, rota: string |
   return !!scheduledDate && !!rota;
 }
 
+// Contagem por status dentro de um grupo (rota/data) -- pedido do Victor
+// 21/08/2026: "dentro da aba de cada rota... preciso que fique dividido em
+// programado, concluido, cancelado e o numero ao lado de cada status".
+// Mesmos 3 baldes do badge acima -- "Não programado" conta junto de
+// "Programado" aqui, só pra bater exatamente com os 3 nomes pedidos.
+// Compartilhado entre NotificacoesList.tsx (SAC/admin) e fila/page.tsx
+// (aba Entregas, admin/assistência) -- mesma regra, um lugar só.
+export type DeliveryStatusCounts = { programado: number; concluido: number; cancelado: number };
+
+export function countByDeliveryStatus(items: { status: string }[]): DeliveryStatusCounts {
+  const counts: DeliveryStatusCounts = { programado: 0, concluido: 0, cancelado: 0 };
+  for (const r of items) {
+    if (r.status === "concluida") counts.concluido++;
+    else if (r.status === "cancelada") counts.cancelado++;
+    else counts.programado++;
+  }
+  return counts;
+}
+
 export function DeliveryStatusBadge({
   status,
   scheduledDate,
