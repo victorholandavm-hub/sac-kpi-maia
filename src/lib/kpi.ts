@@ -928,6 +928,67 @@ async function fetchContactsByIds(
   return result;
 }
 
+export type DayTicketRow = {
+  conversationId: string;
+  clientName: string | null;
+  clientPhone: string | null;
+  storeTag: string | null;
+  category: string | null;
+  product: string | null;
+  urgency: string;
+  channel: string | null;
+  openedAt: string;
+  summaryAi: string | null;
+};
+
+// "Chamados do dia" -- pedido do Victor 20/08/2026: "todos os chamados do
+// dia do sac e ver o resumo da conversa de cada um... das 7h30 até as
+// 18h30". Diferente de getKpiData (busca todo o histórico e filtra em JS,
+// ver comentário lá) -- aqui o filtro de data/hora já vai direto no
+// .gte/.lte da query, bem mais barato pra um recorte de um dia só. `-03:00`
+// fixo no fuso (América/Fortaleza) -- mesmo padrão de dateFrom/dateTo em
+// listRequests (serviceRequests.ts).
+export async function listTicketsForDay(date: string, fromTime: string, toTime: string): Promise<DayTicketRow[]> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(fromTime) || !/^\d{2}:\d{2}$/.test(toTime)) {
+    return [];
+  }
+
+  const supabase = getSupabaseAdmin();
+  const fromIso = `${date}T${fromTime}:00-03:00`;
+  const toIso = `${date}T${toTime}:00-03:00`;
+
+  const rows = await fetchAllPagesParallel<TicketRow>(
+    (from, to) =>
+      supabase
+        .from("v_ticket_enriched")
+        .select("*", { count: "exact" })
+        .gte("opened_at", fromIso)
+        .lte("opened_at", toIso)
+        .order("opened_at", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<TicketRow>>,
+    { pageSize: 1000 }
+  );
+
+  const contactIds = [...new Set(rows.map((r) => r.contact_id).filter((id): id is string => !!id))];
+  const contactsById = await fetchContactsByIds(supabase, contactIds);
+
+  return rows.map((r) => {
+    const contact = contactsById.get(r.contact_id ?? "");
+    return {
+      conversationId: r.conversation_id,
+      clientName: contact?.name ?? null,
+      clientPhone: contact?.phone ?? null,
+      storeTag: r.store_tag,
+      category: r.category,
+      product: r.product,
+      urgency: r.urgency,
+      channel: r.channel,
+      openedAt: r.opened_at,
+      summaryAi: r.summary_ai,
+    };
+  });
+}
+
 export async function getKpiData(
   range: DateRange,
   labelFns: {

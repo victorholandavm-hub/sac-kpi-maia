@@ -114,6 +114,13 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
             >
               Atendimentos em andamento
             </Link>
+            <Link
+              href="/kpis/chamados-do-dia"
+              className="text-sm font-medium px-3 py-1.5 rounded-full"
+              style={{ background: "var(--brand-orange)", color: "#fff" }}
+            >
+              Chamados do dia
+            </Link>
             <PerformanceReportButton data={data.performanceReport} />
           </div>
         </div>
