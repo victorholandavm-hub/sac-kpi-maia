@@ -15,7 +15,7 @@ import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
-import { countByDeliveryStatus } from "@/components/assistencia/DeliveryStatusBadge";
+import { countByDeliveryStatus, isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 
 type QueueDateSubgroup = { dateKey: string; label: string; items: ServiceRequestSummary[] };
@@ -170,6 +170,7 @@ function buildHref(params: {
   to?: string;
   tab?: string;
   origem?: string;
+  sched?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -180,6 +181,7 @@ function buildHref(params: {
   if (params.to) sp.set("to", params.to);
   if (params.tab) sp.set("tab", params.tab);
   if (params.origem) sp.set("origem", params.origem);
+  if (params.sched) sp.set("sched", params.sched);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
@@ -192,6 +194,25 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Em andamento", value: "em_andamento" },
   { label: "Concluídas", value: "concluida" },
   { label: "Canceladas", value: "cancelada" },
+];
+
+// Filtros específicos da aba Entregas -- pedido do Victor 21/08/2026: "na
+// tela de notificação de assistência, não tem como eu filtrar por
+// programado". Os FILTERS genéricos acima (Abertas/Em contato/Em
+// andamento) são pensados pro status detalhado de visita de montador --
+// entrega não passa por negociação de agenda (ver isDeliveryScheduled em
+// DeliveryStatusBadge.tsx), só existe "aberta" (que vira Programado/Não
+// programado dependendo se já tem data+rota), concluída ou cancelada.
+// "Programado"/"Não programado" não são status de verdade no banco -- são
+// status=aberta filtrado depois em JS por scheduledDate+rota (ver `sched`
+// abaixo), porque não dá pra expressar isso só com `.eq("status", ...)`.
+type EntregaFilterValue = { status: string | null; sched?: boolean };
+const ENTREGA_FILTERS: { label: string; value: EntregaFilterValue; color: string }[] = [
+  { label: "Todas", value: { status: null }, color: "var(--text-secondary)" },
+  { label: "Programado", value: { status: "aberta", sched: true }, color: "var(--brand-green)" },
+  { label: "Não programado", value: { status: "aberta", sched: false }, color: "var(--status-warning)" },
+  { label: "Concluídas", value: { status: "concluida" }, color: "var(--status-good)" },
+  { label: "Canceladas", value: { status: "cancelada" }, color: "var(--text-muted)" },
 ];
 
 // Troca/entrega de produto (SAC) e envio/recolhimento de peça (assistência)
@@ -235,11 +256,12 @@ export default async function AssistenciaQueuePage({
     to?: string;
     tab?: string;
     origem?: string;
+    sched?: string;
   }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler, from, to, tab, origem } = await searchParams;
+  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
@@ -252,6 +274,10 @@ export default async function AssistenciaQueuePage({
   // valor de "origem" que tenha sobrado na URL de antes de trocar pra
   // Visitas, mesmo padrão de effectiveAssembler logo abaixo.
   const filterOrigem = showPecas && (origem === "sac" || origem === "assistencia") ? origem : undefined;
+  // Programado/Não programado (ver ENTREGA_FILTERS acima) -- também só faz
+  // sentido dentro da aba Entregas, mesmo padrão de filterOrigem.
+  const filterSched: boolean | undefined = showPecas && filterStatus === "aberta" && (sched === "1" || sched === "0") ? sched === "1" : undefined;
+  const schedParam = filterSched === true ? "1" : filterSched === false ? "0" : undefined;
   const types = showPecas
     ? filterOrigem === "sac"
       ? ENTREGA_TYPES_SAC
@@ -271,15 +297,26 @@ export default async function AssistenciaQueuePage({
   // esses tipos.
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const today = new Date().toISOString().slice(0, 10);
-  const [{ items: requests, total, pageSize }, stores, assemblers, drivers, rotaOverview] = await Promise.all([
+  const [{ items: rawRequests, total: rawTotal, pageSize }, stores, assemblers, drivers, rotaOverview] = await Promise.all([
     listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: effectiveAssembler, types, dateFrom, dateTo, excludeOwnAssemblerStoreIds }),
     listStores(),
     listAssemblers(),
     showPecas ? listDrivers() : Promise.resolve([]),
     showPecas ? getRotaWeekOverview(startOfRotaWeek(today), 14) : Promise.resolve([]),
   ]);
+  // Programado/Não programado não são status de verdade no banco (ver
+  // ENTREGA_FILTERS acima) -- `.eq("status", "aberta")` já rolou no
+  // servidor, esse filtro extra em JS separa quem já tem data+rota de
+  // quem não tem. `total`/`totalPages` do servidor ficam errados nesse
+  // caso (contam a "aberta" inteira, não só o sub-balde) -- recalculo os
+  // dois a partir do que sobrou depois do filtro. Sem problema de paginação
+  // na prática: a fila de entregas em aberto nunca chega perto do tamanho
+  // de página pra precisar de mais de uma página dividida ainda por cima
+  // em programado/não programado.
+  const requests = filterSched === undefined ? rawRequests : rawRequests.filter((r) => isDeliveryScheduled(r.scheduledDate, r.rota) === filterSched);
+  const total = filterSched === undefined ? rawTotal : requests.length;
   const groups = showPecas ? groupByRota(requests) : groupByDate(requests);
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const totalPages = filterSched === undefined ? Math.max(1, Math.ceil(total / pageSize)) : 1;
   // Calculado uma vez aqui (Server Component, sem hooks) e repassado pra
   // AssistenciaQueueGroup -- lá dentro é "use client" com hooks, onde
   // chamar Date.now() direto no corpo do render quebra a regra de pureza.
@@ -307,7 +344,7 @@ export default async function AssistenciaQueuePage({
           Visitas
         </Link>
         <Link
-          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem })}
+          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, sched: schedParam })}
           className="text-base font-bold px-4 py-2 rounded-full"
           style={
             showPecas
@@ -323,44 +360,80 @@ export default async function AssistenciaQueuePage({
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
-          {FILTERS.map((f) => {
-            const selected = (f.value ?? undefined) === filterStatus;
-            const color = f.value ? STATUS_COLORS[f.value] ?? "var(--text-secondary)" : "var(--text-secondary)";
-            return (
-              <Link
-                key={f.label}
-                href={buildHref({
-                  status: f.value ?? undefined,
-                  q,
-                  store,
-                  assembler: effectiveAssembler,
-                  from: dateFrom,
-                  to: dateTo,
-                  tab: showPecas ? "pecas" : undefined,
-                  origem: filterOrigem,
-                })}
-                className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
-                style={
-                  f.value
-                    ? {
-                        color: "var(--text-primary)",
-                        background: selected ? `color-mix(in srgb, ${color} 35%, var(--surface-1))` : "transparent",
-                        fontWeight: selected ? 600 : 400,
-                        border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
-                      }
-                    : {
-                        borderColor: "var(--border)",
-                        border: "1px solid var(--border)",
-                        background: selected ? "var(--surface-1)" : "transparent",
-                        color: selected ? "var(--text-primary)" : "var(--text-secondary)",
-                        fontWeight: selected ? 600 : 400,
-                      }
-                }
-              >
-                {f.label}
-              </Link>
-            );
-          })}
+          {showPecas
+            ? ENTREGA_FILTERS.map((f) => {
+                const selected = (f.value.status ?? undefined) === filterStatus && (f.value.sched ?? undefined) === filterSched;
+                return (
+                  <Link
+                    key={f.label}
+                    href={buildHref({
+                      status: f.value.status ?? undefined,
+                      q,
+                      store,
+                      from: dateFrom,
+                      to: dateTo,
+                      tab: "pecas",
+                      origem: filterOrigem,
+                      sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
+                    })}
+                    className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
+                    style={
+                      f.value.status
+                        ? {
+                            color: "var(--text-primary)",
+                            background: selected ? `color-mix(in srgb, ${f.color} 35%, var(--surface-1))` : "transparent",
+                            fontWeight: selected ? 600 : 400,
+                            border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${f.color} 40%, transparent)`}`,
+                          }
+                        : {
+                            borderColor: "var(--border)",
+                            border: "1px solid var(--border)",
+                            background: selected ? "var(--surface-1)" : "transparent",
+                            color: selected ? "var(--text-primary)" : "var(--text-secondary)",
+                            fontWeight: selected ? 600 : 400,
+                          }
+                    }
+                  >
+                    {f.label}
+                  </Link>
+                );
+              })
+            : FILTERS.map((f) => {
+                const selected = (f.value ?? undefined) === filterStatus;
+                const color = f.value ? STATUS_COLORS[f.value] ?? "var(--text-secondary)" : "var(--text-secondary)";
+                return (
+                  <Link
+                    key={f.label}
+                    href={buildHref({
+                      status: f.value ?? undefined,
+                      q,
+                      store,
+                      assembler: effectiveAssembler,
+                      from: dateFrom,
+                      to: dateTo,
+                    })}
+                    className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
+                    style={
+                      f.value
+                        ? {
+                            color: "var(--text-primary)",
+                            background: selected ? `color-mix(in srgb, ${color} 35%, var(--surface-1))` : "transparent",
+                            fontWeight: selected ? 600 : 400,
+                            border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
+                          }
+                        : {
+                            borderColor: "var(--border)",
+                            border: "1px solid var(--border)",
+                            background: selected ? "var(--surface-1)" : "transparent",
+                            color: selected ? "var(--text-primary)" : "var(--text-secondary)",
+                            fontWeight: selected ? 600 : 400,
+                          }
+                    }
+                  >
+                    {f.label}
+                  </Link>
+                );
+              })}
         </div>
         <Link
           href={showPecas ? "/assistencia/nova-entrega" : "/assistencia/nova-rapida"}
@@ -381,7 +454,7 @@ export default async function AssistenciaQueuePage({
             return (
               <Link
                 key={f.label}
-                href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, tab: "pecas", origem: f.value ?? undefined })}
+                href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, tab: "pecas", origem: f.value ?? undefined, sched: schedParam })}
                 className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
                 style={{
                   border: "1px solid var(--border)",
@@ -416,6 +489,7 @@ export default async function AssistenciaQueuePage({
         {effectiveAssembler ? <input type="hidden" name="assembler" value={effectiveAssembler} /> : null}
         {showPecas ? <input type="hidden" name="tab" value="pecas" /> : null}
         {filterOrigem ? <input type="hidden" name="origem" value={filterOrigem} /> : null}
+        {schedParam ? <input type="hidden" name="sched" value={schedParam} /> : null}
         <input
           type="search"
           name="q"
@@ -453,7 +527,7 @@ export default async function AssistenciaQueuePage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, tab: showPecas ? "pecas" : undefined, origem: filterOrigem })}
+            href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -531,7 +605,7 @@ export default async function AssistenciaQueuePage({
         <div className="flex items-center justify-center gap-4 pt-2">
           {page > 1 ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem })}
+              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
@@ -543,7 +617,7 @@ export default async function AssistenciaQueuePage({
           </span>
           {page < totalPages ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem })}
+              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
