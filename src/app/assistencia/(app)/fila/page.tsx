@@ -9,6 +9,7 @@ import {
   SAC_MANAGED_TYPES,
   STATUS_COLORS,
   OWN_ASSEMBLER_STORE_IDS,
+  VISITA_REQUEST_TYPES,
 } from "@/lib/assistenciaLabels";
 import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
@@ -200,9 +201,7 @@ const FILTERS: { label: string; value: string | null }[] = [
 // troca de peça/vistoria), que fica exclusiva na outra aba -- "recolhimento"
 // mudou de lado em 18/08/2026 (era visita de montador, virou entrega de
 // motorista, ver DELIVERY_REQUEST_TYPES).
-const VISITA_TYPES: RequestType[] = ASSISTENCIA_MANAGED_TYPES.filter(
-  (t) => !(DELIVERY_REQUEST_TYPES as readonly string[]).includes(t)
-);
+const VISITA_TYPES: RequestType[] = [...VISITA_REQUEST_TYPES];
 const ENTREGA_TYPES: RequestType[] = [...DELIVERY_REQUEST_TYPES];
 
 // Filtro "SAC x Assistência" dentro da aba Entregas -- pedido do Victor
@@ -497,7 +496,14 @@ export default async function AssistenciaQueuePage({
               </span>
             </summary>
             <div style={{ background: "var(--surface-1)" }}>
-              <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate={showPecas} printable={showPecas} />
+              <AssistenciaQueueGroup
+                items={group.items}
+                reorderable
+                now={now}
+                showCreatedDate={showPecas}
+                printable={showPecas}
+                showStaleBadge={!showPecas}
+              />
             </div>
           </details>
         ))
