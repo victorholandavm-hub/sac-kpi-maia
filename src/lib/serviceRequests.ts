@@ -1428,7 +1428,23 @@ export async function listRecentlyHandledBySac(profileId: string, limit = 3): Pr
     .filter((r): r is RecentlyHandledRequest => r !== null);
 }
 
-export type ReportRow = { key: string; total: number; concluida: number; cancelada: number };
+// Um chamado dentro de uma linha agregada -- pra permitir "clicar e ver os
+// detalhes" em cada linha das tabelas de relatório (pedido do Victor
+// 21/08/2026: "em todas as listas, assim que clicar, mostrar os
+// detalhes"), sem precisar de uma consulta nova por linha: os dados já
+// vêm da mesma query que gera a contagem, só preservados em vez de
+// descartados depois de contar.
+export type ReportRowItem = {
+  id: string;
+  ticketNumber: number;
+  type: RequestType;
+  status: RequestStatus;
+  clientName: string | null;
+  storeName: string;
+  createdAt: string;
+};
+
+export type ReportRow = { key: string; total: number; concluida: number; cancelada: number; items: ReportRowItem[] };
 
 export type RequestsReport = {
   byStore: ReportRow[];
@@ -1442,9 +1458,20 @@ export type RequestsReport = {
 
 // Relatório por período — a planilha permitia filtrar/dinamizar por data,
 // loja, vendedor; aqui é a mesma coisa, mas dentro do app.
-export async function getRequestsReport(opts: { dateFrom?: string; dateTo?: string } = {}): Promise<RequestsReport> {
+//
+// `alvo` filtra entre montagem de mostruário (a loja monta pra exposição
+// própria, sem cliente real -- ver isMostruarioRequest) e cliente de
+// verdade -- pedido do Victor 21/08/2026: "coloque Filtro de montagem de
+// mostruário e cliente". Só se aplica a este relatório principal (não à
+// seção "Indicadores de X" nem aos pagamentos, que não têm order_code/
+// client_name na consulta).
+export async function getRequestsReport(
+  opts: { dateFrom?: string; dateTo?: string; alvo?: "mostruario" | "cliente" } = {}
+): Promise<RequestsReport> {
   const admin = getSupabaseAdmin();
-  let query = admin.from("service_requests").select("store_id, seller_name, type, status, causa_raiz, created_at, stores(name)");
+  let query = admin
+    .from("service_requests")
+    .select("id, ticket_number, store_id, seller_name, type, status, causa_raiz, created_at, order_code, client_name, stores(name)");
 
   if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
   if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
@@ -1453,25 +1480,41 @@ export async function getRequestsReport(opts: { dateFrom?: string; dateTo?: stri
   if (error) throw new Error(error.message);
 
   type Row = {
+    id: string;
+    ticket_number: number;
     store_id: string;
     seller_name: string | null;
     type: RequestType;
     status: RequestStatus;
     causa_raiz: string | null;
     created_at: string;
+    order_code: string | null;
+    client_name: string | null;
     stores: { name: string } | null;
   };
-  const rows = (data ?? []) as unknown as Row[];
+  const allRows = (data ?? []) as unknown as Row[];
+  const rows = opts.alvo
+    ? allRows.filter((r) => isMostruarioRequest(r.order_code, r.client_name) === (opts.alvo === "mostruario"))
+    : allRows;
 
   function aggregate(keyFn: (r: Row) => string | null): ReportRow[] {
     const map = new Map<string, ReportRow>();
     for (const r of rows) {
       const key = keyFn(r);
       if (!key) continue;
-      const entry = map.get(key) ?? { key, total: 0, concluida: 0, cancelada: 0 };
+      const entry = map.get(key) ?? { key, total: 0, concluida: 0, cancelada: 0, items: [] };
       entry.total++;
       if (r.status === "concluida") entry.concluida++;
       if (r.status === "cancelada") entry.cancelada++;
+      entry.items.push({
+        id: r.id,
+        ticketNumber: r.ticket_number,
+        type: r.type,
+        status: r.status,
+        clientName: r.client_name,
+        storeName: r.stores?.name ?? r.store_id,
+        createdAt: r.created_at,
+      });
       map.set(key, entry);
     }
     return [...map.values()].sort((a, b) => b.total - a.total);
@@ -1486,9 +1529,20 @@ export async function getRequestsReport(opts: { dateFrom?: string; dateTo?: stri
   };
 }
 
-export type MonthCount = { month: string; total: number; concluida: number };
-export type AssemblerCount = { assemblerName: string; total: number; concluida: number; avgDaysToComplete: number | null };
-export type StoreCount = { storeId: string; storeName: string; total: number; concluida: number };
+// Mesma ideia de ReportRowItem acima -- item cru guardado do lado de cada
+// contagem, pra dar pra expandir e ver os chamados de verdade por trás de
+// cada linha (mês/montador/loja).
+export type IndicatorItem = { id: string; ticketNumber: number; clientName: string | null; status: RequestStatus; createdAt: string };
+
+export type MonthCount = { month: string; total: number; concluida: number; items: IndicatorItem[] };
+export type AssemblerCount = {
+  assemblerName: string;
+  total: number;
+  concluida: number;
+  avgDaysToComplete: number | null;
+  items: IndicatorItem[];
+};
+export type StoreCount = { storeId: string; storeName: string; total: number; concluida: number; items: IndicatorItem[] };
 
 export type ServiceTypeIndicators = {
   byMonth: MonthCount[];
@@ -1507,7 +1561,7 @@ export async function getServiceTypeIndicators(
   const admin = getSupabaseAdmin();
   let query = admin
     .from("service_requests")
-    .select("store_id, assembler_name, status, created_at, completed_at, stores(name)")
+    .select("id, ticket_number, store_id, assembler_name, status, client_name, created_at, completed_at, stores(name)")
     .eq("type", type);
 
   if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
@@ -1517,9 +1571,12 @@ export async function getServiceTypeIndicators(
   if (error) throw new Error(error.message);
 
   type Row = {
+    id: string;
+    ticket_number: number;
     store_id: string;
     assembler_name: string | null;
     status: RequestStatus;
+    client_name: string | null;
     created_at: string;
     completed_at: string | null;
     stores: { name: string } | null;
@@ -1527,18 +1584,21 @@ export async function getServiceTypeIndicators(
   const rows = (data ?? []) as unknown as Row[];
 
   const monthMap = new Map<string, MonthCount>();
-  const assemblerMap = new Map<string, { total: number; concluida: number; daysSum: number; daysCount: number }>();
+  const assemblerMap = new Map<string, { total: number; concluida: number; daysSum: number; daysCount: number; items: IndicatorItem[] }>();
   const storeMap = new Map<string, StoreCount>();
 
   for (const r of rows) {
+    const item: IndicatorItem = { id: r.id, ticketNumber: r.ticket_number, clientName: r.client_name, status: r.status, createdAt: r.created_at };
+
     const month = r.created_at.slice(0, 7);
-    const monthEntry = monthMap.get(month) ?? { month, total: 0, concluida: 0 };
+    const monthEntry = monthMap.get(month) ?? { month, total: 0, concluida: 0, items: [] };
     monthEntry.total++;
     if (r.status === "concluida") monthEntry.concluida++;
+    monthEntry.items.push(item);
     monthMap.set(month, monthEntry);
 
     const assemblerName = r.assembler_name ?? "Sem montador definido";
-    const assemblerEntry = assemblerMap.get(assemblerName) ?? { total: 0, concluida: 0, daysSum: 0, daysCount: 0 };
+    const assemblerEntry = assemblerMap.get(assemblerName) ?? { total: 0, concluida: 0, daysSum: 0, daysCount: 0, items: [] };
     assemblerEntry.total++;
     if (r.status === "concluida") {
       assemblerEntry.concluida++;
@@ -1548,11 +1608,13 @@ export async function getServiceTypeIndicators(
         assemblerEntry.daysCount++;
       }
     }
+    assemblerEntry.items.push(item);
     assemblerMap.set(assemblerName, assemblerEntry);
 
-    const storeEntry = storeMap.get(r.store_id) ?? { storeId: r.store_id, storeName: r.stores?.name ?? r.store_id, total: 0, concluida: 0 };
+    const storeEntry = storeMap.get(r.store_id) ?? { storeId: r.store_id, storeName: r.stores?.name ?? r.store_id, total: 0, concluida: 0, items: [] };
     storeEntry.total++;
     if (r.status === "concluida") storeEntry.concluida++;
+    storeEntry.items.push(item);
     storeMap.set(r.store_id, storeEntry);
   }
 
@@ -1564,6 +1626,7 @@ export async function getServiceTypeIndicators(
         total: v.total,
         concluida: v.concluida,
         avgDaysToComplete: v.daysCount > 0 ? v.daysSum / v.daysCount : null,
+        items: v.items,
       }))
       .sort((a, b) => b.total - a.total),
     byStore: [...storeMap.values()].sort((a, b) => b.total - a.total),
