@@ -6,14 +6,17 @@ import { useRouter } from "next/navigation";
 import { bulkSetRotaAction, getAvailableRotasForDateAction } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { ROTAS, ROTA_LABELS, ROTA_COLORS, type AvailableRota, type Rota } from "@/lib/rotas";
+import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
 import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 
-// Agrupado por rota, mesma ordem/rótulo fixo de groupByRota em fila/page.tsx
-// (Praia/Sul/Centro, "Sem rota definida" por último) -- pedido do Victor
-// 19/08/2026: "ainda não aparece o agrupamento por rota". Sem sub-grupo de
-// data aqui de propósito (fila/page.tsx tem, mas essa lista raramente passa
-// de umas dezenas de itens -- um nível a mais só atrapalharia).
+// Agrupado por DATA primeiro, rota dentro de cada data -- pedido do Victor
+// 20/08/2026: "na tela do sac também fique em ordem por data". Antes era só
+// por rota (pedido do Victor 19/08/2026: "ainda não aparece o agrupamento
+// por rota", sem sub-grupo de data "de propósito"), mas isso misturava
+// datas fora de ordem dentro de cada rota -- mesmo problema, e mesmo
+// conserto, já aplicado em groupByRota de fila/page.tsx ("a data manda, não
+// a rota"). Mesmo rank de sempre: hoje, amanhã, depois, atrasado, sem data.
 const NO_ROTA = "sem_rota" as const;
 type RotaGroupKey = Rota | typeof NO_ROTA;
 const ROTA_GROUP_ORDER: RotaGroupKey[] = [...ROTAS, NO_ROTA];
@@ -26,10 +29,58 @@ const ROTA_GROUP_COLORS: Record<RotaGroupKey, string> = {
   [NO_ROTA]: "var(--text-muted)",
 };
 
-function groupByRota(requests: ServiceRequestSummary[]): { key: RotaGroupKey; items: ServiceRequestSummary[] }[] {
-  return ROTA_GROUP_ORDER.map((key) => ({ key, items: requests.filter((r) => (r.rota ?? NO_ROTA) === key) })).filter(
-    (g) => g.items.length > 0
-  );
+const NO_SCHEDULED_DATE_KEY = "sem_data";
+const SCHEDULED_DATE_BUCKET_RANK: Record<DateBucketKey, number> = {
+  hoje: 0,
+  amanha: 1,
+  depois: 2,
+  atrasado: 3,
+  sem_data: 4,
+};
+
+type DateSubgroup = { dateKey: string; label: string; items: ServiceRequestSummary[] };
+
+function groupByScheduledDate(items: ServiceRequestSummary[]): DateSubgroup[] {
+  const groups: DateSubgroup[] = [];
+  for (const r of items) {
+    const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
+    const dateKey = effectiveDate ?? NO_SCHEDULED_DATE_KEY;
+    let group = groups.find((g) => g.dateKey === dateKey);
+    if (!group) {
+      const label = effectiveDate
+        ? new Date(`${effectiveDate}T00:00:00Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" })
+        : "Sem data definida";
+      group = { dateKey, label, items: [] };
+      groups.push(group);
+    }
+    group.items.push(r);
+  }
+  groups.sort((a, b) => {
+    const rankA = SCHEDULED_DATE_BUCKET_RANK[bucketByScheduledDate(a.dateKey === NO_SCHEDULED_DATE_KEY ? null : a.dateKey)];
+    const rankB = SCHEDULED_DATE_BUCKET_RANK[bucketByScheduledDate(b.dateKey === NO_SCHEDULED_DATE_KEY ? null : b.dateKey)];
+    if (rankA !== rankB) return rankA - rankB;
+    return a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0;
+  });
+  return groups;
+}
+
+type Group = { key: string; label: string; color: string; items: ServiceRequestSummary[] };
+
+function groupByDateAndRota(requests: ServiceRequestSummary[]): Group[] {
+  const groups: Group[] = [];
+  for (const dateGroup of groupByScheduledDate(requests)) {
+    for (const rotaKey of ROTA_GROUP_ORDER) {
+      const items = dateGroup.items.filter((r) => (r.rota ?? NO_ROTA) === rotaKey);
+      if (items.length === 0) continue;
+      groups.push({
+        key: `${dateGroup.dateKey}_${rotaKey}`,
+        label: `${rotaKey === NO_ROTA ? "" : "Rota "}${ROTA_GROUP_LABELS[rotaKey]} · ${dateGroup.label}`,
+        color: ROTA_GROUP_COLORS[rotaKey],
+        items,
+      });
+    }
+  }
+  return groups;
 }
 
 // Lista de notificações com seleção em bloco (pedido do Victor 19/08/2026:
@@ -50,7 +101,7 @@ export function NotificacoesList({
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const allSelected = selectable && requests.length > 0 && selected.size === requests.length;
-  const groups = groupByRota(requests);
+  const groups = groupByDateAndRota(requests);
 
   function toggleAll() {
     setSelected(allSelected ? new Set() : new Set(requests.map((r) => r.id)));
@@ -110,10 +161,9 @@ export function NotificacoesList({
             >
               ▶
             </span>
-            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ROTA_GROUP_COLORS[group.key] }} />
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: group.color }} />
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-              {group.key === NO_ROTA ? "" : "Rota "}
-              {ROTA_GROUP_LABELS[group.key]}
+              {group.label}
             </h3>
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
               ({group.items.length})
