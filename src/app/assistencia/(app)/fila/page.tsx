@@ -15,6 +15,7 @@ import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
+import { countByDeliveryStatus } from "@/components/assistencia/DeliveryStatusBadge";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 
 type QueueDateSubgroup = { dateKey: string; label: string; items: ServiceRequestSummary[] };
@@ -468,7 +469,16 @@ export default async function AssistenciaQueuePage({
           </p>
         </div>
       ) : (
-        groups.map((group) => (
+        groups.map((group) => {
+          // Divisão programado/concluído/cancelado, com o número ao lado
+          // de cada um -- pedido do Victor 21/08/2026: "dentro da aba de
+          // cada rota... preciso que fique dividido em programado,
+          // concluido, cancelado". Só faz sentido pra Entregas (status
+          // simplificado de DeliveryStatusBadge) -- Visitas usa outro
+          // conjunto de status (aberta/em_contato/em_andamento/remarcar),
+          // que já tem o próprio badge por chamado.
+          const statusCounts = showPecas ? countByDeliveryStatus(group.items) : null;
+          return (
           // Recolhível -- pedido do Victor 20/08/2026: "os agrupamentos por
           // data (Entregas e Visitas) precisam poder ser recolhidos, e
           // mostrar a quantidade de dentro quando estiver recolhido".
@@ -478,7 +488,7 @@ export default async function AssistenciaQueuePage({
           // quando recolhido) -- mais útil pra decidir o que vale a pena abrir.
           <details key={group.key} className="group rounded-xl overflow-hidden" style={{ border: `2px solid ${group.borderColor}` }} open>
             <summary
-              className="px-4 py-2 flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+              className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
               style={{ background: group.headerBg }}
             >
               <span
@@ -494,6 +504,13 @@ export default async function AssistenciaQueuePage({
               <span className="text-xs font-semibold" style={{ color: group.headerText, opacity: 0.85 }}>
                 ({group.items.length})
               </span>
+              {statusCounts ? (
+                <span className="flex items-center gap-2 text-[11px] font-medium ml-auto" style={{ color: group.headerText }}>
+                  <span>Programado {statusCounts.programado}</span>
+                  <span>Concluído {statusCounts.concluido}</span>
+                  <span>Cancelado {statusCounts.cancelado}</span>
+                </span>
+              ) : null}
             </summary>
             <div style={{ background: "var(--surface-1)" }}>
               <AssistenciaQueueGroup
@@ -506,7 +523,8 @@ export default async function AssistenciaQueuePage({
               />
             </div>
           </details>
-        ))
+          );
+        })
       )}
 
       {totalPages > 1 ? (
