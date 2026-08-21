@@ -5,7 +5,7 @@ import Link from "next/link";
 import { setAssistenciaOrderAction } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
-import { DeliveryStatusBadge, DELIVERY_STATUS_COLUMNS, deliveryStatusBucket, partitionByDeliveryStatus } from "./DeliveryStatusBadge";
+import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
@@ -45,247 +45,6 @@ const PAYMENT_FLAG_COLORS: Record<PaymentFlag, string> = {
   no_items: "var(--status-critical)",
 };
 
-// Estilo da borda de atenção -- pura, sem estado nem ref, calculada no
-// wrapper <div ref={...}> de cada ponto de chamada (ver AssistenciaQueueGroup
-// mais abaixo).
-function itemAttentionStyle(r: ServiceRequestSummary): React.CSSProperties | undefined {
-  const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
-  return needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined;
-}
-
-type MoveControls = { canMoveUp: boolean; canMoveDown: boolean; onMoveUp: () => void; onMoveDown: () => void } | null;
-
-// Conteúdo de um chamado -- componente à parte de verdade (não uma função
-// helper fechada sobre o escopo do pai) de propósito: o callback de ref que
-// mede a posição pra animação FLIP precisa ficar literal dentro do .map()
-// de cada ponto de chamada (modo plano ou por coluna, ver
-// AssistenciaQueueGroup), senão o linter do React Compiler acusa "Cannot
-// access refs during render" (a análise estática não confia numa função
-// helper comum do mesmo jeito que confia numa fronteira de componente).
-function QueueItemBody({
-  r,
-  move,
-  moveDisabled,
-  printable,
-  selected,
-  onToggleSelected,
-  showCreatedDate,
-  showStaleBadge,
-  now,
-}: {
-  r: ServiceRequestSummary;
-  move: MoveControls;
-  // true enquanto uma troca anterior ainda está sendo persistida -- trava
-  // os botões pra evitar clique duplo disparando duas trocas em cima da
-  // mesma posição antes da primeira terminar.
-  moveDisabled: boolean;
-  printable?: boolean;
-  selected: boolean;
-  onToggleSelected: () => void;
-  showCreatedDate?: boolean;
-  showStaleBadge: boolean;
-  now: number;
-}) {
-  // Só scheduledDate (ScheduleField) ou approvedDeadline
-  // (approveDeadline/rejectDeadline) -- as duas são decisão da
-  // assistência. De propósito SEM cair pra requestedDeadline (o pedido
-  // da loja, ainda não aprovado): mostrar isso aqui como se fosse a
-  // data definida enganaria quem tá vendo a fila -- pra esse caso já
-  // existe o badge "Prazo pendente".
-  const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
-  // "Concluída parcialmente" não é um status próprio -- vira
-  // "remarcar" com os itens já feitos marcados (ver
-  // montadorCompletePartially em montador-actions.ts).
-  const isPartialCompletion = r.status === "remarcar" && r.items.some((item) => item.completed);
-  // Só montagem/desmontagem tem valor de montador a pagar por item --
-  // confirmado com o usuário que troca de peça não entra aqui (#4588
-  // era falso positivo).
-  const showPaymentFlag = (r.type === "montagem" || r.type === "desmontagem") && (r.status === "concluida" || isPartialCompletion);
-  const paymentFlag = showPaymentFlag ? paymentValueFlag(r.items) : null;
-  // "Aberta" parada há muito tempo sem ninguém sequer entrar em
-  // contato -- indício de triagem esquecida, não de trabalho em
-  // andamento (esse já muda pra "em_contato"/"em_andamento").
-  const staleOpen = showStaleBadge && r.status === "aberta" && now - new Date(r.createdAt).getTime() > 4 * 3_600_000;
-
-  return (
-    <>
-      <div className="flex items-center gap-2 flex-wrap">
-        {printable ? (
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={onToggleSelected}
-            className="rounded shrink-0"
-            aria-label={`Selecionar #${r.ticketNumber}`}
-          />
-        ) : null}
-        {move ? (
-          <div className="flex flex-col items-center gap-0.5 shrink-0">
-            <button
-              onClick={move.onMoveUp}
-              disabled={!move.canMoveUp || moveDisabled}
-              aria-label="Mover pra cima"
-              className="text-sm leading-none px-1 disabled:opacity-25"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              ▲
-            </button>
-            <button
-              onClick={move.onMoveDown}
-              disabled={!move.canMoveDown || moveDisabled}
-              aria-label="Mover pra baixo"
-              className="text-sm leading-none px-1 disabled:opacity-25"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              ▼
-            </button>
-          </div>
-        ) : null}
-
-        <Link href={`/assistencia/${r.id}`} className="flex items-center justify-between gap-4 flex-wrap hover:opacity-80 flex-1 min-w-0">
-          <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                #{r.ticketNumber}
-              </span>
-              {/* Troca/entrega/envio de peça usam o status simplificado
-                  (Programado/Concluído) desde o pedido do Victor
-                  19/08/2026 -- montagem/desmontagem/vistoria/troca de
-                  peça (aba Visitas) continuam com o status detalhado,
-                  onde as etapas fazem sentido de verdade. */}
-              {(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type) ? (
-                <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
-              ) : (
-                <StatusBadge status={r.status} />
-              )}
-              {r.type === "troca_produto" && r.exchangeRound > 1 ? (
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                  style={{ color: "#fff", background: "var(--status-warning)" }}
-                >
-                  {r.exchangeRound}ª troca
-                </span>
-              ) : null}
-              {staleOpen ? (
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                  style={{ background: "var(--status-critical)", color: "#fff" }}
-                >
-                  ⏱ parada há {Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h
-                </span>
-              ) : null}
-              <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
-              {isPartialCompletion ? (
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                  style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
-                >
-                  ◐ Concluída parcialmente
-                </span>
-              ) : null}
-              {r.deadlineStatus === "pendente" ? (
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                  style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-                >
-                  Prazo pendente
-                </span>
-              ) : null}
-              {r.escalationRisk ? (
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                  style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
-                >
-                  ⚠ Risco de escalonamento
-                </span>
-              ) : null}
-              <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-              </span>
-              {r.comboMontagemDesmontagem ? (
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                  style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
-                >
-                  {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
-                </span>
-              ) : null}
-              {effectiveDate ? (
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                  style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
-                >
-                  📅 {formatDateOnly(effectiveDate)}
-                  {effectiveDate === r.scheduledDate && r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
-                  {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
-                </span>
-              ) : null}
-              {r.clientTimeRestriction ? (
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                  style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-                >
-                  🕐 {r.clientTimeRestriction}
-                </span>
-              ) : null}
-              {paymentFlag ? (
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                  style={{
-                    color: "var(--text-primary)",
-                    background: `color-mix(in srgb, ${PAYMENT_FLAG_COLORS[paymentFlag]} 35%, var(--surface-1))`,
-                  }}
-                >
-                  {PAYMENT_FLAG_LABELS[paymentFlag]}
-                </span>
-              ) : null}
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                {r.storeName}
-              </span>
-            </div>
-            <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-              {r.clientName ?? "Sem nome de cliente"}
-              {r.clientPhone ? ` · 📞 ${r.clientPhone}` : ""}
-              {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            <span>
-              Aberta {showCreatedDate ? `em ${new Date(r.createdAt).toLocaleDateString("pt-BR")} ` : ""}às{" "}
-              {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-            {r.completedAt ? <span>Concluída em {formatDateTimeBr(r.completedAt)}</span> : null}
-            <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
-            {r.assemblerName ? <span>Montador: {r.assemblerName}</span> : null}
-            {r.driverName ? <span>Motorista: {r.driverName}</span> : null}
-          </div>
-        </Link>
-
-        <div className="shrink-0">
-          <ProductsModalButton items={r.items} />
-        </div>
-      </div>
-
-      {r.montadorInstruction ? (
-        // Recolhida por padrão -- expandida sempre (era o normal antes),
-        // ela sozinha esgota boa parte da rolagem da fila quando tem
-        // muito chamado com instrução. `<details>` nativo, sem JS extra.
-        <details
-          className="rounded-lg p-2.5"
-          style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
-        >
-          <summary className="text-xs font-bold cursor-pointer" style={{ color: "var(--text-primary)" }}>
-            ⚠ Instrução pro montador
-          </summary>
-          <p className="text-sm whitespace-pre-line mt-1" style={{ color: "var(--text-primary)" }}>
-            {r.montadorInstruction}
-          </p>
-        </details>
-      ) : null}
-    </>
-  );
-}
-
 // Fila reordenável com feedback visual: ao clicar ▲▼, os dois cards que
 // trocam de lugar deslizam pra posição nova em vez de simplesmente
 // "teleportar" -- técnica FLIP (mede a posição antes de trocar o estado,
@@ -301,7 +60,6 @@ export function AssistenciaQueueGroup({
   showCreatedDate,
   printable,
   showStaleBadge = true,
-  splitByStatus = false,
 }: {
   items: ServiceRequestSummary[];
   reorderable: boolean;
@@ -325,14 +83,6 @@ export function AssistenciaQueueGroup({
   // desmontagem". Entrega/notificação (aba Entregas) usa outro sinal de
   // atraso, o prazo (📅), não tempo parado sem contato.
   showStaleBadge?: boolean;
-  // Divide os chamados do grupo em 3 colunas -- programado/concluído/
-  // cancelado -- pedido do Victor 21/08/2026: "dentro da aba de cada
-  // rota... precisa estar dentro de cada coluna dentro do agrupamento da
-  // data/rota" (só a contagem, que já existia no cabeçalho do grupo em
-  // fila/page.tsx, não bastava). Só faz sentido na aba Entregas -- Visitas
-  // usa outro conjunto de status. Quando ligado, mover ▲▼ passa a mover
-  // dentro da própria coluna (mesmo status), não na lista inteira.
-  splitByStatus?: boolean;
 }) {
   const [order, setOrder] = useState(items);
   const [saving, setSaving] = useState(false);
@@ -388,14 +138,17 @@ export function AssistenciaQueueGroup({
     }
   }, [order]);
 
-  async function swapAndPersist(indexA: number, indexB: number) {
+  async function move(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= order.length) return;
+
     const rects = new Map<string, DOMRect>();
     for (const [id, el] of nodeRefs.current) rects.set(id, el.getBoundingClientRect());
     prevRects.current = rects;
 
     const previous = order;
     const next = [...order];
-    [next[indexA], next[indexB]] = [next[indexB], next[indexA]];
+    [next[index], next[target]] = [next[target], next[index]];
     setOrder(next);
     setSaving(true);
     try {
@@ -408,42 +161,6 @@ export function AssistenciaQueueGroup({
     } finally {
       setSaving(false);
     }
-  }
-
-  async function move(index: number, direction: -1 | 1) {
-    const target = index + direction;
-    if (target < 0 || target >= order.length) return;
-    await swapAndPersist(index, target);
-  }
-
-  // Mover ▲▼ dentro da própria coluna (splitByStatus) -- acha o vizinho
-  // mais próximo NO MESMO balde de status dentro do array plano `order` e
-  // troca de posição com ele (mesmo se não forem adjacentes na lista
-  // inteira). Isso move o item certo dentro da coluna visualmente sem
-  // bagunçar a ordem relativa dos itens dos outros baldes -- eles não são
-  // tocados, só os dois que trocam de lugar.
-  async function moveWithinColumn(id: string, direction: -1 | 1) {
-    const idx = order.findIndex((r) => r.id === id);
-    if (idx === -1) return;
-    const bucket = deliveryStatusBucket(order[idx].status);
-    let neighborIdx = -1;
-    if (direction === -1) {
-      for (let i = idx - 1; i >= 0; i--) {
-        if (deliveryStatusBucket(order[i].status) === bucket) {
-          neighborIdx = i;
-          break;
-        }
-      }
-    } else {
-      for (let i = idx + 1; i < order.length; i++) {
-        if (deliveryStatusBucket(order[i].status) === bucket) {
-          neighborIdx = i;
-          break;
-        }
-      }
-    }
-    if (neighborIdx === -1) return;
-    await swapAndPersist(idx, neighborIdx);
   }
 
   return (
@@ -479,104 +196,220 @@ export function AssistenciaQueueGroup({
           ) : null}
         </div>
       ) : null}
+      <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+      {order.map((r, i) => {
+        const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
+        // Só scheduledDate (ScheduleField) ou approvedDeadline
+        // (approveDeadline/rejectDeadline) -- as duas são decisão da
+        // assistência. De propósito SEM cair pra requestedDeadline (o pedido
+        // da loja, ainda não aprovado): mostrar isso aqui como se fosse a
+        // data definida enganaria quem tá vendo a fila -- pra esse caso já
+        // existe o badge "Prazo pendente".
+        const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
+        // "Concluída parcialmente" não é um status próprio -- vira
+        // "remarcar" com os itens já feitos marcados (ver
+        // montadorCompletePartially em montador-actions.ts).
+        const isPartialCompletion = r.status === "remarcar" && r.items.some((item) => item.completed);
+        // Só montagem/desmontagem tem valor de montador a pagar por item --
+        // confirmado com o usuário que troca de peça não entra aqui (#4588
+        // era falso positivo).
+        const showPaymentFlag = (r.type === "montagem" || r.type === "desmontagem") && (r.status === "concluida" || isPartialCompletion);
+        const paymentFlag = showPaymentFlag ? paymentValueFlag(r.items) : null;
+        // "Aberta" parada há muito tempo sem ninguém sequer entrar em
+        // contato -- indício de triagem esquecida, não de trabalho em
+        // andamento (esse já muda pra "em_contato"/"em_andamento").
+        const staleOpen = showStaleBadge && r.status === "aberta" && now - new Date(r.createdAt).getTime() > 4 * 3_600_000;
 
-      {splitByStatus ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 px-4 pb-2">
-          {DELIVERY_STATUS_COLUMNS.map((col) => {
-            const colItems = partitionByDeliveryStatus(order)[col.key];
-            return (
-              <div
-                key={col.key}
-                className="rounded-lg overflow-hidden flex flex-col"
-                style={{ background: "var(--surface-1)", border: `2px solid ${col.color}` }}
-              >
-                <div
-                  className="px-3 py-1.5 text-xs font-bold flex items-center justify-between"
-                  style={{ background: `color-mix(in srgb, ${col.color} 18%, var(--surface-1))`, color: col.color }}
-                >
-                  <span>{col.label}</span>
-                  <span>{colItems.length}</span>
-                </div>
-                <div className="divide-y flex-1" style={{ borderColor: "var(--gridline)" }}>
-                  {colItems.length === 0 ? (
-                    <p className="text-xs p-3 text-center" style={{ color: "var(--text-muted)" }}>
-                      Nenhuma
-                    </p>
-                  ) : (
-                    colItems.map((r, i) => (
-                      <div
-                        key={r.id}
-                        ref={(el) => {
-                          if (el) nodeRefs.current.set(r.id, el);
-                          else nodeRefs.current.delete(r.id);
-                        }}
-                        className="flex flex-col gap-2 p-4"
-                        style={itemAttentionStyle(r)}
-                      >
-                        <QueueItemBody
-                          r={r}
-                          printable={printable}
-                          selected={selected.has(r.id)}
-                          onToggleSelected={() => toggleSelected(r.id)}
-                          move={
-                            reorderable
-                              ? {
-                                  canMoveUp: i > 0,
-                                  canMoveDown: i < colItems.length - 1,
-                                  onMoveUp: () => moveWithinColumn(r.id, -1),
-                                  onMoveDown: () => moveWithinColumn(r.id, 1),
-                                }
-                              : null
-                          }
-                          moveDisabled={saving}
-                          showCreatedDate={showCreatedDate}
-                          showStaleBadge={showStaleBadge}
-                          now={now}
-                        />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-          {order.map((r, i) => (
-            <div
-              key={r.id}
-              ref={(el) => {
-                if (el) nodeRefs.current.set(r.id, el);
-                else nodeRefs.current.delete(r.id);
-              }}
-              className="flex flex-col gap-2 p-4"
-              style={itemAttentionStyle(r)}
-            >
-              <QueueItemBody
-                r={r}
-                printable={printable}
-                selected={selected.has(r.id)}
-                onToggleSelected={() => toggleSelected(r.id)}
-                move={
-                  reorderable
-                    ? {
-                        canMoveUp: i > 0,
-                        canMoveDown: i < order.length - 1,
-                        onMoveUp: () => move(i, -1),
-                        onMoveDown: () => move(i, 1),
-                      }
-                    : null
-                }
-                moveDisabled={saving}
-                showCreatedDate={showCreatedDate}
-                showStaleBadge={showStaleBadge}
-                now={now}
+        return (
+          <div
+            key={r.id}
+            ref={(el) => {
+              if (el) nodeRefs.current.set(r.id, el);
+              else nodeRefs.current.delete(r.id);
+            }}
+            className="flex flex-col gap-2 p-4"
+            style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
+          >
+          <div className="flex items-center gap-2 flex-wrap">
+            {printable ? (
+              <input
+                type="checkbox"
+                checked={selected.has(r.id)}
+                onChange={() => toggleSelected(r.id)}
+                className="rounded shrink-0"
+                aria-label={`Selecionar #${r.ticketNumber}`}
               />
+            ) : null}
+            {reorderable ? (
+              <div className="flex flex-col items-center gap-0.5 shrink-0">
+                <button
+                  onClick={() => move(i, -1)}
+                  disabled={i === 0 || saving}
+                  aria-label="Mover pra cima"
+                  className="text-sm leading-none px-1 disabled:opacity-25"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  ▲
+                </button>
+                <button
+                  onClick={() => move(i, 1)}
+                  disabled={i === order.length - 1 || saving}
+                  aria-label="Mover pra baixo"
+                  className="text-sm leading-none px-1 disabled:opacity-25"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  ▼
+                </button>
+              </div>
+            ) : null}
+
+            <Link
+              href={`/assistencia/${r.id}`}
+              className="flex items-center justify-between gap-4 flex-wrap hover:opacity-80 flex-1 min-w-0"
+            >
+              <div className="flex flex-col gap-1 min-w-0 w-0 grow">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                    #{r.ticketNumber}
+                  </span>
+                  {/* Troca/entrega/envio de peça usam o status simplificado
+                      (Programado/Concluído) desde o pedido do Victor
+                      19/08/2026 -- montagem/desmontagem/vistoria/troca de
+                      peça (aba Visitas) continuam com o status detalhado,
+                      onde as etapas fazem sentido de verdade. */}
+                  {(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type) ? (
+                    <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+                  ) : (
+                    <StatusBadge status={r.status} />
+                  )}
+                  {r.type === "troca_produto" && r.exchangeRound > 1 ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ color: "#fff", background: "var(--status-warning)" }}
+                    >
+                      {r.exchangeRound}ª troca
+                    </span>
+                  ) : null}
+                  {staleOpen ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ background: "var(--status-critical)", color: "#fff" }}
+                    >
+                      ⏱ parada há {Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h
+                    </span>
+                  ) : null}
+                  <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
+                  {isPartialCompletion ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
+                    >
+                      ◐ Concluída parcialmente
+                    </span>
+                  ) : null}
+                  {r.deadlineStatus === "pendente" ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+                    >
+                      Prazo pendente
+                    </span>
+                  ) : null}
+                  {r.escalationRisk ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
+                    >
+                      ⚠ Risco de escalonamento
+                    </span>
+                  ) : null}
+                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                    {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+                  </span>
+                  {r.comboMontagemDesmontagem ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
+                    >
+                      {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
+                    </span>
+                  ) : null}
+                  {effectiveDate ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
+                    >
+                      📅 {formatDateOnly(effectiveDate)}
+                      {effectiveDate === r.scheduledDate && r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
+                      {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
+                    </span>
+                  ) : null}
+                  {r.clientTimeRestriction ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+                    >
+                      🕐 {r.clientTimeRestriction}
+                    </span>
+                  ) : null}
+                  {paymentFlag ? (
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{
+                        color: "var(--text-primary)",
+                        background: `color-mix(in srgb, ${PAYMENT_FLAG_COLORS[paymentFlag]} 35%, var(--surface-1))`,
+                      }}
+                    >
+                      {PAYMENT_FLAG_LABELS[paymentFlag]}
+                    </span>
+                  ) : null}
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    {r.storeName}
+                  </span>
+                </div>
+                <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
+                  {r.clientName ?? "Sem nome de cliente"}
+                  {r.clientPhone ? ` · 📞 ${r.clientPhone}` : ""}
+                  {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
+                </p>
+              </div>
+              <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                <span>
+                  Aberta {showCreatedDate ? `em ${new Date(r.createdAt).toLocaleDateString("pt-BR")} ` : ""}às{" "}
+                  {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+                {r.completedAt ? <span>Concluída em {formatDateTimeBr(r.completedAt)}</span> : null}
+                <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
+                {r.assemblerName ? <span>Montador: {r.assemblerName}</span> : null}
+                {r.driverName ? <span>Motorista: {r.driverName}</span> : null}
+              </div>
+            </Link>
+
+            <div className="shrink-0">
+              <ProductsModalButton items={r.items} />
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+
+          {r.montadorInstruction ? (
+            // Recolhida por padrão -- expandida sempre (era o normal antes),
+            // ela sozinha esgota boa parte da rolagem da fila quando tem
+            // muito chamado com instrução. `<details>` nativo, sem JS extra.
+            <details
+              className="rounded-lg p-2.5"
+              style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
+            >
+              <summary className="text-xs font-bold cursor-pointer" style={{ color: "var(--text-primary)" }}>
+                ⚠ Instrução pro montador
+              </summary>
+              <p className="text-sm whitespace-pre-line mt-1" style={{ color: "var(--text-primary)" }}>
+                {r.montadorInstruction}
+              </p>
+            </details>
+          ) : null}
+          </div>
+        );
+      })}
+      </div>
     </div>
   );
 }

@@ -15,7 +15,7 @@ import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
-import { partitionByDeliveryStatus } from "@/components/assistencia/DeliveryStatusBadge";
+import { countByDeliveryStatus } from "@/components/assistencia/DeliveryStatusBadge";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 
 type QueueDateSubgroup = { dateKey: string; label: string; items: ServiceRequestSummary[] };
@@ -477,7 +477,7 @@ export default async function AssistenciaQueuePage({
           // simplificado de DeliveryStatusBadge) -- Visitas usa outro
           // conjunto de status (aberta/em_contato/em_andamento/remarcar),
           // que já tem o próprio badge por chamado.
-          const statusCounts = showPecas ? partitionByDeliveryStatus(group.items) : null;
+          const statusCounts = showPecas ? countByDeliveryStatus(group.items) : null;
           return (
           // Recolhível -- pedido do Victor 20/08/2026: "os agrupamentos por
           // data (Entregas e Visitas) precisam poder ser recolhidos, e
@@ -506,9 +506,9 @@ export default async function AssistenciaQueuePage({
               </span>
               {statusCounts ? (
                 <span className="flex items-center gap-2 text-[11px] font-medium ml-auto" style={{ color: group.headerText }}>
-                  <span>Programado {statusCounts.programado.length}</span>
-                  <span>Concluído {statusCounts.concluido.length}</span>
-                  <span>Cancelado {statusCounts.cancelado.length}</span>
+                  <span>Programado {statusCounts.programado}</span>
+                  <span>Concluído {statusCounts.concluido}</span>
+                  <span>Cancelado {statusCounts.cancelado}</span>
                 </span>
               ) : null}
             </summary>
@@ -520,7 +520,6 @@ export default async function AssistenciaQueuePage({
                 showCreatedDate={showPecas}
                 printable={showPecas}
                 showStaleBadge={!showPecas}
-                splitByStatus={showPecas}
               />
             </div>
           </details>
