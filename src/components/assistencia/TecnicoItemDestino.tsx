@@ -1,6 +1,6 @@
 "use client";
 
-import { setItemDestino } from "@/app/assistencia/tecnico-actions";
+import { setItemDestino, clearItemDestino } from "@/app/assistencia/tecnico-actions";
 import { useQuickAction } from "./useQuickAction";
 import { ITEM_DESTINOS, ITEM_DESTINO_LABELS, ITEM_DESTINO_COLORS, type ItemDestino } from "@/lib/tecnicos";
 
@@ -36,6 +36,15 @@ export function TecnicoItemDestino({
             {destinoDefinidoEm ? ` · ${formatDateTime(destinoDefinidoEm)}` : ""}
           </span>
         ) : null}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => run(() => clearItemDestino(itemId), "Destino desfeito -- volta pra pendente.")}
+          className="text-xs underline disabled:opacity-60"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          ↩ desfazer
+        </button>
       </div>
     );
   }
