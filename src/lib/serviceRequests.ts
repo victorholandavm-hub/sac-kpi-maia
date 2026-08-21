@@ -1531,8 +1531,17 @@ export async function getRequestsReport(
 
 // Mesma ideia de ReportRowItem acima -- item cru guardado do lado de cada
 // contagem, pra dar pra expandir e ver os chamados de verdade por trás de
-// cada linha (mês/montador/loja).
-export type IndicatorItem = { id: string; ticketNumber: number; clientName: string | null; status: RequestStatus; createdAt: string };
+// cada linha (mês/montador/loja). `type` só importa de verdade no modo
+// "todos" (ver getServiceTypeIndicators) -- com um tipo só selecionado é
+// sempre o mesmo valor repetido, mas não custa nada guardar sempre.
+export type IndicatorItem = {
+  id: string;
+  ticketNumber: number;
+  type: RequestType;
+  clientName: string | null;
+  status: RequestStatus;
+  createdAt: string;
+};
 
 export type MonthCount = { month: string; total: number; concluida: number; items: IndicatorItem[] };
 export type AssemblerCount = {
@@ -1551,18 +1560,23 @@ export type ServiceTypeIndicators = {
 };
 
 // Indicadores operacionais de UM tipo de solicitação por vez (padrão:
-// montagem) — volume por mês, por montador (com tempo médio até concluir) e
-// por loja. Complementa getRequestsReport, que agrega todos os tipos juntos
-// sem quebrar por mês nem por montador.
+// montagem), ou de TODOS os tipos juntos (type === "todos") — volume por
+// mês, por montador (com tempo médio até concluir) e por loja.
+// "todos" -- pedido do Victor 21/08/2026: "preciso que tenha uma opção no
+// seletor para 'ver tudo'" (a comparação dele entre esse total por
+// montador e a lista de Solicitações batia certinho pro tipo selecionado,
+// só que aqui só dava pra ver um tipo de cada vez -- estava correto, só
+// faltava essa opção). Complementa getRequestsReport, que já agrega todos
+// os tipos juntos mas sem quebrar por mês/montador/loja.
 export async function getServiceTypeIndicators(
-  type: RequestType,
+  type: RequestType | "todos",
   opts: { dateFrom?: string; dateTo?: string } = {}
 ): Promise<ServiceTypeIndicators> {
   const admin = getSupabaseAdmin();
   let query = admin
     .from("service_requests")
-    .select("id, ticket_number, store_id, assembler_name, status, client_name, created_at, completed_at, stores(name)")
-    .eq("type", type);
+    .select("id, ticket_number, store_id, type, assembler_name, status, client_name, created_at, completed_at, stores(name)");
+  if (type !== "todos") query = query.eq("type", type);
 
   if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
   if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
@@ -1574,6 +1588,7 @@ export async function getServiceTypeIndicators(
     id: string;
     ticket_number: number;
     store_id: string;
+    type: RequestType;
     assembler_name: string | null;
     status: RequestStatus;
     client_name: string | null;
@@ -1588,7 +1603,14 @@ export async function getServiceTypeIndicators(
   const storeMap = new Map<string, StoreCount>();
 
   for (const r of rows) {
-    const item: IndicatorItem = { id: r.id, ticketNumber: r.ticket_number, clientName: r.client_name, status: r.status, createdAt: r.created_at };
+    const item: IndicatorItem = {
+      id: r.id,
+      ticketNumber: r.ticket_number,
+      type: r.type,
+      clientName: r.client_name,
+      status: r.status,
+      createdAt: r.created_at,
+    };
 
     const month = r.created_at.slice(0, 7);
     const monthEntry = monthMap.get(month) ?? { month, total: 0, concluida: 0, items: [] };
