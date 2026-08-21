@@ -53,6 +53,7 @@ export function RotaMotoristaDoDia({
   drivers,
   actions = DEFAULT_ACTIONS,
   compact,
+  defaultDriver,
 }: {
   today: string;
   initialOverview: RotaDayOverview[];
@@ -65,6 +66,13 @@ export function RotaMotoristaDoDia({
   // células no mesmo espaço já resolve isso sozinho). `initialOverview` já
   // vem só com os 2 dias nesse modo (ver motorista/page.tsx).
   compact?: boolean;
+  // Motorista pré-selecionado ao editar um dia sem motorista salvo ainda --
+  // pedido do Victor 21/08/2026 ("deixe Junior como motorista padrão da aba
+  // de notificação de assistência"), só passado por quem chama esse
+  // componente a partir daquela aba (ver sac/notificacoes/page.tsx). Só
+  // preenche quando o dia ainda não tem motorista salvo -- não sobrescreve
+  // atribuição já feita.
+  defaultDriver?: string;
 }) {
   const [overview, setOverview] = useState<RotaDayOverview[]>(initialOverview);
   // Fechado por padrão -- só a semana atual (pedido do Victor 18/08/2026: as
@@ -97,7 +105,16 @@ export function RotaMotoristaDoDia({
       {compact ? (
         <div className="grid grid-cols-2 gap-2">
           {overview.map((day) => (
-            <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} compact />
+            <RotaDayCell
+              key={day.date}
+              day={day}
+              today={today}
+              drivers={drivers}
+              onChange={updateDay}
+              actions={actions}
+              defaultDriver={defaultDriver}
+              compact
+            />
           ))}
         </div>
       ) : (
@@ -114,7 +131,15 @@ export function RotaMotoristaDoDia({
             {weeks.map((week, i) => (
               <div key={i} className="grid grid-cols-2 sm:grid-cols-7 gap-1.5">
                 {week.map((day) => (
-                  <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} />
+                  <RotaDayCell
+                    key={day.date}
+                    day={day}
+                    today={today}
+                    drivers={drivers}
+                    onChange={updateDay}
+                    actions={actions}
+                    defaultDriver={defaultDriver}
+                  />
                 ))}
               </div>
             ))}
@@ -141,6 +166,7 @@ function RotaDayCell({
   onChange,
   actions,
   compact,
+  defaultDriver,
 }: {
   day: RotaDayOverview;
   today: string;
@@ -148,6 +174,7 @@ function RotaDayCell({
   onChange: (day: RotaDayOverview) => void;
   actions: RotaActions;
   compact?: boolean;
+  defaultDriver?: string;
 }) {
   const { pending, run, showToast } = useQuickAction();
   const savedRota = day.assignments.primary?.rota ?? day.expectedRota;
@@ -156,7 +183,7 @@ function RotaDayCell({
   const [rotaEditOpen, setRotaEditOpen] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
   const [rotaValue, setRotaValue] = useState<Rota | "">(savedRota ?? "");
-  const [driverValue, setDriverValue] = useState(savedDriver);
+  const [driverValue, setDriverValue] = useState(savedDriver || defaultDriver || "");
   const [extraRota, setExtraRota] = useState<Rota | "">("");
   const [extraDriver, setExtraDriver] = useState("");
 
