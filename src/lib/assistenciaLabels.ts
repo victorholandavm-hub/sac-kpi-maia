@@ -223,6 +223,18 @@ export const DELIVERY_REQUEST_TYPES = [
   "recolhimento_produto",
 ] as const;
 
+// O outro lado do corte acima -- montagem/desmontagem/vistoria/troca de
+// peça, a "visita de montador" de verdade, sem rota nem motorista (aba
+// "Visitas" de fila/page.tsx). Centralizado aqui em vez de recalculado onde
+// é usado (era um filter local em fila/page.tsx) porque também vira o
+// escopo do badge da aba "Solicitações" em AssistenciaNav -- pedido do
+// Victor 21/08/2026: "só faz sentido aparecer ali o número de solicitações
+// em aberto das montagens/desmontagens", não entrega/notificação (que tem
+// badge própria, ver countEntregasOverview em serviceRequests.ts).
+export const VISITA_REQUEST_TYPES = ASSISTENCIA_MANAGED_TYPES.filter(
+  (t) => !(DELIVERY_REQUEST_TYPES as readonly string[]).includes(t)
+);
+
 // Vistoria e troca de peça exigem confiança/qualificação que só um
 // funcionário de verdade tem — hoje só o Manoel; os outros montadores são
 // terceirizados só pra montagem/desmontagem/recolhimento.

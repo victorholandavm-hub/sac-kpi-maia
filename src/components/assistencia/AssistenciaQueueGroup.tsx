@@ -59,6 +59,7 @@ export function AssistenciaQueueGroup({
   now,
   showCreatedDate,
   printable,
+  showStaleBadge = true,
 }: {
   items: ServiceRequestSummary[];
   reorderable: boolean;
@@ -76,6 +77,12 @@ export function AssistenciaQueueGroup({
   // Seleção fica por grupo (cada grupo já é uma rota+data aqui, ver
   // groupByRota em fila/page.tsx), não precisa atravessar grupos.
   printable?: boolean;
+  // "Parada há Xh" só faz sentido pra visita de montador (aba Visitas) --
+  // pedido do Victor 21/08/2026: "na aba de notificação de assistência...
+  // não precisa estar ali, só tem sentido estar na aba de montagem e
+  // desmontagem". Entrega/notificação (aba Entregas) usa outro sinal de
+  // atraso, o prazo (📅), não tempo parado sem contato.
+  showStaleBadge?: boolean;
 }) {
   const [order, setOrder] = useState(items);
   const [saving, setSaving] = useState(false);
@@ -211,7 +218,7 @@ export function AssistenciaQueueGroup({
         // "Aberta" parada há muito tempo sem ninguém sequer entrar em
         // contato -- indício de triagem esquecida, não de trabalho em
         // andamento (esse já muda pra "em_contato"/"em_andamento").
-        const staleOpen = r.status === "aberta" && now - new Date(r.createdAt).getTime() > 4 * 3_600_000;
+        const staleOpen = showStaleBadge && r.status === "aberta" && now - new Date(r.createdAt).getTime() > 4 * 3_600_000;
 
         return (
           <div

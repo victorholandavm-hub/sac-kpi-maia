@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
-import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES } from "./assistenciaLabels";
+import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES } from "./assistenciaLabels";
 
 export type RequestType =
   | "montagem"
@@ -1314,6 +1314,30 @@ export async function countMontagensOverview(excludeOwnAssemblerStoreIds?: strin
       .select("id", { count: "exact", head: true })
       .in("type", [...ASSISTENCIA_MANAGED_TYPES])
       .not("status", "in", "(concluida,cancelada)"),
+    excludeOwnAssemblerStoreIds
+  );
+  const { count, error } = await query;
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+// Badge da aba "Solicitações" (AssistenciaNav, admin/assistência) --
+// pedido do Victor 21/08/2026: "só faz sentido aparecer ali o número de
+// solicitações em aberto das montagens/desmontagens" -- antes usava
+// countRequestsOverview().openNoContact, que conta TODO tipo aberto,
+// inclusive entrega/notificação de assistência (que tem badge própria na
+// aba dela, ver countEntregasOverview logo abaixo, e nem usa status
+// "aberta" do mesmo jeito). Mesmo escopo de tipo da aba "Visitas" em
+// fila/page.tsx (VISITA_REQUEST_TYPES), só que contando "aberta" (sem
+// contato ainda) em vez de "não concluída/cancelada".
+export async function countVisitasOpenNoContact(excludeOwnAssemblerStoreIds?: string[]): Promise<number> {
+  const admin = getSupabaseAdmin();
+  const query = applyOwnAssemblerStoreExclusion(
+    admin
+      .from("service_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "aberta")
+      .in("type", [...VISITA_REQUEST_TYPES]),
     excludeOwnAssemblerStoreIds
   );
   const { count, error } = await query;

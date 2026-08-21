@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getProfile, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { ROLE_LABELS, OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { signOut } from "@/app/assistencia/actions";
-import { countRequestsOverview } from "@/lib/serviceRequests";
+import { countVisitasOpenNoContact } from "@/lib/serviceRequests";
 import { countPedidosEncomendaSolicitados } from "@/lib/pedidosEncomenda";
 import { AssistenciaNav } from "@/components/assistencia/AssistenciaNav";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -30,12 +30,18 @@ export default async function AssistenciaAppLayout({
   // montagem/desmontagem/vistoria de loja com montador próprio de quem não
   // tem visibilidade sobre elas (ver OWN_ASSEMBLER_STORE_IDS) -- sem isso o
   // número do badge denunciava chamado pendente que a lista já esconde.
+  //
+  // "Solicitações" só conta montagem/desmontagem/vistoria/troca de peça
+  // (o que a aba de fato lista, ver VISITA_REQUEST_TYPES) -- pedido do
+  // Victor 21/08/2026: antes contava TODO chamado "aberta", inclusive
+  // entrega/notificação de assistência, que não tem nada a ver com essa
+  // aba (mora em /assistencia/sac/notificacoes ou na aba Entregas).
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
-  const [requestsOverview, pedidosSolicitados] = isSac
-    ? [null, 0]
-    : await Promise.all([countRequestsOverview(excludeOwnAssemblerStoreIds), countPedidosEncomendaSolicitados()]);
+  const [solicitacoesAbertas, pedidosSolicitados] = isSac
+    ? [0, 0]
+    : await Promise.all([countVisitasOpenNoContact(excludeOwnAssemblerStoreIds), countPedidosEncomendaSolicitados()]);
   const counts = {
-    solicitacoes: requestsOverview?.openNoContact ?? 0,
+    solicitacoes: solicitacoesAbertas,
     encomendas: pedidosSolicitados,
   };
 
