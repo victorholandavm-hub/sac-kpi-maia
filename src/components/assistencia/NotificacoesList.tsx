@@ -8,7 +8,7 @@ import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { ROTAS, ROTA_LABELS, ROTA_COLORS, type AvailableRota, type Rota } from "@/lib/rotas";
 import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
-import { DeliveryStatusBadge, countByDeliveryStatus } from "./DeliveryStatusBadge";
+import { DeliveryStatusBadge, DELIVERY_STATUS_COLUMNS, partitionByDeliveryStatus } from "./DeliveryStatusBadge";
 
 // Agrupado por DATA primeiro, rota dentro de cada data -- pedido do Victor
 // 20/08/2026: "na tela do sac também fique em ordem por data". Antes era só
@@ -166,7 +166,7 @@ export function NotificacoesList({
       ) : null}
 
       {groups.map((group) => {
-        const statusCounts = countByDeliveryStatus(group.items);
+        const columns = partitionByDeliveryStatus(group.items);
         return (
         <details key={group.key} className="group flex flex-col gap-1.5" open>
           <summary className="flex items-center gap-2 px-1 cursor-pointer list-none flex-wrap [&::-webkit-details-marker]:hidden">
@@ -195,55 +195,88 @@ export function NotificacoesList({
               ({group.items.length})
             </span>
             <span className="flex items-center gap-2 text-[11px] font-medium ml-auto">
-              <span style={{ color: "var(--brand-green)" }}>Programado {statusCounts.programado}</span>
-              <span style={{ color: "var(--status-good)" }}>Concluído {statusCounts.concluido}</span>
-              <span style={{ color: "var(--text-secondary)" }}>Cancelado {statusCounts.cancelado}</span>
+              {DELIVERY_STATUS_COLUMNS.map((col) => (
+                <span key={col.key} style={{ color: col.color }}>
+                  {col.label} {columns[col.key].length}
+                </span>
+              ))}
             </span>
           </summary>
-          <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-            <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-              {group.items.map((r) => (
-                <div key={r.id} className="flex items-center gap-2 p-4">
-                  {selectable ? (
-                    <input
-                      type="checkbox"
-                      checked={selected.has(r.id)}
-                      onChange={() => toggleOne(r.id)}
-                      className="rounded shrink-0"
-                      aria-label={`Selecionar #${r.ticketNumber}`}
-                    />
-                  ) : null}
-                  <Link href={`/assistencia/${r.id}`} className="flex-1 min-w-0 flex items-center justify-between gap-3 flex-wrap hover:opacity-80">
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                          #{r.ticketNumber}
-                        </span>
-                        <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
-                        <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                          {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                        </span>
-                        {r.clientTimeRestriction ? (
-                          <span
-                            className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                            style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-                          >
-                            🕐 {r.clientTimeRestriction}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="text-base font-bold truncate" style={{ color: "var(--text-primary)" }}>
-                        {r.clientName ?? "Sem nome de cliente"}
+          {/* Dividido em 3 colunas (programado/concluído/cancelado) --
+              pedido do Victor 21/08/2026: "precisa estar dentro de cada
+              coluna dentro do agrupamento da data/rota", não só a
+              contagem no cabeçalho (que já existia). */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {DELIVERY_STATUS_COLUMNS.map((col) => {
+              const colItems = columns[col.key];
+              return (
+                <div
+                  key={col.key}
+                  className="rounded-lg overflow-hidden flex flex-col"
+                  style={{ background: "var(--surface-1)", border: `2px solid ${col.color}` }}
+                >
+                  <div
+                    className="px-3 py-1.5 text-xs font-bold flex items-center justify-between"
+                    style={{ background: `color-mix(in srgb, ${col.color} 18%, var(--surface-1))`, color: col.color }}
+                  >
+                    <span>{col.label}</span>
+                    <span>{colItems.length}</span>
+                  </div>
+                  <div className="divide-y flex-1" style={{ borderColor: "var(--gridline)" }}>
+                    {colItems.length === 0 ? (
+                      <p className="text-xs p-3 text-center" style={{ color: "var(--text-muted)" }}>
+                        Nenhuma
                       </p>
-                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        {r.storeName}
-                        {r.driverName ? ` · Motorista: ${r.driverName}` : ""}
-                      </p>
-                    </div>
-                  </Link>
+                    ) : (
+                      colItems.map((r) => (
+                        <div key={r.id} className="flex items-center gap-2 p-3">
+                          {selectable ? (
+                            <input
+                              type="checkbox"
+                              checked={selected.has(r.id)}
+                              onChange={() => toggleOne(r.id)}
+                              className="rounded shrink-0"
+                              aria-label={`Selecionar #${r.ticketNumber}`}
+                            />
+                          ) : null}
+                          <Link href={`/assistencia/${r.id}`} className="flex-1 min-w-0 flex flex-col gap-1 hover:opacity-80">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                                #{r.ticketNumber}
+                              </span>
+                              {/* Coluna já diz o balde (programado/concluído/
+                                  cancelado) -- badge continua aqui só pra
+                                  distinguir "Programado" de "Não programado"
+                                  dentro da coluna Programado, o único caso
+                                  em que os dois divergem. */}
+                              <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+                              <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                                {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+                              </span>
+                              {r.clientTimeRestriction ? (
+                                <span
+                                  className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                  style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+                                >
+                                  🕐 {r.clientTimeRestriction}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                              {r.clientName ?? "Sem nome de cliente"}
+                            </p>
+                            <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+                              {r.storeName}
+                              {r.driverName ? ` · Motorista: ${r.driverName}` : ""}
+                            </p>
+                          </Link>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </details>
         );

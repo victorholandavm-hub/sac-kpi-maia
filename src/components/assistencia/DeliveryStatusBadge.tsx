@@ -12,23 +12,36 @@ export function isDeliveryScheduled(scheduledDate: string | null, rota: string |
   return !!scheduledDate && !!rota;
 }
 
-// Contagem por status dentro de um grupo (rota/data) -- pedido do Victor
-// 21/08/2026: "dentro da aba de cada rota... preciso que fique dividido em
-// programado, concluido, cancelado e o numero ao lado de cada status".
-// Mesmos 3 baldes do badge acima -- "Não programado" conta junto de
-// "Programado" aqui, só pra bater exatamente com os 3 nomes pedidos.
-// Compartilhado entre NotificacoesList.tsx (SAC/admin) e fila/page.tsx
-// (aba Entregas, admin/assistência) -- mesma regra, um lugar só.
-export type DeliveryStatusCounts = { programado: number; concluido: number; cancelado: number };
+// Divisão em 3 baldes (rota/data) -- pedido do Victor 21/08/2026: "dentro
+// da aba de cada rota... preciso que fique dividido em programado,
+// concluido, cancelado e o numero ao lado de cada status" + follow-up:
+// "precisa estar dentro de cada coluna" (não só a contagem -- os
+// chamados de verdade, organizados em 3 colunas). Mesmos 3 baldes do badge
+// acima -- "Não programado" conta junto de "Programado" aqui, só pra bater
+// exatamente com os 3 nomes pedidos. Compartilhado entre NotificacoesList.tsx
+// (SAC/admin) e AssistenciaQueueGroup.tsx (aba Entregas, admin/assistência)
+// -- mesma regra, um lugar só.
+export type DeliveryStatusBucket = "programado" | "concluido" | "cancelado";
 
-export function countByDeliveryStatus(items: { status: string }[]): DeliveryStatusCounts {
-  const counts: DeliveryStatusCounts = { programado: 0, concluido: 0, cancelado: 0 };
-  for (const r of items) {
-    if (r.status === "concluida") counts.concluido++;
-    else if (r.status === "cancelada") counts.cancelado++;
-    else counts.programado++;
-  }
-  return counts;
+export function deliveryStatusBucket(status: string): DeliveryStatusBucket {
+  if (status === "concluida") return "concluido";
+  if (status === "cancelada") return "cancelado";
+  return "programado";
+}
+
+// Cor de cada coluna -- mesmo tom já usado no badge por chamado acima
+// (verde = programado, "status-good" = concluído; cancelado usa um tom
+// neutro, já que a badge original também é neutra/cinza).
+export const DELIVERY_STATUS_COLUMNS: { key: DeliveryStatusBucket; label: string; color: string }[] = [
+  { key: "programado", label: "Programado", color: "var(--brand-green)" },
+  { key: "concluido", label: "Concluído", color: "var(--status-good)" },
+  { key: "cancelado", label: "Cancelado", color: "var(--text-muted)" },
+];
+
+export function partitionByDeliveryStatus<T extends { status: string }>(items: T[]): Record<DeliveryStatusBucket, T[]> {
+  const result: Record<DeliveryStatusBucket, T[]> = { programado: [], concluido: [], cancelado: [] };
+  for (const r of items) result[deliveryStatusBucket(r.status)].push(r);
+  return result;
 }
 
 export function DeliveryStatusBadge({
