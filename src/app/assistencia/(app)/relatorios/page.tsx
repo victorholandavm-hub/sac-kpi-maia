@@ -79,13 +79,17 @@ const ALVO_FILTERS: { label: string; value: "mostruario" | "cliente" | undefined
 // Linha de detalhe de um chamado, dentro de uma linha expandida -- mesmo
 // formato reaproveitado nas 3 tabelas de indicadores por tipo (mês/
 // montador/loja) e no relatório principal (loja/tipo/vendedor/causa raiz).
-function IndicatorItemsList({ items }: { items: IndicatorItem[] }) {
+// `showType` só liga no modo "Todos os tipos" -- com um tipo só
+// selecionado, repetir o tipo em toda linha é ruído (já está no título da
+// seção).
+function IndicatorItemsList({ items, showType }: { items: IndicatorItem[]; showType?: boolean }) {
   return (
     <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
       {items.map((it) => (
         <div key={it.id} className="pl-9 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
           <span className="truncate" style={{ color: "var(--text-primary)" }}>
-            #{it.ticketNumber} · {it.clientName ?? "Sem cliente"} · {formatDateBr(it.createdAt)}
+            #{it.ticketNumber}
+            {showType ? ` · ${REQUEST_TYPE_LABELS[it.type] ?? it.type}` : ""} · {it.clientName ?? "Sem cliente"} · {formatDateBr(it.createdAt)}
           </span>
           <span className="shrink-0 font-medium" style={{ color: STATUS_COLORS[it.status] ?? "var(--text-muted)" }}>
             {STATUS_LABELS[it.status] ?? it.status}
@@ -221,7 +225,13 @@ export default async function RelatoriosPage({
   const dateTo = to || today();
   const filterAlvo = alvo === "mostruario" || alvo === "cliente" ? alvo : undefined;
 
-  const indicatorType = (REQUEST_TYPES as readonly string[]).includes(tipo ?? "") ? (tipo as (typeof REQUEST_TYPES)[number]) : "montagem";
+  // "Todos" -- pedido do Victor 21/08/2026: "preciso que tenha uma opção
+  // no seletor para 'ver tudo'" (comparou o total por montador de um tipo
+  // só com a lista de Solicitações, que mostra todos os tipos juntos --
+  // os números batiam certinho pro tipo selecionado, só faltava essa
+  // opção pra ver tudo de uma vez).
+  const indicatorType: (typeof REQUEST_TYPES)[number] | "todos" =
+    tipo === "todos" ? "todos" : (REQUEST_TYPES as readonly string[]).includes(tipo ?? "") ? (tipo as (typeof REQUEST_TYPES)[number]) : "montagem";
   const indicatorDateFrom = indFrom || sixMonthsAgoFirstDay();
   const indicatorDateTo = indTo || today();
 
@@ -318,7 +328,7 @@ export default async function RelatoriosPage({
 
       <div className="flex flex-col gap-3 rounded-lg p-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
         <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Indicadores de {REQUEST_TYPE_LABELS[indicatorType]?.toLowerCase() ?? indicatorType}
+          Indicadores de {indicatorType === "todos" ? "todos os tipos" : (REQUEST_TYPE_LABELS[indicatorType]?.toLowerCase() ?? indicatorType)}
         </h3>
 
         <form action="/assistencia/relatorios" method="GET" className="flex items-center gap-2 flex-wrap">
@@ -327,6 +337,7 @@ export default async function RelatoriosPage({
           <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
             Tipo
             <select name="tipo" defaultValue={indicatorType} className="rounded border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }}>
+              <option value="todos">Todos os tipos</option>
               {REQUEST_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {REQUEST_TYPE_LABELS[t]}
@@ -367,7 +378,7 @@ export default async function RelatoriosPage({
                     label={formatMonth(m.month)}
                     numbers={[{ value: m.total }, { value: m.concluida, color: "var(--status-good)" }]}
                   >
-                    <IndicatorItemsList items={m.items} />
+                    <IndicatorItemsList items={m.items} showType={indicatorType === "todos"} />
                   </ExpandableRow>
                 ))}
               </div>
@@ -400,7 +411,7 @@ export default async function RelatoriosPage({
                         { value: formatDays(a.avgDaysToComplete), color: "var(--text-muted)" },
                       ]}
                     >
-                      <IndicatorItemsList items={a.items} />
+                      <IndicatorItemsList items={a.items} showType={indicatorType === "todos"} />
                     </ExpandableRow>
                   ))}
                 </div>
@@ -428,7 +439,7 @@ export default async function RelatoriosPage({
                       label={s.storeName}
                       numbers={[{ value: s.total }, { value: s.concluida, color: "var(--status-good)" }]}
                     >
-                      <IndicatorItemsList items={s.items} />
+                      <IndicatorItemsList items={s.items} showType={indicatorType === "todos"} />
                     </ExpandableRow>
                   ))}
                 </div>
