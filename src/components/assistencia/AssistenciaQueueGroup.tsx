@@ -93,6 +93,17 @@ export function AssistenciaQueueGroup({
     });
   }
 
+  // "Selecionar todas" desse grupo (cada grupo já é uma rota+data aqui, ver
+  // groupByRota em fila/page.tsx) -- pedido do Victor 21/08/2026: precisa
+  // existir tanto aqui (admin/assistência) quanto em NotificacoesList.tsx
+  // (SAC/admin), e selecionando tudo de um dia/rota específico de uma vez,
+  // não item por item.
+  const allSelected = items.length > 0 && items.every((r) => selected.has(r.id));
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(items.map((r) => r.id)));
+  }
+
   // Mesmo ajuste-durante-render de DriverRouteGroup.tsx: RealtimeQueueRefresher
   // traz dado novo do Server Component pai sem remontar este client component.
   if (items !== syncedItems && !saving) {
@@ -147,27 +158,35 @@ export function AssistenciaQueueGroup({
 
   return (
     <div className="flex flex-col gap-2">
-      {printable && selected.size > 0 ? (
-        <div className="flex items-center gap-2 flex-wrap px-4 pt-2">
-          <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
-            {selected.size} selecionada{selected.size === 1 ? "" : "s"}
-          </span>
-          <Link
-            href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
-            target="_blank"
-            className="text-xs rounded-full px-3 py-1.5 font-medium border"
-            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-          >
-            🖨️ Imprimir selecionadas
-          </Link>
-          <button
-            type="button"
-            onClick={() => setSelected(new Set())}
-            className="text-xs underline"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            limpar seleção
-          </button>
+      {printable ? (
+        <div className="flex items-center gap-3 flex-wrap px-4 pt-2">
+          <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
+            Selecionar todas
+          </label>
+          {selected.size > 0 ? (
+            <>
+              <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                {selected.size} selecionada{selected.size === 1 ? "" : "s"}
+              </span>
+              <Link
+                href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
+                target="_blank"
+                className="text-xs rounded-full px-3 py-1.5 font-medium border"
+                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+              >
+                🖨️ Imprimir selecionadas
+              </Link>
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                className="text-xs underline"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                limpar seleção
+              </button>
+            </>
+          ) : null}
         </div>
       ) : null}
       <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
