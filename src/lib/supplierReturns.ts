@@ -119,12 +119,27 @@ export async function countSupplierReturnsOverview(): Promise<{ open: number; ov
   return { open: openRes.count ?? 0, overdue: overdueRes.count ?? 0 };
 }
 
+// Item cru guardado do lado de cada linha de fornecedor -- mesma ideia de
+// ReportRowItem em serviceRequests.ts, pra dar pra expandir e ver as
+// remessas de verdade por trás de cada fornecedor (pedido do Victor
+// 21/08/2026: "em todas as listas, assim que clicar, mostrar os
+// detalhes").
+export type SupplierReconciliationItem = {
+  id: string;
+  ticketNumber: number;
+  partName: string;
+  invoiceValue: number | null;
+  reimbursedValue: number | null;
+  status: SupplierReturnStatus;
+};
+
 export type SupplierReconciliationRow = {
   supplier: string;
   emDevolucao: number;
   faturado: number;
   reembolsado: number;
   pendente: number;
+  items: SupplierReconciliationItem[];
 };
 
 // "Compartivos": valor por fornecedor em devolução (aguardando envio/enviado),
@@ -133,16 +148,24 @@ export async function getSupplierReconciliation(): Promise<SupplierReconciliatio
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("supplier_returns")
-    .select("supplier, invoice_value, reimbursed_value, status");
+    .select("id, ticket_number, supplier, part_name, invoice_value, reimbursed_value, status");
   if (error) throw new Error(error.message);
 
-  type Row = { supplier: string | null; invoice_value: number | null; reimbursed_value: number | null; status: SupplierReturnStatus };
+  type Row = {
+    id: string;
+    ticket_number: number;
+    supplier: string | null;
+    part_name: string;
+    invoice_value: number | null;
+    reimbursed_value: number | null;
+    status: SupplierReturnStatus;
+  };
   const rows = (data ?? []) as unknown as Row[];
 
   const map = new Map<string, SupplierReconciliationRow>();
   for (const r of rows) {
     const key = r.supplier ?? "Sem fornecedor definido";
-    const entry = map.get(key) ?? { supplier: key, emDevolucao: 0, faturado: 0, reembolsado: 0, pendente: 0 };
+    const entry = map.get(key) ?? { supplier: key, emDevolucao: 0, faturado: 0, reembolsado: 0, pendente: 0, items: [] };
     const invoiceValue = r.invoice_value ?? 0;
     const reimbursedValue = r.reimbursed_value ?? 0;
 
@@ -150,6 +173,14 @@ export async function getSupplierReconciliation(): Promise<SupplierReconciliatio
     if (invoiceValue > 0) entry.faturado += invoiceValue;
     entry.reembolsado += reimbursedValue;
     entry.pendente += Math.max(0, invoiceValue - reimbursedValue);
+    entry.items.push({
+      id: r.id,
+      ticketNumber: r.ticket_number,
+      partName: r.part_name,
+      invoiceValue: r.invoice_value,
+      reimbursedValue: r.reimbursed_value,
+      status: r.status,
+    });
 
     map.set(key, entry);
   }

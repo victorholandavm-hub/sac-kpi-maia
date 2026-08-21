@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
-import { getRequestsReport, getServiceTypeIndicators, type ReportRow } from "@/lib/serviceRequests";
-import { listPaymentItems, paymentStage } from "@/lib/payments";
-import { getSupplierReconciliation } from "@/lib/supplierReturns";
-import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
+import { getRequestsReport, getServiceTypeIndicators, type ReportRow, type ReportRowItem, type IndicatorItem } from "@/lib/serviceRequests";
+import { listPaymentItems, paymentStage, type PaymentItem } from "@/lib/payments";
+import { getSupplierReconciliation, type SupplierReconciliationItem } from "@/lib/supplierReturns";
+import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, STATUS_LABELS, STATUS_COLORS, SUPPLIER_RETURN_STATUS_LABELS, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { StatTile } from "@/components/StatTile";
 
 const REQUEST_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
@@ -38,6 +39,131 @@ function formatDays(days: number | null): string {
   return `${rounded.toFixed(1)} dia${rounded >= 2 ? "s" : ""}`;
 }
 
+function formatDateBr(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR");
+}
+
+// Manoel é o único montador funcionário nosso (o resto é terceirizado, ver
+// MANOEL_ONLY_ASSEMBLER/MANOEL_ONLY_TYPES em assistenciaLabels.ts) --
+// pedido do Victor 21/08/2026: "Colocar Manoel pra baixo na lista de
+// montadores pois ele é o único que é funcionário nosso e não
+// terceirizado". Não muda a ordenação por total (continua maior pro
+// menor) -- só empurra a linha do Manoel pro final da lista, mesmo que o
+// total dele fosse alto o bastante pra aparecer no meio.
+function sortManoelLast<T>(rows: T[], nameOf: (r: T) => string): T[] {
+  const rest = rows.filter((r) => nameOf(r) !== MANOEL_ONLY_ASSEMBLER);
+  const manoel = rows.filter((r) => nameOf(r) === MANOEL_ONLY_ASSEMBLER);
+  return [...rest, ...manoel];
+}
+
+function buildReportHref(params: { from?: string; to?: string; alvo?: string }) {
+  const sp = new URLSearchParams();
+  if (params.from) sp.set("from", params.from);
+  if (params.to) sp.set("to", params.to);
+  if (params.alvo) sp.set("alvo", params.alvo);
+  const qs = sp.toString();
+  return qs ? `/assistencia/relatorios?${qs}` : "/assistencia/relatorios";
+}
+
+// Filtro "montagem de mostruário" x "cliente" -- pedido do Victor
+// 21/08/2026: "coloque Filtro de montagem de mostruário e cliente". Só se
+// aplica ao relatório principal (getRequestsReport tem order_code/
+// client_name na consulta; a seção de indicadores por tipo e os
+// pagamentos, não).
+const ALVO_FILTERS: { label: string; value: "mostruario" | "cliente" | undefined }[] = [
+  { label: "Todos", value: undefined },
+  { label: "Mostruário", value: "mostruario" },
+  { label: "Cliente", value: "cliente" },
+];
+
+// Linha de detalhe de um chamado, dentro de uma linha expandida -- mesmo
+// formato reaproveitado nas 3 tabelas de indicadores por tipo (mês/
+// montador/loja) e no relatório principal (loja/tipo/vendedor/causa raiz).
+function IndicatorItemsList({ items }: { items: IndicatorItem[] }) {
+  return (
+    <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
+      {items.map((it) => (
+        <div key={it.id} className="pl-9 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
+          <span className="truncate" style={{ color: "var(--text-primary)" }}>
+            #{it.ticketNumber} · {it.clientName ?? "Sem cliente"} · {formatDateBr(it.createdAt)}
+          </span>
+          <span className="shrink-0 font-medium" style={{ color: STATUS_COLORS[it.status] ?? "var(--text-muted)" }}>
+            {STATUS_LABELS[it.status] ?? it.status}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Linha de detalhe de um chamado do relatório principal -- inclui tipo
+// (as tabelas dele misturam tipos diferentes, diferente das de
+// indicadores, que já filtram por um tipo só).
+function ReportRowItemsList({ items }: { items: ReportRowItem[] }) {
+  return (
+    <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
+      {items.map((it) => (
+        <div key={it.id} className="pl-9 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
+          <span className="truncate" style={{ color: "var(--text-primary)" }}>
+            #{it.ticketNumber} · {REQUEST_TYPE_LABELS[it.type] ?? it.type} · {it.storeName} · {formatDateBr(it.createdAt)}
+          </span>
+          <span className="shrink-0 font-medium" style={{ color: STATUS_COLORS[it.status] ?? "var(--text-muted)" }}>
+            {STATUS_LABELS[it.status] ?? it.status}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Cabeçalho de colunas fixo, acima da lista de linhas expansíveis -- as
+// linhas viraram <details> (pra clicar e ver os chamados por trás, pedido
+// do Victor 21/08/2026: "em todas as listas, assim que clicar, mostrar os
+// detalhes"), então não tem mais um <table> de verdade com <thead> --
+// isso replica visualmente as mesmas colunas.
+function ColumnsHeader({ columns }: { columns: string[] }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-2 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--gridline)" }}>
+      <span className="w-3 shrink-0" aria-hidden="true" />
+      <span className="flex-1 min-w-0">{columns[0]}</span>
+      {columns.slice(1).map((c) => (
+        <span key={c} className="w-20 shrink-0 text-right">
+          {c}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ExpandableRow({
+  label,
+  numbers,
+  children,
+}: {
+  label: string;
+  numbers: { value: number | string; color?: string }[];
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group">
+      <summary className="flex items-center gap-2 px-4 py-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <span className="w-3 shrink-0 text-xs transition-transform group-open:rotate-90" style={{ color: "var(--text-muted)" }} aria-hidden="true">
+          ▶
+        </span>
+        <span className="flex-1 min-w-0 truncate text-sm" style={{ color: "var(--text-primary)" }}>
+          {label}
+        </span>
+        {numbers.map((n, i) => (
+          <span key={i} className="w-20 shrink-0 text-right text-sm" style={{ color: n.color ?? "var(--text-primary)" }}>
+            {n.value}
+          </span>
+        ))}
+      </summary>
+      {children}
+    </details>
+  );
+}
+
 function ReportTable({
   title,
   rows,
@@ -61,35 +187,23 @@ function ReportTable({
           {emptyMessage}
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-                <th className="text-left font-normal px-4 py-2 whitespace-nowrap">{keyLabel}</th>
-                <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Total</th>
-                <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Concluídas</th>
-                <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Canceladas</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-              {rows.map((r) => (
-                <tr key={r.key}>
-                  <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                    {labelFor(r.key)}
-                  </td>
-                  <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                    {r.total}
-                  </td>
-                  <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--status-good)" }}>
-                    {r.concluida}
-                  </td>
-                  <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                    {r.cancelada}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div>
+          <ColumnsHeader columns={[keyLabel, "Total", "Concluídas", "Canceladas"]} />
+          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+            {rows.map((r) => (
+              <ExpandableRow
+                key={r.key}
+                label={labelFor(r.key)}
+                numbers={[
+                  { value: r.total },
+                  { value: r.concluida, color: "var(--status-good)" },
+                  { value: r.cancelada, color: "var(--text-muted)" },
+                ]}
+              >
+                <ReportRowItemsList items={r.items} />
+              </ExpandableRow>
+            ))}
+          </div>
         </div>
       )}
     </details>
@@ -99,37 +213,50 @@ function ReportTable({
 export default async function RelatoriosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; tipo?: string; indFrom?: string; indTo?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; tipo?: string; indFrom?: string; indTo?: string; alvo?: string }>;
 }) {
   redirectIfSac(await getProfile());
-  const { from, to, tipo, indFrom, indTo } = await searchParams;
+  const { from, to, tipo, indFrom, indTo, alvo } = await searchParams;
   const dateFrom = from || firstDayOfMonth();
   const dateTo = to || today();
+  const filterAlvo = alvo === "mostruario" || alvo === "cliente" ? alvo : undefined;
 
   const indicatorType = (REQUEST_TYPES as readonly string[]).includes(tipo ?? "") ? (tipo as (typeof REQUEST_TYPES)[number]) : "montagem";
   const indicatorDateFrom = indFrom || sixMonthsAgoFirstDay();
   const indicatorDateTo = indTo || today();
 
   const [report, paymentItems, supplierReconciliation, indicators] = await Promise.all([
-    getRequestsReport({ dateFrom, dateTo }),
+    getRequestsReport({ dateFrom, dateTo, alvo: filterAlvo }),
     listPaymentItems({ dateFrom, dateTo }),
     getSupplierReconciliation(),
     getServiceTypeIndicators(indicatorType, { dateFrom: indicatorDateFrom, dateTo: indicatorDateTo }),
   ]);
 
-  const byAssembler = new Map<string, { total: number; pendente: number; itens: number }>();
+  const byAssembler = new Map<string, { total: number; pendente: number; pago: number; itens: number; items: PaymentItem[] }>();
   for (const item of paymentItems) {
     const name = item.assemblerName ?? "Sem montador definido";
-    const entry = byAssembler.get(name) ?? { total: 0, pendente: 0, itens: 0 };
+    const entry = byAssembler.get(name) ?? { total: 0, pendente: 0, pago: 0, itens: 0, items: [] };
     const value = (item.unitValue ?? 0) * item.quantity;
     entry.total += value;
     entry.itens += 1;
-    if (paymentStage(item.requestStatus, item.paymentReleased) === "pendente") entry.pendente += value;
+    entry.items.push(item);
+    if (item.paymentReleased) entry.pago += value;
+    else if (paymentStage(item.requestStatus, item.paymentReleased) === "pendente") entry.pendente += value;
     byAssembler.set(name, entry);
   }
-  const assemblerRows = [...byAssembler.entries()].sort((a, b) => b[1].total - a[1].total);
+  const assemblerRows = sortManoelLast([...byAssembler.entries()].sort((a, b) => b[1].total - a[1].total), ([name]) => name);
+  // "Total" aqui é tudo que tem valor definido (inclusive item ainda não
+  // montado, com valor pré-definido) -- mesmo critério de "Total" na aba
+  // Pagamentos (ver pagamentos/page.tsx). "Pago" é só o que já foi
+  // liberado -- faltava esse número aqui antes (achado da revisão do
+  // Victor 21/08/2026: o card "Total pago a montadores" somava tudo, não
+  // só o pago de verdade -- corrigido junto com o pedido de "Pendentes/
+  // pago/total como na aba de pagamentos").
   const paymentTotal = assemblerRows.reduce((sum, [, v]) => sum + v.total, 0);
   const paymentPending = assemblerRows.reduce((sum, [, v]) => sum + v.pendente, 0);
+  const paymentPaid = assemblerRows.reduce((sum, [, v]) => sum + v.pago, 0);
+
+  const indicatorsByAssembler = sortManoelLast(indicators.byAssembler, (a) => a.assemblerName);
 
   return (
     <div className="flex flex-col gap-4">
@@ -146,14 +273,46 @@ export default async function RelatoriosPage({
           Até
           <input type="date" name="to" defaultValue={dateTo} className="rounded border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
         </label>
+        {filterAlvo ? <input type="hidden" name="alvo" value={filterAlvo} /> : null}
         <button type="submit" className="text-sm px-3 py-2 rounded border" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
           Aplicar
         </button>
       </form>
 
-      <div className="grid sm:grid-cols-3 gap-4">
+      {/* Mostruário (loja monta pra exposição própria, sem cliente real) x
+          cliente de verdade -- pedido do Victor 21/08/2026: "coloque
+          Filtro de montagem de mostruário e cliente". Só afeta o
+          relatório principal logo abaixo (loja/tipo/vendedor/causa raiz)
+          -- indicadores por tipo e pagamentos não têm essa distinção na
+          consulta. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Alvo:
+        </span>
+        {ALVO_FILTERS.map((f) => {
+          const selected = f.value === filterAlvo;
+          return (
+            <Link
+              key={f.label}
+              href={buildReportHref({ from: dateFrom, to: dateTo, alvo: f.value })}
+              className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+              style={{
+                border: "1px solid var(--border)",
+                background: selected ? "var(--brand-green)" : "transparent",
+                color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                fontWeight: selected ? 600 : 400,
+              }}
+            >
+              {f.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="grid sm:grid-cols-4 gap-4">
         <StatTile label="Solicitações no período" value={report.totalRequests} />
-        <StatTile label="Total pago a montadores" value={formatBRL(paymentTotal)} />
+        <StatTile label="Total a pagar a montadores" value={formatBRL(paymentTotal)} />
+        <StatTile label="Pago" value={formatBRL(paymentPaid)} accent="var(--status-good)" />
         <StatTile label="Pendente de liberação" value={formatBRL(paymentPending)} accent="var(--status-warning)" />
       </div>
 
@@ -199,31 +358,19 @@ export default async function RelatoriosPage({
               Nenhuma solicitação desse tipo no período.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Mês</th>
-                    <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Total</th>
-                    <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Concluídas</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                  {indicators.byMonth.map((m) => (
-                    <tr key={m.month}>
-                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                        {formatMonth(m.month)}
-                      </td>
-                      <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                        {m.total}
-                      </td>
-                      <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--status-good)" }}>
-                        {m.concluida}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div>
+              <ColumnsHeader columns={["Mês", "Total", "Concluídas"]} />
+              <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                {indicators.byMonth.map((m) => (
+                  <ExpandableRow
+                    key={m.month}
+                    label={formatMonth(m.month)}
+                    numbers={[{ value: m.total }, { value: m.concluida, color: "var(--status-good)" }]}
+                  >
+                    <IndicatorItemsList items={m.items} />
+                  </ExpandableRow>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -235,40 +382,28 @@ export default async function RelatoriosPage({
                 Por montador
               </h4>
             </div>
-            {indicators.byAssembler.length === 0 ? (
+            {indicatorsByAssembler.length === 0 ? (
               <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
                 Nenhuma solicitação desse tipo no período.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Montador</th>
-                      <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Total</th>
-                      <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Concluídas</th>
-                      <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Tempo médio</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                    {indicators.byAssembler.map((a) => (
-                      <tr key={a.assemblerName}>
-                        <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                          {a.assemblerName}
-                        </td>
-                        <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                          {a.total}
-                        </td>
-                        <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--status-good)" }}>
-                          {a.concluida}
-                        </td>
-                        <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                          {formatDays(a.avgDaysToComplete)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div>
+                <ColumnsHeader columns={["Montador", "Total", "Concluídas", "Tempo médio"]} />
+                <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                  {indicatorsByAssembler.map((a) => (
+                    <ExpandableRow
+                      key={a.assemblerName}
+                      label={a.assemblerName}
+                      numbers={[
+                        { value: a.total },
+                        { value: a.concluida, color: "var(--status-good)" },
+                        { value: formatDays(a.avgDaysToComplete), color: "var(--text-muted)" },
+                      ]}
+                    >
+                      <IndicatorItemsList items={a.items} />
+                    </ExpandableRow>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -284,31 +419,19 @@ export default async function RelatoriosPage({
                 Nenhuma solicitação desse tipo no período.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Loja</th>
-                      <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Total</th>
-                      <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Concluídas</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                    {indicators.byStore.map((s) => (
-                      <tr key={s.storeId}>
-                        <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                          {s.storeName}
-                        </td>
-                        <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                          {s.total}
-                        </td>
-                        <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--status-good)" }}>
-                          {s.concluida}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div>
+                <ColumnsHeader columns={["Loja", "Total", "Concluídas"]} />
+                <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                  {indicators.byStore.map((s) => (
+                    <ExpandableRow
+                      key={s.storeId}
+                      label={s.storeName}
+                      numbers={[{ value: s.total }, { value: s.concluida, color: "var(--status-good)" }]}
+                    >
+                      <IndicatorItemsList items={s.items} />
+                    </ExpandableRow>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -346,35 +469,38 @@ export default async function RelatoriosPage({
             Nenhum pagamento no período.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Montador</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Itens</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Total</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Pendente</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {assemblerRows.map(([name, v]) => (
-                  <tr key={name}>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                      {name}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                      {v.itens}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                      {formatBRL(v.total)}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: v.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" }}>
-                      {formatBRL(v.pendente)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div>
+            <ColumnsHeader columns={["Montador", "Itens", "Total", "Pago", "Pendente"]} />
+            <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+              {assemblerRows.map(([name, v]) => (
+                <ExpandableRow
+                  key={name}
+                  label={name}
+                  numbers={[
+                    { value: v.itens },
+                    { value: formatBRL(v.total) },
+                    { value: formatBRL(v.pago), color: "var(--status-good)" },
+                    { value: formatBRL(v.pendente), color: v.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" },
+                  ]}
+                >
+                  <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
+                    {v.items.map((it) => (
+                      <div key={it.itemId} className="pl-9 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
+                        <span className="truncate" style={{ color: "var(--text-primary)" }}>
+                          {it.product} · {it.quantity}x · {it.clientName ?? it.storeName} · {formatDateBr(it.createdAt)}
+                        </span>
+                        <span
+                          className="shrink-0 font-medium"
+                          style={{ color: it.paymentReleased ? "var(--status-good)" : "var(--status-warning)" }}
+                        >
+                          {it.unitValue !== null ? formatBRL(it.unitValue * it.quantity) : "—"} · {it.paymentReleased ? "Pago" : "Pendente"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </ExpandableRow>
+              ))}
+            </div>
           </div>
         )}
       </details>
@@ -388,42 +514,45 @@ export default async function RelatoriosPage({
             Nenhuma remessa registrada ainda.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  <th className="text-left font-normal px-4 py-2 whitespace-nowrap">Fornecedor</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Em devolução</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Faturado</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Reembolsado</th>
-                  <th className="text-right font-normal px-4 py-2 whitespace-nowrap">Pendente</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {supplierReconciliation.map((r) => (
-                  <tr key={r.supplier}>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                      {r.supplier}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                      {formatBRL(r.emDevolucao)}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                      {formatBRL(r.faturado)}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--status-good)" }}>
-                      {formatBRL(r.reembolsado)}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: r.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" }}>
-                      {formatBRL(r.pendente)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div>
+            <ColumnsHeader columns={["Fornecedor", "Em devolução", "Faturado", "Reembolsado", "Pendente"]} />
+            <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+              {supplierReconciliation.map((r) => (
+                <ExpandableRow
+                  key={r.supplier}
+                  label={r.supplier}
+                  numbers={[
+                    { value: formatBRL(r.emDevolucao) },
+                    { value: formatBRL(r.faturado) },
+                    { value: formatBRL(r.reembolsado), color: "var(--status-good)" },
+                    { value: formatBRL(r.pendente), color: r.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" },
+                  ]}
+                >
+                  <SupplierReturnItemsList items={r.items} />
+                </ExpandableRow>
+              ))}
+            </div>
           </div>
         )}
       </details>
+    </div>
+  );
+}
+
+function SupplierReturnItemsList({ items }: { items: SupplierReconciliationItem[] }) {
+  return (
+    <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
+      {items.map((it) => (
+        <div key={it.id} className="pl-9 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
+          <span className="truncate" style={{ color: "var(--text-primary)" }}>
+            #{it.ticketNumber} · {it.partName}
+            {it.invoiceValue !== null ? ` · ${formatBRL(it.invoiceValue)}` : ""}
+          </span>
+          <span className="shrink-0 font-medium" style={{ color: "var(--text-muted)" }}>
+            {SUPPLIER_RETURN_STATUS_LABELS[it.status] ?? it.status}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
