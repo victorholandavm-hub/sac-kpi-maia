@@ -109,3 +109,40 @@ export async function setItemDestino(itemId: string, destino: string): Promise<v
   revalidatePath("/assistencia/tecnico");
   revalidatePath(`/assistencia/${item.request_id}`);
 }
+
+// Desfaz o destino de um item, a qualquer momento -- pedido do Victor
+// 20/08/2026: "após ele dar o destino... ele tenha a opção de retornar o
+// status, a qualquer tempo". Sem confirmação (mesmo padrão direto de
+// setItemDestino, sem diálogo no meio) -- volta o item pra "pendente" (na
+// aba de novo), pra corrigir clique errado ou mudar de ideia depois.
+export async function clearItemDestino(itemId: string): Promise<void> {
+  const tecnicoName = await getTecnicoSession();
+  if (!tecnicoName) throw new Error("Sessão expirada. Faça login de novo.");
+
+  const admin = getSupabaseAdmin();
+  const { data: item, error: itemError } = await admin
+    .from("service_request_items")
+    .select("request_id, product, quantity, destino")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (itemError || !item) throw new Error("Item não encontrado.");
+
+  const previousLabel = isItemDestino(item.destino) ? ITEM_DESTINO_LABELS[item.destino] : item.destino;
+
+  const { error: updateError } = await admin
+    .from("service_request_items")
+    .update({ destino: null, destino_definido_por: null, destino_definido_em: null })
+    .eq("id", itemId);
+  if (updateError) throw new Error(updateError.message);
+
+  const label = item.quantity > 1 ? `${item.quantity}x ${item.product}` : item.product;
+  await admin.from("service_request_events").insert({
+    request_id: item.request_id,
+    actor_id: null,
+    event_type: "note_added",
+    note: `${tecnicoName} (equipe técnica) desfez o destino de "${label}" (era: ${previousLabel ?? "—"}) -- volta pra pendente.`,
+  });
+
+  revalidatePath("/assistencia/tecnico");
+  revalidatePath(`/assistencia/${item.request_id}`);
+}
