@@ -100,18 +100,37 @@ export function NotificacoesList({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const allSelected = selectable && requests.length > 0 && selected.size === requests.length;
   const groups = groupByDateAndRota(requests);
-
-  function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(requests.map((r) => r.id)));
-  }
 
   function toggleOne(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }
+
+  // "Selecionar todas" fica por grupo (dia+rota), não mais um único
+  // checkbox pra lista inteira -- pedido do Victor 21/08/2026: "quando o
+  // selecionar todas estiver selecionado, selecione todos [os itens] de um
+  // dia/rota específica". Impressão em lote normalmente é isso mesmo: a
+  // remessa de uma rota num dia, não a fila inteira misturada. `selected`
+  // continua um Set só (atravessa grupos se a pessoa marcar item a item de
+  // grupos diferentes), só o atalho de "marcar tudo de uma vez" que virou
+  // por grupo.
+  function isGroupFullySelected(group: Group): boolean {
+    return group.items.length > 0 && group.items.every((r) => selected.has(r.id));
+  }
+
+  function toggleGroup(group: Group) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const fullySelected = group.items.every((r) => next.has(r.id));
+      for (const r of group.items) {
+        if (fullySelected) next.delete(r.id);
+        else next.add(r.id);
+      }
       return next;
     });
   }
@@ -123,31 +142,26 @@ export function NotificacoesList({
 
   return (
     <div className="flex flex-col gap-3">
-      {selectable && requests.length > 0 ? (
+      {selectable && selected.size > 0 ? (
         <div className="flex items-center gap-3 flex-wrap">
-          <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
-            <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
-            Selecionar todas
-          </label>
-          {selected.size > 0 ? (
-            <>
-              <Link
-                href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
-                target="_blank"
-                className="text-xs rounded-full px-3 py-1.5 font-medium border"
-                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-              >
-                🖨️ Imprimir selecionadas
-              </Link>
-              <BulkRotaBar
-                selectedIds={[...selected]}
-                count={selected.size}
-                onDone={clearAfterApply}
-                onPartialProgress={() => router.refresh()}
-                onCancel={() => setSelected(new Set())}
-              />
-            </>
-          ) : null}
+          <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+            {selected.size} selecionada{selected.size === 1 ? "" : "s"}
+          </span>
+          <Link
+            href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
+            target="_blank"
+            className="text-xs rounded-full px-3 py-1.5 font-medium border"
+            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+          >
+            🖨️ Imprimir selecionadas
+          </Link>
+          <BulkRotaBar
+            selectedIds={[...selected]}
+            count={selected.size}
+            onDone={clearAfterApply}
+            onPartialProgress={() => router.refresh()}
+            onCancel={() => setSelected(new Set())}
+          />
         </div>
       ) : null}
 
@@ -161,6 +175,16 @@ export function NotificacoesList({
             >
               ▶
             </span>
+            {selectable ? (
+              <input
+                type="checkbox"
+                checked={isGroupFullySelected(group)}
+                onChange={() => toggleGroup(group)}
+                onClick={(e) => e.stopPropagation()}
+                className="rounded shrink-0"
+                aria-label={`Selecionar tudo de ${group.label}`}
+              />
+            ) : null}
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: group.color }} />
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               {group.label}
