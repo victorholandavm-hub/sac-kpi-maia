@@ -108,13 +108,6 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           <RangePicker range={range} />
           <div className="flex items-center gap-2">
             <Link
-              href="/em-andamento"
-              className="text-sm font-medium px-3 py-1.5 rounded-full"
-              style={{ background: "var(--brand-green)", color: "#fff" }}
-            >
-              Atendimentos em andamento
-            </Link>
-            <Link
               href="/kpis/chamados-do-dia"
               className="text-sm font-medium px-3 py-1.5 rounded-full"
               style={{ background: "var(--brand-orange)", color: "#fff" }}
