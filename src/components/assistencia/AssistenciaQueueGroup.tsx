@@ -130,8 +130,17 @@ function EntregaCardRow({
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-stretch gap-2 sm:gap-0">
-      {/* Coluna 1 (5%): checkbox + setas de ordenação */}
-      <div className="w-full sm:w-[5%] shrink-0 flex sm:flex-col items-center sm:justify-center gap-2 sm:gap-0.5">
+      {/* Coluna 1 (5%): checkbox + setas de ordenação. `sm:pr-3` em todas as
+          colunas (menos a última) -- pedido do Victor 22/08/2026: "os
+          elementos ainda variam de posição dependendo do tamanho do nome do
+          cliente". As colunas já são 100% fixas em largura (confirmado via
+          medição real: mesma coordenada X em toda notificação, mesmo com
+          nome de 40+ caracteres truncando) -- o problema era zero espaço
+          entre colunas (`sm:gap-0` no container), então um nome no limite do
+          truncamento encostava literalmente na coluna seguinte, parecendo
+          desalinhado mesmo sem estar. `pr-3` (padding interno, não gap)
+          evita esse encostamento sem risco de estourar a largura total. */}
+      <div className="w-full sm:w-[5%] shrink-0 flex sm:flex-col items-center sm:justify-center gap-2 sm:gap-0.5 sm:pr-3">
         {printable ? (
           <input
             type="checkbox"
@@ -170,7 +179,7 @@ function EntregaCardRow({
           do flex são o que realmente aparece). */}
       <Link href={`/assistencia/${r.id}`} className="contents">
         {/* Coluna 2 (12%): ID + status */}
-        <div className="w-full sm:w-[12%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start">
+        <div className="w-full sm:w-[12%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start sm:pr-3">
           <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
             #{r.ticketNumber}
           </span>
@@ -181,7 +190,7 @@ function EntregaCardRow({
         </div>
 
         {/* Coluna 3 (18%): tipo de serviço + data/turno */}
-        <div className="w-full sm:w-[18%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start">
+        <div className="w-full sm:w-[18%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start sm:pr-3">
           <span
             className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
             style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "var(--text-muted)", color: "#fff" }}
@@ -206,7 +215,7 @@ function EntregaCardRow({
             observações (tag compacta, altura fixa -- ver WarningTag) --
             pedido do Victor 21/08/2026: "padronize a tipografia do nome
             do cliente, telefone e bairro em negrito e tamanho legível". */}
-        <div className="w-full sm:w-[35%] shrink-0 flex flex-col gap-0.5 min-w-0">
+        <div className="w-full sm:w-[35%] shrink-0 flex flex-col gap-0.5 min-w-0 sm:pr-3">
           <span className="text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
             {r.clientName ?? "Sem nome de cliente"}
           </span>
@@ -233,7 +242,7 @@ function EntregaCardRow({
         </div>
 
         {/* Coluna 5 (20%): loja de origem, atendente que criou, motorista */}
-        <div className="w-full sm:w-[20%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs" style={{ color: "var(--text-muted)" }}>
+        <div className="w-full sm:w-[20%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3" style={{ color: "var(--text-muted)" }}>
           <span className="truncate">{r.storeName}</span>
           <span className="truncate">Atendente: {r.requestedByName ?? "—"}</span>
           <span className="truncate">{r.driverName ? `Motorista: ${r.driverName}` : "Sem motorista"}</span>

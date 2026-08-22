@@ -597,9 +597,23 @@ export default async function AssistenciaQueuePage({
           // aberto por padrão, então o comportamento de sempre não muda até
           // alguém clicar pra recolher. A contagem fica sempre visível (não só
           // quando recolhido) -- mais útil pra decidir o que vale a pena abrir.
-          <details key={group.key} className="group rounded-xl overflow-hidden" style={{ border: `2px solid ${group.borderColor}` }} open>
+          // Destaque na barra da rota aberta -- pedido do Victor 22/08/2026:
+          // "quando a rota está expandida... a barra fica idêntica às
+          // outras colapsadas... dê um leve destaque visual". `open:` é
+          // pseudo-classe nativa do <details> (via [open]), então isso
+          // reage sozinho ao clique de abrir/fechar sem precisar de JS --
+          // borda mais grossa (2px fechado, 4px aberto) + leve escurecida
+          // no cabeçalho. Cor vem de style (dinâmica por rota), largura da
+          // borda vem de className (senão o `open:` não teria como competir
+          // com a especificidade do style inline).
+          <details
+            key={group.key}
+            className="group rounded-xl overflow-hidden border-2 open:border-4 transition-[border-width]"
+            style={{ borderColor: group.borderColor }}
+            open
+          >
             <summary
-              className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+              className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:brightness-95"
               style={{ background: group.headerBg }}
             >
               <span
