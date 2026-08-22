@@ -58,21 +58,67 @@ const DELIVERY_TYPE_COLORS: Record<string, string> = {
   recolhimento_produto: "var(--series-5)",
 };
 
-// Grid de 4 blocos fixos, só pra aba Entregas -- pedido do Victor
-// 21/08/2026: "Transformar a linha fluida em colunas fixas: Organize
-// todos os dados do card em 4 blocos horizontais fixos (ID/Status,
-// Serviço/Turno, Cliente/Bairro, Responsáveis/Abertura) para alinhar
-// visualmente todas as notificações em lista". A aba Visitas continua
-// com o layout fluido de sempre (badges variados, quantidade e ordem
-// diferentes por chamado) -- os 4 blocos fixos só fazem sentido pra
-// entrega, que tem sempre o mesmo conjunto de campos.
-function EntregaCardGrid({
+// Tag compacta de aviso -- pedido do Victor 21/08/2026: "Mantenha a
+// altura da linha fixa. Se houver observação, exiba uma tag amarela
+// compacta... contendo apenas um ícone... Ao passar o mouse por cima
+// (hover), o texto completo é exibido em um tooltip". `title` nativo do
+// navegador já resolve o tooltip sem JS extra; o truncamento por largura
+// máxima é o que garante altura fixa (nunca quebra linha, nunca empurra o
+// resto do card pra baixo) -- como a observação é texto livre (não dá pra
+// extrair "palavra-chave" de verdade sem NLP), o compromisso prático é
+// cortar com reticências e confiar no tooltip pro texto inteiro.
+function WarningTag({ icon, text, color }: { icon: string; text: string; color: string }) {
+  return (
+    <span
+      title={text}
+      className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap truncate max-w-[9rem] cursor-help"
+      style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
+    >
+      {icon} {text}
+    </span>
+  );
+}
+
+// Linha de tabela com 6 colunas de largura fixa (percentual), só pra aba
+// Entregas -- pedido do Victor 21/08/2026: "trave o card com larguras
+// percentuais fixas para cada dado. Assim, ao rolar a tela, o olho do
+// atendente busca o dado sempre na mesma coluna vertical". Empilha em
+// coluna única no celular (w-full) e vira linha de verdade a partir do
+// `sm:` -- larguras percentuais só fazem sentido numa tela larga o
+// bastante pra caber as 6 colunas lado a lado sem espremer.
+//
+// Coluna 1 (checkbox+setas) e coluna 6 (Ver produtos) ficam FORA do
+// <Link> -- são controles clicáveis próprios, não podem estar dentro de
+// um link (cliques neles não podem navegar pro chamado). As colunas 2-5
+// entram numa <Link style={{display:"contents"}}> -- isso faz o próprio
+// <a> não gerar caixa nenhuma no layout, então os 4 filhos viram itens
+// diretos do flex container externo (cada um com sua largura percentual
+// certa), mesmo estando dentro do link.
+function EntregaCardRow({
   r,
+  i,
+  orderLength,
+  reorderable,
+  saving,
+  onMoveUp,
+  onMoveDown,
+  printable,
+  selected,
+  onToggleSelected,
   effectiveDate,
   showStaleBadge,
   now,
 }: {
   r: ServiceRequestSummary;
+  i: number;
+  orderLength: number;
+  reorderable: boolean;
+  saving: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  printable?: boolean;
+  selected: boolean;
+  onToggleSelected: () => void;
   effectiveDate: string | null;
   showStaleBadge: boolean;
   now: number;
@@ -81,13 +127,50 @@ function EntregaCardGrid({
   // AssistenciaQueueGroup) -- mantido genérico só caso esse componente
   // seja reaproveitado num contexto onde volte a fazer sentido.
   const staleOpen = showStaleBadge && r.status === "aberta" && now - new Date(r.createdAt).getTime() > 4 * 3_600_000;
-  const hasSecondaryRow = !!r.clientTimeRestriction || staleOpen || r.escalationRisk || r.deadlineStatus === "pendente";
 
   return (
-    <div className="flex flex-col gap-2 flex-1 min-w-0">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Bloco 1: ID/Status */}
-        <div className="flex flex-col gap-1 min-w-0">
+    <div className="flex flex-col sm:flex-row sm:items-stretch gap-2 sm:gap-0">
+      {/* Coluna 1 (5%): checkbox + setas de ordenação */}
+      <div className="w-full sm:w-[5%] shrink-0 flex sm:flex-col items-center sm:justify-center gap-2 sm:gap-0.5">
+        {printable ? (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelected}
+            className="rounded shrink-0"
+            aria-label={`Selecionar #${r.ticketNumber}`}
+          />
+        ) : null}
+        {reorderable ? (
+          <div className="flex sm:flex-col items-center gap-0.5 shrink-0">
+            <button
+              onClick={onMoveUp}
+              disabled={i === 0 || saving}
+              aria-label="Mover pra cima"
+              className="text-sm leading-none px-1 disabled:opacity-25"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              ▲
+            </button>
+            <button
+              onClick={onMoveDown}
+              disabled={i === orderLength - 1 || saving}
+              aria-label="Mover pra baixo"
+              className="text-sm leading-none px-1 disabled:opacity-25"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              ▼
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {/* display:contents -- sem hover:opacity aqui, opacity não tem efeito
+          num elemento sem caixa própria (os filhos que viram itens diretos
+          do flex são o que realmente aparece). */}
+      <Link href={`/assistencia/${r.id}`} className="contents">
+        {/* Coluna 2 (12%): ID + status */}
+        <div className="w-full sm:w-[12%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start">
           <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
             #{r.ticketNumber}
           </span>
@@ -97,16 +180,16 @@ function EntregaCardGrid({
           </div>
         </div>
 
-        {/* Bloco 2: Serviço/Turno */}
-        <div className="flex flex-col gap-1 min-w-0">
+        {/* Coluna 3 (18%): tipo de serviço + data/turno */}
+        <div className="w-full sm:w-[18%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start">
           <span
-            className="text-xs font-semibold px-2 py-0.5 rounded-full self-start whitespace-nowrap"
+            className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
             style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "var(--text-muted)", color: "#fff" }}
           >
             {REQUEST_TYPE_LABELS[r.type] ?? r.type}
             {r.type === "troca_produto" && r.exchangeRound > 1 ? ` · ${r.exchangeRound}ª` : ""}
           </span>
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
             {effectiveDate ? (
               <>
                 📅 {formatDateOnly(effectiveDate)}
@@ -119,73 +202,48 @@ function EntregaCardGrid({
           </span>
         </div>
 
-        {/* Bloco 3: Cliente/Bairro -- negrito e tamanho legível, pedido do
-            Victor 21/08/2026: "padronize a tipografia do nome do cliente,
-            telefone e bairro em negrito e tamanho legível". */}
-        <div className="flex flex-col gap-0.5 min-w-0">
+        {/* Coluna 4 (35%): cliente em destaque, telefone, bairro +
+            observações (tag compacta, altura fixa -- ver WarningTag) --
+            pedido do Victor 21/08/2026: "padronize a tipografia do nome
+            do cliente, telefone e bairro em negrito e tamanho legível". */}
+        <div className="w-full sm:w-[35%] shrink-0 flex flex-col gap-0.5 min-w-0">
           <span className="text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
             {r.clientName ?? "Sem nome de cliente"}
           </span>
           <span className="text-xs font-semibold truncate" style={{ color: "var(--text-secondary)" }}>
             {r.clientPhone ?? "—"}
           </span>
-          <span className="text-xs font-semibold truncate" style={{ color: "var(--text-secondary)" }}>
-            {r.clientNeighborhood ?? "—"} · {r.storeName}
+          <span className="text-sm font-bold truncate" style={{ color: "var(--text-secondary)" }}>
+            {r.clientNeighborhood ?? "—"}
           </span>
+          {r.clientTimeRestriction || staleOpen || r.escalationRisk || r.deadlineStatus === "pendente" ? (
+            <div className="flex items-center gap-1 flex-wrap pt-0.5">
+              {r.clientTimeRestriction ? <WarningTag icon="🕐" text={r.clientTimeRestriction} color="var(--status-warning)" /> : null}
+              {staleOpen ? (
+                <WarningTag
+                  icon="⏱"
+                  text={`parada há ${Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h`}
+                  color="var(--status-critical)"
+                />
+              ) : null}
+              {r.escalationRisk ? <WarningTag icon="⚠" text="Risco de escalonamento" color="var(--status-critical)" /> : null}
+              {r.deadlineStatus === "pendente" ? <WarningTag icon="⚠" text="Prazo pendente" color="var(--status-warning)" /> : null}
+            </div>
+          ) : null}
         </div>
 
-        {/* Bloco 4: Responsáveis/Abertura */}
-        <div className="flex flex-col gap-0.5 min-w-0 text-xs" style={{ color: "var(--text-muted)" }}>
+        {/* Coluna 5 (20%): loja de origem, atendente que criou, motorista */}
+        <div className="w-full sm:w-[20%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs" style={{ color: "var(--text-muted)" }}>
+          <span className="truncate">{r.storeName}</span>
+          <span className="truncate">Atendente: {r.requestedByName ?? "—"}</span>
           <span className="truncate">{r.driverName ? `Motorista: ${r.driverName}` : "Sem motorista"}</span>
-          <span>
-            Aberta {new Date(r.createdAt).toLocaleDateString("pt-BR")} às{" "}
-            {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-          </span>
-          {r.completedAt ? <span>Concluída {formatDateTimeBr(r.completedAt)}</span> : null}
         </div>
-      </div>
+      </Link>
 
-      {/* Linha secundária -- área própria pros avisos, pra não quebrar o
-          alinhamento dos 4 blocos acima -- pedido do Victor 21/08/2026:
-          "Posicione os avisos críticos de restrição de horário... em uma
-          linha secundária... evitando a quebra de alinhamento das
-          informações principais". */}
-      {hasSecondaryRow ? (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {r.clientTimeRestriction ? (
-            <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap max-w-full truncate"
-              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-            >
-              🕐 {r.clientTimeRestriction}
-            </span>
-          ) : null}
-          {staleOpen ? (
-            <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-              style={{ background: "var(--status-critical)", color: "#fff" }}
-            >
-              ⏱ parada há {Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h
-            </span>
-          ) : null}
-          {r.escalationRisk ? (
-            <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
-            >
-              ⚠ Risco de escalonamento
-            </span>
-          ) : null}
-          {r.deadlineStatus === "pendente" ? (
-            <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-            >
-              Prazo pendente
-            </span>
-          ) : null}
-        </div>
-      ) : null}
+      {/* Coluna 6 (10%): Ver produtos -- fora do <Link>, é botão próprio */}
+      <div className="w-full sm:w-[10%] shrink-0 flex items-center justify-start sm:justify-center">
+        <ProductsModalButton items={r.items} />
+      </div>
     </div>
   );
 }
@@ -394,6 +452,28 @@ export function AssistenciaQueueGroup({
             className="flex flex-col gap-2 p-4"
             style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
           >
+          {showCreatedDate ? (
+            // Aba Entregas -- tabela de 6 colunas fixas (ver EntregaCardRow
+            // acima), não o layout fluido de badges variados da Visitas.
+            // Esse componente já cuida do checkbox/setas (coluna 1) e do
+            // botão Ver produtos (coluna 6) por dentro -- nada fica de fora
+            // dele nesse ramo.
+            <EntregaCardRow
+              r={r}
+              i={i}
+              orderLength={order.length}
+              reorderable={reorderable}
+              saving={saving}
+              onMoveUp={() => move(i, -1)}
+              onMoveDown={() => move(i, 1)}
+              printable={printable}
+              selected={selected.has(r.id)}
+              onToggleSelected={() => toggleSelected(r.id)}
+              effectiveDate={effectiveDate}
+              showStaleBadge={showStaleBadge}
+              now={now}
+            />
+          ) : (
           <div className="flex items-center gap-2 flex-wrap">
             {printable ? (
               <input
@@ -427,14 +507,7 @@ export function AssistenciaQueueGroup({
               </div>
             ) : null}
 
-            {showCreatedDate ? (
-              // Aba Entregas -- grid de 4 blocos fixos (ver EntregaCardGrid
-              // acima), não o layout fluido de badges variados da Visitas.
-              <Link href={`/assistencia/${r.id}`} className="flex items-start hover:opacity-80 flex-1 min-w-0">
-                <EntregaCardGrid r={r} effectiveDate={effectiveDate} showStaleBadge={showStaleBadge} now={now} />
-              </Link>
-            ) : (
-              <Link
+            <Link
                 href={`/assistencia/${r.id}`}
                 className="flex items-center justify-between gap-4 flex-wrap hover:opacity-80 flex-1 min-w-0"
               >
@@ -555,12 +628,12 @@ export function AssistenciaQueueGroup({
                   {r.driverName ? <span>Motorista: {r.driverName}</span> : null}
                 </div>
               </Link>
-            )}
 
             <div className="shrink-0">
               <ProductsModalButton items={r.items} />
             </div>
           </div>
+          )}
 
           {r.montadorInstruction ? (
             // Recolhida por padrão -- expandida sempre (era o normal antes),

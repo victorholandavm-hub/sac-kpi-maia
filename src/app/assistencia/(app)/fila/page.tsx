@@ -27,6 +27,20 @@ type QueueGroup = {
   headerText: string;
   borderColor: string;
   items: ServiceRequestSummary[];
+  // Só populado por groupByRota (aba Entregas) -- pedido do Victor
+  // 21/08/2026: "Aplique uma sutil variação de tom no cabeçalho ou uma
+  // tag para distinguir Rotas de Hoje, Rotas Futuras e a barra de Sem
+  // Rota Definida, permitindo bater o olho... sem ler a data completa".
+  dateBucket?: DateBucketKey;
+  isSemRota?: boolean;
+};
+
+const DATE_BUCKET_TAG: Record<DateBucketKey, { label: string; bg: string } | null> = {
+  hoje: { label: "HOJE", bg: "var(--status-good)" },
+  amanha: { label: "FUTURA", bg: "color-mix(in srgb, #fff 35%, transparent)" },
+  depois: { label: "FUTURA", bg: "color-mix(in srgb, #fff 35%, transparent)" },
+  atrasado: { label: "ATRASADA", bg: "var(--status-critical)" },
+  sem_data: null,
 };
 
 // Dentro de cada grupo, mesma prioridade de sempre: ordem manual
@@ -155,6 +169,8 @@ function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
         headerText: rotaInfo.headerText,
         borderColor: rotaInfo.borderColor,
         items,
+        dateBucket: bucketByScheduledDate(dateGroup.dateKey === NO_SCHEDULED_DATE_KEY ? null : dateGroup.dateKey),
+        isSemRota: rotaInfo.key === "sem_rota",
       });
     }
   }
@@ -596,6 +612,21 @@ export default async function AssistenciaQueuePage({
               <span className="text-sm font-bold uppercase tracking-wide" style={{ color: group.headerText }}>
                 {group.label}
               </span>
+              {group.isSemRota ? (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                  style={{ background: "var(--surface-1)", color: "var(--text-secondary)" }}
+                >
+                  Sem rota
+                </span>
+              ) : group.dateBucket && DATE_BUCKET_TAG[group.dateBucket] ? (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                  style={{ background: DATE_BUCKET_TAG[group.dateBucket]!.bg, color: "#fff" }}
+                >
+                  {DATE_BUCKET_TAG[group.dateBucket]!.label}
+                </span>
+              ) : null}
               <span className="text-xs font-semibold" style={{ color: group.headerText, opacity: 0.85 }}>
                 ({group.items.length})
               </span>
