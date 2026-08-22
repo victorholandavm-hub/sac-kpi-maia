@@ -17,6 +17,7 @@ import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRe
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
 import { countByDeliveryStatus, isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
+import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcut";
 
 type QueueDateSubgroup = { dateKey: string; label: string; items: ServiceRequestSummary[] };
 type QueueGroup = {
@@ -66,6 +67,14 @@ const SCHEDULED_DATE_BUCKET_RANK: Record<DateBucketKey, number> = {
 // showCreatedDate em AssistenciaQueueGroup). Agrupa por
 // scheduledDate/approvedDeadline (o mesmo 📅 mostrado no card -- ver
 // effectiveDate em AssistenciaQueueGroup.tsx), não por createdAt.
+// Dia da semana ao lado da data -- pedido do Victor 21/08/2026: "Adicione
+// o dia da semana ao lado da data nas barras sanfonadas (ex: ROTA CENTRO
+// - 24/08/2026 (Segunda-feira)) para evitar erros na troca em bloco".
+function weekdayLabel(dateStr: string): string {
+  const raw = new Date(`${dateStr}T00:00:00Z`).toLocaleDateString("pt-BR", { weekday: "long", timeZone: "UTC" });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 function groupByScheduledDate(items: ServiceRequestSummary[]): QueueDateSubgroup[] {
   const groups: QueueDateSubgroup[] = [];
   for (const r of items) {
@@ -74,7 +83,7 @@ function groupByScheduledDate(items: ServiceRequestSummary[]): QueueDateSubgroup
     let group = groups.find((g) => g.dateKey === dateKey);
     if (!group) {
       const label = effectiveDate
-        ? new Date(`${effectiveDate}T00:00:00Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" })
+        ? `${new Date(`${effectiveDate}T00:00:00Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" })} (${weekdayLabel(effectiveDate)})`
         : "Sem data definida";
       group = { dateKey, label, items: [] };
       groups.push(group);
@@ -435,12 +444,24 @@ export default async function AssistenciaQueuePage({
                 );
               })}
         </div>
+        {/* Contraste maior + atalho Alt+N só na aba Entregas -- pedido do
+            Victor 21/08/2026: "Aumente o contraste visual do botão + Nova
+            entrega no topo da página e adicione o atalho de teclado
+            Alt + N". Visitas continua com o botão de sempre (pedido era
+            especificamente sobre "+ Nova entrega"). */}
+        {showPecas ? <NovaEntregaShortcut href="/assistencia/nova-entrega" /> : null}
         <Link
           href={showPecas ? "/assistencia/nova-entrega" : "/assistencia/nova-rapida"}
-          className="text-sm px-3 py-2 rounded font-medium"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          className={showPecas ? "text-sm px-4 py-2.5 rounded-lg font-bold shadow-md" : "text-sm px-3 py-2 rounded font-medium"}
+          style={
+            showPecas
+              ? { background: "var(--brand-orange)", color: "#fff", border: "2px solid var(--brand-orange)" }
+              : { background: "var(--brand-green)", color: "var(--brand-green-ink)" }
+          }
+          title={showPecas ? "Atalho: Alt + N" : undefined}
         >
           + Nova {showPecas ? "entrega" : "visita"}
+          {showPecas ? <span className="ml-1.5 text-xs font-normal opacity-80">(Alt+N)</span> : null}
         </Link>
       </div>
 
@@ -580,9 +601,9 @@ export default async function AssistenciaQueuePage({
               </span>
               {statusCounts ? (
                 <span className="flex items-center gap-2 text-[11px] font-medium ml-auto" style={{ color: group.headerText }}>
-                  <span>Programado {statusCounts.programado}</span>
-                  <span>Concluído {statusCounts.concluido}</span>
-                  <span>Cancelado {statusCounts.cancelado}</span>
+                  <span>{statusCounts.programado} Programado{statusCounts.programado === 1 ? "" : "s"}</span>
+                  <span>{statusCounts.concluido} Concluído{statusCounts.concluido === 1 ? "" : "s"}</span>
+                  <span>{statusCounts.cancelado} Cancelado{statusCounts.cancelado === 1 ? "" : "s"}</span>
                 </span>
               ) : null}
             </summary>

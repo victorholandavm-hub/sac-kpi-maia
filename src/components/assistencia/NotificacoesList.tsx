@@ -332,16 +332,13 @@ export function BulkRotaBar({
   if (!open) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
-          {count} selecionada{count === 1 ? "" : "s"}
-        </span>
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="text-xs rounded-full px-3 py-1.5 font-medium"
+          className="text-xs rounded-full px-3 py-1.5 font-medium whitespace-nowrap"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
         >
-          Colocar em rota
+          Mover {count} selecionado{count === 1 ? "" : "s"}
         </button>
         <button type="button" onClick={onCancel} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
           limpar seleção
@@ -350,82 +347,104 @@ export function BulkRotaBar({
     );
   }
 
+  // Modal, não painel expandido inline -- pedido do Victor 21/08/2026:
+  // "Crie um modal direto para transferência em bloco com dois seletores
+  // encadeados: Selecione a Nova Data -> Selecione a Rota de Destino".
+  // Os dois campos já eram encadeados de verdade (a rota só aparece
+  // depois de escolher a data, ver efeito acima) -- só o container que
+  // virou overlay centralizado em vez de caixa inline.
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-3 w-full" style={{ borderColor: "var(--brand-green)", background: "var(--surface-1)" }}>
-      <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
-        Colocar {count} solicitaç{count === 1 ? "ão" : "ões"} na mesma rota
-      </span>
-      <div className="flex items-center gap-2 flex-wrap">
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="rounded border px-2 py-1 text-sm"
-          style={{ borderColor: "var(--border)" }}
-          autoFocus
-        />
-        <select
-          value={assignmentId}
-          onChange={(e) => setAssignmentId(e.target.value)}
-          disabled={!date || loadingRotas}
-          className="rounded border px-2 py-1 text-sm disabled:opacity-60"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <option value="">Selecione a rota…</option>
-          {effectiveAvailableRotas.map((r) => (
-            <option key={r.id} value={r.id}>
-              {ROTA_LABELS[r.rota]}
-              {r.isExtra ? " (extra)" : ""}
-              {r.driverName ? ` — ${r.driverName}` : ""}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          disabled={pending || !date || !selectedAssignment}
-          onClick={apply}
-          className="text-xs rounded px-3 py-1.5 font-medium disabled:opacity-60"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-        >
-          {pending ? "Aplicando…" : "Aplicar"}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setOpen(false);
-            setResult(null);
-          }}
-          className="text-xs underline"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          cancelar
-        </button>
-      </div>
-      {!date ? null : loadingRotas ? (
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Carregando rotas…
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "color-mix(in srgb, black 55%, transparent)" }}>
+      <div
+        className="flex flex-col gap-3 rounded-lg border p-4 w-full max-w-sm"
+        style={{ borderColor: "var(--brand-green)", background: "var(--surface-1)" }}
+      >
+        <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+          Mover {count} solicitaç{count === 1 ? "ão" : "ões"}
         </span>
-      ) : effectiveAvailableRotas.length === 0 ? (
-        <span className="text-xs" style={{ color: "var(--status-warning)" }}>
-          Nenhuma rota disponível pra essa data.
-        </span>
-      ) : null}
-      {result ? (
-        <div className="flex flex-col gap-1">
-          {result.successCount > 0 ? (
-            <span className="text-xs" style={{ color: "var(--status-good)" }}>
-              {result.successCount} atualizada{result.successCount === 1 ? "" : "s"} com sucesso.
-            </span>
-          ) : null}
-          {result.errors.length > 0 ? (
-            <div className="text-xs" style={{ color: "var(--status-critical)" }}>
-              {result.errors.map((e) => (
-                <p key={e}>{e}</p>
-              ))}
-            </div>
-          ) : null}
+
+        <label className="flex flex-col gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+          1. Nova data
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="rounded border px-2 py-1.5 text-sm"
+            style={{ borderColor: "var(--border)" }}
+            autoFocus
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+          2. Rota de destino
+          <select
+            value={assignmentId}
+            onChange={(e) => setAssignmentId(e.target.value)}
+            disabled={!date || loadingRotas}
+            className="rounded border px-2 py-1.5 text-sm disabled:opacity-60"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <option value="">{date ? "Selecione a rota…" : "Escolha a data primeiro"}</option>
+            {effectiveAvailableRotas.map((r) => (
+              <option key={r.id} value={r.id}>
+                {ROTA_LABELS[r.rota]}
+                {r.isExtra ? " (extra)" : ""}
+                {r.driverName ? ` — ${r.driverName}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {!date ? null : loadingRotas ? (
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Carregando rotas…
+          </span>
+        ) : effectiveAvailableRotas.length === 0 ? (
+          <span className="text-xs" style={{ color: "var(--status-warning)" }}>
+            Nenhuma rota disponível pra essa data.
+          </span>
+        ) : null}
+
+        {result ? (
+          <div className="flex flex-col gap-1">
+            {result.successCount > 0 ? (
+              <span className="text-xs" style={{ color: "var(--status-good)" }}>
+                {result.successCount} atualizada{result.successCount === 1 ? "" : "s"} com sucesso.
+              </span>
+            ) : null}
+            {result.errors.length > 0 ? (
+              <div className="text-xs" style={{ color: "var(--status-critical)" }}>
+                {result.errors.map((e) => (
+                  <p key={e}>{e}</p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            type="button"
+            disabled={pending || !date || !selectedAssignment}
+            onClick={apply}
+            className="text-sm rounded px-3 py-2 font-medium disabled:opacity-60"
+            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          >
+            {pending ? "Movendo…" : `Mover ${count} selecionado${count === 1 ? "" : "s"}`}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setResult(null);
+            }}
+            className="text-sm underline"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            cancelar
+          </button>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
