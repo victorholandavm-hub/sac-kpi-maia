@@ -454,7 +454,8 @@ export type RequestEvent = {
     | "note_added"
     | "deadline_approved"
     | "deadline_rejected"
-    | "edited";
+    | "edited"
+    | "printed";
   fromStatus: string | null;
   toStatus: string | null;
   note: string | null;

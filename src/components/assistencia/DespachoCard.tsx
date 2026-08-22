@@ -101,6 +101,13 @@ export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
 
       <SectionTitle>Descrição da solicitação</SectionTitle>
       <div className="flex flex-col gap-2 px-4 py-3">
+        {/* Atendente que abriu a notificação -- pedido do Victor
+            21/08/2026: "preciso que na impressão... apareça quem foi o
+            atendente que fez aquela notificação". Não é o mesmo que
+            "Autorizado por" (quem autorizou a troca/entrega, texto livre
+            -- ver comentário em serviceRequests.ts/actions.ts sobre por
+            que os dois são campos separados desde 18/08/2026). */}
+        <Field label="Atendente" value={request.requestedByName} />
         <Field label="Autorizado por" value={request.authorizedBy} />
         <Field label="Problema" value={request.reason} />
         <Field label="Observação" value={request.restrictionNote || request.notes} />

@@ -50,7 +50,7 @@ export default async function DespachoLotePage({
         <Link href="/assistencia/fila" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
           ← Voltar
         </Link>
-        <PrintButton />
+        <PrintButton requestIds={requests.map((r) => r.id)} />
       </div>
 
       {requests.length < ids.length ? (
