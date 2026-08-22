@@ -47,6 +47,149 @@ const PAYMENT_FLAG_COLORS: Record<PaymentFlag, string> = {
   no_items: "var(--status-critical)",
 };
 
+// Cor fixa por tipo de serviço na aba Entregas -- pedido do Victor
+// 21/08/2026: "Fixe a cor de cada tipo de serviço (Troca, Envio,
+// Recolhimento)". Um tom por tipo, sem depender de status.
+const DELIVERY_TYPE_COLORS: Record<string, string> = {
+  troca_produto: "var(--brand-orange)",
+  entrega_produto: "var(--brand-green)",
+  envio_peca: "var(--series-1)",
+  recolhimento: "var(--series-4)",
+  recolhimento_produto: "var(--series-5)",
+};
+
+// Grid de 4 blocos fixos, só pra aba Entregas -- pedido do Victor
+// 21/08/2026: "Transformar a linha fluida em colunas fixas: Organize
+// todos os dados do card em 4 blocos horizontais fixos (ID/Status,
+// Serviço/Turno, Cliente/Bairro, Responsáveis/Abertura) para alinhar
+// visualmente todas as notificações em lista". A aba Visitas continua
+// com o layout fluido de sempre (badges variados, quantidade e ordem
+// diferentes por chamado) -- os 4 blocos fixos só fazem sentido pra
+// entrega, que tem sempre o mesmo conjunto de campos.
+function EntregaCardGrid({
+  r,
+  effectiveDate,
+  showStaleBadge,
+  now,
+}: {
+  r: ServiceRequestSummary;
+  effectiveDate: string | null;
+  showStaleBadge: boolean;
+  now: number;
+}) {
+  // Sempre false na prática (showStaleBadge vem false pra Entregas, ver
+  // AssistenciaQueueGroup) -- mantido genérico só caso esse componente
+  // seja reaproveitado num contexto onde volte a fazer sentido.
+  const staleOpen = showStaleBadge && r.status === "aberta" && now - new Date(r.createdAt).getTime() > 4 * 3_600_000;
+  const hasSecondaryRow = !!r.clientTimeRestriction || staleOpen || r.escalationRisk || r.deadlineStatus === "pendente";
+
+  return (
+    <div className="flex flex-col gap-2 flex-1 min-w-0">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Bloco 1: ID/Status */}
+        <div className="flex flex-col gap-1 min-w-0">
+          <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+            #{r.ticketNumber}
+          </span>
+          <div className="flex items-center gap-1 flex-wrap">
+            <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+            <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
+          </div>
+        </div>
+
+        {/* Bloco 2: Serviço/Turno */}
+        <div className="flex flex-col gap-1 min-w-0">
+          <span
+            className="text-xs font-semibold px-2 py-0.5 rounded-full self-start whitespace-nowrap"
+            style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "var(--text-muted)", color: "#fff" }}
+          >
+            {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+            {r.type === "troca_produto" && r.exchangeRound > 1 ? ` · ${r.exchangeRound}ª` : ""}
+          </span>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            {effectiveDate ? (
+              <>
+                📅 {formatDateOnly(effectiveDate)}
+                {effectiveDate === r.scheduledDate && r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
+                {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
+              </>
+            ) : (
+              "Sem data"
+            )}
+          </span>
+        </div>
+
+        {/* Bloco 3: Cliente/Bairro -- negrito e tamanho legível, pedido do
+            Victor 21/08/2026: "padronize a tipografia do nome do cliente,
+            telefone e bairro em negrito e tamanho legível". */}
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
+            {r.clientName ?? "Sem nome de cliente"}
+          </span>
+          <span className="text-xs font-semibold truncate" style={{ color: "var(--text-secondary)" }}>
+            {r.clientPhone ?? "—"}
+          </span>
+          <span className="text-xs font-semibold truncate" style={{ color: "var(--text-secondary)" }}>
+            {r.clientNeighborhood ?? "—"} · {r.storeName}
+          </span>
+        </div>
+
+        {/* Bloco 4: Responsáveis/Abertura */}
+        <div className="flex flex-col gap-0.5 min-w-0 text-xs" style={{ color: "var(--text-muted)" }}>
+          <span className="truncate">{r.driverName ? `Motorista: ${r.driverName}` : "Sem motorista"}</span>
+          <span>
+            Aberta {new Date(r.createdAt).toLocaleDateString("pt-BR")} às{" "}
+            {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+          {r.completedAt ? <span>Concluída {formatDateTimeBr(r.completedAt)}</span> : null}
+        </div>
+      </div>
+
+      {/* Linha secundária -- área própria pros avisos, pra não quebrar o
+          alinhamento dos 4 blocos acima -- pedido do Victor 21/08/2026:
+          "Posicione os avisos críticos de restrição de horário... em uma
+          linha secundária... evitando a quebra de alinhamento das
+          informações principais". */}
+      {hasSecondaryRow ? (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {r.clientTimeRestriction ? (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap max-w-full truncate"
+              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+            >
+              🕐 {r.clientTimeRestriction}
+            </span>
+          ) : null}
+          {staleOpen ? (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+              style={{ background: "var(--status-critical)", color: "#fff" }}
+            >
+              ⏱ parada há {Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h
+            </span>
+          ) : null}
+          {r.escalationRisk ? (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
+            >
+              ⚠ Risco de escalonamento
+            </span>
+          ) : null}
+          {r.deadlineStatus === "pendente" ? (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+            >
+              Prazo pendente
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // Fila reordenável com feedback visual: ao clicar ▲▼, os dois cards que
 // trocam de lugar deslizam pra posição nova em vez de simplesmente
 // "teleportar" -- técnica FLIP (mede a posição antes de trocar o estado,
@@ -174,37 +317,47 @@ export function AssistenciaQueueGroup({
             <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
             Selecionar todas
           </label>
-          {selected.size > 0 ? (
-            <>
-              <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
-                {selected.size} selecionada{selected.size === 1 ? "" : "s"}
-              </span>
-              <Link
-                href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
-                target="_blank"
-                className="text-xs rounded-full px-3 py-1.5 font-medium border"
-                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-              >
-                🖨️ Imprimir selecionadas
-              </Link>
-              {/* Mudar motorista/rota em bloco -- pedido do Victor
-                  21/08/2026: "preciso de uma forma de selecionar em bloco,
-                  no meu acesso de admin, para mudar aquelas notificações
-                  para outro motorista/rota". Mesmo BulkRotaBar já usado na
-                  aba do SAC (NotificacoesList.tsx), reaproveitado aqui em
-                  vez de duplicado. */}
-              <BulkRotaBar
-                selectedIds={[...selected]}
-                count={selected.size}
-                onDone={() => {
-                  setSelected(new Set());
-                  router.refresh();
-                }}
-                onPartialProgress={() => router.refresh()}
-                onCancel={() => setSelected(new Set())}
-              />
-            </>
-          ) : null}
+        </div>
+      ) : null}
+      {/* Barra flutuante fixa no rodapé -- pedido do Victor 21/08/2026:
+          "ao marcar um ou mais checkboxes, apareça uma barra fixa na
+          parte inferior da tela com os botões [ Mover X Selecionados ] e
+          [ Imprimir Selecionados ]. Isso elimina a necessidade de rolar a
+          página para cima". Mesmo padrão de barra flutuante já usado em
+          PedidoEncomendaFilaList.tsx (bottom-20 no mobile por causa da
+          barra de navegação inferior, bottom-4 no desktop). */}
+      {printable && selected.size > 0 ? (
+        <div
+          className="fixed bottom-20 sm:bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:left-auto z-40 flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg flex-wrap"
+          style={{ background: "var(--surface-1)", borderColor: "var(--brand-green)" }}
+        >
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            {selected.size} selecionada{selected.size === 1 ? "" : "s"}
+          </span>
+          <Link
+            href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
+            target="_blank"
+            className="text-sm rounded-full px-3 py-1.5 font-medium border"
+            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+          >
+            🖨️ Imprimir selecionados
+          </Link>
+          {/* Mudar motorista/rota em bloco -- pedido do Victor
+              21/08/2026: "preciso de uma forma de selecionar em bloco,
+              no meu acesso de admin, para mudar aquelas notificações
+              para outro motorista/rota". Mesmo BulkRotaBar já usado na
+              aba do SAC (NotificacoesList.tsx), reaproveitado aqui em
+              vez de duplicado. */}
+          <BulkRotaBar
+            selectedIds={[...selected]}
+            count={selected.size}
+            onDone={() => {
+              setSelected(new Set());
+              router.refresh();
+            }}
+            onPartialProgress={() => router.refresh()}
+            onCancel={() => setSelected(new Set())}
+          />
         </div>
       ) : null}
       <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -274,127 +427,135 @@ export function AssistenciaQueueGroup({
               </div>
             ) : null}
 
-            <Link
-              href={`/assistencia/${r.id}`}
-              className="flex items-center justify-between gap-4 flex-wrap hover:opacity-80 flex-1 min-w-0"
-            >
-              <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                    #{r.ticketNumber}
-                  </span>
-                  {/* Troca/entrega/envio de peça usam o status simplificado
-                      (Programado/Concluído) desde o pedido do Victor
-                      19/08/2026 -- montagem/desmontagem/vistoria/troca de
-                      peça (aba Visitas) continuam com o status detalhado,
-                      onde as etapas fazem sentido de verdade. */}
-                  {(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type) ? (
-                    <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
-                  ) : (
-                    <StatusBadge status={r.status} />
-                  )}
-                  {r.type === "troca_produto" && r.exchangeRound > 1 ? (
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                      style={{ color: "#fff", background: "var(--status-warning)" }}
-                    >
-                      {r.exchangeRound}ª troca
+            {showCreatedDate ? (
+              // Aba Entregas -- grid de 4 blocos fixos (ver EntregaCardGrid
+              // acima), não o layout fluido de badges variados da Visitas.
+              <Link href={`/assistencia/${r.id}`} className="flex items-start hover:opacity-80 flex-1 min-w-0">
+                <EntregaCardGrid r={r} effectiveDate={effectiveDate} showStaleBadge={showStaleBadge} now={now} />
+              </Link>
+            ) : (
+              <Link
+                href={`/assistencia/${r.id}`}
+                className="flex items-center justify-between gap-4 flex-wrap hover:opacity-80 flex-1 min-w-0"
+              >
+                <div className="flex flex-col gap-1 min-w-0 w-0 grow">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                      #{r.ticketNumber}
                     </span>
-                  ) : null}
-                  {staleOpen ? (
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                      style={{ background: "var(--status-critical)", color: "#fff" }}
-                    >
-                      ⏱ parada há {Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h
+                    {/* Troca/entrega/envio de peça usam o status simplificado
+                        (Programado/Concluído) desde o pedido do Victor
+                        19/08/2026 -- montagem/desmontagem/vistoria/troca de
+                        peça (aba Visitas) continuam com o status detalhado,
+                        onde as etapas fazem sentido de verdade. */}
+                    {(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type) ? (
+                      <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+                    ) : (
+                      <StatusBadge status={r.status} />
+                    )}
+                    {r.type === "troca_produto" && r.exchangeRound > 1 ? (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ color: "#fff", background: "var(--status-warning)" }}
+                      >
+                        {r.exchangeRound}ª troca
+                      </span>
+                    ) : null}
+                    {staleOpen ? (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ background: "var(--status-critical)", color: "#fff" }}
+                      >
+                        ⏱ parada há {Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h
+                      </span>
+                    ) : null}
+                    <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
+                    {isPartialCompletion ? (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
+                      >
+                        ◐ Concluída parcialmente
+                      </span>
+                    ) : null}
+                    {r.deadlineStatus === "pendente" ? (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+                      >
+                        Prazo pendente
+                      </span>
+                    ) : null}
+                    {r.escalationRisk ? (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
+                      >
+                        ⚠ Risco de escalonamento
+                      </span>
+                    ) : null}
+                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                      {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                     </span>
-                  ) : null}
-                  <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
-                  {isPartialCompletion ? (
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
-                    >
-                      ◐ Concluída parcialmente
+                    {r.comboMontagemDesmontagem ? (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
+                      >
+                        {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
+                      </span>
+                    ) : null}
+                    {effectiveDate ? (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
+                      >
+                        📅 {formatDateOnly(effectiveDate)}
+                        {effectiveDate === r.scheduledDate && r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
+                        {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
+                      </span>
+                    ) : null}
+                    {r.clientTimeRestriction ? (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+                      >
+                        🕐 {r.clientTimeRestriction}
+                      </span>
+                    ) : null}
+                    {paymentFlag ? (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{
+                          color: "var(--text-primary)",
+                          background: `color-mix(in srgb, ${PAYMENT_FLAG_COLORS[paymentFlag]} 35%, var(--surface-1))`,
+                        }}
+                      >
+                        {PAYMENT_FLAG_LABELS[paymentFlag]}
+                      </span>
+                    ) : null}
+                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      {r.storeName}
                     </span>
-                  ) : null}
-                  {r.deadlineStatus === "pendente" ? (
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-                    >
-                      Prazo pendente
-                    </span>
-                  ) : null}
-                  {r.escalationRisk ? (
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
-                    >
-                      ⚠ Risco de escalonamento
-                    </span>
-                  ) : null}
-                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                    {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                  </span>
-                  {r.comboMontagemDesmontagem ? (
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
-                    >
-                      {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
-                    </span>
-                  ) : null}
-                  {effectiveDate ? (
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
-                    >
-                      📅 {formatDateOnly(effectiveDate)}
-                      {effectiveDate === r.scheduledDate && r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
-                      {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
-                    </span>
-                  ) : null}
-                  {r.clientTimeRestriction ? (
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                      style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-                    >
-                      🕐 {r.clientTimeRestriction}
-                    </span>
-                  ) : null}
-                  {paymentFlag ? (
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                      style={{
-                        color: "var(--text-primary)",
-                        background: `color-mix(in srgb, ${PAYMENT_FLAG_COLORS[paymentFlag]} 35%, var(--surface-1))`,
-                      }}
-                    >
-                      {PAYMENT_FLAG_LABELS[paymentFlag]}
-                    </span>
-                  ) : null}
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    {r.storeName}
-                  </span>
+                  </div>
+                  <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
+                    {r.clientName ?? "Sem nome de cliente"}
+                    {r.clientPhone ? ` · 📞 ${r.clientPhone}` : ""}
+                    {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
+                  </p>
                 </div>
-                <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                  {r.clientName ?? "Sem nome de cliente"}
-                  {r.clientPhone ? ` · 📞 ${r.clientPhone}` : ""}
-                  {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                <span>
-                  Aberta {showCreatedDate ? `em ${new Date(r.createdAt).toLocaleDateString("pt-BR")} ` : ""}às{" "}
-                  {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-                {r.completedAt ? <span>Concluída em {formatDateTimeBr(r.completedAt)}</span> : null}
-                <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
-                {r.assemblerName ? <span>Montador: {r.assemblerName}</span> : null}
-                {r.driverName ? <span>Motorista: {r.driverName}</span> : null}
-              </div>
-            </Link>
+                <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                  <span>
+                    Aberta {showCreatedDate ? `em ${new Date(r.createdAt).toLocaleDateString("pt-BR")} ` : ""}às{" "}
+                    {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  {r.completedAt ? <span>Concluída em {formatDateTimeBr(r.completedAt)}</span> : null}
+                  <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
+                  {r.assemblerName ? <span>Montador: {r.assemblerName}</span> : null}
+                  {r.driverName ? <span>Motorista: {r.driverName}</span> : null}
+                </div>
+              </Link>
+            )}
 
             <div className="shrink-0">
               <ProductsModalButton items={r.items} />
