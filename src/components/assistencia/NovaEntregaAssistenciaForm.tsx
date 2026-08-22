@@ -477,6 +477,27 @@ export function NovaEntregaAssistenciaForm({
             </Field>
           </div>
         ) : null}
+
+        {/* "Outro" precisa dizer exatamente o que houve -- pedido do
+            Victor 21/08/2026, mesmo padrão de erro_conferencia/
+            erro_motorista acima. */}
+        {causaRaiz === "outro" ? (
+          <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
+            <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+              Causa raiz &quot;Outro&quot; -- descreva exatamente o que houve, pra dar pra apurar depois.
+            </p>
+            <Field label="O que houve, exatamente *">
+              <textarea
+                name="causa_raiz_detalhe"
+                rows={2}
+                required
+                placeholder="Descreva a causa raiz com o máximo de detalhe"
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+            </Field>
+          </div>
+        ) : null}
       </FormSection>
 
       <FormSection title="Agendamento" number={5}>
