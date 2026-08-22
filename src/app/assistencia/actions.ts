@@ -1597,7 +1597,13 @@ export async function setSchedule(
   scheduledDate: string,
   shift: string,
   scheduledTime: string,
-  rota?: string
+  rota?: string,
+  // Motorista explícito da atribuição escolhida (ver ScheduleField.tsx) --
+  // pedido do Victor 21/08/2026: precisa pra diferenciar duas atribuições
+  // com a MESMA rota (principal + extra) e motoristas diferentes, já que
+  // só a rota sozinha não identifica qual delas foi escolhida. Sem isso,
+  // cai no primeiro match por rota (comportamento de sempre).
+  driverName?: string
 ) {
   const profile = await getProfile();
   // SAC também agenda rota/data dos próprios chamados (troca/entrega de
@@ -1647,13 +1653,20 @@ export async function setSchedule(
   if (scheduledDate && rotaInput) {
     if (!isRota(rotaInput)) throw new Error("Rota inválida.");
     const availableRotas = await getAvailableRotasForDate(scheduledDate);
-    const match = availableRotas.find((r) => r.rota === rotaInput);
     // Mantém a rota que o chamado já tinha pra essa mesma data mesmo se ela
     // não estiver mais na lista de disponíveis (achado 18/08/2026: sem essa
     // exceção, salvar qualquer outro campo -- turno, hora -- de um chamado
     // com rota "fora do padrão" apagava a rota sozinho, sem o usuário nem
     // ter mexido nela).
     const isCurrentAssignment = scheduledDate === current.scheduled_date && rotaInput === current.rota;
+    // Match por rota+motorista quando o motorista veio explícito (ver
+    // parâmetro driverName acima) -- é isso que escolhe a atribuição certa
+    // quando duas têm a mesma rota (principal + extra). Sem motorista
+    // informado, cai no primeiro match por rota só (chamadas antigas/
+    // diretas que ainda não passam o parâmetro novo).
+    const match = driverName
+      ? availableRotas.find((r) => r.rota === rotaInput && r.driverName === driverName)
+      : availableRotas.find((r) => r.rota === rotaInput);
     if (!match && !isCurrentAssignment) {
       throw new Error(`${ROTA_LABELS[rotaInput]} não tem carro saindo em ${scheduledDate.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.`);
     }
@@ -1711,7 +1724,11 @@ export async function setSchedule(
 export async function bulkSetRotaAction(
   requestIds: string[],
   scheduledDate: string,
-  rota: string
+  rota: string,
+  // Motorista explícito da atribuição escolhida (ver BulkRotaBar em
+  // NotificacoesList.tsx) -- mesmo motivo de setSchedule: sem isso, duas
+  // atribuições com a mesma rota (principal + extra) ficam ambíguas.
+  driverName?: string
 ): Promise<{ successCount: number; errors: string[] }> {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");
@@ -1730,7 +1747,7 @@ export async function bulkSetRotaAction(
   let successCount = 0;
   for (const row of rows ?? []) {
     try {
-      await setSchedule(row.id, scheduledDate, row.shift ?? "", row.scheduled_time ?? "", rota);
+      await setSchedule(row.id, scheduledDate, row.shift ?? "", row.scheduled_time ?? "", rota, driverName);
       successCount++;
     } catch (e) {
       errors.push(`#${row.ticket_number}: ${e instanceof Error ? e.message : "erro desconhecido"}`);

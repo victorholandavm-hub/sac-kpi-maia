@@ -77,14 +77,6 @@ export async function getRotaDriverAssignments(date: string): Promise<RotaDriver
   return { primary, extras };
 }
 
-// Acha o motorista do dia pra uma rota específica -- principal primeiro,
-// senão procura entre as extras (ex: chamado é de "sul" mas a rota
-// principal do dia é "praia" -- só acha se tiver uma extra de "sul").
-export function findDriverForRota(assignments: RotaDriverAssignments, rota: Rota): string | null {
-  if (assignments.primary?.rota === rota) return assignments.primary.driverName;
-  return assignments.extras.find((e) => e.rota === rota)?.driverName ?? null;
-}
-
 // Função pura — recebe a data já como string YYYY-MM-DD pra não depender de
 // timezone do servidor (new Date("YYYY-MM-DD") é sempre UTC meia-noite).
 export function getRotaForDate(dateStr: string, config: RotaWeekdayConfig): Rota | null {
@@ -92,30 +84,41 @@ export function getRotaForDate(dateStr: string, config: RotaWeekdayConfig): Rota
   return config[weekday] ?? null;
 }
 
-export type AvailableRota = { rota: Rota; driverName: string | null };
+// `id` é o id da linha em rota_driver_assignments (ou um id sintético
+// quando ainda não existe atribuição nenhuma) -- pedido do Victor
+// 21/08/2026: "quando eu preciso mudar uma notificação de um motorista
+// para outro... coloquei a mesma rota do dia, não apareceu a rota extra".
+// Antes essa lista era deduplicada por ROTA (um Set<Rota>), então uma
+// extra com a mesma rota da principal virava invisível (a principal
+// sempre "ganhava" em findDriverForRota) -- agora é uma entrada por
+// atribuição de verdade, id é o que diferencia duas entradas com a mesma
+// rota mas motoristas diferentes.
+export type AvailableRota = { id: string; rota: Rota; driverName: string | null; isExtra: boolean };
 
 // Rotas que uma solicitação pode escolher pra uma data -- pedido do Victor
 // 18/08/2026: "a escolha tem que ser baseada nas rotas disponiveis", não
-// mais livre entre praia/sul/centro com aviso de exceção depois. Union do
-// que já está registrado como "motorista do dia" (principal + extras) pra
-// essa data; sem nada registrado ainda, cai no padrão da semana (só domingo
-// fica vazio de verdade). Já vem com o motorista de cada rota (ou null, se
-// a rota ainda não tem motorista definido) -- rota e motorista são a mesma
-// coisa vista de dois jeitos (pedido do Victor 18/08/2026), então quem
-// escolhe a rota já sabe/recebe o motorista junto, sem digitar nada à parte.
+// mais livre entre praia/sul/centro com aviso de exceção depois. Uma
+// entrada por atribuição registrada como "motorista do dia" (principal +
+// cada extra) pra essa data; sem nada registrado ainda, cai no padrão da
+// semana (só domingo fica vazio de verdade, sem motorista). Já vem com o
+// motorista de cada rota (ou null, se ainda não tem motorista definido) --
+// rota e motorista são a mesma coisa vista de dois jeitos (pedido do
+// Victor 18/08/2026), então quem escolhe a rota já sabe/recebe o
+// motorista junto, sem digitar nada à parte.
 export async function getAvailableRotasForDate(dateStr: string): Promise<AvailableRota[]> {
   const [config, assignments] = await Promise.all([getRotaWeekdayConfig(), getRotaDriverAssignments(dateStr)]);
 
-  const registered = new Set<Rota>();
-  if (assignments.primary) registered.add(assignments.primary.rota);
-  for (const extra of assignments.extras) registered.add(extra.rota);
+  const entries: AvailableRota[] = [];
+  if (assignments.primary) {
+    entries.push({ id: assignments.primary.id, rota: assignments.primary.rota, driverName: assignments.primary.driverName, isExtra: false });
+  }
+  for (const extra of assignments.extras) {
+    entries.push({ id: extra.id, rota: extra.rota, driverName: extra.driverName, isExtra: true });
+  }
+  if (entries.length > 0) return entries;
 
-  const rotas = registered.size > 0 ? [...registered] : (() => {
-    const expected = getRotaForDate(dateStr, config);
-    return expected ? [expected] : [];
-  })();
-
-  return rotas.map((rota) => ({ rota, driverName: findDriverForRota(assignments, rota) }));
+  const expected = getRotaForDate(dateStr, config);
+  return expected ? [{ id: `expected-${expected}`, rota: expected, driverName: null, isExtra: false }] : [];
 }
 
 // Segunda-feira da semana de `dateStr` (formato YYYY-MM-DD) -- ponto de

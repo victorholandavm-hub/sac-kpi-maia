@@ -2,12 +2,14 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { setAssistenciaOrderAction } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
 import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
+import { BulkRotaBar } from "./NotificacoesList";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import type { RequestItem, ServiceRequestSummary } from "@/lib/serviceRequests";
 
@@ -84,6 +86,7 @@ export function AssistenciaQueueGroup({
   // atraso, o prazo (📅), não tempo parado sem contato.
   showStaleBadge?: boolean;
 }) {
+  const router = useRouter();
   const [order, setOrder] = useState(items);
   const [saving, setSaving] = useState(false);
   const [syncedItems, setSyncedItems] = useState(items);
@@ -184,14 +187,22 @@ export function AssistenciaQueueGroup({
               >
                 🖨️ Imprimir selecionadas
               </Link>
-              <button
-                type="button"
-                onClick={() => setSelected(new Set())}
-                className="text-xs underline"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                limpar seleção
-              </button>
+              {/* Mudar motorista/rota em bloco -- pedido do Victor
+                  21/08/2026: "preciso de uma forma de selecionar em bloco,
+                  no meu acesso de admin, para mudar aquelas notificações
+                  para outro motorista/rota". Mesmo BulkRotaBar já usado na
+                  aba do SAC (NotificacoesList.tsx), reaproveitado aqui em
+                  vez de duplicado. */}
+              <BulkRotaBar
+                selectedIds={[...selected]}
+                count={selected.size}
+                onDone={() => {
+                  setSelected(new Set());
+                  router.refresh();
+                }}
+                onPartialProgress={() => router.refresh()}
+                onCancel={() => setSelected(new Set())}
+              />
             </>
           ) : null}
         </div>
