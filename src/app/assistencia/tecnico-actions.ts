@@ -7,7 +7,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
-import { isItemDestino, ITEM_DESTINO_LABELS } from "@/lib/tecnicos";
+import { isItemDestino, ITEM_DESTINO_LABELS, ITEM_DESTINO_NEEDS_STORE } from "@/lib/tecnicos";
 import {
   TECNICO_COOKIE_NAME,
   TECNICO_SESSION_MAX_AGE,
@@ -74,17 +74,29 @@ export async function getTecnicoSession(): Promise<string | null> {
   return verifyTecnicoSession(cookieStore.get(TECNICO_COOKIE_NAME)?.value);
 }
 
-// Grava o destino de um item (fábrica/estoque/conserto/sem condições) --
-// registrado por item, não pelo chamado inteiro (uma troca pode voltar com
-// mais de um produto, cada um com destino diferente). Evento de auditoria
-// vai pro histórico do chamado, igual toda outra mutação relevante do
-// projeto.
-export async function setItemDestino(itemId: string, destino: string): Promise<void> {
+// Grava o destino de um item (fábrica/estoque/conserto/sem condições/
+// mostruário/pequena avaria/peça enviada) -- registrado por item, não
+// pelo chamado inteiro (uma troca pode voltar com mais de um produto,
+// cada um com destino diferente). "mostruario" exige a loja pra quem foi
+// enviado (ver ITEM_DESTINO_NEEDS_STORE) -- pedido do Victor 21/08/2026:
+// "enviado para mostruario... eles teriam que selecionar a loja pra qual
+// foi enviada". Evento de auditoria vai pro histórico do chamado, igual
+// toda outra mutação relevante do projeto.
+export async function setItemDestino(itemId: string, destino: string, destinoLojaId?: string): Promise<void> {
   const tecnicoName = await getTecnicoSession();
   if (!tecnicoName) throw new Error("Sessão expirada. Faça login de novo.");
   if (!isItemDestino(destino)) throw new Error("Destino inválido.");
 
   const admin = getSupabaseAdmin();
+  let lojaName: string | null = null;
+  if (destino === ITEM_DESTINO_NEEDS_STORE) {
+    const loja = (destinoLojaId ?? "").trim();
+    if (!loja) throw new Error("Selecione a loja pra qual o item foi enviado.");
+    const { data: store } = await admin.from("stores").select("id, name").eq("id", loja).maybeSingle();
+    if (!store) throw new Error("Loja inválida.");
+    lojaName = store.name;
+  }
+
   const { data: item, error: itemError } = await admin
     .from("service_request_items")
     .select("request_id, product, quantity")
@@ -94,16 +106,22 @@ export async function setItemDestino(itemId: string, destino: string): Promise<v
 
   const { error: updateError } = await admin
     .from("service_request_items")
-    .update({ destino, destino_definido_por: tecnicoName, destino_definido_em: new Date().toISOString() })
+    .update({
+      destino,
+      destino_definido_por: tecnicoName,
+      destino_definido_em: new Date().toISOString(),
+      destino_loja_id: destino === ITEM_DESTINO_NEEDS_STORE ? destinoLojaId : null,
+    })
     .eq("id", itemId);
   if (updateError) throw new Error(updateError.message);
 
   const label = item.quantity > 1 ? `${item.quantity}x ${item.product}` : item.product;
+  const lojaNote = lojaName ? ` (loja: ${lojaName})` : "";
   await admin.from("service_request_events").insert({
     request_id: item.request_id,
     actor_id: null,
     event_type: "note_added",
-    note: `${tecnicoName} (equipe técnica) definiu destino de "${label}": ${ITEM_DESTINO_LABELS[destino]}.`,
+    note: `${tecnicoName} (equipe técnica) definiu destino de "${label}": ${ITEM_DESTINO_LABELS[destino]}${lojaNote}.`,
   });
 
   revalidatePath("/assistencia/tecnico");
@@ -131,7 +149,7 @@ export async function clearItemDestino(itemId: string): Promise<void> {
 
   const { error: updateError } = await admin
     .from("service_request_items")
-    .update({ destino: null, destino_definido_por: null, destino_definido_em: null })
+    .update({ destino: null, destino_definido_por: null, destino_definido_em: null, destino_loja_id: null })
     .eq("id", itemId);
   if (updateError) throw new Error(updateError.message);
 

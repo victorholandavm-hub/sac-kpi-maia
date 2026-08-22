@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTecnicoSession, tecnicoSignOut } from "@/app/assistencia/tecnico-actions";
 import { listRequestsForTecnico, type TecnicoRequestView } from "@/lib/tecnicos";
+import { listStores } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
@@ -62,7 +63,7 @@ export default async function TecnicoHomePage({
   const { view } = await searchParams;
   const showClassificados = view === "classificados";
 
-  const todos = await listRequestsForTecnico();
+  const [todos, stores] = await Promise.all([listRequestsForTecnico(), listStores()]);
   // Um chamado pode ter item pendente E item já classificado ao mesmo tempo
   // (troca com 2 produtos, cada um resolvido em momento diferente) -- por
   // isso o filtro é "tem pelo menos um item nesse estado", não "todos os
@@ -195,6 +196,8 @@ export default async function TecnicoHomePage({
                                 destino={i.destino}
                                 destinoDefinidoPor={i.destinoDefinidoPor}
                                 destinoDefinidoEm={i.destinoDefinidoEm}
+                                destinoLojaName={i.destinoLojaName}
+                                stores={stores}
                               />
                             </div>
                           ))}
