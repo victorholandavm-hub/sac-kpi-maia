@@ -5,59 +5,18 @@ import { useState } from "react";
 import { bulkMarkEnviadoParaCD } from "@/app/assistencia/encomendas-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PedidoEncomendaStatusBadge } from "./PedidoEncomendaStatusBadge";
+import { StatusStepper } from "./StatusStepper";
 import { NewSinceBadge } from "./NewSinceBadge";
-import { PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
+import { PEDIDO_ENCOMENDA_STATUS_COLORS, PEDIDO_ENCOMENDA_STATUS_STEPS } from "@/lib/assistenciaLabels";
 import { prazoUrgencyStyle } from "@/lib/prazoStyle";
-import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
+import { groupByDeadline } from "@/lib/encomendaDeadline";
 import type { PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
 
-// Agrupado por prazo (data que importa pra fila de verdade -- quando o
-// pedido é esperado, não quando foi criado) -- pedido do Victor 20/08/2026:
-// "deixe com a mesma organização que fizemos na tela dos admin... separado
-// por data e organizado por ordem cronológica. Passou a data? vai lá pra
-// baixo". Mesmo rank de sempre (hoje, amanhã, depois, atrasado, sem data)
-// já usado em fila/page.tsx (Entregas) e NotificacoesList.tsx (SAC).
-// "Prazo" aqui segue a mesma prioridade já exibida em cada card: prazo p/
-// loja (CD já confirmou) vence prazo p/ CD (fábrica ainda não despachou),
-// que vence "sem prazo nenhum".
-function effectiveDeadline(p: PedidoEncomendaSummary): string | null {
-  return p.prazoCdLoja ?? p.prazoFabricaCd ?? null;
-}
-
-const NO_DEADLINE_KEY = "sem_prazo";
-const DEADLINE_BUCKET_RANK: Record<DateBucketKey, number> = {
-  hoje: 0,
-  amanha: 1,
-  depois: 2,
-  atrasado: 3,
-  sem_data: 4,
-};
-
-type DeadlineGroup = { dateKey: string; label: string; pedidos: PedidoEncomendaSummary[] };
-
-function groupByDeadline(pedidos: PedidoEncomendaSummary[]): DeadlineGroup[] {
-  const groups: DeadlineGroup[] = [];
-  for (const p of pedidos) {
-    const deadline = effectiveDeadline(p);
-    const dateKey = deadline ?? NO_DEADLINE_KEY;
-    let group = groups.find((g) => g.dateKey === dateKey);
-    if (!group) {
-      const label = deadline
-        ? new Date(`${deadline}T00:00:00Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" })
-        : "Sem prazo definido";
-      group = { dateKey, label, pedidos: [] };
-      groups.push(group);
-    }
-    group.pedidos.push(p);
-  }
-  groups.sort((a, b) => {
-    const rankA = DEADLINE_BUCKET_RANK[bucketByScheduledDate(a.dateKey === NO_DEADLINE_KEY ? null : a.dateKey)];
-    const rankB = DEADLINE_BUCKET_RANK[bucketByScheduledDate(b.dateKey === NO_DEADLINE_KEY ? null : b.dateKey)];
-    if (rankA !== rankB) return rankA - rankB;
-    return a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0;
-  });
-  return groups;
-}
+// Estados fora do caminho linear -- mesmo critério do StatusStepper na tela
+// de detalhe (fila/[id]/page.tsx): continuam com a tag simples, o stepper só
+// faz sentido pra quem está de fato andando pela sequência
+// solicitado→em_producao→...→entregue.
+const STEPPER_EXCLUDED: PedidoEncomendaSummary["status"][] = ["cancelado", "negado", "recebido_cd"];
 
 // Único status de origem elegível pra seleção em lote hoje: fábrica termina a
 // produção de vários pedidos e marca todos como "enviado para o CD" de uma
@@ -174,7 +133,6 @@ export function PedidoEncomendaFilaList({
                             <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
                               #{p.pedidoNumber}
                             </span>
-                            <PedidoEncomendaStatusBadge status={p.status} />
                             <NewSinceBadge createdAt={p.createdAt} storageKey="fila-encomendas-last-seen" />
                             <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                               {p.storeName}
@@ -188,6 +146,19 @@ export function PedidoEncomendaFilaList({
                               </span>
                             ) : null}
                           </div>
+                          {/* Linha de progresso visual em vez da tag de status --
+                              pedido do Victor 22/08/2026: "Substitua as tags de
+                              status por uma linha de progresso visual...
+                              Solicitado ➔ Em Produção ➔ Enviado para CD ➔
+                              Entregue. Isso elimina dúvidas entre a fábrica... e
+                              a loja... sem precisar perguntar". Estados fora do
+                              caminho linear continuam com a tag (ver
+                              STEPPER_EXCLUDED). */}
+                          {STEPPER_EXCLUDED.includes(p.status) ? (
+                            <PedidoEncomendaStatusBadge status={p.status} />
+                          ) : (
+                            <StatusStepper steps={PEDIDO_ENCOMENDA_STATUS_STEPS} currentKey={p.status} compact />
+                          )}
                           {p.items.length > 1 ? (
                             <ul className="text-sm list-disc pl-4" style={{ color: "var(--text-secondary)" }}>
                               {p.items.map((i, idx) => (

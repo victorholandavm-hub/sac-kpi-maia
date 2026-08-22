@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { requireEncomendaActor } from "@/lib/encomendaAuth";
 import { listStores } from "@/lib/serviceRequests";
-import { listAllPedidos, listOpenPedidoEncomendaQueueIds, isPedidoEncomendaStatus, getChegadaCdDates } from "@/lib/pedidosEncomenda";
+import {
+  listAllPedidos,
+  listOpenPedidoEncomendaQueueIds,
+  isPedidoEncomendaStatus,
+  getChegadaCdDates,
+  OPEN_PEDIDO_ENCOMENDA_STATUSES,
+} from "@/lib/pedidosEncomenda";
 import { encomendaCanAdvance } from "@/lib/dal";
 import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 import { ROLE_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PedidoEncomendaFilaList } from "@/components/assistencia/PedidoEncomendaFilaList";
+import { FabricaProducaoView } from "@/components/assistencia/FabricaProducaoView";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { NotificationBell } from "@/components/assistencia/NotificationBell";
@@ -19,12 +26,13 @@ import { switchRafaelToFabrica, switchRafaelToCd } from "@/app/assistencia/rafae
 
 export const dynamic = "force-dynamic";
 
-function buildHref(params: { status?: string; store?: string; fornecedor?: string; q?: string }) {
+function buildHref(params: { status?: string; store?: string; fornecedor?: string; q?: string; view?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.store) sp.set("store", params.store);
   if (params.fornecedor) sp.set("fornecedor", params.fornecedor);
   if (params.q) sp.set("q", params.q);
+  if (params.view) sp.set("view", params.view);
   const qs = sp.toString();
   return qs ? `/assistencia/encomendas/fila?${qs}` : "/assistencia/encomendas/fila";
 }
@@ -58,15 +66,21 @@ const FILTERS: { label: string; value: string | null }[] = [
 export default async function EncomendasQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; store?: string; fornecedor?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; store?: string; fornecedor?: string; q?: string; view?: string }>;
 }) {
   // Aceita sessão PIN de CD/fábrica ou perfil Supabase Auth de
   // admin/assistência — ver src/lib/encomendaAuth.ts. Página fora do grupo
   // (app) porque CD/fábrica não têm sessão Supabase Auth.
   const actor = await requireEncomendaActor();
-  const { status, store, fornecedor, q } = await searchParams;
+  const { status, store, fornecedor, q, view } = await searchParams;
   const filterStatus = isPedidoEncomendaStatus(status) ? status : undefined;
   const showAllStatuses = status === "todos";
+  // Visão Fábrica -- pedido do Victor 22/08/2026: "Crie um botão no topo
+  // [Alternar para Visão Fábrica] que consolida os itens por especificação
+  // técnica... enquanto o vendedor precisa ver a ordem por pedido
+  // individual". Só troca como os MESMOS `pedidos` já filtrados são
+  // exibidos (ver FabricaProducaoView.tsx) -- nenhum filtro/dado novo.
+  const fabricaView = view === "fabrica";
 
   // Fábrica nunca enxerga pedido externo -- só o(s) da(s) fábrica(s)
   // própria(s) que é dela (a maioria tem uma só; fabricaId nulo, caso do
@@ -83,7 +97,7 @@ export default async function EncomendasQueuePage({
         ? ("fabrica_externa" as const)
         : undefined;
 
-  const [pedidos, stores, queueIds] = await Promise.all([
+  const [pedidos, allForCounts, stores, queueIds] = await Promise.all([
     listAllPedidos({
       status: filterStatus,
       onlyOpen: !filterStatus && !showAllStatuses,
@@ -92,9 +106,18 @@ export default async function EncomendasQueuePage({
       fornecedorTipo: fornecedorTipoFilter,
       q,
     }),
+    // Contagem por status pros chips do topo -- pedido do Victor 22/08/2026:
+    // "torne-os em Chips com Contadores Visuais... A fábrica clica
+    // diretamente no chip Em Produção pra focar". Mesmos filtros de
+    // loja/fornecedor/busca da lista principal, só sem o filtro de status
+    // (senão toda contagem menos a do pill ativo ficaria zerada).
+    listAllPedidos({ storeId: store, fabricaId: fabricaIdFilter, fornecedorTipo: fornecedorTipoFilter, q }),
     listStores(),
     listOpenPedidoEncomendaQueueIds(),
   ]);
+  const statusCounts = new Map<string, number>();
+  for (const p of allForCounts) statusCounts.set(p.status, (statusCounts.get(p.status) ?? 0) + 1);
+  const openCount = allForCounts.filter((p) => (OPEN_PEDIDO_ENCOMENDA_STATUSES as string[]).includes(p.status)).length;
   // Depende dos ids de `pedidos` acima, então não dá pra entrar no mesmo
   // Promise.all -- ver getChegadaCdDates (troca "Prazo p/ CD" por "Chegou no
   // CD: <data>" assim que o CD confirma o pedido, na lista abaixo).
@@ -168,10 +191,15 @@ export default async function EncomendasQueuePage({
           const selected = (f.value ?? null) === activeValue;
           const isStatusPill = !!f.value && f.value !== "todos";
           const color = isStatusPill ? PEDIDO_ENCOMENDA_STATUS_COLORS[f.value as string] ?? "var(--text-secondary)" : "var(--text-secondary)";
+          // Contador visual em cada chip -- pedido do Victor 22/08/2026:
+          // "torne-os em Chips com Contadores Visuais (ex: Em Produção
+          // (14))". "Em andamento" soma os status ainda abertos, "Todos" é
+          // o total, cada status individual usa a própria contagem.
+          const count = f.value === null ? openCount : f.value === "todos" ? allForCounts.length : (statusCounts.get(f.value) ?? 0);
           return (
             <Link
               key={f.label}
-              href={buildHref({ status: f.value ?? undefined, store, fornecedor, q })}
+              href={buildHref({ status: f.value ?? undefined, store, fornecedor, q, view })}
               className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
               style={
                 isStatusPill
@@ -189,7 +217,7 @@ export default async function EncomendasQueuePage({
                     }
               }
             >
-              {f.label}
+              {f.label} ({count})
             </Link>
           );
         })}
@@ -202,7 +230,7 @@ export default async function EncomendasQueuePage({
             return (
               <Link
                 key={f.label}
-                href={buildHref({ status, store, fornecedor: f.value ?? undefined, q })}
+                href={buildHref({ status, store, fornecedor: f.value ?? undefined, q, view })}
                 className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
                 style={{
                   border: "1px solid var(--border)",
@@ -220,12 +248,30 @@ export default async function EncomendasQueuePage({
 
       <div className="flex items-center gap-2 flex-wrap">
         <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+        {/* Alternar para Visão Fábrica -- pedido do Victor 22/08/2026: "Crie
+            um botão no topo [Alternar para Visão Fábrica]... A fábrica
+            precisa ver o total do lote para corte e estofamento, enquanto o
+            vendedor precisa ver a ordem por pedido individual". Só troca a
+            forma de exibir os MESMOS pedidos já filtrados -- ver
+            FabricaProducaoView.tsx. */}
+        <Link
+          href={buildHref({ status, store, fornecedor, q, view: fabricaView ? undefined : "fabrica" })}
+          className="text-sm px-3 py-2 rounded font-medium whitespace-nowrap"
+          style={
+            fabricaView
+              ? { background: "var(--brand-orange)", color: "#fff" }
+              : { border: "1px solid var(--brand-orange)", color: "var(--brand-orange)" }
+          }
+        >
+          {fabricaView ? "📋 Voltar para visão por pedido" : "🏭 Alternar para visão fábrica"}
+        </Link>
       </div>
 
       <form action="/assistencia/encomendas/fila" method="GET" className="flex items-center gap-2 flex-wrap">
         {status ? <input type="hidden" name="status" value={status} /> : null}
         {store ? <input type="hidden" name="store" value={store} /> : null}
         {fornecedor ? <input type="hidden" name="fornecedor" value={fornecedor} /> : null}
+        {view ? <input type="hidden" name="view" value={view} /> : null}
         <input
           type="search"
           name="q"
@@ -243,7 +289,7 @@ export default async function EncomendasQueuePage({
         </button>
         {q ? (
           <Link
-            href={buildHref({ status, store, fornecedor })}
+            href={buildHref({ status, store, fornecedor, view })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -258,6 +304,8 @@ export default async function EncomendasQueuePage({
             Nenhum pedido encontrado.
           </p>
         </div>
+      ) : fabricaView ? (
+        <FabricaProducaoView pedidos={pedidos} />
       ) : (
         <PedidoEncomendaFilaList
           pedidos={pedidos}
