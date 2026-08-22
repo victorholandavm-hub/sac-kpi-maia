@@ -658,6 +658,30 @@ export function SacCreateRequestForm({
           </div>
         ) : null}
 
+        {/* "Outro" não tem campo próprio nenhum além do Motivo genérico lá
+            em cima -- pedido do Victor 21/08/2026: "quando... selecionar
+            'outro' ele precisar digitar o que houve exatamente". Mesmo
+            padrão visual de erro_conferencia/erro_motorista acima, só que
+            sem sub-campos estruturados (não tem carga/conferente pra
+            "outro") -- um textarea dedicado, obrigatório. */}
+        {causaRaiz === "outro" ? (
+          <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
+            <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+              Causa raiz &quot;Outro&quot; -- descreva exatamente o que houve, pra dar pra apurar depois.
+            </p>
+            <Field label="O que houve, exatamente *">
+              <textarea
+                name="causa_raiz_detalhe"
+                rows={2}
+                required
+                placeholder="Descreva a causa raiz com o máximo de detalhe"
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+            </Field>
+          </div>
+        ) : null}
+
         {type === "troca_produto" ? (
           <Field label="O que recolher / instrução pro motorista">
             <textarea

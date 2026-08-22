@@ -82,6 +82,7 @@ export function RequestActions({
   const [novaTrocaCarga, setNovaTrocaCarga] = useState("");
   const [novaTrocaConferente, setNovaTrocaConferente] = useState("");
   const [novaTrocaDriverName, setNovaTrocaDriverName] = useState("");
+  const [novaTrocaCausaRaizDetalhe, setNovaTrocaCausaRaizDetalhe] = useState("");
 
   function resetNovaTroca() {
     setAskingNovaTroca(false);
@@ -91,6 +92,7 @@ export function RequestActions({
     setNovaTrocaCarga("");
     setNovaTrocaConferente("");
     setNovaTrocaDriverName("");
+    setNovaTrocaCausaRaizDetalhe("");
   }
 
   // Produto trocado pode voltar com defeito de novo -- em vez de reabrir o
@@ -108,6 +110,12 @@ export function RequestActions({
       showToast("Selecione quem errou.", "error");
       return;
     }
+    // "Outro" precisa dizer exatamente o que houve -- pedido do Victor
+    // 21/08/2026.
+    if (novaTrocaCausaRaiz === "outro" && !novaTrocaCausaRaizDetalhe.trim()) {
+      showToast("Descreva a causa raiz.", "error");
+      return;
+    }
     if (sameProduct === null) return;
     run(async () => {
       const child = await createExchangeChild(requestId, {
@@ -117,6 +125,7 @@ export function RequestActions({
         causaCarga: novaTrocaCarga,
         causaConferente: novaTrocaConferente,
         driverNameForError: novaTrocaDriverName,
+        causaRaizDetalhe: novaTrocaCausaRaizDetalhe,
       });
       resetNovaTroca();
       router.push(`/assistencia/${child.id}`);
@@ -314,9 +323,24 @@ export function RequestActions({
               />
             </div>
           ) : null}
+          {novaTrocaCausaRaiz === "outro" ? (
+            <textarea
+              value={novaTrocaCausaRaizDetalhe}
+              onChange={(e) => setNovaTrocaCausaRaizDetalhe(e.target.value)}
+              rows={2}
+              placeholder="O que houve, exatamente? *"
+              className="rounded border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--border)" }}
+            />
+          ) : null}
           <div className="flex items-center gap-2">
             <button
-              disabled={pending || !novaTrocaReason.trim() || !novaTrocaCausaRaiz}
+              disabled={
+                pending ||
+                !novaTrocaReason.trim() ||
+                !novaTrocaCausaRaiz ||
+                (novaTrocaCausaRaiz === "outro" && !novaTrocaCausaRaizDetalhe.trim())
+              }
               onClick={confirmNovaTroca}
               className="text-sm rounded px-3 py-2 disabled:opacity-60"
               style={{ background: "var(--status-warning)", color: "#fff" }}

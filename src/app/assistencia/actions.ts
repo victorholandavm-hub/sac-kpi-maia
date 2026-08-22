@@ -1018,6 +1018,7 @@ export async function createExchangeChild(
     causaCarga?: string;
     causaConferente?: string;
     driverNameForError?: string;
+    causaRaizDetalhe?: string;
   }
 ): Promise<{ id: string; ticketNumber: number }> {
   const profile = await getProfile();
@@ -1044,6 +1045,7 @@ export async function createExchangeChild(
   let causaCarga: string | null = null;
   let causaConferente: string | null = null;
   let driverNameForError: string | null = null;
+  let causaRaizDetalhe: string | null = null;
   if (opts.causaRaiz === "erro_conferencia") {
     causaCarga = (opts.causaCarga ?? "").trim();
     causaConferente = (opts.causaConferente ?? "").trim();
@@ -1056,6 +1058,13 @@ export async function createExchangeChild(
     if (!causaCarga) throw new Error("Informe a carga (erro do motorista precisa registrar qual foi).");
     if (!typedDriverName) throw new Error("Informe o motorista (erro do motorista precisa registrar quem entregou).");
     driverNameForError = await resolveDriverName(typedDriverName);
+  }
+  // "Outro" precisa dizer exatamente o que houve (pedido do Victor
+  // 21/08/2026), mesmo padrão de erro_conferencia/erro_motorista acima --
+  // só que sem sub-campos estruturados, um texto livre só.
+  if (opts.causaRaiz === "outro") {
+    causaRaizDetalhe = (opts.causaRaizDetalhe ?? "").trim();
+    if (!causaRaizDetalhe) throw new Error("Descreva a causa raiz (obrigatório quando é \"Outro\").");
   }
 
   const nextRound = (parent.exchange_round ?? 1) + 1;
@@ -1102,6 +1111,7 @@ export async function createExchangeChild(
       causa_raiz: opts.causaRaiz,
       causa_carga: causaCarga,
       causa_conferente: causaConferente,
+      causa_raiz_detalhe: causaRaizDetalhe,
       exchange_round: nextRound,
       parent_request_id: requestId,
       deadline_status: "aprovado",
@@ -1949,6 +1959,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   let causaCarga: string | null = null;
   let causaConferente: string | null = null;
   let driverNameForError: string | null = null;
+  let causaRaizDetalhe: string | null = null;
   if (isDelivery) {
     causaRaiz = String(formData.get("causa_raiz") ?? "").trim();
     if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
@@ -1966,6 +1977,12 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       if (!causaCarga) return { error: "Informe a carga (erro do motorista precisa registrar qual foi)." };
       if (!typedDriverName) return { error: "Informe o motorista (erro do motorista precisa registrar quem entregou)." };
       driverNameForError = await resolveDriverName(typedDriverName);
+    }
+    // "Outro" precisa dizer exatamente o que houve (pedido do Victor
+    // 21/08/2026), mesmo padrão de erro_conferencia/erro_motorista acima.
+    if (causaRaiz === "outro") {
+      causaRaizDetalhe = String(formData.get("causa_raiz_detalhe") ?? "").trim();
+      if (!causaRaizDetalhe) return { error: "Descreva a causa raiz (obrigatório quando é \"Outro\")." };
     }
   }
 
@@ -2074,6 +2091,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       causa_raiz: causaRaiz,
       causa_carga: causaCarga,
       causa_conferente: causaConferente,
+      causa_raiz_detalhe: causaRaizDetalhe,
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
       // Restrição de horário/turno do cliente pra receber (pedido do Victor
       // 19/08/2026) -- só faz sentido pra tipo de entrega, mas não custa
@@ -2206,6 +2224,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   let causaRaiz: string | null = null;
   let causaCarga: string | null = null;
   let causaConferente: string | null = null;
+  let causaRaizDetalhe: string | null = null;
   if (isDeliveryTypeCreate) {
     causaRaiz = String(formData.get("causa_raiz") ?? "").trim();
     if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
@@ -2221,6 +2240,14 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       causaCarga = String(formData.get("causa_carga") ?? "").trim();
       if (!causaCarga) return { error: "Informe a carga (erro do motorista precisa registrar qual foi)." };
       if (!driverNameInput) return { error: "Informe o motorista (erro do motorista precisa registrar quem entregou)." };
+    }
+    // "Outro" precisa dizer exatamente o que houve (pedido do Victor
+    // 21/08/2026: "quando... selecionar 'outro' ele precisar digitar o
+    // que houve exatamente"), mesmo padrão de erro_conferencia/
+    // erro_motorista acima -- só que sem sub-campos estruturados.
+    if (causaRaiz === "outro") {
+      causaRaizDetalhe = String(formData.get("causa_raiz_detalhe") ?? "").trim();
+      if (!causaRaizDetalhe) return { error: "Descreva a causa raiz (obrigatório quando é \"Outro\")." };
     }
   }
 
@@ -2347,6 +2374,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       causa_raiz: causaRaiz,
       causa_carga: causaCarga,
       causa_conferente: causaConferente,
+      causa_raiz_detalhe: causaRaizDetalhe,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
       // Criado direto pelo SAC, não pela loja — não há prazo pra aprovar.
       deadline_status: "aprovado",

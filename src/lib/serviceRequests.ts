@@ -173,10 +173,12 @@ export type ServiceRequestSummary = {
   // Causa raiz da troca (troca_produto) -- ver CAUSA_RAIZ_LABELS. Quando
   // "erro_conferencia", causaCarga/causaConferente são preenchimento
   // obrigatório na criação; quando "erro_motorista", causaCarga + o
-  // driverName do chamado (ver createSacRequest).
+  // driverName do chamado; quando "outro", causaRaizDetalhe (ver
+  // createSacRequest/createQuickRequest/createExchangeChild).
   causaRaiz: string | null;
   causaCarga: string | null;
   causaConferente: string | null;
+  causaRaizDetalhe: string | null;
 };
 
 type SummaryRow = {
@@ -216,6 +218,7 @@ type SummaryRow = {
   causa_raiz: string | null;
   causa_carga: string | null;
   causa_conferente: string | null;
+  causa_raiz_detalhe: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -227,7 +230,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -284,6 +287,7 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     causaRaiz: row.causa_raiz,
     causaCarga: row.causa_carga,
     causaConferente: row.causa_conferente,
+    causaRaizDetalhe: row.causa_raiz_detalhe,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,

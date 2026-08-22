@@ -109,7 +109,9 @@ export function DeliveryRequestDetailContent({
         ? [request.causaCarga ? `Carga: ${request.causaCarga}` : null, request.driverName ? `Motorista: ${request.driverName}` : null]
             .filter(Boolean)
             .join(" · ")
-        : null;
+        : request.causaRaiz === "outro"
+          ? request.causaRaizDetalhe
+          : null;
 
   return (
     <div className="flex flex-col gap-4">
