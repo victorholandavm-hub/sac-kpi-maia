@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setAssistenciaOrderAction } from "@/app/assistencia/actions";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
 import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
@@ -67,14 +67,15 @@ const DELIVERY_TYPE_COLORS: Record<string, string> = {
 // resto do card pra baixo) -- como a observação é texto livre (não dá pra
 // extrair "palavra-chave" de verdade sem NLP), o compromisso prático é
 // cortar com reticências e confiar no tooltip pro texto inteiro.
-function WarningTag({ icon, text, color }: { icon: string; text: string; color: string }) {
+function WarningTag({ icon, text, color }: { icon?: string; text: string; color: string }) {
   return (
     <span
       title={text}
       className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap truncate max-w-[9rem] cursor-help"
       style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
     >
-      {icon} {text}
+      {icon ? `${icon} ` : ""}
+      {text}
     </span>
   );
 }
@@ -253,6 +254,216 @@ function EntregaCardRow({
       <div className="w-full sm:w-[10%] shrink-0 flex items-center justify-start sm:justify-center">
         <ProductsModalButton items={r.items} />
       </div>
+    </div>
+  );
+}
+
+// Linha de tabela com colunas fixas, aba Visitas -- pedido do Victor
+// 22/08/2026: "alguns cards têm aviso em amarelo... outros mostram texto de
+// loja... outros exibem o cliente. Trave o card em uma linha com colunas
+// fixas: Col 1: Status + Tipo. Col 2: Cliente/Loja + Bairro. Col 3: Montador
+// Responsável (ou tag Sem Montador). Col 4: Datas. Col 5: Ícone/Badge de
+// Observação + Ver produtos". Mesmo esqueleto de EntregaCardRow (setas fora
+// do <Link>, colunas 1-4 dentro de um <Link display:contents>, coluna de
+// observação/ação fora) -- Visitas nunca é `printable` (ver fila/page.tsx),
+// então não tem checkbox, só as setas de ordenação.
+function VisitaCardRow({
+  r,
+  i,
+  orderLength,
+  reorderable,
+  saving,
+  onMoveUp,
+  onMoveDown,
+  effectiveDate,
+  staleOpen,
+  isPartialCompletion,
+  paymentFlag,
+  now,
+}: {
+  r: ServiceRequestSummary;
+  i: number;
+  orderLength: number;
+  reorderable: boolean;
+  saving: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  effectiveDate: string | null;
+  staleOpen: boolean;
+  isPartialCompletion: boolean;
+  paymentFlag: PaymentFlag | null;
+  now: number;
+}) {
+  // "Instrução pro montador" clicável -- pedido do Victor 22/08/2026: "O
+  // bloco amarelo esticado... toma espaço vertical excessivo quando está
+  // vazio ou com texto curto. Transforme-o em uma tag/ícone de alerta
+  // clicável na linha do card. Ao passar o mouse (hover) ou clicar, exibe a
+  // instrução". `title` já cobre o hover (tooltip nativo); o clique abre a
+  // caixa completa abaixo da linha -- só nesse caso a altura do card cresce
+  // (ação do usuário, não estado passivo, então não quebra o alinhamento
+  // vertical da lista igual o bloco amarelo sempre-visível quebrava).
+  const [instructionOpen, setInstructionOpen] = useState(false);
+  const hasObservacoes =
+    !!r.montadorInstruction || !!r.clientTimeRestriction || staleOpen || r.escalationRisk || r.deadlineStatus === "pendente" || !!paymentFlag;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col sm:flex-row sm:items-stretch gap-2 sm:gap-0">
+        {/* Setas de ordenação (sem checkbox -- Visitas nunca é printable) */}
+        <div className="w-full sm:w-[4%] shrink-0 flex sm:flex-col items-center sm:justify-center gap-2 sm:gap-0.5 sm:pr-2">
+          {reorderable ? (
+            <div className="flex sm:flex-col items-center gap-0.5 shrink-0">
+              <button
+                onClick={onMoveUp}
+                disabled={i === 0 || saving}
+                aria-label="Mover pra cima"
+                className="text-sm leading-none px-1 disabled:opacity-25"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                ▲
+              </button>
+              <button
+                onClick={onMoveDown}
+                disabled={i === orderLength - 1 || saving}
+                aria-label="Mover pra baixo"
+                className="text-sm leading-none px-1 disabled:opacity-25"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                ▼
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        <Link href={`/assistencia/${r.id}`} className="contents">
+          {/* Coluna 1 (15%): status + tipo (com nuances de status: parcial,
+              combo montagem+desmontagem, parada há tempo) */}
+          <div className="w-full sm:w-[15%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start sm:pr-3">
+            <div className="flex items-center gap-1 flex-wrap">
+              <StatusBadge status={r.status} />
+              <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
+            </div>
+            <span className="text-sm font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+              {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+            </span>
+            {r.comboMontagemDesmontagem ? (
+              <span
+                className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
+              >
+                {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
+              </span>
+            ) : null}
+            {isPartialCompletion ? (
+              <span
+                className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
+              >
+                ◐ Parcial
+              </span>
+            ) : null}
+          </div>
+
+          {/* Coluna 2 (28%): cliente/loja em destaque + bairro -- pedido do
+              Victor: "Cliente/Loja em negrito + Bairro". Mostruário já vem
+              com esse nome dentro do próprio clientName (ver
+              isMostruarioRequest em serviceRequests.ts, ex: "Mostruário —
+              Maia Barão"), então não precisa de lógica extra aqui pra
+              diferenciar cliente de loja. */}
+          <div className="w-full sm:w-[28%] shrink-0 flex flex-col gap-0.5 min-w-0 sm:pr-3">
+            <span className="text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
+              {r.clientName ?? "Sem nome de cliente"}
+            </span>
+            <span className="text-xs font-semibold truncate" style={{ color: "var(--text-secondary)" }}>
+              {r.clientPhone ?? "—"}
+            </span>
+            <span className="text-sm font-bold truncate" style={{ color: "var(--text-secondary)" }}>
+              {r.clientNeighborhood ?? "—"}
+            </span>
+            <span className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+              🏬 {r.storeName}
+            </span>
+          </div>
+
+          {/* Coluna 3 (16%): montador responsável -- tag vermelha quando
+              não tem, pedido do Victor: "Em vez de deixar a palavra Não
+              definido em cinza apagado, use uma tag em destaque (ex: Sem
+              Montador) para atrair o olho do operador imediatamente". */}
+          <div className="w-full sm:w-[16%] shrink-0 flex items-center min-w-0 sm:pr-3">
+            {r.assemblerName ? (
+              <span className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+                {r.assemblerName}
+              </span>
+            ) : (
+              <span
+                className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ background: "var(--status-critical)", color: "#fff" }}
+              >
+                ⚠️ Sem Montador
+              </span>
+            )}
+          </div>
+
+          {/* Coluna 4 (17%): datas de abertura e previsão */}
+          <div className="w-full sm:w-[17%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3" style={{ color: "var(--text-muted)" }}>
+            <span className="whitespace-nowrap">Aberta {new Date(r.createdAt).toLocaleDateString("pt-BR")}</span>
+            {effectiveDate ? (
+              <span className="whitespace-nowrap">
+                Previsão: {formatDateOnly(effectiveDate)}
+                {effectiveDate === r.scheduledDate && r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
+                {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
+              </span>
+            ) : (
+              <span className="whitespace-nowrap">Sem previsão</span>
+            )}
+            {r.completedAt ? <span className="whitespace-nowrap">Concluída {formatDateTimeBr(r.completedAt)}</span> : null}
+          </div>
+        </Link>
+
+        {/* Coluna 5 (20%): ícone/badge de observação + Ver produtos -- fora
+            do <Link>, são controles próprios (botão de instrução é
+            clicável, Ver produtos abre modal). */}
+        <div className="w-full sm:w-[20%] shrink-0 flex flex-col gap-1.5 items-start sm:items-center justify-center">
+          {hasObservacoes ? (
+            <div className="flex items-center gap-1 flex-wrap">
+              {r.montadorInstruction ? (
+                <button
+                  type="button"
+                  title={r.montadorInstruction}
+                  onClick={() => setInstructionOpen((v) => !v)}
+                  className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap cursor-pointer"
+                  style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+                >
+                  📋 Instrução
+                </button>
+              ) : null}
+              {r.clientTimeRestriction ? <WarningTag icon="🕐" text={r.clientTimeRestriction} color="var(--status-warning)" /> : null}
+              {staleOpen ? (
+                <WarningTag
+                  icon="⏱"
+                  text={`parada há ${Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h`}
+                  color="var(--status-critical)"
+                />
+              ) : null}
+              {r.escalationRisk ? <WarningTag icon="⚠" text="Risco de escalonamento" color="var(--status-critical)" /> : null}
+              {r.deadlineStatus === "pendente" ? <WarningTag icon="⚠" text="Prazo pendente" color="var(--status-warning)" /> : null}
+              {paymentFlag ? <WarningTag text={PAYMENT_FLAG_LABELS[paymentFlag]} color={PAYMENT_FLAG_COLORS[paymentFlag]} /> : null}
+            </div>
+          ) : null}
+          <ProductsModalButton items={r.items} />
+        </div>
+      </div>
+
+      {instructionOpen && r.montadorInstruction ? (
+        <div
+          className="rounded-lg p-2.5 sm:ml-[4%]"
+          style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
+        >
+          <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-primary)" }}>
+            {r.montadorInstruction}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -483,183 +694,25 @@ export function AssistenciaQueueGroup({
               now={now}
             />
           ) : (
-          <div className="flex items-center gap-2 flex-wrap">
-            {printable ? (
-              <input
-                type="checkbox"
-                checked={selected.has(r.id)}
-                onChange={() => toggleSelected(r.id)}
-                className="rounded shrink-0"
-                aria-label={`Selecionar #${r.ticketNumber}`}
-              />
-            ) : null}
-            {reorderable ? (
-              <div className="flex flex-col items-center gap-0.5 shrink-0">
-                <button
-                  onClick={() => move(i, -1)}
-                  disabled={i === 0 || saving}
-                  aria-label="Mover pra cima"
-                  className="text-sm leading-none px-1 disabled:opacity-25"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  ▲
-                </button>
-                <button
-                  onClick={() => move(i, 1)}
-                  disabled={i === order.length - 1 || saving}
-                  aria-label="Mover pra baixo"
-                  className="text-sm leading-none px-1 disabled:opacity-25"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  ▼
-                </button>
-              </div>
-            ) : null}
-
-            <Link
-                href={`/assistencia/${r.id}`}
-                className="flex items-center justify-between gap-4 flex-wrap hover:opacity-80 flex-1 min-w-0"
-              >
-                <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                      #{r.ticketNumber}
-                    </span>
-                    {/* Troca/entrega/envio de peça usam o status simplificado
-                        (Programado/Concluído) desde o pedido do Victor
-                        19/08/2026 -- montagem/desmontagem/vistoria/troca de
-                        peça (aba Visitas) continuam com o status detalhado,
-                        onde as etapas fazem sentido de verdade. */}
-                    {(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type) ? (
-                      <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
-                    ) : (
-                      <StatusBadge status={r.status} />
-                    )}
-                    {r.type === "troca_produto" && r.exchangeRound > 1 ? (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ color: "#fff", background: "var(--status-warning)" }}
-                      >
-                        {r.exchangeRound}ª troca
-                      </span>
-                    ) : null}
-                    {staleOpen ? (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ background: "var(--status-critical)", color: "#fff" }}
-                      >
-                        ⏱ parada há {Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h
-                      </span>
-                    ) : null}
-                    <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
-                    {isPartialCompletion ? (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
-                      >
-                        ◐ Concluída parcialmente
-                      </span>
-                    ) : null}
-                    {r.deadlineStatus === "pendente" ? (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-                      >
-                        Prazo pendente
-                      </span>
-                    ) : null}
-                    {r.escalationRisk ? (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))" }}
-                      >
-                        ⚠ Risco de escalonamento
-                      </span>
-                    ) : null}
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                      {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                    </span>
-                    {r.comboMontagemDesmontagem ? (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
-                      >
-                        {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
-                      </span>
-                    ) : null}
-                    {effectiveDate ? (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-green) 35%, var(--surface-1))" }}
-                      >
-                        📅 {formatDateOnly(effectiveDate)}
-                        {effectiveDate === r.scheduledDate && r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
-                        {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
-                      </span>
-                    ) : null}
-                    {r.clientTimeRestriction ? (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
-                      >
-                        🕐 {r.clientTimeRestriction}
-                      </span>
-                    ) : null}
-                    {paymentFlag ? (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{
-                          color: "var(--text-primary)",
-                          background: `color-mix(in srgb, ${PAYMENT_FLAG_COLORS[paymentFlag]} 35%, var(--surface-1))`,
-                        }}
-                      >
-                        {PAYMENT_FLAG_LABELS[paymentFlag]}
-                      </span>
-                    ) : null}
-                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {r.storeName}
-                    </span>
-                  </div>
-                  <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                    {r.clientName ?? "Sem nome de cliente"}
-                    {r.clientPhone ? ` · 📞 ${r.clientPhone}` : ""}
-                    {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                  <span>
-                    Aberta {showCreatedDate ? `em ${new Date(r.createdAt).toLocaleDateString("pt-BR")} ` : ""}às{" "}
-                    {new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                  {r.completedAt ? <span>Concluída em {formatDateTimeBr(r.completedAt)}</span> : null}
-                  <span>{r.assignedToName ? `Com ${r.assignedToName}` : "Sem responsável"}</span>
-                  {r.assemblerName ? <span>Montador: {r.assemblerName}</span> : null}
-                  {r.driverName ? <span>Motorista: {r.driverName}</span> : null}
-                </div>
-              </Link>
-
-            <div className="shrink-0">
-              <ProductsModalButton items={r.items} />
-            </div>
-          </div>
+            // Aba Visitas -- tabela de colunas fixas (ver VisitaCardRow
+            // acima), mesma ideia de Entregas: card sempre com a mesma
+            // altura, sem depender de quais avisos/campos essa notificação
+            // específica tem.
+            <VisitaCardRow
+              r={r}
+              i={i}
+              orderLength={order.length}
+              reorderable={reorderable}
+              saving={saving}
+              onMoveUp={() => move(i, -1)}
+              onMoveDown={() => move(i, 1)}
+              effectiveDate={effectiveDate}
+              staleOpen={staleOpen}
+              isPartialCompletion={isPartialCompletion}
+              paymentFlag={paymentFlag}
+              now={now}
+            />
           )}
-
-          {r.montadorInstruction ? (
-            // Recolhida por padrão -- expandida sempre (era o normal antes),
-            // ela sozinha esgota boa parte da rolagem da fila quando tem
-            // muito chamado com instrução. `<details>` nativo, sem JS extra.
-            <details
-              className="rounded-lg p-2.5"
-              style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
-            >
-              <summary className="text-xs font-bold cursor-pointer" style={{ color: "var(--text-primary)" }}>
-                ⚠ Instrução pro montador
-              </summary>
-              <p className="text-sm whitespace-pre-line mt-1" style={{ color: "var(--text-primary)" }}>
-                {r.montadorInstruction}
-              </p>
-            </details>
-          ) : null}
           </div>
         );
       })}

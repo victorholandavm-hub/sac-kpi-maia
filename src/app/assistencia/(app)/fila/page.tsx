@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
-import { listRequests, listStores, isRequestStatus, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
+import { listRequests, listStores, isRequestStatus, isMostruarioRequest, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
 import { getRotaWeekOverview, startOfRotaWeek, ROTAS, ROTA_LABELS, ROTA_COLORS } from "@/lib/rotas";
 import {
@@ -196,6 +196,7 @@ function buildHref(params: {
   tab?: string;
   origem?: string;
   sched?: string;
+  alvo?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -207,10 +208,24 @@ function buildHref(params: {
   if (params.tab) sp.set("tab", params.tab);
   if (params.origem) sp.set("origem", params.origem);
   if (params.sched) sp.set("sched", params.sched);
+  if (params.alvo) sp.set("alvo", params.alvo);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
 }
+
+// Chip "Clientes x Mostruário" -- só na aba Visitas -- pedido do Victor
+// 22/08/2026: "Crie chips de filtro no topo para isolar chamados comuns de
+// solicitações de Mostruário das Lojas, reduzindo o volume de itens na tela
+// principal quando o foco for atendimento ao cliente final". Reaproveita
+// isMostruarioRequest (serviceRequests.ts) -- mesmo heurística já usada em
+// Indicadores/relatórios (order_code vazio + clientName começando com
+// "Mostruário — "), não precisa de coluna nova.
+const ALVO_FILTERS: { label: string; value: "cliente" | "mostruario" | null }[] = [
+  { label: "Todos", value: null },
+  { label: "Clientes", value: "cliente" },
+  { label: "🏬 Mostruário", value: "mostruario" },
+];
 
 const FILTERS: { label: string; value: string | null }[] = [
   { label: "Todas", value: null },
@@ -282,11 +297,12 @@ export default async function AssistenciaQueuePage({
     tab?: string;
     origem?: string;
     sched?: string;
+    alvo?: string;
   }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched } = await searchParams;
+  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
@@ -303,6 +319,9 @@ export default async function AssistenciaQueuePage({
   // sentido dentro da aba Entregas, mesmo padrão de filterOrigem.
   const filterSched: boolean | undefined = showPecas && filterStatus === "aberta" && (sched === "1" || sched === "0") ? sched === "1" : undefined;
   const schedParam = filterSched === true ? "1" : filterSched === false ? "0" : undefined;
+  // Clientes x Mostruário (ver ALVO_FILTERS acima) -- só existe na aba
+  // Visitas, mesmo padrão de filterOrigem/filterSched pras outras abas.
+  const filterAlvo: "cliente" | "mostruario" | undefined = !showPecas && (alvo === "cliente" || alvo === "mostruario") ? alvo : undefined;
   const types = showPecas
     ? filterOrigem === "sac"
       ? ENTREGA_TYPES_SAC
@@ -338,10 +357,18 @@ export default async function AssistenciaQueuePage({
   // na prática: a fila de entregas em aberto nunca chega perto do tamanho
   // de página pra precisar de mais de uma página dividida ainda por cima
   // em programado/não programado.
-  const requests = filterSched === undefined ? rawRequests : rawRequests.filter((r) => isDeliveryScheduled(r.scheduledDate, r.rota) === filterSched);
-  const total = filterSched === undefined ? rawTotal : requests.length;
+  let requests = filterSched === undefined ? rawRequests : rawRequests.filter((r) => isDeliveryScheduled(r.scheduledDate, r.rota) === filterSched);
+  // Mesmo raciocínio do filterSched acima -- "mostruário" não é uma coluna
+  // no banco, é uma heurística sobre order_code/client_name (ver
+  // isMostruarioRequest), então também só dá pra aplicar em JS depois da
+  // busca no servidor.
+  if (filterAlvo !== undefined) {
+    requests = requests.filter((r) => isMostruarioRequest(r.orderCode, r.clientName) === (filterAlvo === "mostruario"));
+  }
+  const postFiltered = filterSched !== undefined || filterAlvo !== undefined;
+  const total = postFiltered ? requests.length : rawTotal;
   const groups = showPecas ? groupByRota(requests) : groupByDate(requests);
-  const totalPages = filterSched === undefined ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+  const totalPages = postFiltered ? 1 : Math.max(1, Math.ceil(total / pageSize));
   // Calculado uma vez aqui (Server Component, sem hooks) e repassado pra
   // AssistenciaQueueGroup -- lá dentro é "use client" com hooks, onde
   // chamar Date.now() direto no corpo do render quebra a regra de pureza.
@@ -358,7 +385,7 @@ export default async function AssistenciaQueuePage({
           os filtros de status logo abaixo. */}
       <div className="flex items-center gap-2">
         <Link
-          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo })}
+          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
           className="text-base font-bold px-4 py-2 rounded-full"
           style={
             !showPecas
@@ -436,6 +463,7 @@ export default async function AssistenciaQueuePage({
                       assembler: effectiveAssembler,
                       from: dateFrom,
                       to: dateTo,
+                      alvo: filterAlvo,
                     })}
                     className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
                     style={
@@ -507,6 +535,37 @@ export default async function AssistenciaQueuePage({
         </div>
       ) : null}
 
+      {/* Clientes x Mostruário -- só na aba Visitas -- pedido do Victor
+          22/08/2026: "Crie chips de filtro no topo para isolar chamados
+          comuns de solicitações de Mostruário das Lojas, reduzindo o
+          volume de itens na tela principal quando o foco for atendimento
+          ao cliente final". */}
+      {!showPecas ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Tipo de solicitação:
+          </span>
+          {ALVO_FILTERS.map((f) => {
+            const selected = (f.value ?? undefined) === filterAlvo;
+            return (
+              <Link
+                key={f.label}
+                href={buildHref({ status: filterStatus, q, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: f.value ?? undefined })}
+                className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+                style={{
+                  border: "1px solid var(--border)",
+                  background: selected ? "var(--brand-green)" : "transparent",
+                  color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                  fontWeight: selected ? 600 : 400,
+                }}
+              >
+                {f.label}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
         {total} solicitaç{total === 1 ? "ão" : "ões"} encontrada{total === 1 ? "" : "s"}
         {totalPages > 1 ? ` · página ${page} de ${totalPages}` : ""}
@@ -527,6 +586,7 @@ export default async function AssistenciaQueuePage({
         {showPecas ? <input type="hidden" name="tab" value="pecas" /> : null}
         {filterOrigem ? <input type="hidden" name="origem" value={filterOrigem} /> : null}
         {schedParam ? <input type="hidden" name="sched" value={schedParam} /> : null}
+        {filterAlvo ? <input type="hidden" name="alvo" value={filterAlvo} /> : null}
         <input
           type="search"
           name="q"
@@ -564,7 +624,7 @@ export default async function AssistenciaQueuePage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam })}
+            href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -676,7 +736,7 @@ export default async function AssistenciaQueuePage({
         <div className="flex items-center justify-center gap-4 pt-2">
           {page > 1 ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam })}
+              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
@@ -688,7 +748,7 @@ export default async function AssistenciaQueuePage({
           </span>
           {page < totalPages ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam })}
+              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
