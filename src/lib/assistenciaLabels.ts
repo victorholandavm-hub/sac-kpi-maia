@@ -360,6 +360,13 @@ export const CAUSA_RAIZ_LABELS: Record<string, string> = {
   outro: "Outro",
 };
 
+// Causas que são retrabalho interno (alguém do time errou), em vez de algo
+// externo (transporte, fábrica) ou uma decisão legítima do cliente -- pedido
+// do Victor 22/08/2026: "Destaque os erros operacionais internos... com
+// badges amarelas/vermelhas para chamar a atenção da gestão para o
+// retrabalho interno". Usado no relatório (badge + cor no gráfico de rosca).
+export const CAUSA_RAIZ_ERRO_INTERNO: string[] = ["erro_conferencia", "erro_motorista", "erro_loja", "erro_vendedor", "erro_sac"];
+
 export const SAC_CATEGORIES = [
   "atraso_entrega",
   "entrega_parcial",

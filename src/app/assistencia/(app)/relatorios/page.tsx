@@ -3,8 +3,16 @@ import { getProfile, redirectIfSac } from "@/lib/dal";
 import { getRequestsReport, getServiceTypeIndicators, type ReportRow, type ReportRowItem, type IndicatorItem } from "@/lib/serviceRequests";
 import { listPaymentItems, paymentStage, type PaymentItem } from "@/lib/payments";
 import { getSupplierReconciliation, type SupplierReconciliationItem } from "@/lib/supplierReturns";
-import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, STATUS_LABELS, STATUS_COLORS, SUPPLIER_RETURN_STATUS_LABELS, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
-import { StatTile } from "@/components/StatTile";
+import {
+  REQUEST_TYPE_LABELS,
+  CAUSA_RAIZ_LABELS,
+  CAUSA_RAIZ_ERRO_INTERNO,
+  STATUS_LABELS,
+  STATUS_COLORS,
+  SUPPLIER_RETURN_STATUS_LABELS,
+  MANOEL_ONLY_ASSEMBLER,
+} from "@/lib/assistenciaLabels";
+import { CausaRaizDonutChart } from "@/components/CausaRaizDonutChart";
 
 const REQUEST_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
 
@@ -144,7 +152,11 @@ function ExpandableRow({
   numbers,
   children,
 }: {
-  label: string;
+  // ReactNode (não só string) -- pedido do Victor 22/08/2026: "Destaque os
+  // erros operacionais internos... com badges", precisa caber um badge ao
+  // lado do texto (ver Causa Raiz mais abaixo). Continua funcionando igual
+  // pras chamadas que só passam string (loja, vendedor, montador etc.).
+  label: React.ReactNode;
   numbers: { value: number | string; color?: string }[];
   children: React.ReactNode;
 }) {
@@ -154,8 +166,8 @@ function ExpandableRow({
         <span className="w-3 shrink-0 text-xs transition-transform group-open:rotate-90" style={{ color: "var(--text-muted)" }} aria-hidden="true">
           ▶
         </span>
-        <span className="flex-1 min-w-0 truncate text-sm" style={{ color: "var(--text-primary)" }}>
-          {label}
+        <span className="flex-1 min-w-0 flex items-center gap-1.5 text-sm" style={{ color: "var(--text-primary)" }}>
+          {typeof label === "string" ? <span className="truncate">{label}</span> : label}
         </span>
         {numbers.map((n, i) => (
           <span key={i} className="w-20 shrink-0 text-right text-sm" style={{ color: n.color ?? "var(--text-primary)" }}>
@@ -168,19 +180,67 @@ function ExpandableRow({
   );
 }
 
+// Cards de KPI coloridos no topo -- pedido do Victor 22/08/2026:
+// "Transformar em KPI Cards em Grid: Mantenha os números principais no
+// topo em caixas/cards horizontais estilizados com cores temáticas".
+// Componente próprio dessa tela (não o StatTile genérico, que é usado em
+// vários outros lugares do painel com o visual atual -- mudar o StatTile
+// pra fundo colorido afetaria todo o resto do site sem ter sido pedido).
+function ReportKpiCard({ label, value, bg }: { label: string; value: string; bg: string }) {
+  return (
+    <div className="rounded-xl p-4 flex flex-col gap-1 shadow-sm" style={{ background: bg }}>
+      <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#fff", opacity: 0.85 }}>
+        {label}
+      </span>
+      <span className="text-2xl sm:text-3xl font-extrabold" style={{ color: "#fff" }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// Linhas além do Top 5 ficam recolhidas num "Ver todos" -- pedido do Victor
+// 22/08/2026: "Nas tabelas longas... exiba os Top 5 inicialmente e insira
+// um botão Ver todos (19) para expandir, mantendo a tela compacta". Mesmo
+// truque de sempre nessa tela: <details> nativo aninhado, sem JS extra --
+// as linhas já vêm ordenadas por total (maior primeiro, ver
+// getRequestsReport), então "Top 5" é literalmente as 5 primeiras.
+const TOP_N = 5;
+
 function ReportTable({
   title,
   rows,
   keyLabel,
   emptyMessage,
   labelFor = (key) => key,
+  limitRows = false,
 }: {
   title: string;
   rows: ReportRow[];
   keyLabel: string;
   emptyMessage: string;
   labelFor?: (key: string) => string;
+  limitRows?: boolean;
 }) {
+  const visible = limitRows ? rows.slice(0, TOP_N) : rows;
+  const hidden = limitRows ? rows.slice(TOP_N) : [];
+
+  function renderRow(r: ReportRow) {
+    return (
+      <ExpandableRow
+        key={r.key}
+        label={labelFor(r.key)}
+        numbers={[
+          { value: r.total },
+          { value: r.concluida, color: "var(--status-good)" },
+          { value: r.cancelada, color: "var(--text-muted)" },
+        ]}
+      >
+        <ReportRowItemsList items={r.items} />
+      </ExpandableRow>
+    );
+  }
+
   return (
     <details className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
       <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
@@ -194,23 +254,58 @@ function ReportTable({
         <div>
           <ColumnsHeader columns={[keyLabel, "Total", "Concluídas", "Canceladas"]} />
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-            {rows.map((r) => (
-              <ExpandableRow
-                key={r.key}
-                label={labelFor(r.key)}
-                numbers={[
-                  { value: r.total },
-                  { value: r.concluida, color: "var(--status-good)" },
-                  { value: r.cancelada, color: "var(--text-muted)" },
-                ]}
-              >
-                <ReportRowItemsList items={r.items} />
-              </ExpandableRow>
-            ))}
+            {visible.map(renderRow)}
           </div>
+          {hidden.length > 0 ? (
+            <details className="group/vertodos">
+              <summary
+                className="text-xs font-semibold cursor-pointer list-none px-4 py-2.5 text-center"
+                style={{ color: "var(--brand-green)", borderTop: "1px solid var(--gridline)" }}
+              >
+                <span className="group-open/vertodos:hidden">Ver todos ({hidden.length})</span>
+                <span className="hidden group-open/vertodos:inline">Mostrar menos</span>
+              </summary>
+              <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                {hidden.map(renderRow)}
+              </div>
+            </details>
+          ) : null}
         </div>
       )}
     </details>
+  );
+}
+
+// Badge de retrabalho interno -- pedido do Victor 22/08/2026: "Destaque os
+// erros operacionais internos (Erro de conferência, Erro do vendedor, Erro
+// do motorista) com badges amarelas/vermelhas para chamar a atenção da
+// gestão para o retrabalho interno". Ver CAUSA_RAIZ_ERRO_INTERNO.
+function ErroInternoBadge() {
+  return (
+    <span
+      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0"
+      style={{ background: "var(--status-critical)", color: "#fff" }}
+    >
+      Retrabalho interno
+    </span>
+  );
+}
+
+// Barra de progresso financeira -- pedido do Victor 22/08/2026: "Na tabela
+// de Pagamento por montador, adicione uma barra de progresso visual
+// mostrando a porcentagem do valor que já foi pago em relação ao total a
+// liberar".
+function PaymentProgressBar({ pago, total }: { pago: number; total: number }) {
+  const pct = total > 0 ? Math.min(100, Math.round((pago / total) * 100)) : 0;
+  return (
+    <div className="flex items-center gap-2 px-4 pb-2">
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--status-good)" }} />
+      </div>
+      <span className="text-[11px] shrink-0" style={{ color: "var(--text-muted)" }}>
+        {pct}% pago
+      </span>
+    </div>
   );
 }
 
@@ -320,10 +415,10 @@ export default async function RelatoriosPage({
       </div>
 
       <div className="grid sm:grid-cols-4 gap-4">
-        <StatTile label="Solicitações no período" value={report.totalRequests} />
-        <StatTile label="Total a pagar a montadores" value={formatBRL(paymentTotal)} />
-        <StatTile label="Pago" value={formatBRL(paymentPaid)} accent="var(--status-good)" />
-        <StatTile label="Pendente de liberação" value={formatBRL(paymentPending)} accent="var(--status-warning)" />
+        <ReportKpiCard label="Solicitações no período" value={String(report.totalRequests)} bg="var(--series-5)" />
+        <ReportKpiCard label="Total a pagar a montadores" value={formatBRL(paymentTotal)} bg="var(--brand-green)" />
+        <ReportKpiCard label="Pago" value={formatBRL(paymentPaid)} bg="var(--status-good)" />
+        <ReportKpiCard label="Pendente de liberação" value={formatBRL(paymentPending)} bg="var(--brand-orange)" />
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg p-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
@@ -449,7 +544,6 @@ export default async function RelatoriosPage({
         </div>
       </div>
 
-      <ReportTable title="Solicitações por loja" rows={report.byStore} keyLabel="Loja" emptyMessage="Nenhuma solicitação no período." />
       <ReportTable
         title="Solicitações por tipo"
         rows={report.byType}
@@ -457,64 +551,116 @@ export default async function RelatoriosPage({
         emptyMessage="Nenhuma solicitação no período."
         labelFor={(key) => REQUEST_TYPE_LABELS[key] ?? key}
       />
-      <ReportTable
-        title="Solicitações por vendedor(a)"
-        rows={report.bySeller}
-        keyLabel="Vendedor(a)"
-        emptyMessage="Nenhuma solicitação com vendedor(a) preenchido nesse período — campo novo, só passa a existir dado a partir de agora."
-      />
-      <ReportTable
-        title="Trocas de produto por causa raiz"
-        rows={report.byCausaRaiz}
-        keyLabel="Causa raiz"
-        emptyMessage="Nenhuma troca de produto com causa raiz registrada nesse período."
-        labelFor={(key) => CAUSA_RAIZ_LABELS[key] ?? key}
-      />
 
-      <details className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-        <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
-          Pagamento por montador ({assemblerRows.length})
-        </summary>
-        {assemblerRows.length === 0 ? (
-          <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
-            Nenhum pagamento no período.
-          </p>
-        ) : (
-          <div>
-            <ColumnsHeader columns={["Montador", "Itens", "Total", "Pago", "Pendente"]} />
-            <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-              {assemblerRows.map(([name, v]) => (
-                <ExpandableRow
-                  key={name}
-                  label={name}
-                  numbers={[
-                    { value: v.itens },
-                    { value: formatBRL(v.total) },
-                    { value: formatBRL(v.pago), color: "var(--status-good)" },
-                    { value: formatBRL(v.pendente), color: v.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" },
-                  ]}
-                >
-                  <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
-                    {v.items.map((it) => (
-                      <div key={it.itemId} className="pl-9 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
-                        <span className="truncate" style={{ color: "var(--text-primary)" }}>
-                          {it.product} · {it.quantity}x · {it.clientName ?? it.storeName} · {formatDateBr(it.createdAt)}
-                        </span>
-                        <span
-                          className="shrink-0 font-medium"
-                          style={{ color: it.paymentReleased ? "var(--status-good)" : "var(--status-warning)" }}
-                        >
-                          {it.unitValue !== null ? formatBRL(it.unitValue * it.quantity) : "—"} · {it.paymentReleased ? "Pago" : "Pendente"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </ExpandableRow>
-              ))}
-            </div>
-          </div>
-        )}
-      </details>
+      {/* Duas colunas -- pedido do Victor 22/08/2026: "organize os dados
+          lado a lado em um grid de 2 colunas: Coluna Esquerda
+          (Operacional): Indicadores por Montador/Pagamentos, Causa Raiz de
+          Trocas. Coluna Direita (Vendas e Lojas): Solicitações por Loja,
+          Solicitações por Vendedor". */}
+      <div className="grid lg:grid-cols-2 gap-4 items-start">
+        <div className="flex flex-col gap-4">
+          <details className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+            <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
+              Pagamento por montador ({assemblerRows.length})
+            </summary>
+            {assemblerRows.length === 0 ? (
+              <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
+                Nenhum pagamento no período.
+              </p>
+            ) : (
+              <div>
+                <ColumnsHeader columns={["Montador", "Itens", "Total", "Pago", "Pendente"]} />
+                <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                  {assemblerRows.map(([name, v]) => (
+                    <div key={name}>
+                      <ExpandableRow
+                        label={name}
+                        numbers={[
+                          { value: v.itens },
+                          { value: formatBRL(v.total) },
+                          { value: formatBRL(v.pago), color: "var(--status-good)" },
+                          { value: formatBRL(v.pendente), color: v.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" },
+                        ]}
+                      >
+                        <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
+                          {v.items.map((it) => (
+                            <div key={it.itemId} className="pl-9 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
+                              <span className="truncate" style={{ color: "var(--text-primary)" }}>
+                                {it.product} · {it.quantity}x · {it.clientName ?? it.storeName} · {formatDateBr(it.createdAt)}
+                              </span>
+                              <span
+                                className="shrink-0 font-medium"
+                                style={{ color: it.paymentReleased ? "var(--status-good)" : "var(--status-warning)" }}
+                              >
+                                {it.unitValue !== null ? formatBRL(it.unitValue * it.quantity) : "—"} · {it.paymentReleased ? "Pago" : "Pendente"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </ExpandableRow>
+                      <PaymentProgressBar pago={v.pago} total={v.total} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </details>
+
+          {/* Gráfico de rosca + tags de retrabalho interno -- pedido do
+              Victor 22/08/2026 (ver ErroInternoBadge/CausaRaizDonutChart
+              acima). */}
+          <details className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+            <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
+              Trocas de produto por causa raiz ({report.byCausaRaiz.length})
+            </summary>
+            {report.byCausaRaiz.length === 0 ? (
+              <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
+                Nenhuma troca de produto com causa raiz registrada nesse período.
+              </p>
+            ) : (
+              <div>
+                <div className="px-2 pt-2">
+                  <CausaRaizDonutChart
+                    data={report.byCausaRaiz.map((r) => ({ key: r.key, name: CAUSA_RAIZ_LABELS[r.key] ?? r.key, value: r.total }))}
+                  />
+                </div>
+                <ColumnsHeader columns={["Causa raiz", "Total", "Concluídas", "Canceladas"]} />
+                <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                  {report.byCausaRaiz.map((r) => (
+                    <ExpandableRow
+                      key={r.key}
+                      label={
+                        <>
+                          <span className="truncate">{CAUSA_RAIZ_LABELS[r.key] ?? r.key}</span>
+                          {CAUSA_RAIZ_ERRO_INTERNO.includes(r.key) ? <ErroInternoBadge /> : null}
+                        </>
+                      }
+                      numbers={[
+                        { value: r.total },
+                        { value: r.concluida, color: "var(--status-good)" },
+                        { value: r.cancelada, color: "var(--text-muted)" },
+                      ]}
+                    >
+                      <ReportRowItemsList items={r.items} />
+                    </ExpandableRow>
+                  ))}
+                </div>
+              </div>
+            )}
+          </details>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <ReportTable title="Solicitações por loja" rows={report.byStore} keyLabel="Loja" emptyMessage="Nenhuma solicitação no período." limitRows />
+          <ReportTable
+            title="Solicitações por vendedor(a)"
+            rows={report.bySeller}
+            keyLabel="Vendedor(a)"
+            emptyMessage="Nenhuma solicitação com vendedor(a) preenchido nesse período — campo novo, só passa a existir dado a partir de agora."
+            limitRows
+          />
+        </div>
+      </div>
 
       <details className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
         <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
