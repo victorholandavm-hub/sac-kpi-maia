@@ -606,9 +606,14 @@ export default async function AssistenciaQueuePage({
           // no cabeçalho. Cor vem de style (dinâmica por rota), largura da
           // borda vem de className (senão o `open:` não teria como competir
           // com a especificidade do style inline).
+          // Rota/data já passada com opacidade reduzida -- pedido do Victor
+          // 22/08/2026: "deixe um pouco transparente as datas/rotas que já
+          // passaram". Só se aplica a `atrasado` (dateBucket só existe pra
+          // Entregas, ver groupByRota) -- hoje/amanhã/depois continuam 100%
+          // opacos, já que ainda tem entrega pra fazer neles.
           <details
             key={group.key}
-            className="group rounded-xl overflow-hidden border-2 open:border-4 transition-[border-width]"
+            className={`group rounded-xl overflow-hidden border-2 open:border-4 transition-[border-width] ${group.dateBucket === "atrasado" ? "opacity-60" : ""}`}
             style={{ borderColor: group.borderColor }}
             open
           >
