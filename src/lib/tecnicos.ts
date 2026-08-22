@@ -6,7 +6,22 @@ import type { RequestType } from "./serviceRequests";
 // próprio, login por nome+PIN igual a montador/motorista -- ver
 // tecnicoAuth.ts / tecnico-actions.ts.
 
-export const ITEM_DESTINOS = ["fabrica", "estoque", "conserto", "sem_condicoes"] as const;
+// "mostruario"/"pequena_avaria"/"peca_enviada" -- pedido do Victor
+// 21/08/2026: "para a equipe tecnica, tenha mais uma opção que seria
+// 'enviado para mostruario'... Alem desse, tem o 'pequena avaria'. E mais
+// uma que seria o 'peça enviada'". "mostruario" é o único que pede um
+// dado a mais (qual loja recebeu, ver destinoLojaId/destinoLojaName
+// abaixo e setItemDestino em tecnico-actions.ts) -- os outros dois são
+// clique único, igual aos 4 de sempre.
+export const ITEM_DESTINOS = [
+  "fabrica",
+  "estoque",
+  "conserto",
+  "sem_condicoes",
+  "mostruario",
+  "pequena_avaria",
+  "peca_enviada",
+] as const;
 export type ItemDestino = (typeof ITEM_DESTINOS)[number];
 
 export function isItemDestino(value: string | undefined | null): value is ItemDestino {
@@ -18,6 +33,9 @@ export const ITEM_DESTINO_LABELS: Record<ItemDestino, string> = {
   estoque: "Voltar pro estoque",
   conserto: "Conserto",
   sem_condicoes: "Sem condições",
+  mostruario: "Enviado pra mostruário",
+  pequena_avaria: "Pequena avaria",
+  peca_enviada: "Peça enviada",
 };
 
 export const ITEM_DESTINO_COLORS: Record<ItemDestino, string> = {
@@ -25,7 +43,14 @@ export const ITEM_DESTINO_COLORS: Record<ItemDestino, string> = {
   estoque: "var(--status-good)",
   conserto: "var(--status-warning)",
   sem_condicoes: "var(--status-critical)",
+  mostruario: "var(--brand-orange)",
+  pequena_avaria: "var(--series-5)",
+  peca_enviada: "var(--brand-green)",
 };
+
+// Único destino que precisa de um dado extra -- pra qual loja o item foi
+// enviado (ver ITEM_DESTINOS acima).
+export const ITEM_DESTINO_NEEDS_STORE: ItemDestino = "mostruario";
 
 export type TecnicoWithPinStatus = { name: string; hasPin: boolean };
 
@@ -55,6 +80,10 @@ export type TecnicoItem = {
   destino: ItemDestino | null;
   destinoDefinidoPor: string | null;
   destinoDefinidoEm: string | null;
+  // Só preenchido quando destino === "mostruario" (ver
+  // ITEM_DESTINO_NEEDS_STORE) -- pra qual loja o item foi enviado.
+  destinoLojaId: string | null;
+  destinoLojaName: string | null;
 };
 
 export type TecnicoRequestView = {
@@ -91,7 +120,7 @@ export type TecnicoRequestView = {
 
 const TECNICO_VIEW_LIMIT = 200;
 const TECNICO_VIEW_COLUMNS =
-  "id, ticket_number, type, store_id, client_name, client_cpf, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, client_time_restriction, driver_name, completed_at, requested_by_name, requester:profiles!requested_by(full_name), stores(name), items:service_request_items(id, product, part_code, quantity, destino, destino_definido_por, destino_definido_em)";
+  "id, ticket_number, type, store_id, client_name, client_cpf, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, client_time_restriction, driver_name, completed_at, requested_by_name, requester:profiles!requested_by(full_name), stores(name), items:service_request_items(id, product, part_code, quantity, destino, destino_definido_por, destino_definido_em, destino_loja_id, destino_loja:stores!destino_loja_id(name))";
 
 type TecnicoViewRow = {
   id: string;
@@ -122,6 +151,8 @@ type TecnicoViewRow = {
     destino: string | null;
     destino_definido_por: string | null;
     destino_definido_em: string | null;
+    destino_loja_id: string | null;
+    destino_loja: { name: string } | null;
   }[] | null;
 };
 
@@ -154,6 +185,8 @@ function toTecnicoView(row: TecnicoViewRow): TecnicoRequestView {
       destino: isItemDestino(i.destino) ? i.destino : null,
       destinoDefinidoPor: i.destino_definido_por,
       destinoDefinidoEm: i.destino_definido_em,
+      destinoLojaId: i.destino_loja_id,
+      destinoLojaName: i.destino_loja?.name ?? null,
     })),
   };
 }
