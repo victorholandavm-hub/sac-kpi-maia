@@ -283,10 +283,11 @@ function ReportTable({
 function ErroInternoBadge() {
   return (
     <span
-      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0"
+      title="Retrabalho interno -- erro do time, não externo"
+      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0 cursor-help"
       style={{ background: "var(--status-critical)", color: "#fff" }}
     >
-      Retrabalho interno
+      ⚠ Interno
     </span>
   );
 }
@@ -631,7 +632,9 @@ export default async function RelatoriosPage({
                       key={r.key}
                       label={
                         <>
-                          <span className="truncate">{CAUSA_RAIZ_LABELS[r.key] ?? r.key}</span>
+                          <span className="truncate" title={CAUSA_RAIZ_LABELS[r.key] ?? r.key}>
+                            {CAUSA_RAIZ_LABELS[r.key] ?? r.key}
+                          </span>
                           {CAUSA_RAIZ_ERRO_INTERNO.includes(r.key) ? <ErroInternoBadge /> : null}
                         </>
                       }
