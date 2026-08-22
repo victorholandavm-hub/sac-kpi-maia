@@ -1,4 +1,3 @@
-import { bucketByScheduledDate, type DateBucketKey } from "./dateBuckets";
 import type { PedidoEncomendaSummary } from "./pedidosEncomenda";
 
 // Extraído de PedidoEncomendaFilaList.tsx (22/08/2026) -- a Visão Fábrica
@@ -7,28 +6,26 @@ import type { PedidoEncomendaSummary } from "./pedidosEncomenda";
 // compartilhada em vez de duplicar a lógica.
 
 // Agrupado por prazo (data que importa pra fila de verdade -- quando o
-// pedido é esperado, não quando foi criado) -- pedido do Victor 20/08/2026:
-// "deixe com a mesma organização que fizemos na tela dos admin... separado
-// por data e organizado por ordem cronológica. Passou a data? vai lá pra
-// baixo". "Prazo" aqui segue a mesma prioridade já exibida em cada card:
-// prazo p/ loja (CD já confirmou) vence prazo p/ CD (fábrica ainda não
-// despachou), que vence "sem prazo nenhum".
+// pedido é esperado, não quando foi criado) -- "Prazo" aqui segue a mesma
+// prioridade já exibida em cada card: prazo p/ loja (CD já confirmou) vence
+// prazo p/ CD (fábrica ainda não despachou), que vence "sem prazo nenhum".
 export function effectiveDeadline(p: PedidoEncomendaSummary): string | null {
   return p.prazoCdLoja ?? p.prazoFabricaCd ?? null;
 }
 
 export const NO_DEADLINE_KEY = "sem_prazo";
 
-const DEADLINE_BUCKET_RANK: Record<DateBucketKey, number> = {
-  hoje: 0,
-  amanha: 1,
-  depois: 2,
-  atrasado: 3,
-  sem_data: 4,
-};
-
 export type DeadlineGroup = { dateKey: string; label: string; pedidos: PedidoEncomendaSummary[] };
 
+// Ordem cronológica pura (data mais antiga primeiro) -- pedido do Victor
+// 22/08/2026: "essa organização de datas está ruim nessa tela, precisa
+// voltar a ser por ordem cronologica mesma, em ordem por tempo ou seja quem
+// pediu primeiro aparece primeiro". Existiu uma versão anterior que
+// agrupava em baldes hoje/amanhã/depois/atrasado (mesmo padrão da aba
+// Entregas) com "atrasado" jogado pro fim -- ficou ruim aqui porque
+// misturava pedido de 12/08 (bem atrasado) depois de pedido de 04/09
+// (bem no futuro), quebrando a leitura sequencial da fila. "Sem prazo
+// definido" continua por último (não tem data pra ordenar de verdade).
 export function groupByDeadline(pedidos: PedidoEncomendaSummary[]): DeadlineGroup[] {
   const groups: DeadlineGroup[] = [];
   for (const p of pedidos) {
@@ -45,9 +42,8 @@ export function groupByDeadline(pedidos: PedidoEncomendaSummary[]): DeadlineGrou
     group.pedidos.push(p);
   }
   groups.sort((a, b) => {
-    const rankA = DEADLINE_BUCKET_RANK[bucketByScheduledDate(a.dateKey === NO_DEADLINE_KEY ? null : a.dateKey)];
-    const rankB = DEADLINE_BUCKET_RANK[bucketByScheduledDate(b.dateKey === NO_DEADLINE_KEY ? null : b.dateKey)];
-    if (rankA !== rankB) return rankA - rankB;
+    if (a.dateKey === NO_DEADLINE_KEY) return b.dateKey === NO_DEADLINE_KEY ? 0 : 1;
+    if (b.dateKey === NO_DEADLINE_KEY) return -1;
     return a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0;
   });
   return groups;
