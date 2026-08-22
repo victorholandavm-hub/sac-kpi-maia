@@ -51,6 +51,8 @@ function eventAction(event: { eventType: string; fromStatus: string | null; toSt
       return "adicionou uma nota.";
     case "edited":
       return "corrigiu os dados da solicitação.";
+    case "printed":
+      return "imprimiu o despacho.";
     default:
       return "";
   }

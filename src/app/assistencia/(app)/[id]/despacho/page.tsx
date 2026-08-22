@@ -45,7 +45,7 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
         <Link href={`/assistencia/${request.id}`} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
           ← Ver chamado completo
         </Link>
-        <PrintButton />
+        <PrintButton requestIds={[request.id]} />
       </div>
 
       {/* @page/margin aqui mesmo (não no CSS global) -- só essa página

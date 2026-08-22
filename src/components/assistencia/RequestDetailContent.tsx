@@ -73,6 +73,8 @@ function eventAction(event: { eventType: string; fromStatus: string | null; toSt
       return "recusou o prazo e propôs outra data.";
     case "edited":
       return "corrigiu os dados da solicitação.";
+    case "printed":
+      return "imprimiu o despacho.";
     default:
       return "";
   }

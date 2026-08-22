@@ -1192,6 +1192,32 @@ export async function addNote(requestId: string, note: string) {
   revalidatePath(`/assistencia/${requestId}`);
 }
 
+// Pedido do Victor 21/08/2026: "quando alguem mandar imprimir essas
+// notificações fique registrado em algum lugar quem imprimiu, data e
+// hora". Mesmo padrão de addNote acima (insere em service_request_events),
+// só que aceita vários ids de uma vez (impressão em lote, ver
+// PrintButton.tsx/despacho-lote/page.tsx) e não precisa de nota nenhuma --
+// actor_id + created_at já são o registro. Sem requireManageAccess de
+// propósito: quem pode VER o despacho (ver canView nas duas páginas de
+// despacho) pode imprimir -- editar é que é restrito por tipo, não
+// ver/imprimir.
+export async function logPrint(requestIds: string[]): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin", "sac");
+  const ids = requestIds.map((id) => id.trim()).filter(Boolean);
+  if (ids.length === 0) return;
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("service_request_events").insert(
+    ids.map((id) => ({
+      request_id: id,
+      actor_id: profile.id,
+      event_type: "printed",
+    }))
+  );
+  if (error) throw new Error(error.message);
+}
+
 export async function addRequestPhoto(requestId: string, formData: FormData): Promise<void> {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");
