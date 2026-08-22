@@ -252,7 +252,12 @@ export function NotificacoesList({
   );
 }
 
-function BulkRotaBar({
+// Exportado -- pedido do Victor 21/08/2026: "preciso de uma forma de
+// selecionar em bloco, no meu acesso de admin, para mudar aquelas
+// notificações para outro motorista/rota". Mesmo componente da aba do
+// SAC, reaproveitado na aba Entregas de /assistencia/fila (admin/
+// assistência, ver AssistenciaQueueGroup.tsx) em vez de duplicar.
+export function BulkRotaBar({
   selectedIds,
   count,
   onDone,
@@ -271,7 +276,11 @@ function BulkRotaBar({
 }) {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
-  const [rota, setRota] = useState("");
+  // Id da atribuição escolhida, não só a rota -- pedido do Victor
+  // 21/08/2026: precisa diferenciar duas atribuições com a MESMA rota
+  // (principal + extra, motoristas diferentes), mesmo problema e mesma
+  // solução de ScheduleField.tsx.
+  const [assignmentId, setAssignmentId] = useState("");
   const [availableRotas, setAvailableRotas] = useState<AvailableRota[]>([]);
   const [loadingRotas, setLoadingRotas] = useState(false);
   const [pending, setPending] = useState(false);
@@ -286,7 +295,7 @@ function BulkRotaBar({
       getAvailableRotasForDateAction(date)
         .then((rotas) => {
           setAvailableRotas(rotas);
-          setRota((prev) => (prev && !rotas.some((r) => r.rota === prev) ? "" : prev));
+          setAssignmentId((prev) => (prev && !rotas.some((r) => r.id === prev) ? "" : prev));
         })
         .catch(() => setAvailableRotas([]))
         .finally(() => setLoadingRotas(false));
@@ -298,12 +307,14 @@ function BulkRotaBar({
   // ficado com um valor antigo de uma data anterior) -- mesmo desenho do
   // ScheduleField.tsx, evita limpar o state direto no corpo do efeito.
   const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
+  const selectedAssignment = effectiveAvailableRotas.find((r) => r.id === assignmentId) ?? null;
 
   async function apply() {
+    if (!selectedAssignment) return;
     setPending(true);
     setResult(null);
     try {
-      const r = await bulkSetRotaAction(selectedIds, date, rota);
+      const r = await bulkSetRotaAction(selectedIds, date, selectedAssignment.rota, selectedAssignment.driverName ?? undefined);
       setResult(r);
       if (r.errors.length === 0) {
         setOpen(false);
@@ -354,23 +365,24 @@ function BulkRotaBar({
           autoFocus
         />
         <select
-          value={rota}
-          onChange={(e) => setRota(e.target.value)}
+          value={assignmentId}
+          onChange={(e) => setAssignmentId(e.target.value)}
           disabled={!date || loadingRotas}
           className="rounded border px-2 py-1 text-sm disabled:opacity-60"
           style={{ borderColor: "var(--border)" }}
         >
           <option value="">Selecione a rota…</option>
           {effectiveAvailableRotas.map((r) => (
-            <option key={r.rota} value={r.rota}>
+            <option key={r.id} value={r.id}>
               {ROTA_LABELS[r.rota]}
+              {r.isExtra ? " (extra)" : ""}
               {r.driverName ? ` — ${r.driverName}` : ""}
             </option>
           ))}
         </select>
         <button
           type="button"
-          disabled={pending || !date || !rota}
+          disabled={pending || !date || !selectedAssignment}
           onClick={apply}
           className="text-xs rounded px-3 py-1.5 font-medium disabled:opacity-60"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}

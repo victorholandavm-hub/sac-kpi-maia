@@ -62,7 +62,19 @@ export function ScheduleField({
   const [date, setDate] = useState(scheduledDate ?? "");
   const [time, setTime] = useState(formatTimeOnly(scheduledTime) ?? "");
   const [selectedShift, setSelectedShift] = useState<string>(shift ?? "");
+  // Duas coisas distintas: a ROTA escolhida (o que fica gravado em
+  // service_requests.rota) e QUAL atribuição específica (id de
+  // rota_driver_assignments) -- normalmente uma escolhe a outra sozinha,
+  // mas quando tem uma rota extra igual à principal (ex.: dois carros na
+  // rota Sul, motoristas diferentes), as duas opções têm a MESMA rota e só
+  // o id diferencia qual motorista vai pro chamado. Selecionar pelo id (em
+  // vez de só pela rota) é o que resolve o pedido do Victor 21/08/2026:
+  // "quando eu preciso mudar uma notificação de um motorista para outro...
+  // coloquei a mesma rota do dia, não apareceu a rota extra" -- antes elas
+  // colidiam (mesma rota = mesma opção no select), agora cada atribuição é
+  // uma opção própria.
   const [selectedRota, setSelectedRota] = useState<string>(rota ?? "");
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>("");
   // Rota só pode ser uma das disponíveis pra data escolhida (pedido do
   // Victor 18/08/2026) -- busca de novo toda vez que a data muda, em vez de
   // deixar escolher livre entre praia/sul/centro com aviso de exceção
@@ -95,6 +107,14 @@ export function ScheduleField({
             if (prev === rota && isOriginalAssignment) return prev;
             return prev && !rotas.some((r) => r.rota === prev) ? "" : prev;
           });
+          // Id só é preenchido de novo se o que já estava selecionado sumiu
+          // da lista nova (data mudou) -- senão mantém a escolha explícita
+          // de qual atribuição (não só qual rota) a pessoa já tinha feito.
+          setSelectedAssignmentId((prevId) => {
+            if (prevId && rotas.some((r) => r.id === prevId)) return prevId;
+            const targetRota = isOriginalAssignment ? rota : null;
+            return rotas.find((r) => r.rota === targetRota)?.id ?? "";
+          });
         })
         .catch(() => setAvailableRotas([]))
         .finally(() => setLoadingRotas(false));
@@ -107,15 +127,16 @@ export function ScheduleField({
   // mesmo que "oficialmente" não esteja mais disponível pra esse dia.
   const effectiveAvailableRotas = hasDateContext
     ? date === scheduledDate && rota && !availableRotas.some((r) => r.rota === rota)
-      ? [...availableRotas, { rota, driverName: null }]
+      ? [...availableRotas, { id: "current", rota, driverName: null, isExtra: false }]
       : availableRotas
     : [];
   const effectiveLoadingRotas = hasDateContext && loadingRotas;
+  const selectedAssignment = effectiveAvailableRotas.find((r) => r.id === selectedAssignmentId) ?? null;
   // Motorista da rota escolhida -- pedido do Victor 18/08/2026: "quando eu
   // escolho a rota, ele ja deve preencher o motorista daquela rota". Só
   // preview aqui (setSchedule já grava isso sozinho ao salvar, ver
   // actions.ts); não dá pra digitar/trocar nesse campo.
-  const previewDriverName = effectiveAvailableRotas.find((r) => r.rota === selectedRota)?.driverName ?? null;
+  const previewDriverName = selectedAssignment?.driverName ?? null;
 
   if (!editing) {
     return (
@@ -188,16 +209,23 @@ export function ScheduleField({
         <div className="flex items-center gap-2 flex-wrap">
           <RotaBadge rota={(selectedRota as Rota) || null} />
           <select
-            value={selectedRota}
-            onChange={(e) => setSelectedRota(e.target.value)}
+            value={selectedAssignmentId}
+            onChange={(e) => {
+              const id = e.target.value;
+              const entry = effectiveAvailableRotas.find((r) => r.id === id);
+              setSelectedAssignmentId(id);
+              setSelectedRota(entry?.rota ?? "");
+            }}
             disabled={!date || effectiveLoadingRotas}
             className="rounded border px-2 py-1 text-sm disabled:opacity-60"
             style={{ borderColor: "var(--border)" }}
           >
             <option value="">Sem rota</option>
             {effectiveAvailableRotas.map((r) => (
-              <option key={r.rota} value={r.rota}>
+              <option key={r.id} value={r.id}>
                 {ROTA_LABELS[r.rota]}
+                {r.isExtra ? " (extra)" : ""}
+                {r.driverName ? ` — ${r.driverName}` : ""}
               </option>
             ))}
           </select>
@@ -226,7 +254,12 @@ export function ScheduleField({
           disabled={pending}
           onClick={() => {
             run(async () => {
-              await setSchedule(requestId, date, selectedShift, time, selectedRota || undefined);
+              // driverName explícito (da atribuição escolhida, não
+              // re-derivado da rota no servidor) -- é isso que permite
+              // escolher a extra certa quando ela tem a mesma rota da
+              // principal (ver comentário no estado selectedAssignmentId
+              // acima).
+              await setSchedule(requestId, date, selectedShift, time, selectedRota || undefined, selectedAssignment?.driverName ?? undefined);
               setEditing(false);
             }, "Agenda atualizada.");
           }}
@@ -241,6 +274,7 @@ export function ScheduleField({
             setTime(formatTimeOnly(scheduledTime) ?? "");
             setSelectedShift(shift ?? "");
             setSelectedRota(rota ?? "");
+            setSelectedAssignmentId("");
             setEditing(false);
           }}
           className="text-xs underline"
