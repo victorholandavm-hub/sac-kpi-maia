@@ -391,7 +391,7 @@ function VisitaCardRow({
               {r.clientPhone ?? "—"}
             </span>
             <span className="text-sm font-bold truncate" style={{ color: "var(--text-secondary)" }}>
-              {r.clientNeighborhood ?? "—"}
+              📍 {r.clientNeighborhood ?? "—"}
             </span>
             <span className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
               🏬 {r.storeName}
@@ -401,11 +401,15 @@ function VisitaCardRow({
           {/* Coluna 3 (16%): montador responsável -- tag vermelha quando
               não tem, pedido do Victor: "Em vez de deixar a palavra Não
               definido em cinza apagado, use uma tag em destaque (ex: Sem
-              Montador) para atrair o olho do operador imediatamente". */}
+              Montador) para atrair o olho do operador imediatamente".
+              🔧 identifica que é o montador (não outro tipo de nome/pessoa
+              na linha) -- pedido do Victor 23/08/2026: "coloque, no
+              bairro, aquele pino de localização que tinha e coloque algo
+              tambem para identificar o montador". */}
           <div className="w-full sm:w-[16%] shrink-0 flex items-center min-w-0 sm:pr-3">
             {r.assemblerName ? (
               <span className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-                {r.assemblerName}
+                🔧 {r.assemblerName}
               </span>
             ) : (
               <span
