@@ -443,10 +443,19 @@ function VisitaCardRow({
             inteira a ficar mais larga que o previsto e invadir a coluna 4
             ao lado -- mesmo problema, mesma causa, mesmo fix que todas as
             outras colunas já tinham (ver Coluna 2-4 acima), só essa aqui
-            que ficou faltando. */}
-        <div className="w-full sm:w-[20%] shrink-0 min-w-0 flex flex-col gap-1.5 items-start sm:items-center justify-center">
+            que ficou faltando.
+            Empilhamento vertical explícito (`flex-col`), não mais
+            `flex-wrap` horizontal -- achado do Victor 23/08/2026 (prints
+            em anexo, persistiu mesmo após o fix do min-w-0 acima): com 2-3
+            badges, o `flex-wrap` deixava a decisão de quebrar linha pro
+            cálculo de largura disponível, que em alguns navegadores/zoom
+            ficava visualmente apertado o bastante pra parecer que os
+            badges se tocavam. Empilhar cada badge na própria linha, sem
+            depender de wrap nenhum, elimina essa ambiguidade de vez --
+            cada linha tem sua altura garantida, sem cálculo de quebra. */}
+        <div className="w-full sm:w-[20%] shrink-0 min-w-0 flex flex-col gap-2 items-start">
           {hasObservacoes ? (
-            <div className="flex items-center gap-1 flex-wrap">
+            <div className="flex flex-col gap-1.5 items-start w-full">
               {r.montadorInstruction ? (
                 <button
                   type="button"
