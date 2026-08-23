@@ -10,7 +10,7 @@ import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
 import { BulkRotaBar } from "./NotificacoesList";
-import { formatDateTimeBr } from "@/lib/formatDateTime";
+import { formatDateTimeShortBr } from "@/lib/formatDateTime";
 import type { RequestItem, ServiceRequestSummary } from "@/lib/serviceRequests";
 
 function formatDateOnly(value: string | null): string | null {
@@ -429,7 +429,7 @@ function VisitaCardRow({
             ) : (
               <span className="whitespace-nowrap">Sem previsão</span>
             )}
-            {r.completedAt ? <span className="whitespace-nowrap">Concluída {formatDateTimeBr(r.completedAt)}</span> : null}
+            {r.completedAt ? <span className="whitespace-nowrap">Concluída {formatDateTimeShortBr(r.completedAt)}</span> : null}
           </div>
         </Link>
 
