@@ -7,3 +7,18 @@
 export function formatDateTimeBr(iso: string): string {
   return new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Fortaleza" });
 }
+
+// Mesma ideia, sem os segundos -- pedido do Victor 23/08/2026: "so precisa
+// excluir os segundos, basta deixar hora e minuto do concluido". Só usado
+// onde segundo é ruído visual (card compacto da fila) -- telas de
+// histórico/auditoria continuam com formatDateTimeBr (precisão completa).
+export function formatDateTimeShortBr(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", {
+    timeZone: "America/Fortaleza",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
