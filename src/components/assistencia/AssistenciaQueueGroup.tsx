@@ -141,7 +141,12 @@ function EntregaCardRow({
           truncamento encostava literalmente na coluna seguinte, parecendo
           desalinhado mesmo sem estar. `pr-3` (padding interno, não gap)
           evita esse encostamento sem risco de estourar a largura total. */}
-      <div className="w-full sm:w-[5%] shrink-0 flex sm:flex-col items-center sm:justify-center gap-2 sm:gap-0.5 sm:pr-3">
+      {/* `sm:justify-start`, não `sm:justify-center` -- mesmo achado do
+          Victor 23/08/2026 na aba Visitas (ver VisitaCardRow): a linha toda
+          fica com a altura da coluna mais alta (geralmente a Coluna 4,
+          cliente), e checkbox+setas centralizados na altura TOTAL flutuam
+          sem alinhar com o conteúdo top-anchored da Coluna 2 (ID+status). */}
+      <div className="w-full sm:w-[5%] shrink-0 flex sm:flex-col items-center sm:justify-start gap-2 sm:gap-0.5 sm:pr-3">
         {printable ? (
           <input
             type="checkbox"
@@ -309,8 +314,16 @@ function VisitaCardRow({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-col sm:flex-row sm:items-stretch gap-2 sm:gap-0">
-        {/* Setas de ordenação (sem checkbox -- Visitas nunca é printable) */}
-        <div className="w-full sm:w-[4%] shrink-0 flex sm:flex-col items-center sm:justify-center gap-2 sm:gap-0.5 sm:pr-2">
+        {/* Setas de ordenação (sem checkbox -- Visitas nunca é printable).
+            `sm:justify-start`, não `sm:justify-center` -- achado do Victor
+            23/08/2026 (print em anexo): a linha inteira fica com a altura da
+            coluna mais alta (geralmente a Coluna 2, cliente/telefone/
+            bairro/loja, 4 linhas), e a Coluna 1 (status+tipo) só tem 2
+            linhas, ancoradas no topo por padrão -- com as setas centralizadas
+            na altura TOTAL da linha, elas flutuavam no meio, sem alinhar com
+            "Concluída" nem com "Montagem". Ancorando no topo igual a
+            Coluna 1, as setas ficam nas mesmas linhas de verdade. */}
+        <div className="w-full sm:w-[4%] shrink-0 flex sm:flex-col items-center sm:justify-start gap-2 sm:gap-0.5 sm:pr-2">
           {reorderable ? (
             <div className="flex sm:flex-col items-center gap-0.5 shrink-0">
               <button
