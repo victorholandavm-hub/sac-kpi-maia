@@ -422,8 +422,16 @@ function VisitaCardRow({
 
         {/* Coluna 5 (20%): ícone/badge de observação + Ver produtos -- fora
             do <Link>, são controles próprios (botão de instrução é
-            clicável, Ver produtos abre modal). */}
-        <div className="w-full sm:w-[20%] shrink-0 flex flex-col gap-1.5 items-start sm:items-center justify-center">
+            clicável, Ver produtos abre modal). `min-w-0` -- sem isso (achado
+            do Victor 22/08/2026: "quando tem tres badges as duas primeiras
+            ficam... deslocadas à coluna do lado") a largura mínima
+            automática do item flex vira o min-content dos badges (2-3
+            badges de até 9rem cada não cabem em 20%), forçando a coluna
+            inteira a ficar mais larga que o previsto e invadir a coluna 4
+            ao lado -- mesmo problema, mesma causa, mesmo fix que todas as
+            outras colunas já tinham (ver Coluna 2-4 acima), só essa aqui
+            que ficou faltando. */}
+        <div className="w-full sm:w-[20%] shrink-0 min-w-0 flex flex-col gap-1.5 items-start sm:items-center justify-center">
           {hasObservacoes ? (
             <div className="flex items-center gap-1 flex-wrap">
               {r.montadorInstruction ? (
