@@ -17,15 +17,17 @@ export function EntregasGroupsList({ groups, now }: { groups: QueueGroup[]; now:
         // cada um.
         const statusCounts = countByDeliveryStatus(group.items);
         return (
-          // Recolhível, aberto por padrão -- <details> nativo, sem JS
-          // extra. Destaque na barra da rota aberta (`open:`, pseudo-
-          // classe nativa do <details>, reage sozinha ao clique) + opacidade
-          // reduzida pra rota/data já passada (só `atrasado`).
+          // Recolhível, recolhido por padrão -- achado do Victor 24/08/2026:
+          // "toda vez que eu entrar em qualquer tela, as demandas agrupadas
+          // precisam aparecer recolhidas" (antes abria tudo, poluía a tela
+          // com pedido grande). <details> nativo, sem JS extra, sem `open`
+          // já nasce fechado. Destaque na barra da rota aberta (`open:`,
+          // pseudo-classe nativa do <details>, reage sozinha ao clique) +
+          // opacidade reduzida pra rota/data já passada (só `atrasado`).
           <details
             key={group.key}
             className={`group rounded-xl overflow-hidden border-2 open:border-4 transition-[border-width] ${group.dateBucket === "atrasado" ? "opacity-60" : ""}`}
             style={{ borderColor: group.borderColor }}
-            open
           >
             <summary
               className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:brightness-95"

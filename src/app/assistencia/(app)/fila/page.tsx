@@ -481,8 +481,11 @@ export default async function AssistenciaQueuePage({
           // Recolhível -- pedido do Victor 20/08/2026: "os agrupamentos por
           // data (Entregas e Visitas) precisam poder ser recolhidos, e
           // mostrar a quantidade de dentro quando estiver recolhido".
-          // <details> nativo, sem JS extra; aberto por padrão.
-          <details key={group.key} className="group rounded-xl overflow-hidden" style={{ border: `2px solid ${group.borderColor}` }} open>
+          // Recolhido por padrão -- achado do Victor 24/08/2026: "toda vez
+          // que eu entrar em qualquer tela, as demandas agrupadas precisam
+          // aparecer recolhidas". <details> nativo, sem JS extra; sem `open`
+          // já nasce fechado.
+          <details key={group.key} className="group rounded-xl overflow-hidden" style={{ border: `2px solid ${group.borderColor}` }}>
             <summary
               className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
               style={{ background: group.headerBg }}

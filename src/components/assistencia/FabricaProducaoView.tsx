@@ -55,7 +55,10 @@ export function FabricaProducaoView({ pedidos }: { pedidos: PedidoEncomendaSumma
       {groups.map((group) => {
         const lines = aggregateItemsBySpec(group.pedidos);
         return (
-          <details key={group.dateKey} className="group flex flex-col gap-1.5" open>
+          // Recolhido por padrão -- achado do Victor 24/08/2026: "toda vez
+          // que eu entrar em qualquer tela, as demandas agrupadas precisam
+          // aparecer recolhidas".
+          <details key={group.dateKey} className="group flex flex-col gap-1.5">
             <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
               <span className="inline-block transition-transform group-open:rotate-90" style={{ color: "var(--text-muted)" }}>
                 ▶
