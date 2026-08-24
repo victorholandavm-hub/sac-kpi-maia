@@ -1,5 +1,5 @@
 import { bucketByScheduledDate, type DateBucketKey } from "./dateBuckets";
-import { ROTAS, ROTA_LABELS, ROTA_COLORS } from "./rotas";
+import { ROTAS, ROTA_LABELS, ROTA_COLORS, JP_EXTRA_ROTA } from "./rotas";
 import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, SAC_MANAGED_TYPES } from "./assistenciaLabels";
 import type { ServiceRequestSummary, RequestType } from "./serviceRequests";
 
@@ -138,7 +138,15 @@ export const DATE_BUCKET_TAG: Record<DateBucketKey, { label: string; bg: string 
 // data é que separa por rota.
 export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
   const rotaOrder: (Omit<QueueGroup, "items" | "label"> & { rotaLabel: string })[] = [
-    ...ROTAS.map((r) => ({ key: r, rotaLabel: `Rota ${ROTA_LABELS[r]}`, headerBg: ROTA_COLORS[r], headerText: "#fff", borderColor: ROTA_COLORS[r] })),
+    ...ROTAS.map((r) => ({
+      key: r,
+      // "Rota extra" já é o nome inteiro (ver JP_EXTRA_ROTA em rotas.ts)
+      // -- sem isso o grupo virava "Rota Rota extra", duplicado.
+      rotaLabel: r === JP_EXTRA_ROTA ? ROTA_LABELS[r] : `Rota ${ROTA_LABELS[r]}`,
+      headerBg: ROTA_COLORS[r],
+      headerText: "#fff",
+      borderColor: ROTA_COLORS[r],
+    })),
     { key: "sem_rota", rotaLabel: "Sem rota definida", headerBg: "var(--surface-2)", headerText: "var(--text-secondary)", borderColor: "var(--border)" },
   ];
 

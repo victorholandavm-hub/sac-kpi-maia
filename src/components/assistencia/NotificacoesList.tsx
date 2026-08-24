@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { bulkSetRotaAction, getAvailableRotasForDateAction } from "@/app/assistencia/actions";
-import { ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
+import { labelAvailableRota, type AvailableRota } from "@/lib/rotas";
 
 // A lista de notificações que morava aqui (NotificacoesList, com seu
 // próprio agrupamento por data+rota) foi removida em 24/08/2026 -- achado
@@ -146,8 +146,7 @@ export function BulkRotaBar({
             <option value="">{date ? "Selecione a rota…" : "Escolha a data primeiro"}</option>
             {effectiveAvailableRotas.map((r) => (
               <option key={r.id} value={r.id}>
-                {ROTA_LABELS[r.rota]}
-                {r.isExtra ? " (extra)" : ""}
+                {labelAvailableRota(effectiveAvailableRotas, r)}
                 {r.driverName ? ` — ${r.driverName}` : ""}
               </option>
             ))}

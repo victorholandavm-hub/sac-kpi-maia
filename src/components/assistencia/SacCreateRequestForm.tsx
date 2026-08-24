@@ -18,7 +18,7 @@ import {
   CAUSA_RAIZ_LABELS,
 } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
-import { ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
+import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -171,7 +171,16 @@ export function SacCreateRequestForm({
   // escolhida -- busca de novo toda vez que a data muda, validado de novo no
   // servidor (createSacRequest espelha setSchedule), nunca confia só nisso
   // aqui.
-  const [selectedRota, setSelectedRota] = useState("");
+  // Cidade primeiro, rota depois -- pedido do Victor 24/08/2026: "o
+  // atendente escolher primeiro a cidade: João Pessoa ou Campina
+  // Grande e depois as rotas".
+  const [selectedCity, setSelectedCity] = useState<RotaCity>("joao_pessoa");
+  // Id da atribuição (não só a rota) -- necessário desde que a rota
+  // extra genérica de João Pessoa existe: duas extras do mesmo dia têm
+  // o mesmo valor de `rota` ("extra"), só o `id` diferencia qual é
+  // qual (mesmo motivo/solução de ScheduleField.tsx, pedido do Victor
+  // 21/08/2026).
+  const [selectedRotaId, setSelectedRotaId] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   // Só valem enquanto isDelivery/scheduledDate se mantiverem verdadeiros --
@@ -192,7 +201,7 @@ export function SacCreateRequestForm({
       getAvailableRotasForDateAction(scheduledDate)
         .then((rotas) => {
           setAvailableRotas(rotas);
-          setSelectedRota((prev) => (prev && !rotas.some((r) => r.rota === prev) ? "" : prev));
+          setSelectedRotaId((prev) => (prev && !rotas.some((r) => r.id === prev) ? "" : prev));
         })
         .catch(() => setAvailableRotas([]))
         .finally(() => setLoadingRotas(false));
@@ -200,13 +209,13 @@ export function SacCreateRequestForm({
     return () => clearTimeout(timer);
   }, [hasDateContext, scheduledDate]);
 
-  const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
+  const effectiveAvailableRotas = (hasDateContext ? availableRotas : []).filter((r) => ROTA_CITY[r.rota] === selectedCity);
   const effectiveLoadingRotas = hasDateContext && loadingRotas;
   // Motorista da rota escolhida -- pedido do Victor 18/08/2026: "quando eu
   // escolho a rota, ele ja deve preencher o motorista daquela rota". Só
   // preview aqui (setSchedule já grava isso sozinho ao salvar, ver
   // actions.ts); não dá pra digitar/trocar nesse campo.
-  const previewDriverName = effectiveAvailableRotas.find((r) => r.rota === selectedRota)?.driverName ?? null;
+  const previewDriverName = effectiveAvailableRotas.find((r) => r.id === selectedRotaId)?.driverName ?? null;
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
 
   const [items, setItems] = useState<Item[]>([blankItem()]);
@@ -499,19 +508,44 @@ export function SacCreateRequestForm({
                 </Field>
               </div>
 
+              {/* Cidade primeiro, rota depois -- pedido do Victor
+                  24/08/2026. */}
+              <Field label="Cidade">
+                <div className="flex items-center gap-2">
+                  {(["joao_pessoa", "campina_grande"] as RotaCity[]).map((city) => (
+                    <button
+                      key={city}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCity(city);
+                        setSelectedRotaId("");
+                      }}
+                      className="text-xs px-3 py-1.5 rounded-full border font-medium"
+                      style={{
+                        borderColor: "var(--border)",
+                        background: selectedCity === city ? "var(--brand-green)" : "transparent",
+                        color: selectedCity === city ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                      }}
+                    >
+                      {CITY_LABELS[city]}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+
               <Field label="Rota">
                 <select
-                  name="rota"
-                  value={selectedRota}
-                  onChange={(e) => setSelectedRota(e.target.value)}
+                  name="rotaAssignmentId"
+                  value={selectedRotaId}
+                  onChange={(e) => setSelectedRotaId(e.target.value)}
                   disabled={!scheduledDate || effectiveLoadingRotas}
                   className="rounded border px-3 py-2 disabled:opacity-60"
                   style={inputStyle}
                 >
                   <option value="">Sem rota</option>
                   {effectiveAvailableRotas.map((r) => (
-                    <option key={r.rota} value={r.rota}>
-                      {ROTA_LABELS[r.rota]}
+                    <option key={r.id} value={r.id}>
+                      {labelAvailableRota(effectiveAvailableRotas, r)}
                     </option>
                   ))}
                 </select>
@@ -526,9 +560,9 @@ export function SacCreateRequestForm({
                 </p>
               ) : effectiveAvailableRotas.length === 0 ? (
                 <p className="text-xs" style={{ color: "var(--status-warning)" }}>
-                  Nenhuma rota disponível pra essa data.
+                  Nenhuma rota de {CITY_LABELS[selectedCity]} disponível pra essa data.
                 </p>
-              ) : selectedRota ? (
+              ) : selectedRotaId ? (
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                   Motorista: {previewDriverName ?? "nenhum escolhido ainda"}
                 </p>

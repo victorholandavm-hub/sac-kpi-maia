@@ -11,7 +11,7 @@ import {
 import { withRetry } from "@/lib/retryLookup";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
 import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
-import { ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
+import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -98,9 +98,14 @@ export function NovaEntregaAssistenciaForm({
 
   const [causaRaiz, setCausaRaiz] = useState("");
 
-  // Rota/motorista -- mesmo desenho de SacCreateRequestForm.tsx.
+  // Rota/motorista -- mesmo desenho de SacCreateRequestForm.tsx. Cidade
+  // primeiro, rota depois -- pedido do Victor 24/08/2026.
   const [scheduledDate, setScheduledDate] = useState("");
-  const [selectedRota, setSelectedRota] = useState("");
+  const [selectedCity, setSelectedCity] = useState<RotaCity>("joao_pessoa");
+  // Id da atribuição (não só a rota) -- mesmo motivo de
+  // SacCreateRequestForm.tsx (rota extra genérica de JP pode repetir o
+  // mesmo valor de `rota` em duas linhas do mesmo dia).
+  const [selectedRotaId, setSelectedRotaId] = useState("");
   const [availableRotas, setAvailableRotas] = useState<AvailableRota[]>([]);
   const [loadingRotas, setLoadingRotas] = useState(false);
   const hasDateContext = !!scheduledDate;
@@ -114,7 +119,7 @@ export function NovaEntregaAssistenciaForm({
       getAvailableRotasForDateAction(scheduledDate)
         .then((rotas) => {
           setAvailableRotas(rotas);
-          setSelectedRota((prev) => (prev && !rotas.some((r) => r.rota === prev) ? "" : prev));
+          setSelectedRotaId((prev) => (prev && !rotas.some((r) => r.id === prev) ? "" : prev));
         })
         .catch(() => setAvailableRotas([]))
         .finally(() => setLoadingRotas(false));
@@ -122,9 +127,9 @@ export function NovaEntregaAssistenciaForm({
     return () => clearTimeout(timer);
   }, [hasDateContext, scheduledDate]);
 
-  const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
+  const effectiveAvailableRotas = (hasDateContext ? availableRotas : []).filter((r) => ROTA_CITY[r.rota] === selectedCity);
   const effectiveLoadingRotas = hasDateContext && loadingRotas;
-  const previewDriverName = effectiveAvailableRotas.find((r) => r.rota === selectedRota)?.driverName ?? null;
+  const previewDriverName = effectiveAvailableRotas.find((r) => r.id === selectedRotaId)?.driverName ?? null;
 
   const [items, setItems] = useState<Item[]>([blankItem()]);
   const [itemsLookupStatus, setItemsLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
@@ -527,19 +532,43 @@ export function NovaEntregaAssistenciaForm({
           </Field>
         </div>
 
+        {/* Cidade primeiro, rota depois -- pedido do Victor 24/08/2026. */}
+        <Field label="Cidade">
+          <div className="flex items-center gap-2">
+            {(["joao_pessoa", "campina_grande"] as RotaCity[]).map((city) => (
+              <button
+                key={city}
+                type="button"
+                onClick={() => {
+                  setSelectedCity(city);
+                  setSelectedRotaId("");
+                }}
+                className="text-xs px-3 py-1.5 rounded-full border font-medium"
+                style={{
+                  borderColor: "var(--border)",
+                  background: selectedCity === city ? "var(--brand-green)" : "transparent",
+                  color: selectedCity === city ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                }}
+              >
+                {CITY_LABELS[city]}
+              </button>
+            ))}
+          </div>
+        </Field>
+
         <Field label="Rota">
           <select
-            name="rota"
-            value={selectedRota}
-            onChange={(e) => setSelectedRota(e.target.value)}
+            name="rotaAssignmentId"
+            value={selectedRotaId}
+            onChange={(e) => setSelectedRotaId(e.target.value)}
             disabled={!scheduledDate || effectiveLoadingRotas}
             className="rounded border px-3 py-2 disabled:opacity-60"
             style={inputStyle}
           >
             <option value="">Sem rota</option>
             {effectiveAvailableRotas.map((r) => (
-              <option key={r.rota} value={r.rota}>
-                {ROTA_LABELS[r.rota]}
+              <option key={r.id} value={r.id}>
+                {labelAvailableRota(effectiveAvailableRotas, r)}
               </option>
             ))}
           </select>
@@ -554,9 +583,9 @@ export function NovaEntregaAssistenciaForm({
           </p>
         ) : effectiveAvailableRotas.length === 0 ? (
           <p className="text-xs" style={{ color: "var(--status-warning)" }}>
-            Nenhuma rota disponível pra essa data.
+            Nenhuma rota de {CITY_LABELS[selectedCity]} disponível pra essa data.
           </p>
-        ) : selectedRota ? (
+        ) : selectedRotaId ? (
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Motorista: {previewDriverName ?? "nenhum escolhido ainda"}
           </p>

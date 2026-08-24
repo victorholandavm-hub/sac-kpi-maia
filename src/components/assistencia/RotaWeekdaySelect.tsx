@@ -2,7 +2,7 @@
 
 import { setRotaWeekday } from "@/app/assistencia/admin-actions";
 import { useQuickAction } from "./useQuickAction";
-import { ROTAS, ROTA_LABELS, WEEKDAY_LABELS, type Rota } from "@/lib/rotas";
+import { JP_PRIMARY_ROTAS, ROTA_LABELS, WEEKDAY_LABELS, type Rota } from "@/lib/rotas";
 
 export function RotaWeekdaySelect({ weekday, rota }: { weekday: number; rota: Rota | null }) {
   const { pending, run } = useQuickAction();
@@ -20,7 +20,10 @@ export function RotaWeekdaySelect({ weekday, rota }: { weekday: number; rota: Ro
         style={{ borderColor: "var(--border)" }}
       >
         <option value="">Sem rota</option>
-        {ROTAS.map((r) => (
+        {/* Só João Pessoa "de verdade" -- padrão semanal não existe pra
+            Campina Grande (confirmado com o Victor 24/08/2026) nem faz
+            sentido pra rota extra genérica. */}
+        {JP_PRIMARY_ROTAS.map((r) => (
           <option key={r} value={r}>
             {ROTA_LABELS[r]}
           </option>

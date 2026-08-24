@@ -5,7 +5,7 @@ import { setSchedule, getAvailableRotasForDateAction } from "@/app/assistencia/a
 import { useQuickAction } from "./useQuickAction";
 import { SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { SHIFTS, type Shift } from "@/lib/serviceRequests";
-import { ROTA_LABELS, ROTA_COLORS, type Rota, type AvailableRota } from "@/lib/rotas";
+import { JP_EXTRA_ROTA, ROTA_COLORS, ROTA_LABELS, labelAvailableRota, type Rota, type AvailableRota } from "@/lib/rotas";
 
 // Selo colorido de rota -- igual ao usado no painel "Motorista do dia"
 // (RotaMotoristaDoDia). Pedido do Victor 18/08/2026: a rota do chamado
@@ -18,7 +18,9 @@ export function RotaBadge({ rota }: { rota: Rota | null }) {
       className="text-xs font-medium rounded-full px-2 py-1 shrink-0"
       style={{ background: rota ? ROTA_COLORS[rota] : "var(--surface-2)", color: rota ? "#fff" : "var(--text-muted)" }}
     >
-      {rota ? `Rota ${ROTA_LABELS[rota]}` : "Sem rota"}
+      {/* "Rota extra" já é o nome inteiro (ver JP_EXTRA_ROTA em
+          rotas.ts) -- sem isso virava "Rota Rota extra", duplicado. */}
+      {rota ? (rota === JP_EXTRA_ROTA ? ROTA_LABELS[rota] : `Rota ${ROTA_LABELS[rota]}`) : "Sem rota"}
     </span>
   );
 }
@@ -223,8 +225,7 @@ export function ScheduleField({
             <option value="">Sem rota</option>
             {effectiveAvailableRotas.map((r) => (
               <option key={r.id} value={r.id}>
-                {ROTA_LABELS[r.rota]}
-                {r.isExtra ? " (extra)" : ""}
+                {labelAvailableRota(effectiveAvailableRotas, r)}
                 {r.driverName ? ` — ${r.driverName}` : ""}
               </option>
             ))}
