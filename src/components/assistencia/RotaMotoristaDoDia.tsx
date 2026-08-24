@@ -58,6 +58,13 @@ const DEFAULT_ACTIONS: RotaActions = {
 // dia). Rota extra não tem limite de quantidade.
 const WEEKDAY_SHORT = WEEKDAY_LABELS.map((w) => w.slice(0, 3));
 
+// Quantos dias aparecem recolhido por padrão -- ver comentário em
+// `showAllDays` no componente. Grid é flexível (minmax, sem número fixo
+// de colunas), então não dá pra saber exatamente quantos cabem numa
+// fileira em cada tela -- 4 é uma aproximação boa pro uso comum
+// (desktop, onde essa tela normalmente é usada).
+const DEFAULT_VISIBLE_DAYS = 4;
+
 export function RotaMotoristaDoDia({
   today,
   initialOverview,
@@ -86,19 +93,22 @@ export function RotaMotoristaDoDia({
   defaultDriver?: string;
 }) {
   const [overview, setOverview] = useState<RotaDayOverview[]>(initialOverview);
-  // Fechado por padrão -- só a semana atual (pedido do Victor 18/08/2026: as
-  // 2 semanas inteiras tomavam espaço demais). "Mostrar mais rotas" abre a
-  // semana seguinte também. Não existe em modo compact (não tem semana pra
-  // expandir).
-  const [expanded, setExpanded] = useState(false);
+  // Recolhido por padrão, só uma fileira de dias -- achado do Victor
+  // 24/08/2026: "deixe apenas uma fileira de rotas aparecendo, o resto
+  // deixe recolhido" (as células ficaram maiores pra caber João Pessoa +
+  // Campina Grande, então 2 semanas inteiras de uma vez tomava espaço
+  // demais de novo). Sem grade fixa de 7 colunas (ver DEFAULT_VISIBLE_DAYS
+  // acima do componente) não dá pra saber quantas cabem numa fileira de
+  // verdade em cada tela -- 4 é uma aproximação boa pro uso comum
+  // (desktop), "Mostrar mais dias" revela as 2 semanas inteiras de uma
+  // vez. Não existe em modo compact (só 2 dias, não tem o que recolher).
+  const [showAllDays, setShowAllDays] = useState(false);
 
   function updateDay(updated: RotaDayOverview) {
     setOverview((prev) => prev.map((d) => (d.date === updated.date ? updated : d)));
   }
 
-  const week1 = overview.slice(0, 7);
-  const week2 = overview.slice(7, 14);
-  const weeks = expanded ? [week1, week2] : [week1];
+  const visibleDays = showAllDays ? overview : overview.slice(0, DEFAULT_VISIBLE_DAYS);
 
   return (
     <div
@@ -137,31 +147,27 @@ export function RotaMotoristaDoDia({
               da semana volta a ficar dentro da própria célula (sem
               cabeçalho separado, que só fazia sentido sincronizado a uma
               grade de 7 colunas fixa). */}
-          <div className="flex flex-col gap-3">
-            {weeks.map((week, i) => (
-              <div key={i} className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-                {week.map((day) => (
-                  <RotaDayCell
-                    key={day.date}
-                    day={day}
-                    today={today}
-                    drivers={drivers}
-                    onChange={updateDay}
-                    actions={actions}
-                    defaultDriver={defaultDriver}
-                  />
-                ))}
-              </div>
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+            {visibleDays.map((day) => (
+              <RotaDayCell
+                key={day.date}
+                day={day}
+                today={today}
+                drivers={drivers}
+                onChange={updateDay}
+                actions={actions}
+                defaultDriver={defaultDriver}
+              />
             ))}
           </div>
 
           <button
             type="button"
-            onClick={() => setExpanded((e) => !e)}
-            className="text-xs rounded px-3 py-1.5 border font-medium self-start mt-1"
-            style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+            onClick={() => setShowAllDays((e) => !e)}
+            className="text-xs rounded-md px-3 py-1.5 border font-semibold self-start mt-1 shadow-sm"
+            style={{ background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }}
           >
-            {expanded ? "Mostrar só essa semana" : "Mostrar semana seguinte também"}
+            {showAllDays ? "Mostrar menos dias" : "Mostrar mais dias"}
           </button>
         </>
       )}
@@ -339,7 +345,13 @@ function RotaDayCell({
   // Cores dos botões "de ação" (salvar/+extra/+motorista) -- fundo com um
   // toque da cor da marca, não mais cinza quase igual ao fundo do card,
   // pra realmente parecer clicável.
-  const actionButtonStyle = { background: "color-mix(in srgb, var(--brand-green) 14%, var(--surface-1))", borderColor: "var(--brand-green)", color: "var(--brand-green-ink)" };
+  // Achado do Victor 24/08/2026: "as letras de dentro dos botoes estão
+  // sem contraste" -- --brand-green-ink é branco (pensado pra texto em
+  // cima de --brand-green sólido, escuro), não pra cima de um fundo
+  // clarinho como esse. --brand-green-soft + --text-primary é o par
+  // certo pra fundo claro (mesmo usado em DriverRouteGroup.tsx,
+  // MobileNav.tsx etc.).
+  const actionButtonStyle = { background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" };
   const neutralButtonStyle = { background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" };
 
   return (
