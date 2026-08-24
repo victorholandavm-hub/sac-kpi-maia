@@ -59,11 +59,13 @@ const DEFAULT_ACTIONS: RotaActions = {
 const WEEKDAY_SHORT = WEEKDAY_LABELS.map((w) => w.slice(0, 3));
 
 // Quantos dias aparecem recolhido por padrão -- ver comentário em
-// `showAllDays` no componente. Grid é flexível (minmax, sem número fixo
-// de colunas), então não dá pra saber exatamente quantos cabem numa
-// fileira em cada tela -- 4 é uma aproximação boa pro uso comum
-// (desktop, onde essa tela normalmente é usada).
-const DEFAULT_VISIBLE_DAYS = 4;
+// `showAllDays` no componente. Grid é flexível (minmax 380px, sem
+// número fixo de colunas), então não dá pra saber exatamente quantos
+// cabem numa fileira em cada tela -- nas telas onde esse painel mora
+// (largura de container ~1024px), 2 é o que cabe numa fileira só, com
+// a célula bem maior de 24/08/2026 (João Pessoa + Campina Grande lado a
+// lado).
+const DEFAULT_VISIBLE_DAYS = 2;
 
 export function RotaMotoristaDoDia({
   today,
@@ -141,13 +143,14 @@ export function RotaMotoristaDoDia({
       ) : (
         <>
           {/* Grid flexível (minmax), não mais 7 colunas fixas -- achado do
-              Victor 24/08/2026: com João Pessoa + Campina Grande no mesmo
-              card, 7 por linha ficava espremido demais pro conteúdo. Cada
-              célula tem no mínimo 220px, quantas couberem por linha; dia
-              da semana volta a ficar dentro da própria célula (sem
-              cabeçalho separado, que só fazia sentido sincronizado a uma
-              grade de 7 colunas fixa). */}
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+              Victor 24/08/2026: com João Pessoa + Campina Grande lado a
+              lado dentro da mesma célula, precisa de bem mais largura do
+              que cabia em 220px (achado seguinte: "preciso de ainda que
+              fique maior... lado a lado"). Célula com no mínimo 380px,
+              quantas couberem por linha; dia da semana fica dentro da
+              própria célula (sem cabeçalho separado, que só fazia
+              sentido sincronizado a uma grade de 7 colunas fixa). */}
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))" }}>
             {visibleDays.map((day) => (
               <RotaDayCell
                 key={day.date}
@@ -315,8 +318,13 @@ function RotaDayCell({
   // -- achado do Victor: célula pequena demais pra caber João Pessoa +
   // Campina Grande juntas, e os botões não pareciam clicáveis (cor quase
   // igual ao fundo do card).
-  const cellPadding = compact ? "p-3" : "p-2.5";
-  const headerTextClass = compact ? "text-sm font-semibold" : "text-xs font-semibold";
+  const cellPadding = compact ? "p-3" : "p-3";
+  const headerTextClass = compact ? "text-sm font-semibold" : "text-sm font-semibold";
+  // Título de cada cartão de cidade (João Pessoa / Campina Grande) --
+  // acima do peso do texto normal, mas ainda menor que os dados de
+  // verdade (badge da rota, nome do motorista), que continuam sendo o
+  // que mais chama atenção dentro do cartão.
+  const cityLabelClass = compact ? "text-xs font-bold uppercase tracking-wide" : "text-[11px] font-bold uppercase tracking-wide";
   const editButtonClass = compact
     ? "text-lg leading-none shrink-0 rounded-md px-2 py-1.5 border"
     : "text-sm leading-none shrink-0 rounded-md px-2 py-1 border";
@@ -366,191 +374,206 @@ function RotaDayCell({
         opacity: isPast ? 0.3 : 1,
       }}
     >
-      <div className="flex items-center justify-between gap-1">
-        {/* Dia da semana sempre visível na própria célula -- antes só
-            aparecia no mobile, sincronizado com um cabeçalho de 7 colunas
-            fixas que não existe mais (ver grid flexível acima). */}
-        <span className={`${headerTextClass} truncate`} style={{ color: "var(--text-primary)" }}>
-          {weekdayLabel} {dateLabel}
-          {isToday ? " · hoje" : ""}
-        </span>
-        <button
-          type="button"
-          onClick={rotaEditOpen ? cancelRotaEdit : () => setRotaEditOpen(true)}
-          aria-label={rotaEditOpen ? "Cancelar edição da rota" : "Editar rota do dia"}
-          className={editButtonClass}
-          style={neutralButtonStyle}
-        >
-          {rotaEditOpen ? "✕" : "✏️"}
-        </button>
-      </div>
+      {/* Dia da semana sempre visível na própria célula -- antes só
+          aparecia no mobile, sincronizado com um cabeçalho de 7 colunas
+          fixas que não existe mais (ver grid flexível acima). */}
+      <span className={`${headerTextClass} truncate`} style={{ color: "var(--text-primary)" }}>
+        {weekdayLabel} {dateLabel}
+        {isToday ? " · hoje" : ""}
+      </span>
 
-      {rotaEditOpen ? (
-        <div className="flex flex-col gap-1">
-          <select
-            value={rotaValue}
-            onChange={(e) => setRotaValue(e.target.value as Rota)}
-            className={selectClass}
-            style={{ borderColor: "var(--border)" }}
-            disabled={pending}
-          >
-            <option value="">Sem rota</option>
-            {/* Só João Pessoa "de verdade" -- a rota principal do dia
-                nunca é Campina Grande nem a extra genérica (ver
-                JP_PRIMARY_ROTAS em rotas.ts). */}
-            {JP_PRIMARY_ROTAS.map((r) => (
-              <option key={r} value={r}>
-                {ROTA_LABELS[r]}
-              </option>
-            ))}
-          </select>
-          <DriverPicker value={driverValue} onChange={setDriverValue} drivers={drivers} disabled={pending} compact={compact} />
-          {dirty ? (
-            <button type="button" disabled={pending} onClick={save} className={saveButtonClass} style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
-              Salvar
+      {/* João Pessoa e Campina Grande lado a lado, mesma hierarquia visual
+          -- achado do Victor 24/08/2026: "parece que a rota de joao
+          pessoa ta acima em hierarquia... fique dentro da data, mas lado
+          a lado, joão pessoa e campina e com as rotas e motoristas de
+          cada um". Antes João Pessoa vinha solta no topo da célula (com o
+          lápis de editar junto do cabeçalho da data) e só Campina Grande
+          tinha um bloco/rótulo próprio -- agora as duas são a mesma coisa
+          duas vezes: um cartão com título da cidade + conteúdo, um do
+          lado do outro. O lápis (só edita a rota principal, que é sempre
+          de João Pessoa) muda de lugar junto, pro cabeçalho do cartão de
+          João Pessoa -- deixa mais claro o que ele edita. */}
+      <div className="grid grid-cols-2 gap-2 items-start">
+        <div className="flex flex-col gap-1.5 rounded-md p-2 min-w-0" style={{ border: "1px solid var(--gridline)" }}>
+          <div className="flex items-center justify-between gap-1">
+            <span className={cityLabelClass} style={{ color: "var(--text-secondary)" }}>
+              João Pessoa
+            </span>
+            <button
+              type="button"
+              onClick={rotaEditOpen ? cancelRotaEdit : () => setRotaEditOpen(true)}
+              aria-label={rotaEditOpen ? "Cancelar edição da rota" : "Editar rota do dia"}
+              className={editButtonClass}
+              style={neutralButtonStyle}
+            >
+              {rotaEditOpen ? "✕" : "✏️"}
             </button>
-          ) : null}
-        </div>
-      ) : (
-        <>
-          <span
-            className={rotaBadgeClass}
-            style={{ background: rotaValue ? ROTA_COLORS[rotaValue] : "var(--surface-2)", color: rotaValue ? "#fff" : "var(--text-muted)" }}
-          >
-            {rotaValue ? ROTA_LABELS[rotaValue] : "Sem rota"}
-          </span>
-          <span className={driverTextClass} style={{ color: driverValue ? "var(--text-primary)" : "var(--text-muted)" }}>
-            {driverValue || "Sem motorista"}
-          </span>
-        </>
-      )}
+          </div>
 
-      {/* Rotas extras genéricas de João Pessoa -- pedido do Victor
-          24/08/2026: sem escolher região, só o motorista; rótulo com
-          ordinal (Rota extra 1, 2...) via labelAvailableRota. Filtra as
-          de Campina Grande daqui, elas têm seção própria fixa logo
-          abaixo. */}
-      <div className="flex flex-col gap-1 pt-1" style={{ borderTop: "1px solid var(--gridline)" }}>
-        {jpExtras.length > 0 ? (
-          <div className="flex flex-col gap-1">
-            {jpExtras.map((extra) => (
-              <div key={extra.id} className="flex items-center gap-1.5 min-w-0 rounded-md px-1.5 py-1" style={{ background: "var(--surface-2)" }}>
-                <span className={extraChipClass} style={{ background: "var(--surface-1)", color: "var(--text-secondary)" }}>
-                  {labelAvailableRota(jpExtras, extra)}
-                </span>
-                <span className={extraDriverTextClass} style={{ color: "var(--text-primary)" }}>
-                  {extra.driverName}
-                </span>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => removeExtra(extra.id)}
-                  aria-label="Remover rota extra"
-                  className={extraRemoveClass}
-                  style={{ background: "var(--surface-1)", borderColor: "var(--status-critical)", color: "var(--status-critical)" }}
-                >
-                  ✕
+          {rotaEditOpen ? (
+            <div className="flex flex-col gap-1">
+              <select
+                value={rotaValue}
+                onChange={(e) => setRotaValue(e.target.value as Rota)}
+                className={selectClass}
+                style={{ borderColor: "var(--border)" }}
+                disabled={pending}
+              >
+                <option value="">Sem rota</option>
+                {/* Só João Pessoa "de verdade" -- a rota principal do dia
+                    nunca é Campina Grande nem a extra genérica (ver
+                    JP_PRIMARY_ROTAS em rotas.ts). */}
+                {JP_PRIMARY_ROTAS.map((r) => (
+                  <option key={r} value={r}>
+                    {ROTA_LABELS[r]}
+                  </option>
+                ))}
+              </select>
+              <DriverPicker value={driverValue} onChange={setDriverValue} drivers={drivers} disabled={pending} compact={compact} />
+              {dirty ? (
+                <button type="button" disabled={pending} onClick={save} className={saveButtonClass} style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
+                  Salvar
                 </button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {extraOpen ? (
-          <div className="flex flex-col gap-1">
-            <DriverPicker value={extraDriver} onChange={setExtraDriver} drivers={drivers} disabled={pending} compact={compact} />
-            <div className="flex items-center gap-1">
-              <button type="button" disabled={pending} onClick={addExtra} className={extraActionButtonClass} style={actionButtonStyle}>
-                salvar
-              </button>
-              <button type="button" onClick={() => setExtraOpen(false)} className={extraCancelButtonClass} style={neutralButtonStyle}>
-                cancelar
-              </button>
+              ) : null}
             </div>
-          </div>
-        ) : (
-          <button type="button" onClick={() => setExtraOpen(true)} className={addExtraButtonClass} style={actionButtonStyle}>
-            + rota extra
-          </button>
-        )}
-      </div>
+          ) : (
+            <>
+              <span
+                className={rotaBadgeClass}
+                style={{ background: rotaValue ? ROTA_COLORS[rotaValue] : "var(--surface-2)", color: rotaValue ? "#fff" : "var(--text-muted)" }}
+              >
+                {rotaValue ? ROTA_LABELS[rotaValue] : "Sem rota"}
+              </span>
+              <span className={driverTextClass} style={{ color: driverValue ? "var(--text-primary)" : "var(--text-muted)" }}>
+                {driverValue || "Sem motorista"}
+              </span>
+            </>
+          )}
 
-      {/* Campina Grande -- pedido do Victor 24/08/2026: painel único
-          com João Pessoa, seção separada. Sempre as 2 rotas fixas
-          (CG_ROTAS), sem "+ adicionar" -- "campina nao tem rota extra".
-          Por baixo dos panos são linhas is_extra:true igual a rota
-          extra de JP (ver Achados no plano), só que nunca aparecem
-          rotuladas como "extra" aqui. Cada rota em seu próprio
-          mini-card, empilhado (nome numa linha, motorista/botão na
-          seguinte) -- nomes longos como "Centro/Norte/Leste" não cabiam
-          numa pílula ao lado do motorista sem colidir (achado do Victor
-          24/08/2026, ver captura de tela). */}
-      <div className="flex flex-col gap-1 pt-1" style={{ borderTop: "1px solid var(--gridline)" }}>
-        <span className={compact ? "text-xs font-semibold" : "text-[11px] font-semibold"} style={{ color: "var(--text-muted)" }}>
-          Campina Grande
-        </span>
-        {CG_ROTAS.map((cgRota) => {
-          const assignment = day.assignments.extras.find((e) => e.rota === cgRota);
-          return (
-            <div key={cgRota} className="flex flex-col gap-1 rounded-md p-1.5 min-w-0" style={{ background: "var(--surface-2)" }}>
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: ROTA_COLORS[cgRota] }} aria-hidden="true" />
-                <span className={`${driverTextClass} font-semibold`} style={{ color: "var(--text-secondary)" }}>
-                  {ROTA_LABELS[cgRota]}
-                </span>
-              </div>
-              {cgPickingRota === cgRota ? (
-                <div className="flex flex-col gap-1">
-                  <DriverPicker value={cgDriverValue} onChange={setCgDriverValue} drivers={drivers} disabled={pending} compact={compact} />
-                  <div className="flex items-center gap-1">
-                    <button type="button" disabled={pending} onClick={() => addCgDriver(cgRota)} className={extraActionButtonClass} style={actionButtonStyle}>
-                      salvar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCgPickingRota(null);
-                        setCgDriverValue("");
-                      }}
-                      className={extraCancelButtonClass}
-                      style={neutralButtonStyle}
-                    >
-                      cancelar
-                    </button>
-                  </div>
-                </div>
-              ) : assignment ? (
-                <div className="flex items-center gap-1.5 min-w-0">
+          {/* Rotas extras genéricas de João Pessoa -- pedido do Victor
+              24/08/2026: sem escolher região, só o motorista; rótulo com
+              ordinal (Rota extra 1, 2...) via labelAvailableRota. */}
+          {jpExtras.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              {jpExtras.map((extra) => (
+                <div key={extra.id} className="flex items-center gap-1.5 min-w-0 rounded-md px-1.5 py-1" style={{ background: "var(--surface-2)" }}>
+                  <span className={extraChipClass} style={{ background: "var(--surface-1)", color: "var(--text-secondary)" }}>
+                    {labelAvailableRota(jpExtras, extra)}
+                  </span>
                   <span className={extraDriverTextClass} style={{ color: "var(--text-primary)" }}>
-                    {assignment.driverName}
+                    {extra.driverName}
                   </span>
                   <button
                     type="button"
                     disabled={pending}
-                    onClick={() => removeExtra(assignment.id)}
-                    aria-label="Remover motorista"
+                    onClick={() => removeExtra(extra.id)}
+                    aria-label="Remover rota extra"
                     className={extraRemoveClass}
                     style={{ background: "var(--surface-1)", borderColor: "var(--status-critical)", color: "var(--status-critical)" }}
                   >
                     ✕
                   </button>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCgPickingRota(cgRota);
-                    setCgDriverValue("");
-                  }}
-                  className={addExtraButtonClass}
-                  style={actionButtonStyle}
-                >
-                  + motorista
-                </button>
-              )}
+              ))}
             </div>
-          );
-        })}
+          ) : null}
+
+          {extraOpen ? (
+            <div className="flex flex-col gap-1">
+              <DriverPicker value={extraDriver} onChange={setExtraDriver} drivers={drivers} disabled={pending} compact={compact} />
+              <div className="flex items-center gap-1">
+                <button type="button" disabled={pending} onClick={addExtra} className={extraActionButtonClass} style={actionButtonStyle}>
+                  salvar
+                </button>
+                <button type="button" onClick={() => setExtraOpen(false)} className={extraCancelButtonClass} style={neutralButtonStyle}>
+                  cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setExtraOpen(true)} className={addExtraButtonClass} style={actionButtonStyle}>
+              + rota extra
+            </button>
+          )}
+        </div>
+
+        {/* Campina Grande -- pedido do Victor 24/08/2026: painel único
+            com João Pessoa, mesma hierarquia visual (cartão idêntico ao
+            lado). Sempre as 2 rotas fixas (CG_ROTAS), sem "+ adicionar"
+            -- "campina nao tem rota extra". Por baixo dos panos são
+            linhas is_extra:true igual a rota extra de JP (ver Achados no
+            plano), só que nunca aparecem rotuladas como "extra" aqui.
+            Cada rota em seu próprio mini-card, empilhado (nome numa
+            linha, motorista/botão na seguinte) -- nomes longos como
+            "Centro/Norte/Leste" não cabiam numa pílula ao lado do
+            motorista sem colidir (achado do Victor 24/08/2026). */}
+        <div className="flex flex-col gap-1.5 rounded-md p-2 min-w-0" style={{ border: "1px solid var(--gridline)" }}>
+          <span className={cityLabelClass} style={{ color: "var(--text-secondary)" }}>
+            Campina Grande
+          </span>
+          {CG_ROTAS.map((cgRota) => {
+            const assignment = day.assignments.extras.find((e) => e.rota === cgRota);
+            return (
+              <div key={cgRota} className="flex flex-col gap-1 rounded-md p-1.5 min-w-0" style={{ background: "var(--surface-2)" }}>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: ROTA_COLORS[cgRota] }} aria-hidden="true" />
+                  <span className={`${driverTextClass} font-semibold`} style={{ color: "var(--text-secondary)" }}>
+                    {ROTA_LABELS[cgRota]}
+                  </span>
+                </div>
+                {cgPickingRota === cgRota ? (
+                  <div className="flex flex-col gap-1">
+                    <DriverPicker value={cgDriverValue} onChange={setCgDriverValue} drivers={drivers} disabled={pending} compact={compact} />
+                    <div className="flex items-center gap-1">
+                      <button type="button" disabled={pending} onClick={() => addCgDriver(cgRota)} className={extraActionButtonClass} style={actionButtonStyle}>
+                        salvar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCgPickingRota(null);
+                          setCgDriverValue("");
+                        }}
+                        className={extraCancelButtonClass}
+                        style={neutralButtonStyle}
+                      >
+                        cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : assignment ? (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={extraDriverTextClass} style={{ color: "var(--text-primary)" }}>
+                      {assignment.driverName}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => removeExtra(assignment.id)}
+                      aria-label="Remover motorista"
+                      className={extraRemoveClass}
+                      style={{ background: "var(--surface-1)", borderColor: "var(--status-critical)", color: "var(--status-critical)" }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCgPickingRota(cgRota);
+                      setCgDriverValue("");
+                    }}
+                    className={addExtraButtonClass}
+                    style={actionButtonStyle}
+                  >
+                    + motorista
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
