@@ -2,121 +2,31 @@ import Link from "next/link";
 import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, isMostruarioRequest, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
-import { getRotaWeekOverview, startOfRotaWeek, ROTAS, ROTA_LABELS, ROTA_COLORS } from "@/lib/rotas";
-import {
-  ASSISTENCIA_MANAGED_TYPES,
-  DELIVERY_REQUEST_TYPES,
-  SAC_MANAGED_TYPES,
-  STATUS_COLORS,
-  OWN_ASSEMBLER_STORE_IDS,
-  VISITA_REQUEST_TYPES,
-} from "@/lib/assistenciaLabels";
-import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
+import { getRotaWeekOverview, startOfRotaWeek } from "@/lib/rotas";
+import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
-import { countByDeliveryStatus, isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
+import { EntregasGroupsList } from "@/components/assistencia/EntregasGroupsList";
+import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcut";
-
-type QueueDateSubgroup = { dateKey: string; label: string; items: ServiceRequestSummary[] };
-type QueueGroup = {
-  key: string;
-  label: string;
-  headerBg: string;
-  headerText: string;
-  borderColor: string;
-  items: ServiceRequestSummary[];
-  // Só populado por groupByRota (aba Entregas) -- pedido do Victor
-  // 21/08/2026: "Aplique uma sutil variação de tom no cabeçalho ou uma
-  // tag para distinguir Rotas de Hoje, Rotas Futuras e a barra de Sem
-  // Rota Definida, permitindo bater o olho... sem ler a data completa".
-  dateBucket?: DateBucketKey;
-  isSemRota?: boolean;
-};
-
-const DATE_BUCKET_TAG: Record<DateBucketKey, { label: string; bg: string } | null> = {
-  hoje: { label: "HOJE", bg: "var(--status-good)" },
-  amanha: { label: "FUTURA", bg: "color-mix(in srgb, #fff 35%, transparent)" },
-  depois: { label: "FUTURA", bg: "color-mix(in srgb, #fff 35%, transparent)" },
-  atrasado: { label: "ATRASADA", bg: "var(--status-critical)" },
-  sem_data: null,
-};
-
-// Dentro de cada grupo, mesma prioridade de sempre: ordem manual
-// (assistencia_order) primeiro, senão mais recente primeiro.
-function sortGroupItems(items: ServiceRequestSummary[]) {
-  items.sort((a, b) => {
-    if (a.assistenciaOrder !== null && b.assistenciaOrder !== null) return a.assistenciaOrder - b.assistenciaOrder;
-    if (a.assistenciaOrder !== null) return -1;
-    if (b.assistenciaOrder !== null) return 1;
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
-}
-
-const NO_SCHEDULED_DATE_KEY = "sem_data";
-
-// Hoje sempre em primeiro, não "a data mais antiga" -- achado 19/08/2026: a
-// primeira versão disso era só ordem ascendente de data, então uma rota
-// atrasada (ex.: 18/08, com hoje sendo 20/08) aparecia ANTES de hoje, porque
-// "18" < "20" como string. bucketByScheduledDate (dateBuckets.ts) já resolve
-// "hoje" de verdade, no fuso de João Pessoa (mesmo helper usado nas listas
-// de motorista/montador, com a mesma armadilha de fuso já corrigida lá --
-// ver comentário de BUSINESS_TZ_OFFSET_MS). Ordem aqui: hoje, amanhã, resto
-// do futuro (crescente), atrasado, sem data -- diferente da lista de
-// motorista (que abre "Atrasado" primeiro, por ser o que precisa de atenção
-// imediata pra QUEM VAI SAIR AGORA); aqui é o pedido explícito do Victor
-// ("a rota do dia sempre tem que ser a primeira de cima").
-const SCHEDULED_DATE_BUCKET_RANK: Record<DateBucketKey, number> = {
-  hoje: 0,
-  amanha: 1,
-  depois: 2,
-  atrasado: 3,
-  sem_data: 4,
-};
-
-// Só usado por groupByRota (aba Entregas) -- pedido do Victor 19/08/2026:
-// "no agrupamento de cada rota, eu não devo ter ao lado a data de criação,
-// mas sim a data da rota" (a de criação já aparece em cada notificação, ver
-// showCreatedDate em AssistenciaQueueGroup). Agrupa por
-// scheduledDate/approvedDeadline (o mesmo 📅 mostrado no card -- ver
-// effectiveDate em AssistenciaQueueGroup.tsx), não por createdAt.
-// Dia da semana ao lado da data -- pedido do Victor 21/08/2026: "Adicione
-// o dia da semana ao lado da data nas barras sanfonadas (ex: ROTA CENTRO
-// - 24/08/2026 (Segunda-feira)) para evitar erros na troca em bloco".
-function weekdayLabel(dateStr: string): string {
-  const raw = new Date(`${dateStr}T00:00:00Z`).toLocaleDateString("pt-BR", { weekday: "long", timeZone: "UTC" });
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
-}
-
-function groupByScheduledDate(items: ServiceRequestSummary[]): QueueDateSubgroup[] {
-  const groups: QueueDateSubgroup[] = [];
-  for (const r of items) {
-    const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
-    const dateKey = effectiveDate ?? NO_SCHEDULED_DATE_KEY;
-    let group = groups.find((g) => g.dateKey === dateKey);
-    if (!group) {
-      const label = effectiveDate
-        ? `${new Date(`${effectiveDate}T00:00:00Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" })} (${weekdayLabel(effectiveDate)})`
-        : "Sem data definida";
-      group = { dateKey, label, items: [] };
-      groups.push(group);
-    }
-    group.items.push(r);
-  }
-  groups.sort((a, b) => {
-    const rankA = SCHEDULED_DATE_BUCKET_RANK[bucketByScheduledDate(a.dateKey === NO_SCHEDULED_DATE_KEY ? null : a.dateKey)];
-    const rankB = SCHEDULED_DATE_BUCKET_RANK[bucketByScheduledDate(b.dateKey === NO_SCHEDULED_DATE_KEY ? null : b.dateKey)];
-    if (rankA !== rankB) return rankA - rankB;
-    // Dentro do mesmo balde ("depois" ou "atrasado" podem ter mais de uma
-    // data) -- crescente entre si.
-    return a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0;
-  });
-  for (const group of groups) sortGroupItems(group.items);
-  return groups;
-}
+import {
+  groupByRota,
+  sortGroupItems,
+  type QueueGroup,
+  ENTREGA_FILTERS,
+  ORIGEM_FILTERS,
+  ENTREGA_TYPES,
+  ENTREGA_TYPES_SAC,
+  ENTREGA_TYPES_ASSISTENCIA,
+} from "@/lib/entregaQueueGrouping";
 
 // Aba "Visitas" -- agrupado por data de criação, mais novo pro mais antigo.
+// Aba "Entregas" usa groupByRota (compartilhado com a tela de notificações
+// do SAC, ver src/lib/entregaQueueGrouping.ts -- extraído de propósito pra
+// nunca mais as duas telas divergirem, achado do Victor 24/08/2026: "a
+// tela de notificação de assistencia do sac deve ser igual a de admin").
 function groupByDate(requests: ServiceRequestSummary[]): QueueGroup[] {
   const groups: QueueGroup[] = [];
   for (const r of requests) {
@@ -132,48 +42,6 @@ function groupByDate(requests: ServiceRequestSummary[]): QueueGroup[] {
   }
   groups.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
   for (const group of groups) sortGroupItems(group.items);
-  return groups;
-}
-
-// Aba "Entregas" -- agrupado por rota, com a data DA ROTA (agendada) ao
-// lado no mesmo cabeçalho -- não a data de criação do chamado, que já
-// aparece em cada notificação (pedido do Victor 18 e 19/08/2026: "a data...
-// tem que aparecer ao lado da rota, não dentro" + "eu não devo ter ao lado
-// a data de criação, mas sim a data da rota"). Cada grupo é um par
-// rota+data-agendada.
-//
-// A DATA manda na ordem, não a rota -- pedido do Victor 20/08/2026: "eu
-// preciso que o primeiro seja a data do dia e abaixo as próximas... e só
-// depois disso, vem as datas que já passaram". Até 20/08/2026 o loop
-// externo era por rota (Praia, Sul, Centro, Sem rota) e só por dentro de
-// cada rota é que a data mandava -- isso fazia uma rota atrasada aparecer
-// ANTES de outra rota com entrega hoje, só porque "Praia" vem antes de
-// "Sul" na ordem fixa. Agora primeiro agrupa tudo por data (mesmo rank de
-// groupByScheduledDate: hoje, amanhã, depois, atrasado, sem_data) e só
-// dentro de cada data é que separa por rota.
-function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
-  const rotaOrder: (Omit<QueueGroup, "items" | "label"> & { rotaLabel: string })[] = [
-    ...ROTAS.map((r) => ({ key: r, rotaLabel: `Rota ${ROTA_LABELS[r]}`, headerBg: ROTA_COLORS[r], headerText: "#fff", borderColor: ROTA_COLORS[r] })),
-    { key: "sem_rota", rotaLabel: "Sem rota definida", headerBg: "var(--surface-2)", headerText: "var(--text-secondary)", borderColor: "var(--border)" },
-  ];
-
-  const groups: QueueGroup[] = [];
-  for (const dateGroup of groupByScheduledDate(requests)) {
-    for (const rotaInfo of rotaOrder) {
-      const items = dateGroup.items.filter((r) => (r.rota ?? "sem_rota") === rotaInfo.key);
-      if (items.length === 0) continue;
-      groups.push({
-        key: `${dateGroup.dateKey}_${rotaInfo.key}`,
-        label: `${rotaInfo.rotaLabel} · ${dateGroup.label}`,
-        headerBg: rotaInfo.headerBg,
-        headerText: rotaInfo.headerText,
-        borderColor: rotaInfo.borderColor,
-        items,
-        dateBucket: bucketByScheduledDate(dateGroup.dateKey === NO_SCHEDULED_DATE_KEY ? null : dateGroup.dateKey),
-        isSemRota: rotaInfo.key === "sem_rota",
-      });
-    }
-  }
   return groups;
 }
 
@@ -236,25 +104,6 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Canceladas", value: "cancelada" },
 ];
 
-// Filtros específicos da aba Entregas -- pedido do Victor 21/08/2026: "na
-// tela de notificação de assistência, não tem como eu filtrar por
-// programado". Os FILTERS genéricos acima (Abertas/Em contato/Em
-// andamento) são pensados pro status detalhado de visita de montador --
-// entrega não passa por negociação de agenda (ver isDeliveryScheduled em
-// DeliveryStatusBadge.tsx), só existe "aberta" (que vira Programado/Não
-// programado dependendo se já tem data+rota), concluída ou cancelada.
-// "Programado"/"Não programado" não são status de verdade no banco -- são
-// status=aberta filtrado depois em JS por scheduledDate+rota (ver `sched`
-// abaixo), porque não dá pra expressar isso só com `.eq("status", ...)`.
-type EntregaFilterValue = { status: string | null; sched?: boolean };
-const ENTREGA_FILTERS: { label: string; value: EntregaFilterValue; color: string }[] = [
-  { label: "Todas", value: { status: null }, color: "var(--text-secondary)" },
-  { label: "Programado", value: { status: "aberta", sched: true }, color: "var(--brand-green)" },
-  { label: "Não programado", value: { status: "aberta", sched: false }, color: "var(--status-warning)" },
-  { label: "Concluídas", value: { status: "concluida" }, color: "var(--status-good)" },
-  { label: "Canceladas", value: { status: "cancelada" }, color: "var(--text-muted)" },
-];
-
 // Troca/entrega de produto (SAC) e envio/recolhimento de peça (assistência)
 // saem no mesmo carro, na mesma rota do dia -- por isso ficam juntos numa
 // aba só, visível tanto daqui quanto de /assistencia/sac (ver lá), cada lado
@@ -262,26 +111,10 @@ const ENTREGA_FILTERS: { label: string; value: EntregaFilterValue; color: string
 // disso). Não tem nada a ver com visita de montador (montagem/desmontagem/
 // troca de peça/vistoria), que fica exclusiva na outra aba -- "recolhimento"
 // mudou de lado em 18/08/2026 (era visita de montador, virou entrega de
-// motorista, ver DELIVERY_REQUEST_TYPES).
+// motorista, ver DELIVERY_REQUEST_TYPES). ENTREGA_FILTERS/ORIGEM_FILTERS/
+// ENTREGA_TYPES* vêm de entregaQueueGrouping.ts -- compartilhados com a
+// tela de notificações do SAC (mesmo motivo de groupByRota, ver acima).
 const VISITA_TYPES: RequestType[] = [...VISITA_REQUEST_TYPES];
-const ENTREGA_TYPES: RequestType[] = [...DELIVERY_REQUEST_TYPES];
-
-// Filtro "SAC x Assistência" dentro da aba Entregas -- pedido do Victor
-// 20/08/2026: "preciso de um filtro na aba de entregas para conseguir
-// filtrar as notificações do sac e da assistencia". Os 5 tipos de
-// DELIVERY_REQUEST_TYPES se dividem nos dois grupos de sempre (mesma
-// divisão de SAC_MANAGED_TYPES/ASSISTENCIA_MANAGED_TYPES, ver
-// assistenciaLabels.ts) -- troca/entrega/recolhimento de PRODUTO nascem no
-// SAC, envio/recolhimento de PEÇA nascem na assistência, mesmo os dois
-// saindo juntos na mesma rota.
-const ENTREGA_TYPES_SAC: RequestType[] = ENTREGA_TYPES.filter((t) => (SAC_MANAGED_TYPES as readonly string[]).includes(t));
-const ENTREGA_TYPES_ASSISTENCIA: RequestType[] = ENTREGA_TYPES.filter((t) => (ASSISTENCIA_MANAGED_TYPES as readonly string[]).includes(t));
-
-const ORIGEM_FILTERS: { label: string; value: "sac" | "assistencia" | null }[] = [
-  { label: "Todas", value: null },
-  { label: "SAC", value: "sac" },
-  { label: "Assistência", value: "assistencia" },
-];
 
 export default async function AssistenciaQueuePage({
   searchParams,
@@ -639,46 +472,19 @@ export default async function AssistenciaQueuePage({
             Nenhuma solicitação encontrada.
           </p>
         </div>
+      ) : showPecas ? (
+        // Compartilhado com a tela de notificações do SAC -- ver
+        // EntregasGroupsList.tsx.
+        <EntregasGroupsList groups={groups} now={now} />
       ) : (
-        groups.map((group) => {
-          // Divisão programado/concluído/cancelado, com o número ao lado
-          // de cada um -- pedido do Victor 21/08/2026: "dentro da aba de
-          // cada rota... preciso que fique dividido em programado,
-          // concluido, cancelado". Só faz sentido pra Entregas (status
-          // simplificado de DeliveryStatusBadge) -- Visitas usa outro
-          // conjunto de status (aberta/em_contato/em_andamento/remarcar),
-          // que já tem o próprio badge por chamado.
-          const statusCounts = showPecas ? countByDeliveryStatus(group.items) : null;
-          return (
+        groups.map((group) => (
           // Recolhível -- pedido do Victor 20/08/2026: "os agrupamentos por
           // data (Entregas e Visitas) precisam poder ser recolhidos, e
           // mostrar a quantidade de dentro quando estiver recolhido".
-          // <details> nativo, sem JS extra (mesmo padrão de NotificacoesList.tsx);
-          // aberto por padrão, então o comportamento de sempre não muda até
-          // alguém clicar pra recolher. A contagem fica sempre visível (não só
-          // quando recolhido) -- mais útil pra decidir o que vale a pena abrir.
-          // Destaque na barra da rota aberta -- pedido do Victor 22/08/2026:
-          // "quando a rota está expandida... a barra fica idêntica às
-          // outras colapsadas... dê um leve destaque visual". `open:` é
-          // pseudo-classe nativa do <details> (via [open]), então isso
-          // reage sozinho ao clique de abrir/fechar sem precisar de JS --
-          // borda mais grossa (2px fechado, 4px aberto) + leve escurecida
-          // no cabeçalho. Cor vem de style (dinâmica por rota), largura da
-          // borda vem de className (senão o `open:` não teria como competir
-          // com a especificidade do style inline).
-          // Rota/data já passada com opacidade reduzida -- pedido do Victor
-          // 22/08/2026: "deixe um pouco transparente as datas/rotas que já
-          // passaram". Só se aplica a `atrasado` (dateBucket só existe pra
-          // Entregas, ver groupByRota) -- hoje/amanhã/depois continuam 100%
-          // opacos, já que ainda tem entrega pra fazer neles.
-          <details
-            key={group.key}
-            className={`group rounded-xl overflow-hidden border-2 open:border-4 transition-[border-width] ${group.dateBucket === "atrasado" ? "opacity-60" : ""}`}
-            style={{ borderColor: group.borderColor }}
-            open
-          >
+          // <details> nativo, sem JS extra; aberto por padrão.
+          <details key={group.key} className="group rounded-xl overflow-hidden" style={{ border: `2px solid ${group.borderColor}` }} open>
             <summary
-              className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:brightness-95"
+              className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
               style={{ background: group.headerBg }}
             >
               <span
@@ -691,45 +497,15 @@ export default async function AssistenciaQueuePage({
               <span className="text-sm font-bold uppercase tracking-wide" style={{ color: group.headerText }}>
                 {group.label}
               </span>
-              {group.isSemRota ? (
-                <span
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                  style={{ background: "var(--surface-1)", color: "var(--text-secondary)" }}
-                >
-                  Sem rota
-                </span>
-              ) : group.dateBucket && DATE_BUCKET_TAG[group.dateBucket] ? (
-                <span
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                  style={{ background: DATE_BUCKET_TAG[group.dateBucket]!.bg, color: "#fff" }}
-                >
-                  {DATE_BUCKET_TAG[group.dateBucket]!.label}
-                </span>
-              ) : null}
               <span className="text-xs font-semibold" style={{ color: group.headerText, opacity: 0.85 }}>
                 ({group.items.length})
               </span>
-              {statusCounts ? (
-                <span className="flex items-center gap-2 text-[11px] font-medium ml-auto" style={{ color: group.headerText }}>
-                  <span>{statusCounts.programado} Programado{statusCounts.programado === 1 ? "" : "s"}</span>
-                  <span>{statusCounts.concluido} Concluído{statusCounts.concluido === 1 ? "" : "s"}</span>
-                  <span>{statusCounts.cancelado} Cancelado{statusCounts.cancelado === 1 ? "" : "s"}</span>
-                </span>
-              ) : null}
             </summary>
             <div style={{ background: "var(--surface-1)" }}>
-              <AssistenciaQueueGroup
-                items={group.items}
-                reorderable
-                now={now}
-                showCreatedDate={showPecas}
-                printable={showPecas}
-                showStaleBadge={!showPecas}
-              />
+              <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate={false} printable={false} showStaleBadge />
             </div>
           </details>
-          );
-        })
+        ))
       )}
 
       {totalPages > 1 ? (

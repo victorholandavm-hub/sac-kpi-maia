@@ -1,0 +1,163 @@
+import { bucketByScheduledDate, type DateBucketKey } from "./dateBuckets";
+import { ROTAS, ROTA_LABELS, ROTA_COLORS } from "./rotas";
+import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, SAC_MANAGED_TYPES } from "./assistenciaLabels";
+import type { ServiceRequestSummary, RequestType } from "./serviceRequests";
+
+// Filtros da aba Entregas -- pedido do Victor 21/08/2026: "na tela de
+// notificação de assistência, não tem como eu filtrar por programado".
+// Entrega não passa por negociação de agenda (ver isDeliveryScheduled em
+// DeliveryStatusBadge.tsx), só existe "aberta" (que vira Programado/Não
+// programado dependendo se já tem data+rota), concluída ou cancelada.
+// "Programado"/"Não programado" não são status de verdade no banco -- são
+// status=aberta filtrado depois em JS por scheduledDate+rota (ver `sched`
+// nas duas telas que usam isso).
+export type EntregaFilterValue = { status: string | null; sched?: boolean };
+export const ENTREGA_FILTERS: { label: string; value: EntregaFilterValue; color: string }[] = [
+  { label: "Todas", value: { status: null }, color: "var(--text-secondary)" },
+  { label: "Programado", value: { status: "aberta", sched: true }, color: "var(--brand-green)" },
+  { label: "Não programado", value: { status: "aberta", sched: false }, color: "var(--status-warning)" },
+  { label: "Concluídas", value: { status: "concluida" }, color: "var(--status-good)" },
+  { label: "Canceladas", value: { status: "cancelada" }, color: "var(--text-muted)" },
+];
+
+// Filtro "SAC x Assistência" -- pedido do Victor 20/08/2026: "preciso de um
+// filtro na aba de entregas para conseguir filtrar as notificações do sac e
+// da assistencia". Os 5 tipos de DELIVERY_REQUEST_TYPES se dividem nos dois
+// grupos de sempre -- troca/entrega/recolhimento de PRODUTO nascem no SAC,
+// envio/recolhimento de PEÇA nascem na assistência, mesmo os dois saindo
+// juntos na mesma rota.
+export const ENTREGA_TYPES: RequestType[] = [...DELIVERY_REQUEST_TYPES];
+export const ENTREGA_TYPES_SAC: RequestType[] = ENTREGA_TYPES.filter((t) => (SAC_MANAGED_TYPES as readonly string[]).includes(t));
+export const ENTREGA_TYPES_ASSISTENCIA: RequestType[] = ENTREGA_TYPES.filter((t) => (ASSISTENCIA_MANAGED_TYPES as readonly string[]).includes(t));
+
+export const ORIGEM_FILTERS: { label: string; value: "sac" | "assistencia" | null }[] = [
+  { label: "Todas", value: null },
+  { label: "SAC", value: "sac" },
+  { label: "Assistência", value: "assistencia" },
+];
+
+// Extraído de fila/page.tsx (24/08/2026) -- a tela de notificações do SAC
+// (assistencia/sac/notificacoes/page.tsx) tinha sua PRÓPRIA cópia quase
+// igual desse agrupamento (groupByDateAndRota em NotificacoesList.tsx), que
+// foi divergindo aos poucos e virou uma tela visualmente diferente com
+// contagem diferente da aba Entregas do admin -- achado do Victor
+// 24/08/2026: "a tela de notificação de assistencia do sac deve ser igual
+// a de admin... as notificações de hoje, ta contando 11 e na minha tela de
+// admin mostra 16". Centralizado aqui pra nunca mais duas cópias
+// divergirem de novo -- as duas telas passam a usar exatamente essa mesma
+// função.
+
+const NO_SCHEDULED_DATE_KEY = "sem_data";
+
+// Hoje sempre em primeiro, não "a data mais antiga" -- bucketByScheduledDate
+// (dateBuckets.ts) já resolve "hoje" de verdade, no fuso de João Pessoa.
+// Ordem: hoje, amanhã, resto do futuro (crescente), atrasado, sem data --
+// pedido explícito do Victor ("a rota do dia sempre tem que ser a primeira
+// de cima").
+const SCHEDULED_DATE_BUCKET_RANK: Record<DateBucketKey, number> = {
+  hoje: 0,
+  amanha: 1,
+  depois: 2,
+  atrasado: 3,
+  sem_data: 4,
+};
+
+// Dia da semana ao lado da data -- pedido do Victor 21/08/2026: "Adicione o
+// dia da semana ao lado da data nas barras sanfonadas (ex: ROTA CENTRO -
+// 24/08/2026 (Segunda-feira)) para evitar erros na troca em bloco".
+function weekdayLabel(dateStr: string): string {
+  const raw = new Date(`${dateStr}T00:00:00Z`).toLocaleDateString("pt-BR", { weekday: "long", timeZone: "UTC" });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+// Dentro de cada grupo, mesma prioridade de sempre: ordem manual
+// (assistencia_order) primeiro, senão mais recente primeiro. Exportado --
+// groupByDate (Visitas, fila/page.tsx) também usa, e ordena do mesmo jeito.
+export function sortGroupItems(items: ServiceRequestSummary[]) {
+  items.sort((a, b) => {
+    if (a.assistenciaOrder !== null && b.assistenciaOrder !== null) return a.assistenciaOrder - b.assistenciaOrder;
+    if (a.assistenciaOrder !== null) return -1;
+    if (b.assistenciaOrder !== null) return 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+type QueueDateSubgroup = { dateKey: string; label: string; items: ServiceRequestSummary[] };
+
+function groupByScheduledDate(items: ServiceRequestSummary[]): QueueDateSubgroup[] {
+  const groups: QueueDateSubgroup[] = [];
+  for (const r of items) {
+    const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
+    const dateKey = effectiveDate ?? NO_SCHEDULED_DATE_KEY;
+    let group = groups.find((g) => g.dateKey === dateKey);
+    if (!group) {
+      const label = effectiveDate
+        ? `${new Date(`${effectiveDate}T00:00:00Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" })} (${weekdayLabel(effectiveDate)})`
+        : "Sem data definida";
+      group = { dateKey, label, items: [] };
+      groups.push(group);
+    }
+    group.items.push(r);
+  }
+  groups.sort((a, b) => {
+    const rankA = SCHEDULED_DATE_BUCKET_RANK[bucketByScheduledDate(a.dateKey === NO_SCHEDULED_DATE_KEY ? null : a.dateKey)];
+    const rankB = SCHEDULED_DATE_BUCKET_RANK[bucketByScheduledDate(b.dateKey === NO_SCHEDULED_DATE_KEY ? null : b.dateKey)];
+    if (rankA !== rankB) return rankA - rankB;
+    // Dentro do mesmo balde ("depois" ou "atrasado" podem ter mais de uma
+    // data) -- crescente entre si.
+    return a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : 0;
+  });
+  for (const group of groups) sortGroupItems(group.items);
+  return groups;
+}
+
+export type QueueGroup = {
+  key: string;
+  label: string;
+  headerBg: string;
+  headerText: string;
+  borderColor: string;
+  items: ServiceRequestSummary[];
+  // Pra tag Hoje/Futura/Atrasada/Sem rota no cabeçalho -- ver DATE_BUCKET_TAG.
+  dateBucket?: DateBucketKey;
+  isSemRota?: boolean;
+};
+
+export const DATE_BUCKET_TAG: Record<DateBucketKey, { label: string; bg: string } | null> = {
+  hoje: { label: "HOJE", bg: "var(--status-good)" },
+  amanha: { label: "FUTURA", bg: "color-mix(in srgb, #fff 35%, transparent)" },
+  depois: { label: "FUTURA", bg: "color-mix(in srgb, #fff 35%, transparent)" },
+  atrasado: { label: "ATRASADA", bg: "var(--status-critical)" },
+  sem_data: null,
+};
+
+// Agrupado por rota, com a data DA ROTA (agendada) ao lado no mesmo
+// cabeçalho -- não a data de criação do chamado, que já aparece em cada
+// notificação. A DATA manda na ordem, não a rota -- primeiro agrupa tudo
+// por data (hoje, amanhã, depois, atrasado, sem_data) e só dentro de cada
+// data é que separa por rota.
+export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
+  const rotaOrder: (Omit<QueueGroup, "items" | "label"> & { rotaLabel: string })[] = [
+    ...ROTAS.map((r) => ({ key: r, rotaLabel: `Rota ${ROTA_LABELS[r]}`, headerBg: ROTA_COLORS[r], headerText: "#fff", borderColor: ROTA_COLORS[r] })),
+    { key: "sem_rota", rotaLabel: "Sem rota definida", headerBg: "var(--surface-2)", headerText: "var(--text-secondary)", borderColor: "var(--border)" },
+  ];
+
+  const groups: QueueGroup[] = [];
+  for (const dateGroup of groupByScheduledDate(requests)) {
+    for (const rotaInfo of rotaOrder) {
+      const items = dateGroup.items.filter((r) => (r.rota ?? "sem_rota") === rotaInfo.key);
+      if (items.length === 0) continue;
+      groups.push({
+        key: `${dateGroup.dateKey}_${rotaInfo.key}`,
+        label: `${rotaInfo.rotaLabel} · ${dateGroup.label}`,
+        headerBg: rotaInfo.headerBg,
+        headerText: rotaInfo.headerText,
+        borderColor: rotaInfo.borderColor,
+        items,
+        dateBucket: bucketByScheduledDate(dateGroup.dateKey === NO_SCHEDULED_DATE_KEY ? null : dateGroup.dateKey),
+        isSemRota: rotaInfo.key === "sem_rota",
+      });
+    }
+  }
+  return groups;
+}
