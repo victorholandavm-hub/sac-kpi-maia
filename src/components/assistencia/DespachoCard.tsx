@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { formatFullAddress, type ServiceRequestDetail } from "@/lib/serviceRequests";
+import { formatDateOnlyBr } from "@/lib/formatDateTime";
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -45,8 +46,11 @@ export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
             <h1 className="text-base font-bold leading-tight" style={{ color: "var(--brand-green)" }}>
               Notificação de Assistência
             </h1>
+            {/* Data de abertura, sem hora -- pedido do Victor 23/08/2026:
+                "é necessário ter a data na notificação impressa, só a
+                data, sem precisar da hora". */}
             <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-              Chamado #{request.ticketNumber} · {request.storeName}
+              Chamado #{request.ticketNumber} · {request.storeName} · {formatDateOnlyBr(request.createdAt)}
             </span>
           </div>
         </div>

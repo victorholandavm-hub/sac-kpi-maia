@@ -22,3 +22,15 @@ export function formatDateTimeShortBr(iso: string): string {
     minute: "2-digit",
   });
 }
+
+// Só a data, sem hora nenhuma -- pedido do Victor 23/08/2026: "nas
+// notificações de assistencia, é necessário ter a data na notificação
+// impressa, só a data, sem precisar da hora" (ver DespachoCard.tsx).
+export function formatDateOnlyBr(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", {
+    timeZone: "America/Fortaleza",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
