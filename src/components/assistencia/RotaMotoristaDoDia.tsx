@@ -130,17 +130,16 @@ export function RotaMotoristaDoDia({
         </div>
       ) : (
         <>
-          <div className="hidden sm:grid grid-cols-7 gap-1.5">
-            {week1.map((day) => (
-              <span key={day.date} className="text-[11px] font-semibold text-center" style={{ color: "var(--text-muted)" }}>
-                {WEEKDAY_SHORT[day.weekday]}
-              </span>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
+          {/* Grid flexível (minmax), não mais 7 colunas fixas -- achado do
+              Victor 24/08/2026: com João Pessoa + Campina Grande no mesmo
+              card, 7 por linha ficava espremido demais pro conteúdo. Cada
+              célula tem no mínimo 220px, quantas couberem por linha; dia
+              da semana volta a ficar dentro da própria célula (sem
+              cabeçalho separado, que só fazia sentido sincronizado a uma
+              grade de 7 colunas fixa). */}
+          <div className="flex flex-col gap-3">
             {weeks.map((week, i) => (
-              <div key={i} className="grid grid-cols-2 sm:grid-cols-7 gap-1.5">
+              <div key={i} className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
                 {week.map((day) => (
                   <RotaDayCell
                     key={day.date}
@@ -306,45 +305,61 @@ function RotaDayCell({
   // Modo compact (Everton/Samuel, ver RotaMotoristaDoDia acima): só 2
   // células na tela em vez de 7/14, então dá pra deixar tudo maior -- era
   // justamente o pedido do Victor 19/08/2026 ("deixar os botões de edição e
-  // rota extra maiores").
-  const cellPadding = compact ? "p-3" : "p-1.5";
-  const headerTextClass = compact ? "text-sm font-semibold" : "text-[11px] font-semibold";
-  const editButtonClass = compact ? "text-xl leading-none shrink-0 rounded px-2 py-1" : "text-xs leading-none shrink-0 rounded px-1 py-0.5";
-  const selectClass = compact ? "rounded border px-3 py-2 text-sm w-full" : "rounded border px-1.5 py-1 text-xs w-full";
+  // rota extra maiores"). Tamanhos aumentados de modo geral em 24/08/2026
+  // -- achado do Victor: célula pequena demais pra caber João Pessoa +
+  // Campina Grande juntas, e os botões não pareciam clicáveis (cor quase
+  // igual ao fundo do card).
+  const cellPadding = compact ? "p-3" : "p-2.5";
+  const headerTextClass = compact ? "text-sm font-semibold" : "text-xs font-semibold";
+  const editButtonClass = compact
+    ? "text-lg leading-none shrink-0 rounded-md px-2 py-1.5 border"
+    : "text-sm leading-none shrink-0 rounded-md px-2 py-1 border";
+  const selectClass = compact ? "rounded-md border px-3 py-2 text-sm w-full" : "rounded-md border px-2 py-1.5 text-xs w-full";
   const saveButtonClass = compact
-    ? "text-sm rounded px-4 py-2.5 font-medium disabled:opacity-60"
-    : "text-xs rounded px-2 py-1 font-medium disabled:opacity-60";
+    ? "text-sm rounded-md px-4 py-2.5 font-semibold disabled:opacity-60 shadow-sm"
+    : "text-xs rounded-md px-3 py-1.5 font-semibold disabled:opacity-60 shadow-sm";
   const rotaBadgeClass = compact
-    ? "text-sm font-medium rounded-full px-3 py-1.5 self-start truncate max-w-full"
-    : "text-[11px] font-medium rounded-full px-1.5 py-0.5 self-start truncate max-w-full";
-  const driverTextClass = compact ? "text-sm truncate" : "text-xs truncate";
-  const extraChipClass = compact ? "text-xs rounded-full px-2.5 py-1 shrink-0" : "text-[10px] rounded-full px-1.5 py-0.5 shrink-0";
-  const extraDriverTextClass = compact ? "text-sm truncate flex-1 min-w-0" : "text-[11px] truncate flex-1 min-w-0";
-  const extraRemoveClass = compact ? "text-base shrink-0 px-1" : "text-[10px] shrink-0";
+    ? "text-sm font-semibold rounded-full px-3 py-1.5 self-start truncate max-w-full shadow-sm"
+    : "text-xs font-semibold rounded-full px-2.5 py-1 self-start truncate max-w-full shadow-sm";
+  const driverTextClass = compact ? "text-sm truncate font-medium" : "text-xs truncate font-medium";
+  const extraChipClass = compact ? "text-xs rounded-full px-2.5 py-1 shrink-0 font-medium" : "text-[11px] rounded-full px-2 py-1 shrink-0 font-medium";
+  const extraDriverTextClass = compact ? "text-sm truncate flex-1 min-w-0" : "text-xs truncate flex-1 min-w-0";
+  const extraRemoveClass = compact
+    ? "text-sm shrink-0 rounded-md border px-2 py-1.5"
+    : "text-xs shrink-0 rounded-md border px-1.5 py-1";
   const extraActionButtonClass = compact
-    ? "text-sm rounded px-4 py-2.5 font-medium disabled:opacity-60 flex-1"
-    : "text-[11px] rounded px-2 py-1 font-medium disabled:opacity-60 flex-1";
-  const extraCancelButtonClass = compact ? "text-sm rounded px-4 py-2.5 border font-medium" : "text-[11px] rounded px-2 py-1 border font-medium";
+    ? "text-sm rounded-md px-4 py-2.5 font-semibold disabled:opacity-60 flex-1 shadow-sm"
+    : "text-xs rounded-md px-3 py-1.5 font-semibold disabled:opacity-60 flex-1 shadow-sm";
+  const extraCancelButtonClass = compact
+    ? "text-sm rounded-md px-4 py-2.5 border font-medium"
+    : "text-xs rounded-md px-3 py-1.5 border font-medium";
   const addExtraButtonClass = compact
-    ? "text-sm rounded px-3 py-2 border font-medium self-start"
-    : "text-[10px] rounded px-1.5 py-0.5 border font-medium self-start";
+    ? "text-sm rounded-md px-3 py-2 border font-semibold self-start shadow-sm"
+    : "text-xs rounded-md px-2.5 py-1.5 border font-semibold self-start shadow-sm";
+  // Cores dos botões "de ação" (salvar/+extra/+motorista) -- fundo com um
+  // toque da cor da marca, não mais cinza quase igual ao fundo do card,
+  // pra realmente parecer clicável.
+  const actionButtonStyle = { background: "color-mix(in srgb, var(--brand-green) 14%, var(--surface-1))", borderColor: "var(--brand-green)", color: "var(--brand-green-ink)" };
+  const neutralButtonStyle = { background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" };
 
   return (
     <div
-      className={`rounded-md ${cellPadding} flex flex-col gap-1 min-w-0 transition-opacity`}
+      className={`rounded-lg ${cellPadding} flex flex-col gap-1.5 min-w-0 transition-opacity shadow-sm`}
       style={{
         // "Hoje" precisa se destacar de verdade no calendário -- pedido do
         // Victor 19/08/2026 ("cor um pouco mais forte na rota do dia"),
         // var(--surface-2) sozinho era sutil demais pra bater o olho.
         border: isToday ? "2px solid var(--brand-green)" : "1px solid var(--gridline)",
-        background: isToday ? "color-mix(in srgb, var(--brand-green) 14%, var(--surface-1))" : "transparent",
+        background: isToday ? "color-mix(in srgb, var(--brand-green) 14%, var(--surface-1))" : "var(--surface-1)",
         opacity: isPast ? 0.3 : 1,
       }}
     >
       <div className="flex items-center justify-between gap-1">
+        {/* Dia da semana sempre visível na própria célula -- antes só
+            aparecia no mobile, sincronizado com um cabeçalho de 7 colunas
+            fixas que não existe mais (ver grid flexível acima). */}
         <span className={`${headerTextClass} truncate`} style={{ color: "var(--text-primary)" }}>
-          <span className={compact ? "" : "sm:hidden"}>{weekdayLabel} </span>
-          {dateLabel}
+          {weekdayLabel} {dateLabel}
           {isToday ? " · hoje" : ""}
         </span>
         <button
@@ -352,7 +367,7 @@ function RotaDayCell({
           onClick={rotaEditOpen ? cancelRotaEdit : () => setRotaEditOpen(true)}
           aria-label={rotaEditOpen ? "Cancelar edição da rota" : "Editar rota do dia"}
           className={editButtonClass}
-          style={{ color: "var(--text-secondary)" }}
+          style={neutralButtonStyle}
         >
           {rotaEditOpen ? "✕" : "✏️"}
         </button>
@@ -403,111 +418,97 @@ function RotaDayCell({
           ordinal (Rota extra 1, 2...) via labelAvailableRota. Filtra as
           de Campina Grande daqui, elas têm seção própria fixa logo
           abaixo. */}
-      {jpExtras.length > 0 ? (
-        <div className="flex flex-col gap-0.5 pt-0.5" style={{ borderTop: "1px solid var(--gridline)" }}>
-          {jpExtras.map((extra) => (
-            <div key={extra.id} className="flex items-center gap-1 min-w-0">
-              <span className={extraChipClass} style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
-                {labelAvailableRota(jpExtras, extra)}
-              </span>
-              <span className={extraDriverTextClass} style={{ color: "var(--text-primary)" }}>
-                {extra.driverName}
-              </span>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => removeExtra(extra.id)}
-                aria-label="Remover rota extra"
-                className={extraRemoveClass}
-                style={{ color: "var(--status-critical)" }}
-              >
-                ✕
+      <div className="flex flex-col gap-1 pt-1" style={{ borderTop: "1px solid var(--gridline)" }}>
+        {jpExtras.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            {jpExtras.map((extra) => (
+              <div key={extra.id} className="flex items-center gap-1.5 min-w-0 rounded-md px-1.5 py-1" style={{ background: "var(--surface-2)" }}>
+                <span className={extraChipClass} style={{ background: "var(--surface-1)", color: "var(--text-secondary)" }}>
+                  {labelAvailableRota(jpExtras, extra)}
+                </span>
+                <span className={extraDriverTextClass} style={{ color: "var(--text-primary)" }}>
+                  {extra.driverName}
+                </span>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => removeExtra(extra.id)}
+                  aria-label="Remover rota extra"
+                  className={extraRemoveClass}
+                  style={{ background: "var(--surface-1)", borderColor: "var(--status-critical)", color: "var(--status-critical)" }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {extraOpen ? (
+          <div className="flex flex-col gap-1">
+            <DriverPicker value={extraDriver} onChange={setExtraDriver} drivers={drivers} disabled={pending} compact={compact} />
+            <div className="flex items-center gap-1">
+              <button type="button" disabled={pending} onClick={addExtra} className={extraActionButtonClass} style={actionButtonStyle}>
+                salvar
+              </button>
+              <button type="button" onClick={() => setExtraOpen(false)} className={extraCancelButtonClass} style={neutralButtonStyle}>
+                cancelar
               </button>
             </div>
-          ))}
-        </div>
-      ) : null}
-
-      {extraOpen ? (
-        <div className="flex flex-col gap-1 pt-0.5" style={{ borderTop: "1px solid var(--gridline)" }}>
-          <DriverPicker value={extraDriver} onChange={setExtraDriver} drivers={drivers} disabled={pending} compact={compact} />
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={addExtra}
-              className={extraActionButtonClass}
-              style={{ background: "var(--surface-2)", border: "1px solid", borderColor: "var(--border)", color: "var(--text-primary)" }}
-            >
-              salvar
-            </button>
-            <button
-              type="button"
-              onClick={() => setExtraOpen(false)}
-              className={extraCancelButtonClass}
-              style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
-            >
-              cancelar
-            </button>
           </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setExtraOpen(true)}
-          className={addExtraButtonClass}
-          style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
-        >
-          + extra
-        </button>
-      )}
+        ) : (
+          <button type="button" onClick={() => setExtraOpen(true)} className={addExtraButtonClass} style={actionButtonStyle}>
+            + rota extra
+          </button>
+        )}
+      </div>
 
       {/* Campina Grande -- pedido do Victor 24/08/2026: painel único
           com João Pessoa, seção separada. Sempre as 2 rotas fixas
           (CG_ROTAS), sem "+ adicionar" -- "campina nao tem rota extra".
           Por baixo dos panos são linhas is_extra:true igual a rota
           extra de JP (ver Achados no plano), só que nunca aparecem
-          rotuladas como "extra" aqui. */}
-      <div className="flex flex-col gap-0.5 pt-0.5" style={{ borderTop: "1px solid var(--gridline)" }}>
-        <span className={compact ? "text-xs font-semibold" : "text-[10px] font-semibold"} style={{ color: "var(--text-muted)" }}>
+          rotuladas como "extra" aqui. Cada rota em seu próprio
+          mini-card, empilhado (nome numa linha, motorista/botão na
+          seguinte) -- nomes longos como "Centro/Norte/Leste" não cabiam
+          numa pílula ao lado do motorista sem colidir (achado do Victor
+          24/08/2026, ver captura de tela). */}
+      <div className="flex flex-col gap-1 pt-1" style={{ borderTop: "1px solid var(--gridline)" }}>
+        <span className={compact ? "text-xs font-semibold" : "text-[11px] font-semibold"} style={{ color: "var(--text-muted)" }}>
           Campina Grande
         </span>
         {CG_ROTAS.map((cgRota) => {
           const assignment = day.assignments.extras.find((e) => e.rota === cgRota);
-          if (cgPickingRota === cgRota) {
-            return (
-              <div key={cgRota} className="flex items-center gap-1 min-w-0">
-                <DriverPicker value={cgDriverValue} onChange={setCgDriverValue} drivers={drivers} disabled={pending} compact={compact} />
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => addCgDriver(cgRota)}
-                  className={extraActionButtonClass}
-                  style={{ background: "var(--surface-2)", border: "1px solid", borderColor: "var(--border)", color: "var(--text-primary)" }}
-                >
-                  salvar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCgPickingRota(null);
-                    setCgDriverValue("");
-                  }}
-                  className={extraCancelButtonClass}
-                  style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
-                >
-                  cancelar
-                </button>
-              </div>
-            );
-          }
           return (
-            <div key={cgRota} className="flex items-center gap-1 min-w-0">
-              <span className={extraChipClass} style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
-                {ROTA_LABELS[cgRota]}
-              </span>
-              {assignment ? (
-                <>
+            <div key={cgRota} className="flex flex-col gap-1 rounded-md p-1.5 min-w-0" style={{ background: "var(--surface-2)" }}>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: ROTA_COLORS[cgRota] }} aria-hidden="true" />
+                <span className={`${driverTextClass} font-semibold`} style={{ color: "var(--text-secondary)" }}>
+                  {ROTA_LABELS[cgRota]}
+                </span>
+              </div>
+              {cgPickingRota === cgRota ? (
+                <div className="flex flex-col gap-1">
+                  <DriverPicker value={cgDriverValue} onChange={setCgDriverValue} drivers={drivers} disabled={pending} compact={compact} />
+                  <div className="flex items-center gap-1">
+                    <button type="button" disabled={pending} onClick={() => addCgDriver(cgRota)} className={extraActionButtonClass} style={actionButtonStyle}>
+                      salvar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCgPickingRota(null);
+                        setCgDriverValue("");
+                      }}
+                      className={extraCancelButtonClass}
+                      style={neutralButtonStyle}
+                    >
+                      cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : assignment ? (
+                <div className="flex items-center gap-1.5 min-w-0">
                   <span className={extraDriverTextClass} style={{ color: "var(--text-primary)" }}>
                     {assignment.driverName}
                   </span>
@@ -517,11 +518,11 @@ function RotaDayCell({
                     onClick={() => removeExtra(assignment.id)}
                     aria-label="Remover motorista"
                     className={extraRemoveClass}
-                    style={{ color: "var(--status-critical)" }}
+                    style={{ background: "var(--surface-1)", borderColor: "var(--status-critical)", color: "var(--status-critical)" }}
                   >
                     ✕
                   </button>
-                </>
+                </div>
               ) : (
                 <button
                   type="button"
@@ -530,7 +531,7 @@ function RotaDayCell({
                     setCgDriverValue("");
                   }}
                   className={addExtraButtonClass}
-                  style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  style={actionButtonStyle}
                 >
                   + motorista
                 </button>
