@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
-import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
+import { recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import { notifyLoja, notifyAssistencia } from "@/lib/notifications";
@@ -26,8 +26,21 @@ export async function montadorSignIn(_state: MontadorFormState, formData: FormDa
   if (!typedName) return { error: "Informe seu nome." };
   if (!isValidLoginPinFormat(pin)) return { error: "Digite os números do seu PIN." };
 
+  // O check de rate limit por IP e a busca do montador não dependem um do
+  // outro -- rodar junto em vez de sequencial (eram 2 idas ao banco em
+  // fila esperando à toa) -- achado do Victor 24/08/2026: "depois que
+  // coloco o pin, tá demorando muito pra entrar". `pin_locked_until` já
+  // vem nessa mesma busca dos montadores (era uma 3ª ida ao banco
+  // separada, checkPinLockout, só pra reler a MESMA linha que já tinha
+  // vindo aqui do lado) -- checado localmente embaixo, sem round-trip
+  // extra. getClientIp só lê headers já recebidos (sem rede), por isso
+  // fica de fora do Promise.all -- resolve na hora, não atrasa nada.
   const ip = await getClientIp();
-  const ipLimit = await checkIpRateLimit(ip);
+  const admin = getSupabaseAdmin();
+  const [ipLimit, assemblersResult] = await Promise.all([
+    checkIpRateLimit(ip),
+    admin.from("assemblers").select("name, pin_hash, pin_locked_until"),
+  ]);
   if (ipLimit.locked) {
     return { error: `Muitas tentativas deste local. Tente de novo em ${ipLimit.minutesLeft} minuto(s).` };
   }
@@ -37,14 +50,13 @@ export async function montadorSignIn(_state: MontadorFormState, formData: FormDa
   // % e _ como curinga, o que um nome digitado não deveria acionar). Usa o
   // nome como está gravado no banco (não o que a pessoa digitou) daqui pra
   // frente, pra bloqueio de tentativas e sessão não divergirem por causa de caixa.
-  const admin = getSupabaseAdmin();
-  const { data: assemblers } = await admin.from("assemblers").select("name, pin_hash");
+  const assemblers = assemblersResult.data;
   const data = (assemblers ?? []).find((a) => a.name.toLowerCase() === typedName.toLowerCase());
   const name = data?.name ?? typedName;
 
-  const lockout = await checkPinLockout("assemblers", "name", name);
-  if (lockout.locked) {
-    return { error: `Muitas tentativas erradas. Tente de novo em ${lockout.minutesLeft} minuto(s).` };
+  if (data?.pin_locked_until && new Date(data.pin_locked_until).getTime() > Date.now()) {
+    const minutesLeft = Math.ceil((new Date(data.pin_locked_until).getTime() - Date.now()) / 60000);
+    return { error: `Muitas tentativas erradas. Tente de novo em ${minutesLeft} minuto(s).` };
   }
 
   if (!data || !data.pin_hash || !verifyPin(pin, data.pin_hash)) {
