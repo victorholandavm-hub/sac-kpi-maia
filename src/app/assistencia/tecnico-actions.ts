@@ -7,7 +7,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
-import { isItemDestino, ITEM_DESTINO_LABELS, ITEM_DESTINO_NEEDS_STORE } from "@/lib/tecnicos";
+import { isItemDestino, ITEM_DESTINO_LABELS, ITEM_DESTINO_NEEDS_STORE, ITEM_DESTINO_NEEDS_NOTE } from "@/lib/tecnicos";
 import {
   TECNICO_COOKIE_NAME,
   TECNICO_SESSION_MAX_AGE,
@@ -75,14 +75,16 @@ export async function getTecnicoSession(): Promise<string | null> {
 }
 
 // Grava o destino de um item (fábrica/estoque/conserto/sem condições/
-// mostruário/pequena avaria/peça enviada) -- registrado por item, não
-// pelo chamado inteiro (uma troca pode voltar com mais de um produto,
-// cada um com destino diferente). "mostruario" exige a loja pra quem foi
-// enviado (ver ITEM_DESTINO_NEEDS_STORE) -- pedido do Victor 21/08/2026:
-// "enviado para mostruario... eles teriam que selecionar a loja pra qual
-// foi enviada". Evento de auditoria vai pro histórico do chamado, igual
-// toda outra mutação relevante do projeto.
-export async function setItemDestino(itemId: string, destino: string, destinoLojaId?: string): Promise<void> {
+// mostruário/pequena avaria/peça enviada/em observação) -- registrado por
+// item, não pelo chamado inteiro (uma troca pode voltar com mais de um
+// produto, cada um com destino diferente). "mostruario" exige a loja pra
+// quem foi enviado (ver ITEM_DESTINO_NEEDS_STORE) -- pedido do Victor
+// 21/08/2026. "em_observacao" exige uma nota de texto livre (ver
+// ITEM_DESTINO_NEEDS_NOTE) -- pedido do Victor 24/08/2026: "abre um campo
+// de texto livre e quando confirma ja vai para o status em observação".
+// Evento de auditoria vai pro histórico do chamado, igual toda outra
+// mutação relevante do projeto.
+export async function setItemDestino(itemId: string, destino: string, destinoLojaId?: string, destinoObservacao?: string): Promise<void> {
   const tecnicoName = await getTecnicoSession();
   if (!tecnicoName) throw new Error("Sessão expirada. Faça login de novo.");
   if (!isItemDestino(destino)) throw new Error("Destino inválido.");
@@ -95,6 +97,11 @@ export async function setItemDestino(itemId: string, destino: string, destinoLoj
     const { data: store } = await admin.from("stores").select("id, name").eq("id", loja).maybeSingle();
     if (!store) throw new Error("Loja inválida.");
     lojaName = store.name;
+  }
+  let observacao: string | null = null;
+  if (destino === ITEM_DESTINO_NEEDS_NOTE) {
+    observacao = (destinoObservacao ?? "").trim();
+    if (!observacao) throw new Error("Descreva o motivo da observação.");
   }
 
   const { data: item, error: itemError } = await admin
@@ -111,17 +118,19 @@ export async function setItemDestino(itemId: string, destino: string, destinoLoj
       destino_definido_por: tecnicoName,
       destino_definido_em: new Date().toISOString(),
       destino_loja_id: destino === ITEM_DESTINO_NEEDS_STORE ? destinoLojaId : null,
+      destino_observacao: observacao,
     })
     .eq("id", itemId);
   if (updateError) throw new Error(updateError.message);
 
   const label = item.quantity > 1 ? `${item.quantity}x ${item.product}` : item.product;
   const lojaNote = lojaName ? ` (loja: ${lojaName})` : "";
+  const observacaoNote = observacao ? ` (nota: ${observacao})` : "";
   await admin.from("service_request_events").insert({
     request_id: item.request_id,
     actor_id: null,
     event_type: "note_added",
-    note: `${tecnicoName} (equipe técnica) definiu destino de "${label}": ${ITEM_DESTINO_LABELS[destino]}${lojaNote}.`,
+    note: `${tecnicoName} (equipe técnica) definiu destino de "${label}": ${ITEM_DESTINO_LABELS[destino]}${lojaNote}${observacaoNote}.`,
   });
 
   revalidatePath("/assistencia/tecnico");
@@ -149,7 +158,7 @@ export async function clearItemDestino(itemId: string): Promise<void> {
 
   const { error: updateError } = await admin
     .from("service_request_items")
-    .update({ destino: null, destino_definido_por: null, destino_definido_em: null, destino_loja_id: null })
+    .update({ destino: null, destino_definido_por: null, destino_definido_em: null, destino_loja_id: null, destino_observacao: null })
     .eq("id", itemId);
   if (updateError) throw new Error(updateError.message);
 
