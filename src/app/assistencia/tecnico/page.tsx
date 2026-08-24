@@ -189,7 +189,10 @@ export default async function TecnicoHomePage({
         ) : (
           <div className="flex flex-col gap-3">
             {groups.map((group) => (
-              <details key={group.dateKey} className="group flex flex-col gap-2" open>
+              // Recolhido por padrão -- achado do Victor 24/08/2026: "toda
+              // vez que eu entrar em qualquer tela, as demandas agrupadas
+              // precisam aparecer recolhidas".
+              <details key={group.dateKey} className="group flex flex-col gap-2">
                 <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                   <span
                     className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"

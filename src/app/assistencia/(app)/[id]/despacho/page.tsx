@@ -40,7 +40,7 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
   }
 
   return (
-    <div className="flex flex-col gap-4 max-w-2xl despacho-print">
+    <div className="flex flex-col gap-4 max-w-2xl print:max-w-none despacho-print">
       <div className="flex items-center justify-between gap-3 print:hidden">
         <Link href={`/assistencia/${request.id}`} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
           ← Ver chamado completo
@@ -53,12 +53,20 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
           print-color-adjust, o navegador some com o fundo preto das
           SectionTitle na impressão (economia de tinta por padrão) e a folha
           sai toda branca -- pedido do Victor 18/08/2026: as listras pretas
-          têm que sair pretas de verdade, igual a notificação física. */}
+          têm que sair pretas de verdade, igual a notificação física.
+          max-w-2xl (tela) travava a largura na impressão também, deixando o
+          papel com uma faixa em branco na lateral em vez de ocupar a folha
+          A4 inteira -- achado do Victor 24/08/2026: "a impressão... ainda
+          nao está na folha A4 inteira, precisa redimensionar certo".
+          print:max-w-none acima solta a largura; largura/altura 100% aqui
+          garante que o cartão realmente estica até a borda da margem, não
+          só o container em volta dele. */}
       <style>{`
         @page { size: A4; margin: 10mm; }
         @media print {
           html, body { height: auto !important; }
           * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+          .despacho-print { width: 100% !important; max-width: 100% !important; }
         }
       `}</style>
 

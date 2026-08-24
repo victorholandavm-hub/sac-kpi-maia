@@ -45,7 +45,7 @@ export default async function DespachoLotePage({
   const requests: ServiceRequestDetail[] = results.filter((r) => r !== null).map((r) => r.request);
 
   return (
-    <div className="flex flex-col gap-4 max-w-2xl despacho-print">
+    <div className="flex flex-col gap-4 max-w-2xl print:max-w-none despacho-print">
       <div className="flex items-center justify-between gap-3 print:hidden">
         <Link href="/assistencia/fila" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
           ← Voltar
@@ -62,12 +62,17 @@ export default async function DespachoLotePage({
 
       {/* Mesmo ajuste de @page do despacho individual -- break-after força
           cada cartão pra sua própria folha na impressão (tela mostra tudo
-          empilhado com espaço normal entre eles). */}
+          empilhado com espaço normal entre eles). max-w-2xl (tela) travava
+          a largura na impressão também -- achado do Victor 24/08/2026: "a
+          impressão... ainda nao está na folha A4 inteira, precisa
+          redimensionar certo". print:max-w-none + width 100% garante que o
+          cartão estica até a borda da margem A4. */}
       <style>{`
         @page { size: A4; margin: 10mm; }
         @media print {
           html, body { height: auto !important; }
           * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+          .despacho-print { width: 100% !important; max-width: 100% !important; }
         }
         .despacho-lote-item:not(:last-child) { break-after: page; page-break-after: always; }
       `}</style>
