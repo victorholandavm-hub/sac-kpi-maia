@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTecnicoSession, tecnicoSignOut } from "@/app/assistencia/tecnico-actions";
-import { listRequestsForTecnico, type TecnicoRequestView } from "@/lib/tecnicos";
+import { listRequestsForTecnico, ITEM_DESTINO_NEEDS_NOTE, type TecnicoRequestView, type ItemDestino } from "@/lib/tecnicos";
 import { listStores } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
+import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { TecnicoItemDestino } from "@/components/assistencia/TecnicoItemDestino";
 import { TecnicoNotificationModalButton } from "@/components/assistencia/TecnicoNotificationModalButton";
 
@@ -24,6 +25,29 @@ function formatDateTime(iso: string | null): string {
 // já usada no filtro "Origem" da aba Entregas (fila/page.tsx).
 function origemLabel(type: TecnicoRequestView["type"]): "SAC" | "Assistência" {
   return (SAC_MANAGED_TYPES as readonly string[]).includes(type) ? "SAC" : "Assistência";
+}
+
+// Três fases -- pedido do Victor 24/08/2026: "preciso de uma nova fase
+// alem de pendentes e concluido, que é a fase 'em observação'". Um item
+// pendente (destino null) vira "em observação" quando alguém escolhe
+// esse destino especificamente (ver ITEM_DESTINO_NEEDS_NOTE/
+// TecnicoItemDestino.tsx), e "classificado" quando ganha qualquer outro
+// destino de verdade.
+type Phase = "pendentes" | "observacao" | "classificados";
+
+function itemPhase(destino: ItemDestino | null): Phase {
+  if (destino === null) return "pendentes";
+  if (destino === ITEM_DESTINO_NEEDS_NOTE) return "observacao";
+  return "classificados";
+}
+
+function buildHref(params: { view?: string; q?: string; store?: string }) {
+  const sp = new URLSearchParams();
+  if (params.view) sp.set("view", params.view);
+  if (params.q) sp.set("q", params.q);
+  if (params.store) sp.set("store", params.store);
+  const qs = sp.toString();
+  return qs ? `/assistencia/tecnico?${qs}` : "/assistencia/tecnico";
 }
 
 type DateGroup = { dateKey: string; label: string; requests: TecnicoRequestView[] };
@@ -53,22 +77,36 @@ function groupByCompletedDate(requests: TecnicoRequestView[]): DateGroup[] {
 export default async function TecnicoHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; q?: string; store?: string }>;
 }) {
   const tecnicoName = await getTecnicoSession();
   if (!tecnicoName) {
     redirect("/assistencia/tecnico/login");
   }
 
-  const { view } = await searchParams;
-  const showClassificados = view === "classificados";
+  const { view, q, store } = await searchParams;
+  const phase: Phase = view === "observacao" ? "observacao" : view === "classificados" ? "classificados" : "pendentes";
 
   const [todos, stores] = await Promise.all([listRequestsForTecnico(), listStores()]);
   // Um chamado pode ter item pendente E item já classificado ao mesmo tempo
   // (troca com 2 produtos, cada um resolvido em momento diferente) -- por
-  // isso o filtro é "tem pelo menos um item nesse estado", não "todos os
-  // itens", e a mesma solicitação pode aparecer nas duas abas.
-  const requests = todos.filter((r) => r.items.some((i) => (showClassificados ? i.destino !== null : i.destino === null)));
+  // isso o filtro é "tem pelo menos um item nessa fase", não "todos os
+  // itens", e a mesma solicitação pode aparecer em mais de uma aba.
+  let requests = todos.filter((r) => r.items.some((i) => itemPhase(i.destino) === phase));
+  // Filtro por nome/loja/produto -- pedido do Victor 24/08/2026: "coloque
+  // uma possibilidade de filtro por nome, loja, produto". Loja é um
+  // <select> à parte (ver FilterSelect abaixo); nome do cliente e produto
+  // dividem a mesma busca de texto, mesmo padrão de fila/page.tsx
+  // ("Buscar por nº do chamado, cliente, produto...").
+  if (store) {
+    requests = requests.filter((r) => r.storeId === store);
+  }
+  if (q) {
+    const needle = q.trim().toLowerCase();
+    requests = requests.filter(
+      (r) => (r.clientName ?? "").toLowerCase().includes(needle) || r.items.some((i) => i.product.toLowerCase().includes(needle))
+    );
+  }
   const groups = groupByCompletedDate(requests);
 
   return (
@@ -88,37 +126,64 @@ export default async function TecnicoHomePage({
           </div>
         </AssistenciaHeader>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/assistencia/tecnico"
-            className="text-xs px-3 py-1.5 rounded-full border"
-            style={{
-              borderColor: "var(--border)",
-              background: !showClassificados ? "var(--surface-1)" : "transparent",
-              color: !showClassificados ? "var(--text-primary)" : "var(--text-secondary)",
-              fontWeight: !showClassificados ? 600 : 400,
-            }}
-          >
-            Pendentes
-          </Link>
-          <Link
-            href="/assistencia/tecnico?view=classificados"
-            className="text-xs px-3 py-1.5 rounded-full border"
-            style={{
-              borderColor: "var(--border)",
-              background: showClassificados ? "var(--surface-1)" : "transparent",
-              color: showClassificados ? "var(--text-primary)" : "var(--text-secondary)",
-              fontWeight: showClassificados ? 600 : 400,
-            }}
-          >
-            Já classificados
-          </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          {(
+            [
+              ["pendentes", "Pendentes"],
+              ["observacao", "Em observação"],
+              ["classificados", "Já classificados"],
+            ] as const
+          ).map(([value, label]) => (
+            <Link
+              key={value}
+              href={buildHref({ view: value === "pendentes" ? undefined : value, q, store })}
+              className="text-xs px-3 py-1.5 rounded-full border"
+              style={{
+                borderColor: "var(--border)",
+                background: phase === value ? "var(--surface-1)" : "transparent",
+                color: phase === value ? "var(--text-primary)" : "var(--text-secondary)",
+                fontWeight: phase === value ? 600 : 400,
+              }}
+            >
+              {label}
+            </Link>
+          ))}
         </div>
+
+        {/* Filtro por nome/loja/produto -- pedido do Victor 24/08/2026. */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+        </div>
+
+        <form action="/assistencia/tecnico" method="GET" className="flex items-center gap-2 flex-wrap">
+          {phase !== "pendentes" ? <input type="hidden" name="view" value={phase} /> : null}
+          {store ? <input type="hidden" name="store" value={store} /> : null}
+          <input
+            type="search"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Buscar por cliente ou produto…"
+            className="rounded border px-3 py-2 text-sm flex-1 min-w-[200px]"
+            style={{ borderColor: "var(--border)" }}
+          />
+          <button type="submit" className="text-sm px-3 py-2 rounded border" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+            Buscar
+          </button>
+          {q || store ? (
+            <Link href={buildHref({ view: phase === "pendentes" ? undefined : phase })} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+              Limpar
+            </Link>
+          ) : null}
+        </form>
 
         {requests.length === 0 ? (
           <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              {showClassificados ? "Nenhum item classificado ainda." : "Nenhum item pendente no momento."}
+              {phase === "classificados"
+                ? "Nenhum item classificado ainda."
+                : phase === "observacao"
+                  ? "Nenhum item em observação no momento."
+                  : "Nenhum item pendente no momento."}
             </p>
           </div>
         ) : (
@@ -183,7 +248,7 @@ export default async function TecnicoHomePage({
                       </div>
                       <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
                         {r.items
-                          .filter((i) => (showClassificados ? i.destino !== null : i.destino === null))
+                          .filter((i) => itemPhase(i.destino) === phase)
                           .map((i) => (
                             <div key={i.id} className="flex items-center justify-between gap-3 flex-wrap px-4 py-3">
                               <span className="text-sm" style={{ color: "var(--text-primary)" }}>
@@ -197,6 +262,7 @@ export default async function TecnicoHomePage({
                                 destinoDefinidoPor={i.destinoDefinidoPor}
                                 destinoDefinidoEm={i.destinoDefinidoEm}
                                 destinoLojaName={i.destinoLojaName}
+                                destinoObservacao={i.destinoObservacao}
                                 stores={stores}
                               />
                             </div>

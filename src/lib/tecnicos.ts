@@ -13,6 +13,12 @@ import type { RequestType } from "./serviceRequests";
 // dado a mais (qual loja recebeu, ver destinoLojaId/destinoLojaName
 // abaixo e setItemDestino em tecnico-actions.ts) -- os outros dois são
 // clique único, igual aos 4 de sempre.
+// "em_observacao" -- pedido do Victor 24/08/2026: "preciso de uma nova
+// fase alem de pendentes e concluido, que é a fase 'em observação'...
+// abre um campo de texto livre e quando confirma ja vai para o status em
+// observação". Mesmo padrão do "mostruario" (pede um dado extra antes de
+// confirmar), só que texto livre em vez de loja -- ver
+// ITEM_DESTINO_NEEDS_NOTE/destinoObservacao abaixo.
 export const ITEM_DESTINOS = [
   "fabrica",
   "estoque",
@@ -21,6 +27,7 @@ export const ITEM_DESTINOS = [
   "mostruario",
   "pequena_avaria",
   "peca_enviada",
+  "em_observacao",
 ] as const;
 export type ItemDestino = (typeof ITEM_DESTINOS)[number];
 
@@ -36,6 +43,7 @@ export const ITEM_DESTINO_LABELS: Record<ItemDestino, string> = {
   mostruario: "Enviado pra mostruário",
   pequena_avaria: "Pequena avaria",
   peca_enviada: "Peça enviada",
+  em_observacao: "Em observação",
 };
 
 export const ITEM_DESTINO_COLORS: Record<ItemDestino, string> = {
@@ -46,11 +54,17 @@ export const ITEM_DESTINO_COLORS: Record<ItemDestino, string> = {
   mostruario: "var(--brand-orange)",
   pequena_avaria: "var(--series-5)",
   peca_enviada: "var(--brand-green)",
+  em_observacao: "var(--series-3)",
 };
 
 // Único destino que precisa de um dado extra -- pra qual loja o item foi
 // enviado (ver ITEM_DESTINOS acima).
 export const ITEM_DESTINO_NEEDS_STORE: ItemDestino = "mostruario";
+
+// O outro destino que precisa de um dado extra -- por que está em
+// observação, texto livre (ver ITEM_DESTINO_NEEDS_STORE acima, mesma
+// ideia).
+export const ITEM_DESTINO_NEEDS_NOTE: ItemDestino = "em_observacao";
 
 export type TecnicoWithPinStatus = { name: string; hasPin: boolean };
 
@@ -84,12 +98,18 @@ export type TecnicoItem = {
   // ITEM_DESTINO_NEEDS_STORE) -- pra qual loja o item foi enviado.
   destinoLojaId: string | null;
   destinoLojaName: string | null;
+  // Só preenchido quando destino === "em_observacao" (ver
+  // ITEM_DESTINO_NEEDS_NOTE) -- o motivo, texto livre.
+  destinoObservacao: string | null;
 };
 
 export type TecnicoRequestView = {
   id: string;
   ticketNumber: number;
   type: RequestType;
+  // Pro filtro por loja -- pedido do Victor 24/08/2026: "coloque uma
+  // possibilidade de filtro por nome, loja, produto".
+  storeId: string | null;
   storeName: string;
   clientName: string | null;
   // CPF, não código do Protheus -- pedido do Victor 20/08/2026: "no lugar
@@ -120,12 +140,13 @@ export type TecnicoRequestView = {
 
 const TECNICO_VIEW_LIMIT = 200;
 const TECNICO_VIEW_COLUMNS =
-  "id, ticket_number, type, store_id, client_name, client_cpf, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, client_time_restriction, driver_name, completed_at, requested_by_name, requester:profiles!requested_by(full_name), stores(name), items:service_request_items(id, product, part_code, quantity, destino, destino_definido_por, destino_definido_em, destino_loja_id, destino_loja:stores!destino_loja_id(name))";
+  "id, ticket_number, type, store_id, client_name, client_cpf, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, client_time_restriction, driver_name, completed_at, requested_by_name, requester:profiles!requested_by(full_name), stores(name), items:service_request_items(id, product, part_code, quantity, destino, destino_definido_por, destino_definido_em, destino_loja_id, destino_loja:stores!destino_loja_id(name), destino_observacao)";
 
 type TecnicoViewRow = {
   id: string;
   ticket_number: number;
   type: RequestType;
+  store_id: string | null;
   client_name: string | null;
   client_cpf: string | null;
   client_phone: string | null;
@@ -153,6 +174,7 @@ type TecnicoViewRow = {
     destino_definido_em: string | null;
     destino_loja_id: string | null;
     destino_loja: { name: string } | null;
+    destino_observacao: string | null;
   }[] | null;
 };
 
@@ -161,6 +183,7 @@ function toTecnicoView(row: TecnicoViewRow): TecnicoRequestView {
     id: row.id,
     ticketNumber: row.ticket_number,
     type: row.type,
+    storeId: row.store_id,
     storeName: row.stores?.name ?? "—",
     clientName: row.client_name,
     clientCpf: row.client_cpf,
@@ -187,6 +210,7 @@ function toTecnicoView(row: TecnicoViewRow): TecnicoRequestView {
       destinoDefinidoEm: i.destino_definido_em,
       destinoLojaId: i.destino_loja_id,
       destinoLojaName: i.destino_loja?.name ?? null,
+      destinoObservacao: i.destino_observacao,
     })),
   };
 }

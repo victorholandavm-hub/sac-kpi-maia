@@ -3,7 +3,14 @@
 import { useState } from "react";
 import { setItemDestino, clearItemDestino } from "@/app/assistencia/tecnico-actions";
 import { useQuickAction } from "./useQuickAction";
-import { ITEM_DESTINOS, ITEM_DESTINO_LABELS, ITEM_DESTINO_COLORS, ITEM_DESTINO_NEEDS_STORE, type ItemDestino } from "@/lib/tecnicos";
+import {
+  ITEM_DESTINOS,
+  ITEM_DESTINO_LABELS,
+  ITEM_DESTINO_COLORS,
+  ITEM_DESTINO_NEEDS_STORE,
+  ITEM_DESTINO_NEEDS_NOTE,
+  type ItemDestino,
+} from "@/lib/tecnicos";
 import type { Store } from "@/lib/serviceRequests";
 
 function formatDateTime(iso: string): string {
@@ -16,6 +23,7 @@ export function TecnicoItemDestino({
   destinoDefinidoPor,
   destinoDefinidoEm,
   destinoLojaName,
+  destinoObservacao,
   stores,
 }: {
   itemId: string;
@@ -26,39 +34,54 @@ export function TecnicoItemDestino({
   // -- pedido do Victor 21/08/2026: "enviado para mostruario... eles
   // teriam que selecionar a loja pra qual foi enviada".
   destinoLojaName: string | null;
+  // Só usado quando destino === "em_observacao" (ver
+  // ITEM_DESTINO_NEEDS_NOTE) -- pedido do Victor 24/08/2026: "abre um
+  // campo de texto livre e quando confirma ja vai para o status em
+  // observação".
+  destinoObservacao: string | null;
   stores: Store[];
 }) {
   const { pending, run } = useQuickAction();
-  // "mostruario" pede a loja antes de confirmar -- só esse destino abre
-  // esse passo extra, os outros continuam clique único de sempre.
+  // "mostruario" pede a loja, "em_observacao" pede uma nota -- os únicos
+  // dois destinos que abrem um passo extra antes de confirmar, o resto
+  // continua clique único de sempre.
   const [pickingStore, setPickingStore] = useState(false);
   const [storeId, setStoreId] = useState("");
+  const [pickingNote, setPickingNote] = useState(false);
+  const [note, setNote] = useState("");
 
   if (destino) {
     return (
-      <div className="flex items-center gap-2 flex-wrap">
-        <span
-          className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
-          style={{ color: ITEM_DESTINO_COLORS[destino], borderColor: ITEM_DESTINO_COLORS[destino] }}
-        >
-          {ITEM_DESTINO_LABELS[destino]}
-          {destino === ITEM_DESTINO_NEEDS_STORE && destinoLojaName ? ` · ${destinoLojaName}` : ""}
-        </span>
-        {destinoDefinidoPor ? (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            {destinoDefinidoPor}
-            {destinoDefinidoEm ? ` · ${formatDateTime(destinoDefinidoEm)}` : ""}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
+            style={{ color: ITEM_DESTINO_COLORS[destino], borderColor: ITEM_DESTINO_COLORS[destino] }}
+          >
+            {ITEM_DESTINO_LABELS[destino]}
+            {destino === ITEM_DESTINO_NEEDS_STORE && destinoLojaName ? ` · ${destinoLojaName}` : ""}
           </span>
+          {destinoDefinidoPor ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {destinoDefinidoPor}
+              {destinoDefinidoEm ? ` · ${formatDateTime(destinoDefinidoEm)}` : ""}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => run(() => clearItemDestino(itemId), "Destino desfeito -- volta pra pendente.")}
+            className="text-xs underline disabled:opacity-60"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            ↩ desfazer
+          </button>
+        </div>
+        {destino === ITEM_DESTINO_NEEDS_NOTE && destinoObservacao ? (
+          <p className="text-xs whitespace-pre-line" style={{ color: "var(--text-secondary)" }}>
+            {destinoObservacao}
+          </p>
         ) : null}
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => run(() => clearItemDestino(itemId), "Destino desfeito -- volta pra pendente.")}
-          className="text-xs underline disabled:opacity-60"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          ↩ desfazer
-        </button>
       </div>
     );
   }
@@ -108,6 +131,49 @@ export function TecnicoItemDestino({
     );
   }
 
+  if (pickingNote) {
+    return (
+      <div className="flex flex-col gap-1.5 w-full max-w-xs">
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Por que está em observação?"
+          rows={2}
+          className="text-xs rounded border px-2 py-1.5 w-full"
+          style={{ borderColor: "var(--border)" }}
+          autoFocus
+        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={pending || !note.trim()}
+            onClick={() =>
+              run(
+                () => setItemDestino(itemId, ITEM_DESTINO_NEEDS_NOTE, undefined, note),
+                `Destino: ${ITEM_DESTINO_LABELS[ITEM_DESTINO_NEEDS_NOTE]}.`
+              )
+            }
+            className="text-xs rounded-full px-2.5 py-1 font-medium disabled:opacity-60"
+            style={{ background: ITEM_DESTINO_COLORS[ITEM_DESTINO_NEEDS_NOTE], color: "#fff" }}
+          >
+            Confirmar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPickingNote(false);
+              setNote("");
+            }}
+            className="text-xs underline"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       {ITEM_DESTINOS.map((d) => (
@@ -115,7 +181,13 @@ export function TecnicoItemDestino({
           key={d}
           type="button"
           disabled={pending}
-          onClick={() => (d === ITEM_DESTINO_NEEDS_STORE ? setPickingStore(true) : run(() => setItemDestino(itemId, d), `Destino: ${ITEM_DESTINO_LABELS[d]}.`))}
+          onClick={() =>
+            d === ITEM_DESTINO_NEEDS_STORE
+              ? setPickingStore(true)
+              : d === ITEM_DESTINO_NEEDS_NOTE
+                ? setPickingNote(true)
+                : run(() => setItemDestino(itemId, d), `Destino: ${ITEM_DESTINO_LABELS[d]}.`)
+          }
           className="text-xs rounded-full px-2.5 py-1 border font-medium whitespace-nowrap disabled:opacity-60"
           style={{ borderColor: ITEM_DESTINO_COLORS[d], color: ITEM_DESTINO_COLORS[d] }}
         >
