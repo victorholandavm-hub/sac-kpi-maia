@@ -8,7 +8,18 @@ import {
   getRotaDriverAssignmentsAction as assistenciaGetRotaDriverAssignments,
 } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
-import { ROTAS, ROTA_LABELS, ROTA_COLORS, WEEKDAY_LABELS, type Rota, type RotaDayOverview, type RotaDriverAssignments } from "@/lib/rotas";
+import {
+  CG_ROTAS,
+  JP_EXTRA_ROTA,
+  JP_PRIMARY_ROTAS,
+  ROTA_LABELS,
+  ROTA_COLORS,
+  WEEKDAY_LABELS,
+  labelAvailableRota,
+  type Rota,
+  type RotaDayOverview,
+  type RotaDriverAssignments,
+} from "@/lib/rotas";
 
 type RotaActions = {
   setRotaDriverAssignment: (date: string, rota: string, driverName: string) => Promise<{ updatedCount: number }>;
@@ -184,8 +195,15 @@ function RotaDayCell({
   const [extraOpen, setExtraOpen] = useState(false);
   const [rotaValue, setRotaValue] = useState<Rota | "">(savedRota ?? "");
   const [driverValue, setDriverValue] = useState(savedDriver || defaultDriver || "");
-  const [extraRota, setExtraRota] = useState<Rota | "">("");
   const [extraDriver, setExtraDriver] = useState("");
+  // Motorista de uma das 2 rotas fixas de Campina Grande -- qual delas
+  // está sendo editada agora (null = nenhuma). Pedido do Victor
+  // 24/08/2026: "campina nao tem rota extra", as 2 rotas de CG entram
+  // como linhas is_extra:true por baixo dos panos (ver Achados no plano),
+  // mas na tela nunca aparecem chamadas de "extra" -- seção própria,
+  // sempre as mesmas 2, cada uma com seu motorista.
+  const [cgPickingRota, setCgPickingRota] = useState<Rota | null>(null);
+  const [cgDriverValue, setCgDriverValue] = useState("");
 
   const isToday = day.date === today;
   // Dia já passado -- pedido do Victor 20/08/2026: "todas as datas que já
@@ -201,6 +219,9 @@ function RotaDayCell({
   });
   const weekdayLabel = WEEKDAY_SHORT[day.weekday];
   const dirty = rotaValue !== (savedRota ?? "") || driverValue.trim() !== savedDriver;
+  // Extras genéricas de João Pessoa (rota extra) -- as de Campina Grande
+  // (CG_ROTAS) têm seção própria fixa, não entram aqui.
+  const jpExtras = day.assignments.extras.filter((e) => e.rota === JP_EXTRA_ROTA);
 
   function cancelRotaEdit() {
     setRotaValue(savedRota ?? "");
@@ -229,26 +250,25 @@ function RotaDayCell({
     });
   }
 
+  // Rota extra genérica de João Pessoa -- pedido do Victor 24/08/2026:
+  // "fica por padrão o nome 'rota extra' sem precisar escolher entre
+  // sul, centro e praia, só precisando escolher o nome do motorista".
+  // Sempre JP_EXTRA_ROTA, sem escolher região -- o ordinal (Rota extra
+  // 1, 2...) é calculado na hora de exibir por labelAvailableRota.
   function addExtra() {
-    if (!extraRota) {
-      showToast("Escolha a rota extra.", "error");
-      return;
-    }
     const name = extraDriver.trim();
     if (!name) {
       showToast("Escolha um motorista.", "error");
       return;
     }
-    const rota = extraRota;
     run(async () => {
-      const result = await actions.addRotaExtra(day.date, rota, name);
+      const result = await actions.addRotaExtra(day.date, JP_EXTRA_ROTA, name);
       const assignments = await actions.getRotaDriverAssignments(day.date);
       onChange({ ...day, assignments });
-      setExtraRota("");
       setExtraDriver("");
       setExtraOpen(false);
       showToast(
-        `Rota extra em ${dateLabel}: ${ROTA_LABELS[rota]} com ${name}. ${result.updatedCount} chamado${result.updatedCount === 1 ? "" : "s"} atualizado${result.updatedCount === 1 ? "" : "s"}.`,
+        `Rota extra em ${dateLabel} com ${name}. ${result.updatedCount} chamado${result.updatedCount === 1 ? "" : "s"} atualizado${result.updatedCount === 1 ? "" : "s"}.`,
         "success"
       );
     });
@@ -259,6 +279,28 @@ function RotaDayCell({
       await actions.removeRotaExtra(id);
       onChange({ ...day, assignments: { ...day.assignments, extras: day.assignments.extras.filter((e) => e.id !== id) } });
     }, "Rota extra removida.");
+  }
+
+  // Motorista de uma das 2 rotas fixas de Campina Grande -- mesma
+  // action de sempre (addRotaExtra), só que a rota já vem fixa (cgRota),
+  // sem escolher.
+  function addCgDriver(cgRota: Rota) {
+    const name = cgDriverValue.trim();
+    if (!name) {
+      showToast("Escolha um motorista.", "error");
+      return;
+    }
+    run(async () => {
+      const result = await actions.addRotaExtra(day.date, cgRota, name);
+      const assignments = await actions.getRotaDriverAssignments(day.date);
+      onChange({ ...day, assignments });
+      setCgPickingRota(null);
+      setCgDriverValue("");
+      showToast(
+        `${ROTA_LABELS[cgRota]} (Campina Grande) em ${dateLabel} com ${name}. ${result.updatedCount} chamado${result.updatedCount === 1 ? "" : "s"} atualizado${result.updatedCount === 1 ? "" : "s"}.`,
+        "success"
+      );
+    });
   }
 
   // Modo compact (Everton/Samuel, ver RotaMotoristaDoDia acima): só 2
@@ -326,7 +368,10 @@ function RotaDayCell({
             disabled={pending}
           >
             <option value="">Sem rota</option>
-            {ROTAS.map((r) => (
+            {/* Só João Pessoa "de verdade" -- a rota principal do dia
+                nunca é Campina Grande nem a extra genérica (ver
+                JP_PRIMARY_ROTAS em rotas.ts). */}
+            {JP_PRIMARY_ROTAS.map((r) => (
               <option key={r} value={r}>
                 {ROTA_LABELS[r]}
               </option>
@@ -353,12 +398,17 @@ function RotaDayCell({
         </>
       )}
 
-      {day.assignments.extras.length > 0 ? (
+      {/* Rotas extras genéricas de João Pessoa -- pedido do Victor
+          24/08/2026: sem escolher região, só o motorista; rótulo com
+          ordinal (Rota extra 1, 2...) via labelAvailableRota. Filtra as
+          de Campina Grande daqui, elas têm seção própria fixa logo
+          abaixo. */}
+      {jpExtras.length > 0 ? (
         <div className="flex flex-col gap-0.5 pt-0.5" style={{ borderTop: "1px solid var(--gridline)" }}>
-          {day.assignments.extras.map((extra) => (
+          {jpExtras.map((extra) => (
             <div key={extra.id} className="flex items-center gap-1 min-w-0">
               <span className={extraChipClass} style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
-                {ROTA_LABELS[extra.rota]}
+                {labelAvailableRota(jpExtras, extra)}
               </span>
               <span className={extraDriverTextClass} style={{ color: "var(--text-primary)" }}>
                 {extra.driverName}
@@ -380,20 +430,6 @@ function RotaDayCell({
 
       {extraOpen ? (
         <div className="flex flex-col gap-1 pt-0.5" style={{ borderTop: "1px solid var(--gridline)" }}>
-          <select
-            value={extraRota}
-            onChange={(e) => setExtraRota(e.target.value as Rota)}
-            className={selectClass}
-            style={{ borderColor: "var(--border)" }}
-            disabled={pending}
-          >
-            <option value="">Rota…</option>
-            {ROTAS.map((r) => (
-              <option key={r} value={r}>
-                {ROTA_LABELS[r]}
-              </option>
-            ))}
-          </select>
           <DriverPicker value={extraDriver} onChange={setExtraDriver} drivers={drivers} disabled={pending} compact={compact} />
           <div className="flex items-center gap-1">
             <button
@@ -425,6 +461,84 @@ function RotaDayCell({
           + extra
         </button>
       )}
+
+      {/* Campina Grande -- pedido do Victor 24/08/2026: painel único
+          com João Pessoa, seção separada. Sempre as 2 rotas fixas
+          (CG_ROTAS), sem "+ adicionar" -- "campina nao tem rota extra".
+          Por baixo dos panos são linhas is_extra:true igual a rota
+          extra de JP (ver Achados no plano), só que nunca aparecem
+          rotuladas como "extra" aqui. */}
+      <div className="flex flex-col gap-0.5 pt-0.5" style={{ borderTop: "1px solid var(--gridline)" }}>
+        <span className={compact ? "text-xs font-semibold" : "text-[10px] font-semibold"} style={{ color: "var(--text-muted)" }}>
+          Campina Grande
+        </span>
+        {CG_ROTAS.map((cgRota) => {
+          const assignment = day.assignments.extras.find((e) => e.rota === cgRota);
+          if (cgPickingRota === cgRota) {
+            return (
+              <div key={cgRota} className="flex items-center gap-1 min-w-0">
+                <DriverPicker value={cgDriverValue} onChange={setCgDriverValue} drivers={drivers} disabled={pending} compact={compact} />
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => addCgDriver(cgRota)}
+                  className={extraActionButtonClass}
+                  style={{ background: "var(--surface-2)", border: "1px solid", borderColor: "var(--border)", color: "var(--text-primary)" }}
+                >
+                  salvar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCgPickingRota(null);
+                    setCgDriverValue("");
+                  }}
+                  className={extraCancelButtonClass}
+                  style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                >
+                  cancelar
+                </button>
+              </div>
+            );
+          }
+          return (
+            <div key={cgRota} className="flex items-center gap-1 min-w-0">
+              <span className={extraChipClass} style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
+                {ROTA_LABELS[cgRota]}
+              </span>
+              {assignment ? (
+                <>
+                  <span className={extraDriverTextClass} style={{ color: "var(--text-primary)" }}>
+                    {assignment.driverName}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => removeExtra(assignment.id)}
+                    aria-label="Remover motorista"
+                    className={extraRemoveClass}
+                    style={{ color: "var(--status-critical)" }}
+                  >
+                    ✕
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCgPickingRota(cgRota);
+                    setCgDriverValue("");
+                  }}
+                  className={addExtraButtonClass}
+                  style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                >
+                  + motorista
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

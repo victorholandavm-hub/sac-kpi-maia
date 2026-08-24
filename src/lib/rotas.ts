@@ -1,13 +1,26 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 
-export type Rota = "praia" | "sul" | "centro";
+// "cg_centro_norte_leste"/"cg_sul_oeste" -- rotas de Campina Grande,
+// pedido do Victor 24/08/2026: "agora, a gente tem as rotas de Campina
+// Grande... em campina grande as rotas são: centro/norte/leste e
+// sul/oeste, juntas assim, são apenas duas rotas". "extra" -- rota extra
+// genérica de João Pessoa, mesmo pedido: "nas rotas extras de joão
+// pessoa, fica por padrão o nome 'rota extra' sem precisar escolher
+// entre sul, centro e praia" -- ver JP_EXTRA_ROTA/labelAvailableRota
+// abaixo pro nome com ordinal (Rota extra 1, Rota extra 2...).
+export type Rota = "praia" | "sul" | "centro" | "cg_centro_norte_leste" | "cg_sul_oeste" | "extra";
 
-export const ROTAS: Rota[] = ["praia", "sul", "centro"];
+export const ROTAS: Rota[] = ["praia", "sul", "centro", "cg_centro_norte_leste", "cg_sul_oeste", "extra"];
 
 export const ROTA_LABELS: Record<Rota, string> = {
   praia: "Praia",
   sul: "Sul",
   centro: "Centro",
+  cg_centro_norte_leste: "Centro/Norte/Leste",
+  cg_sul_oeste: "Sul/Oeste",
+  // Fallback genérico -- quem precisa do nome com ordinal (Rota extra
+  // 2, 3...) usa labelAvailableRota abaixo, não isso direto.
+  extra: "Rota extra",
 };
 
 // Cor própria por rota na agenda (ver AgendaQueueGroup) -- bate o olho em
@@ -16,7 +29,76 @@ export const ROTA_COLORS: Record<Rota, string> = {
   praia: "var(--series-5)",
   sul: "var(--series-1)",
   centro: "var(--series-4)",
+  cg_centro_norte_leste: "var(--series-7)",
+  cg_sul_oeste: "var(--series-8)",
+  // Cinza neutro -- sinaliza "não é uma rota geográfica fixa", diferente
+  // das outras.
+  extra: "var(--text-muted)",
 };
+
+// Cidade de cada rota -- pedido do Victor 24/08/2026: "o atendente
+// escolher primeiro a cidade... e depois as rotas". "extra" entra como
+// João Pessoa (é lá que existe o conceito de rota extra genérica; ver
+// achado "campina nao tem rota extra").
+export type RotaCity = "joao_pessoa" | "campina_grande";
+
+export const CITY_LABELS: Record<RotaCity, string> = {
+  joao_pessoa: "João Pessoa",
+  campina_grande: "Campina Grande",
+};
+
+export const ROTA_CITY: Record<Rota, RotaCity> = {
+  praia: "joao_pessoa",
+  sul: "joao_pessoa",
+  centro: "joao_pessoa",
+  extra: "joao_pessoa",
+  cg_centro_norte_leste: "campina_grande",
+  cg_sul_oeste: "campina_grande",
+};
+
+export const ROTAS_BY_CITY: Record<RotaCity, Rota[]> = {
+  joao_pessoa: ROTAS.filter((r) => ROTA_CITY[r] === "joao_pessoa"),
+  campina_grande: ROTAS.filter((r) => ROTA_CITY[r] === "campina_grande"),
+};
+
+// Valor de rota da "rota extra" genérica de João Pessoa -- ver comentário
+// no topo do arquivo. Nome exportado em vez de espalhar a string mágica
+// "extra" pelo código (mesmo padrão de ITEM_DESTINO_NEEDS_NOTE em
+// tecnicos.ts).
+export const JP_EXTRA_ROTA: Rota = "extra";
+
+// As 2 rotas fixas de Campina Grande -- sem "+ adicionar" no painel
+// "Motorista do dia" (achado do Victor 24/08/2026: "campina nao tem rota
+// extra"), são sempre essas duas, cada uma com seu próprio motorista.
+export const CG_ROTAS: Rota[] = ROTAS_BY_CITY.campina_grande;
+
+// As 3 rotas "de verdade" de João Pessoa (praia/sul/centro) -- sem a
+// rota extra genérica. Usado onde só faz sentido escolher uma região
+// fixa: rota principal do dia (RotaMotoristaDoDia.tsx), padrão semanal
+// (RotaWeekdaySelect.tsx) e o filtro de rota da Agenda (visitas
+// técnicas, não usa Campina Grande nem rota extra).
+export const JP_PRIMARY_ROTAS: Rota[] = ROTAS_BY_CITY.joao_pessoa.filter((r) => r !== JP_EXTRA_ROTA);
+
+// Rótulo de uma atribuição disponível, considerando o caso especial da
+// rota extra genérica de João Pessoa -- pedido do Victor 24/08/2026:
+// "caso tenha mais de uma rota extra, fica: rota extra 1, rota extra
+// 2...". O ordinal não fica salvo em lugar nenhum, é calculado na hora
+// de exibir a partir da posição dentro da lista (mesma ordem que já vem
+// do banco, updated_at crescente -- ver getRotaDriverAssignments).
+// Único lugar que sabe montar esse rótulo -- evita duplicar a contagem
+// em RotaMotoristaDoDia.tsx, ScheduleField.tsx, NotificacoesList.tsx,
+// DriverRouteGroup.tsx e nos formulários de criação. Tipo estrutural
+// mínimo (não exige `AvailableRota` inteiro) -- RotaMotoristaDoDia.tsx
+// chama isso com `RotaDriverAssignmentEntry[]` (sem `isExtra`), que já
+// bate com esse formato.
+export function labelAvailableRota(all: { id: string; rota: Rota }[], entry: { id: string; rota: Rota }): string {
+  if (entry.rota === JP_EXTRA_ROTA) {
+    const genericExtras = all.filter((r) => r.rota === JP_EXTRA_ROTA);
+    const idx = genericExtras.findIndex((r) => r.id === entry.id);
+    return genericExtras.length > 1 ? `Rota extra ${idx + 1}` : "Rota extra";
+  }
+  return ROTA_LABELS[entry.rota];
+}
 
 export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 

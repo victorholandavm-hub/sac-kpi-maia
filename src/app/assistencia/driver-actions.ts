@@ -476,7 +476,14 @@ export async function driverRemoveRotaExtra(id: string): Promise<void> {
 export async function driverBulkSetRota(
   requestIds: string[],
   scheduledDate: string,
-  rota: string
+  rota: string,
+  // Motorista explícito da atribuição escolhida (ver DriverRouteGroup.tsx)
+  // -- mesmo motivo de bulkSetRotaAction/setSchedule (actions.ts): sem
+  // isso, duas atribuições com a mesma rota (rota extra genérica de João
+  // Pessoa, pedido do Victor 24/08/2026, pode repetir em duas linhas do
+  // mesmo dia) ficam ambíguas -- pega sempre a primeira, que pode não ser
+  // a escolhida.
+  rotaDriverName?: string
 ): Promise<{ successCount: number; errors: string[] }> {
   const driverName = await getDriverSession();
   if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
@@ -487,7 +494,9 @@ export async function driverBulkSetRota(
 
   const admin = getSupabaseAdmin();
   const availableRotas = await getAvailableRotasForDate(scheduledDate);
-  const match = availableRotas.find((r) => r.rota === rota);
+  const match = rotaDriverName
+    ? availableRotas.find((r) => r.rota === rota && r.driverName === rotaDriverName)
+    : availableRotas.find((r) => r.rota === rota);
 
   const { data: rows, error } = await admin
     .from("service_requests")

@@ -2030,19 +2030,22 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   }
 
   const scheduledDateInput = String(formData.get("scheduled_date") ?? "").trim();
-  const rotaInput = String(formData.get("rota") ?? "").trim();
+  // Id da atribuição, não a rota crua -- pedido do Victor 24/08/2026 (rota
+  // extra genérica de João Pessoa): duas extras do mesmo dia podem ter o
+  // mesmo valor de `rota` ("extra"), só o `id` diferencia qual delas foi
+  // escolhida no formulário (ver NovaEntregaAssistenciaForm.tsx).
+  const rotaAssignmentIdInput = String(formData.get("rotaAssignmentId") ?? "").trim();
   let rotaValue: string | null = null;
   let driverNameForRota: string | null = null;
-  if (isDelivery && scheduledDateInput && rotaInput) {
-    if (!isRota(rotaInput)) return { error: "Rota inválida." };
+  if (isDelivery && scheduledDateInput && rotaAssignmentIdInput) {
     const availableRotas = await getAvailableRotasForDate(scheduledDateInput);
-    const match = availableRotas.find((r) => r.rota === rotaInput);
+    const match = availableRotas.find((r) => r.id === rotaAssignmentIdInput);
     if (!match) {
       return {
-        error: `${ROTA_LABELS[rotaInput]} não tem carro saindo em ${scheduledDateInput.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.`,
+        error: `Essa rota não está mais disponível em ${scheduledDateInput.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.`,
       };
     }
-    rotaValue = rotaInput;
+    rotaValue = match.rota;
     driverNameForRota = match.driverName;
   }
   if (driverNameForRota) {
@@ -2296,7 +2299,11 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
 
   const scheduledDate = String(formData.get("scheduled_date") ?? "").trim();
   const scheduledTime = String(formData.get("scheduled_time") ?? "").trim();
-  const rotaInput = String(formData.get("rota") ?? "").trim();
+  // Id da atribuição, não a rota crua -- mesmo motivo de
+  // createQuickRequest acima (rota extra genérica de João Pessoa, pedido
+  // do Victor 24/08/2026: duas extras do mesmo dia podem compartilhar o
+  // mesmo valor de `rota`, só o `id` diferencia).
+  const rotaAssignmentIdInput = String(formData.get("rotaAssignmentId") ?? "").trim();
 
   // Mesma validação de setSchedule (edição do chamado já criado) -- rota só
   // pode ser uma das disponíveis pra data escolhida (pedido do Victor
@@ -2306,14 +2313,13 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   // motorista definido no painel "Motorista do dia".
   let rotaValue: string | null = null;
   let driverNameForRota: string | null = null;
-  if (scheduledDate && rotaInput) {
-    if (!isRota(rotaInput)) return { error: "Rota inválida." };
+  if (scheduledDate && rotaAssignmentIdInput) {
     const availableRotas = await getAvailableRotasForDate(scheduledDate);
-    const match = availableRotas.find((r) => r.rota === rotaInput);
+    const match = availableRotas.find((r) => r.id === rotaAssignmentIdInput);
     if (!match) {
-      return { error: `${ROTA_LABELS[rotaInput]} não tem carro saindo em ${scheduledDate.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.` };
+      return { error: `Essa rota não está mais disponível em ${scheduledDate.split("-").reverse().join("/")} — escolha uma das rotas disponíveis pra essa data.` };
     }
-    rotaValue = rotaInput;
+    rotaValue = match.rota;
     driverNameForRota = match.driverName;
   }
   const rotaExceptionNote: string | null = null;

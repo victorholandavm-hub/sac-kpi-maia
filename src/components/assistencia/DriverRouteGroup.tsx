@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setDriverOrderAction, driverBulkSetRota, driverGetAvailableRotasForDate } from "@/app/assistencia/driver-actions";
 import { SHIFT_LABELS, DRIVER_TYPE_LABELS } from "@/lib/assistenciaLabels";
-import { ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
+import { labelAvailableRota, type AvailableRota } from "@/lib/rotas";
 import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { DriverNotificationModalButton } from "./DriverNotificationModalButton";
 import { formatFullAddress, type DriverRequestView } from "@/lib/serviceRequests";
@@ -307,7 +307,11 @@ function MoveRotaBar({
 }) {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
-  const [rota, setRota] = useState("");
+  // Id da atribuição, não só a rota -- mesmo motivo/solução de
+  // ScheduleField.tsx/NotificacoesList.tsx (rota extra genérica de João
+  // Pessoa, pedido do Victor 24/08/2026, pode repetir o mesmo valor de
+  // `rota` em duas linhas do mesmo dia).
+  const [assignmentId, setAssignmentId] = useState("");
   const [availableRotas, setAvailableRotas] = useState<AvailableRota[]>([]);
   const [loadingRotas, setLoadingRotas] = useState(false);
   const [pending, setPending] = useState(false);
@@ -321,7 +325,7 @@ function MoveRotaBar({
       driverGetAvailableRotasForDate(date)
         .then((rotas) => {
           setAvailableRotas(rotas);
-          setRota((prev) => (prev && !rotas.some((r) => r.rota === prev) ? "" : prev));
+          setAssignmentId((prev) => (prev && !rotas.some((r) => r.id === prev) ? "" : prev));
         })
         .catch(() => setAvailableRotas([]))
         .finally(() => setLoadingRotas(false));
@@ -330,12 +334,14 @@ function MoveRotaBar({
   }, [hasDateContext, date]);
 
   const effectiveAvailableRotas = hasDateContext ? availableRotas : [];
+  const selectedAssignment = effectiveAvailableRotas.find((r) => r.id === assignmentId) ?? null;
 
   async function apply() {
+    if (!selectedAssignment) return;
     setPending(true);
     setResult(null);
     try {
-      const r = await driverBulkSetRota(selectedIds, date, rota);
+      const r = await driverBulkSetRota(selectedIds, date, selectedAssignment.rota, selectedAssignment.driverName ?? undefined);
       setResult(r);
       if (r.errors.length === 0) {
         setOpen(false);
@@ -384,23 +390,23 @@ function MoveRotaBar({
           autoFocus
         />
         <select
-          value={rota}
-          onChange={(e) => setRota(e.target.value)}
+          value={assignmentId}
+          onChange={(e) => setAssignmentId(e.target.value)}
           disabled={!date || loadingRotas}
           className="rounded border px-2 py-1 text-sm disabled:opacity-60"
           style={{ borderColor: "var(--border)" }}
         >
           <option value="">Selecione a rota…</option>
           {effectiveAvailableRotas.map((r) => (
-            <option key={r.rota} value={r.rota}>
-              {ROTA_LABELS[r.rota]}
+            <option key={r.id} value={r.id}>
+              {labelAvailableRota(effectiveAvailableRotas, r)}
               {r.driverName ? ` — ${r.driverName}` : ""}
             </option>
           ))}
         </select>
         <button
           type="button"
-          disabled={pending || !date || !rota}
+          disabled={pending || !date || !assignmentId}
           onClick={apply}
           className="text-xs rounded px-3 py-1.5 font-medium disabled:opacity-60"
           style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}

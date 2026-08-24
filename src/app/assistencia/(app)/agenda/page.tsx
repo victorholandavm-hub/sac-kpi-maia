@@ -5,7 +5,7 @@ import { listAssemblers, isAssistenciaControlledAssembler } from "@/lib/payments
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { AgendaDayGroups } from "@/components/assistencia/AgendaDayGroups";
 import { AgendaKanbanBoard } from "@/components/assistencia/AgendaKanbanBoard";
-import { ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
+import { JP_PRIMARY_ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
 import { DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 
 function groupByDate(requests: ServiceRequestSummary[]) {
@@ -97,7 +97,10 @@ export default async function AgendaPage({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        {[{ label: "Todas as rotas", value: undefined }, ...ROTAS.map((r) => ({ label: ROTA_LABELS[r], value: r }))].map((f) => {
+        {/* Só João Pessoa "de verdade" -- Agenda é visitas técnicas
+            (montagem/manutenção), Campina Grande e rota extra genérica
+            são conceito de entrega/carga, não fazem sentido aqui. */}
+        {[{ label: "Todas as rotas", value: undefined }, ...JP_PRIMARY_ROTAS.map((r) => ({ label: ROTA_LABELS[r], value: r }))].map((f) => {
           const sp = new URLSearchParams();
           if (filterRange) sp.set("range", filterRange);
           if (f.value) sp.set("rota", f.value);
