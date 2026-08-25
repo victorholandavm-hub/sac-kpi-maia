@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus } from "@/lib/serviceRequests";
 import { listDrivers } from "@/lib/payments";
-import { getRotaWeekOverview, startOfRotaWeek } from "@/lib/rotas";
+import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY } from "@/lib/rotas";
 import { ROLE_LABELS } from "@/lib/assistenciaLabels";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
@@ -16,6 +16,7 @@ import {
   groupByRota,
   ENTREGA_FILTERS,
   ORIGEM_FILTERS,
+  CITY_FILTERS,
   ENTREGA_TYPES,
   ENTREGA_TYPES_SAC,
   ENTREGA_TYPES_ASSISTENCIA,
@@ -29,7 +30,7 @@ function currentTimeMs(): number {
   return Date.now();
 }
 
-function buildHref(params: { status?: string; q?: string; store?: string; from?: string; to?: string; origem?: string; sched?: string }) {
+function buildHref(params: { status?: string; q?: string; store?: string; from?: string; to?: string; origem?: string; sched?: string; city?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
@@ -38,6 +39,7 @@ function buildHref(params: { status?: string; q?: string; store?: string; from?:
   if (params.to) sp.set("to", params.to);
   if (params.origem) sp.set("origem", params.origem);
   if (params.sched) sp.set("sched", params.sched);
+  if (params.city) sp.set("city", params.city);
   const qs = sp.toString();
   return qs ? `/assistencia/sac/notificacoes?${qs}` : "/assistencia/sac/notificacoes";
 }
@@ -60,20 +62,22 @@ function buildHref(params: { status?: string; q?: string; store?: string; from?:
 export default async function SacNotificacoesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; store?: string; from?: string; to?: string; origem?: string; sched?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; store?: string; from?: string; to?: string; origem?: string; sched?: string; city?: string }>;
 }) {
   const profile = await getProfile();
   if (profile.role !== "sac" && profile.role !== "admin") {
     redirect("/assistencia/inicio");
   }
 
-  const { status, q, store, from, to, origem, sched } = await searchParams;
+  const { status, q, store, from, to, origem, sched, city } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
   const dateTo = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : undefined;
   const filterOrigem = origem === "sac" || origem === "assistencia" ? origem : undefined;
   const filterSched: boolean | undefined = filterStatus === "aberta" && (sched === "1" || sched === "0") ? sched === "1" : undefined;
   const schedParam = filterSched === true ? "1" : filterSched === false ? "0" : undefined;
+  // Filtro por cidade (ver CITY_FILTERS) -- pedido do Victor 24/08/2026.
+  const filterCity: "joao_pessoa" | "campina_grande" | undefined = city === "joao_pessoa" || city === "campina_grande" ? city : undefined;
   const types = filterOrigem === "sac" ? ENTREGA_TYPES_SAC : filterOrigem === "assistencia" ? ENTREGA_TYPES_ASSISTENCIA : ENTREGA_TYPES;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -85,7 +89,13 @@ export default async function SacNotificacoesPage({
   ]);
   // Mesmo raciocínio de fila/page.tsx: Programado/Não programado não são
   // status de verdade no banco, só dá pra separar em JS depois da busca.
-  const requests = filterSched === undefined ? rawRequests : rawRequests.filter((r) => isDeliveryScheduled(r.scheduledDate, r.rota) === filterSched);
+  let requests = filterSched === undefined ? rawRequests : rawRequests.filter((r) => isDeliveryScheduled(r.scheduledDate, r.rota) === filterSched);
+  // Cidade não é coluna no banco -- é derivada da rota (ver ROTA_CITY em
+  // rotas.ts), mesmo raciocínio do filtro de programado acima. Sem rota
+  // ainda (`r.rota === null`) não entra em nenhuma cidade.
+  if (filterCity !== undefined) {
+    requests = requests.filter((r) => r.rota !== null && ROTA_CITY[r.rota] === filterCity);
+  }
   const groups = groupByRota(requests);
   const now = currentTimeMs();
 
@@ -118,6 +128,7 @@ export default async function SacNotificacoesPage({
                   to: dateTo,
                   origem: filterOrigem,
                   sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
+                  city: filterCity,
                 })}
                 className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
                 style={
@@ -160,7 +171,33 @@ export default async function SacNotificacoesPage({
           return (
             <Link
               key={f.label}
-              href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, origem: f.value ?? undefined, sched: schedParam })}
+              href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, origem: f.value ?? undefined, sched: schedParam, city: filterCity })}
+              className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+              style={{
+                border: "1px solid var(--border)",
+                background: selected ? "var(--brand-green)" : "transparent",
+                color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                fontWeight: selected ? 600 : 400,
+              }}
+            >
+              {f.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Filtro por cidade -- pedido do Victor 24/08/2026: "filtro por
+          cidade". */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Cidade:
+        </span>
+        {CITY_FILTERS.map((f) => {
+          const selected = (f.value ?? undefined) === filterCity;
+          return (
+            <Link
+              key={f.label}
+              href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, origem: filterOrigem, sched: schedParam, city: f.value ?? undefined })}
               className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
               style={{
                 border: "1px solid var(--border)",
@@ -188,6 +225,7 @@ export default async function SacNotificacoesPage({
         {store ? <input type="hidden" name="store" value={store} /> : null}
         {filterOrigem ? <input type="hidden" name="origem" value={filterOrigem} /> : null}
         {schedParam ? <input type="hidden" name="sched" value={schedParam} /> : null}
+        {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
         <input
           type="search"
           name="q"
@@ -209,7 +247,7 @@ export default async function SacNotificacoesPage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, origem: filterOrigem, sched: schedParam })}
+            href={buildHref({ status: filterStatus, store, origem: filterOrigem, sched: schedParam, city: filterCity })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >

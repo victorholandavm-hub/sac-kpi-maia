@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, isMostruarioRequest, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
-import { getRotaWeekOverview, startOfRotaWeek } from "@/lib/rotas";
+import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY } from "@/lib/rotas";
 import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -17,6 +17,7 @@ import {
   type QueueGroup,
   ENTREGA_FILTERS,
   ORIGEM_FILTERS,
+  CITY_FILTERS,
   ENTREGA_TYPES,
   ENTREGA_TYPES_SAC,
   ENTREGA_TYPES_ASSISTENCIA,
@@ -65,6 +66,7 @@ function buildHref(params: {
   origem?: string;
   sched?: string;
   alvo?: string;
+  city?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -77,6 +79,7 @@ function buildHref(params: {
   if (params.origem) sp.set("origem", params.origem);
   if (params.sched) sp.set("sched", params.sched);
   if (params.alvo) sp.set("alvo", params.alvo);
+  if (params.city) sp.set("city", params.city);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
@@ -131,11 +134,12 @@ export default async function AssistenciaQueuePage({
     origem?: string;
     sched?: string;
     alvo?: string;
+    city?: string;
   }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo } = await searchParams;
+  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo, city } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
@@ -155,6 +159,12 @@ export default async function AssistenciaQueuePage({
   // Clientes x Mostruário (ver ALVO_FILTERS acima) -- só existe na aba
   // Visitas, mesmo padrão de filterOrigem/filterSched pras outras abas.
   const filterAlvo: "cliente" | "mostruario" | undefined = !showPecas && (alvo === "cliente" || alvo === "mostruario") ? alvo : undefined;
+  // Filtro por cidade (ver CITY_FILTERS) -- só existe dentro da aba
+  // Entregas, mesmo padrão das outras. Visitas não usa esse filtro --
+  // Campina Grande não tem rota de visita técnica (montador), só de
+  // entrega.
+  const filterCity: "joao_pessoa" | "campina_grande" | undefined =
+    showPecas && (city === "joao_pessoa" || city === "campina_grande") ? city : undefined;
   const types = showPecas
     ? filterOrigem === "sac"
       ? ENTREGA_TYPES_SAC
@@ -198,7 +208,14 @@ export default async function AssistenciaQueuePage({
   if (filterAlvo !== undefined) {
     requests = requests.filter((r) => isMostruarioRequest(r.orderCode, r.clientName) === (filterAlvo === "mostruario"));
   }
-  const postFiltered = filterSched !== undefined || filterAlvo !== undefined;
+  // Cidade não é coluna no banco -- é derivada da rota (ver ROTA_CITY em
+  // rotas.ts), mesmo raciocínio de filterSched/filterAlvo acima: filtro
+  // em JS depois da busca. Sem rota ainda (`r.rota === null`) não entra
+  // em nenhuma cidade.
+  if (filterCity !== undefined) {
+    requests = requests.filter((r) => r.rota !== null && ROTA_CITY[r.rota] === filterCity);
+  }
+  const postFiltered = filterSched !== undefined || filterAlvo !== undefined || filterCity !== undefined;
   const total = postFiltered ? requests.length : rawTotal;
   const groups = showPecas ? groupByRota(requests) : groupByDate(requests);
   const totalPages = postFiltered ? 1 : Math.max(1, Math.ceil(total / pageSize));
@@ -229,7 +246,7 @@ export default async function AssistenciaQueuePage({
           Visitas
         </Link>
         <Link
-          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, sched: schedParam })}
+          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, sched: schedParam, city: filterCity })}
           className="text-base font-bold px-4 py-2 rounded-full"
           style={
             showPecas
@@ -260,6 +277,7 @@ export default async function AssistenciaQueuePage({
                       tab: "pecas",
                       origem: filterOrigem,
                       sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
+                      city: filterCity,
                     })}
                     className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
                     style={
@@ -352,7 +370,37 @@ export default async function AssistenciaQueuePage({
             return (
               <Link
                 key={f.label}
-                href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, tab: "pecas", origem: f.value ?? undefined, sched: schedParam })}
+                href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, tab: "pecas", origem: f.value ?? undefined, sched: schedParam, city: filterCity })}
+                className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
+                style={{
+                  border: "1px solid var(--border)",
+                  background: selected ? "var(--brand-green)" : "transparent",
+                  color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                  fontWeight: selected ? 600 : 400,
+                }}
+              >
+                {f.label}
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {/* Filtro por cidade -- pedido do Victor 24/08/2026: "filtro por
+          cidade" (depois de confirmar que o agrupamento por rota já
+          separa Campina Grande sozinho, mas não tinha como filtrar só
+          por uma). */}
+      {showPecas ? (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Cidade:
+          </span>
+          {CITY_FILTERS.map((f) => {
+            const selected = (f.value ?? undefined) === filterCity;
+            return (
+              <Link
+                key={f.label}
+                href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, sched: schedParam, city: f.value ?? undefined })}
                 className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
                 style={{
                   border: "1px solid var(--border)",
@@ -420,6 +468,7 @@ export default async function AssistenciaQueuePage({
         {filterOrigem ? <input type="hidden" name="origem" value={filterOrigem} /> : null}
         {schedParam ? <input type="hidden" name="sched" value={schedParam} /> : null}
         {filterAlvo ? <input type="hidden" name="alvo" value={filterAlvo} /> : null}
+        {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
         <input
           type="search"
           name="q"
@@ -457,7 +506,7 @@ export default async function AssistenciaQueuePage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo })}
+            href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
@@ -515,7 +564,7 @@ export default async function AssistenciaQueuePage({
         <div className="flex items-center justify-center gap-4 pt-2">
           {page > 1 ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo })}
+              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
@@ -527,7 +576,7 @@ export default async function AssistenciaQueuePage({
           </span>
           {page < totalPages ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo })}
+              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
