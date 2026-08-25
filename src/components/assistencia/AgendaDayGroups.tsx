@@ -18,13 +18,30 @@ function isGroupOverdue(group: Group, todayKey: string): boolean {
   return group.dateKey < todayKey && hasPending;
 }
 
+// Recolhível, recolhido por padrão -- pedido do Victor 25/08/2026: "na
+// tela de agenda, precisa por padrão estar recolhido o agrupamento".
+// <details> nativo, sem JS extra, sem `open` já nasce fechado (mesmo
+// padrão de EntregasGroupsList.tsx/fila/notificações do SAC).
 function DayCard({ group, todayKey }: { group: Group; todayKey: string }) {
   const isOverdue = isGroupOverdue(group, todayKey);
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
-      <div className="px-4 py-2 flex items-center gap-2 flex-wrap" style={{ background: "var(--brand-green)" }}>
+    <details className="rounded-xl overflow-hidden group" style={{ border: "2px solid var(--brand-green)" }}>
+      <summary
+        className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+        style={{ background: "var(--brand-green)" }}
+      >
+        <span
+          className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
+          style={{ color: "var(--brand-green-ink)" }}
+          aria-hidden="true"
+        >
+          ▶
+        </span>
         <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--brand-green-ink)" }}>
           {group.label}
+        </span>
+        <span className="text-xs font-semibold" style={{ color: "var(--brand-green-ink)", opacity: 0.85 }}>
+          ({group.items.length})
         </span>
         {group.dateKey === todayKey ? (
           <span
@@ -41,11 +58,11 @@ function DayCard({ group, todayKey }: { group: Group; todayKey: string }) {
             ATRASADO
           </span>
         ) : null}
-      </div>
+      </summary>
       <div style={{ background: "var(--surface-1)" }}>
         <AgendaQueueGroup items={group.items} isOverdue={isOverdue} />
       </div>
-    </div>
+    </details>
   );
 }
 
