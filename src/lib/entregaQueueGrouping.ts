@@ -1,5 +1,5 @@
 import { bucketByScheduledDate, type DateBucketKey } from "./dateBuckets";
-import { ROTAS, ROTA_LABELS, ROTA_COLORS, JP_EXTRA_ROTA } from "./rotas";
+import { ROTAS, ROTA_LABELS, ROTA_COLORS, JP_EXTRA_ROTA, type RotaCity } from "./rotas";
 import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, SAC_MANAGED_TYPES } from "./assistenciaLabels";
 import type { ServiceRequestSummary, RequestType } from "./serviceRequests";
 
@@ -34,6 +34,20 @@ export const ORIGEM_FILTERS: { label: string; value: "sac" | "assistencia" | nul
   { label: "Todas", value: null },
   { label: "SAC", value: "sac" },
   { label: "Assistência", value: "assistencia" },
+];
+
+// Filtro por cidade -- pedido do Victor 24/08/2026: "filtro por cidade"
+// (depois de perguntar se as telas de acompanhamento já tinham divisão
+// por Campina Grande -- o agrupamento por rota já mostra separado
+// sozinho, ver groupByRota, mas não existia um jeito de FILTRAR só por
+// uma cidade). Só filtra quem já tem rota definida -- sem rota ainda
+// (`r.rota === null`) não aparece em nenhuma das duas, só em "Todas"
+// (mesmo raciocínio de ORIGEM_FILTERS/ENTREGA_FILTERS: filtro só afeta
+// quem já tem o dado que ele filtra).
+export const CITY_FILTERS: { label: string; value: RotaCity | null }[] = [
+  { label: "Todas", value: null },
+  { label: "João Pessoa", value: "joao_pessoa" },
+  { label: "Campina Grande", value: "campina_grande" },
 ];
 
 // Extraído de fila/page.tsx (24/08/2026) -- a tela de notificações do SAC
