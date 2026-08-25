@@ -224,7 +224,11 @@ function EntregaCardRow({
             pedido do Victor 21/08/2026: "padronize a tipografia do nome
             do cliente, telefone e bairro em negrito e tamanho legível". */}
         <div className="w-full sm:w-[35%] shrink-0 flex flex-col gap-0.5 min-w-0 sm:pr-3">
-          <span className="text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
+          {/* Caixa alta -- pedido do Victor 25/08/2026 ("guia de
+              padronização"): "Nome do Cliente (Bold, caixa alta)". Só
+              visual (Tailwind `uppercase`), o dado no banco continua com
+              a grafia original. */}
+          <span className="text-sm font-bold truncate uppercase" style={{ color: "var(--text-primary)" }}>
             {r.clientName ?? "Sem nome de cliente"}
           </span>
           <span className="text-xs font-semibold truncate" style={{ color: "var(--text-secondary)" }}>
@@ -386,7 +390,9 @@ function VisitaCardRow({
               Maia Barão"), então não precisa de lógica extra aqui pra
               diferenciar cliente de loja. */}
           <div className="w-full sm:w-[28%] shrink-0 flex flex-col gap-0.5 min-w-0 sm:pr-3">
-            <span className="text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
+            {/* Caixa alta -- mesmo pedido/motivo de EntregaCardRow (ver
+                acima), guia de padronização 25/08/2026. */}
+            <span className="text-sm font-bold truncate uppercase" style={{ color: "var(--text-primary)" }}>
               {r.clientName ?? "Sem nome de cliente"}
             </span>
             <span className="text-xs font-semibold truncate" style={{ color: "var(--text-secondary)" }}>
