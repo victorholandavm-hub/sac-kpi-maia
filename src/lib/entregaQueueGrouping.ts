@@ -98,6 +98,27 @@ export function filterOverdueOpen(requests: ServiceRequestSummary[]): ServiceReq
   return requests.filter((r) => r.status === "aberta" && bucketByScheduledDate(r.scheduledDate) === "atrasado");
 }
 
+// Entregas/envios ainda sem rota atribuída -- pedido do Victor 25/08/2026
+// (revisão da tela de notificações de assistência): "Sem Rota Definida...
+// não devem ficar perdidos no meio do feed de datas". Mesmo critério de
+// filterOverdueOpen (só "aberta" -- concluído/cancelado sem rota não
+// precisa de atenção de ninguém). Usado tanto pro contador do pill quanto
+// pra filtrar a lista quando ele é clicado.
+export function filterSemRotaOpen(requests: ServiceRequestSummary[]): ServiceRequestSummary[] {
+  return requests.filter((r) => r.status === "aberta" && r.rota === null);
+}
+
+// Tira os grupos "sem rota" do meio do feed ordenado por data e coloca
+// primeiro -- mesmo pedido do Victor acima. groupByRota já calcula
+// `isSemRota` por grupo (ver abaixo); aqui só reordena o array que ele
+// devolve, sem recalcular nada. Aplicado nas duas telas que usam
+// groupByRota (fila/page.tsx aba Entregas e sac/notificacoes/page.tsx).
+export function pinSemRotaFirst(groups: QueueGroup[]): QueueGroup[] {
+  const semRota = groups.filter((g) => g.isSemRota);
+  const rest = groups.filter((g) => !g.isSemRota);
+  return [...semRota, ...rest];
+}
+
 // Dentro de cada grupo, mesma prioridade de sempre: ordem manual
 // (assistencia_order) primeiro, senão mais recente primeiro. Exportado --
 // groupByDate (Visitas, fila/page.tsx) também usa, e ordena do mesmo jeito.
@@ -175,7 +196,12 @@ export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
       headerText: "#fff",
       borderColor: ROTA_COLORS[r],
     })),
-    { key: "sem_rota", rotaLabel: "Sem rota definida", headerBg: "var(--surface-2)", headerText: "var(--text-secondary)", borderColor: "var(--border)" },
+    // Cor de atenção (mesma família do "Não programado" acima), não mais
+    // cinza neutro -- pedido do Victor 25/08/2026: sem rota é pendência
+    // que precisa ser tratada, não deve se camuflar no meio dos grupos
+    // normais (reforçado por pinSemRotaFirst, que também bota esses
+    // grupos primeiro na lista).
+    { key: "sem_rota", rotaLabel: "⚠ Sem rota definida", headerBg: "var(--status-warning)", headerText: "#fff", borderColor: "var(--status-warning)" },
   ];
 
   const groups: QueueGroup[] = [];

@@ -67,6 +67,26 @@ const WEEKDAY_SHORT = WEEKDAY_LABELS.map((w) => w.slice(0, 3));
 // lado).
 const DEFAULT_VISIBLE_DAYS = 2;
 
+// Resumo de uma linha pro cabeçalho do painel recolhido -- pedido do
+// Victor 25/08/2026 (revisão da tela de notificações): "o bloco
+// 'Motorista do dia' consome bastante espaço vertical... transforme
+// essa área em um painel retrátil, deixe apenas um resumo compacto em
+// linha". Só a rota principal (João Pessoa) + as 2 de Campina Grande --
+// rota extra genérica de JP entra só como contador ("+N extra"), não
+// teria espaço pra listar motorista de cada uma numa linha só.
+function daySummaryLabel(day: RotaDayOverview): string {
+  const rota = day.assignments.primary?.rota ?? day.expectedRota;
+  const driver = day.assignments.primary?.driverName;
+  const primaryPart = rota ? `${ROTA_LABELS[rota]}${driver ? `: ${driver}` : " (sem motorista)"}` : "Sem rota";
+  const cgParts = CG_ROTAS.map((r) => {
+    const assignment = day.assignments.extras.find((e) => e.rota === r);
+    return `${ROTA_LABELS[r]}: ${assignment ? assignment.driverName : "—"}`;
+  });
+  const jpExtrasCount = day.assignments.extras.filter((e) => e.rota === JP_EXTRA_ROTA).length;
+  const extraPart = jpExtrasCount > 0 ? [`+${jpExtrasCount} extra${jpExtrasCount > 1 ? "s" : ""}`] : [];
+  return [primaryPart, ...cgParts, ...extraPart].join(" · ");
+}
+
 export function RotaMotoristaDoDia({
   today,
   initialOverview,
@@ -112,69 +132,94 @@ export function RotaMotoristaDoDia({
 
   const visibleDays = showAllDays ? overview : overview.slice(0, DEFAULT_VISIBLE_DAYS);
 
-  return (
-    <div
-      className="rounded-lg p-4 flex flex-col gap-2"
-      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-    >
-      <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-        Motorista do dia
-      </h3>
-      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-        A rota segue o padrão da semana -- só escolha o motorista. Clique no lápis pra mudar a rota de um dia
-        específico.
-      </p>
-
-      {compact ? (
-        <div className="grid grid-cols-2 gap-2">
-          {overview.map((day) => (
-            <RotaDayCell
-              key={day.date}
-              day={day}
-              today={today}
-              drivers={drivers}
-              onChange={updateDay}
-              actions={actions}
-              defaultDriver={defaultDriver}
-              compact
-            />
-          ))}
-        </div>
-      ) : (
-        <>
-          {/* Grid flexível (minmax), não mais 7 colunas fixas -- achado do
-              Victor 24/08/2026: com João Pessoa + Campina Grande lado a
-              lado dentro da mesma célula, precisa de bem mais largura do
-              que cabia em 220px (achado seguinte: "preciso de ainda que
-              fique maior... lado a lado"). Célula com no mínimo 380px,
-              quantas couberem por linha; dia da semana fica dentro da
-              própria célula (sem cabeçalho separado, que só fazia
-              sentido sincronizado a uma grade de 7 colunas fixa). */}
-          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))" }}>
-            {visibleDays.map((day) => (
-              <RotaDayCell
-                key={day.date}
-                day={day}
-                today={today}
-                drivers={drivers}
-                onChange={updateDay}
-                actions={actions}
-                defaultDriver={defaultDriver}
-              />
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowAllDays((e) => !e)}
-            className="text-xs rounded-md px-3 py-1.5 border font-semibold self-start mt-1 shadow-sm"
-            style={{ background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }}
-          >
-            {showAllDays ? "Mostrar menos dias" : "Mostrar mais dias"}
-          </button>
-        </>
-      )}
+  // Painel completo (grade de dias + botão "mostrar mais") -- igual pro
+  // modo compact e pro recolhível abaixo, só muda o que embrulha em volta.
+  const body = compact ? (
+    <div className="grid grid-cols-2 gap-2">
+      {overview.map((day) => (
+        <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} defaultDriver={defaultDriver} compact />
+      ))}
     </div>
+  ) : (
+    <>
+      {/* Grid flexível (minmax), não mais 7 colunas fixas -- achado do
+          Victor 24/08/2026: com João Pessoa + Campina Grande lado a
+          lado dentro da mesma célula, precisa de bem mais largura do
+          que cabia em 220px (achado seguinte: "preciso de ainda que
+          fique maior... lado a lado"). Célula com no mínimo 380px,
+          quantas couberem por linha; dia da semana fica dentro da
+          própria célula (sem cabeçalho separado, que só fazia
+          sentido sincronizado a uma grade de 7 colunas fixa). */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))" }}>
+        {visibleDays.map((day) => (
+          <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} defaultDriver={defaultDriver} />
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowAllDays((e) => !e)}
+        className="text-xs rounded-md px-3 py-1.5 border font-semibold self-start mt-1 shadow-sm"
+        style={{ background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }}
+      >
+        {showAllDays ? "Mostrar menos dias" : "Mostrar mais dias"}
+      </button>
+    </>
+  );
+
+  const description = (
+    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+      A rota segue o padrão da semana -- só escolha o motorista. Clique no lápis pra mudar a rota de um dia
+      específico.
+    </p>
+  );
+
+  // Modo compact (Everton/Samuel, só 2 células) já é enxuto por natureza --
+  // continua fixo, sem retrátil. O painel cheio (fila de Entregas/
+  // notificações do SAC) é quem consome espaço vertical de sobra -- pedido
+  // do Victor 25/08/2026: "o bloco 'Motorista do dia' consome bastante
+  // espaço vertical e polui o fluxo operacional... transforme essa área em
+  // um painel retrátil". <details> nativo, recolhido por padrão, com
+  // resumo de uma linha (daySummaryLabel) sempre visível no cabeçalho
+  // mesmo fechado -- não precisa abrir só pra saber quem tá na rota hoje.
+  if (compact) {
+    return (
+      <div className="rounded-lg p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+          Motorista do dia
+        </h3>
+        {description}
+        {body}
+      </div>
+    );
+  }
+
+  const todayEntry = overview.find((d) => d.date === today) ?? overview[0] ?? null;
+
+  return (
+    <details className="group rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+      <summary className="px-4 py-3 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:pb-2">
+        <span
+          className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
+          style={{ color: "var(--text-primary)" }}
+          aria-hidden="true"
+        >
+          ▶
+        </span>
+        <span className="text-sm font-bold shrink-0" style={{ color: "var(--text-primary)" }}>
+          🚚 Motorista do dia
+        </span>
+        {todayEntry ? (
+          <span className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
+            {daySummaryLabel(todayEntry)}
+          </span>
+        ) : null}
+      </summary>
+      <div className="px-4 pb-4 flex flex-col gap-2">
+        {description}
+        {body}
+      </div>
+    </details>
   );
 }
 

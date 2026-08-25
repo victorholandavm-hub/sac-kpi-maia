@@ -15,6 +15,8 @@ import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadg
 import {
   groupByRota,
   filterOverdueOpen,
+  filterSemRotaOpen,
+  pinSemRotaFirst,
   ENTREGA_FILTERS,
   ORIGEM_FILTERS,
   CITY_FILTERS,
@@ -41,6 +43,7 @@ function buildHref(params: {
   sched?: string;
   city?: string;
   urgente?: string;
+  semrota?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -52,6 +55,7 @@ function buildHref(params: {
   if (params.sched) sp.set("sched", params.sched);
   if (params.city) sp.set("city", params.city);
   if (params.urgente) sp.set("urgente", params.urgente);
+  if (params.semrota) sp.set("semrota", params.semrota);
   const qs = sp.toString();
   return qs ? `/assistencia/sac/notificacoes?${qs}` : "/assistencia/sac/notificacoes";
 }
@@ -84,6 +88,7 @@ export default async function SacNotificacoesPage({
     sched?: string;
     city?: string;
     urgente?: string;
+    semrota?: string;
   }>;
 }) {
   const profile = await getProfile();
@@ -91,7 +96,7 @@ export default async function SacNotificacoesPage({
     redirect("/assistencia/inicio");
   }
 
-  const { status, q, store, from, to, origem, sched, city, urgente } = await searchParams;
+  const { status, q, store, from, to, origem, sched, city, urgente, semrota } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
   const dateTo = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : undefined;
@@ -103,6 +108,8 @@ export default async function SacNotificacoesPage({
   // Banner "Remarcar urgente" (ver filterOverdueOpen) -- pedido do Victor
   // 25/08/2026, mesmo motivo de fila/page.tsx.
   const filterUrgente = urgente === "1";
+  // Pill "sem rota" -- mesmo padrão de fila/page.tsx (ver lá).
+  const filterSemRota = semrota === "1";
   const types = filterOrigem === "sac" ? ENTREGA_TYPES_SAC : filterOrigem === "assistencia" ? ENTREGA_TYPES_ASSISTENCIA : ENTREGA_TYPES;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -124,10 +131,13 @@ export default async function SacNotificacoesPage({
   // Quantas estão atrasadas dentro do que já foi buscado -- ANTES do
   // filtro de status/programado (mesmo raciocínio de fila/page.tsx).
   const overdueCount = filterOverdueOpen(rawRequests).length;
+  const semRotaCount = filterSemRotaOpen(rawRequests).length;
   if (filterUrgente) {
     requests = filterOverdueOpen(rawRequests);
+  } else if (filterSemRota) {
+    requests = filterSemRotaOpen(rawRequests);
   }
-  const groups = groupByRota(requests);
+  const groups = pinSemRotaFirst(groupByRota(requests));
   const now = currentTimeMs();
 
   return (
@@ -206,6 +216,25 @@ export default async function SacNotificacoesPage({
               ⚠ {overdueCount} pra remarcar
             </Link>
           ) : null}
+          {/* Pill "sem rota" -- mesmo desenho/motivo de fila/page.tsx (ver
+              lá), cor de atenção em vez de crítica. */}
+          {semRotaCount > 0 || filterSemRota ? (
+            <Link
+              href={
+                filterSemRota
+                  ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
+                  : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, semrota: "1" })
+              }
+              className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold"
+              style={{
+                background: "var(--status-warning)",
+                color: "#fff",
+                border: filterSemRota ? "2px solid var(--text-primary)" : "2px solid var(--status-warning)",
+              }}
+            >
+              🧭 {semRotaCount} sem rota
+            </Link>
+          ) : null}
         </div>
         <Link
           href="/assistencia/sac/nova"
@@ -216,62 +245,29 @@ export default async function SacNotificacoesPage({
         </Link>
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Origem:
-        </span>
-        {ORIGEM_FILTERS.map((f) => {
-          const selected = (f.value ?? undefined) === filterOrigem;
-          return (
-            <Link
-              key={f.label}
-              href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, origem: f.value ?? undefined, sched: schedParam, city: filterCity })}
-              className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
-              style={{
-                border: "1px solid var(--border)",
-                background: selected ? "var(--brand-green)" : "transparent",
-                color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
-                fontWeight: selected ? 600 : 400,
-              }}
-            >
-              {f.label}
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Filtro por cidade -- pedido do Victor 24/08/2026: "filtro por
-          cidade". */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Cidade:
-        </span>
-        {CITY_FILTERS.map((f) => {
-          const selected = (f.value ?? undefined) === filterCity;
-          return (
-            <Link
-              key={f.label}
-              href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, origem: filterOrigem, sched: schedParam, city: f.value ?? undefined })}
-              className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
-              style={{
-                border: "1px solid var(--border)",
-                background: selected ? "var(--brand-green)" : "transparent",
-                color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
-                fontWeight: selected ? 600 : 400,
-              }}
-            >
-              {f.label}
-            </Link>
-          );
-        })}
-      </div>
-
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
         {requests.length} solicitaç{requests.length === 1 ? "ão" : "ões"} encontrada{requests.length === 1 ? "" : "s"}
       </p>
 
+      {/* Filtros avançados consolidados numa barra só -- pedido do Victor
+          25/08/2026: "os filtros estão espalhados em vários blocos...
+          crie uma barra única de filtragem". Origem/Cidade eram fileiras
+          de pills próprias (ver git blame) -- viram dropdown junto de
+          Loja, mesmas opções de sempre (ORIGEM_FILTERS/CITY_FILTERS), só
+          reaproveitadas aqui em vez de lá. Mesmo padrão de fila/page.tsx
+          (aba Entregas). */}
       <div className="flex items-center gap-2 flex-wrap">
         <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+        <FilterSelect
+          name="origem"
+          placeholder="Origem: todas"
+          options={ORIGEM_FILTERS.filter((f) => f.value !== null).map((f) => ({ value: f.value as string, label: f.label }))}
+        />
+        <FilterSelect
+          name="city"
+          placeholder="Cidade: todas"
+          options={CITY_FILTERS.filter((f) => f.value !== null).map((f) => ({ value: f.value as string, label: f.label }))}
+        />
       </div>
 
       <form action="/assistencia/sac/notificacoes" method="GET" className="flex items-center gap-2 flex-wrap">
@@ -281,6 +277,7 @@ export default async function SacNotificacoesPage({
         {schedParam ? <input type="hidden" name="sched" value={schedParam} /> : null}
         {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
         {filterUrgente ? <input type="hidden" name="urgente" value="1" /> : null}
+        {filterSemRota ? <input type="hidden" name="semrota" value="1" /> : null}
         <input
           type="search"
           name="q"
@@ -302,7 +299,7 @@ export default async function SacNotificacoesPage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, origem: filterOrigem, sched: schedParam, city: filterCity, urgente: filterUrgente ? "1" : undefined })}
+            href={buildHref({ status: filterStatus, store, origem: filterOrigem, sched: schedParam, city: filterCity, urgente: filterUrgente ? "1" : undefined, semrota: filterSemRota ? "1" : undefined })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
