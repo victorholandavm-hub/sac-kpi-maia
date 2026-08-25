@@ -1230,7 +1230,15 @@ export async function listScheduledRequests(
   }
 
   return items.sort((a, b) => {
-    const dateCompare = (agendaEffectiveDate(a) ?? "").localeCompare(agendaEffectiveDate(b) ?? "");
+    // Mais recente primeiro (b vs a, não a vs b) -- pedido do Victor
+    // 25/08/2026: "na tela de agenda, preciso que a ordem seja igual a
+    // da tela de visitas, por ordem de mais recentes primeiro" (Visitas
+    // -- groupByDate em fila/page.tsx -- já ordena os grupos de dia do
+    // mais recente pro mais antigo). Era crescente (data mais próxima
+    // primeiro) antes disso -- só a ordem dos GRUPOS de dia muda; dentro
+    // do mesmo dia continua exatamente a mesma ordem de sempre
+    // (assistencia_order/turno/bairro/horário, ver abaixo).
+    const dateCompare = (agendaEffectiveDate(b) ?? "").localeCompare(agendaEffectiveDate(a) ?? "");
     if (dateCompare !== 0) return dateCompare;
     // assistencia_order primeiro (a assistência pode reorganizar o dia, ver
     // AgendaQueueGroup.tsx) -- quem ainda não foi reorganizado (null) cai
