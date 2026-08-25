@@ -18,6 +18,48 @@ function isGroupOverdue(group: Group, todayKey: string): boolean {
   return group.dateKey < todayKey && hasPending;
 }
 
+// Agrupa os dias por semana (segunda a domingo) antes de renderizar --
+// pedido do Victor 25/08/2026 (proposta de melhorias na Agenda): "Agrupe
+// primeiro por Mês ou Semana... Dentro da semana, exiba os dias". Só na
+// lista empilhada do desktop (ver AgendaDayGroups abaixo) -- o seletor de
+// dia do celular já é outro paradigma (tira uma faixa horizontal, não
+// empilha), agrupar por semana ali não se encaixa. Rótulo usa as datas de
+// verdade que têm visita (não a semana inteira teórica) -- sem
+// implicar que existe algo num dia sem nenhum chamado.
+type WeekGroup = { weekKey: string; label: string; days: Group[] };
+
+function mondayOfWeek(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const daysSinceMonday = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - daysSinceMonday);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDayMonth(dateKey: string): string {
+  const [, m, d] = dateKey.split("-");
+  return `${d}/${m}`;
+}
+
+function groupIntoWeeks(groups: Group[]): WeekGroup[] {
+  const weeks: WeekGroup[] = [];
+  for (const g of groups) {
+    const weekKey = mondayOfWeek(g.dateKey);
+    let week = weeks.find((w) => w.weekKey === weekKey);
+    if (!week) {
+      week = { weekKey, label: "", days: [] };
+      weeks.push(week);
+    }
+    week.days.push(g);
+  }
+  for (const week of weeks) {
+    const first = week.days[0].dateKey;
+    const last = week.days[week.days.length - 1].dateKey;
+    week.label = first === last ? `Semana de ${formatDayMonth(first)}` : `Semana de ${formatDayMonth(first)} a ${formatDayMonth(last)}`;
+  }
+  return weeks;
+}
+
 // Recolhível, recolhido por padrão -- pedido do Victor 25/08/2026: "na
 // tela de agenda, precisa por padrão estar recolhido o agrupamento".
 // <details> nativo, sem JS extra, sem `open` já nasce fechado (mesmo
@@ -105,10 +147,41 @@ export function AgendaDayGroups({ groups, todayKey }: { groups: Group[]; todayKe
 
       <div className="sm:hidden">{selectedGroup ? <DayCard group={selectedGroup} todayKey={todayKey} /> : null}</div>
 
-      <div className="hidden sm:flex flex-col gap-4">
-        {groups.map((g) => (
-          <DayCard key={g.dateKey} group={g} todayKey={todayKey} />
-        ))}
+      <div className="hidden sm:flex flex-col gap-3">
+        {/* Grupo nomeado (group/week) -- DayCard já usa "group" sem nome
+            pro próprio ícone de abrir/fechar; sem o nome, abrir a semana
+            giraria também as setas de todos os dias lá dentro, mesmo
+            fechados. */}
+        {groupIntoWeeks(groups).map((week) => {
+          const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
+          return (
+            <details key={week.weekKey} className="rounded-xl overflow-hidden group/week" style={{ border: "2px solid var(--border)" }}>
+              <summary
+                className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+                style={{ background: "var(--surface-2)" }}
+              >
+                <span
+                  className="text-xs shrink-0 transition-transform duration-150 group-open/week:rotate-90"
+                  style={{ color: "var(--text-secondary)" }}
+                  aria-hidden="true"
+                >
+                  ▶
+                </span>
+                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
+                  {week.label}
+                </span>
+                <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+                  ({weekTotal})
+                </span>
+              </summary>
+              <div className="flex flex-col gap-3 p-3" style={{ background: "var(--surface-1)" }}>
+                {week.days.map((g) => (
+                  <DayCard key={g.dateKey} group={g} todayKey={todayKey} />
+                ))}
+              </div>
+            </details>
+          );
+        })}
       </div>
     </div>
   );
