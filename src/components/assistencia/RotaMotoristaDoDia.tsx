@@ -196,30 +196,85 @@ export function RotaMotoristaDoDia({
 
   const todayEntry = overview.find((d) => d.date === today) ?? overview[0] ?? null;
 
+  return <RotaMotoristaDoDiaModalTrigger todayEntry={todayEntry} description={description} body={body} />;
+}
+
+// Painel completo vira modal -- pedido do Victor 25/08/2026 (revisão da
+// tela de notificações, segunda rodada): "o painel de motoristas virar
+// modal separado" (a versão anterior, recolhível inline, ficou pouco
+// tempo -- ver git blame -- e foi substituída por essa escolha explícita
+// do Victor). Mesmo desenho de modal já usado em ProductsModalButton.tsx
+// (backdrop clicável + <dialog> centralizado), só mais largo pra caber a
+// grade de dias.
+function RotaMotoristaDoDiaModalTrigger({
+  todayEntry,
+  description,
+  body,
+}: {
+  todayEntry: RotaDayOverview | null;
+  description: React.ReactNode;
+  body: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <details className="group rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-      <summary className="px-4 py-3 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:pb-2">
-        <span
-          className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
-          style={{ color: "var(--text-primary)" }}
-          aria-hidden="true"
-        >
-          ▶
-        </span>
+    <>
+      <div
+        className="rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap"
+        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+      >
         <span className="text-sm font-bold shrink-0" style={{ color: "var(--text-primary)" }}>
           🚚 Motorista do dia
         </span>
         {todayEntry ? (
-          <span className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-xs truncate flex-1 min-w-0" style={{ color: "var(--text-secondary)" }}>
             {daySummaryLabel(todayEntry)}
           </span>
-        ) : null}
-      </summary>
-      <div className="px-4 pb-4 flex flex-col gap-2">
-        {description}
-        {body}
+        ) : (
+          <span className="flex-1 min-w-0" />
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-xs rounded-md px-3 py-2 font-bold shrink-0 shadow-sm"
+          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+        >
+          🚚 Gestão de Motoristas &amp; Escala
+        </button>
       </div>
-    </details>
+
+      {open ? (
+        <>
+          <button
+            aria-label="Fechar gestão de motoristas"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-40"
+            style={{ background: "rgba(0,0,0,0.4)" }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-x-4 top-[6vh] z-50 mx-auto max-w-4xl max-h-[88vh] overflow-y-auto rounded-lg border p-4 shadow-lg flex flex-col gap-2"
+            style={{ background: "var(--surface-1)", borderColor: "var(--brand-green)" }}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                🚚 Gestão de Motoristas &amp; Escala
+              </h3>
+              <button
+                onClick={() => setOpen(false)}
+                className="text-xs px-2 py-1 rounded"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Fechar
+              </button>
+            </div>
+            {description}
+            {body}
+          </div>
+        </>
+      ) : null}
+    </>
   );
 }
 

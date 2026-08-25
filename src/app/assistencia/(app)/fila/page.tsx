@@ -8,6 +8,7 @@ import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
 import { EntregasGroupsList } from "@/components/assistencia/EntregasGroupsList";
+import { EntregasKanbanHoje } from "@/components/assistencia/EntregasKanbanHoje";
 import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcut";
@@ -256,6 +257,12 @@ export default async function AssistenciaQueuePage({
   // "Sem rota" primeiro, não perdido no meio do feed por data -- ver
   // pinSemRotaFirst.
   const groups = showPecas ? pinSemRotaFirst(groupByRota(requests)) : groupByDate(requests);
+  // Kanban só pra hoje (ver EntregasKanbanHoje) -- pedido do Victor
+  // 25/08/2026: "Para a operação de Hoje, um quadro estilo Kanban". O
+  // resto dos dias continua na sanfona de sempre, embaixo.
+  const todayGroups = showPecas ? groups.filter((g) => g.dateBucket === "hoje") : [];
+  const restGroups = showPecas ? groups.filter((g) => g.dateBucket !== "hoje") : groups;
+  const todayOverview = showPecas ? (rotaOverview.find((d) => d.date === today) ?? null) : null;
   const totalPages = postFiltered ? 1 : Math.max(1, Math.ceil(total / pageSize));
   // Calculado uma vez aqui (Server Component, sem hooks) e repassado pra
   // AssistenciaQueueGroup -- lá dentro é "use client" com hooks, onde
@@ -587,8 +594,11 @@ export default async function AssistenciaQueuePage({
         </div>
       ) : showPecas ? (
         // Compartilhado com a tela de notificações do SAC -- ver
-        // EntregasGroupsList.tsx.
-        <EntregasGroupsList groups={groups} now={now} />
+        // EntregasKanbanHoje.tsx/EntregasGroupsList.tsx.
+        <div className="flex flex-col gap-4">
+          <EntregasKanbanHoje groups={todayGroups} todayOverview={todayOverview} />
+          {restGroups.length > 0 ? <EntregasGroupsList groups={restGroups} now={now} /> : null}
+        </div>
       ) : (
         groups.map((group) => (
           // Recolhível -- pedido do Victor 20/08/2026: "os agrupamentos por
