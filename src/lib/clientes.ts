@@ -49,6 +49,22 @@ export type ClientesResumo = {
   totalGeral: number;
 };
 
+// "LOJAS AIAM..." (raiz de CNPJ 39537682) e "CONSUMIDOR FINAL" -- mesma
+// exclusão de isClienteInterno (ver mais abaixo, usada em
+// listClientesPorNivel), aplicada aqui também -- achado na revisão do
+// Victor 25/08/2026 ("veja se os clientes estão sendo puxados... e
+// classificados de maneira correta"): a aba Status (esta função +
+// listClientes, as duas em cima de totvs_clientes direto) não tinha essa
+// exclusão, só a aba Nível de relacionamento tinha -- inconsistente
+// (embora sem efeito prático hoje: nenhum desses dois registros existe em
+// totvs_clientes atualmente, só aparecem em totvs_orders, conferido no
+// banco). Corrigido pra nunca divergir se algum dia aparecer um.
+function excludeInternalClients<
+  Q extends { not: (column: string, operator: string, value: string) => Q },
+>(query: Q): Q {
+  return query.not("cpf_cnpj", "like", `${COMPANY_CNPJ_ROOT}%`).not("name", "ilike", "CONSUMIDOR FINAL");
+}
+
 // Só contagens (head: true) -- 3.760 clientes hoje cabem numa página só,
 // mas conta em vez de trazer linha por linha é mais barato de qualquer
 // jeito, e não cresce com a base de clientes do jeito que um SELECT
@@ -58,7 +74,9 @@ export async function getClientesResumo(): Promise<ClientesResumo> {
 
   const porStatus = await Promise.all(
     CLIENTE_STATUSES.map(async (status) => {
-      const { count, error } = await admin.from("totvs_clientes").select("id", { count: "exact", head: true }).eq("status", status);
+      const { count, error } = await excludeInternalClients(
+        admin.from("totvs_clientes").select("id", { count: "exact", head: true }).eq("status", status)
+      );
       if (error) throw new Error(error.message);
       return { status, total: count ?? 0 };
     })
@@ -69,11 +87,9 @@ export async function getClientesResumo(): Promise<ClientesResumo> {
     await Promise.all(
       statusComFaixa.flatMap((status) =>
         FAIXAS_DIAS.map(async (faixa) => {
-          let query = admin
-            .from("totvs_clientes")
-            .select("id", { count: "exact", head: true })
-            .eq("status", status)
-            .gte("days_without_buying", faixa.min);
+          let query = excludeInternalClients(
+            admin.from("totvs_clientes").select("id", { count: "exact", head: true }).eq("status", status).gte("days_without_buying", faixa.min)
+          );
           if (faixa.max !== null) query = query.lte("days_without_buying", faixa.max);
           const { count, error } = await query;
           if (error) throw new Error(error.message);
@@ -141,12 +157,14 @@ export async function listClientes(
   const page = Math.max(1, opts.page ?? 1);
   const pageSize = CLIENTES_PAGE_SIZE;
 
-  let query = admin
-    .from("totvs_clientes")
-    .select("protheus_code, name, cpf_cnpj, status, last_purchase_date, days_without_buying, phone1, address_city, address_state", {
-      count: "exact",
-    })
-    .order("name");
+  let query = excludeInternalClients(
+    admin
+      .from("totvs_clientes")
+      .select("protheus_code, name, cpf_cnpj, status, last_purchase_date, days_without_buying, phone1, address_city, address_state", {
+        count: "exact",
+      })
+      .order("name")
+  );
 
   if (opts.status) query = query.eq("status", opts.status);
 
