@@ -16,6 +16,16 @@ import { CausaRaizDonutChart } from "@/components/CausaRaizDonutChart";
 
 const REQUEST_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
 
+// "Solicitações por período" (relatório principal: loja/tipo/vendedor/
+// causa raiz) -- pedido do Victor 24/08/2026: "nas solicitações por
+// periodo, deve mostrar apenas solicitações de montagem/desmontagem".
+// Antes trazia todos os tipos juntos (troca de produto, entrega, etc.) --
+// não fazia sentido pro filtro mostruário x cliente logo abaixo (só
+// existe pra montagem: "loja monta pra exposição própria"), nem pro
+// pagamento de montador na sequência (que só paga item de montagem/
+// desmontagem).
+const REQUEST_REPORT_TYPES = ["montagem", "desmontagem"] as const;
+
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -115,13 +125,26 @@ function ReportRowItemsList({ items }: { items: ReportRowItem[] }) {
   return (
     <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
       {items.map((it) => (
-        <div key={it.id} className="pl-9 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
-          <span className="truncate" style={{ color: "var(--text-primary)" }}>
-            #{it.ticketNumber} · {REQUEST_TYPE_LABELS[it.type] ?? it.type} · {it.storeName} · {formatDateBr(it.createdAt)}
-          </span>
-          <span className="shrink-0 font-medium" style={{ color: STATUS_COLORS[it.status] ?? "var(--text-muted)" }}>
-            {STATUS_LABELS[it.status] ?? it.status}
-          </span>
+        <div key={it.id} className="pl-9 pr-4 py-1.5 flex flex-col gap-0.5 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate" style={{ color: "var(--text-primary)" }}>
+              #{it.ticketNumber} · {REQUEST_TYPE_LABELS[it.type] ?? it.type} · {it.storeName} · {formatDateBr(it.createdAt)}
+            </span>
+            <span className="shrink-0 font-medium" style={{ color: STATUS_COLORS[it.status] ?? "var(--text-muted)" }}>
+              {STATUS_LABELS[it.status] ?? it.status}
+            </span>
+          </div>
+          {/* O que aconteceu de verdade -- pedido do Victor 24/08/2026: ao
+              clicar num grupo de causa raiz (ex.: "Erro do vendedor"),
+              "preciso que apareça qual foi o erro ao clicar, e não em
+              quais chamados foram os erros". Número do chamado sozinho
+              não dizia o quê -- `reason` é a descrição livre do
+              problema, preenchida na criação do chamado. */}
+          {it.reason ? (
+            <span className="truncate" style={{ color: "var(--text-secondary)" }} title={it.reason}>
+              {it.reason}
+            </span>
+          ) : null}
         </div>
       ))}
     </div>
@@ -332,8 +355,12 @@ export default async function RelatoriosPage({
   const indicatorDateTo = indTo || today();
 
   const [report, paymentItems, supplierReconciliation, indicators] = await Promise.all([
-    getRequestsReport({ dateFrom, dateTo, alvo: filterAlvo }),
-    listPaymentItems({ dateFrom, dateTo }),
+    getRequestsReport({ dateFrom, dateTo, alvo: filterAlvo, types: [...REQUEST_REPORT_TYPES] }),
+    // Filtro mostruário x cliente também vale pro pagamento de montador --
+    // achado do Victor 24/08/2026: "quando filtrar, o numero de
+    // solicitações, total a pagar a montadores, pago e penente de
+    // liberação deve ser filtrado" (antes só filtrava a tabela de cima).
+    listPaymentItems({ dateFrom, dateTo, alvo: filterAlvo }),
     getSupplierReconciliation(),
     getServiceTypeIndicators(indicatorType, { dateFrom: indicatorDateFrom, dateTo: indicatorDateTo }),
   ]);
@@ -387,10 +414,13 @@ export default async function RelatoriosPage({
 
       {/* Mostruário (loja monta pra exposição própria, sem cliente real) x
           cliente de verdade -- pedido do Victor 21/08/2026: "coloque
-          Filtro de montagem de mostruário e cliente". Só afeta o
-          relatório principal logo abaixo (loja/tipo/vendedor/causa raiz)
-          -- indicadores por tipo e pagamentos não têm essa distinção na
-          consulta. */}
+          Filtro de montagem de mostruário e cliente". Afeta o relatório
+          principal logo abaixo (loja/tipo/vendedor/causa raiz) E o
+          pagamento de montador (total/pago/pendente) -- achado do Victor
+          24/08/2026: antes só filtrava a tabela de cima, os números de
+          pagamento continuavam somando tudo. "Indicadores de X" (mais
+          abaixo) continua sem essa distinção -- tem seletor de tipo
+          próprio, incluindo tipos que não são de montagem/mostruário. */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
           Alvo:

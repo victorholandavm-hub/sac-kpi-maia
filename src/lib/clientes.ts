@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
+import { listStores } from "./serviceRequests";
 
 // Perfil de compra/relacionamento dos clientes -- pedido do Victor
 // 14/08/2026: "preciso classificar os clientes". A classificação por
@@ -99,7 +100,30 @@ export type ClienteListItem = {
   phone1: string | null;
   city: string | null;
   state: string | null;
+  // Loja(s) onde o cliente já comprou -- pedido do Victor 24/08/2026:
+  // "preciso que na tela de clientes, tenha uma coluna mostrando a loja
+  // daquele cliente, onde ele comprou, se for mais de uma, aparece as
+  // duas ou mais". Nomes, não códigos -- ver storeNameById abaixo
+  // (branch do Protheus é o mesmo id de stores.id, tabela já usada pela
+  // assistência).
+  stores: string[];
 };
+
+// Mapa filial (branch) -> nome da loja -- totvs_orders.branch é o mesmo
+// código de stores.id (conferido direto no banco: '201'..'216' batem
+// 1:1 com as 16 lojas cadastradas em stores). Só uma consulta pra
+// reaproveitar nas duas views da tela de clientes.
+async function getStoreNameById(): Promise<Map<string, string>> {
+  const stores = await listStores();
+  return new Map(stores.map((s) => [s.id, s.name]));
+}
+
+// Nomes de loja pra um cliente, a partir do Set de códigos de filial
+// (branch) que ele comprou -- ordenado alfabeticamente, código cru como
+// fallback se algum branch não bater com nenhuma loja cadastrada.
+function resolveStoreNames(branches: Iterable<string>, storeNameById: Map<string, string>): string[] {
+  return [...branches].map((b) => storeNameById.get(b) ?? b).sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
 
 export type ListClientesResult = {
   items: ClienteListItem[];
@@ -148,9 +172,30 @@ export async function listClientes(
     address_city: string | null;
     address_state: string | null;
   };
+  const rows = (data ?? []) as unknown as Row[];
+
+  // Loja(s) de cada cliente da página -- só os ~50 códigos dessa página
+  // (nunca a base de pedidos inteira), consulta à parte porque
+  // totvs_clientes não tem esse dado, só totvs_orders. Sem clientes na
+  // página (busca sem resultado), pula a consulta.
+  const protheusCodes = rows.map((r) => r.protheus_code);
+  const [storeNameById, branchRows] = await Promise.all([
+    getStoreNameById(),
+    protheusCodes.length > 0
+      ? admin.from("totvs_orders").select("client_id, branch").in("client_id", protheusCodes)
+      : Promise.resolve({ data: [] as { client_id: string | null; branch: string }[], error: null }),
+  ]);
+  if (branchRows.error) throw new Error(branchRows.error.message);
+  const branchesByClient = new Map<string, Set<string>>();
+  for (const r of branchRows.data ?? []) {
+    if (!r.client_id) continue;
+    const set = branchesByClient.get(r.client_id) ?? new Set<string>();
+    set.add(r.branch);
+    branchesByClient.set(r.client_id, set);
+  }
 
   return {
-    items: ((data ?? []) as unknown as Row[]).map((r) => ({
+    items: rows.map((r) => ({
       protheusCode: r.protheus_code,
       name: r.name,
       cpfCnpj: r.cpf_cnpj,
@@ -160,6 +205,7 @@ export async function listClientes(
       phone1: r.phone1,
       city: r.address_city,
       state: r.address_state,
+      stores: resolveStoreNames(branchesByClient.get(r.protheus_code) ?? [], storeNameById),
     })),
     total: count ?? 0,
     page,
@@ -274,6 +320,9 @@ export type ClienteNivelInfo = {
   // sinaliza pra tela não confundir "Diamante de anos atrás, sumiu" com
   // "Diamante comprando até mês passado".
   inativoRecente: boolean;
+  // Loja(s) onde o cliente já comprou -- ver ClienteListItem.stores acima
+  // (mesmo pedido do Victor 24/08/2026).
+  stores: string[];
 };
 
 // Pedido do Victor 15/08/2026: "LOJAS AIAM..." e "CONSUMIDOR FINAL" não são
@@ -303,6 +352,7 @@ type ClientePedidoRow = {
   issue_date: string;
   client_name: string | null;
   client_cpf_cnpj: string | null;
+  branch: string | null;
 };
 
 // Busca o histórico de pedidos inteiro (paginado de verdade -- ver
@@ -317,22 +367,34 @@ type ClientePedidoRow = {
 export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
   const admin = getSupabaseAdmin();
 
-  const rows = await fetchAllPagesParallel<ClientePedidoRow>(
-    (from, to) =>
-      admin
-        .from("totvs_orders")
-        .select("client_id, type, invoice_total, issue_date, client_name, client_cpf_cnpj", { count: "exact" })
-        .not("client_id", "is", null)
-        .range(from, to) as unknown as PromiseLike<PagedQueryResult<ClientePedidoRow>>,
-    { pageSize: ORDER_PAGE_SIZE }
-  );
+  const [rows, storeNameById] = await Promise.all([
+    fetchAllPagesParallel<ClientePedidoRow>(
+      (from, to) =>
+        admin
+          .from("totvs_orders")
+          .select("client_id, type, invoice_total, issue_date, client_name, client_cpf_cnpj, branch", { count: "exact" })
+          .not("client_id", "is", null)
+          .range(from, to) as unknown as PromiseLike<PagedQueryResult<ClientePedidoRow>>,
+      { pageSize: ORDER_PAGE_SIZE }
+    ),
+    getStoreNameById(),
+  ]);
 
-  type Acc = { nome: string | null; cpfCnpj: string | null; compras: number; gasto: number; primeira: string | null; ultima: string | null };
+  type Acc = {
+    nome: string | null;
+    cpfCnpj: string | null;
+    compras: number;
+    gasto: number;
+    primeira: string | null;
+    ultima: string | null;
+    branches: Set<string>;
+  };
   const porCliente = new Map<string, Acc>();
   for (const r of rows) {
     if (!r.client_id) continue;
     if (isClienteInterno(r.client_name, r.client_cpf_cnpj)) continue;
-    const acc = porCliente.get(r.client_id) ?? { nome: null, cpfCnpj: null, compras: 0, gasto: 0, primeira: null, ultima: null };
+    const acc = porCliente.get(r.client_id) ?? { nome: null, cpfCnpj: null, compras: 0, gasto: 0, primeira: null, ultima: null, branches: new Set<string>() };
+    if (r.branch) acc.branches.add(r.branch);
     // invoice_total já vem líquido/assinado direto do Protheus -- negativo
     // pra Devolução, tanto no pedido quanto em cada item dele (conferido
     // direto no banco 20/08/2026). Bug achado no mesmo dia: a versão
@@ -371,6 +433,7 @@ export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
       posicaoNoNivel: 0, // preenchido abaixo, depois que todo o nível está montado
       diasSemComprar: dias,
       inativoRecente: dias !== null && dias >= DIAS_INATIVO_RECENTE,
+      stores: resolveStoreNames(acc.branches, storeNameById),
     });
   }
 
