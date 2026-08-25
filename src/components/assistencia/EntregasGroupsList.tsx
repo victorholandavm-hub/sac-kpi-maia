@@ -50,7 +50,17 @@ export function EntregasGroupsList({ groups, now }: { groups: QueueGroup[]; now:
                 >
                   Sem rota
                 </span>
-              ) : group.dateBucket && DATE_BUCKET_TAG[group.dateBucket] ? (
+              ) : group.dateBucket &&
+                DATE_BUCKET_TAG[group.dateBucket] &&
+                // "Atrasada" só faz sentido enquanto sobra algo pra
+                // remarcar -- achado do Victor 25/08/2026: "tire a badge
+                // de 'atrasada' nas datas em que as notificações
+                // programadas estão zeradas" (grupo com 0 Programado, só
+                // Concluído/Cancelado, não precisa de remarcar mais
+                // nada, mesmo com a data no passado). Só essa tag -- Hoje/
+                // Futura continuam aparecendo mesmo com tudo já resolvido,
+                // ainda dizem algo útil sobre a data em si.
+                !(group.dateBucket === "atrasado" && statusCounts.programado === 0) ? (
                 <span
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
                   style={{ background: DATE_BUCKET_TAG[group.dateBucket]!.bg, color: "#fff" }}
