@@ -279,38 +279,6 @@ export default async function AssistenciaQueuePage({
         </Link>
       </div>
 
-      {/* Banner "Remarcar urgente" -- pedido do Victor 25/08/2026: "preciso
-          que haja algo bem visivel para as notificações de assistencia
-          que nao foram feitas no dia e estao em atraso... para que fique
-          mais facil deles verem e remarcarem e nao ficar nada atrasado e
-          para tras". Só aparece quando tem alguma (0 não polui a tela) --
-          vermelho/laranja forte, logo abaixo do Visitas/Entregas, antes
-          de qualquer outro filtro, pra ser a primeira coisa que salta aos
-          olhos. Clicar filtra só as atrasadas em aberto; clicar de novo
-          (ou "Todas") volta ao normal. */}
-      {showPecas && (overdueCount > 0 || filterUrgente) ? (
-        <Link
-          href={
-            filterUrgente
-              ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
-              : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, urgente: "1" })
-          }
-          className="flex items-center gap-2 rounded-lg px-4 py-3 font-bold text-sm shadow-md"
-          style={{
-            background: "var(--status-critical)",
-            color: "#fff",
-            border: filterUrgente ? "3px solid var(--text-primary)" : "3px solid var(--status-critical)",
-          }}
-        >
-          <span className="text-lg" aria-hidden="true">
-            ⚠️
-          </span>
-          {filterUrgente
-            ? `Mostrando ${overdueCount} atrasada${overdueCount === 1 ? "" : "s"} -- voltar pra todas`
-            : `${overdueCount} notificaç${overdueCount === 1 ? "ão" : "ões"} atrasada${overdueCount === 1 ? "" : "s"} -- Remarcar urgente`}
-        </Link>
-      ) : null}
-
       {showPecas ? <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} /> : null}
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -391,6 +359,33 @@ export default async function AssistenciaQueuePage({
                   </Link>
                 );
               })}
+          {/* Badge "pra remarcar" -- pedido do Victor 25/08/2026: "nao
+              gostei da badge gigante... colocar uma badge em vermelho
+              com a quantidade a remarcar ao lado de Todas/Programado/
+              Não programado/Concluídas/Canceladas, pouca coisa maior em
+              tamanho que os outros, mas bem vermelho e piscando"
+              (banner grande de antes, ver git blame, era chamativo
+              demais). Mesmo lugar/tamanho dos outros pills, só um passo
+              maior + animate-pulse (Tailwind) pra piscar. Sem pulsar
+              enquanto já filtrado -- chamar atenção só faz sentido antes
+              de clicar. */}
+          {showPecas && (overdueCount > 0 || filterUrgente) ? (
+            <Link
+              href={
+                filterUrgente
+                  ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
+                  : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, urgente: "1" })
+              }
+              className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold ${filterUrgente ? "" : "animate-pulse"}`}
+              style={{
+                background: "var(--status-critical)",
+                color: "#fff",
+                border: filterUrgente ? "2px solid var(--text-primary)" : "2px solid var(--status-critical)",
+              }}
+            >
+              ⚠ {overdueCount} pra remarcar
+            </Link>
+          ) : null}
         </div>
         {/* Contraste maior + atalho Alt+N só na aba Entregas -- pedido do
             Victor 21/08/2026: "Aumente o contraste visual do botão + Nova
