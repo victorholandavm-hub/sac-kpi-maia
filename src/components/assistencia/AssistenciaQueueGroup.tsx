@@ -49,8 +49,10 @@ const PAYMENT_FLAG_COLORS: Record<PaymentFlag, string> = {
 
 // Cor fixa por tipo de serviço na aba Entregas -- pedido do Victor
 // 21/08/2026: "Fixe a cor de cada tipo de serviço (Troca, Envio,
-// Recolhimento)". Um tom por tipo, sem depender de status.
-const DELIVERY_TYPE_COLORS: Record<string, string> = {
+// Recolhimento)". Um tom por tipo, sem depender de status. Exportado --
+// EntregasKanbanHoje.tsx (25/08/2026) reaproveita a mesma cor no card do
+// Kanban, em vez de duplicar a tabela.
+export const DELIVERY_TYPE_COLORS: Record<string, string> = {
   troca_produto: "var(--brand-orange)",
   entrega_produto: "var(--brand-green)",
   envio_peca: "var(--series-1)",

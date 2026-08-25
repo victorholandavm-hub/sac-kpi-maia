@@ -159,6 +159,15 @@ export async function getRotaDriverAssignments(date: string): Promise<RotaDriver
   return { primary, extras };
 }
 
+// Nome do motorista de uma rota específica num dia, a partir do overview
+// que RotaMotoristaDoDia já busca (RotaDayOverview) -- usado pelo Kanban
+// de "Hoje" (EntregasKanbanHoje.tsx) pra mostrar quem tá em cada coluna,
+// sem duplicar a lógica de "primary vs extras" que já existia espalhada.
+export function driverNameForRota(day: RotaDayOverview, rota: Rota): string | null {
+  if (day.assignments.primary?.rota === rota) return day.assignments.primary.driverName;
+  return day.assignments.extras.find((e) => e.rota === rota)?.driverName ?? null;
+}
+
 // Função pura — recebe a data já como string YYYY-MM-DD pra não depender de
 // timezone do servidor (new Date("YYYY-MM-DD") é sempre UTC meia-noite).
 export function getRotaForDate(dateStr: string, config: RotaWeekdayConfig): Rota | null {

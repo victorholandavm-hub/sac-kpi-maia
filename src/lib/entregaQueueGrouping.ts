@@ -1,5 +1,5 @@
 import { bucketByScheduledDate, type DateBucketKey } from "./dateBuckets";
-import { ROTAS, ROTA_LABELS, ROTA_COLORS, JP_EXTRA_ROTA, type RotaCity } from "./rotas";
+import { ROTAS, ROTA_LABELS, ROTA_COLORS, JP_EXTRA_ROTA, type Rota, type RotaCity } from "./rotas";
 import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, SAC_MANAGED_TYPES } from "./assistenciaLabels";
 import type { ServiceRequestSummary, RequestType } from "./serviceRequests";
 
@@ -170,6 +170,14 @@ export type QueueGroup = {
   // Pra tag Hoje/Futura/Atrasada/Sem rota no cabeçalho -- ver DATE_BUCKET_TAG.
   dateBucket?: DateBucketKey;
   isSemRota?: boolean;
+  // Rota "crua" (sem a data junto) -- pedido do Victor 25/08/2026: o
+  // Kanban de "Hoje" (EntregasKanbanHoje.tsx) precisa de coluna por rota
+  // com cabeçalho só "Rota Praia" (sem "· 25 de agosto..." repetido em
+  // toda coluna do mesmo dia) e precisa da chave crua pra buscar o nome
+  // do motorista (driverNameForRota, rotas.ts). Só existe em groupByRota
+  // -- groupByDate (Visitas) não agrupa por rota, não preenche.
+  rotaKey?: Rota | "sem_rota";
+  rotaLabel?: string;
 };
 
 export const DATE_BUCKET_TAG: Record<DateBucketKey, { label: string; bg: string } | null> = {
@@ -186,7 +194,7 @@ export const DATE_BUCKET_TAG: Record<DateBucketKey, { label: string; bg: string 
 // por data (hoje, amanhã, depois, atrasado, sem_data) e só dentro de cada
 // data é que separa por rota.
 export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
-  const rotaOrder: (Omit<QueueGroup, "items" | "label"> & { rotaLabel: string })[] = [
+  const rotaOrder: (Omit<QueueGroup, "items" | "label" | "key" | "rotaKey" | "rotaLabel"> & { key: Rota | "sem_rota"; rotaLabel: string })[] = [
     ...ROTAS.map((r) => ({
       key: r,
       // "Rota extra" já é o nome inteiro (ver JP_EXTRA_ROTA em rotas.ts)
@@ -218,6 +226,8 @@ export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
         items,
         dateBucket: bucketByScheduledDate(dateGroup.dateKey === NO_SCHEDULED_DATE_KEY ? null : dateGroup.dateKey),
         isSemRota: rotaInfo.key === "sem_rota",
+        rotaKey: rotaInfo.key,
+        rotaLabel: rotaInfo.rotaLabel,
       });
     }
   }

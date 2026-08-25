@@ -11,6 +11,7 @@ import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia"
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { EntregasGroupsList } from "@/components/assistencia/EntregasGroupsList";
+import { EntregasKanbanHoje } from "@/components/assistencia/EntregasKanbanHoje";
 import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import {
   groupByRota,
@@ -138,6 +139,10 @@ export default async function SacNotificacoesPage({
     requests = filterSemRotaOpen(rawRequests);
   }
   const groups = pinSemRotaFirst(groupByRota(requests));
+  // Kanban só pra hoje -- mesmo motivo/desenho de fila/page.tsx (ver lá).
+  const todayGroups = groups.filter((g) => g.dateBucket === "hoje");
+  const restGroups = groups.filter((g) => g.dateBucket !== "hoje");
+  const todayOverview = rotaOverview.find((d) => d.date === today) ?? null;
   const now = currentTimeMs();
 
   return (
@@ -315,7 +320,10 @@ export default async function SacNotificacoesPage({
           </p>
         </div>
       ) : (
-        <EntregasGroupsList groups={groups} now={now} />
+        <div className="flex flex-col gap-4">
+          <EntregasKanbanHoje groups={todayGroups} todayOverview={todayOverview} />
+          {restGroups.length > 0 ? <EntregasGroupsList groups={restGroups} now={now} /> : null}
+        </div>
       )}
     </div>
   );
