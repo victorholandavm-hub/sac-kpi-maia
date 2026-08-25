@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { hashPin } from "./montadorAuth";
+import { isMostruarioRequest } from "./serviceRequests";
 
 export async function listAssemblers(): Promise<string[]> {
   const admin = getSupabaseAdmin();
@@ -158,6 +159,11 @@ export type PaymentItem = {
   paymentAuthorizedBy: string | null;
   assemblerName: string | null;
   clientName: string | null;
+  // Só pra aplicar o filtro mostruário x cliente (ver isMostruarioRequest)
+  // -- achado do Victor 24/08/2026: "quando filtrar, o numero de
+  // solicitações, total a pagar a montadores, pago e penente de liberação
+  // deve ser filtrado" também, não só o relatório principal.
+  orderCode: string | null;
   storeName: string;
   createdAt: string;
 };
@@ -175,19 +181,30 @@ type PaymentItemRow = {
     status: string;
     assembler_name: string | null;
     client_name: string | null;
+    order_code: string | null;
     created_at: string;
     stores: { name: string } | null;
   } | null;
 };
 
 export async function listPaymentItems(
-  opts: { assemblerName?: string; dateFrom?: string; dateTo?: string; includeNoValue?: boolean } = {}
+  opts: {
+    assemblerName?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    includeNoValue?: boolean;
+    // Mesmo filtro mostruário x cliente da tela de relatórios (ver
+    // isMostruarioRequest/ALVO_FILTERS em relatorios/page.tsx) -- pedido
+    // do Victor 24/08/2026: sem isso, o total a pagar/pago/pendente de
+    // montador não respeitava o filtro escolhido na tela.
+    alvo?: "mostruario" | "cliente";
+  } = {}
 ): Promise<PaymentItem[]> {
   const admin = getSupabaseAdmin();
   let query = admin
     .from("service_request_items")
     .select(
-      "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, status, assembler_name, client_name, created_at, stores(name))"
+      "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, status, assembler_name, client_name, order_code, created_at, stores(name))"
     )
     .order("created_at", { ascending: false });
   // Visão geral (sem montador escolhido) só mostra quem já tem valor --
@@ -217,6 +234,7 @@ export async function listPaymentItems(
       paymentAuthorizedBy: row.payment_authorized_by,
       assemblerName: row.request!.assembler_name,
       clientName: row.request!.client_name,
+      orderCode: row.request!.order_code,
       storeName: row.request!.stores?.name ?? "",
       createdAt: row.request!.created_at,
     }));
@@ -225,6 +243,7 @@ export async function listPaymentItems(
     if (opts.assemblerName && i.assemblerName !== opts.assemblerName) return false;
     if (opts.dateFrom && i.createdAt < opts.dateFrom) return false;
     if (opts.dateTo && i.createdAt > `${opts.dateTo}T23:59:59`) return false;
+    if (opts.alvo && isMostruarioRequest(i.orderCode, i.clientName) !== (opts.alvo === "mostruario")) return false;
     return true;
   });
 }

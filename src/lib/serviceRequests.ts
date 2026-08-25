@@ -1447,6 +1447,14 @@ export type ReportRowItem = {
   clientName: string | null;
   storeName: string;
   createdAt: string;
+  // Descrição livre do problema, preenchida na criação do chamado --
+  // pedido do Victor 24/08/2026: ao clicar num grupo de causa raiz
+  // (ex.: "Erro do vendedor"), "preciso que apareça qual foi o erro ao
+  // clicar, e não em quais chamados foram os erros" -- o número do
+  // chamado sozinho não dizia o QUE aconteceu, só onde procurar. `reason`
+  // é o mesmo campo que já aparece como "Problema" na notificação
+  // impressa (ver DespachoCard.tsx).
+  reason: string | null;
 };
 
 export type ReportRow = { key: string; total: number; concluida: number; cancelada: number; items: ReportRowItem[] };
@@ -1455,8 +1463,11 @@ export type RequestsReport = {
   byStore: ReportRow[];
   bySeller: ReportRow[];
   byType: ReportRow[];
-  // Só troca_produto tem causa_raiz preenchida -- a agregação abaixo já
-  // ignora linha sem valor, então isso sai "de graça" sem filtrar por tipo.
+  // Só troca_produto tem causa_raiz preenchida -- por isso NÃO passa pelo
+  // filtro `types` como o resto do relatório (ver scopedRows abaixo):
+  // restringir a query a montagem/desmontagem (pedido do Victor
+  // 24/08/2026 pro relatório principal) apagaria essa seção inteira, que
+  // é sobre troca de produto, não montagem.
   byCausaRaiz: ReportRow[];
   totalRequests: number;
 };
@@ -1467,19 +1478,25 @@ export type RequestsReport = {
 // `alvo` filtra entre montagem de mostruário (a loja monta pra exposição
 // própria, sem cliente real -- ver isMostruarioRequest) e cliente de
 // verdade -- pedido do Victor 21/08/2026: "coloque Filtro de montagem de
-// mostruário e cliente". Só se aplica a este relatório principal (não à
-// seção "Indicadores de X" nem aos pagamentos, que não têm order_code/
-// client_name na consulta).
+// mostruário e cliente". `types` restringe o relatório principal (loja/
+// tipo/vendedor/total) a um subconjunto de tipos -- pedido do Victor
+// 24/08/2026: "nas solicitações por periodo, deve mostrar apenas
+// solicitações de montagem/desmontagem" -- mas NÃO afeta `byCausaRaiz`
+// (ver comentário em RequestsReport acima, é sobre troca_produto, tipo
+// diferente de propósito).
 export async function getRequestsReport(
-  opts: { dateFrom?: string; dateTo?: string; alvo?: "mostruario" | "cliente" } = {}
+  opts: { dateFrom?: string; dateTo?: string; alvo?: "mostruario" | "cliente"; types?: RequestType[] } = {}
 ): Promise<RequestsReport> {
   const admin = getSupabaseAdmin();
   let query = admin
     .from("service_requests")
-    .select("id, ticket_number, store_id, seller_name, type, status, causa_raiz, created_at, order_code, client_name, stores(name)");
+    .select("id, ticket_number, store_id, seller_name, type, status, causa_raiz, reason, created_at, order_code, client_name, stores(name)");
 
   if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
   if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
+  // Sem filtro de `type` na query -- ver comentário acima, causa_raiz
+  // precisa das linhas de troca_produto mesmo quando `types` pede só
+  // montagem/desmontagem pro resto do relatório.
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -1492,6 +1509,7 @@ export async function getRequestsReport(
     type: RequestType;
     status: RequestStatus;
     causa_raiz: string | null;
+    reason: string | null;
     created_at: string;
     order_code: string | null;
     client_name: string | null;
@@ -1501,10 +1519,13 @@ export async function getRequestsReport(
   const rows = opts.alvo
     ? allRows.filter((r) => isMostruarioRequest(r.order_code, r.client_name) === (opts.alvo === "mostruario"))
     : allRows;
+  // Escopo do relatório principal (loja/tipo/vendedor/total) -- causa
+  // raiz continua sobre `rows` inteiro, sem essa restrição.
+  const scopedRows = opts.types ? rows.filter((r) => opts.types!.includes(r.type)) : rows;
 
-  function aggregate(keyFn: (r: Row) => string | null): ReportRow[] {
+  function aggregate(rowsForAgg: Row[], keyFn: (r: Row) => string | null): ReportRow[] {
     const map = new Map<string, ReportRow>();
-    for (const r of rows) {
+    for (const r of rowsForAgg) {
       const key = keyFn(r);
       if (!key) continue;
       const entry = map.get(key) ?? { key, total: 0, concluida: 0, cancelada: 0, items: [] };
@@ -1519,6 +1540,7 @@ export async function getRequestsReport(
         clientName: r.client_name,
         storeName: r.stores?.name ?? r.store_id,
         createdAt: r.created_at,
+        reason: r.reason,
       });
       map.set(key, entry);
     }
@@ -1526,11 +1548,11 @@ export async function getRequestsReport(
   }
 
   return {
-    byStore: aggregate((r) => r.stores?.name ?? r.store_id),
-    bySeller: aggregate((r) => r.seller_name),
-    byType: aggregate((r) => r.type),
-    byCausaRaiz: aggregate((r) => r.causa_raiz),
-    totalRequests: rows.length,
+    byStore: aggregate(scopedRows, (r) => r.stores?.name ?? r.store_id),
+    bySeller: aggregate(scopedRows, (r) => r.seller_name),
+    byType: aggregate(scopedRows, (r) => r.type),
+    byCausaRaiz: aggregate(rows, (r) => r.causa_raiz),
+    totalRequests: scopedRows.length,
   };
 }
 

@@ -206,6 +206,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Dias sem comprar</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Telefone</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cidade</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -214,7 +215,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                     key={c.protheusCode}
                     clientId={c.protheusCode}
                     name={c.name}
-                    colSpan={6}
+                    colSpan={7}
                     accentColor={CLIENTE_STATUS_COLORS[c.status]}
                   >
                     <td className="px-4 py-2 whitespace-nowrap">
@@ -239,6 +240,9 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.city ? `${c.city}${c.state ? `/${c.state}` : ""}` : "—"}
+                    </td>
+                    <td className="px-4 py-2" style={{ color: "var(--text-secondary)" }}>
+                      {c.stores.length > 0 ? c.stores.join(", ") : "—"}
                     </td>
                   </ClienteHistoricoRow>
                 ))}
@@ -400,6 +404,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cliente desde</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Dias sem comprar</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -408,7 +413,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                     key={c.clientId}
                     clientId={c.clientId}
                     name={c.nome ?? c.clientId}
-                    colSpan={8}
+                    colSpan={9}
                     accentColor={CLIENTE_NIVEL_COLORS[c.nivel]}
                     leadingCells={
                       <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
@@ -455,6 +460,9 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                       style={{ color: c.inativoRecente ? "var(--status-critical)" : "var(--text-secondary)" }}
                     >
                       {c.diasSemComprar ?? "—"}
+                    </td>
+                    <td className="px-4 py-2" style={{ color: "var(--text-secondary)" }}>
+                      {c.stores.length > 0 ? c.stores.join(", ") : "—"}
                     </td>
                   </ClienteHistoricoRow>
                 ))}
