@@ -144,31 +144,6 @@ export default async function SacNotificacoesPage({
           dia. Junior como motorista padrão -- pedido do Victor 21/08/2026. */}
       <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver="Junior" />
 
-      {/* Banner "Remarcar urgente" -- pedido do Victor 25/08/2026, mesmo
-          desenho de fila/page.tsx (ver comentário lá). */}
-      {overdueCount > 0 || filterUrgente ? (
-        <Link
-          href={
-            filterUrgente
-              ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
-              : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, urgente: "1" })
-          }
-          className="flex items-center gap-2 rounded-lg px-4 py-3 font-bold text-sm shadow-md"
-          style={{
-            background: "var(--status-critical)",
-            color: "#fff",
-            border: filterUrgente ? "3px solid var(--text-primary)" : "3px solid var(--status-critical)",
-          }}
-        >
-          <span className="text-lg" aria-hidden="true">
-            ⚠️
-          </span>
-          {filterUrgente
-            ? `Mostrando ${overdueCount} atrasada${overdueCount === 1 ? "" : "s"} -- voltar pra todas`
-            : `${overdueCount} notificaç${overdueCount === 1 ? "ão" : "ões"} atrasada${overdueCount === 1 ? "" : "s"} -- Remarcar urgente`}
-        </Link>
-      ) : null}
-
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
           {ENTREGA_FILTERS.map((f) => {
@@ -208,6 +183,29 @@ export default async function SacNotificacoesPage({
               </Link>
             );
           })}
+          {/* Badge "pra remarcar" -- pedido do Victor 25/08/2026: "nao
+              gostei da badge gigante... colocar uma badge em vermelho
+              com a quantidade a remarcar ao lado de Todas/Programado/
+              Não programado/Concluídas/Canceladas, pouca coisa maior em
+              tamanho que os outros, mas bem vermelho e piscando".
+              Mesmo desenho de fila/page.tsx (ver comentário lá). */}
+          {overdueCount > 0 || filterUrgente ? (
+            <Link
+              href={
+                filterUrgente
+                  ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
+                  : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, urgente: "1" })
+              }
+              className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold ${filterUrgente ? "" : "animate-pulse"}`}
+              style={{
+                background: "var(--status-critical)",
+                color: "#fff",
+                border: filterUrgente ? "2px solid var(--text-primary)" : "2px solid var(--status-critical)",
+              }}
+            >
+              ⚠ {overdueCount} pra remarcar
+            </Link>
+          ) : null}
         </div>
         <Link
           href="/assistencia/sac/nova"
