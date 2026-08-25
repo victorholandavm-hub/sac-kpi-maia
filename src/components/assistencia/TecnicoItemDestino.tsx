@@ -12,10 +12,7 @@ import {
   type ItemDestino,
 } from "@/lib/tecnicos";
 import type { Store } from "@/lib/serviceRequests";
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
+import { formatDateTimeShortBr } from "@/lib/formatDateTime";
 
 export function TecnicoItemDestino({
   itemId,
@@ -64,7 +61,7 @@ export function TecnicoItemDestino({
           {destinoDefinidoPor ? (
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
               {destinoDefinidoPor}
-              {destinoDefinidoEm ? ` · ${formatDateTime(destinoDefinidoEm)}` : ""}
+              {destinoDefinidoEm ? ` · ${formatDateTimeShortBr(destinoDefinidoEm)}` : ""}
             </span>
           ) : null}
           <button

@@ -14,6 +14,7 @@ import { EntregasGroupsList } from "@/components/assistencia/EntregasGroupsList"
 import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import {
   groupByRota,
+  filterOverdueOpen,
   ENTREGA_FILTERS,
   ORIGEM_FILTERS,
   CITY_FILTERS,
@@ -30,7 +31,17 @@ function currentTimeMs(): number {
   return Date.now();
 }
 
-function buildHref(params: { status?: string; q?: string; store?: string; from?: string; to?: string; origem?: string; sched?: string; city?: string }) {
+function buildHref(params: {
+  status?: string;
+  q?: string;
+  store?: string;
+  from?: string;
+  to?: string;
+  origem?: string;
+  sched?: string;
+  city?: string;
+  urgente?: string;
+}) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
@@ -40,6 +51,7 @@ function buildHref(params: { status?: string; q?: string; store?: string; from?:
   if (params.origem) sp.set("origem", params.origem);
   if (params.sched) sp.set("sched", params.sched);
   if (params.city) sp.set("city", params.city);
+  if (params.urgente) sp.set("urgente", params.urgente);
   const qs = sp.toString();
   return qs ? `/assistencia/sac/notificacoes?${qs}` : "/assistencia/sac/notificacoes";
 }
@@ -62,14 +74,24 @@ function buildHref(params: { status?: string; q?: string; store?: string; from?:
 export default async function SacNotificacoesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; store?: string; from?: string; to?: string; origem?: string; sched?: string; city?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    q?: string;
+    store?: string;
+    from?: string;
+    to?: string;
+    origem?: string;
+    sched?: string;
+    city?: string;
+    urgente?: string;
+  }>;
 }) {
   const profile = await getProfile();
   if (profile.role !== "sac" && profile.role !== "admin") {
     redirect("/assistencia/inicio");
   }
 
-  const { status, q, store, from, to, origem, sched, city } = await searchParams;
+  const { status, q, store, from, to, origem, sched, city, urgente } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
   const dateTo = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : undefined;
@@ -78,6 +100,9 @@ export default async function SacNotificacoesPage({
   const schedParam = filterSched === true ? "1" : filterSched === false ? "0" : undefined;
   // Filtro por cidade (ver CITY_FILTERS) -- pedido do Victor 24/08/2026.
   const filterCity: "joao_pessoa" | "campina_grande" | undefined = city === "joao_pessoa" || city === "campina_grande" ? city : undefined;
+  // Banner "Remarcar urgente" (ver filterOverdueOpen) -- pedido do Victor
+  // 25/08/2026, mesmo motivo de fila/page.tsx.
+  const filterUrgente = urgente === "1";
   const types = filterOrigem === "sac" ? ENTREGA_TYPES_SAC : filterOrigem === "assistencia" ? ENTREGA_TYPES_ASSISTENCIA : ENTREGA_TYPES;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -96,6 +121,12 @@ export default async function SacNotificacoesPage({
   if (filterCity !== undefined) {
     requests = requests.filter((r) => r.rota !== null && ROTA_CITY[r.rota] === filterCity);
   }
+  // Quantas estão atrasadas dentro do que já foi buscado -- ANTES do
+  // filtro de status/programado (mesmo raciocínio de fila/page.tsx).
+  const overdueCount = filterOverdueOpen(rawRequests).length;
+  if (filterUrgente) {
+    requests = filterOverdueOpen(rawRequests);
+  }
   const groups = groupByRota(requests);
   const now = currentTimeMs();
 
@@ -112,6 +143,31 @@ export default async function SacNotificacoesPage({
           pra não depender de pedir pra assistência mudar o motorista do
           dia. Junior como motorista padrão -- pedido do Victor 21/08/2026. */}
       <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver="Junior" />
+
+      {/* Banner "Remarcar urgente" -- pedido do Victor 25/08/2026, mesmo
+          desenho de fila/page.tsx (ver comentário lá). */}
+      {overdueCount > 0 || filterUrgente ? (
+        <Link
+          href={
+            filterUrgente
+              ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
+              : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, urgente: "1" })
+          }
+          className="flex items-center gap-2 rounded-lg px-4 py-3 font-bold text-sm shadow-md"
+          style={{
+            background: "var(--status-critical)",
+            color: "#fff",
+            border: filterUrgente ? "3px solid var(--text-primary)" : "3px solid var(--status-critical)",
+          }}
+        >
+          <span className="text-lg" aria-hidden="true">
+            ⚠️
+          </span>
+          {filterUrgente
+            ? `Mostrando ${overdueCount} atrasada${overdueCount === 1 ? "" : "s"} -- voltar pra todas`
+            : `${overdueCount} notificaç${overdueCount === 1 ? "ão" : "ões"} atrasada${overdueCount === 1 ? "" : "s"} -- Remarcar urgente`}
+        </Link>
+      ) : null}
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
@@ -226,6 +282,7 @@ export default async function SacNotificacoesPage({
         {filterOrigem ? <input type="hidden" name="origem" value={filterOrigem} /> : null}
         {schedParam ? <input type="hidden" name="sched" value={schedParam} /> : null}
         {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
+        {filterUrgente ? <input type="hidden" name="urgente" value="1" /> : null}
         <input
           type="search"
           name="q"
@@ -247,7 +304,7 @@ export default async function SacNotificacoesPage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, origem: filterOrigem, sched: schedParam, city: filterCity })}
+            href={buildHref({ status: filterStatus, store, origem: filterOrigem, sched: schedParam, city: filterCity, urgente: filterUrgente ? "1" : undefined })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >

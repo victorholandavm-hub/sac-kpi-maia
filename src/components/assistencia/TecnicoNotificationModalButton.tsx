@@ -4,10 +4,17 @@ import { useState } from "react";
 import { formatFullAddress } from "@/lib/serviceRequests";
 import type { TecnicoRequestView } from "@/lib/tecnicos";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import { formatDateTimeShortBr } from "@/lib/formatDateTime";
 
+// Fuso explícito (América/Fortaleza), não o fuso do navegador de quem tá
+// vendo -- achado do Victor 25/08/2026: sem isso, esse modal batia com o
+// card só por coincidência (navegador do Victor já em horário do
+// Brasil); alguém acessando de outro fuso veria um horário diferente do
+// que está de verdade nas outras telas, todas fixas em América/Fortaleza
+// (ver formatDateTime.ts).
 function formatDateTime(iso: string | null): string | null {
   if (!iso) return null;
-  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return formatDateTimeShortBr(iso);
 }
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {

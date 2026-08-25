@@ -84,6 +84,20 @@ function weekdayLabel(dateStr: string): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+// Entregas/envios que já passaram da data agendada e continuam em
+// aberto -- pedido do Victor 25/08/2026: "preciso que haja algo bem
+// visivel para as notificações de assistencia que nao foram feitas no
+// dia e estao em atraso... para que fique mais facil deles verem e
+// remarcarem e nao ficar nada atrasado e para tras". Só quem ainda está
+// "aberta" -- concluído/cancelado não precisa remarcar mais nada, mesmo
+// com data agendada no passado. Usado tanto pro número do banner ("N
+// atrasadas") quanto pra filtrar a lista quando o banner "Remarcar
+// urgente" é clicado -- um cálculo só, compartilhado entre fila/page.tsx
+// (aba Entregas) e sac/notificacoes/page.tsx.
+export function filterOverdueOpen(requests: ServiceRequestSummary[]): ServiceRequestSummary[] {
+  return requests.filter((r) => r.status === "aberta" && bucketByScheduledDate(r.scheduledDate) === "atrasado");
+}
+
 // Dentro de cada grupo, mesma prioridade de sempre: ordem manual
 // (assistencia_order) primeiro, senão mais recente primeiro. Exportado --
 // groupByDate (Visitas, fila/page.tsx) também usa, e ordena do mesmo jeito.
