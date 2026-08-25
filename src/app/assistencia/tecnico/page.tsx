@@ -10,12 +10,20 @@ import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRe
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { TecnicoItemDestino } from "@/components/assistencia/TecnicoItemDestino";
 import { TecnicoNotificationModalButton } from "@/components/assistencia/TecnicoNotificationModalButton";
+import { formatDateTimeShortBr } from "@/lib/formatDateTime";
 
 export const dynamic = "force-dynamic";
 
+// Achado do Victor 25/08/2026: essa tela mostrava "Concluído 21:57" no
+// card, mas o modal "Ver notificação completa" (que formata no navegador,
+// já no fuso local de quem tá vendo) mostrava "18:57" pro MESMO chamado --
+// 3h de diferença. Causa: formatDateTime local não passava
+// `timeZone: "America/Fortaleza"`, então rodando aqui (Server Component,
+// processo Node da VPS em UTC) saía a hora crua em UTC, sem converter --
+// mesmo bug que formatDateTime.ts já existe pra evitar em outras telas.
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return formatDateTimeShortBr(iso);
 }
 
 // SAC (troca/entrega/recolhimento de produto, notificação externa) x

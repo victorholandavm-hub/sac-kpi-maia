@@ -10,6 +10,7 @@ import { NewSinceBadge } from "./NewSinceBadge";
 import { PEDIDO_ENCOMENDA_STATUS_COLORS, PEDIDO_ENCOMENDA_STATUS_STEPS } from "@/lib/assistenciaLabels";
 import { prazoUrgencyStyle } from "@/lib/prazoStyle";
 import { groupByDeadline } from "@/lib/encomendaDeadline";
+import { formatDateTimeBr } from "@/lib/formatDateTime";
 import type { PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
 
 // Estados fora do caminho linear -- mesmo critério do StatusStepper na tela
@@ -183,7 +184,7 @@ export function PedidoEncomendaFilaList({
                         </div>
                         <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
                           <span className="font-bold" style={{ color: "var(--text-secondary)" }}>
-                            {new Date(p.createdAt).toLocaleString("pt-BR")}
+                            {formatDateTimeBr(p.createdAt)}
                           </span>
                           <span>Pedido por {p.requestedByName}</span>
                           {/* Prazo fábrica→CD continua valendo até o CD confirmar

@@ -14,6 +14,7 @@ import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcu
 import {
   groupByRota,
   sortGroupItems,
+  filterOverdueOpen,
   type QueueGroup,
   ENTREGA_FILTERS,
   ORIGEM_FILTERS,
@@ -67,6 +68,7 @@ function buildHref(params: {
   sched?: string;
   alvo?: string;
   city?: string;
+  urgente?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -80,6 +82,7 @@ function buildHref(params: {
   if (params.sched) sp.set("sched", params.sched);
   if (params.alvo) sp.set("alvo", params.alvo);
   if (params.city) sp.set("city", params.city);
+  if (params.urgente) sp.set("urgente", params.urgente);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
@@ -135,11 +138,12 @@ export default async function AssistenciaQueuePage({
     sched?: string;
     alvo?: string;
     city?: string;
+    urgente?: string;
   }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo, city } = await searchParams;
+  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo, city, urgente } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
@@ -165,6 +169,12 @@ export default async function AssistenciaQueuePage({
   // entrega.
   const filterCity: "joao_pessoa" | "campina_grande" | undefined =
     showPecas && (city === "joao_pessoa" || city === "campina_grande") ? city : undefined;
+  // Banner "Remarcar urgente" (ver filterOverdueOpen) -- pedido do Victor
+  // 25/08/2026: entregas/envios já atrasados (data agendada no passado,
+  // ainda "aberta") precisam de um jeito bem visível de achar e remarcar,
+  // sem depender de reparar sozinho no selo "ATRASADA" dentro de cada
+  // grupo. Só existe na aba Entregas.
+  const filterUrgente = showPecas && urgente === "1";
   const types = showPecas
     ? filterOrigem === "sac"
       ? ENTREGA_TYPES_SAC
@@ -215,7 +225,18 @@ export default async function AssistenciaQueuePage({
   if (filterCity !== undefined) {
     requests = requests.filter((r) => r.rota !== null && ROTA_CITY[r.rota] === filterCity);
   }
-  const postFiltered = filterSched !== undefined || filterAlvo !== undefined || filterCity !== undefined;
+  // Quantas estão atrasadas dentro do que já foi buscado (loja/origem/
+  // data escolhidos) -- ANTES do filtro de status/programado, pra não
+  // sumir o aviso só porque "Concluídas" ou "Não programado" tá
+  // selecionado. Reflete o total de verdade só na visão padrão ("Todas").
+  const overdueCount = showPecas ? filterOverdueOpen(rawRequests).length : 0;
+  // Clicar no banner força só as atrasadas em aberto -- ignora
+  // status/programado escolhidos antes (não fazem sentido juntos:
+  // "atrasada" já implica "aberta").
+  if (filterUrgente) {
+    requests = filterOverdueOpen(rawRequests);
+  }
+  const postFiltered = filterSched !== undefined || filterAlvo !== undefined || filterCity !== undefined || filterUrgente;
   const total = postFiltered ? requests.length : rawTotal;
   const groups = showPecas ? groupByRota(requests) : groupByDate(requests);
   const totalPages = postFiltered ? 1 : Math.max(1, Math.ceil(total / pageSize));
@@ -257,6 +278,38 @@ export default async function AssistenciaQueuePage({
           Entregas
         </Link>
       </div>
+
+      {/* Banner "Remarcar urgente" -- pedido do Victor 25/08/2026: "preciso
+          que haja algo bem visivel para as notificações de assistencia
+          que nao foram feitas no dia e estao em atraso... para que fique
+          mais facil deles verem e remarcarem e nao ficar nada atrasado e
+          para tras". Só aparece quando tem alguma (0 não polui a tela) --
+          vermelho/laranja forte, logo abaixo do Visitas/Entregas, antes
+          de qualquer outro filtro, pra ser a primeira coisa que salta aos
+          olhos. Clicar filtra só as atrasadas em aberto; clicar de novo
+          (ou "Todas") volta ao normal. */}
+      {showPecas && (overdueCount > 0 || filterUrgente) ? (
+        <Link
+          href={
+            filterUrgente
+              ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
+              : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, urgente: "1" })
+          }
+          className="flex items-center gap-2 rounded-lg px-4 py-3 font-bold text-sm shadow-md"
+          style={{
+            background: "var(--status-critical)",
+            color: "#fff",
+            border: filterUrgente ? "3px solid var(--text-primary)" : "3px solid var(--status-critical)",
+          }}
+        >
+          <span className="text-lg" aria-hidden="true">
+            ⚠️
+          </span>
+          {filterUrgente
+            ? `Mostrando ${overdueCount} atrasada${overdueCount === 1 ? "" : "s"} -- voltar pra todas`
+            : `${overdueCount} notificaç${overdueCount === 1 ? "ão" : "ões"} atrasada${overdueCount === 1 ? "" : "s"} -- Remarcar urgente`}
+        </Link>
+      ) : null}
 
       {showPecas ? <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} /> : null}
 
@@ -469,6 +522,7 @@ export default async function AssistenciaQueuePage({
         {schedParam ? <input type="hidden" name="sched" value={schedParam} /> : null}
         {filterAlvo ? <input type="hidden" name="alvo" value={filterAlvo} /> : null}
         {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
+        {filterUrgente ? <input type="hidden" name="urgente" value="1" /> : null}
         <input
           type="search"
           name="q"
@@ -506,7 +560,17 @@ export default async function AssistenciaQueuePage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
+            href={buildHref({
+              status: filterStatus,
+              store,
+              assembler: effectiveAssembler,
+              tab: showPecas ? "pecas" : undefined,
+              origem: filterOrigem,
+              sched: schedParam,
+              alvo: filterAlvo,
+              city: filterCity,
+              urgente: filterUrgente ? "1" : undefined,
+            })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
           >
