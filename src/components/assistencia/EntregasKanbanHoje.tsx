@@ -76,7 +76,10 @@ function KanbanCard({ r }: { r: ServiceRequestSummary }) {
             <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
           </div>
         </div>
-        <span className="text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
+        {/* Caixa alta -- pedido do Victor 25/08/2026 ("guia de
+            padronização"): "Nome do Cliente (Bold, caixa alta)", mesmo
+            tratamento de AssistenciaQueueGroup.tsx. */}
+        <span className="text-sm font-bold truncate uppercase" style={{ color: "var(--text-primary)" }}>
           {r.clientName ?? "Sem nome de cliente"}
         </span>
         <span className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>

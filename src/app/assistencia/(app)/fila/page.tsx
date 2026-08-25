@@ -12,6 +12,8 @@ import { EntregasKanbanHoje } from "@/components/assistencia/EntregasKanbanHoje"
 import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcut";
+import { PageHeader } from "@/components/assistencia/PageHeader";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 import {
   groupByRota,
   sortGroupItems,
@@ -273,6 +275,44 @@ export default async function AssistenciaQueuePage({
     <div className="flex flex-col gap-4">
       <RealtimeQueueRefresher notifyOnInsert="Nova solicitação recebida!" />
 
+      {/* Título + descrição + CTA no canto direito -- pedido do Victor
+          25/08/2026 ("guia de padronização"): "Todas as telas devem
+          começar com o Título H1... botão principal sempre fixado no
+          canto superior direito". Muda de título/descrição junto com a
+          aba Visitas/Entregas (ver logo abaixo) -- são duas telas
+          diferentes de verdade (Solicitações x Entregas), só moram na
+          mesma rota. */}
+      <PageHeader
+        title={showPecas ? "Entregas" : "Solicitações"}
+        description={
+          showPecas
+            ? "Rotas de motorista -- troca, entrega e recolhimento de produto, envio e recolhimento de peça."
+            : "Chamados de montagem, desmontagem, vistoria e troca de peça -- triagem de clientes e mostruário."
+        }
+        cta={
+          <div className="flex items-center gap-2">
+            {/* Contraste maior + atalho Alt+N só na aba Entregas -- pedido
+                do Victor 21/08/2026: "Aumente o contraste visual do botão
+                + Nova entrega no topo da página e adicione o atalho de
+                teclado Alt + N". Visitas continua com o botão de sempre. */}
+            {showPecas ? <NovaEntregaShortcut href="/assistencia/nova-entrega" /> : null}
+            <Link
+              href={showPecas ? "/assistencia/nova-entrega" : "/assistencia/nova-rapida"}
+              className={showPecas ? "text-sm px-4 py-2.5 rounded-lg font-bold shadow-md" : "text-sm px-3 py-2 rounded font-medium"}
+              style={
+                showPecas
+                  ? { background: "var(--brand-orange)", color: "#fff", border: "2px solid var(--brand-orange)" }
+                  : { background: "var(--brand-green)", color: "var(--brand-green-ink)" }
+              }
+              title={showPecas ? "Atalho: Alt + N" : undefined}
+            >
+              + Nova {showPecas ? "entrega" : "visita"}
+              {showPecas ? <span className="ml-1.5 text-xs font-normal opacity-80">(Alt+N)</span> : null}
+            </Link>
+          </div>
+        }
+      />
+
       {/* Pílulas cheias em vez de contorno fino -- pedido do Victor
           18/08/2026: a troca entre Visitas/Entregas é a navegação mais
           importante da tela (decide a tela inteira embaixo) e precisa ser a
@@ -305,153 +345,92 @@ export default async function AssistenciaQueuePage({
 
       {showPecas ? <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} /> : null}
 
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
-          {showPecas
-            ? ENTREGA_FILTERS.map((f) => {
-                const selected = (f.value.status ?? undefined) === filterStatus && (f.value.sched ?? undefined) === filterSched;
-                return (
-                  <Link
-                    key={f.label}
-                    href={buildHref({
-                      status: f.value.status ?? undefined,
-                      q,
-                      store,
-                      from: dateFrom,
-                      to: dateTo,
-                      tab: "pecas",
-                      origem: filterOrigem,
-                      sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
-                      city: filterCity,
-                    })}
-                    className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
-                    style={
-                      f.value.status
-                        ? {
-                            color: "var(--text-primary)",
-                            background: selected ? `color-mix(in srgb, ${f.color} 35%, var(--surface-1))` : "transparent",
-                            fontWeight: selected ? 600 : 400,
-                            border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${f.color} 40%, transparent)`}`,
-                          }
-                        : {
-                            borderColor: "var(--border)",
-                            border: "1px solid var(--border)",
-                            background: selected ? "var(--surface-1)" : "transparent",
-                            color: selected ? "var(--text-primary)" : "var(--text-secondary)",
-                            fontWeight: selected ? 600 : 400,
-                          }
-                    }
-                  >
-                    {f.label}
-                  </Link>
-                );
-              })
-            : FILTERS.map((f) => {
-                const selected = (f.value ?? undefined) === filterStatus;
-                const color = f.value ? STATUS_COLORS[f.value] ?? "var(--text-secondary)" : "var(--text-secondary)";
-                return (
-                  <Link
-                    key={f.label}
-                    href={buildHref({
-                      status: f.value ?? undefined,
-                      q,
-                      store,
-                      assembler: effectiveAssembler,
-                      from: dateFrom,
-                      to: dateTo,
-                      alvo: filterAlvo,
-                    })}
-                    className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
-                    style={
-                      f.value
-                        ? {
-                            color: "var(--text-primary)",
-                            background: selected ? `color-mix(in srgb, ${color} 35%, var(--surface-1))` : "transparent",
-                            fontWeight: selected ? 600 : 400,
-                            border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
-                          }
-                        : {
-                            borderColor: "var(--border)",
-                            border: "1px solid var(--border)",
-                            background: selected ? "var(--surface-1)" : "transparent",
-                            color: selected ? "var(--text-primary)" : "var(--text-secondary)",
-                            fontWeight: selected ? 600 : 400,
-                          }
-                    }
-                  >
-                    {f.label}
-                  </Link>
-                );
-              })}
-          {/* Badge "pra remarcar" -- pedido do Victor 25/08/2026: "nao
-              gostei da badge gigante... colocar uma badge em vermelho
-              com a quantidade a remarcar ao lado de Todas/Programado/
-              Não programado/Concluídas/Canceladas, pouca coisa maior em
-              tamanho que os outros, mas bem vermelho e piscando"
-              (banner grande de antes, ver git blame, era chamativo
-              demais). Mesmo lugar/tamanho dos outros pills, só um passo
-              maior + animate-pulse (Tailwind) pra piscar. Sem pulsar
-              enquanto já filtrado -- chamar atenção só faz sentido antes
-              de clicar. */}
-          {showPecas && (overdueCount > 0 || filterUrgente) ? (
-            <Link
-              href={
-                filterUrgente
-                  ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
-                  : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, urgente: "1" })
-              }
-              className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold ${filterUrgente ? "" : "animate-pulse"}`}
-              style={{
-                background: "var(--status-critical)",
-                color: "#fff",
-                border: filterUrgente ? "2px solid var(--text-primary)" : "2px solid var(--status-critical)",
-              }}
-            >
-              ⚠ {overdueCount} pra remarcar
-            </Link>
-          ) : null}
-          {/* Pill "sem rota" -- pedido do Victor 25/08/2026: "Sem Rota
-              Definida... não devem ficar perdidos no meio do feed de
-              datas", junto do resto dos atalhos rápidos com contador.
-              Mesmo desenho do "pra remarcar" ao lado, cor de atenção em
-              vez de crítica (não é atraso, é falta de atribuição). */}
-          {showPecas && (semRotaCount > 0 || filterSemRota) ? (
-            <Link
-              href={
-                filterSemRota
-                  ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
-                  : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, semrota: "1" })
-              }
-              className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold"
-              style={{
-                background: "var(--status-warning)",
-                color: "#fff",
-                border: filterSemRota ? "2px solid var(--text-primary)" : "2px solid var(--status-warning)",
-              }}
-            >
-              🧭 {semRotaCount} sem rota
-            </Link>
-          ) : null}
-        </div>
-        {/* Contraste maior + atalho Alt+N só na aba Entregas -- pedido do
-            Victor 21/08/2026: "Aumente o contraste visual do botão + Nova
-            entrega no topo da página e adicione o atalho de teclado
-            Alt + N". Visitas continua com o botão de sempre (pedido era
-            especificamente sobre "+ Nova entrega"). */}
-        {showPecas ? <NovaEntregaShortcut href="/assistencia/nova-entrega" /> : null}
-        <Link
-          href={showPecas ? "/assistencia/nova-entrega" : "/assistencia/nova-rapida"}
-          className={showPecas ? "text-sm px-4 py-2.5 rounded-lg font-bold shadow-md" : "text-sm px-3 py-2 rounded font-medium"}
-          style={
-            showPecas
-              ? { background: "var(--brand-orange)", color: "#fff", border: "2px solid var(--brand-orange)" }
-              : { background: "var(--brand-green)", color: "var(--brand-green-ink)" }
-          }
-          title={showPecas ? "Atalho: Alt + N" : undefined}
-        >
-          + Nova {showPecas ? "entrega" : "visita"}
-          {showPecas ? <span className="ml-1.5 text-xs font-normal opacity-80">(Alt+N)</span> : null}
-        </Link>
+      {/* Linha 1 do guia de padronização: filtros rápidos por status, com
+          contador -- pedido do Victor 25/08/2026 ("guia de padronização"):
+          "Botões estilo Pill/Badge para filtro rápido com contadores
+          numéricos". FilterPill centraliza o estilo (ver
+          FilterPill.tsx) -- as pills coloridas (ENTREGA_FILTERS/FILTERS
+          já trazem `color` própria) e as de alerta (pra remarcar/sem
+          rota, com contador) ficam nessa mesma fileira. CTA saiu daqui,
+          agora mora no PageHeader (canto direito, fixo). */}
+      <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
+        {showPecas
+          ? ENTREGA_FILTERS.map((f) => (
+              <FilterPill
+                key={f.label}
+                label={f.label}
+                color={f.color}
+                selected={(f.value.status ?? undefined) === filterStatus && (f.value.sched ?? undefined) === filterSched}
+                href={buildHref({
+                  status: f.value.status ?? undefined,
+                  q,
+                  store,
+                  from: dateFrom,
+                  to: dateTo,
+                  tab: "pecas",
+                  origem: filterOrigem,
+                  sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
+                  city: filterCity,
+                })}
+              />
+            ))
+          : FILTERS.map((f) => (
+              <FilterPill
+                key={f.label}
+                label={f.label}
+                color={f.value ? (STATUS_COLORS[f.value] ?? "var(--text-secondary)") : undefined}
+                selected={(f.value ?? undefined) === filterStatus}
+                href={buildHref({ status: f.value ?? undefined, q, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
+              />
+            ))}
+        {/* Badge "pra remarcar" -- pedido do Victor 25/08/2026: "nao
+            gostei da badge gigante... colocar uma badge em vermelho com
+            a quantidade a remarcar ao lado de Todas/Programado/Não
+            programado/Concluídas/Canceladas, pouca coisa maior em
+            tamanho que os outros, mas bem vermelho e piscando" (banner
+            grande de antes, ver git blame, era chamativo demais). Não
+            usa FilterPill -- é maior de propósito (mais chamativo que os
+            outros) e pisca (animate-pulse), duas coisas que o pill
+            padrão não faz. */}
+        {showPecas && (overdueCount > 0 || filterUrgente) ? (
+          <Link
+            href={
+              filterUrgente
+                ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
+                : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, urgente: "1" })
+            }
+            className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold ${filterUrgente ? "" : "animate-pulse"}`}
+            style={{
+              background: "var(--status-critical)",
+              color: "#fff",
+              border: filterUrgente ? "2px solid var(--text-primary)" : "2px solid var(--status-critical)",
+            }}
+          >
+            ⚠ {overdueCount} pra remarcar
+          </Link>
+        ) : null}
+        {/* Pill "sem rota" -- pedido do Victor 25/08/2026: "Sem Rota
+            Definida... não devem ficar perdidos no meio do feed de
+            datas", junto do resto dos atalhos rápidos com contador.
+            Mesmo desenho do "pra remarcar" ao lado, cor de atenção em
+            vez de crítica (não é atraso, é falta de atribuição). */}
+        {showPecas && (semRotaCount > 0 || filterSemRota) ? (
+          <Link
+            href={
+              filterSemRota
+                ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
+                : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, semrota: "1" })
+            }
+            className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold"
+            style={{
+              background: "var(--status-warning)",
+              color: "#fff",
+              border: filterSemRota ? "2px solid var(--text-primary)" : "2px solid var(--status-warning)",
+            }}
+          >
+            🧭 {semRotaCount} sem rota
+          </Link>
+        ) : null}
       </div>
 
       {/* Clientes x Mostruário -- só na aba Visitas -- pedido do Victor
@@ -529,14 +508,23 @@ export default async function AssistenciaQueuePage({
         {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
         {filterUrgente ? <input type="hidden" name="urgente" value="1" /> : null}
         {filterSemRota ? <input type="hidden" name="semrota" value="1" /> : null}
-        <input
-          type="search"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Buscar por nº do chamado, cliente, produto, CPF, telefone ou código do pedido…"
-          className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
-          style={{ borderColor: "var(--border)" }}
-        />
+        {/* Ícone de lupa -- pedido do Victor 25/08/2026 ("guia de
+            padronização"): "Input de Busca por texto largo com ícone de
+            lupa". `pointer-events-none` no ícone -- sem isso o clique nele
+            não cai no input logo atrás. */}
+        <div className="relative flex-1 min-w-[240px]">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-muted)" }} aria-hidden="true">
+            🔍
+          </span>
+          <input
+            type="search"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Buscar por nº do chamado, cliente, produto, CPF ou telefone…"
+            className="rounded border pl-8 pr-3 py-2 text-sm w-full"
+            style={{ borderColor: "var(--border)" }}
+          />
+        </div>
         <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
           De
           <input

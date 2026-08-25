@@ -164,10 +164,19 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                     {r.storeName}
                   </span>
                 </div>
-                <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                  {r.clientName ?? "Sem nome de cliente"}
-                  {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
-                  {r.reason ? ` · ${r.reason}` : ""}
+                <p className="text-sm truncate">
+                  {/* Negrito + caixa alta -- pedido do Victor 25/08/2026
+                      ("guia de padronização"): "Nome do Cliente (Bold,
+                      caixa alta)", mesmo tratamento das outras 2 telas
+                      (aqui era mais fraco -- text-secondary, sem negrito
+                      -- alinhado agora). */}
+                  <span className="font-bold uppercase" style={{ color: "var(--text-primary)" }}>
+                    {r.clientName ?? "Sem nome de cliente"}
+                  </span>
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
+                    {r.reason ? ` · ${r.reason}` : ""}
+                  </span>
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>

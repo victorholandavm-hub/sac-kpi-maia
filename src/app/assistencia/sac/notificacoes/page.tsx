@@ -12,6 +12,8 @@ import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { EntregasGroupsList } from "@/components/assistencia/EntregasGroupsList";
 import { EntregasKanbanHoje } from "@/components/assistencia/EntregasKanbanHoje";
+import { PageHeader } from "@/components/assistencia/PageHeader";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import {
   groupByRota,
@@ -153,101 +155,93 @@ export default async function SacNotificacoesPage({
 
       <SacTabs active="notificacoes" />
 
+      {/* Título + descrição + CTA no canto direito -- pedido do Victor
+          25/08/2026 ("guia de padronização"), mesmo padrão de
+          fila/page.tsx (aba Entregas) -- essa tela é o equivalente pro
+          papel SAC. */}
+      <PageHeader
+        title="Entregas"
+        description="Rotas de motorista -- troca, entrega e recolhimento de produto, envio e recolhimento de peça."
+        cta={
+          <Link
+            href="/assistencia/sac/nova"
+            className="text-sm px-4 py-2.5 rounded-lg font-bold shadow-md"
+            style={{ background: "var(--brand-orange)", color: "#fff", border: "2px solid var(--brand-orange)" }}
+          >
+            + Nova solicitação
+          </Link>
+        }
+      />
+
       {/* Mesmo painel de /assistencia/fila (aba Entregas) -- SAC não
           alcança a fila da assistência, precisa desse atalho aqui também
           pra não depender de pedir pra assistência mudar o motorista do
           dia. Junior como motorista padrão -- pedido do Victor 21/08/2026. */}
       <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver="Junior" />
 
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
-          {ENTREGA_FILTERS.map((f) => {
-            const selected = (f.value.status ?? undefined) === filterStatus && (f.value.sched ?? undefined) === filterSched;
-            return (
-              <Link
-                key={f.label}
-                href={buildHref({
-                  status: f.value.status ?? undefined,
-                  q,
-                  store,
-                  from: dateFrom,
-                  to: dateTo,
-                  origem: filterOrigem,
-                  sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
-                  city: filterCity,
-                })}
-                className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
-                style={
-                  f.value.status
-                    ? {
-                        color: "var(--text-primary)",
-                        background: selected ? `color-mix(in srgb, ${f.color} 35%, var(--surface-1))` : "transparent",
-                        fontWeight: selected ? 600 : 400,
-                        border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${f.color} 40%, transparent)`}`,
-                      }
-                    : {
-                        borderColor: "var(--border)",
-                        border: "1px solid var(--border)",
-                        background: selected ? "var(--surface-1)" : "transparent",
-                        color: selected ? "var(--text-primary)" : "var(--text-secondary)",
-                        fontWeight: selected ? 600 : 400,
-                      }
-                }
-              >
-                {f.label}
-              </Link>
-            );
-          })}
-          {/* Badge "pra remarcar" -- pedido do Victor 25/08/2026: "nao
-              gostei da badge gigante... colocar uma badge em vermelho
-              com a quantidade a remarcar ao lado de Todas/Programado/
-              Não programado/Concluídas/Canceladas, pouca coisa maior em
-              tamanho que os outros, mas bem vermelho e piscando".
-              Mesmo desenho de fila/page.tsx (ver comentário lá). */}
-          {overdueCount > 0 || filterUrgente ? (
-            <Link
-              href={
-                filterUrgente
-                  ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
-                  : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, urgente: "1" })
-              }
-              className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold ${filterUrgente ? "" : "animate-pulse"}`}
-              style={{
-                background: "var(--status-critical)",
-                color: "#fff",
-                border: filterUrgente ? "2px solid var(--text-primary)" : "2px solid var(--status-critical)",
-              }}
-            >
-              ⚠ {overdueCount} pra remarcar
-            </Link>
-          ) : null}
-          {/* Pill "sem rota" -- mesmo desenho/motivo de fila/page.tsx (ver
-              lá), cor de atenção em vez de crítica. */}
-          {semRotaCount > 0 || filterSemRota ? (
-            <Link
-              href={
-                filterSemRota
-                  ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
-                  : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, semrota: "1" })
-              }
-              className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold"
-              style={{
-                background: "var(--status-warning)",
-                color: "#fff",
-                border: filterSemRota ? "2px solid var(--text-primary)" : "2px solid var(--status-warning)",
-              }}
-            >
-              🧭 {semRotaCount} sem rota
-            </Link>
-          ) : null}
-        </div>
-        <Link
-          href="/assistencia/sac/nova"
-          className="text-sm px-4 py-2.5 rounded-lg font-bold shadow-md"
-          style={{ background: "var(--brand-orange)", color: "#fff", border: "2px solid var(--brand-orange)" }}
-        >
-          + Nova solicitação
-        </Link>
+      {/* Linha 1 do guia de padronização -- mesmo desenho/motivo de
+          fila/page.tsx (aba Entregas, ver lá). */}
+      <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
+        {ENTREGA_FILTERS.map((f) => (
+          <FilterPill
+            key={f.label}
+            label={f.label}
+            color={f.color}
+            selected={(f.value.status ?? undefined) === filterStatus && (f.value.sched ?? undefined) === filterSched}
+            href={buildHref({
+              status: f.value.status ?? undefined,
+              q,
+              store,
+              from: dateFrom,
+              to: dateTo,
+              origem: filterOrigem,
+              sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
+              city: filterCity,
+            })}
+          />
+        ))}
+        {/* Badge "pra remarcar" -- pedido do Victor 25/08/2026: "nao
+            gostei da badge gigante... colocar uma badge em vermelho
+            com a quantidade a remarcar ao lado de Todas/Programado/
+            Não programado/Concluídas/Canceladas, pouca coisa maior em
+            tamanho que os outros, mas bem vermelho e piscando".
+            Mesmo desenho de fila/page.tsx (ver comentário lá). */}
+        {overdueCount > 0 || filterUrgente ? (
+          <Link
+            href={
+              filterUrgente
+                ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
+                : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, urgente: "1" })
+            }
+            className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold ${filterUrgente ? "" : "animate-pulse"}`}
+            style={{
+              background: "var(--status-critical)",
+              color: "#fff",
+              border: filterUrgente ? "2px solid var(--text-primary)" : "2px solid var(--status-critical)",
+            }}
+          >
+            ⚠ {overdueCount} pra remarcar
+          </Link>
+        ) : null}
+        {/* Pill "sem rota" -- mesmo desenho/motivo de fila/page.tsx (ver
+            lá), cor de atenção em vez de crítica. */}
+        {semRotaCount > 0 || filterSemRota ? (
+          <Link
+            href={
+              filterSemRota
+                ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
+                : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, semrota: "1" })
+            }
+            className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold"
+            style={{
+              background: "var(--status-warning)",
+              color: "#fff",
+              border: filterSemRota ? "2px solid var(--text-primary)" : "2px solid var(--status-warning)",
+            }}
+          >
+            🧭 {semRotaCount} sem rota
+          </Link>
+        ) : null}
       </div>
 
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -283,14 +277,20 @@ export default async function SacNotificacoesPage({
         {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
         {filterUrgente ? <input type="hidden" name="urgente" value="1" /> : null}
         {filterSemRota ? <input type="hidden" name="semrota" value="1" /> : null}
-        <input
-          type="search"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Buscar por nº do chamado, cliente, produto, CPF, telefone ou código do pedido…"
-          className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
-          style={{ borderColor: "var(--border)" }}
-        />
+        {/* Ícone de lupa -- mesmo padrão de fila/page.tsx (ver lá). */}
+        <div className="relative flex-1 min-w-[240px]">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-muted)" }} aria-hidden="true">
+            🔍
+          </span>
+          <input
+            type="search"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Buscar por nº do chamado, cliente, produto, CPF ou telefone…"
+            className="rounded border pl-8 pr-3 py-2 text-sm w-full"
+            style={{ borderColor: "var(--border)" }}
+          />
+        </div>
         <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
           De
           <input type="date" name="from" defaultValue={dateFrom ?? ""} className="rounded border px-2 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
