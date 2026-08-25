@@ -26,6 +26,16 @@ function groupByDate(requests: ServiceRequestSummary[]) {
     }
     group.items.push(r);
   }
+  // Concluído vai pro final -- pedido do Victor 25/08/2026: "os que
+  // estiverem com status de concluido, precisam ir para baixo". Partição
+  // estável (não reordena dentro de cada grupo, só separa quem já
+  // terminou de quem ainda não) -- continua dando pra reordenar manualmente
+  // dentro do dia (ver AgendaQueueGroup), só o arranjo inicial que muda.
+  for (const group of groups) {
+    const pendentes = group.items.filter((r) => r.status !== "concluida");
+    const concluidos = group.items.filter((r) => r.status === "concluida");
+    group.items = [...pendentes, ...concluidos];
+  }
   return groups;
 }
 
