@@ -15,6 +15,8 @@ import {
   groupByRota,
   sortGroupItems,
   filterOverdueOpen,
+  filterSemRotaOpen,
+  pinSemRotaFirst,
   type QueueGroup,
   ENTREGA_FILTERS,
   ORIGEM_FILTERS,
@@ -69,6 +71,7 @@ function buildHref(params: {
   alvo?: string;
   city?: string;
   urgente?: string;
+  semrota?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -83,6 +86,7 @@ function buildHref(params: {
   if (params.alvo) sp.set("alvo", params.alvo);
   if (params.city) sp.set("city", params.city);
   if (params.urgente) sp.set("urgente", params.urgente);
+  if (params.semrota) sp.set("semrota", params.semrota);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
@@ -139,11 +143,12 @@ export default async function AssistenciaQueuePage({
     alvo?: string;
     city?: string;
     urgente?: string;
+    semrota?: string;
   }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo, city, urgente } = await searchParams;
+  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo, city, urgente, semrota } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
@@ -175,6 +180,11 @@ export default async function AssistenciaQueuePage({
   // sem depender de reparar sozinho no selo "ATRASADA" dentro de cada
   // grupo. Só existe na aba Entregas.
   const filterUrgente = showPecas && urgente === "1";
+  // Pill "sem rota" (ver filterSemRotaOpen) -- pedido do Victor 25/08/2026
+  // (revisão da tela de notificações): "Sem Rota Definida... não devem
+  // ficar perdidos no meio do feed de datas". Mesmo padrão de
+  // filterUrgente acima -- só existe na aba Entregas.
+  const filterSemRota = showPecas && semrota === "1";
   const types = showPecas
     ? filterOrigem === "sac"
       ? ENTREGA_TYPES_SAC
@@ -230,15 +240,22 @@ export default async function AssistenciaQueuePage({
   // sumir o aviso só porque "Concluídas" ou "Não programado" tá
   // selecionado. Reflete o total de verdade só na visão padrão ("Todas").
   const overdueCount = showPecas ? filterOverdueOpen(rawRequests).length : 0;
-  // Clicar no banner força só as atrasadas em aberto -- ignora
-  // status/programado escolhidos antes (não fazem sentido juntos:
-  // "atrasada" já implica "aberta").
+  // Mesmo raciocínio do overdueCount acima, pro pill "sem rota".
+  const semRotaCount = showPecas ? filterSemRotaOpen(rawRequests).length : 0;
+  // Clicar no pill força só as atrasadas (ou só as sem rota) em aberto --
+  // ignora status/programado escolhidos antes (não fazem sentido juntos:
+  // os dois já implicam "aberta"). Mutuamente exclusivos -- os próprios
+  // links de cada pill nunca combinam os dois parâmetros na URL.
   if (filterUrgente) {
     requests = filterOverdueOpen(rawRequests);
+  } else if (filterSemRota) {
+    requests = filterSemRotaOpen(rawRequests);
   }
-  const postFiltered = filterSched !== undefined || filterAlvo !== undefined || filterCity !== undefined || filterUrgente;
+  const postFiltered = filterSched !== undefined || filterAlvo !== undefined || filterCity !== undefined || filterUrgente || filterSemRota;
   const total = postFiltered ? requests.length : rawTotal;
-  const groups = showPecas ? groupByRota(requests) : groupByDate(requests);
+  // "Sem rota" primeiro, não perdido no meio do feed por data -- ver
+  // pinSemRotaFirst.
+  const groups = showPecas ? pinSemRotaFirst(groupByRota(requests)) : groupByDate(requests);
   const totalPages = postFiltered ? 1 : Math.max(1, Math.ceil(total / pageSize));
   // Calculado uma vez aqui (Server Component, sem hooks) e repassado pra
   // AssistenciaQueueGroup -- lá dentro é "use client" com hooks, onde
@@ -386,6 +403,28 @@ export default async function AssistenciaQueuePage({
               ⚠ {overdueCount} pra remarcar
             </Link>
           ) : null}
+          {/* Pill "sem rota" -- pedido do Victor 25/08/2026: "Sem Rota
+              Definida... não devem ficar perdidos no meio do feed de
+              datas", junto do resto dos atalhos rápidos com contador.
+              Mesmo desenho do "pra remarcar" ao lado, cor de atenção em
+              vez de crítica (não é atraso, é falta de atribuição). */}
+          {showPecas && (semRotaCount > 0 || filterSemRota) ? (
+            <Link
+              href={
+                filterSemRota
+                  ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
+                  : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, semrota: "1" })
+              }
+              className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold"
+              style={{
+                background: "var(--status-warning)",
+                color: "#fff",
+                border: filterSemRota ? "2px solid var(--text-primary)" : "2px solid var(--status-warning)",
+              }}
+            >
+              🧭 {semRotaCount} sem rota
+            </Link>
+          ) : null}
         </div>
         {/* Contraste maior + atalho Alt+N só na aba Entregas -- pedido do
             Victor 21/08/2026: "Aumente o contraste visual do botão + Nova
@@ -407,62 +446,6 @@ export default async function AssistenciaQueuePage({
           {showPecas ? <span className="ml-1.5 text-xs font-normal opacity-80">(Alt+N)</span> : null}
         </Link>
       </div>
-
-      {showPecas ? (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Origem:
-          </span>
-          {ORIGEM_FILTERS.map((f) => {
-            const selected = (f.value ?? undefined) === filterOrigem;
-            return (
-              <Link
-                key={f.label}
-                href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, tab: "pecas", origem: f.value ?? undefined, sched: schedParam, city: filterCity })}
-                className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
-                style={{
-                  border: "1px solid var(--border)",
-                  background: selected ? "var(--brand-green)" : "transparent",
-                  color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
-                  fontWeight: selected ? 600 : 400,
-                }}
-              >
-                {f.label}
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {/* Filtro por cidade -- pedido do Victor 24/08/2026: "filtro por
-          cidade" (depois de confirmar que o agrupamento por rota já
-          separa Campina Grande sozinho, mas não tinha como filtrar só
-          por uma). */}
-      {showPecas ? (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Cidade:
-          </span>
-          {CITY_FILTERS.map((f) => {
-            const selected = (f.value ?? undefined) === filterCity;
-            return (
-              <Link
-                key={f.label}
-                href={buildHref({ status: filterStatus, q, store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, sched: schedParam, city: f.value ?? undefined })}
-                className="text-xs px-3 py-1 rounded-full whitespace-nowrap"
-                style={{
-                  border: "1px solid var(--border)",
-                  background: selected ? "var(--brand-green)" : "transparent",
-                  color: selected ? "var(--brand-green-ink)" : "var(--text-secondary)",
-                  fontWeight: selected ? 600 : 400,
-                }}
-              >
-                {f.label}
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
 
       {/* Clientes x Mostruário -- só na aba Visitas -- pedido do Victor
           22/08/2026: "Crie chips de filtro no topo para isolar chamados
@@ -500,8 +483,28 @@ export default async function AssistenciaQueuePage({
         {totalPages > 1 ? ` · página ${page} de ${totalPages}` : ""}
       </p>
 
+      {/* Filtros avançados consolidados numa barra só -- pedido do Victor
+          25/08/2026: "os filtros estão espalhados em vários blocos...
+          crie uma barra única de filtragem". Origem/Cidade eram fileiras
+          de pills próprias (ver git blame) -- viram dropdown junto de
+          Loja/Montador, mesmas opções de sempre (ORIGEM_FILTERS/
+          CITY_FILTERS), só reaproveitadas aqui em vez de lá. */}
       <div className="flex items-center gap-2 flex-wrap">
         <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+        {showPecas ? (
+          <FilterSelect
+            name="origem"
+            placeholder="Origem: todas"
+            options={ORIGEM_FILTERS.filter((f) => f.value !== null).map((f) => ({ value: f.value as string, label: f.label }))}
+          />
+        ) : null}
+        {showPecas ? (
+          <FilterSelect
+            name="city"
+            placeholder="Cidade: todas"
+            options={CITY_FILTERS.filter((f) => f.value !== null).map((f) => ({ value: f.value as string, label: f.label }))}
+          />
+        ) : null}
         {/* Filtro de montador não existe na aba de entrega de peça -- lá é
             motorista, não montador (ver Motorista/Montador em
             AssistenciaQueueGroup.tsx). */}
@@ -518,6 +521,7 @@ export default async function AssistenciaQueuePage({
         {filterAlvo ? <input type="hidden" name="alvo" value={filterAlvo} /> : null}
         {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
         {filterUrgente ? <input type="hidden" name="urgente" value="1" /> : null}
+        {filterSemRota ? <input type="hidden" name="semrota" value="1" /> : null}
         <input
           type="search"
           name="q"
@@ -565,6 +569,7 @@ export default async function AssistenciaQueuePage({
               alvo: filterAlvo,
               city: filterCity,
               urgente: filterUrgente ? "1" : undefined,
+              semrota: filterSemRota ? "1" : undefined,
             })}
             className="text-xs underline"
             style={{ color: "var(--text-secondary)" }}
