@@ -1182,7 +1182,7 @@ export function agendaEffectiveDate(r: Pick<ServiceRequestSummary, "scheduledDat
 }
 
 export async function listScheduledRequests(
-  opts: { range?: AgendaRange } = {}
+  opts: { range?: AgendaRange; month?: string } = {}
 ): Promise<ServiceRequestSummary[]> {
   const admin = getSupabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
@@ -1220,6 +1220,13 @@ export async function listScheduledRequests(
       const d = agendaEffectiveDate(r);
       return !!d && d >= today && d <= in7Days;
     });
+  } else if (opts.month) {
+    // "Tudo" (nenhum range escolhido) limitado ao mês corrente por padrão --
+    // pedido do Victor 25/08/2026: "Se a opção padrão for 'Tudo', limite
+    // por padrão ao mês corrente" (senão a lista mistura anos de histórico
+    // com o que falta agendar, sem filtro nenhum). Navegação de mês
+    // (</>) troca esse valor -- ver buildHref em agenda/page.tsx.
+    items = items.filter((r) => (agendaEffectiveDate(r) ?? "").slice(0, 7) === opts.month);
   }
 
   return items.sort((a, b) => {
