@@ -182,3 +182,53 @@ export function encomendaCanAdvance(actor: { role: string; fabricaId?: string | 
   }
   return false;
 }
+
+// Botão de avanço rápido direto na linha da fila, sem abrir o pedido --
+// pedido do Victor 25/08/2026 (reforma da Fila de Encomendas): "Ações:
+// Botão direto para alterar status ou ver detalhes sem expandir o card".
+// Só devolve uma transição quando ela é SEMPRE segura de disparar sem
+// preencher mais nada antes -- mesmas checagens de advancePedidoStatus
+// (encomendas-actions.ts): prazo fábrica→CD, prazo CD→loja e NF-e
+// continuam bloqueando o avanço lá (a fonte de verdade não muda), aqui só
+// filtra ANTES pra não oferecer um botão que ia falhar na certeza. Quando
+// há mais de uma transição possível a partir do status atual (ex: CD em
+// "pronto_para_expedicao" pode ir pra "em_carga" OU "recebido_cd") não tem
+// como escolher sozinho -- fica só o link "Ver detalhes" nesse caso.
+// admin/assistência não usa isso (mesma exclusão de encomendaCanAdvance
+// acima -- não têm tabela de transição própria, avançam livremente só
+// pela tela de detalhe).
+export function nextQuickAdvance(
+  actor: { role: string; fabricaId?: string | null },
+  pedido: PedidoEncomendaForAuth & { prazoFabricaCd: string | null; prazoCdLoja: string | null }
+): string | null {
+  const externo = pedido.fornecedorTipo === "fabrica_externa";
+  const fromStatus = pedido.status;
+
+  if (actor.role === "fabrica") {
+    if (externo) return null;
+    if (actor.fabricaId && pedido.fabricaId && actor.fabricaId !== pedido.fabricaId) return null;
+    const options = FABRICA_TRANSITIONS[fromStatus] ?? [];
+    if (options.length !== 1) return null;
+    const toStatus = options[0];
+    // solicitado -> em_producao é a fábrica "aceitando" o pedido -- exige
+    // prazo fábrica→CD já definido (mesma checagem de advancePedidoStatus).
+    if (toStatus === "em_producao" && !pedido.prazoFabricaCd) return null;
+    return toStatus;
+  }
+
+  if (actor.role === "cd") {
+    const table = externo ? CD_TRANSITIONS_EXTERNO : CD_TRANSITIONS;
+    const options = table[fromStatus] ?? [];
+    if (options.length !== 1) return null;
+    const toStatus = options[0];
+    // Fornecedor externo: CD assume a etapa de "aceitar" no lugar da
+    // fábrica (mesma checagem de prazo fábrica→CD).
+    const aceitandoExterno = externo && toStatus === "pronto_para_expedicao" && fromStatus === "solicitado";
+    if (aceitandoExterno && !pedido.prazoFabricaCd) return null;
+    if (toStatus === "em_carga" && !pedido.prazoCdLoja) return null;
+    if (toStatus === "faturado") return null; // sempre exige NF-e, nunca é "rápido"
+    return toStatus;
+  }
+
+  return null;
+}

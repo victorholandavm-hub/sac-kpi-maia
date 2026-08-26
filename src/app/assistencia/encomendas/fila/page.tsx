@@ -8,7 +8,7 @@ import {
   getChegadaCdDates,
   OPEN_PEDIDO_ENCOMENDA_STATUSES,
 } from "@/lib/pedidosEncomenda";
-import { encomendaCanAdvance } from "@/lib/dal";
+import { encomendaCanAdvance, nextQuickAdvance } from "@/lib/dal";
 import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 import { ROLE_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PedidoEncomendaFilaList } from "@/components/assistencia/PedidoEncomendaFilaList";
@@ -128,6 +128,19 @@ export default async function EncomendasQueuePage({
       .filter((p) => encomendaCanAdvance({ role: actor.role, fabricaId: actor.fabricaId }, { status: p.status, fornecedorTipo: p.fornecedorTipo, fabricaId: p.fabricaId }))
       .map((p) => p.id)
   );
+  // Botão "Avançar" direto na linha (ver PedidoEncomendaFilaList.tsx) --
+  // pedido do Victor 25/08/2026: "Botão direto para alterar status ou ver
+  // detalhes sem expandir o card". null quando não há uma transição única
+  // e segura pra oferecer (ver nextQuickAdvance, dal.ts).
+  const quickAdvanceByPedido: Record<string, string | null> = Object.fromEntries(
+    pedidos.map((p) => [
+      p.id,
+      nextQuickAdvance(
+        { role: actor.role, fabricaId: actor.fabricaId },
+        { status: p.status, fornecedorTipo: p.fornecedorTipo, fabricaId: p.fabricaId, prazoFabricaCd: p.prazoFabricaCd, prazoCdLoja: p.prazoCdLoja }
+      ),
+    ])
+  );
   const canBulkAdvance = actor.role === "fabrica" || actor.role === "admin" || actor.role === "assistencia";
   const showFornecedorFilter = actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia";
 
@@ -185,42 +198,84 @@ export default async function EncomendasQueuePage({
         </div>
       </AssistenciaHeader>
 
-      <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
-        {FILTERS.map((f) => {
-          const activeValue = showAllStatuses ? "todos" : (filterStatus ?? null);
-          const selected = (f.value ?? null) === activeValue;
-          const isStatusPill = !!f.value && f.value !== "todos";
-          const color = isStatusPill ? PEDIDO_ENCOMENDA_STATUS_COLORS[f.value as string] ?? "var(--text-secondary)" : "var(--text-secondary)";
-          // Contador visual em cada chip -- pedido do Victor 22/08/2026:
-          // "torne-os em Chips com Contadores Visuais (ex: Em Produção
-          // (14))". "Em andamento" soma os status ainda abertos, "Todos" é
-          // o total, cada status individual usa a própria contagem.
-          const count = f.value === null ? openCount : f.value === "todos" ? allForCounts.length : (statusCounts.get(f.value) ?? 0);
-          return (
+      {/* Barra de filtros/busca consolidada e fixa (sticky) -- pedido do
+          Victor 25/08/2026 (reforma da Fila de Encomendas): "Consolide o
+          campo de Busca, o filtro de Lojas e os Chips de Status com
+          contadores... em uma barra superior fixa (sticky header)".
+          Fundo opaco (var(--background), a mesma cor do body) -- sem
+          isso o conteúdo por trás aparece por cima ao rolar. Fornecedor
+          (filtro extra, só pra CD/admin/assistência) e o botão "visão
+          fábrica" ficam FORA da barra fixa -- o pedido citou só busca +
+          loja + chips, esses dois não fazem parte da consolidação. */}
+      <div className="sticky top-0 z-20 flex flex-col gap-2 py-2" style={{ background: "var(--background)", borderBottom: "1px solid var(--border)" }}>
+        <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
+          {FILTERS.map((f) => {
+            const activeValue = showAllStatuses ? "todos" : (filterStatus ?? null);
+            const selected = (f.value ?? null) === activeValue;
+            const isStatusPill = !!f.value && f.value !== "todos";
+            const color = isStatusPill ? PEDIDO_ENCOMENDA_STATUS_COLORS[f.value as string] ?? "var(--text-secondary)" : "var(--text-secondary)";
+            // Contador visual em cada chip -- pedido do Victor 22/08/2026:
+            // "torne-os em Chips com Contadores Visuais (ex: Em Produção
+            // (14))". "Em andamento" soma os status ainda abertos, "Todos" é
+            // o total, cada status individual usa a própria contagem.
+            const count = f.value === null ? openCount : f.value === "todos" ? allForCounts.length : (statusCounts.get(f.value) ?? 0);
+            return (
+              <Link
+                key={f.label}
+                href={buildHref({ status: f.value ?? undefined, store, fornecedor, q, view })}
+                className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
+                style={
+                  isStatusPill
+                    ? {
+                        color: "var(--text-primary)",
+                        background: selected ? `color-mix(in srgb, ${color} 35%, var(--surface-1))` : "transparent",
+                        fontWeight: selected ? 600 : 400,
+                        border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
+                      }
+                    : {
+                        border: "1px solid var(--border)",
+                        background: selected ? "var(--surface-1)" : "transparent",
+                        color: selected ? "var(--text-primary)" : "var(--text-secondary)",
+                        fontWeight: selected ? 600 : 400,
+                      }
+                }
+              >
+                {f.label} ({count})
+              </Link>
+            );
+          })}
+        </div>
+
+        <form action="/assistencia/encomendas/fila" method="GET" className="flex items-center gap-2 flex-wrap">
+          {status ? <input type="hidden" name="status" value={status} /> : null}
+          {fornecedor ? <input type="hidden" name="fornecedor" value={fornecedor} /> : null}
+          {view ? <input type="hidden" name="view" value={view} /> : null}
+          <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+          <input
+            type="search"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Buscar por nº do pedido, cliente ou produto…"
+            className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
+            style={{ borderColor: "var(--border)" }}
+          />
+          <button
+            type="submit"
+            className="text-sm px-3 py-2 rounded border"
+            style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+          >
+            Buscar
+          </button>
+          {q ? (
             <Link
-              key={f.label}
-              href={buildHref({ status: f.value ?? undefined, store, fornecedor, q, view })}
-              className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
-              style={
-                isStatusPill
-                  ? {
-                      color: "var(--text-primary)",
-                      background: selected ? `color-mix(in srgb, ${color} 35%, var(--surface-1))` : "transparent",
-                      fontWeight: selected ? 600 : 400,
-                      border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
-                    }
-                  : {
-                      border: "1px solid var(--border)",
-                      background: selected ? "var(--surface-1)" : "transparent",
-                      color: selected ? "var(--text-primary)" : "var(--text-secondary)",
-                      fontWeight: selected ? 600 : 400,
-                    }
-              }
+              href={buildHref({ status, store, fornecedor, view })}
+              className="text-xs underline"
+              style={{ color: "var(--text-secondary)" }}
             >
-              {f.label} ({count})
+              Limpar busca
             </Link>
-          );
-        })}
+          ) : null}
+        </form>
       </div>
 
       {showFornecedorFilter ? (
@@ -246,57 +301,23 @@ export default async function EncomendasQueuePage({
         </div>
       ) : null}
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
-        {/* Alternar para Visão Fábrica -- pedido do Victor 22/08/2026: "Crie
-            um botão no topo [Alternar para Visão Fábrica]... A fábrica
-            precisa ver o total do lote para corte e estofamento, enquanto o
-            vendedor precisa ver a ordem por pedido individual". Só troca a
-            forma de exibir os MESMOS pedidos já filtrados -- ver
-            FabricaProducaoView.tsx. */}
-        <Link
-          href={buildHref({ status, store, fornecedor, q, view: fabricaView ? undefined : "fabrica" })}
-          className="text-sm px-3 py-2 rounded font-medium whitespace-nowrap"
-          style={
-            fabricaView
-              ? { background: "var(--brand-orange)", color: "#fff" }
-              : { border: "1px solid var(--brand-orange)", color: "var(--brand-orange)" }
-          }
-        >
-          {fabricaView ? "📋 Voltar para visão por pedido" : "🏭 Alternar para visão fábrica"}
-        </Link>
-      </div>
-
-      <form action="/assistencia/encomendas/fila" method="GET" className="flex items-center gap-2 flex-wrap">
-        {status ? <input type="hidden" name="status" value={status} /> : null}
-        {store ? <input type="hidden" name="store" value={store} /> : null}
-        {fornecedor ? <input type="hidden" name="fornecedor" value={fornecedor} /> : null}
-        {view ? <input type="hidden" name="view" value={view} /> : null}
-        <input
-          type="search"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Buscar por nº do pedido, cliente ou produto…"
-          className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
-          style={{ borderColor: "var(--border)" }}
-        />
-        <button
-          type="submit"
-          className="text-sm px-3 py-2 rounded border"
-          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
-        >
-          Buscar
-        </button>
-        {q ? (
-          <Link
-            href={buildHref({ status, store, fornecedor, view })}
-            className="text-xs underline"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Limpar busca
-          </Link>
-        ) : null}
-      </form>
+      {/* Alternar para Visão Fábrica -- pedido do Victor 22/08/2026: "Crie
+          um botão no topo [Alternar para Visão Fábrica]... A fábrica
+          precisa ver o total do lote para corte e estofamento, enquanto o
+          vendedor precisa ver a ordem por pedido individual". Só troca a
+          forma de exibir os MESMOS pedidos já filtrados -- ver
+          FabricaProducaoView.tsx. */}
+      <Link
+        href={buildHref({ status, store, fornecedor, q, view: fabricaView ? undefined : "fabrica" })}
+        className="text-sm px-3 py-2 rounded font-medium whitespace-nowrap self-start"
+        style={
+          fabricaView
+            ? { background: "var(--brand-orange)", color: "#fff" }
+            : { border: "1px solid var(--brand-orange)", color: "var(--brand-orange)" }
+        }
+      >
+        {fabricaView ? "📋 Voltar para visão por pedido" : "🏭 Alternar para visão fábrica"}
+      </Link>
 
       {pedidos.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
@@ -313,6 +334,7 @@ export default async function EncomendasQueuePage({
           actionNeededIds={actionNeededIds}
           canBulkAdvance={canBulkAdvance}
           chegadaCdByPedido={chegadaCdByPedido}
+          quickAdvanceByPedido={quickAdvanceByPedido}
         />
       )}
     </div>
