@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
+import { sanitizeOrFilterValue } from "./searchFilter";
 
 // Tela "Vendas por produto" (admin + CD, ver 0073_vendas_produto_rls.sql):
 // curva semanal de um produto, ranking dos mais vendidos e classificação por
@@ -135,13 +136,20 @@ export type ProdutoSugestao = { productCode: string; description: string | null 
 export async function searchProdutosVenda(query: string): Promise<ProdutoSugestao[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
+  // Sanitiza antes de colar na string do .or() -- achado em revisão de
+  // segurança 26/08/2026: `,`/`(`/`)` são delimitadores estruturais desse
+  // formato do PostgREST, um valor digitado com esses caracteres quebra o
+  // filtro pretendido e permite anexar condições extras (mesmo raciocínio
+  // já aplicado em clientes.ts/actions.ts/driver-actions.ts, ver
+  // searchFilter.ts).
+  const safe = sanitizeOrFilterValue(trimmed);
 
   const admin = getSupabaseAdmin();
   const { data } = await admin
     .from("totvs_order_items")
     .select("product, description")
     .not("product", "is", null)
-    .or(`product.ilike.%${trimmed}%,description.ilike.%${trimmed}%`)
+    .or(`product.ilike.%${safe}%,description.ilike.%${safe}%`)
     .limit(200);
 
   const seen = new Map<string, ProdutoSugestao>();
