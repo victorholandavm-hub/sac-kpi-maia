@@ -16,8 +16,81 @@ import type { ServiceRequestSummary } from "@/lib/serviceRequests";
 // Sem arrastar-e-soltar entre colunas -- não foi pedido, e mudar
 // rota/motorista de um card já tem fluxo próprio (dentro do detalhe do
 // chamado); aqui é só uma visão, mais rápida de escanear que a sanfona.
+
+type KanbanColumn = {
+  key: string;
+  rotaLabel: string;
+  headerBg: string;
+  headerText: string;
+  borderColor: string;
+  items: ServiceRequestSummary[];
+  driverName: string | null;
+};
+
+// "Rota extra" genérica (ver JP_EXTRA_ROTA, rotas.ts) pode ter mais de um
+// motorista atribuído no mesmo dia (Joalison, Eduardo, ...) -- todos
+// compartilham o mesmo rotaKey="extra" salvo em cada chamado (só a UI de
+// escolha distingue "Rota extra 1"/"Rota extra 2" na hora de agendar, ver
+// labelAvailableRota). Primeiro achado do Victor 26/08/2026: "eu mudei o
+// motorista, nao foi joalison, foi eduardo que fez, mas na tela ainda
+// aparece joalison" -- um cabeçalho só pro grupo mostrava sempre o mesmo
+// motorista (driverNameForRota pega a primeira atribuição extra do dia).
+// Ajuste pedido em seguida, mesma conversa: "eu prefiro que seja dois
+// cards diferentes no kanban, um para cada motorista" -- em vez de um card
+// com o motorista errado (ou, na correção anterior, o nome certo repetido
+// dentro de cada linha), o grupo "extra" agora vira uma COLUNA POR
+// MOTORISTA, cada uma com seu cabeçalho certo -- mesmo tratamento visual
+// que as rotas fixas (praia/sul/centro/CG) já tinham (um motorista, um
+// cabeçalho). Rotas fixas continuam uma coluna só, sem mudança.
+function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | null): KanbanColumn[] {
+  return groups.flatMap((group): KanbanColumn[] => {
+    if (group.rotaKey === JP_EXTRA_ROTA) {
+      const byDriver = new Map<string, ServiceRequestSummary[]>();
+      for (const r of group.items) {
+        const driverKey = r.driverName ?? "";
+        const list = byDriver.get(driverKey) ?? [];
+        list.push(r);
+        byDriver.set(driverKey, list);
+      }
+      // Sem motorista definido fica sempre por último -- mesmo raciocínio
+      // de sortedOverview/pinSemRotaFirst: pendência não deve se misturar
+      // no meio das colunas já resolvidas.
+      return Array.from(byDriver.entries())
+        .sort(([a], [b]) => {
+          if (!a && !b) return 0;
+          if (!a) return 1;
+          if (!b) return -1;
+          return a.localeCompare(b, "pt-BR");
+        })
+        .map(([driverKey, items]) => ({
+          key: `${group.key}_${driverKey || "sem_motorista"}`,
+          rotaLabel: group.rotaLabel ?? group.label,
+          headerBg: group.headerBg,
+          headerText: group.headerText,
+          borderColor: group.borderColor,
+          items,
+          driverName: driverKey || null,
+        }));
+    }
+    const driverName =
+      todayOverview && group.rotaKey && group.rotaKey !== "sem_rota" ? driverNameForRota(todayOverview, group.rotaKey) : null;
+    return [
+      {
+        key: group.key,
+        rotaLabel: group.rotaLabel ?? group.label,
+        headerBg: group.headerBg,
+        headerText: group.headerText,
+        borderColor: group.borderColor,
+        items: group.items,
+        driverName,
+      },
+    ];
+  });
+}
+
 export function EntregasKanbanHoje({ groups, todayOverview }: { groups: QueueGroup[]; todayOverview: RotaDayOverview | null }) {
   if (groups.length === 0) return null;
+  const columns = buildColumns(groups, todayOverview);
 
   return (
     <div className="flex flex-col gap-2">
@@ -25,48 +98,28 @@ export function EntregasKanbanHoje({ groups, todayOverview }: { groups: QueueGro
         📌 Hoje
       </span>
       <div className="flex items-start gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-        {groups.map((group) => {
-          // "Rota extra" genérica (ver JP_EXTRA_ROTA) pode ter mais de um
-          // motorista no mesmo dia (Joalison, Eduardo, ...) -- todos
-          // compartilham o mesmo rotaKey="extra" (só a UI de escolha
-          // distingue "Rota extra 1"/"Rota extra 2", ver
-          // labelAvailableRota; o valor salvo em cada chamado é sempre
-          // "extra"). driverNameForRota (rotas.ts) faz
-          // extras.find(rota === "extra") -- pega só a PRIMEIRA
-          // atribuição extra do dia, mesmo quando o chamado individual
-          // tem outro motorista (r.driverName, sempre correto -- é o que
-          // a tela do chamado mostra). Achado do Victor 26/08/2026: "eu
-          // mudei o motorista, nao foi joalison, foi eduardo que fez, mas
-          // na tela ainda aparece joalison". Rotas fixas (praia/sul/
-          // centro/CG) só têm UM motorista por dia -- header único
-          // continua certo pra elas; só a "extra" é ambígua, aí o nome
-          // vem por card (KanbanCard), não mais um só pro grupo inteiro.
-          const isExtraGroup = group.rotaKey === JP_EXTRA_ROTA;
-          const driverName =
-            !isExtraGroup && todayOverview && group.rotaKey && group.rotaKey !== "sem_rota" ? driverNameForRota(todayOverview, group.rotaKey) : null;
-          return (
-            <div key={group.key} className="flex flex-col rounded-xl shrink-0 w-72 overflow-hidden" style={{ border: `2px solid ${group.borderColor}` }}>
-              <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ background: group.headerBg }}>
-                <span className="text-sm font-bold" style={{ color: group.headerText }}>
-                  {group.rotaLabel}
-                </span>
-                <span className="text-xs font-semibold" style={{ color: group.headerText, opacity: 0.85 }}>
-                  ({group.items.length})
-                </span>
-              </div>
-              {driverName ? (
-                <div className="px-3 py-1 text-xs font-medium" style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
-                  🚚 {driverName}
-                </div>
-              ) : null}
-              <div className="flex flex-col gap-2 p-2 overflow-y-auto max-h-[65vh]" style={{ background: "var(--surface-1)" }}>
-                {group.items.map((r) => (
-                  <KanbanCard key={r.id} r={r} showDriver={isExtraGroup} />
-                ))}
-              </div>
+        {columns.map((column) => (
+          <div key={column.key} className="flex flex-col rounded-xl shrink-0 w-72 overflow-hidden" style={{ border: `2px solid ${column.borderColor}` }}>
+            <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ background: column.headerBg }}>
+              <span className="text-sm font-bold" style={{ color: column.headerText }}>
+                {column.rotaLabel}
+              </span>
+              <span className="text-xs font-semibold" style={{ color: column.headerText, opacity: 0.85 }}>
+                ({column.items.length})
+              </span>
             </div>
-          );
-        })}
+            {column.driverName ? (
+              <div className="px-3 py-1 text-xs font-medium" style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
+                🚚 {column.driverName}
+              </div>
+            ) : null}
+            <div className="flex flex-col gap-2 p-2 overflow-y-auto max-h-[65vh]" style={{ background: "var(--surface-1)" }}>
+              {column.items.map((r) => (
+                <KanbanCard key={r.id} r={r} />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -76,7 +129,7 @@ export function EntregasKanbanHoje({ groups, todayOverview }: { groups: QueueGro
 // pensado pra ficar largo (linha inteira, 6 colunas percentuais); numa
 // coluna de Kanban de ~280px isso ficaria ilegível, então é um card
 // vertical novo, não reaproveitado dali.
-function KanbanCard({ r, showDriver }: { r: ServiceRequestSummary; showDriver?: boolean }) {
+function KanbanCard({ r }: { r: ServiceRequestSummary }) {
   return (
     <div className="flex flex-col gap-1.5 rounded-lg p-2.5 shadow-sm" style={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }}>
       {/* Campos que navegam pro chamado -- display:contents (mesmo padrão
@@ -111,16 +164,6 @@ function KanbanCard({ r, showDriver }: { r: ServiceRequestSummary; showDriver?: 
           {r.scheduledTime ? (
             <span className="text-[10px] whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
               🕐 {r.scheduledTime.slice(0, 5)}
-            </span>
-          ) : null}
-          {/* Só pra grupo "Rota extra" (showDriver, ver EntregasKanbanHoje
-              acima) -- nas rotas fixas o header do grupo já mostra o
-              motorista certo (um só por dia); na "extra" o header não dá
-              conta de mais de um motorista no mesmo dia, então o nome vem
-              daqui, por chamado (r.driverName, sempre correto). */}
-          {showDriver ? (
-            <span className="text-[10px] whitespace-nowrap font-medium" style={{ color: "var(--text-secondary)" }}>
-              🚚 {r.driverName ?? "Sem motorista"}
             </span>
           ) : null}
         </div>
