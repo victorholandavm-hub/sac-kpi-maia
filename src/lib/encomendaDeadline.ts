@@ -26,6 +26,29 @@ export type DeadlineGroup = { dateKey: string; label: string; pedidos: PedidoEnc
 // misturava pedido de 12/08 (bem atrasado) depois de pedido de 04/09
 // (bem no futuro), quebrando a leitura sequencial da fila. "Sem prazo
 // definido" continua por último (não tem data pra ordenar de verdade).
+// Lista única, sem agrupar por dia -- pedido do Victor 25/08/2026 (reforma
+// da Fila de Encomendas): "Elimine a divisão de telas/visões separadas.
+// Remova os blocos agrupadores por cada dia específico... Exiba uma lista
+// única ordenada cronologicamente (do mais antigo/urgente para o mais
+// recente)". Cronológica = prazo mais próximo/vencido primeiro (mesma
+// direção de sempre, ver groupByDeadline acima) -- só não agrupa mais em
+// blocos de `<details>` por dia, cada pedido vira uma linha direto.
+// "Sem prazo definido" sai da lista principal (não fica "no fim da
+// página" -- pedido do Victor: "não devem ficar no fim da página. Fixe um
+// bloco de alerta no topo") -- essa função só devolve os DOIS grupos
+// (fixo/resto), quem chama decide como renderizar cada um. Usado só pela
+// visão "por pedido" (PedidoEncomendaFilaList.tsx) -- a Visão Fábrica
+// (FabricaProducaoView.tsx) continua usando groupByDeadline: ali o
+// agrupamento por dia tem função de verdade (planejar corte/estofamento
+// por data de entrega), não é só navegação.
+export function pinSemPrazoAndSort(pedidos: PedidoEncomendaSummary[]): { semPrazo: PedidoEncomendaSummary[]; comPrazo: PedidoEncomendaSummary[] } {
+  const semPrazo = pedidos.filter((p) => !effectiveDeadline(p));
+  const comPrazo = pedidos
+    .filter((p) => effectiveDeadline(p))
+    .sort((a, b) => (effectiveDeadline(a) as string).localeCompare(effectiveDeadline(b) as string));
+  return { semPrazo, comPrazo };
+}
+
 export function groupByDeadline(pedidos: PedidoEncomendaSummary[]): DeadlineGroup[] {
   const groups: DeadlineGroup[] = [];
   for (const p of pedidos) {
