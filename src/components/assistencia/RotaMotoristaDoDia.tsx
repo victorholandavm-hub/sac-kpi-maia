@@ -106,12 +106,14 @@ export function RotaMotoristaDoDia({
   // células no mesmo espaço já resolve isso sozinho). `initialOverview` já
   // vem só com os 2 dias nesse modo (ver motorista/page.tsx).
   compact?: boolean;
-  // Motorista pré-selecionado ao editar um dia sem motorista salvo ainda --
-  // pedido do Victor 21/08/2026 ("deixe Junior como motorista padrão da aba
-  // de notificação de assistência"), só passado por quem chama esse
-  // componente a partir daquela aba (ver sac/notificacoes/page.tsx). Só
-  // preenche quando o dia ainda não tem motorista salvo -- não sobrescreve
-  // atribuição já feita.
+  // Motorista pré-selecionado (e já exibido, mesmo sem editar) quando um
+  // dia ainda não tem motorista salvo -- pedido do Victor 21/08/2026
+  // ("deixe Junior como motorista padrão da aba de notificação de
+  // assistência"), ampliado em 26/08/2026 ("coloque por padrão, o
+  // motorista junior na rota do dia de joao pessoa") pra também valer na
+  // aba Entregas da própria assistência (ver fila/page.tsx), não só na
+  // notificação do SAC. Só preenche quando o dia ainda não tem motorista
+  // salvo -- não sobrescreve atribuição já feita.
   defaultDriver?: string;
 }) {
   const [overview, setOverview] = useState<RotaDayOverview[]>(initialOverview);

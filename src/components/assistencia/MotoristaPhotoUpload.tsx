@@ -53,38 +53,68 @@ export function MotoristaPhotoUpload({
           style={{ borderColor: "var(--border)" }}
         />
       )}
-      {/* <label> envolvendo o input, não botão com ref.click() -- em
-          navegadores embutidos (o do WhatsApp, principalmente) um clique
-          disparado por JavaScript no input escondido é bloqueado por não
-          contar como gesto "de verdade" do usuário, e o seletor nunca abre.
-          O label é a forma nativa do HTML de associar um clique visível a um
-          input de arquivo, sem depender de JS pra abrir o seletor -- funciona
-          em muito mais lugares. Sem `capture`: forçar a câmera direto também
-          costuma travar nesses navegadores; deixando livre, abre o seletor
-          nativo (câmera OU galeria). Um clique só: escolher já envia, sem
-          passo extra. */}
-      <label
-        className="text-base rounded-xl px-4 py-6 font-semibold text-center cursor-pointer flex flex-col items-center gap-1.5"
-        style={{
-          border: `2px dashed ${proof ? "var(--status-warning)" : "var(--brand-green)"}`,
-          color: proof ? "var(--status-warning)" : "var(--brand-green)",
-          opacity: pending ? 0.6 : 1,
-          pointerEvents: pending ? "none" : "auto",
-        }}
-      >
-        <span className="text-3xl leading-none">{proof ? "📝" : "📷"}</span>
-        {pending ? "Enviando…" : proof ? "Foto do comprovante assinado" : "Tirar ou enviar foto"}
-        <input
-          key={inputKey}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) upload(file);
+      {/* Dois botões separados (câmera / galeria), não um seletor único
+          "livre" (sem `capture`) -- pedido do Victor 26/08/2026: "o
+          motorista ainda nao consegue abrir a camera... só consegue
+          adicionar a foto vinda da galeria". A teoria era que, sem
+          `capture`, o seletor nativo do celular abriria com as duas
+          opções (câmera OU galeria) -- na prática, em pelo menos um
+          navegador/aparelho de motorista isso não acontece, o seletor cai
+          direto pra galeria/arquivos, sem oferecer câmera nenhuma.
+          Garantia de verdade só existe com DOIS inputs -- um com
+          `capture="environment"` (força câmera, sempre abre a câmera de
+          verdade) e outro sem `capture` nenhum (força o seletor de
+          arquivo, sempre oferece a galeria). Cada um no seu <label> --
+          mesmo motivo de sempre: clique disparado por JS num input
+          escondido é bloqueado em navegador embutido (WhatsApp), o label
+          é a forma nativa de abrir o seletor sem depender de JS. */}
+      <div className="grid grid-cols-2 gap-2">
+        <label
+          className="text-sm rounded-xl px-3 py-5 font-semibold text-center cursor-pointer flex flex-col items-center gap-1"
+          style={{
+            border: `2px dashed ${proof ? "var(--status-warning)" : "var(--brand-green)"}`,
+            color: proof ? "var(--status-warning)" : "var(--brand-green)",
+            opacity: pending ? 0.6 : 1,
+            pointerEvents: pending ? "none" : "auto",
           }}
-          className="hidden"
-        />
-      </label>
+        >
+          <span className="text-2xl leading-none">📷</span>
+          {pending ? "Enviando…" : "Tirar foto"}
+          <input
+            key={`camera-${inputKey}`}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) upload(file);
+            }}
+            className="hidden"
+          />
+        </label>
+        <label
+          className="text-sm rounded-xl px-3 py-5 font-semibold text-center cursor-pointer flex flex-col items-center gap-1"
+          style={{
+            border: `2px dashed ${proof ? "var(--status-warning)" : "var(--brand-green)"}`,
+            color: proof ? "var(--status-warning)" : "var(--brand-green)",
+            opacity: pending ? 0.6 : 1,
+            pointerEvents: pending ? "none" : "auto",
+          }}
+        >
+          <span className="text-2xl leading-none">🖼️</span>
+          {pending ? "Enviando…" : "Da galeria"}
+          <input
+            key={`gallery-${inputKey}`}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) upload(file);
+            }}
+            className="hidden"
+          />
+        </label>
+      </div>
     </div>
   );
 }
