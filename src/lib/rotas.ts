@@ -202,14 +202,25 @@ export async function getAvailableRotasForDate(dateStr: string): Promise<Availab
   const entries: AvailableRota[] = [];
   if (assignments.primary) {
     entries.push({ id: assignments.primary.id, rota: assignments.primary.rota, driverName: assignments.primary.driverName, isExtra: false });
+  } else {
+    // Sem atribuição explícita da rota principal (João Pessoa) pra essa
+    // data ainda -- cai no padrão da semana, mesmo que já exista alguma
+    // rota EXTRA registrada pra essa data (ex.: só uma das rotas de
+    // Campina Grande atribuída até agora). Achado do Victor 26/08/2026:
+    // "só ta aparecendo a rota de campina grande e nao aparece as outras
+    // rotas do dia" -- bug estava aqui: antes, a função só caía nesse
+    // padrão da semana quando NENHUMA atribuição existia pra data
+    // (`entries.length > 0` já bastava pra pular o fallback inteiro, e
+    // Campina Grande sozinha já deixava `entries` não-vazio). Extra nunca
+    // substitui a rota principal no dropdown -- as duas sempre convivem
+    // juntas na lista final.
+    const expected = getRotaForDate(dateStr, config);
+    if (expected) entries.push({ id: `expected-${expected}`, rota: expected, driverName: null, isExtra: false });
   }
   for (const extra of assignments.extras) {
     entries.push({ id: extra.id, rota: extra.rota, driverName: extra.driverName, isExtra: true });
   }
-  if (entries.length > 0) return entries;
-
-  const expected = getRotaForDate(dateStr, config);
-  return expected ? [{ id: `expected-${expected}`, rota: expected, driverName: null, isExtra: false }] : [];
+  return entries;
 }
 
 // Segunda-feira da semana de `dateStr` (formato YYYY-MM-DD) -- ponto de
