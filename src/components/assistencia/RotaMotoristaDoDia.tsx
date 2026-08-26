@@ -346,6 +346,18 @@ function RotaDayCell({
   });
   const weekdayLabel = WEEKDAY_SHORT[day.weekday];
   const dirty = rotaValue !== (savedRota ?? "") || driverValue.trim() !== savedDriver;
+  // driverValue começa preenchido com defaultDriver (ver useState acima)
+  // quando o dia ainda não tem motorista salvo -- só uma SUGESTÃO pra
+  // agilizar (pedido do Victor 21/08/2026: "deixe Junior como motorista
+  // padrão"), nunca foi gravado em rota_driver_assignments nem propagado
+  // pros chamados daquele dia (ver setRotaDriverAssignment, actions.ts --
+  // só roda no clique de "Salvar"). Achado do Victor 26/08/2026: "la no
+  // motorista do dia aparece junior... e na notificação do dia 29 aparece
+  // que esta sem motorista" -- o texto em modo visualização mostrava esse
+  // valor idêntico a uma atribuição de verdade, sem nenhuma pista de que
+  // ainda faltava confirmar. isDefaultUnsaved distingue os dois casos pra
+  // render abaixo.
+  const isDefaultUnsaved = !savedDriver && !!defaultDriver && driverValue === defaultDriver;
   // Extras genéricas de João Pessoa (rota extra) -- as de Campina Grande
   // (CG_ROTAS) têm seção própria fixa, não entram aqui.
   const jpExtras = day.assignments.extras.filter((e) => e.rota === JP_EXTRA_ROTA);
@@ -563,9 +575,31 @@ function RotaDayCell({
               >
                 {rotaValue ? ROTA_LABELS[rotaValue] : "Sem rota"}
               </span>
-              <span className={driverTextClass} style={{ color: driverValue ? "var(--text-primary)" : "var(--text-muted)" }}>
-                {driverValue || "Sem motorista"}
-              </span>
+              {/* Sugestão (defaultDriver) ainda não confirmada -- ver
+                  isDefaultUnsaved acima. Cor de atenção + "confirmar" logo
+                  ali, pra não parecer uma atribuição de verdade (que já
+                  propagou motorista pros chamados do dia) nem exigir abrir
+                  o lápis só pra clicar Salvar num valor que já está certo. */}
+              {isDefaultUnsaved ? (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={driverTextClass} style={{ color: "var(--status-warning)" }}>
+                    {driverValue} (sugestão, não confirmado)
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={save}
+                    className={compact ? "text-xs underline font-semibold shrink-0" : "text-[10px] underline font-semibold shrink-0"}
+                    style={{ color: "var(--brand-green)" }}
+                  >
+                    confirmar
+                  </button>
+                </div>
+              ) : (
+                <span className={driverTextClass} style={{ color: driverValue ? "var(--text-primary)" : "var(--text-muted)" }}>
+                  {driverValue || "Sem motorista"}
+                </span>
+              )}
             </>
           )}
 
