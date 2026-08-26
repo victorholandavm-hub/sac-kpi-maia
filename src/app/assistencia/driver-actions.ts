@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto, hasProofPhoto } from "@/lib/servicePhotos";
+import { getPhotoForAuth, deleteRequestPhoto, hasProofPhoto } from "@/lib/servicePhotos";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
@@ -91,23 +91,14 @@ export async function getDriverSession(): Promise<string | null> {
   return verifyDriverSession(cookieStore.get(DRIVER_COOKIE_NAME)?.value);
 }
 
-export async function driverUploadPhoto(requestId: string, formData: FormData): Promise<void> {
-  const driverName = await getDriverSession();
-  if (!driverName) throw new Error("Sessão expirada. Faça login de novo.");
-
-  const admin = getSupabaseAdmin();
-  const { data: request, error } = await admin.from("service_requests").select("driver_name").eq("id", requestId).maybeSingle();
-  if (error || !request || request.driver_name !== driverName) {
-    throw new Error("Esse chamado não é seu.");
-  }
-
-  const file = formData.get("photo");
-  if (!(file instanceof File) || file.size === 0) throw new Error("Selecione uma foto.");
-  const caption = String(formData.get("caption") ?? "");
-
-  await saveRequestPhoto({ requestId, file, uploadedBy: driverName, caption });
-  revalidatePath("/assistencia/motorista");
-}
+// Upload de foto do motorista NÃO é mais aqui -- virou POST comum em
+// /api/motorista/upload-photo/route.ts (Server Action tinha o mesmo
+// problema de stale ID após deploy que motivou tirar o upload da
+// assistência de Server Action também, ver actions.ts). Essa função ficou
+// órfã (definida, nunca chamada) desde aquela troca -- removida em
+// 26/08/2026 durante a auditoria pedida pelo Victor ("veja isso tambem
+// para os motoristas e para todos que adicionam fotos") pra não confundir
+// alguém procurando "o upload de foto de verdade" e cair nela por engano.
 
 export async function driverDeletePhoto(photoId: string): Promise<void> {
   const driverName = await getDriverSession();
