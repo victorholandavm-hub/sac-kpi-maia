@@ -132,13 +132,30 @@ export function RotaMotoristaDoDia({
     setOverview((prev) => prev.map((d) => (d.date === updated.date ? updated : d)));
   }
 
-  const visibleDays = showAllDays ? overview : overview.slice(0, DEFAULT_VISIBLE_DAYS);
+  // Hoje + futuro primeiro, dias já passados só no final -- achado do
+  // Victor 26/08/2026: "as rotas antigas estao aparecenndo primeiro".
+  // `overview` vem de getRotaWeekOverview(startOfRotaWeek(today), 14), que
+  // sempre começa numa segunda-feira -- no meio da semana, os primeiros
+  // itens do array são dias que já passaram (ex.: hoje quarta, o array
+  // começa segunda/terça). Isso empurrava justamente os dias já passados
+  // pro topo da fileira visível por padrão (DEFAULT_VISIBLE_DAYS corta os
+  // 2 primeiros do array, sem saber se são passado ou futuro). Só reordena
+  // pra EXIBIÇÃO -- updateDay acima continua batendo por `date`, não por
+  // posição, então não precisa reordenar o array guardado no state.
+  const sortedOverview = [...overview].sort((a, b) => {
+    const aPast = a.date < today;
+    const bPast = b.date < today;
+    if (aPast !== bPast) return aPast ? 1 : -1;
+    return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+  });
+
+  const visibleDays = showAllDays ? sortedOverview : sortedOverview.slice(0, DEFAULT_VISIBLE_DAYS);
 
   // Painel completo (grade de dias + botão "mostrar mais") -- igual pro
   // modo compact e pro recolhível abaixo, só muda o que embrulha em volta.
   const body = compact ? (
     <div className="grid grid-cols-2 gap-2">
-      {overview.map((day) => (
+      {sortedOverview.map((day) => (
         <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} defaultDriver={defaultDriver} compact />
       ))}
     </div>
@@ -196,7 +213,7 @@ export function RotaMotoristaDoDia({
     );
   }
 
-  const todayEntry = overview.find((d) => d.date === today) ?? overview[0] ?? null;
+  const todayEntry = overview.find((d) => d.date === today) ?? sortedOverview[0] ?? null;
 
   return <RotaMotoristaDoDiaModalTrigger todayEntry={todayEntry} description={description} body={body} />;
 }
