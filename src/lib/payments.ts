@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { hashPin } from "./montadorAuth";
 import { isMostruarioRequest } from "./serviceRequests";
+import { sanitizeOrFilterValue } from "./searchFilter";
 
 export async function listAssemblers(): Promise<string[]> {
   const admin = getSupabaseAdmin();
@@ -28,10 +29,18 @@ export function isAssistenciaControlledAssembler(name: string): boolean {
 export async function listAssemblersForStores(storeIds: string[]): Promise<string[]> {
   if (storeIds.length === 0) return [];
   const admin = getSupabaseAdmin();
+  // Sanitiza antes de colar na string do .or() -- blindagem defensiva
+  // (revisão de segurança 26/08/2026): hoje `storeIds` sempre vem de fonte
+  // confiável (registro já gravado no banco, ou sessão do gerente via
+  // getGerenteStoreIds), não é explorável agora, mas o padrão em si é
+  // frágil -- se um dia um chamador passar valor cru vindo de
+  // searchParams/formData sem validar, vira injeção de filtro (mesmo
+  // raciocínio de searchFilter.ts).
+  const safeIds = storeIds.map(sanitizeOrFilterValue);
   const { data, error } = await admin
     .from("assemblers")
     .select("name")
-    .or(`store_id.in.(${storeIds.join(",")}),store_id.is.null`)
+    .or(`store_id.in.(${safeIds.join(",")}),store_id.is.null`)
     .order("name");
   if (error) throw new Error(error.message);
   return (data ?? []).map((a) => a.name as string);
@@ -85,10 +94,12 @@ export type AssemblerForStoreDisplay = { name: string; storeId: string | null; s
 export async function listAssemblersForStoresWithStoreName(storeIds: string[]): Promise<AssemblerForStoreDisplay[]> {
   if (storeIds.length === 0) return [];
   const admin = getSupabaseAdmin();
+  // Ver comentário equivalente em listAssemblersForStores acima.
+  const safeIds = storeIds.map(sanitizeOrFilterValue);
   const { data, error } = await admin
     .from("assemblers")
     .select("name, store_id, stores(name)")
-    .or(`store_id.in.(${storeIds.join(",")}),store_id.is.null`)
+    .or(`store_id.in.(${safeIds.join(",")}),store_id.is.null`)
     .order("name");
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as { name: string; store_id: string | null; stores: { name: string } | null }[]).map((a) => ({

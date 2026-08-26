@@ -1235,8 +1235,17 @@ export async function deleteRequestPhotoAsStaff(photoId: string): Promise<void> 
   if (!info) throw new Error("Foto não encontrada.");
 
   const admin = getSupabaseAdmin();
-  const { data: current } = await admin.from("service_requests").select("type").eq("id", info.requestId).single();
-  if (current) requireManageAccess(profile, current.type);
+  // Falha fechada, não aberta -- achado em revisão de segurança
+  // 26/08/2026: antes, se essa busca falhasse por qualquer motivo (erro
+  // transitório de rede/banco, nem checado), `current` vinha undefined e o
+  // requireManageAccess abaixo era pulado silenciosamente, deixando a
+  // exclusão passar sem checar se esse papel tem acesso ao TIPO do
+  // chamado (ex.: SAC apagando foto de um chamado de montagem, fora do
+  // domínio dele). Mesmo padrão que setAssemblerName (mesmo arquivo) já
+  // usava certo.
+  const { data: current, error: fetchError } = await admin.from("service_requests").select("type").eq("id", info.requestId).single();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
 
   await deleteRequestPhoto(photoId);
   revalidatePath(`/assistencia/${info.requestId}`);
