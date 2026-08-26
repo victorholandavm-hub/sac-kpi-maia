@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
+import { getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
@@ -95,28 +95,14 @@ export async function getMontadorSession(): Promise<string | null> {
   return verifyMontadorSession(cookieStore.get(MONTADOR_COOKIE_NAME)?.value);
 }
 
-export async function montadorUploadPhoto(requestId: string, formData: FormData): Promise<void> {
-  const assemblerName = await getMontadorSession();
-  if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
-
-  const admin = getSupabaseAdmin();
-  const { data: request, error } = await admin
-    .from("service_requests")
-    .select("assembler_name")
-    .eq("id", requestId)
-    .maybeSingle();
-  if (error || !request || request.assembler_name !== assemblerName) {
-    throw new Error("Esse chamado não é seu.");
-  }
-
-  const file = formData.get("photo");
-  if (!(file instanceof File) || file.size === 0) throw new Error("Selecione uma foto.");
-  const caption = String(formData.get("caption") ?? "");
-
-  await saveRequestPhoto({ requestId, file, uploadedBy: assemblerName, caption });
-  revalidatePath("/assistencia/montador");
-  revalidatePath(`/assistencia/montador/${requestId}`);
-}
+// Upload de foto do montador NÃO é mais aqui -- virou POST comum em
+// /api/montador/upload-photo/route.ts (ver comentário lá: Server Action
+// prendia a rota inteira num redirect 307 e, mais tarde, mostrou o mesmo
+// problema de ID de ação inválido após deploy que motivou tirar o upload
+// da assistência de Server Action também). Essa função ficou órfã
+// (definida, nunca chamada) desde aquela troca -- removida em 26/08/2026
+// durante a auditoria pedida pelo Victor ("veja isso tambem para os
+// motoristas e para todos que adicionam fotos").
 
 export async function montadorDeletePhoto(photoId: string): Promise<void> {
   const assemblerName = await getMontadorSession();

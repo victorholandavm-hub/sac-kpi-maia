@@ -21,7 +21,7 @@ import {
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
 import { resolveDriverName, listOwnStoreAssemblers } from "@/lib/payments";
-import { saveRequestPhoto, getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
+import { getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { randomUUID } from "crypto";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
@@ -1218,26 +1218,14 @@ export async function logPrint(requestIds: string[]): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export async function addRequestPhoto(requestId: string, formData: FormData): Promise<void> {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin", "sac");
-
-  const admin = getSupabaseAdmin();
-  const { data: current, error: fetchError } = await admin
-    .from("service_requests")
-    .select("type")
-    .eq("id", requestId)
-    .single();
-  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
-  requireManageAccess(profile, current.type);
-
-  const file = formData.get("photo");
-  if (!(file instanceof File) || file.size === 0) throw new Error("Selecione uma foto.");
-  const caption = String(formData.get("caption") ?? "");
-
-  await saveRequestPhoto({ requestId, file, uploadedBy: profile.fullName, caption });
-  revalidatePath(`/assistencia/${requestId}`);
-}
+// Upload de foto pela equipe NÃO é mais aqui -- virou POST comum em
+// /api/staff/upload-photo/route.ts (RequestPhotoUpload.tsx chama aquela
+// rota agora, não essa Server Action). Motivo: Server Action carrega um ID
+// específico do build, e um deploy novo invalida quem já estava com a tela
+// aberta antes -- "Failed to find Server Action", confirmado em produção
+// (pedido do Victor 26/08/2026: "montador e assistencia estão dizendo que
+// nao estao conseguindo adicionar fotos"). Mesmo motivo que já tinha
+// tirado o upload de montador/motorista de Server Action antes.
 
 export async function deleteRequestPhotoAsStaff(photoId: string): Promise<void> {
   const profile = await getProfile();

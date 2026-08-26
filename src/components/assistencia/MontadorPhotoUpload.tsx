@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuickAction } from "./useQuickAction";
+import { uploadPhotoRequest } from "@/lib/uploadPhotoClient";
 
 // Limite por seleção (não é um total acumulado do chamado) -- alinhado com o
 // nginx (client_max_body_size 15m): 10 fotos de até 10 MB cada dariam até
@@ -20,23 +21,10 @@ async function uploadOne(requestId: string, file: File, caption: string): Promis
   // conhecido nesse app com o tipo de resposta em stream que Server
   // Actions usam (ver comentário em NavigationProgressBar.tsx). Rota
   // tradicional com resposta JSON simples é bem mais compatível.
-  const res = await fetch("/api/montador/upload-photo", { method: "POST", body: formData });
-  // Lê como texto primeiro (só dá pra ler o corpo uma vez) -- se não for
-  // JSON válido, é sinal de que a resposta nem chegou na nossa rota (ex.:
-  // nginx/proxy barrando antes, devolvendo página de erro HTML). Nesses
-  // casos mostra o status HTTP na mensagem em vez de um erro genérico
-  // mudo, pra dar pista de diagnóstico sem precisar de devtools no
-  // celular do montador.
-  const raw = await res.text();
-  let data: { error?: string } = {};
-  try {
-    data = raw ? JSON.parse(raw) : {};
-  } catch {
-    // não era JSON -- segue com data vazio, cai no fallback abaixo
-  }
-  if (!res.ok) {
-    throw new Error(data.error || `Não foi possível enviar a foto (erro ${res.status}).`);
-  }
+  // uploadPhotoRequest (uploadPhotoClient.ts) cuida do fetch/timeout/
+  // leitura da resposta, compartilhado com MotoristaPhotoUpload.tsx/
+  // RequestPhotoUpload.tsx.
+  await uploadPhotoRequest("/api/montador/upload-photo", formData);
 }
 
 export function MontadorPhotoUpload({ requestId }: { requestId: string }) {

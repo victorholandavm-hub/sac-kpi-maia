@@ -15,6 +15,12 @@ const PASSTHROUGH_PREFIXES = [
   "/api/totvs-sync",
   "/api/montador/upload-photo",
   "/api/motorista/upload-photo",
+  // Upload de foto pela equipe (assistência/admin/SAC) na tela de detalhe
+  // do chamado -- mesmo motivo dos dois acima (POST comum em vez de Server
+  // Action, ver route.ts), precisa do mesmo passthrough: não começa com
+  // /assistencia, então cairia no gate de auth do painel de KPIs do SAC (ou
+  // no redirect pra /assistencia) sem isso.
+  "/api/staff/upload-photo",
   // Serve foto do disco local (ver src/lib/localPhotoStorage.ts) -- não
   // começa com /assistencia, então sem isso caía no gate de auth do painel
   // de KPIs do SAC (ou no redirect pra /assistencia no projeto exclusivo da

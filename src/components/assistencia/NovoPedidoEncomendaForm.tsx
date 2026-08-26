@@ -390,7 +390,14 @@ export function NovoPedidoEncomendaForm({
               type="file"
               required
               accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-              capture="environment"
+              // Sem `capture` -- pedido do Victor 26/08/2026: "veja a
+              // possibilidade de adicionar fotos diretamente da camera e
+              // nao só da galeria". `capture="environment"` forçava a
+              // câmera direto em muitos navegadores mobile, sem opção de
+              // escolher uma foto já existente (ex.: cupom fotografado
+              // antes) -- sem o atributo, o seletor nativo abre com as
+              // duas opções (câmera OU galeria), mesmo padrão já usado em
+              // MontadorPhotoUpload.tsx/MotoristaPhotoUpload.tsx.
               className="rounded border px-3 py-2 text-sm"
               style={inputStyle}
             />
