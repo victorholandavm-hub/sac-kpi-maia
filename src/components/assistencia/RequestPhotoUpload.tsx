@@ -19,8 +19,15 @@ import { uploadPhotoRequest } from "@/lib/uploadPhotoClient";
 // 2. `capture="environment"` no input forçava a câmera direto em muitos
 //    navegadores mobile, SEM opção de escolher uma foto já existente da
 //    galeria -- e se a câmera falhasse (permissão negada, app trava), não
-//    tinha nenhum jeito de completar o envio. Tirado -- sem `capture`, o
-//    seletor nativo do celular abre com as duas opções (câmera OU galeria).
+//    tinha nenhum jeito de completar o envio.
+//
+// Ajustado de novo em 26/08/2026 -- achado no fluxo do motorista, mesma
+// causa aqui: um único input "livre" (sem `capture`) na teoria abre o
+// seletor nativo com câmera OU galeria, mas na prática, em pelo menos um
+// navegador/aparelho, cai direto pra galeria/arquivos sem nunca oferecer
+// câmera. Virou DOIS botões -- um com `capture="environment"` (força
+// câmera de verdade) e outro sem `capture` (força a galeria) -- garantia
+// de verdade em vez de depender do seletor "adivinhar" as duas opções.
 export function RequestPhotoUpload({ requestId }: { requestId: string }) {
   const { pending, run } = useQuickAction();
   const [caption, setCaption] = useState("");
@@ -51,11 +58,12 @@ export function RequestPhotoUpload({ requestId }: { requestId: string }) {
         className="rounded border px-2 py-1 text-xs w-40"
         style={{ borderColor: "var(--border)" }}
       />
-      {/* <label> envolvendo o input, não botão com ref.click() -- mesmo
-          motivo de MontadorPhotoUpload.tsx: em navegadores embutidos (o do
-          WhatsApp, principalmente) um clique disparado por JS num input
-          escondido é bloqueado por não contar como gesto "de verdade" do
-          usuário. Sem `capture` -- ver comentário no topo do arquivo. */}
+      {/* Dois botões (câmera / galeria) -- ver comentário no topo do
+          arquivo. <label> envolvendo o input, não botão com ref.click()
+          -- mesmo motivo de MontadorPhotoUpload.tsx: em navegadores
+          embutidos (o do WhatsApp, principalmente) um clique disparado
+          por JS num input escondido é bloqueado por não contar como
+          gesto "de verdade" do usuário. */}
       <label
         className="text-xs rounded px-2 py-1 cursor-pointer"
         style={{
@@ -65,9 +73,31 @@ export function RequestPhotoUpload({ requestId }: { requestId: string }) {
           pointerEvents: pending ? "none" : "auto",
         }}
       >
-        {pending ? "Enviando…" : "📷 Tirar ou enviar foto"}
+        {pending ? "Enviando…" : "📷 Tirar foto"}
         <input
-          key={inputKey}
+          key={`camera-${inputKey}`}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) upload(file);
+          }}
+          className="hidden"
+        />
+      </label>
+      <label
+        className="text-xs rounded px-2 py-1 cursor-pointer border"
+        style={{
+          borderColor: "var(--brand-green)",
+          color: "var(--brand-green)",
+          opacity: pending ? 0.6 : 1,
+          pointerEvents: pending ? "none" : "auto",
+        }}
+      >
+        {pending ? "Enviando…" : "🖼️ Da galeria"}
+        <input
+          key={`gallery-${inputKey}`}
           type="file"
           accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
           onChange={(e) => {

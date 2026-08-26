@@ -344,7 +344,14 @@ export default async function AssistenciaQueuePage({
         </Link>
       </div>
 
-      {showPecas ? <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} /> : null}
+      {/* Junior como motorista padrão da rota de João Pessoa -- pedido do
+          Victor 26/08/2026: "coloque por padrão, o motorista junior na
+          rota do dia de joao pessoa". Já valia só pra aba de notificação
+          do SAC (pedido do Victor 21/08/2026) -- agora vale aqui também,
+          a aba Entregas da própria assistência. Só preenche quando o dia
+          ainda não tem motorista salvo (ver defaultDriver em
+          RotaMotoristaDoDia.tsx) -- não sobrescreve atribuição já feita. */}
+      {showPecas ? <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver="Junior" /> : null}
 
       {/* Linha 1 do guia de padronização: filtros rápidos por status, com
           contador -- pedido do Victor 25/08/2026 ("guia de padronização"):
