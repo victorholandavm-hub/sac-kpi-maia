@@ -11,6 +11,18 @@ export type StoreGoogleReviews = {
   // Diferença da nota atual pra leitura anterior -- null quando só tem uma
   // leitura ainda (nada pra comparar).
   ratingDelta: number | null;
+  // Primeira leitura já registrada (início do histórico rastreado) -- base
+  // do ranking de evolução (ver evolutionRatingDelta abaixo), pedido do
+  // Victor 26/08/2026: "preciso de um ranking de melhor evolução". Latest
+  // vs primeira, não latest vs anterior (ratingDelta acima) -- com leitura
+  // semanal e histórico ainda curto, comparar só a última semana pontual
+  // não conta a evolução de verdade desde que a loja começou a ser
+  // acompanhada; comparar com a primeira soma tudo que já mudou.
+  first: GoogleReviewPoint | null;
+  // null quando só tem uma leitura (nada pra comparar -- mesmo critério de
+  // ratingDelta) ou quando first === latest (mesma leitura, sem intervalo).
+  evolutionRatingDelta: number | null;
+  evolutionReviewCountDelta: number | null;
 };
 
 type StoreRow = { id: string; name: string; google_maps_url: string | null };
@@ -49,6 +61,7 @@ export async function listStoreGoogleReviews(): Promise<StoreGoogleReviews[]> {
       const history = historyByStore.get(s.id) ?? [];
       const latest = history.length > 0 ? history[history.length - 1] : null;
       const previous = history.length > 1 ? history[history.length - 2] : null;
+      const first = history.length > 0 ? history[0] : null;
       return {
         storeId: s.id,
         storeName: s.name,
@@ -56,6 +69,9 @@ export async function listStoreGoogleReviews(): Promise<StoreGoogleReviews[]> {
         history,
         latest,
         ratingDelta: latest && previous ? Math.round((latest.rating - previous.rating) * 10) / 10 : null,
+        first,
+        evolutionRatingDelta: latest && first && first !== latest ? Math.round((latest.rating - first.rating) * 10) / 10 : null,
+        evolutionReviewCountDelta: latest && first && first !== latest ? latest.reviewCount - first.reviewCount : null,
       };
     });
 }

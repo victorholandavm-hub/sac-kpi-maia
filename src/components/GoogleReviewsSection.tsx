@@ -47,6 +47,27 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
     return [...withRating, ...withoutRating];
   }, [stores]);
 
+  // Ranking de evolução -- pedido do Victor 26/08/2026: "preciso de um
+  // ranking de melhor evolução nessa tela de avaliações google". Ordenado
+  // pela variação entre a PRIMEIRA leitura já registrada e a mais recente
+  // (evolutionRatingDelta, googleReviews.ts) -- não a variação de uma
+  // semana pra outra (ratingDelta, já mostrado na tabela principal): com
+  // leitura semanal e histórico ainda curto, comparar só a última semana
+  // conta pouco da evolução de verdade desde que a loja passou a ser
+  // acompanhada. Só entram lojas com pelo menos 2 leituras (sem isso não
+  // tem "evolução" nenhuma pra medir); desempate por quem ganhou mais
+  // avaliações no período (crescimento mais sólido, não só nota mais alta
+  // por acaso).
+  const evolutionRanked = useMemo(() => {
+    return stores
+      .filter((s) => s.evolutionRatingDelta !== null)
+      .sort((a, b) => {
+        const byRating = b.evolutionRatingDelta! - a.evolutionRatingDelta!;
+        if (byRating !== 0) return byRating;
+        return (b.evolutionReviewCountDelta ?? 0) - (a.evolutionReviewCountDelta ?? 0);
+      });
+  }, [stores]);
+
   const chartData = useMemo(
     () => (selectedStore?.history ?? []).map((p) => ({ date: p.capturedAt, rating: p.rating })),
     [selectedStore]
@@ -73,6 +94,80 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
           </tbody>
         </table>
       </div>
+
+      {evolutionRanked.length > 0 ? (
+        <div className="rounded-lg overflow-x-auto" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+          <div className="px-3 pt-3 flex flex-col gap-0.5">
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              Ranking de evolução
+            </h3>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Quem mais melhorou a nota desde a primeira leitura registrada, não só na última semana.
+            </p>
+          </div>
+          <table className="w-full text-sm border-collapse min-w-[640px]">
+            <thead>
+              <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
+                <th className="px-3 py-2 text-right font-semibold">#</th>
+                <th className="px-3 py-2 text-left font-semibold">Loja</th>
+                <th className="px-3 py-2 text-left font-semibold">Evolução da nota</th>
+                <th className="px-3 py-2 text-left font-semibold">Avaliações ganhas</th>
+                <th className="px-3 py-2 text-left font-semibold">Período</th>
+              </tr>
+            </thead>
+            <tbody>
+              {evolutionRanked.map((s, i) => {
+                const rank = i + 1;
+                const rankColor = RANK_COLORS[rank];
+                const delta = s.evolutionRatingDelta!;
+                return (
+                  <tr
+                    key={s.storeId}
+                    className="border-b"
+                    style={{
+                      borderColor: "var(--gridline)",
+                      background: rankColor ? `color-mix(in srgb, ${rankColor} 22%, var(--surface-1))` : undefined,
+                    }}
+                  >
+                    <td className="px-3 py-2 text-right font-semibold" style={{ color: rankColor ?? "var(--text-muted)" }}>
+                      {rank}
+                    </td>
+                    <td className="px-3 py-2" style={{ color: "var(--text-primary)" }}>
+                      {s.storeName}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        {s.first!.rating.toFixed(1)} →
+                      </span>{" "}
+                      <span className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {s.latest!.rating.toFixed(1)}
+                      </span>{" "}
+                      {delta !== 0 ? (
+                        <span
+                          className="text-xs font-medium"
+                          style={{ color: delta > 0 ? "var(--status-good)" : "var(--status-critical)" }}
+                        >
+                          {delta > 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          sem variação
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2" style={{ color: "var(--text-secondary)" }}>
+                      {s.evolutionReviewCountDelta! > 0 ? `+${s.evolutionReviewCountDelta}` : s.evolutionReviewCountDelta}
+                    </td>
+                    <td className="px-3 py-2 text-xs" style={{ color: "var(--text-muted)" }}>
+                      {formatDate(s.first!.capturedAt)} – {formatDate(s.latest!.capturedAt)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       <div className="rounded-lg p-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
