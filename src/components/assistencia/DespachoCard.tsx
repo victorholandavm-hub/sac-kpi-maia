@@ -2,6 +2,16 @@ import Image from "next/image";
 import { formatFullAddress, type ServiceRequestDetail } from "@/lib/serviceRequests";
 import { formatDateOnlyBr } from "@/lib/formatDateTime";
 
+// scheduledDate é "YYYY-MM-DD" puro (sem hora/fuso) -- new Date(iso) via
+// formatDateOnlyBr trataria como UTC meia-noite e, convertendo pro fuso de
+// Fortaleza, podia voltar um dia. Mesmo padrão de split/reverse/join já
+// usado em toda a base pra exibir scheduledDate (ver actions.ts,
+// DeliveryRequestDetailContent.tsx) -- só formatDateOnlyBr (timestamp de
+// verdade, com hora) precisa de conversão de fuso.
+function formatScheduledDateBr(dateStr: string): string {
+  return dateStr.split("-").reverse().join("/");
+}
+
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="flex flex-col gap-0.5">
@@ -46,11 +56,20 @@ export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
             <h1 className="text-base font-bold leading-tight" style={{ color: "var(--brand-green)" }}>
               Notificação de Assistência
             </h1>
-            {/* Data de abertura, sem hora -- pedido do Victor 23/08/2026:
-                "é necessário ter a data na notificação impressa, só a
-                data, sem precisar da hora". */}
+            {/* Data da ROTA (scheduledDate), não a de abertura do chamado --
+                pedido do Victor 26/08/2026: "a data das notificações de
+                assistencia tem que sair sempre com a data da rota e caso
+                seja remanejada pra rota de outro dia, da mesma forma, tem
+                que sair com a data daquele nova rota". Antes mostrava
+                createdAt (pedido do Victor 23/08/2026, só "precisa ter uma
+                data, sem hora" -- na época nem existia remanejamento de rota
+                pra expor a diferença), o que congelava a impressão na data
+                de criação mesmo depois do chamado ser remarcado pra outro
+                dia. Sem scheduledDate ainda (chamado sem rota definida),
+                cai pra createdAt -- melhor que não mostrar nada. */}
             <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-              Chamado #{request.ticketNumber} · {request.storeName} · {formatDateOnlyBr(request.createdAt)}
+              Chamado #{request.ticketNumber} · {request.storeName} ·{" "}
+              {request.scheduledDate ? formatScheduledDateBr(request.scheduledDate) : formatDateOnlyBr(request.createdAt)}
             </span>
           </div>
         </div>
