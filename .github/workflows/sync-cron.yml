@@ -5,6 +5,22 @@ on:
     - cron: "0 */2 * * *"
   workflow_dispatch: {}
 
+# Aponta pra VPS (sac.lojasmaia.com.br), não mais pro projeto Vercel
+# (sac-kpi-maia.vercel.app) -- pedido do Victor 26/08/2026, depois do aviso
+# da Vercel de 75% do free tier de Fluid Active CPU usado. A produção real já
+# roda 100% na VPS desde a migração (ver lojas-maia-deploy, memória) -- o
+# projeto Vercel só continuava recebendo tráfego por causa desse cron (e,
+# separadamente, de um consumo não identificado batendo direto no domínio
+# .vercel.app da assistência, sem relação com este workflow). Rota/lógica de
+# cada endpoint não muda -- é o mesmo código, só servido de outro lugar.
+#
+# /api/backup entra aqui também (antes era só o cron nativo do vercel.json,
+# 1x/dia) -- com o projeto Vercel pausado esse cron nativo para de disparar,
+# então precisa de um substituto. Chamar a cada 2h junto dos outros não
+# duplica trabalho: MIN_INTERVAL_HOURS=72 dentro da própria rota (ver
+# src/app/api/backup/route.ts) já garante que só uma em cada ~36 chamadas
+# realmente roda o dump; as outras retornam { skipped: true } rápido, sem
+# custo relevante.
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -12,8 +28,12 @@ jobs:
       - name: Chamar /api/sync
         run: |
           curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://sac-kpi-maia.vercel.app/api/sync"
+            "https://sac.lojasmaia.com.br/api/sync"
       - name: Chamar /api/sync-ai-classify
         run: |
           curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://sac-kpi-maia.vercel.app/api/sync-ai-classify"
+            "https://sac.lojasmaia.com.br/api/sync-ai-classify"
+      - name: Chamar /api/backup
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://sac.lojasmaia.com.br/api/backup"
