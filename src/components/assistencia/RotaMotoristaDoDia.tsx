@@ -154,7 +154,13 @@ export function RotaMotoristaDoDia({
   // Painel completo (grade de dias + botão "mostrar mais") -- igual pro
   // modo compact e pro recolhível abaixo, só muda o que embrulha em volta.
   const body = compact ? (
-    <div className="grid grid-cols-2 gap-2">
+    // Empilhado no mobile, lado a lado a partir de sm: -- achado do Victor
+    // 27/08/2026: "no acesso do samuel não está responsivo" (grid-cols-2
+    // fixo espremia os 2 dias + o grid interno João Pessoa/Campina Grande
+    // de cada um, virando 4 colunas de conteúdo na tela de um celular).
+    // Samuel/Everton acessam isso do próprio celular, na rua -- é
+    // justamente esse modo compact que precisa funcionar bem estreito.
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       {sortedOverview.map((day) => (
         <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} defaultDriver={defaultDriver} compact />
       ))}
@@ -523,8 +529,16 @@ function RotaDayCell({
           duas vezes: um cartão com título da cidade + conteúdo, um do
           lado do outro. O lápis (só edita a rota principal, que é sempre
           de João Pessoa) muda de lugar junto, pro cabeçalho do cartão de
-          João Pessoa -- deixa mais claro o que ele edita. */}
-      <div className="grid grid-cols-2 gap-2 items-start">
+          João Pessoa -- deixa mais claro o que ele edita.
+
+          Empilhado no mobile, lado a lado a partir de sm: -- achado do
+          Victor 27/08/2026 ("no acesso do samuel não está responsivo").
+          No modo compact (motorista, celular estreito) as duas cidades
+          lado a lado ficavam pequenas demais pra caber os botões maiores
+          desse modo; no painel cheio (desktop, célula com no mínimo
+          380px) isso não muda nada na prática -- sm: (640px) quase
+          sempre já está satisfeito. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-start">
         <div className="flex flex-col gap-1.5 rounded-md p-2 min-w-0" style={{ border: "1px solid var(--gridline)" }}>
           <div className="flex items-center justify-between gap-1">
             <span className={cityLabelClass} style={{ color: "var(--text-secondary)" }}>
