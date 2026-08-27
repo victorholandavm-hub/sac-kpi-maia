@@ -206,7 +206,13 @@ function EntregaCardRow({
             {REQUEST_TYPE_LABELS[r.type] ?? r.type}
             {r.type === "troca_produto" && r.exchangeRound > 1 ? ` · ${r.exchangeRound}ª` : ""}
           </span>
-          <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+          {/* Data em destaque -- pedido do Victor 27/08/2026: "a data nas
+              notificações fiquem maiores de mais visiveis" (antes
+              text-xs cinza apagado, quase do mesmo peso visual do "Sem
+              data"). Segue o mesmo padrão de ênfase que o nome do
+              cliente/bairro já usam na coluna ao lado (text-sm font-bold,
+              --text-primary). */}
+          <span className="text-sm font-bold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
             {effectiveDate ? (
               <>
                 📅 {formatDateOnly(effectiveDate)}
@@ -214,7 +220,7 @@ function EntregaCardRow({
                 {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
               </>
             ) : (
-              "Sem data"
+              <span style={{ color: "var(--text-muted)" }}>Sem data</span>
             )}
           </span>
         </div>
