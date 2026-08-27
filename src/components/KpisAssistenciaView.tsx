@@ -38,7 +38,7 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
     <div className="flex flex-col gap-6">
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatTile label="Total de chamados de assistência" value={data.totalChamados} size="lg" />
-        <StatTile label="Produtos distintos com chamado" value={data.byProduct.length} />
+        <StatTile label="Produtos distintos com chamado" value={data.distinctProductCount} />
         <StatTile label="Lojas com chamado no período" value={data.byStore.length} />
         <StatTile label="Rotas com chamado no período" value={data.byRota.length} />
       </section>
@@ -46,7 +46,7 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
       <VolumeChart data={data.dailyVolume} title="Volume de chamados de assistência por dia" />
 
       <section className="grid md:grid-cols-2 gap-4">
-        <BarRanking title="Chamados por produto" data={data.byProduct} onSelect={openDrilldown} />
+        <BarRanking title={`Chamados por produto (top 20 de ${data.distinctProductCount})`} data={data.byProduct} onSelect={openDrilldown} />
         <BarRanking title="Chamados por grupo de produto" data={data.byProductGroup} onSelect={openDrilldown} />
         <BarRanking title="Chamados por tipo de solicitação" data={data.byType} onSelect={openDrilldown} />
         <BarRanking title="Chamados por rota" data={data.byRota} onSelect={openDrilldown} />
