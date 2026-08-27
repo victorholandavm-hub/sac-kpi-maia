@@ -92,7 +92,7 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
               🕐 {request.clientTimeRestriction}
             </span>
           ) : null}
-          {request.shift === "urgencia" ? (
+          {request.urgent ? (
             <span
               className="text-xs font-bold px-2 py-0.5 rounded-full"
               style={{ color: "#fff", background: "var(--status-critical)" }}

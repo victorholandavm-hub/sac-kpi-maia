@@ -41,6 +41,7 @@ export function ScheduleField({
   scheduledDate,
   scheduledTime,
   shift,
+  urgent,
   rota,
   rotaExceptionNote,
   showRota,
@@ -49,6 +50,9 @@ export function ScheduleField({
   scheduledDate: string | null;
   scheduledTime: string | null;
   shift: Shift | null;
+  // Independente do turno desde 27/08/2026 (pedido do Victor) -- pode vir
+  // junto de qualquer período, ou sozinho.
+  urgent: boolean;
   rota: Rota | null;
   // Nota de encaixe fora da rota -- só existe em registros de antes
   // 18/08/2026 (ver setSchedule/actions.ts); fica só de leitura, não dá mais
@@ -64,6 +68,7 @@ export function ScheduleField({
   const [date, setDate] = useState(scheduledDate ?? "");
   const [time, setTime] = useState(formatTimeOnly(scheduledTime) ?? "");
   const [selectedShift, setSelectedShift] = useState<string>(shift ?? "");
+  const [selectedUrgent, setSelectedUrgent] = useState<boolean>(urgent);
   // Duas coisas distintas: a ROTA escolhida (o que fica gravado em
   // service_requests.rota) e QUAL atribuição específica (id de
   // rota_driver_assignments) -- normalmente uma escolhe a outra sozinha,
@@ -153,6 +158,14 @@ export function ScheduleField({
               ? `${formatDateOnly(scheduledDate)}${formatTimeOnly(scheduledTime) ? ` às ${formatTimeOnly(scheduledTime)}` : ""}${shift ? ` · ${SHIFT_LABELS[shift]}` : ""}`
               : "Não agendada"}
           </span>
+          {urgent ? (
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ background: "var(--status-critical)", color: "#fff" }}
+            >
+              URGENTE
+            </span>
+          ) : null}
           <button
             onClick={() => setEditing(true)}
             className="text-xs underline"
@@ -205,6 +218,14 @@ export function ScheduleField({
             </option>
           ))}
         </select>
+        <label className="flex items-center gap-1.5 text-sm" style={{ color: "var(--text-primary)" }}>
+          <input
+            type="checkbox"
+            checked={selectedUrgent}
+            onChange={(e) => setSelectedUrgent(e.target.checked)}
+          />
+          Urgente
+        </label>
       </div>
 
       {showRota ? (
@@ -260,7 +281,7 @@ export function ScheduleField({
               // escolher a extra certa quando ela tem a mesma rota da
               // principal (ver comentário no estado selectedAssignmentId
               // acima).
-              await setSchedule(requestId, date, selectedShift, time, selectedRota || undefined, selectedAssignment?.driverName ?? undefined);
+              await setSchedule(requestId, date, selectedShift, time, selectedRota || undefined, selectedAssignment?.driverName ?? undefined, selectedUrgent);
               setEditing(false);
             }, "Agenda atualizada.");
           }}
@@ -274,6 +295,7 @@ export function ScheduleField({
             setDate(scheduledDate ?? "");
             setTime(formatTimeOnly(scheduledTime) ?? "");
             setSelectedShift(shift ?? "");
+            setSelectedUrgent(urgent);
             setSelectedRota(rota ?? "");
             setSelectedAssignmentId("");
             setEditing(false);

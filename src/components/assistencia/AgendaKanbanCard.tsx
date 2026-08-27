@@ -80,6 +80,14 @@ export function AgendaKanbanCard({
               {SHIFT_LABELS[item.shift] ?? item.shift}
             </span>
           ) : null}
+          {item.urgent ? (
+            <span
+              className="text-xs font-bold px-1.5 py-0.5 rounded-full"
+              style={{ color: "#fff", background: "var(--status-critical)" }}
+            >
+              URGENTE
+            </span>
+          ) : null}
           {/* Rota é só de visita de motorista -- não existe pra montagem/
               desmontagem/vistoria/troca de peça, mesmo com dado velho. */}
           {item.rota && (DELIVERY_REQUEST_TYPES as readonly string[]).includes(item.type) ? (

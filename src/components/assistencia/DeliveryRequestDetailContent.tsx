@@ -259,6 +259,7 @@ export function DeliveryRequestDetailContent({
                 scheduledDate={request.scheduledDate}
                 scheduledTime={request.scheduledTime}
                 shift={request.shift}
+                urgent={request.urgent}
                 rota={request.rota}
                 rotaExceptionNote={request.rotaExceptionNote}
                 showRota

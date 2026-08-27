@@ -52,7 +52,7 @@ const REQUEST_TYPES = [
   "troca_produto",
 ] as const;
 const STATUSES = ["aberta", "em_contato", "em_andamento", "remarcar", "concluida", "cancelada"] as const;
-const SHIFTS = ["manha", "tarde", "dia", "urgencia"] as const;
+const SHIFTS = ["manha", "tarde", "dia"] as const;
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const str = String(value ?? "").trim();
@@ -1033,7 +1033,7 @@ export async function createExchangeChild(
   const { data: parent, error: fetchError } = await admin
     .from("service_requests")
     .select(
-      "ticket_number, status, type, store_id, exchange_round, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, client_protheus_code, order_code, invoice_number, seller_name, authorized_by, restriction_note, client_time_restriction, scheduled_date, scheduled_time, shift, rota, driver_name"
+      "ticket_number, status, type, store_id, exchange_round, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, client_protheus_code, order_code, invoice_number, seller_name, authorized_by, restriction_note, client_time_restriction, scheduled_date, scheduled_time, shift, urgent, rota, driver_name"
     )
     .eq("id", requestId)
     .single();
@@ -1111,6 +1111,7 @@ export async function createExchangeChild(
       scheduled_date: parent.scheduled_date,
       scheduled_time: parent.scheduled_time,
       shift: parent.shift,
+      urgent: parent.urgent,
       rota: parent.rota,
       causa_raiz: opts.causaRaiz,
       causa_carga: causaCarga,
@@ -1610,7 +1611,12 @@ export async function setSchedule(
   // com a MESMA rota (principal + extra) e motoristas diferentes, já que
   // só a rota sozinha não identifica qual delas foi escolhida. Sem isso,
   // cai no primeiro match por rota (comportamento de sempre).
-  driverName?: string
+  driverName?: string,
+  // Urgência é campo independente do turno desde 27/08/2026 (pedido do
+  // Victor: "quando coloco que precisa ser no periodo da tarde, ele nao
+  // me da a opção de colocar como urgencia tambem") -- default false pra
+  // não quebrar chamadas antigas que ainda não passam esse parâmetro.
+  urgent: boolean = false
 ) {
   const profile = await getProfile();
   // SAC também agenda rota/data dos próprios chamados (troca/entrega de
@@ -1691,6 +1697,7 @@ export async function setSchedule(
     .update({
       scheduled_date: scheduledDate || null,
       shift: shift || null,
+      urgent,
       scheduled_time: scheduledTime || null,
       rota: rotaValue,
       rota_exception_note: exceptionNote,
@@ -1712,7 +1719,7 @@ export async function setSchedule(
     from_status: clearingRemarcar ? "remarcar" : undefined,
     to_status: clearingRemarcar ? "em_andamento" : undefined,
     note: scheduledDate
-      ? `Visita agendada: ${scheduledDate}${scheduledTime ? ` às ${scheduledTime}` : ""}${shift ? ` (${shiftLabel})` : ""}${rotaNote}`
+      ? `Visita agendada: ${scheduledDate}${scheduledTime ? ` às ${scheduledTime}` : ""}${shift ? ` (${shiftLabel})` : ""}${urgent ? " (Urgente)" : ""}${rotaNote}`
       : "Agendamento removido.",
   });
 
@@ -1746,7 +1753,7 @@ export async function bulkSetRotaAction(
   const admin = getSupabaseAdmin();
   const { data: rows, error } = await admin
     .from("service_requests")
-    .select("id, ticket_number, shift, scheduled_time")
+    .select("id, ticket_number, shift, scheduled_time, urgent")
     .in("id", requestIds);
   if (error) throw new Error(error.message);
 
@@ -1754,7 +1761,7 @@ export async function bulkSetRotaAction(
   let successCount = 0;
   for (const row of rows ?? []) {
     try {
-      await setSchedule(row.id, scheduledDate, row.shift ?? "", row.scheduled_time ?? "", rota, driverName);
+      await setSchedule(row.id, scheduledDate, row.shift ?? "", row.scheduled_time ?? "", rota, driverName, row.urgent ?? false);
       successCount++;
     } catch (e) {
       errors.push(`#${row.ticket_number}: ${e instanceof Error ? e.message : "erro desconhecido"}`);
@@ -1989,6 +1996,9 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   if (shift && !SHIFTS.includes(shift as (typeof SHIFTS)[number])) {
     return { error: "Turno inválido." };
   }
+  // Urgência é campo independente do turno desde 27/08/2026 (pedido do
+  // Victor) -- pode vir marcado junto de qualquer período, ou sozinho.
+  const urgent = formData.get("urgent") === "on";
 
   const assemblerName = emptyToNull(formData.get("assembler_name"));
   if (assemblerName && (MANOEL_ONLY_TYPES as readonly string[]).includes(type) && assemblerName !== MANOEL_ONLY_ASSEMBLER) {
@@ -2153,6 +2163,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       scheduled_date: emptyToNull(formData.get("scheduled_date")),
       scheduled_time: emptyToNull(formData.get("scheduled_time")),
       shift: shift || null,
+      urgent,
       assembler_name: assemblerName,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
       // Criação rápida não coleta prazo pedido pela loja, então não há nada
@@ -2342,6 +2353,16 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   }
   const rotaExceptionNote: string | null = null;
 
+  // Turno e urgência são campos independentes desde 27/08/2026 (pedido do
+  // Victor: "quando coloco que precisa ser no periodo da tarde, ele nao me
+  // da a opção de colocar como urgencia tambem") -- antes urgência era só
+  // um valor emprestado de `shift`, mutuamente exclusivo com qualquer
+  // período de verdade (ver SacCreateRequestForm.tsx, que agora tem os dois
+  // campos lado a lado).
+  const shift = String(formData.get("shift") ?? "").trim();
+  if (shift && !SHIFTS.includes(shift as (typeof SHIFTS)[number])) {
+    return { error: "Turno inválido." };
+  }
   const urgent = formData.get("urgent") === "on";
   // Vale pra montagem e desmontagem (pedido do Victor 18/08/2026: "SAC
   // também faz desmontagem", antes só existia como perna do combo de
@@ -2453,7 +2474,8 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       scheduled_time: scheduledTime || null,
       rota: rotaValue,
       rota_exception_note: rotaExceptionNote,
-      shift: urgent ? "urgencia" : null,
+      shift: shift || null,
+      urgent,
       sac_category: type === "notificacao_externa" ? emptyToNull(formData.get("sac_category")) : null,
       causa_raiz: causaRaiz,
       causa_carga: causaCarga,

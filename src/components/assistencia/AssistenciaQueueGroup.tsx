@@ -223,6 +223,14 @@ function EntregaCardRow({
               <span style={{ color: "var(--text-muted)" }}>Sem data</span>
             )}
           </span>
+          {r.urgent ? (
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+              style={{ color: "#fff", background: "var(--status-critical)" }}
+            >
+              URGENTE
+            </span>
+          ) : null}
         </div>
 
         {/* Coluna 4 (35%): cliente em destaque, telefone, bairro +
@@ -448,6 +456,14 @@ function VisitaCardRow({
               <span className="whitespace-nowrap">Sem previsão</span>
             )}
             {r.completedAt ? <span className="whitespace-nowrap">Concluída {formatDateTimeShortBr(r.completedAt)}</span> : null}
+            {r.urgent ? (
+              <span
+                className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap self-start"
+                style={{ color: "#fff", background: "var(--status-critical)" }}
+              >
+                URGENTE
+              </span>
+            ) : null}
           </div>
         </Link>
 

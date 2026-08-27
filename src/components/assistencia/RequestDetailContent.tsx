@@ -284,6 +284,7 @@ export function RequestDetailContent({
                 scheduledDate={request.scheduledDate}
                 scheduledTime={request.scheduledTime}
                 shift={request.shift}
+                urgent={request.urgent}
                 rota={null}
                 rotaExceptionNote={null}
                 showRota={false}
@@ -293,7 +294,7 @@ export function RequestDetailContent({
                 label="Visita agendada"
                 value={
                   request.scheduledDate
-                    ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}`
+                    ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}${request.urgent ? " · URGENTE" : ""}`
                     : null
                 }
               />

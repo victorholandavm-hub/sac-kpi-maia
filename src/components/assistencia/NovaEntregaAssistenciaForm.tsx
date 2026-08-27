@@ -530,6 +530,12 @@ export function NovaEntregaAssistenciaForm({
               ))}
             </select>
           </Field>
+          {/* Independente do turno desde 27/08/2026 (pedido do Victor) --
+              pode vir junto de qualquer período, ou sozinho. */}
+          <label className="flex items-center gap-2 text-sm self-end pb-2" style={{ color: "var(--text-primary)" }}>
+            <input type="checkbox" name="urgent" className="rounded" />
+            Urgente
+          </label>
         </div>
 
         {/* Cidade primeiro, rota depois -- pedido do Victor 24/08/2026. */}

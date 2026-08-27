@@ -76,7 +76,6 @@ export const SHIFT_LABELS: Record<string, string> = {
   manha: "Manhã",
   tarde: "Tarde",
   dia: "Dia",
-  urgencia: "Urgência",
 };
 
 export const DEADLINE_STATUS_LABELS: Record<string, string> = {

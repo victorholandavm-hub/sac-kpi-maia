@@ -76,6 +76,14 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
               Visita combo — ver produtos abaixo
             </span>
           ) : null}
+          {request.urgent ? (
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+              style={{ color: "#fff", background: "var(--status-critical)" }}
+            >
+              URGENTE
+            </span>
+          ) : null}
         </div>
 
         {montadorDate ? (
