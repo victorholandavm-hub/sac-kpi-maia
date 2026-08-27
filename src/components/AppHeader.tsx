@@ -8,7 +8,7 @@ import { signOutDashboard } from "@/app/login/actions";
 const TABS = [
   { key: "home", label: "Início", href: "/" },
   { key: "kpis", label: "KPIs", href: "/kpis" },
-  { key: "kpis-assistencia", label: "KPIs Assistência", href: "/kpis-assistencia" },
+  { key: "kpis-assistencia", label: "Relatório de Assistência", href: "/kpis-assistencia" },
   { key: "clientes", label: "Clientes", href: "/clientes" },
   { key: "vendas", label: "Vendas", href: "/vendas" },
   { key: "avaliacoes", label: "Avaliações", href: "/avaliacoes" },

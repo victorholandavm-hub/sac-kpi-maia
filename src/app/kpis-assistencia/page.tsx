@@ -9,7 +9,9 @@ export const revalidate = 60;
 // Página própria (fora do painel de KPIs geral) -- pedido do Victor
 // 27/08/2026: "preciso que os kpis da assistencia fiquem numa aba
 // separada, sozinha" (era a 4ª aba de /kpis por um dia, ver
-// Dashboard.tsx). Mesmo padrão de /avaliacoes (RangePicker com
+// Dashboard.tsx). Título "Relatório de Assistência" (rota/arquivo
+// continuam kpis-assistencia, só o texto visível mudou -- pedido do
+// Victor 27/08/2026). Mesmo padrão de /avaliacoes (RangePicker com
 // basePath próprio, AppHeader compartilhado). Dados vêm de
 // service_requests -- domínio separado do resto do painel (conversas do
 // GHL, ver kpi.ts), ver kpiAssistencia.ts.
@@ -28,7 +30,7 @@ export default async function KpisAssistenciaPage({
 
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
-          KPIs da Assistência
+          Relatório de Assistência
         </h1>
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Mesmos chamados da aba Entregas: troca, entrega e recolhimento de produto, envio e recolhimento de peça — não conta montagem, desmontagem, vistoria nem troca de peça (visita de montador).
