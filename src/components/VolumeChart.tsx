@@ -9,14 +9,14 @@ function formatDate(date: unknown) {
   return `${day}/${month}`;
 }
 
-export function VolumeChart({ data }: { data: DayCount[] }) {
+export function VolumeChart({ data, title = "Volume de chamados por dia" }: { data: DayCount[]; title?: string }) {
   return (
     <div
       className="rounded-lg border p-4"
       style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
     >
       <h3 className="text-sm font-medium mb-3" style={{ color: "var(--text-primary)" }}>
-        Volume de chamados por dia
+        {title}
       </h3>
       {data.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>

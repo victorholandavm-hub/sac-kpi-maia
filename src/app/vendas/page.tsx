@@ -87,13 +87,6 @@ export default async function VendasProdutoPage({
     }
   }
 
-  // Saldo/previsão de chegada do produto pesquisado -- pedido do Victor
-  // 27/08/2026: "eu consigo puxar do protheus a previsao de chegada dos
-  // produtos?" (produto padrão de catálogo, não encomenda). Mesma função
-  // já usada pro ranking (listSaldoEstoqueProdutos), só que com 1 código
-  // só -- reaproveita a mesma leitura de totvs_stock, sem duplicar lógica.
-  const estoqueProduto = curva ? (await listSaldoEstoqueProdutos([curva.productCode])).get(curva.productCode) : undefined;
-
   const [{ ranking, categorias, evolucaoFamilia: evolucao }, earliestSyncedDate] = await Promise.all([
     getVendasPeriodoResumo(range, RANKING_LIMIT, categoriaAtiva),
     getEarliestSyncedOrderDate(),
@@ -280,28 +273,6 @@ export default async function VendasProdutoPage({
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               Faturamento no período: <strong style={{ color: "var(--text-primary)" }}>{formatBRL(curva.valorPeriodo)}</strong>
             </p>
-
-            {/* Estoque/previsão de chegada (WSStock do Protheus, ver
-                listSaldoEstoqueProdutos) -- separado do bloco de venda
-                acima, é um dado diferente (posição atual, não histórico).
-                "Em pedido de compra"/"Previsão de chegada" só aparecem
-                quando o Protheus reporta algo -- null é comum (produto sem
-                compra em aberto agora), não vale poluir a tela com "—". */}
-            {estoqueProduto ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 border-t" style={{ borderColor: "var(--gridline)" }}>
-                <StatTile label="Saldo no CD" value={estoqueProduto.saldoAtual} suffix="un" accent="var(--series-1)" />
-                {estoqueProduto.saldoEmPedidoCompra !== null ? (
-                  <StatTile label="Em pedido de compra" value={estoqueProduto.saldoEmPedidoCompra} suffix="un" accent="var(--series-4)" />
-                ) : null}
-                {estoqueProduto.previsaoChegada ? (
-                  <StatTile
-                    label="Previsão de chegada"
-                    value={new Date(`${estoqueProduto.previsaoChegada}T00:00:00`).toLocaleDateString("pt-BR")}
-                    accent="var(--brand-orange)"
-                  />
-                ) : null}
-              </div>
-            ) : null}
           </div>
 
           <ProdutoVendaCurvaChart semanas={curva.semanas} />

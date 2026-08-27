@@ -12,6 +12,7 @@ const TABS = [
   { label: "Fornecedores", href: "/assistencia/fornecedores" },
   { label: "Pagamentos", href: "/assistencia/pagamentos" },
   { label: "Estoque", href: "/assistencia/estoque" },
+  { label: "Prazos de produtos", href: "/assistencia/prazos-produtos" },
   { label: "Relatórios", href: "/assistencia/relatorios" },
 ];
 
