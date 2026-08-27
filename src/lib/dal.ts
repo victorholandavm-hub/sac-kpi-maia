@@ -2,7 +2,13 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getSupabaseServer } from "./supabaseServer";
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { SAC_MANAGED_TYPES, SAC_ALSO_MANAGED_TYPES, ASSISTENCIA_MANAGED_TYPES, PAYMENTS_CONTROLLER_NAME } from "./assistenciaLabels";
+import {
+  SAC_MANAGED_TYPES,
+  SAC_ALSO_MANAGED_TYPES,
+  ASSISTENCIA_MANAGED_TYPES,
+  ASSISTENCIA_ALSO_MANAGED_TYPES,
+  PAYMENTS_CONTROLLER_NAME,
+} from "./assistenciaLabels";
 
 export type Role = "assistencia" | "admin" | "sac";
 
@@ -66,9 +72,16 @@ export function redirectIfSac(profile: Profile) {
 // bastando saber o id.
 export function requireManageAccess(profile: Profile, requestType: string) {
   if (profile.role === "admin") return;
-  if (profile.role === "assistencia" && (ASSISTENCIA_MANAGED_TYPES as readonly string[]).includes(requestType)) return;
-  // SAC_ALSO_MANAGED_TYPES (envio_peca/recolhimento) -- pedido do Victor
-  // 27/08/2026, ver comentário em assistenciaLabels.ts.
+  // ASSISTENCIA_ALSO_MANAGED_TYPES/SAC_ALSO_MANAGED_TYPES (pedido do
+  // Victor 27/08/2026, ver comentário em assistenciaLabels.ts) --
+  // troca/entrega/recolhimento de produto (do SAC) e envio/recolhimento
+  // de peça (da assistência) viraram gerenciáveis pelos dois times.
+  if (
+    profile.role === "assistencia" &&
+    ((ASSISTENCIA_MANAGED_TYPES as readonly string[]).includes(requestType) ||
+      (ASSISTENCIA_ALSO_MANAGED_TYPES as readonly string[]).includes(requestType))
+  )
+    return;
   if (
     profile.role === "sac" &&
     ((SAC_MANAGED_TYPES as readonly string[]).includes(requestType) || (SAC_ALSO_MANAGED_TYPES as readonly string[]).includes(requestType))
