@@ -3,6 +3,19 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Count, Coverage } from "@/lib/kpi";
 
+// Achado 27/08/2026 (KPIs da Assistência, "Chamados por produto"): label
+// longo (descrição crua do produto, até ~45 caracteres) estourava a
+// largura do eixo Y e ficava sobreposto com a linha de cima/baixo,
+// ilegível. Trunca só o texto do eixo (com "…") -- o Tooltip continua
+// mostrando o label INTEIRO ao passar o mouse (usa o dado bruto, não o
+// tickFormatter), então nenhuma informação se perde, só a barra some de
+// visual poluído.
+const MAX_TICK_LABEL_LENGTH = 24;
+
+function truncateTick(label: string): string {
+  return label.length > MAX_TICK_LABEL_LENGTH ? `${label.slice(0, MAX_TICK_LABEL_LENGTH - 1)}…` : label;
+}
+
 export function BarRanking({
   title,
   data,
@@ -47,7 +60,8 @@ export function BarRanking({
             <YAxis
               type="category"
               dataKey="label"
-              width={120}
+              width={140}
+              tickFormatter={truncateTick}
               stroke="var(--axis)"
               tick={{ fill: "var(--text-secondary)", fontSize: 12 }}
             />
