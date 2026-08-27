@@ -67,6 +67,24 @@ function atendenteName(r: RequestRow): string | null {
   return r.requester?.full_name ?? r.requested_by_name;
 }
 
+// Conferente/motorista (causa_conferente/driver_name) são texto livre
+// digitado na hora, sem cadastro -- achado 27/08/2026 (Victor: "nos
+// conferentes EVERTON e Everton sao a mesma pessoa, DIEGO e diego sao a
+// mesma pessoa"): a mesma pessoa em caixas diferentes virava duas barras
+// separadas no ranking. Agrupa por versão maiúscula (chave insensível a
+// caixa) e mostra sempre em Title Case -- não corrige grafia diferente
+// pro mesmo nome (ex.: apelido vs. nome completo), só a caixa.
+// `.toUpperCase()` faz o agrupamento; a capitalização de exibição evita
+// `\b` do regex (não é Unicode-aware em JS -- "á" quebraria "FLÁVIO" no
+// meio), separando por espaço/barra manualmente.
+function titleCase(s: string): string {
+  return s
+    .toLowerCase()
+    .split(/([\s/])/)
+    .map((part) => (part === " " || part === "/" ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join("");
+}
+
 // Mesmo espírito do `aggregate()` de getRequestsReport (serviceRequests.ts)
 // -- agrupa por chave, guarda os chamados de cada grupo pro drill-down
 // (aqui num Record só, `ticketsByTag`, compartilhado entre todos os
@@ -169,13 +187,12 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   // sentido de quem atendeu/criou a notificação, não quem tá responsável
   // por ela agora (esse último muda de dono com claimRequest).
   const byAgent = aggregate(rows, atendenteName, (k) => k, ticketsByTag, "atendente");
-  // Conferente/motorista são texto livre digitado na hora -- normaliza só
-  // espaço nas pontas (trim), sem tentar corrigir grafia/capitalização
-  // diferente pro mesmo nome (fora de escopo aqui).
+  // Ver titleCase acima -- agrupa por nome em caixa alta (mesma pessoa,
+  // caixa diferente, conta junto), exibe sempre em Title Case.
   const byConferente = aggregate(
     rows.filter((r) => r.causa_raiz === "erro_conferencia" && r.causa_conferente),
-    (r) => r.causa_conferente!.trim(),
-    (k) => k,
+    (r) => r.causa_conferente!.trim().toUpperCase(),
+    titleCase,
     ticketsByTag,
     "conferente"
   );
@@ -188,8 +205,8 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   // desse ranking.
   const byMotoristaErro = aggregate(
     rows.filter((r) => r.causa_raiz === "erro_motorista" && r.driver_name),
-    (r) => r.driver_name!.trim(),
-    (k) => k,
+    (r) => r.driver_name!.trim().toUpperCase(),
+    titleCase,
     ticketsByTag,
     "motorista"
   );
