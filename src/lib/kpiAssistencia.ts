@@ -113,6 +113,14 @@ function aggregate(
 export type AssistenciaKpiData = {
   totalChamados: number;
   dailyVolume: DayCount[];
+  // Contagem de verdade de produtos distintos -- byProduct abaixo é
+  // cortado em PRODUCT_RANKING_LIMIT (senão o gráfico vira uma parede de
+  // barras ilegível), então `byProduct.length` SUBESTIMA o total sempre
+  // que passa do limite (achado 27/08/2026, pedido do Victor "revise
+  // essa tela inteira": 136 produtos distintos de verdade, StatTile
+  // mostrando 20). Esse campo existe só pro StatTile "Produtos distintos
+  // com chamado" -- o gráfico continua usando byProduct (cortado).
+  distinctProductCount: number;
   byProduct: Count[];
   byProductGroup: Count[];
   byAgent: Count[];
@@ -218,28 +226,39 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   // produto no mesmo chamado contam 1 vez). Grupo reaproveita
   // classificarProduto (vendasProduto.ts, mesma classificação por
   // palavra-chave já usada em /vendas) em cima da descrição crua do
-  // item.
+  // item -- dedupe PRÓPRIO por (request_id, grupo), não o mesmo de
+  // produto: achado 27/08/2026 (revisão pedida pelo Victor) -- um
+  // chamado com 2 produtos DIFERENTES que caem no mesmo grupo (ex.:
+  // #4949, troca_produto com "Sofa novo" + "Sofa avariado", os dois
+  // classificam como "Sala de estar / jantar") contava esse chamado 2x
+  // no grupo, sem o dedupe à parte.
   const produtoPorChamado = new Set<string>();
+  const grupoPorChamado = new Set<string>();
   const produtoCount = new Map<string, number>();
   const grupoCount = new Map<string, { label: string; count: number }>();
   for (const item of items) {
     if (!item.product) continue;
-    const dedupeKey = `${item.request_id}::${item.product}`;
-    if (produtoPorChamado.has(dedupeKey)) continue;
-    produtoPorChamado.add(dedupeKey);
-    produtoCount.set(item.product, (produtoCount.get(item.product) ?? 0) + 1);
     const parentRow = rowById.get(item.request_id);
     if (!parentRow) continue;
 
-    const produtoTag = `produto:${item.product}`;
-    (ticketsByTag[produtoTag] ??= []).push(toReportRowItem(parentRow));
+    const dedupeKey = `${item.request_id}::${item.product}`;
+    if (!produtoPorChamado.has(dedupeKey)) {
+      produtoPorChamado.add(dedupeKey);
+      produtoCount.set(item.product, (produtoCount.get(item.product) ?? 0) + 1);
+      const produtoTag = `produto:${item.product}`;
+      (ticketsByTag[produtoTag] ??= []).push(toReportRowItem(parentRow));
+    }
 
     const grupo = classificarProduto(item.product);
-    const grupoEntry = grupoCount.get(grupo.key) ?? { label: grupo.label, count: 0 };
-    grupoEntry.count++;
-    grupoCount.set(grupo.key, grupoEntry);
-    const grupoTag = `grupo:${grupo.key}`;
-    (ticketsByTag[grupoTag] ??= []).push(toReportRowItem(parentRow));
+    const grupoDedupeKey = `${item.request_id}::${grupo.key}`;
+    if (!grupoPorChamado.has(grupoDedupeKey)) {
+      grupoPorChamado.add(grupoDedupeKey);
+      const grupoEntry = grupoCount.get(grupo.key) ?? { label: grupo.label, count: 0 };
+      grupoEntry.count++;
+      grupoCount.set(grupo.key, grupoEntry);
+      const grupoTag = `grupo:${grupo.key}`;
+      (ticketsByTag[grupoTag] ??= []).push(toReportRowItem(parentRow));
+    }
   }
   const byProduct: Count[] = [...produtoCount.entries()]
     .map(([product, count]) => ({ label: product, count, tag: `produto:${product}` }))
@@ -252,6 +271,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   return {
     totalChamados: rows.length,
     dailyVolume,
+    distinctProductCount: produtoCount.size,
     byProduct,
     byProductGroup,
     byAgent,
