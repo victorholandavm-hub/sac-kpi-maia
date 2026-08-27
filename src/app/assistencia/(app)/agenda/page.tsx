@@ -164,6 +164,29 @@ export default async function AgendaPage({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Mesma fileira de pílulas de fila/page.tsx (Visitas/Entregas) --
+          pedido do Victor 27/08/2026: "coloque agenda dentro de
+          solicitações ao lado de visitas/entregas". Agenda é rota
+          própria (filtro/dado bem diferente -- mês corrente, por
+          montador, não por rota), então cada uma das 3 páginas
+          renderiza sua própria fileira em vez de layout compartilhado
+          (mesma razão de SacTabs.tsx). */}
+      <div className="flex items-center gap-2">
+        <Link href="/assistencia/fila" className="text-base font-bold px-4 py-2 rounded-full" style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}>
+          Visitas
+        </Link>
+        <Link
+          href="/assistencia/fila?tab=pecas"
+          className="text-base font-bold px-4 py-2 rounded-full"
+          style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}
+        >
+          Entregas
+        </Link>
+        <Link href="/assistencia/agenda" className="text-base font-bold px-4 py-2 rounded-full" style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
+          Agenda
+        </Link>
+      </div>
+
       {/* Título + descrição + CTA no canto direito -- pedido do Victor
           25/08/2026 ("guia de padronização"), mesmo padrão das outras 2
           telas (fila/page.tsx, sac/notificacoes/page.tsx). */}

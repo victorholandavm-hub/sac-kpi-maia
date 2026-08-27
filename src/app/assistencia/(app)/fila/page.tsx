@@ -370,6 +370,21 @@ export default async function AssistenciaQueuePage({
         >
           Entregas
         </Link>
+        {/* Agenda mora aqui do lado, dentro de "Solicitações" -- pedido do
+            Victor 27/08/2026: "coloque agenda dentro de solicitações ao
+            lado de visitas/entregas" (era aba própria no menu de cima,
+            AssistenciaNav.tsx). Rota própria (agenda/page.tsx, filtro/dado
+            bem diferente -- mês corrente, por montador, não por rota) --
+            sem tentar herdar os filtros desta tela (não fazem sentido lá),
+            mesma ideia de agenda/page.tsx repassar essa mesma fileira de
+            pílulas de volta pra Visitas/Entregas. */}
+        <Link
+          href="/assistencia/agenda"
+          className="text-base font-bold px-4 py-2 rounded-full"
+          style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}
+        >
+          Agenda
+        </Link>
       </div>
 
       {/* Junior como motorista padrão da rota de João Pessoa -- pedido do

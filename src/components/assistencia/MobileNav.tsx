@@ -33,20 +33,6 @@ function ClipboardIcon() {
   );
 }
 
-function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
-      <path
-        d="M5 9h14M7 4v2M17 4v2M6 6h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function BoxIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
@@ -83,18 +69,25 @@ function PlusIcon() {
   );
 }
 
+// Agenda saiu daqui 27/08/2026 (pedido do Victor, mesmo motivo de
+// AssistenciaNav.tsx -- ver lá) -- agora mora dentro de Fila, chega lá
+// pela fileira de pílulas Visitas/Entregas/Agenda. `matches` no ícone
+// Peças cobre Fornecedores/Estoque também ("Controle Assistência",
+// mesma consolidação do menu desktop) -- rótulo curto ("Controle") pra
+// caber embaixo do ícone, sem repetir "Peças" que ficaria menos claro
+// pra quem chega em Fornecedores/Estoque por aqui.
 const PRIMARY_TABS = [
   { label: "Início", href: "/assistencia/inicio", icon: HomeIcon },
-  { label: "Fila", href: "/assistencia/fila", icon: ClipboardIcon },
-  { label: "Agenda", href: "/assistencia/agenda", icon: CalendarIcon },
-  { label: "Peças", href: "/assistencia/pecas", icon: BoxIcon },
+  { label: "Fila", href: "/assistencia/fila", icon: ClipboardIcon, matches: ["/assistencia/fila", "/assistencia/agenda"] },
+  { label: "Controle", href: "/assistencia/pecas", icon: BoxIcon, matches: ["/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
 ];
 
+// Prazos de produtos entrou aqui 27/08/2026 -- tinha ficado de fora
+// quando a aba nasceu (AssistenciaNav.tsx já tinha, esse menu não).
 const MORE_TABS = [
   { label: "Encomendas", href: "/assistencia/encomendas/fila" },
-  { label: "Fornecedores", href: "/assistencia/fornecedores" },
   { label: "Pagamentos", href: "/assistencia/pagamentos" },
-  { label: "Estoque", href: "/assistencia/estoque" },
+  { label: "Prazos de produtos", href: "/assistencia/prazos-produtos" },
   { label: "Relatórios", href: "/assistencia/relatorios" },
 ];
 
@@ -176,7 +169,7 @@ export function MobileNav({
         style={{ background: "var(--surface-1)", borderColor: "var(--border)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {PRIMARY_TABS.map((tab) => {
-          const active = pathname.startsWith(tab.href);
+          const active = (tab.matches ?? [tab.href]).some((path) => pathname.startsWith(path));
           const Icon = tab.icon;
           const tabCount = tab.label === "Fila" ? solicitacoesCount : 0;
           return (

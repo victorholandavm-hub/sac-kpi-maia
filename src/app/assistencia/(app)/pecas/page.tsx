@@ -60,6 +60,24 @@ export default async function PecasQueuePage({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* "Controle Assistência" -- pedido do Victor 27/08/2026: "coloque
+          dessa mesma forma em outra aba peças/fornecedores/estoque e
+          nomeie essa aba como controle assistencia" (mesmo desenho da
+          fileira de pílulas Visitas/Entregas/Agenda em fila/page.tsx).
+          3 rotas próprias, dado/filtro cada uma o seu -- sem layout
+          compartilhado, cada página renderiza sua própria fileira. */}
+      <div className="flex items-center gap-2">
+        <Link href="/assistencia/pecas" className="text-base font-bold px-4 py-2 rounded-full" style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
+          Peças
+        </Link>
+        <Link href="/assistencia/fornecedores" className="text-base font-bold px-4 py-2 rounded-full" style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}>
+          Fornecedores
+        </Link>
+        <Link href="/assistencia/estoque" className="text-base font-bold px-4 py-2 rounded-full" style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}>
+          Estoque
+        </Link>
+      </div>
+
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           {FILTERS.map((f) => (
