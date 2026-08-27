@@ -31,7 +31,7 @@ export default async function KpisAssistenciaPage({
           KPIs da Assistência
         </h1>
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Todas as notificações de assistência (entrega, troca, envio e recolhimento de produto/peça) — não conta montagem, desmontagem nem vistoria.
+          Mesmos chamados da aba Entregas: troca, entrega e recolhimento de produto, envio e recolhimento de peça — não conta montagem, desmontagem, vistoria nem troca de peça (visita de montador).
         </p>
       </div>
 
