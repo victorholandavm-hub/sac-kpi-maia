@@ -67,6 +67,23 @@ export const ROTAS_BY_CITY: Record<RotaCity, Rota[]> = {
 // tecnicos.ts).
 export const JP_EXTRA_ROTA: Rota = "extra";
 
+// Motorista padrão da rota principal (praia/sul/centro) de João Pessoa
+// quando ainda não existe nenhuma atribuição explícita pro dia -- pedido
+// do Victor, reafirmado 27/08/2026: "eu falei que o motorista padrão das
+// rotas de joao pessoa é o junior", depois de achar chamados com rota
+// definida mas sem motorista mesmo com o painel "Motorista do dia"
+// mostrando Junior como sugestão. Antes (21/08 e 26/08/2026) isso só
+// existia como sugestão visual no painel (prop `defaultDriver`,
+// RotaMotoristaDoDia.tsx) -- não afetava getAvailableRotasForDate, então
+// quem agendava sem ninguém ter clicado "confirmar" primeiro ficava com
+// driver_name null de verdade. Agora é o valor que getAvailableRotasForDate
+// resolve de fato pra rota principal esperada da semana (ver uso abaixo) --
+// vira o motorista de qualquer chamado novo agendado pra João Pessoa sem
+// atribuição explícita, sem precisar de confirmação manual. Uma atribuição
+// de verdade (painel "Motorista do dia", lápis de editar) sempre tem
+// prioridade -- esse valor só entra quando `assignments.primary` é null.
+export const JP_DEFAULT_DRIVER = "Junior";
+
 // As 2 rotas fixas de Campina Grande -- sem "+ adicionar" no painel
 // "Motorista do dia" (achado do Victor 24/08/2026: "campina nao tem rota
 // extra"), são sempre essas duas, cada uma com seu próprio motorista.
@@ -214,8 +231,12 @@ export async function getAvailableRotasForDate(dateStr: string): Promise<Availab
     // Campina Grande sozinha já deixava `entries` não-vazio). Extra nunca
     // substitui a rota principal no dropdown -- as duas sempre convivem
     // juntas na lista final.
+    // Sem atribuição real ainda -- motorista padrão (JP_DEFAULT_DRIVER,
+    // ver comentário lá) entra direto aqui, não mais null. Pedido do
+    // Victor 27/08/2026: agendar sem ninguém ter "confirmado" antes não
+    // pode mais deixar o chamado sem motorista.
     const expected = getRotaForDate(dateStr, config);
-    if (expected) entries.push({ id: `expected-${expected}`, rota: expected, driverName: null, isExtra: false });
+    if (expected) entries.push({ id: `expected-${expected}`, rota: expected, driverName: JP_DEFAULT_DRIVER, isExtra: false });
   }
   for (const extra of assignments.extras) {
     entries.push({ id: extra.id, rota: extra.rota, driverName: extra.driverName, isExtra: true });

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus, isMostruarioRequest, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
-import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY } from "@/lib/rotas";
+import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
 import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -351,7 +351,7 @@ export default async function AssistenciaQueuePage({
           a aba Entregas da própria assistência. Só preenche quando o dia
           ainda não tem motorista salvo (ver defaultDriver em
           RotaMotoristaDoDia.tsx) -- não sobrescreve atribuição já feita. */}
-      {showPecas ? <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver="Junior" /> : null}
+      {showPecas ? <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} /> : null}
 
       {/* Linha 1 do guia de padronização: filtros rápidos por status, com
           contador -- pedido do Victor 25/08/2026 ("guia de padronização"):

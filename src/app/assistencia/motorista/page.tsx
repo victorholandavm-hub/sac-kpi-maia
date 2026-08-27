@@ -14,7 +14,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { DriverRouteGroup } from "@/components/assistencia/DriverRouteGroup";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, groupByDateBucket } from "@/lib/dateBuckets";
-import { ROTAS, ROTA_LABELS, getRotaWeekOverview, type Rota } from "@/lib/rotas";
+import { ROTAS, ROTA_LABELS, getRotaWeekOverview, JP_DEFAULT_DRIVER, type Rota } from "@/lib/rotas";
 import { DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
 
 // Rota e data no mesmo cabeçalho, lado a lado -- pedido do Victor
@@ -108,6 +108,7 @@ export default async function MotoristaHomePage({
           initialOverview={rotaOverview}
           drivers={drivers}
           compact
+          defaultDriver={JP_DEFAULT_DRIVER}
           actions={{
             setRotaDriverAssignment: driverSetRotaDriverAssignment,
             addRotaExtra: driverAddRotaExtra,
