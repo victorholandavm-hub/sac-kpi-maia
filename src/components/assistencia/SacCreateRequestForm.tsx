@@ -52,6 +52,47 @@ type Item = { product: string; quantity: number; code: string };
 type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
 const blankItem = (): Item => ({ product: "", quantity: 1, code: "" });
 
+// Hook local -- entrega e recolhimento (troca_produto) usam exatamente o
+// mesmo estado e as mesmas 4 funções, só duas instâncias separadas (ver
+// uso duplicado em SacCreateRequestForm abaixo). Pedido do Victor
+// 26/08/2026: "obrigatorio colocar os produtos que deverão ser entregues e
+// os produtos que deverão ser recolhidos" -- antes só existia essa lista
+// (implicitamente "a entregar"), "o que recolher" era só texto livre
+// opcional.
+function useItemsList() {
+  const [items, setItems] = useState<Item[]>([blankItem()]);
+  const [lookupStatus, setLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
+
+  function update(index: number, patch: Partial<Item>) {
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
+  function add() {
+    setItems((prev) => [...prev, blankItem()]);
+  }
+  function remove(index: number) {
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  }
+  function lookup(index: number, code: string) {
+    if (!code.trim()) {
+      setLookupStatus((prev) => ({ ...prev, [index]: "idle" }));
+      return;
+    }
+    setLookupStatus((prev) => ({ ...prev, [index]: "loading" }));
+    withRetry(() => lookupTotvsProductForTeam(code))
+      .then((match) => {
+        if (!match || !match.description) {
+          setLookupStatus((prev) => ({ ...prev, [index]: "not_found" }));
+          return;
+        }
+        update(index, { product: match.description! });
+        setLookupStatus((prev) => ({ ...prev, [index]: "found" }));
+      })
+      .catch(() => setLookupStatus((prev) => ({ ...prev, [index]: "not_found" })));
+  }
+
+  return { items, lookupStatus, update, add, remove, lookup };
+}
+
 function ItemsFields({
   items,
   lookupStatus,
@@ -218,35 +259,17 @@ export function SacCreateRequestForm({
   const previewDriverName = effectiveAvailableRotas.find((r) => r.id === selectedRotaId)?.driverName ?? null;
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
 
-  const [items, setItems] = useState<Item[]>([blankItem()]);
-  const [itemsLookupStatus, setItemsLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
-
-  function update(index: number, patch: Partial<Item>) {
-    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
-  }
-  function add() {
-    setItems((prev) => [...prev, blankItem()]);
-  }
-  function remove(index: number) {
-    setItems((prev) => prev.filter((_, i) => i !== index));
-  }
-  function lookup(index: number, code: string) {
-    if (!code.trim()) {
-      setItemsLookupStatus((prev) => ({ ...prev, [index]: "idle" }));
-      return;
-    }
-    setItemsLookupStatus((prev) => ({ ...prev, [index]: "loading" }));
-    withRetry(() => lookupTotvsProductForTeam(code))
-      .then((match) => {
-        if (!match || !match.description) {
-          setItemsLookupStatus((prev) => ({ ...prev, [index]: "not_found" }));
-          return;
-        }
-        update(index, { product: match.description! });
-        setItemsLookupStatus((prev) => ({ ...prev, [index]: "found" }));
-      })
-      .catch(() => setItemsLookupStatus((prev) => ({ ...prev, [index]: "not_found" })));
-  }
+  const { items, lookupStatus: itemsLookupStatus, update, add, remove, lookup } = useItemsList();
+  // Só usada quando type === "troca_produto" (ver showProduct/isDelivery
+  // abaixo) -- mas o hook precisa ser chamado sempre, sem condição.
+  const {
+    items: pickupItems,
+    lookupStatus: pickupItemsLookupStatus,
+    update: updatePickup,
+    add: addPickup,
+    remove: removePickup,
+    lookup: lookupPickup,
+  } = useItemsList();
 
   // Extraído do effect abaixo pra também poder ser chamado pelo botão
   // "Tentar de novo" (aparece quando não encontrou -- ver clientLookupStatus
@@ -471,7 +494,11 @@ export function SacCreateRequestForm({
       </FormSection>
 
       {showProduct ? (
-        <FormSection title="Produto(s) e entrega" number={3} hint="Digite o código do produto pra preencher o nome automaticamente (se souber).">
+        <FormSection
+          title={type === "troca_produto" ? "Produtos a entregar" : "Produto(s) e entrega"}
+          number={3}
+          hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
+        >
           <ItemsFields
             items={items}
             lookupStatus={itemsLookupStatus}
@@ -482,6 +509,32 @@ export function SacCreateRequestForm({
             namePrefix="item"
             productLabel="Ex: Super Box Confort Mola Ensacada"
           />
+
+          {/* "Troca com recolhimento" é o único tipo que recolhe de
+              verdade (DRIVER_TYPE_LABELS.troca_produto) -- pedido do
+              Victor 26/08/2026: lista própria e obrigatória, igual a de
+              entrega, em vez de só o texto livre "O que recolher" lá
+              embaixo (que virou só instrução extra, ver Detalhes). Server
+              action (createSacRequest) exige pelo menos 1 item aqui
+              também -- ItemsFields já bloqueia client-side (`required` no
+              campo produto). */}
+          {type === "troca_produto" ? (
+            <div className="flex flex-col gap-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+              <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                Produtos a recolher *
+              </span>
+              <ItemsFields
+                items={pickupItems}
+                lookupStatus={pickupItemsLookupStatus}
+                onUpdate={updatePickup}
+                onAdd={addPickup}
+                onRemove={removePickup}
+                onLookup={lookupPickup}
+                namePrefix="pickup_item"
+                productLabel="Ex: Super Box Confort Mola Ensacada (avariada)"
+              />
+            </div>
+          ) : null}
 
           {isDelivery ? (
             <>
@@ -717,11 +770,15 @@ export function SacCreateRequestForm({
         ) : null}
 
         {type === "troca_produto" ? (
-          <Field label="O que recolher / instrução pro motorista">
+          // "O que recolher" virou lista de produtos própria e obrigatória
+          // lá em cima (ver comentário na Seção 3) -- esse campo agora é
+          // só complemento livre, opcional (ex.: onde deixar o produto
+          // recolhido, algum cuidado especial).
+          <Field label="Instrução extra pro motorista (opcional)">
             <textarea
               name="restriction_note"
               rows={2}
-              placeholder="Ex: recolher Super Box avariada e entregar a nova"
+              placeholder="Ex: deixar a peça recolhida na expedição, cliente prefere receber à tarde"
               className="rounded border px-3 py-2"
               style={inputStyle}
             />

@@ -248,9 +248,17 @@ export function DriverRouteGroup({
                     </a>
                   </p>
                 ) : null}
-                {r.productSummary ? (
+                {r.deliverySummary ? (
                   <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-                    {r.productSummary}
+                    {r.deliverySummary}
+                  </p>
+                ) : null}
+                {/* Recolhimento separado da entrega (troca_produto) --
+                    pedido do Victor 26/08/2026, motorista precisa ver os
+                    dois lados sem misturar. */}
+                {r.pickupSummary ? (
+                  <p className="text-xs truncate" style={{ color: "var(--status-warning)" }}>
+                    ↩ Recolher: {r.pickupSummary}
                   </p>
                 ) : null}
                 {r.scheduledDate ? (

@@ -107,7 +107,10 @@ export function DriverNotificationModalButton({ item }: { item: DriverRequestVie
                     : null
                 }
               />
-              <Row label="Produtos" value={item.productSummary} />
+              <Row label="Produto a entregar" value={item.deliverySummary} />
+              {/* Só aparece pra troca_produto (recolhimento de verdade) --
+                  pedido do Victor 26/08/2026. */}
+              {item.pickupSummary ? <Row label="Produto a recolher" value={item.pickupSummary} /> : null}
               <Row label="Motivo" value={item.reason} />
               <Row label="Restrição / observação" value={item.restrictionNote} />
               <Row label="Restrição de horário do cliente" value={item.clientTimeRestriction} />

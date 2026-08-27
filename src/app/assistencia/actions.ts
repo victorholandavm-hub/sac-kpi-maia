@@ -1070,9 +1070,13 @@ export async function createExchangeChild(
   const nextRound = (parent.exchange_round ?? 1) + 1;
   const childId = randomUUID();
 
+  // is_pickup entra na cópia também -- pedido do Victor 26/08/2026: sem
+  // isso, uma "nova troca" (2ª rodada) copiada perderia a separação
+  // entrega/recolhimento, todo item copiado virava "a entregar" (default
+  // da coluna), mesmo quando era "a recolher" no chamado original.
   const { data: items } = opts.sameProduct
-    ? await admin.from("service_request_items").select("product, part_code, quantity, item_action").eq("request_id", requestId)
-    : { data: [] as { product: string; part_code: string | null; quantity: number; item_action: string | null }[] };
+    ? await admin.from("service_request_items").select("product, part_code, quantity, item_action, is_pickup").eq("request_id", requestId)
+    : { data: [] as { product: string; part_code: string | null; quantity: number; item_action: string | null; is_pickup: boolean }[] };
 
   const { data: child, error } = await admin
     .from("service_requests")
@@ -1131,6 +1135,7 @@ export async function createExchangeChild(
         part_code: item.part_code,
         quantity: item.quantity,
         item_action: item.item_action,
+        is_pickup: item.is_pickup,
       }))
     );
     if (itemsError) throw new Error(`Troca criada (#${child.ticket_number}), mas falhou ao copiar os itens: ${itemsError.message}`);
@@ -1353,7 +1358,11 @@ export async function setAssistenciaOrderAction(items: { id: string; expectedOrd
 // trava de status nenhuma.
 export async function addRequestItemByStaff(
   requestId: string,
-  input: { product: string; partCode?: string; quantity: number; action?: "montar" | "desmontar" | null }
+  // isPickup -- pedido do Victor 26/08/2026 (troca_produto exige os dois
+  // lados declarados): dá pra adicionar item já marcado como "a recolher"
+  // depois que o chamado foi criado (ver DeliveryItemsTable.tsx). Sem valor
+  // (outros tipos, que nunca usam isso) vira "a entregar", igual sempre foi.
+  input: { product: string; partCode?: string; quantity: number; action?: "montar" | "desmontar" | null; isPickup?: boolean }
 ): Promise<void> {
   const profile = await getProfile();
   // SAC também ajusta item dos próprios chamados de entrega desde
@@ -1375,6 +1384,7 @@ export async function addRequestItemByStaff(
     part_code: input.partCode?.trim() || null,
     quantity,
     item_action: input.action ?? null,
+    is_pickup: input.isPickup ?? false,
   });
   if (error) throw new Error(error.message);
 
@@ -2368,6 +2378,23 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     if (semCodigo) return { error: `Informe o código do produto "${semCodigo.product}".` };
   }
 
+  // "Troca com recolhimento" (troca_produto, DRIVER_TYPE_LABELS) é o único
+  // tipo que entrega E recolhe na mesma visita -- pedido do Victor
+  // 26/08/2026: "deve ser obrigatorio colocar os produtos que deverão ser
+  // entregues e os produtos que deverão ser recolhidos". `items` acima
+  // (namePrefix "item") já é obrigatório pelo próprio form (produto exige
+  // `required`) -- essa segunda lista, "pickup_item", é nova, sempre "a
+  // recolher" (is_pickup: true no insert abaixo). Confere os dois lados
+  // aqui de novo (defesa a mais, mesmo padrão do semCodigo acima) -- o form
+  // já bloqueia os dois client-side, mas nunca confia só nisso.
+  const pickupItems = type === "troca_produto" ? parseItems("pickup_item") : [];
+  if (type === "troca_produto") {
+    if (items.length === 0) return { error: "Informe pelo menos um produto a entregar." };
+    if (pickupItems.length === 0) {
+      return { error: "Informe pelo menos um produto a recolher (troca com recolhimento precisa dos dois lados)." };
+    }
+  }
+
   const admin = getSupabaseAdmin();
   // Motorista não é mais um campo livre na criação (pedido do Victor
   // 18/08/2026) -- só continua digitável pra "erro do motorista" (precisa
@@ -2432,14 +2459,22 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     return { error: `Não foi possível criar: ${error?.message ?? "erro desconhecido"}` };
   }
 
-  if (items.length > 0) {
+  const allItems = [
+    ...items.map((item) => ({ ...item, isPickup: false })),
+    // pickupItems nunca tem "action" (montar/desmontar é só pra
+    // montagem/desmontagem, que nunca é troca_produto) -- null explícito
+    // pra bater com o mesmo formato de `items` acima.
+    ...pickupItems.map((item) => ({ ...item, action: null as "montar" | "desmontar" | null, isPickup: true })),
+  ];
+  if (allItems.length > 0) {
     const { error: itemsError } = await admin.from("service_request_items").insert(
-      items.map((item) => ({
+      allItems.map((item) => ({
         request_id: data.id,
         product: item.product,
         part_code: item.partCode,
         quantity: item.quantity,
         item_action: item.action,
+        is_pickup: item.isPickup,
       }))
     );
     if (itemsError) {

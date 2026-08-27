@@ -1,0 +1,13 @@
+-- Distingue produto a entregar de produto a recolher, item por item --
+-- pedido do Victor 26/08/2026: "quando na notificação de assistencia for
+-- uma troca com recolhimento deve ser obrigatorio colocar os produtos que
+-- deverão ser entregues e os produtos que deverão ser recolhidos". Hoje só
+-- existe UMA lista de produtos (implicitamente "a entregar") + um texto
+-- livre opcional pro que recolher (restriction_note) -- essa coluna dá pra
+-- marcar cada item da mesma lista de produtos como um lado ou outro.
+--
+-- Default false -- toda linha existente e todo item de qualquer tipo de
+-- chamado que não seja troca_produto (o único com recolhimento de verdade,
+-- ver DRIVER_TYPE_LABELS.troca_produto) continua significando "a entregar",
+-- sem mudança de comportamento nenhuma.
+alter table service_request_items add column if not exists is_pickup boolean not null default false;

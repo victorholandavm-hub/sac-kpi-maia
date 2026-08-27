@@ -36,6 +36,46 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Extraída pra reaproveitar duas vezes em troca_produto (entregar/recolher,
+// ver DespachoCard abaixo) sem duplicar a tabela inteira -- outros tipos
+// continuam com uma tabela só, chamado direto com todos os itens.
+function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
+  return (
+    <table className="w-full text-sm border-collapse">
+      <thead>
+        <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
+          <th className="px-3 py-1 text-left font-semibold w-24">Código</th>
+          <th className="px-3 py-1 text-left font-semibold">Produto</th>
+          <th className="px-3 py-1 text-right font-semibold w-14">Qtd</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.length > 0 ? (
+          items.map((item) => (
+            <tr key={item.id} className="border-b" style={{ borderColor: "var(--border)" }}>
+              <td className="px-3 py-1" style={{ color: "var(--text-secondary)" }}>
+                {item.partCode || "—"}
+              </td>
+              <td className="px-3 py-1" style={{ color: "var(--text-primary)" }}>
+                {item.product}
+              </td>
+              <td className="px-3 py-1 text-right" style={{ color: "var(--text-primary)" }}>
+                {item.quantity}
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td className="px-3 py-1" style={{ color: "var(--text-muted)" }} colSpan={3}>
+              —
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
+
 // Papel físico da notificação -- extraído de [id]/despacho/page.tsx (pedido
 // do Victor 19/08/2026: reaproveitar o mesmo cartão pra imprimir várias de
 // uma vez, ver despacho-lote/page.tsx) pra não duplicar esse bloco grande
@@ -88,39 +128,23 @@ export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
         {request.clientTimeRestriction ? <Field label="⏰ Restrição de horário" value={request.clientTimeRestriction} /> : null}
       </div>
 
-      <SectionTitle>Descrição do produto</SectionTitle>
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
-            <th className="px-3 py-1 text-left font-semibold w-24">Código</th>
-            <th className="px-3 py-1 text-left font-semibold">Produto</th>
-            <th className="px-3 py-1 text-right font-semibold w-14">Qtd</th>
-          </tr>
-        </thead>
-        <tbody>
-          {request.items.length > 0 ? (
-            request.items.map((item) => (
-              <tr key={item.id} className="border-b" style={{ borderColor: "var(--border)" }}>
-                <td className="px-3 py-1" style={{ color: "var(--text-secondary)" }}>
-                  {item.partCode || "—"}
-                </td>
-                <td className="px-3 py-1" style={{ color: "var(--text-primary)" }}>
-                  {item.product}
-                </td>
-                <td className="px-3 py-1 text-right" style={{ color: "var(--text-primary)" }}>
-                  {item.quantity}
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td className="px-3 py-1" style={{ color: "var(--text-muted)" }} colSpan={3}>
-                —
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      {/* Troca com recolhimento (troca_produto) vira duas tabelas -- o
+          motorista precisa saber separado o que entrega do que recolhe,
+          não uma lista só misturada. Pedido do Victor 26/08/2026. Outros
+          tipos continuam com uma tabela só, igual sempre foi. */}
+      {request.type === "troca_produto" ? (
+        <>
+          <SectionTitle>Produtos a entregar</SectionTitle>
+          <ProductTable items={request.items.filter((item) => !item.isPickup)} />
+          <SectionTitle>Produtos a recolher</SectionTitle>
+          <ProductTable items={request.items.filter((item) => item.isPickup)} />
+        </>
+      ) : (
+        <>
+          <SectionTitle>Descrição do produto</SectionTitle>
+          <ProductTable items={request.items} />
+        </>
+      )}
 
       <SectionTitle>Descrição da solicitação</SectionTitle>
       <div className="flex flex-col gap-2 px-4 py-3">
