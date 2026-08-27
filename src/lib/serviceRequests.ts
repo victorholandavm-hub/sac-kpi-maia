@@ -440,6 +440,35 @@ export async function listRequests(
   };
 }
 
+// "Hoje" no Kanban de Entregas (EntregasKanbanHoje, ver fila/page.tsx)
+// precisa estar SEMPRE completo, mesmo com o resto da fila paginado por
+// created_at -- achado do Victor 27/08/2026: "a notificação de Raemilly
+// que está com everton para hoje, eu só consigo ver na página 2... o
+// certo seria aparecer na primeira pagina junto com as outras
+// notificações com everton". Causa raiz: listRequests pagina por
+// created_at (data de CRIAÇÃO), mas o board de hoje agrupa por
+// scheduled_date (data AGENDADA) -- um chamado remarcado pra hoje muito
+// depois de criado continua "velho" na ordenação por criação e cai numa
+// página adiante da 1ª, mesmo sendo "de hoje". Sem paginação de
+// propósito: o board do dia precisa mostrar TUDO que é de hoje, nunca só
+// o que sobrou na fatia da página atual.
+export async function listRequestsScheduledOn(
+  date: string,
+  opts: { storeId?: string; types?: RequestType[]; status?: RequestStatus } = {}
+): Promise<ServiceRequestSummary[]> {
+  const admin = getSupabaseAdmin();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query: any = admin.from("service_requests").select(SUMMARY_COLUMNS).eq("scheduled_date", date);
+  if (opts.storeId) query = query.eq("store_id", opts.storeId);
+  if (opts.status) query = query.eq("status", opts.status);
+  if (opts.types && opts.types.length > 0) query = query.in("type", opts.types);
+
+  const { data, error } = (await query) as { data: SummaryRow[] | null; error: { message: string } | null };
+  if (error) throw new Error(error.message);
+
+  return ((data ?? []) as unknown as SummaryRow[]).map(toSummary);
+}
+
 export type ServiceRequestDetail = ServiceRequestSummary & {
   clientCpf: string | null;
   clientAddress: string | null;

@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
-import { listRequests, listStores, isRequestStatus, isMostruarioRequest, type ServiceRequestSummary, type RequestType } from "@/lib/serviceRequests";
+import {
+  listRequests,
+  listRequestsScheduledOn,
+  listStores,
+  isRequestStatus,
+  isMostruarioRequest,
+  type ServiceRequestSummary,
+  type RequestType,
+} from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
 import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
 import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES } from "@/lib/assistenciaLabels";
@@ -208,22 +216,31 @@ export default async function AssistenciaQueuePage({
   // esses tipos.
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const today = new Date().toISOString().slice(0, 10);
-  const [{ items: rawRequests, total: rawTotal, pageSize }, stores, assemblers, drivers, rotaOverview] = await Promise.all([
+  const [{ items: rawRequests, total: rawTotal, pageSize }, stores, assemblers, drivers, rotaOverview, todayRequestsFull] = await Promise.all([
     listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: effectiveAssembler, types, dateFrom, dateTo, excludeOwnAssemblerStoreIds }),
     listStores(),
     listAssemblers(),
     showPecas ? listDrivers() : Promise.resolve([]),
     showPecas ? getRotaWeekOverview(startOfRotaWeek(today), 14) : Promise.resolve([]),
+    // Board "Hoje" (EntregasKanbanHoje, ver todayGroups abaixo) busca à
+    // parte, sem paginação -- ver listRequestsScheduledOn.
+    showPecas ? listRequestsScheduledOn(today, { storeId: store, types, status: filterStatus }) : Promise.resolve([]),
   ]);
   // Programado/Não programado não são status de verdade no banco (ver
   // ENTREGA_FILTERS acima) -- `.eq("status", "aberta")` já rolou no
   // servidor, esse filtro extra em JS separa quem já tem data+rota de
   // quem não tem. `total`/`totalPages` do servidor ficam errados nesse
   // caso (contam a "aberta" inteira, não só o sub-balde) -- recalculo os
-  // dois a partir do que sobrou depois do filtro. Sem problema de paginação
-  // na prática: a fila de entregas em aberto nunca chega perto do tamanho
-  // de página pra precisar de mais de uma página dividida ainda por cima
-  // em programado/não programado.
+  // dois a partir do que sobrou depois do filtro.
+  //
+  // Correção 27/08/2026 (achado do Victor: "a notificação de Raemilly que
+  // está com everton para hoje, eu só consigo ver na página 2"): o
+  // comentário antigo aqui dizia que a fila de entregas nunca chegava
+  // perto do tamanho de página, então nunca precisaria de mais de uma --
+  // não é mais verdade (a view padrão sem filtro de status inclui
+  // concluída/cancelada, que só cresce). O board "Hoje" (todayGroups)
+  // NÃO depende mais dessa paginação por created_at -- ver
+  // listRequestsScheduledOn/todayRequestsFull acima.
   let requests = filterSched === undefined ? rawRequests : rawRequests.filter((r) => isDeliveryScheduled(r.scheduledDate, r.rota) === filterSched);
   // Mesmo raciocínio do filterSched acima -- "mostruário" não é uma coluna
   // no banco, é uma heurística sobre order_code/client_name (ver
@@ -263,7 +280,18 @@ export default async function AssistenciaQueuePage({
   // Kanban só pra hoje (ver EntregasKanbanHoje) -- pedido do Victor
   // 25/08/2026: "Para a operação de Hoje, um quadro estilo Kanban". O
   // resto dos dias continua na sanfona de sempre, embaixo.
-  const todayGroups = showPecas ? groups.filter((g) => g.dateBucket === "hoje") : [];
+  //
+  // Board de hoje vem de `todayRequestsFull` (busca à parte, sem
+  // paginação por created_at -- ver comentário lá em cima e
+  // listRequestsScheduledOn) em vez de filtrar `groups`, que só reflete o
+  // que sobrou na página atual. Mesmos filtros de cidade/sem-rota
+  // aplicados aqui, já que fazem sentido dentro de "hoje" também.
+  // Busca por texto (`q`) é a única exceção -- continua vindo da página
+  // atual (replicar a busca completa, com item de produto incluso, só
+  // pra completar o board de hoje não valeria a complexidade).
+  let todayRequests = filterCity !== undefined ? todayRequestsFull.filter((r) => r.rota !== null && ROTA_CITY[r.rota] === filterCity) : todayRequestsFull;
+  if (filterSemRota) todayRequests = todayRequests.filter((r) => r.rota === null);
+  const todayGroups = showPecas ? (q ? groups.filter((g) => g.dateBucket === "hoje") : pinSemRotaFirst(groupByRota(todayRequests))) : [];
   const restGroups = showPecas ? groups.filter((g) => g.dateBucket !== "hoje") : groups;
   const todayOverview = showPecas ? (rotaOverview.find((d) => d.date === today) ?? null) : null;
   const totalPages = postFiltered ? 1 : Math.max(1, Math.ceil(total / pageSize));
