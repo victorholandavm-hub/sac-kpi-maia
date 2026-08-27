@@ -1,7 +1,15 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/dal";
 import { formatFullAddress, type ServiceRequestDetail, type RequestEvent } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, STATUS_LABELS, SAC_MANAGED_TYPES, SAC_ALSO_MANAGED_TYPES, ASSISTENCIA_MANAGED_TYPES, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
+import {
+  REQUEST_TYPE_LABELS,
+  STATUS_LABELS,
+  SAC_MANAGED_TYPES,
+  SAC_ALSO_MANAGED_TYPES,
+  ASSISTENCIA_MANAGED_TYPES,
+  ASSISTENCIA_ALSO_MANAGED_TYPES,
+  CAUSA_RAIZ_LABELS,
+} from "@/lib/assistenciaLabels";
 import { DeliveryStatusBadge, isDeliveryScheduled } from "./DeliveryStatusBadge";
 import { StatusStepper } from "./StatusStepper";
 import { DeliveryRequestActions } from "./DeliveryRequestActions";
@@ -90,27 +98,37 @@ export function DeliveryRequestDetailContent({
 
   const { request, events } = result;
   const isSacType = (SAC_MANAGED_TYPES as readonly string[]).includes(request.type);
-  // SAC_ALSO_MANAGED_TYPES (envio_peca/recolhimento) -- pedido do Victor
-  // 27/08/2026: "quero que o SAC também gerencie esses dois". Checa cada
-  // papel contra a PRÓPRIA lista (mesmo padrão de requireManageAccess) em
-  // vez de inferir a elegibilidade da assistência a partir de "não é do
-  // SAC" -- com esses 2 tipos agora nos dois grupos, `!isSacType` já não
-  // bastava (achado do Victor: "algumas notificações de assistencia os
-  // atendentes do sac nao estao conseguindo editar ou imprimir").
+  // SAC_ALSO_MANAGED_TYPES/ASSISTENCIA_ALSO_MANAGED_TYPES -- pedido do
+  // Victor 27/08/2026 (duas rodadas: primeiro "quero que o SAC também
+  // gerencie [Envio/Recolhimento de peça]", depois testou como Iasmyn em
+  // "Entrega de produto" e travou -- "os 3 tipos do SAC também" pra
+  // assistência). Checa cada papel contra a PRÓPRIA lista (mesmo padrão
+  // de requireManageAccess) em vez de inferir a elegibilidade de um a
+  // partir de "não é do outro" -- com tipos agora nos dois grupos,
+  // `!isSacType` já não bastava.
   const canManage =
     profile.role === "admin" ||
-    (profile.role === "assistencia" && (ASSISTENCIA_MANAGED_TYPES as readonly string[]).includes(request.type)) ||
+    (profile.role === "assistencia" &&
+      ((ASSISTENCIA_MANAGED_TYPES as readonly string[]).includes(request.type) ||
+        (ASSISTENCIA_ALSO_MANAGED_TYPES as readonly string[]).includes(request.type))) ||
     (profile.role === "sac" && (isSacType || (SAC_ALSO_MANAGED_TYPES as readonly string[]).includes(request.type)));
   // Onde o motorista da rota é escolhido de verdade -- pedido do Victor
   // 18/08/2026: motorista não edita mais aqui, só no painel "Motorista do
-  // dia" (RotaMotoristaDoDia), que existe em dois lugares dependendo de
-  // quem gerencia esse tipo de chamado.
-  const motoristaDoDiaHref = isSacType ? "/assistencia/sac/notificacoes" : "/assistencia/fila?tab=pecas";
+  // dia" (RotaMotoristaDoDia), que existe em dois lugares. Baseado no
+  // papel de QUEM TÁ VENDO (profile.role), não mais no tipo do chamado
+  // (isSacType) -- achado do Victor 27/08/2026: assistência gerenciando
+  // "Entrega de produto" (isSacType=true) caía em "/assistencia/sac/nova"/
+  // "/assistencia/sac/notificacoes", que redirecionam embora quem não é
+  // SAC/admin (dal.ts/sac/nova/page.tsx) -- mesmo dead-end na direção
+  // contrária pro SAC em Envio/Recolhimento de peça. As duas filas (SAC
+  // e assistência) já mostram os 5 tipos de entrega por padrão, sem
+  // filtro de origem -- sempre manda pra fila do PRÓPRIO papel.
+  const motoristaDoDiaHref = profile.role === "sac" ? "/assistencia/sac/notificacoes" : "/assistencia/fila?tab=pecas";
   // Atalho pra criar a próxima sem precisar navegar de volta -- pedido do
   // Victor 19/08/2026: "deixe disponível um botão 'criar nova notificação'
   // assim que for criado uma notificação" (fica logo aqui, na tela de
   // detalhe onde a criação já redireciona depois de salvar).
-  const novaNotificacaoHref = isSacType ? "/assistencia/sac/nova" : "/assistencia/nova-entrega";
+  const novaNotificacaoHref = profile.role === "sac" ? "/assistencia/sac/nova" : "/assistencia/nova-entrega";
 
   const causaRaizDetail =
     request.causaRaiz === "erro_conferencia"

@@ -198,6 +198,22 @@ export const ASSISTENCIA_MANAGED_TYPES = ["montagem", "desmontagem", "recolhimen
 // enxergar esse conjunto.
 export const SAC_ALSO_MANAGED_TYPES = ["envio_peca", "recolhimento"] as const;
 
+// Espelho de SAC_ALSO_MANAGED_TYPES, direção contrária -- pedido do
+// Victor 27/08/2026: testou como Iasmyn (assistência) tentando editar
+// "Entrega de produto" (Sheila #4948, Gilsa #4922) e não conseguiu --
+// "voce disse que tinha ajustado isso" (o ajuste de SAC_ALSO_MANAGED_TYPES
+// era só na direção SAC ganhar Envio/Recolhimento de peça, não mexia
+// nisso). Confirmado: "os 3 tipos do SAC também" -- assistência ganha
+// Troca/Entrega/Recolhimento de PRODUTO (os 3 tipos de entrega que
+// continuavam exclusivos do SAC), sem tirar do SAC. Fora daqui de
+// propósito: "notificacao_externa" -- não é tipo de entrega (sem
+// motorista/rota, ver DELIVERY_REQUEST_TYPES abaixo), não tem por que a
+// assistência mexer nisso. Mesmos 5 lugares de SAC_ALSO_MANAGED_TYPES
+// (requireManageAccess/manageableTypesForRole/[id]/page.tsx/
+// [id]/editar/page.tsx/DeliveryRequestDetailContent.tsx) precisam
+// enxergar esse conjunto também.
+export const ASSISTENCIA_ALSO_MANAGED_TYPES = ["troca_produto", "entrega_produto", "recolhimento_produto"] as const;
+
 // União dos dois grupos acima -- todo tipo de chamado que existe hoje (mesmas
 // chaves de REQUEST_TYPE_LABELS). Usado só pra oferecer a troca de tipo na
 // edição do chamado (ver manageableTypesForRole) -- lista central pra não
@@ -214,7 +230,9 @@ export const ALL_REQUEST_TYPES = [...SAC_MANAGED_TYPES, ...ASSISTENCIA_MANAGED_T
 // monta a lista de opções mostradas na tela).
 export function manageableTypesForRole(role: string): readonly string[] {
   if (role === "admin") return ALL_REQUEST_TYPES;
-  if (role === "assistencia") return ASSISTENCIA_MANAGED_TYPES;
+  // ASSISTENCIA_ALSO_MANAGED_TYPES (troca/entrega/recolhimento de
+  // produto) -- ver comentário lá.
+  if (role === "assistencia") return [...ASSISTENCIA_MANAGED_TYPES, ...ASSISTENCIA_ALSO_MANAGED_TYPES];
   // SAC_ALSO_MANAGED_TYPES (envio_peca/recolhimento) -- ver comentário lá.
   if (role === "sac") return [...SAC_MANAGED_TYPES, ...SAC_ALSO_MANAGED_TYPES];
   return [];
