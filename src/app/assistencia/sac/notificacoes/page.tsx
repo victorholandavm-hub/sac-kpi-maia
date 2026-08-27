@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
-import { listRequests, listStores, isRequestStatus } from "@/lib/serviceRequests";
+import { listRequests, listRequestsScheduledOn, listStores, isRequestStatus } from "@/lib/serviceRequests";
 import { listDrivers } from "@/lib/payments";
 import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
 import { ROLE_LABELS } from "@/lib/assistenciaLabels";
@@ -116,11 +116,19 @@ export default async function SacNotificacoesPage({
   const types = filterOrigem === "sac" ? ENTREGA_TYPES_SAC : filterOrigem === "assistencia" ? ENTREGA_TYPES_ASSISTENCIA : ENTREGA_TYPES;
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ items: rawRequests }, stores, drivers, rotaOverview] = await Promise.all([
+  const [{ items: rawRequests }, stores, drivers, rotaOverview, todayRequestsFull] = await Promise.all([
     listRequests({ status: filterStatus, q, storeId: store, types, dateFrom, dateTo }),
     listStores(),
     listDrivers(),
     getRotaWeekOverview(startOfRotaWeek(today), 14),
+    // Board "Hoje" busca à parte, sem o limite de 100 linhas de
+    // listRequests -- achado do Victor 27/08/2026: "a notificação de
+    // Raemilly que está com everton para hoje, eu só consigo ver na
+    // página 2" (aqui nem página 2 existe -- essa tela não tem paginação
+    // nenhuma, então um chamado fora das 100 mais recentes por criação
+    // simplesmente nunca aparecia). Ver listRequestsScheduledOn/
+    // fila/page.tsx (mesmo motivo, mesma correção).
+    listRequestsScheduledOn(today, { storeId: store, types, status: filterStatus }),
   ]);
   // Mesmo raciocínio de fila/page.tsx: Programado/Não programado não são
   // status de verdade no banco, só dá pra separar em JS depois da busca.
@@ -142,7 +150,12 @@ export default async function SacNotificacoesPage({
   }
   const groups = pinSemRotaFirst(groupByRota(requests));
   // Kanban só pra hoje -- mesmo motivo/desenho de fila/page.tsx (ver lá).
-  const todayGroups = groups.filter((g) => g.dateBucket === "hoje");
+  // Vem de `todayRequestsFull` (sem paginação), não de `groups` -- mesmos
+  // filtros de cidade/sem-rota aplicados, busca por texto (`q`) continua
+  // sendo a exceção (cai pro comportamento antigo).
+  let todayRequests = filterCity !== undefined ? todayRequestsFull.filter((r) => r.rota !== null && ROTA_CITY[r.rota] === filterCity) : todayRequestsFull;
+  if (filterSemRota) todayRequests = todayRequests.filter((r) => r.rota === null);
+  const todayGroups = q ? groups.filter((g) => g.dateBucket === "hoje") : pinSemRotaFirst(groupByRota(todayRequests));
   const restGroups = groups.filter((g) => g.dateBucket !== "hoje");
   const todayOverview = rotaOverview.find((d) => d.date === today) ?? null;
   const now = currentTimeMs();
