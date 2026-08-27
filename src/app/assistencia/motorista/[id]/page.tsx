@@ -132,7 +132,13 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
             Detalhes
           </h3>
           <Row label="Cliente" value={request.clientName} />
-          <Row label={request.type === "envio_peca" ? "Peça a entregar" : "Produto a entregar"} value={request.productSummary} />
+          <Row label={request.type === "envio_peca" ? "Peça a entregar" : "Produto a entregar"} value={request.deliverySummary} />
+          {/* Só aparece pra troca_produto (recolhimento de verdade) --
+              pedido do Victor 26/08/2026: "obrigatorio colocar os produtos
+              que deverão ser entregues e os produtos que deverão ser
+              recolhidos" -- o motorista precisa ver separado, não
+              misturado com o que entregar. */}
+          {request.pickupSummary ? <Row label="Produto a recolher" value={request.pickupSummary} /> : null}
           <Row label="Endereço" value={formatFullAddress(request)} />
           <Row label="Bairro" value={request.clientNeighborhood} />
           <Row label="Motivo" value={request.reason} />

@@ -7,9 +7,30 @@ type ModalItem = {
   quantity: number;
   partCode?: string | null;
   action?: "montar" | "desmontar" | null;
+  // Só vem preenchido em troca_produto (recolhimento de verdade) -- pedido
+  // do Victor 26/08/2026, separa a lista em "A entregar"/"A recolher" só
+  // quando tem os dois tipos misturados (ver items.some abaixo); nenhum
+  // outro tipo de chamado tem item com isPickup true, então continuam
+  // mostrando a lista única de sempre.
+  isPickup?: boolean;
 };
 
 const ACTION_LABELS: Record<"montar" | "desmontar", string> = { montar: "montar", desmontar: "desmontar" };
+
+function ItemList({ items }: { items: ModalItem[] }) {
+  return (
+    <ul className="flex flex-col gap-2">
+      {items.map((item, i) => (
+        <li key={i} className="text-sm" style={{ color: "var(--text-primary)" }}>
+          {item.quantity > 1 ? `${item.quantity}x ` : ""}
+          {item.product}
+          {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
+          {item.action ? <span style={{ color: "var(--text-secondary)" }}> — {ACTION_LABELS[item.action]}</span> : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 // Botão + modal com a lista completa de produtos -- alternativa ao resumo
 // truncado que ficava direto no card (poluía a fila quando tinha combo
@@ -19,6 +40,9 @@ const ACTION_LABELS: Record<"montar" | "desmontar", string> = { montar: "montar"
 export function ProductsModalButton({ items }: { items: ModalItem[] }) {
   const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
+  const hasPickup = items.some((item) => item.isPickup);
+  const deliveryItems = hasPickup ? items.filter((item) => !item.isPickup) : items;
+  const pickupItems = hasPickup ? items.filter((item) => item.isPickup) : [];
 
   return (
     <>
@@ -71,16 +95,24 @@ export function ProductsModalButton({ items }: { items: ModalItem[] }) {
                 Fechar
               </button>
             </div>
-            <ul className="flex flex-col gap-2">
-              {items.map((item, i) => (
-                <li key={i} className="text-sm" style={{ color: "var(--text-primary)" }}>
-                  {item.quantity > 1 ? `${item.quantity}x ` : ""}
-                  {item.product}
-                  {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
-                  {item.action ? <span style={{ color: "var(--text-secondary)" }}> — {ACTION_LABELS[item.action]}</span> : null}
-                </li>
-              ))}
-            </ul>
+            {hasPickup ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                    A entregar
+                  </span>
+                  <ItemList items={deliveryItems} />
+                </div>
+                <div className="flex flex-col gap-1.5 pt-1 border-t" style={{ borderColor: "var(--border)" }}>
+                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                    A recolher
+                  </span>
+                  <ItemList items={pickupItems} />
+                </div>
+              </div>
+            ) : (
+              <ItemList items={items} />
+            )}
           </div>
         </>
       ) : null}

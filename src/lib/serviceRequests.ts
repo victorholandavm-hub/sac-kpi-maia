@@ -106,6 +106,13 @@ export type RequestItem = {
   paymentAuthorizedBy: string | null;
   action: ItemAction | null;
   completed: boolean;
+  // Só tem sentido de verdade em troca_produto (o único tipo com
+  // recolhimento junto da entrega, ver DRIVER_TYPE_LABELS.troca_produto) --
+  // pedido do Victor 26/08/2026: "obrigatorio colocar os produtos que
+  // deverão ser entregues e os produtos que deverão ser recolhidos".
+  // false pra todo item de qualquer outro tipo (default da coluna,
+  // 0099_service_request_item_is_pickup.sql).
+  isPickup: boolean;
 };
 
 type ItemRow = {
@@ -119,6 +126,7 @@ type ItemRow = {
   payment_authorized_by: string | null;
   item_action: string | null;
   completed: boolean;
+  is_pickup: boolean;
 };
 
 export type ServiceRequestSummary = {
@@ -230,7 +238,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed, is_pickup)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -244,6 +252,7 @@ function toItem(row: ItemRow): RequestItem {
     paymentAuthorizedBy: row.payment_authorized_by,
     action: row.item_action === "montar" || row.item_action === "desmontar" ? row.item_action : null,
     completed: row.completed,
+    isPickup: row.is_pickup,
   };
 }
 
@@ -496,7 +505,7 @@ const DETAIL_COLUMNS =
   // é provavelmente a causa raiz de verdade do "Sem rota" que aparecia na
   // tela do chamado (mais fundamental que o bug de ScheduleField.tsx
   // corrigido antes hoje, que só evitava apagar a rota ao SALVAR).
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed, is_pickup)";
 
 export async function getRequestDetail(
   id: string
@@ -566,7 +575,7 @@ export async function getRequestDetail(
   return { request, events };
 }
 
-export type OpenRequestForLojaItem = { product: string; quantity: number; partCode: string | null; action: ItemAction | null };
+export type OpenRequestForLojaItem = { product: string; quantity: number; partCode: string | null; action: ItemAction | null; isPickup: boolean };
 
 export type OpenRequestForLoja = {
   id: string;
@@ -615,7 +624,7 @@ export async function listOpenRequestsForLoja(
   let query = admin
     .from("service_requests")
     .select(
-      "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, delivery_rating, resolution_rating, stores(name), items:service_request_items(product, quantity, part_code, item_action)"
+      "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, delivery_rating, resolution_rating, stores(name), items:service_request_items(product, quantity, part_code, item_action, is_pickup)"
     )
     .limit(OPEN_LOJA_LIMIT);
 
@@ -662,7 +671,7 @@ export async function listOpenRequestsForLoja(
     delivery_rating: number | null;
     resolution_rating: number | null;
     stores: { name: string } | null;
-    items: { product: string; quantity: number; part_code: string | null; item_action: string | null }[] | null;
+    items: { product: string; quantity: number; part_code: string | null; item_action: string | null; is_pickup: boolean }[] | null;
   };
 
   return ((data ?? []) as unknown as Row[]).map((row) => ({
@@ -685,6 +694,7 @@ export async function listOpenRequestsForLoja(
       quantity: i.quantity,
       partCode: i.part_code,
       action: i.item_action === "montar" || i.item_action === "desmontar" ? (i.item_action as ItemAction) : null,
+      isPickup: i.is_pickup,
     })),
     createdAt: row.created_at,
     completedAt: row.completed_at,
@@ -999,7 +1009,13 @@ export type DriverRequestView = {
   clientIsApartment: boolean;
   clientAddressComplement: string | null;
   clientNeighborhood: string | null;
-  productSummary: string | null;
+  // Separado em entrega/recolhimento (não mais um productSummary só) --
+  // pedido do Victor 26/08/2026: troca_produto agora exige os dois lados
+  // declarados, o motorista precisa ver os dois separados, não misturados
+  // numa lista só. pickupSummary é null quando o chamado não tem nenhum
+  // item marcado como recolhimento (todo tipo além de troca_produto).
+  deliverySummary: string | null;
+  pickupSummary: string | null;
   reason: string | null;
   restrictionNote: string | null;
   clientTimeRestriction: string | null;
@@ -1031,7 +1047,7 @@ export type DriverRequestView = {
 
 const DRIVER_VIEW_LIMIT = 200;
 const DRIVER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, client_time_restriction, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, authorized_by, requested_by_name, stores(name), requester:profiles!requested_by(full_name), items:service_request_items(product)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, client_time_restriction, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, authorized_by, requested_by_name, stores(name), requester:profiles!requested_by(full_name), items:service_request_items(product, is_pickup)";
 
 type DriverViewRow = {
   id: string;
@@ -1066,10 +1082,13 @@ type DriverViewRow = {
   requested_by_name: string | null;
   stores: { name: string } | null;
   requester: { full_name: string } | null;
-  items: { product: string }[] | null;
+  items: { product: string; is_pickup: boolean }[] | null;
 };
 
 function toDriverView(row: DriverViewRow): DriverRequestView {
+  const items = row.items ?? [];
+  const deliveryItems = items.filter((i) => !i.is_pickup);
+  const pickupItems = items.filter((i) => i.is_pickup);
   return {
     id: row.id,
     ticketNumber: row.ticket_number,
@@ -1083,7 +1102,8 @@ function toDriverView(row: DriverViewRow): DriverRequestView {
     clientIsApartment: row.client_is_apartment,
     clientAddressComplement: row.client_address_complement,
     clientNeighborhood: row.client_neighborhood,
-    productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
+    deliverySummary: deliveryItems.length > 0 ? deliveryItems.map((i) => i.product).join(", ") : null,
+    pickupSummary: pickupItems.length > 0 ? pickupItems.map((i) => i.product).join(", ") : null,
     reason: row.reason,
     restrictionNote: row.restriction_note,
     clientTimeRestriction: row.client_time_restriction,

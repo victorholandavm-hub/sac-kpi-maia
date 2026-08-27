@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { addRequestItemByStaff, removeRequestItemByStaff, lookupTotvsProductForTeam } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
 import { withRetry } from "@/lib/retryLookup";
-import type { RequestItem } from "@/lib/serviceRequests";
+import type { RequestItem, RequestType } from "@/lib/serviceRequests";
 
 // Produtos de troca/entrega/envio de peça -- sem NADA do controle de
 // pagamento de montador (valor unitário, "autorizado por gerente",
@@ -38,7 +38,7 @@ function ItemRow({ item, requestId, canEditItems }: { item: RequestItem; request
   );
 }
 
-function AddItemForm({ requestId }: { requestId: string }) {
+function AddItemForm({ requestId, isPickup }: { requestId: string; isPickup?: boolean }) {
   const { pending, run, showToast } = useQuickAction();
   const [product, setProduct] = useState("");
   const [partCode, setPartCode] = useState("");
@@ -74,7 +74,12 @@ function AddItemForm({ requestId }: { requestId: string }) {
       return;
     }
     run(async () => {
-      await addRequestItemByStaff(requestId, { product, partCode: partCode || undefined, quantity: Math.max(1, parseInt(quantity, 10) || 1) });
+      await addRequestItemByStaff(requestId, {
+        product,
+        partCode: partCode || undefined,
+        quantity: Math.max(1, parseInt(quantity, 10) || 1),
+        isPickup,
+      });
       setProduct("");
       setPartCode("");
       setQuantity("1");
@@ -136,18 +141,62 @@ function AddItemForm({ requestId }: { requestId: string }) {
   );
 }
 
-export function DeliveryItemsTable({ items, requestId, canEditItems }: { items: RequestItem[]; requestId: string; canEditItems: boolean }) {
+export function DeliveryItemsTable({
+  items,
+  requestId,
+  canEditItems,
+  requestType,
+}: {
+  items: RequestItem[];
+  requestId: string;
+  canEditItems: boolean;
+  // "Troca com recolhimento" (troca_produto) é o único tipo com
+  // recolhimento de verdade -- pedido do Victor 26/08/2026: separa a
+  // lista em "A entregar"/"A recolher" só pra esse tipo, cada uma com seu
+  // próprio formulário de adicionar (já marcando isPickup certo, sem
+  // seletor visível pra não dar pra escolher errado). Pros outros tipos,
+  // sem mudança nenhuma -- lista única, igual sempre foi.
+  requestType: RequestType;
+}) {
   if (items.length === 0 && !canEditItems) return null;
 
+  if (requestType !== "troca_produto") {
+    return (
+      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+        <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+          Produtos
+        </span>
+        {items.map((item) => (
+          <ItemRow key={item.id} item={item} requestId={requestId} canEditItems={canEditItems} />
+        ))}
+        {canEditItems ? <AddItemForm requestId={requestId} /> : null}
+      </div>
+    );
+  }
+
+  const deliveryItems = items.filter((item) => !item.isPickup);
+  const pickupItems = items.filter((item) => item.isPickup);
+
   return (
-    <div className="rounded-lg p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-      <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-        Produtos
-      </span>
-      {items.map((item) => (
-        <ItemRow key={item.id} item={item} requestId={requestId} canEditItems={canEditItems} />
-      ))}
-      {canEditItems ? <AddItemForm requestId={requestId} /> : null}
+    <div className="rounded-lg p-4 flex flex-col gap-3" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+          Produtos a entregar
+        </span>
+        {deliveryItems.map((item) => (
+          <ItemRow key={item.id} item={item} requestId={requestId} canEditItems={canEditItems} />
+        ))}
+        {canEditItems ? <AddItemForm requestId={requestId} isPickup={false} /> : null}
+      </div>
+      <div className="flex flex-col gap-1 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+        <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+          Produtos a recolher
+        </span>
+        {pickupItems.map((item) => (
+          <ItemRow key={item.id} item={item} requestId={requestId} canEditItems={canEditItems} />
+        ))}
+        {canEditItems ? <AddItemForm requestId={requestId} isPickup /> : null}
+      </div>
     </div>
   );
 }

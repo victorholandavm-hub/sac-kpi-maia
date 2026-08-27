@@ -216,7 +216,7 @@ export function DeliveryRequestDetailContent({
             <Row label="Bairro" value={request.clientNeighborhood} />
           </div>
 
-          <DeliveryItemsTable items={request.items} requestId={request.id} canEditItems={canManage} />
+          <DeliveryItemsTable items={request.items} requestId={request.id} canEditItems={canManage} requestType={request.type} />
 
           <div
             className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
