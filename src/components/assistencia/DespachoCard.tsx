@@ -89,35 +89,41 @@ export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
 
   return (
     <div className="rounded-lg border overflow-hidden flex flex-col text-sm" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+      <div className="flex items-start justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center gap-3">
           <Image src="/logo.png" alt="Lojas Maia" width={112} height={112} className="h-12 w-12 object-contain shrink-0" />
           <div className="flex flex-col">
             <h1 className="text-base font-bold leading-tight" style={{ color: "var(--brand-green)" }}>
               Notificação de Assistência
             </h1>
-            {/* Data da ROTA (scheduledDate), não a de abertura do chamado --
-                pedido do Victor 26/08/2026: "a data das notificações de
-                assistencia tem que sair sempre com a data da rota e caso
-                seja remanejada pra rota de outro dia, da mesma forma, tem
-                que sair com a data daquele nova rota". Antes mostrava
-                createdAt (pedido do Victor 23/08/2026, só "precisa ter uma
-                data, sem hora" -- na época nem existia remanejamento de rota
-                pra expor a diferença), o que congelava a impressão na data
-                de criação mesmo depois do chamado ser remarcado pra outro
-                dia. Sem scheduledDate ainda (chamado sem rota definida),
-                cai pra createdAt -- melhor que não mostrar nada. */}
             <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-              Chamado #{request.ticketNumber} · {request.storeName} ·{" "}
-              {request.scheduledDate ? formatScheduledDateBr(request.scheduledDate) : formatDateOnlyBr(request.createdAt)}
+              Chamado #{request.ticketNumber} · {request.storeName}
             </span>
           </div>
         </div>
-        {isUrgente ? (
-          <span className="text-sm font-bold px-2 py-1 rounded" style={{ color: "#fff", background: "var(--status-critical)" }}>
-            URGENTE!
+        {/* Data no canto, grande e em preto -- pedido do Victor 27/08/2026:
+            "a data na notificação de assistencia, precisa ficar no canto,
+            maior e na cor preta em negrito" (papel impresso, sem relação
+            com tema claro/escuro da tela -- preto de verdade, não
+            var(--text-primary), é a mesma convenção de qualquer
+            documento impresso). Continua sendo a data da ROTA
+            (scheduledDate), não a de abertura -- ver achado do Victor
+            26/08/2026 mais abaixo, comentário movido pra cá junto da
+            data em si. Antes mostrava createdAt (pedido do Victor
+            23/08/2026), o que congelava a impressão na data de criação
+            mesmo depois do chamado ser remarcado pra outro dia. Sem
+            scheduledDate ainda (chamado sem rota definida), cai pra
+            createdAt -- melhor que não mostrar nada. */}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          {isUrgente ? (
+            <span className="text-sm font-bold px-2 py-1 rounded" style={{ color: "#fff", background: "var(--status-critical)" }}>
+              URGENTE!
+            </span>
+          ) : null}
+          <span className="text-2xl font-black leading-none whitespace-nowrap" style={{ color: "#000" }}>
+            {request.scheduledDate ? formatScheduledDateBr(request.scheduledDate) : formatDateOnlyBr(request.createdAt)}
           </span>
-        ) : null}
+        </div>
       </div>
 
       <SectionTitle>Dados do cliente</SectionTitle>
