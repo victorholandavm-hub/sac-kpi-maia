@@ -2,7 +2,7 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import type { DateRange } from "./dateRange";
 import type { Count, DayCount } from "./kpi";
-import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS } from "./assistenciaLabels";
+import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES } from "./assistenciaLabels";
 import { ROTA_LABELS, type Rota } from "./rotas";
 import { classificarProduto } from "./vendasProduto";
 import type { RequestType, RequestStatus, ReportRowItem } from "./serviceRequests";
@@ -15,20 +15,21 @@ import type { RequestType, RequestStatus, ReportRowItem } from "./serviceRequest
 // assistencias", refinado 27/08/2026: "preciso que os kpis da
 // assistencia fiquem numa aba separada, sozinha" (saiu de dentro do
 // painel de KPIs geral, ver Dashboard.tsx/kpis/page.tsx -- virou página
-// própria) + "a quantidade total de assistencia que nao conta montagem e
-// desmontagem... entram tudo de notificação de assistencia, menos
-// montagem, vistoria e desmontagem" (só visita de montador fica de fora
-// -- ver EXCLUDED_TYPES) + "por atendente... por grupo de produto".
-// Fonte é `service_requests`/`service_request_items` -- domínio
-// TOTALMENTE separado do resto do painel de KPIs (que é só sobre
-// conversas do GHL, ver kpi.ts) -- por isso um módulo próprio, sem
-// misturar no tipo KpiData existente.
-
-// Só visita de montador fica de fora ("menos montagem, vistoria e
-// desmontagem") -- todo o resto (troca/entrega/recolhimento/envio de
-// produto ou peça, notificação externa) conta como "notificação de
-// assistência" pra esse relatório.
-const EXCLUDED_TYPES = ["montagem", "desmontagem", "vistoria"] as const;
+// própria) + "por atendente... por grupo de produto". Fonte é
+// `service_requests`/`service_request_items` -- domínio TOTALMENTE
+// separado do resto do painel de KPIs (que é só sobre conversas do GHL,
+// ver kpi.ts) -- por isso um módulo próprio, sem misturar no tipo
+// KpiData existente.
+//
+// Escopo de tipo (27/08/2026, 2ª correção): primeira versão contava
+// "tudo menos montagem/vistoria/desmontagem" (incluindo Troca de peça,
+// visita de montador sem motorista/rota) -- Victor notou que o total
+// (216) não batia com "139 solicitações" da aba Entregas
+// (fila/page.tsx?tab=pecas) e confirmou que os dados que importam pra
+// esse relatório são só os de Entregas mesmo. Reaproveita
+// DELIVERY_REQUEST_TYPES (assistenciaLabels.ts) direto -- é a MESMA
+// constante que Entregas usa (via ENTREGA_TYPES, entregaQueueGrouping.ts)
+// pra nunca mais divergir.
 
 type RequestRow = {
   id: string;
@@ -141,7 +142,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
           "id, ticket_number, type, status, store_id, rota, causa_raiz, causa_conferente, driver_name, created_at, client_name, reason, requested_by_name, stores(name), requester:profiles!requested_by(full_name)",
           { count: "exact" }
         )
-        .not("type", "in", `(${EXCLUDED_TYPES.join(",")})`)
+        .in("type", DELIVERY_REQUEST_TYPES)
         .lte("created_at", toIso);
       if (fromIso) query = query.gte("created_at", fromIso);
       return query.range(from, to) as unknown as PromiseLike<PagedQueryResult<RequestRow>>;
