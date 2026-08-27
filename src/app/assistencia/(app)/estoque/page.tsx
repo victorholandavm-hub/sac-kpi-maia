@@ -36,6 +36,20 @@ export default async function EstoquePage({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* "Controle Assistência" -- pedido do Victor 27/08/2026, mesmo
+          desenho de pecas/page.tsx (ver lá). */}
+      <div className="flex items-center gap-2">
+        <Link href="/assistencia/pecas" className="text-base font-bold px-4 py-2 rounded-full" style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}>
+          Peças
+        </Link>
+        <Link href="/assistencia/fornecedores" className="text-base font-bold px-4 py-2 rounded-full" style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}>
+          Fornecedores
+        </Link>
+        <Link href="/assistencia/estoque" className="text-base font-bold px-4 py-2 rounded-full" style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
+          Estoque
+        </Link>
+      </div>
+
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           {FILTERS.map((f) => (

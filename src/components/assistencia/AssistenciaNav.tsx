@@ -3,15 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Agenda saiu daqui 27/08/2026 (pedido do Victor: "coloque agenda dentro
+// de solicitações ao lado de visitas/entregas") -- vive dentro da própria
+// tela de Solicitações agora (fila/page.tsx), não é mais aba própria.
+// Peças/Fornecedores/Estoque, mesmo pedido ("coloque dessa mesma forma
+// em outra aba peças/fornecedores/estoque e nomeie essa aba como
+// controle assistencia"): as 3 continuam rotas próprias, só a ENTRADA no
+// menu de cima virou uma só -- `matches` cobre as 3 pra essa aba
+// continuar "ativa" (destacada) em qualquer uma delas, não só na 1ª.
 const TABS = [
   { label: "Início", href: "/assistencia/inicio" },
-  { label: "Solicitações", href: "/assistencia/fila" },
-  { label: "Agenda", href: "/assistencia/agenda" },
-  { label: "Peças", href: "/assistencia/pecas" },
+  { label: "Solicitações", href: "/assistencia/fila", matches: ["/assistencia/fila", "/assistencia/agenda"] },
+  { label: "Controle Assistência", href: "/assistencia/pecas", matches: ["/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
   { label: "Encomendas", href: "/assistencia/encomendas/fila" },
-  { label: "Fornecedores", href: "/assistencia/fornecedores" },
   { label: "Pagamentos", href: "/assistencia/pagamentos" },
-  { label: "Estoque", href: "/assistencia/estoque" },
   { label: "Prazos de produtos", href: "/assistencia/prazos-produtos" },
   { label: "Relatórios", href: "/assistencia/relatorios" },
 ];
@@ -54,7 +59,7 @@ export function AssistenciaNav({
     // invisível, e a última aba (era "Admin") quase nunca era vista.
     <nav className="flex items-center gap-2 overflow-x-auto min-w-0 -mx-1 px-1 pb-1">
       {tabs.map((tab) => {
-        const active = pathname.startsWith(tab.href);
+        const active = (tab.matches ?? [tab.href]).some((path) => pathname.startsWith(path));
         return (
           <Link
             key={tab.href}
