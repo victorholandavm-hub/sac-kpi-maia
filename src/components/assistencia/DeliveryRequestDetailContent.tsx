@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Profile } from "@/lib/dal";
 import { formatFullAddress, type ServiceRequestDetail, type RequestEvent } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, STATUS_LABELS, SAC_MANAGED_TYPES, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, STATUS_LABELS, SAC_MANAGED_TYPES, SAC_ALSO_MANAGED_TYPES, ASSISTENCIA_MANAGED_TYPES, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
 import { DeliveryStatusBadge, isDeliveryScheduled } from "./DeliveryStatusBadge";
 import { StatusStepper } from "./StatusStepper";
 import { DeliveryRequestActions } from "./DeliveryRequestActions";
@@ -90,7 +90,17 @@ export function DeliveryRequestDetailContent({
 
   const { request, events } = result;
   const isSacType = (SAC_MANAGED_TYPES as readonly string[]).includes(request.type);
-  const canManage = profile.role === "admin" || (profile.role === "assistencia" && !isSacType) || (profile.role === "sac" && isSacType);
+  // SAC_ALSO_MANAGED_TYPES (envio_peca/recolhimento) -- pedido do Victor
+  // 27/08/2026: "quero que o SAC também gerencie esses dois". Checa cada
+  // papel contra a PRÓPRIA lista (mesmo padrão de requireManageAccess) em
+  // vez de inferir a elegibilidade da assistência a partir de "não é do
+  // SAC" -- com esses 2 tipos agora nos dois grupos, `!isSacType` já não
+  // bastava (achado do Victor: "algumas notificações de assistencia os
+  // atendentes do sac nao estao conseguindo editar ou imprimir").
+  const canManage =
+    profile.role === "admin" ||
+    (profile.role === "assistencia" && (ASSISTENCIA_MANAGED_TYPES as readonly string[]).includes(request.type)) ||
+    (profile.role === "sac" && (isSacType || (SAC_ALSO_MANAGED_TYPES as readonly string[]).includes(request.type)));
   // Onde o motorista da rota é escolhido de verdade -- pedido do Victor
   // 18/08/2026: motorista não edita mais aqui, só no painel "Motorista do
   // dia" (RotaMotoristaDoDia), que existe em dois lugares dependendo de

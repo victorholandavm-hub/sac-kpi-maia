@@ -178,6 +178,26 @@ export const SAC_MANAGED_TYPES = ["troca_produto", "entrega_produto", "recolhime
 // gerencia (admin continua com acesso total aos dois grupos, como supervisão).
 export const ASSISTENCIA_MANAGED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "envio_peca"] as const;
 
+// Pedido do Victor 27/08/2026 (achado por ele: "algumas notificações de
+// assistencia os atendentes do sac nao estao conseguindo editar ou
+// imprimir, sendo que para mim eu consigo" -- causa raiz era exatamente
+// envio_peca/recolhimento ficarem só em ASSISTENCIA_MANAGED_TYPES, mesmo
+// o SAC criando "Envio de peça" pela própria tela): "quero que o SAC
+// também gerencie esses dois". SAC ganha permissão de editar/imprimir/
+// trocar rota desses 2 tipos, SEM tirar da assistência (ela continua
+// sendo quem despacha de verdade, motorista/rota -- ASSISTENCIA_MANAGED_TYPES
+// não mudou). Deliberadamente um conjunto À PARTE de SAC_MANAGED_TYPES em
+// vez de simplesmente somar ali -- SAC_MANAGED_TYPES também decide origem
+// exibida (entregaQueueGrouping.ts/tecnico/page.tsx), fila da loja
+// (loja/trocas.tsx, só sobre troca/entrega/recolhimento de PRODUTO) e
+// quem é notificado por ação de motorista (driver-actions.ts); nenhum
+// desses outros usos deveria mudar só porque o SAC ganhou permissão de
+// EDITAR esses 2 tipos. Ver requireManageAccess (dal.ts),
+// manageableTypesForRole abaixo, [id]/page.tsx, [id]/editar/page.tsx e
+// DeliveryRequestDetailContent.tsx -- os únicos lugares que devem
+// enxergar esse conjunto.
+export const SAC_ALSO_MANAGED_TYPES = ["envio_peca", "recolhimento"] as const;
+
 // União dos dois grupos acima -- todo tipo de chamado que existe hoje (mesmas
 // chaves de REQUEST_TYPE_LABELS). Usado só pra oferecer a troca de tipo na
 // edição do chamado (ver manageableTypesForRole) -- lista central pra não
@@ -195,7 +215,8 @@ export const ALL_REQUEST_TYPES = [...SAC_MANAGED_TYPES, ...ASSISTENCIA_MANAGED_T
 export function manageableTypesForRole(role: string): readonly string[] {
   if (role === "admin") return ALL_REQUEST_TYPES;
   if (role === "assistencia") return ASSISTENCIA_MANAGED_TYPES;
-  if (role === "sac") return SAC_MANAGED_TYPES;
+  // SAC_ALSO_MANAGED_TYPES (envio_peca/recolhimento) -- ver comentário lá.
+  if (role === "sac") return [...SAC_MANAGED_TYPES, ...SAC_ALSO_MANAGED_TYPES];
   return [];
 }
 

@@ -2,7 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getSupabaseServer } from "./supabaseServer";
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { SAC_MANAGED_TYPES, ASSISTENCIA_MANAGED_TYPES, PAYMENTS_CONTROLLER_NAME } from "./assistenciaLabels";
+import { SAC_MANAGED_TYPES, SAC_ALSO_MANAGED_TYPES, ASSISTENCIA_MANAGED_TYPES, PAYMENTS_CONTROLLER_NAME } from "./assistenciaLabels";
 
 export type Role = "assistencia" | "admin" | "sac";
 
@@ -67,7 +67,13 @@ export function redirectIfSac(profile: Profile) {
 export function requireManageAccess(profile: Profile, requestType: string) {
   if (profile.role === "admin") return;
   if (profile.role === "assistencia" && (ASSISTENCIA_MANAGED_TYPES as readonly string[]).includes(requestType)) return;
-  if (profile.role === "sac" && (SAC_MANAGED_TYPES as readonly string[]).includes(requestType)) return;
+  // SAC_ALSO_MANAGED_TYPES (envio_peca/recolhimento) -- pedido do Victor
+  // 27/08/2026, ver comentário em assistenciaLabels.ts.
+  if (
+    profile.role === "sac" &&
+    ((SAC_MANAGED_TYPES as readonly string[]).includes(requestType) || (SAC_ALSO_MANAGED_TYPES as readonly string[]).includes(requestType))
+  )
+    return;
   throw new Error(`Ação não permitida para o papel "${profile.role}" nesse chamado.`);
 }
 
