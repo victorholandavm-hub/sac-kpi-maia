@@ -16,8 +16,9 @@ import {
   REQUEST_TYPE_LABELS,
   CAUSA_RAIZ_OPTIONS,
   CAUSA_RAIZ_LABELS,
+  SHIFT_LABELS,
 } from "@/lib/assistenciaLabels";
-import { ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
+import { ADDRESS_NUMBER_REQUIRED_TYPES, SHIFTS, type Store } from "@/lib/serviceRequests";
 import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 
@@ -558,6 +559,20 @@ export function SacCreateRequestForm({
                     className="rounded border px-3 py-2"
                     style={inputStyle}
                   />
+                </Field>
+                {/* Independente do checkbox "Urgente" acima (Seção 1) --
+                    pedido do Victor 27/08/2026: "quando coloco que precisa
+                    ser no periodo da tarde, ele nao me da a opção de
+                    colocar como urgencia tambem". */}
+                <Field label="Período (opcional)">
+                  <select name="shift" defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
+                    <option value="">Sem turno</option>
+                    {SHIFTS.map((s) => (
+                      <option key={s} value={s}>
+                        {SHIFT_LABELS[s]}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
               </div>
 

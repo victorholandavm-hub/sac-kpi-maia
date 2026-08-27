@@ -139,6 +139,14 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                       {SHIFT_LABELS[r.shift] ?? r.shift}
                     </span>
                   ) : null}
+                  {r.urgent ? (
+                    <span
+                      className="text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ color: "#fff", background: "var(--status-critical)" }}
+                    >
+                      URGENTE
+                    </span>
+                  ) : null}
                   {/* Rota (praia/sul/centro) é só pra visita de motorista --
                       montagem/desmontagem/vistoria/troca de peça não têm
                       rota, mesmo que exista algum dado velho errado no banco. */}

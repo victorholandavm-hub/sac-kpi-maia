@@ -16,7 +16,13 @@ export type RequestType =
   | "recolhimento_produto";
 export type RequestStatus = "aberta" | "em_contato" | "em_andamento" | "remarcar" | "concluida" | "cancelada";
 export type DeadlineStatus = "pendente" | "aprovado" | "recusado";
-export type Shift = "manha" | "tarde" | "dia" | "urgencia";
+// "urgencia" saiu daqui 27/08/2026 -- pedido do Victor: "quando coloco
+// que precisa ser no periodo da tarde, ele nao me da a opção de colocar
+// como urgencia tambem". Antes era só mais um valor de turno, mutuamente
+// exclusivo com manhã/tarde/dia (uma coluna só) -- agora é um campo
+// booleano à parte (`urgent`, ver ServiceRequestSummary/Detail abaixo),
+// que coexiste com qualquer turno escolhido.
+export type Shift = "manha" | "tarde" | "dia";
 
 export const REQUEST_STATUSES: RequestStatus[] = [
   "aberta",
@@ -27,7 +33,7 @@ export const REQUEST_STATUSES: RequestStatus[] = [
   "cancelada",
 ];
 
-export const SHIFTS: Shift[] = ["manha", "tarde", "dia", "urgencia"];
+export const SHIFTS: Shift[] = ["manha", "tarde", "dia"];
 
 export function isShift(value: string | undefined | null): value is Shift {
   return !!value && (SHIFTS as string[]).includes(value);
@@ -157,6 +163,10 @@ export type ServiceRequestSummary = {
   scheduledDate: string | null;
   scheduledTime: string | null;
   shift: Shift | null;
+  // Independente do turno acima -- pedido do Victor 27/08/2026: antes
+  // "urgência" era só mais um valor de shift, mutuamente exclusivo com
+  // manhã/tarde/dia; agora coexiste com qualquer turno escolhido.
+  urgent: boolean;
   rota: Rota | null;
   rotaExceptionNote: string | null;
   // Restrição de horário/turno do CLIENTE pra receber a entrega (ex.: "só de
@@ -210,6 +220,7 @@ type SummaryRow = {
   scheduled_date: string | null;
   scheduled_time: string | null;
   shift: Shift | null;
+  urgent: boolean;
   rota: Rota | null;
   rota_exception_note: string | null;
   client_time_restriction: string | null;
@@ -238,7 +249,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed, is_pickup)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -280,6 +291,7 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     scheduledDate: row.scheduled_date,
     scheduledTime: row.scheduled_time,
     shift: row.shift,
+    urgent: row.urgent,
     rota: row.rota,
     rotaExceptionNote: row.rota_exception_note,
     clientTimeRestriction: row.client_time_restriction,
@@ -505,7 +517,7 @@ const DETAIL_COLUMNS =
   // é provavelmente a causa raiz de verdade do "Sem rota" que aparecia na
   // tela do chamado (mais fundamental que o bug de ScheduleField.tsx
   // corrigido antes hoje, que só evitava apagar a rota ao SALVAR).
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed, is_pickup)";
 
 export async function getRequestDetail(
   id: string
@@ -836,6 +848,7 @@ export type AssemblerRequestView = {
   scheduledDate: string | null;
   scheduledTime: string | null;
   shift: Shift | null;
+  urgent: boolean;
   requestedDeadline: string | null;
   approvedDeadline: string | null;
   createdAt: string;
@@ -867,7 +880,7 @@ const ASSEMBLER_VIEW_LIMIT = 200;
 // escreve (ver setMontadorInstruction em actions.ts), pensado justamente
 // pra aparecer aqui -- não tem o mesmo risco do Motivo do gerente.
 const ASSEMBLER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, order_code, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, montador_instruction, delivery_rating, stores(name), items:service_request_items(id, product, quantity, item_action, completed)";
+  "id, ticket_number, type, status, order_code, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, scheduled_date, scheduled_time, shift, urgent, requested_deadline, approved_deadline, created_at, completed_at, combo_montagem_desmontagem, montador_instruction, delivery_rating, stores(name), items:service_request_items(id, product, quantity, item_action, completed)";
 
 type AssemblerViewRow = {
   id: string;
@@ -885,6 +898,7 @@ type AssemblerViewRow = {
   scheduled_date: string | null;
   scheduled_time: string | null;
   shift: Shift | null;
+  urgent: boolean;
   requested_deadline: string | null;
   approved_deadline: string | null;
   created_at: string;
@@ -922,6 +936,7 @@ function toAssemblerView(row: AssemblerViewRow): AssemblerRequestView {
     scheduledDate: row.scheduled_date,
     scheduledTime: row.scheduled_time,
     shift: row.shift,
+    urgent: row.urgent,
     requestedDeadline: row.requested_deadline,
     approvedDeadline: row.approved_deadline,
     createdAt: row.created_at,
@@ -1023,6 +1038,7 @@ export type DriverRequestView = {
   scheduledDate: string | null;
   scheduledTime: string | null;
   shift: Shift | null;
+  urgent: boolean;
   requestedDeadline: string | null;
   approvedDeadline: string | null;
   createdAt: string;
@@ -1047,7 +1063,7 @@ export type DriverRequestView = {
 
 const DRIVER_VIEW_LIMIT = 200;
 const DRIVER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, client_time_restriction, pickup_completed, scheduled_date, scheduled_time, shift, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, authorized_by, requested_by_name, stores(name), requester:profiles!requested_by(full_name), items:service_request_items(product, is_pickup)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, client_time_restriction, pickup_completed, scheduled_date, scheduled_time, shift, urgent, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, authorized_by, requested_by_name, stores(name), requester:profiles!requested_by(full_name), items:service_request_items(product, is_pickup)";
 
 type DriverViewRow = {
   id: string;
@@ -1068,6 +1084,7 @@ type DriverViewRow = {
   scheduled_date: string | null;
   scheduled_time: string | null;
   shift: Shift | null;
+  urgent: boolean;
   requested_deadline: string | null;
   approved_deadline: string | null;
   created_at: string;
@@ -1111,6 +1128,7 @@ function toDriverView(row: DriverViewRow): DriverRequestView {
     scheduledDate: row.scheduled_date,
     scheduledTime: row.scheduled_time,
     shift: row.shift,
+    urgent: row.urgent,
     requestedDeadline: row.requested_deadline,
     approvedDeadline: row.approved_deadline,
     createdAt: row.created_at,
@@ -1185,7 +1203,7 @@ export async function getDriverRequestDetail(
   return toDriverView(data as unknown as DriverViewRow);
 }
 
-const SHIFT_ORDER: Record<Shift, number> = { manha: 0, dia: 1, tarde: 2, urgencia: 3 };
+const SHIFT_ORDER: Record<Shift, number> = { manha: 0, dia: 1, tarde: 2 };
 
 export type AgendaRange = "atrasado" | "hoje" | "semana";
 

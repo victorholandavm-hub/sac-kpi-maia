@@ -84,7 +84,7 @@ function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
 // assinatura -- sem "quem errou" (causa raiz), que é controle interno,
 // não vai pro papel que cliente/motorista veem.
 export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
-  const isUrgente = request.shift === "urgencia";
+  const isUrgente = request.urgent;
   const enderecoCompleto = [formatFullAddress(request), request.clientNeighborhood].filter(Boolean).join(" — ");
 
   return (

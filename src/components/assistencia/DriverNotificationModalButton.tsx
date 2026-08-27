@@ -103,7 +103,7 @@ export function DriverNotificationModalButton({ item }: { item: DriverRequestVie
                 label="Visita agendada"
                 value={
                   item.scheduledDate
-                    ? `${formatDateOnly(item.scheduledDate)}${item.scheduledTime ? ` às ${item.scheduledTime.slice(0, 5)}` : ""}${item.shift ? ` · ${SHIFT_LABELS[item.shift]}` : ""}`
+                    ? `${formatDateOnly(item.scheduledDate)}${item.scheduledTime ? ` às ${item.scheduledTime.slice(0, 5)}` : ""}${item.shift ? ` · ${SHIFT_LABELS[item.shift]}` : ""}${item.urgent ? " · URGENTE" : ""}`
                     : null
                 }
               />

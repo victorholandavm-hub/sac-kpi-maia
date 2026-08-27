@@ -64,6 +64,15 @@ function RequestRow({ r }: { r: AssemblerRequestView }) {
         </p>
       ) : null}
 
+      {r.urgent ? (
+        <span
+          className="text-xs font-bold px-2 py-0.5 rounded-full self-start"
+          style={{ color: "#fff", background: "var(--status-critical)" }}
+        >
+          URGENTE
+        </span>
+      ) : null}
+
       {r.items.length > 0 ? (
         <div className="flex flex-col gap-1">
           {r.items.map((item) => (

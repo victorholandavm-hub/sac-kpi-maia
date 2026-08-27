@@ -188,7 +188,7 @@ export function DriverRouteGroup({
                       🚚 {r.driverName ?? "Sem motorista"}
                     </span>
                   ) : null}
-                  {r.shift === "urgencia" ? (
+                  {r.urgent ? (
                     <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ color: "#fff", background: "var(--status-critical)" }}>
                       Urgente!
                     </span>
