@@ -1,4 +1,5 @@
 import { EntregasGroupsList } from "./EntregasGroupsList";
+import { countByDeliveryStatus } from "./DeliveryStatusBadge";
 import { groupIntoWeeks } from "@/lib/weekGrouping";
 import type { QueueGroup } from "@/lib/entregaQueueGrouping";
 
@@ -30,10 +31,21 @@ export function EntregasWeekGroups({ groups, now }: { groups: QueueGroup[]; now:
         // você classifica do mesmo jeito, só com cor diferente". Uma
         // semana com atrasado misturado (comum: a semana atual, que já
         // teve dias passados antes de hoje) fica com o visual neutro de
-        // sempre -- as badges FUTURA/ATRASADA de cada grupo (mantidas,
-        // ver EntregasGroupsList) já dizem o que é o quê lá dentro.
+        // sempre -- as badges FUTURA/ATRASADA de cada grupo (mantidas, ver
+        // EntregasGroupsList) já dizem o que é o quê lá dentro.
+        //
+        // Badge no cabeçalho da SEMANA também -- pedido seguinte do Victor
+        // 26/08/2026: "no agrupamento semanal que tiver alguma atrasada
+        // coloque a badge na semana... e se for futura, da mesma forma,
+        // coloque a badge futura na semana e nao só no dia". Mesmo
+        // critério de "atrasada de verdade" que cada grupo já usa
+        // (EntregasGroupsList) -- um dia atrasado com tudo já
+        // concluído/cancelado (0 Programado) não conta pra essa badge,
+        // não sobrou nada pra remarcar (mesmo raciocínio, achado do
+        // Victor 25/08/2026: "tire a badge de 'atrasada' nas datas em que
+        // as notificações programadas estão zeradas").
         const hasFuture = week.days.some((g) => g.dateBucket === "amanha" || g.dateBucket === "depois");
-        const hasAtrasado = week.days.some((g) => g.dateBucket === "atrasado");
+        const hasAtrasado = week.days.some((g) => g.dateBucket === "atrasado" && countByDeliveryStatus(g.items).programado > 0);
         const isFutureWeek = hasFuture && !hasAtrasado;
         const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
         return (
@@ -56,6 +68,22 @@ export function EntregasWeekGroups({ groups, now }: { groups: QueueGroup[]; now:
               <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
                 {week.label}
               </span>
+              {hasAtrasado ? (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                  style={{ background: "var(--status-critical)", color: "#fff" }}
+                >
+                  Atrasada
+                </span>
+              ) : null}
+              {isFutureWeek ? (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                  style={{ background: "var(--brand-green)", color: "#fff" }}
+                >
+                  Futura
+                </span>
+              ) : null}
               <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
                 ({weekTotal})
               </span>
