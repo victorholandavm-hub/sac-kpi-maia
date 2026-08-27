@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { listRequests, listStores, isRequestStatus } from "@/lib/serviceRequests";
 import { listDrivers } from "@/lib/payments";
-import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY } from "@/lib/rotas";
+import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
 import { ROLE_LABELS } from "@/lib/assistenciaLabels";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
@@ -177,7 +177,7 @@ export default async function SacNotificacoesPage({
           alcança a fila da assistência, precisa desse atalho aqui também
           pra não depender de pedir pra assistência mudar o motorista do
           dia. Junior como motorista padrão -- pedido do Victor 21/08/2026. */}
-      <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver="Junior" />
+      <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} />
 
       {/* Linha 1 do guia de padronização -- mesmo desenho/motivo de
           fila/page.tsx (aba Entregas, ver lá). */}
