@@ -2267,13 +2267,24 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const driverNameInput = emptyToNull(formData.get("driver_name"));
 
   // Causa raiz ("quem errou") passou a ser obrigatória pra todo tipo de
-  // entrega (pedido do Victor 18/08/2026), não só troca_produto -- só os
+  // entrega (pedido do Victor 18/08/2026), não só troca_produto -- e os
   // campos extras de erro_conferencia/erro_motorista (carga, conferente)
-  // continuam exclusivos de troca_produto, que é o único com recolhimento
-  // de verdade. Erro de conferência e erro do motorista eram uma causa só
-  // ("erro_cd") até 14/08/2026 -- separadas por pedido do usuário, pra dar
-  // pra metrificar as duas coisas de forma independente (ver
-  // 0080_causa_raiz_conferencia_motorista.sql).
+  // valem pra qualquer tipo de entrega também (o formulário já mostra os
+  // dois campos pra isDelivery inteiro, ver SacCreateRequestForm.tsx, e a
+  // constraint do banco -- service_requests_causa_completa,
+  // 0080_causa_raiz_conferencia_motorista.sql -- exige carga+conferente
+  // sempre que causa_raiz='erro_conferencia', sem exceção por tipo).
+  // Bug real encontrado 27/08/2026 (usuário bateu de frente com o erro cru
+  // do Postgres tentando criar uma "Entrega de produto" com "Erro de
+  // conferência"): esse `if` só capturava/validava causa_carga/
+  // causa_conferente quando type === "troca_produto" -- pros outros 3
+  // tipos de entrega, o formulário pedia os campos (obrigatórios lá) mas o
+  // servidor simplesmente IGNORAVA o que foi digitado (nunca lia
+  // causa_carga/causa_conferente do formData), gravando null nos dois e
+  // batendo direto na constraint, sem a mensagem amigável de validação
+  // ("Informe a carga..."). Erro de conferência e erro do motorista eram
+  // uma causa só ("erro_cd") até 14/08/2026 -- separadas por pedido do
+  // usuário, pra dar pra metrificar as duas coisas de forma independente.
   let causaRaiz: string | null = null;
   let causaCarga: string | null = null;
   let causaConferente: string | null = null;
@@ -2283,7 +2294,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
       return { error: "Selecione quem errou." };
     }
-    if (type === "troca_produto" && causaRaiz === "erro_conferencia") {
+    if (causaRaiz === "erro_conferencia") {
       causaCarga = String(formData.get("causa_carga") ?? "").trim();
       causaConferente = String(formData.get("causa_conferente") ?? "").trim();
       if (!causaCarga) return { error: "Informe a carga (erro de conferência precisa registrar qual foi)." };
