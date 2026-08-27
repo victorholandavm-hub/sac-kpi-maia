@@ -4,18 +4,31 @@ import type { DateRange } from "./dateRange";
 import type { Count, DayCount } from "./kpi";
 import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS } from "./assistenciaLabels";
 import { ROTA_LABELS, type Rota } from "./rotas";
+import { classificarProduto } from "./vendasProduto";
 import type { RequestType, RequestStatus, ReportRowItem } from "./serviceRequests";
 
-// Aba "KPIs da Assistência" (painel de KPIs do SAC, /kpis) -- pedido do
+// "KPIs da Assistência" (página própria, /kpis-assistencia) -- pedido do
 // Victor 27/08/2026: "preciso que você pegue todas as informações de
-// todas as notificações de assistencias e coloque na tela de kpis do
-// sac... quais produtos tem mais assistencia, qual rota tem mais
-// assistencias, quem errou, o nome de quem errou, quantas vezes errou e a
+// todas as notificações de assistencias... quais produtos tem mais
+// assistencia, qual rota tem mais assistencias, quem errou... a
 // volumetria de assistencia por periodo, quais lojas mais tem
-// assistencias". Fonte é `service_requests`/`service_request_items` --
-// domínio TOTALMENTE separado do resto do painel de KPIs (que é só sobre
+// assistencias", refinado 27/08/2026: "preciso que os kpis da
+// assistencia fiquem numa aba separada, sozinha" (saiu de dentro do
+// painel de KPIs geral, ver Dashboard.tsx/kpis/page.tsx -- virou página
+// própria) + "a quantidade total de assistencia que nao conta montagem e
+// desmontagem... entram tudo de notificação de assistencia, menos
+// montagem, vistoria e desmontagem" (só visita de montador fica de fora
+// -- ver EXCLUDED_TYPES) + "por atendente... por grupo de produto".
+// Fonte é `service_requests`/`service_request_items` -- domínio
+// TOTALMENTE separado do resto do painel de KPIs (que é só sobre
 // conversas do GHL, ver kpi.ts) -- por isso um módulo próprio, sem
 // misturar no tipo KpiData existente.
+
+// Só visita de montador fica de fora ("menos montagem, vistoria e
+// desmontagem") -- todo o resto (troca/entrega/recolhimento/envio de
+// produto ou peça, notificação externa) conta como "notificação de
+// assistência" pra esse relatório.
+const EXCLUDED_TYPES = ["montagem", "desmontagem", "vistoria"] as const;
 
 type RequestRow = {
   id: string;
@@ -30,7 +43,9 @@ type RequestRow = {
   created_at: string;
   client_name: string | null;
   reason: string | null;
+  requested_by_name: string | null;
   stores: { name: string } | null;
+  requester: { full_name: string } | null;
 };
 
 const PAGE_SIZE = 1000;
@@ -46,6 +61,10 @@ function toReportRowItem(r: RequestRow): ReportRowItem {
     createdAt: r.created_at,
     reason: r.reason,
   };
+}
+
+function atendenteName(r: RequestRow): string | null {
+  return r.requester?.full_name ?? r.requested_by_name;
 }
 
 // Mesmo espírito do `aggregate()` de getRequestsReport (serviceRequests.ts)
@@ -76,6 +95,8 @@ export type AssistenciaKpiData = {
   totalChamados: number;
   dailyVolume: DayCount[];
   byProduct: Count[];
+  byProductGroup: Count[];
+  byAgent: Count[];
   byRota: Count[];
   byStore: Count[];
   byType: Count[];
@@ -99,9 +120,10 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
       let query = admin
         .from("service_requests")
         .select(
-          "id, ticket_number, type, status, store_id, rota, causa_raiz, causa_conferente, driver_name, created_at, client_name, reason, stores(name)",
+          "id, ticket_number, type, status, store_id, rota, causa_raiz, causa_conferente, driver_name, created_at, client_name, reason, requested_by_name, stores(name), requester:profiles!requested_by(full_name)",
           { count: "exact" }
         )
+        .not("type", "in", `(${EXCLUDED_TYPES.join(",")})`)
         .lte("created_at", toIso);
       if (fromIso) query = query.gte("created_at", fromIso);
       return query.range(from, to) as unknown as PromiseLike<PagedQueryResult<RequestRow>>;
@@ -142,6 +164,11 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   const byStore = aggregate(rows, (r) => r.stores?.name ?? r.store_id, (k) => k, ticketsByTag, "loja");
   const byType = aggregate(rows, (r) => r.type, (k) => REQUEST_TYPE_LABELS[k as RequestType] ?? k, ticketsByTag, "tipo");
   const byCausaRaiz = aggregate(rows, (r) => r.causa_raiz, (k) => CAUSA_RAIZ_LABELS[k] ?? k, ticketsByTag, "causa");
+  // Quem registrou o chamado (requested_by, ver toSummary em
+  // serviceRequests.ts pro mesmo fallback join→texto) -- "atendente" no
+  // sentido de quem atendeu/criou a notificação, não quem tá responsável
+  // por ela agora (esse último muda de dono com claimRequest).
+  const byAgent = aggregate(rows, atendenteName, (k) => k, ticketsByTag, "atendente");
   // Conferente/motorista são texto livre digitado na hora -- normaliza só
   // espaço nas pontas (trim), sem tentar corrigir grafia/capitalização
   // diferente pro mesmo nome (fora de escopo aqui).
@@ -152,13 +179,13 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     ticketsByTag,
     "conferente"
   );
-  // Ressalva importante (ver plano): `driver_name` também é sobrescrito
-  // toda vez que a rota/data do chamado é reagendada (setSchedule,
-  // actions.ts) -- pra um chamado criado com causa_raiz='erro_motorista' e
-  // depois remarcado, esse valor pode já não ser mais quem entregou
-  // errado, e sim o motorista da entrega de verdade. Única fonte
-  // disponível sem mexer em schema -- a tela mostra uma nota curta sobre
-  // isso perto desse ranking.
+  // Ressalva importante: `driver_name` também é sobrescrito toda vez que
+  // a rota/data do chamado é reagendada (setSchedule, actions.ts) -- pra
+  // um chamado criado com causa_raiz='erro_motorista' e depois
+  // remarcado, esse valor pode já não ser mais quem entregou errado, e
+  // sim o motorista da entrega de verdade. Única fonte disponível sem
+  // mexer em schema -- a tela mostra uma nota curta sobre isso perto
+  // desse ranking.
   const byMotoristaErro = aggregate(
     rows.filter((r) => r.causa_raiz === "erro_motorista" && r.driver_name),
     (r) => r.driver_name!.trim(),
@@ -167,31 +194,49 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     "motorista"
   );
 
-  // Produto -- de service_request_items, dedupe por (request_id, product)
-  // antes de contar: "em quantos chamados esse produto apareceu", não
-  // soma de quantidade (2 unidades do mesmo produto no mesmo chamado
-  // contam 1 vez).
+  // Produto (e grupo de produto) -- de service_request_items, dedupe por
+  // (request_id, product) antes de contar: "em quantos chamados esse
+  // produto apareceu", não soma de quantidade (2 unidades do mesmo
+  // produto no mesmo chamado contam 1 vez). Grupo reaproveita
+  // classificarProduto (vendasProduto.ts, mesma classificação por
+  // palavra-chave já usada em /vendas) em cima da descrição crua do
+  // item.
   const produtoPorChamado = new Set<string>();
   const produtoCount = new Map<string, number>();
+  const grupoCount = new Map<string, { label: string; count: number }>();
   for (const item of items) {
     if (!item.product) continue;
     const dedupeKey = `${item.request_id}::${item.product}`;
     if (produtoPorChamado.has(dedupeKey)) continue;
     produtoPorChamado.add(dedupeKey);
     produtoCount.set(item.product, (produtoCount.get(item.product) ?? 0) + 1);
-    const tag = `produto:${item.product}`;
     const parentRow = rowById.get(item.request_id);
-    if (parentRow) (ticketsByTag[tag] ??= []).push(toReportRowItem(parentRow));
+    if (!parentRow) continue;
+
+    const produtoTag = `produto:${item.product}`;
+    (ticketsByTag[produtoTag] ??= []).push(toReportRowItem(parentRow));
+
+    const grupo = classificarProduto(item.product);
+    const grupoEntry = grupoCount.get(grupo.key) ?? { label: grupo.label, count: 0 };
+    grupoEntry.count++;
+    grupoCount.set(grupo.key, grupoEntry);
+    const grupoTag = `grupo:${grupo.key}`;
+    (ticketsByTag[grupoTag] ??= []).push(toReportRowItem(parentRow));
   }
   const byProduct: Count[] = [...produtoCount.entries()]
     .map(([product, count]) => ({ label: product, count, tag: `produto:${product}` }))
     .sort((a, b) => b.count - a.count)
     .slice(0, PRODUCT_RANKING_LIMIT);
+  const byProductGroup: Count[] = [...grupoCount.entries()]
+    .map(([key, { label, count }]) => ({ label, count, tag: `grupo:${key}` }))
+    .sort((a, b) => b.count - a.count);
 
   return {
     totalChamados: rows.length,
     dailyVolume,
     byProduct,
+    byProductGroup,
+    byAgent,
     byRota,
     byStore,
     byType,
