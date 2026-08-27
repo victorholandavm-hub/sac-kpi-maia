@@ -10,6 +10,7 @@ const TABS = [
   { key: "encomendas", label: "Minhas encomendas", href: "/assistencia/encomendas/sac" },
   { key: "montagens", label: "Montagens e serviços", href: "/assistencia/sac/montagens" },
   { key: "cargas", label: "Cargas", href: "/assistencia/sac/cargas" },
+  { key: "prazos-produtos", label: "Prazos de produtos", href: "/assistencia/prazos-produtos" },
 ] as const;
 
 export type SacTabKey = (typeof TABS)[number]["key"];

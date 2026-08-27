@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { KpiData, Count, StoreBreakdownTicket } from "@/lib/kpi";
+import type { AssistenciaKpiData } from "@/lib/kpiAssistencia";
+import type { ReportRowItem } from "@/lib/serviceRequests";
 import type { DateRange } from "@/lib/dateRange";
 import { StatTile } from "./StatTile";
 import { BarRanking } from "./BarRanking";
@@ -18,22 +20,27 @@ import { PerformanceReportButton } from "./PerformanceReportButton";
 import { NpsCard, NPS_INDEX_TARGET, indexColor, NPS_SCORE_LABELS } from "./NpsCard";
 import { CategoryTicketsModal } from "./CategoryTicketsModal";
 import { CategoryBreakdownModal } from "./CategoryBreakdownModal";
+import { AssistenciaTicketsModal } from "./AssistenciaTicketsModal";
+import { CausaRaizDonutChart } from "./CausaRaizDonutChart";
 import { InsightGrid } from "./InsightCard";
 import { buildHeadlineInsights, buildPerformanceInsights, buildGargalosInsights } from "@/lib/kpiInsights";
 import { categoryLabel, storeLabel, productLabel } from "@/lib/labels";
 
-// As 3 abas do painel -- separa "o que aconteceu" (volumetria), "quem
-// atendeu" (equipe) e "onde travou" (gargalos/logística) em vez de uma
-// rolagem só com tudo misturado. NPS/Google reviews viraram aba própria
-// /avaliacoes (pedido do Victor 19/08/2026) -- saiu daqui.
+// As 4 abas do painel -- separa "o que aconteceu" (volumetria), "quem
+// atendeu" (equipe), "onde travou" (gargalos/logística) e "assistência"
+// (chamados de entrega/troca/montagem, domínio separado do resto -- ver
+// kpiAssistencia.ts) em vez de uma rolagem só com tudo misturado. NPS/
+// Google reviews viraram aba própria /avaliacoes (pedido do Victor
+// 19/08/2026) -- saiu daqui.
 const TABS = [
   { id: "geral", label: "Geral e Volumetria" },
   { id: "performance", label: "Performance da Equipe" },
   { id: "gargalos", label: "Gargalos e Logística" },
+  { id: "assistencia", label: "KPIs da Assistência" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
-export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) {
+export function Dashboard({ data, range, assistenciaData }: { data: KpiData; range: DateRange; assistenciaData: AssistenciaKpiData }) {
   // `tag` preserva o valor cru ("cat-duvida") por trás do label traduzido --
   // usado pra abrir o drill-down (data.categoryTickets é indexado pela tag).
   const byCategory = data.byCategory.map((c) => ({ ...c, tag: c.label, label: categoryLabel(c.label) }));
@@ -88,6 +95,26 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
       categories: data.storeCategories[tag] ?? [],
     });
   }
+
+  // Drill-down da aba "KPIs da Assistência" -- todo BarRanking dessa aba
+  // usa o mesmo `ticketsByTag` (kpiAssistencia.ts), então um estado só
+  // serve pra todos os rankings em vez de um modal por ranking.
+  const [assistenciaTicketsModal, setAssistenciaTicketsModal] = useState<{ title: string; totalCount: number; tickets: ReportRowItem[] } | null>(
+    null
+  );
+  function openAssistenciaDrilldown(item: Count) {
+    const tag = item.tag ?? item.label;
+    setAssistenciaTicketsModal({
+      title: item.label,
+      totalCount: item.count,
+      tickets: assistenciaData.ticketsByTag[tag] ?? [],
+    });
+  }
+  const causaRaizDonutData = assistenciaData.byCausaRaiz.map((c) => ({
+    key: c.tag?.replace(/^causa:/, "") ?? c.label,
+    name: c.label,
+    value: c.count,
+  }));
   // Ordem invertida (5 no topo) -- fica mais intuitivo no gráfico de barras
   // horizontal ver "muito satisfeito" em cima.
   const npsDistribution = [...data.npsSummary.distribution]
@@ -280,6 +307,55 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
         </div>
       ) : null}
 
+      {activeTab === "assistencia" ? (
+        <div className="flex flex-col gap-6">
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatTile label="Total de chamados de assistência" value={assistenciaData.totalChamados} size="lg" />
+            <StatTile label="Produtos distintos com chamado" value={assistenciaData.byProduct.length} />
+            <StatTile label="Lojas com chamado no período" value={assistenciaData.byStore.length} />
+            <StatTile label="Rotas com chamado no período" value={assistenciaData.byRota.length} />
+          </section>
+
+          <VolumeChart data={assistenciaData.dailyVolume} title="Volume de chamados de assistência por dia" />
+
+          <section className="grid md:grid-cols-2 gap-4">
+            <BarRanking title="Chamados por produto" data={assistenciaData.byProduct} onSelect={openAssistenciaDrilldown} />
+            <BarRanking title="Chamados por tipo de solicitação" data={assistenciaData.byType} onSelect={openAssistenciaDrilldown} />
+            <BarRanking title="Chamados por rota" data={assistenciaData.byRota} onSelect={openAssistenciaDrilldown} />
+            <BarRanking title="Chamados por loja" data={assistenciaData.byStore} onSelect={openAssistenciaDrilldown} />
+          </section>
+
+          <div className="rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+            <h3 className="text-sm font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+              Quem errou
+            </h3>
+            {assistenciaData.byCausaRaiz.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                Sem dados suficientes ainda.
+              </p>
+            ) : (
+              <>
+                <CausaRaizDonutChart data={causaRaizDonutData} />
+                <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+                  Clique numa fatia da lista abaixo pra ver os chamados.
+                </p>
+                <BarRanking title="Chamados por causa raiz" data={assistenciaData.byCausaRaiz} onSelect={openAssistenciaDrilldown} />
+              </>
+            )}
+          </div>
+
+          <section className="grid md:grid-cols-2 gap-4">
+            <BarRanking title="Conferente que mais errou" data={assistenciaData.byConferente} onSelect={openAssistenciaDrilldown} />
+            <div className="flex flex-col gap-2">
+              <BarRanking title="Motorista que mais errou" data={assistenciaData.byMotoristaErro} onSelect={openAssistenciaDrilldown} />
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Baseado no motorista atual do chamado — se a rota foi reatribuída depois da criação, pode não refletir mais quem entregou o item errado originalmente.
+              </p>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {ticketListModal ? (
         <CategoryTicketsModal
           title={ticketListModal.title}
@@ -295,6 +371,15 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           totalCount={storeCategoryModal.totalCount}
           categories={storeCategoryModal.categories}
           onClose={() => setStoreCategoryModal(null)}
+        />
+      ) : null}
+
+      {assistenciaTicketsModal ? (
+        <AssistenciaTicketsModal
+          title={assistenciaTicketsModal.title}
+          totalCount={assistenciaTicketsModal.totalCount}
+          tickets={assistenciaTicketsModal.tickets}
+          onClose={() => setAssistenciaTicketsModal(null)}
         />
       ) : null}
     </div>

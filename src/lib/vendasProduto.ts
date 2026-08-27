@@ -416,6 +416,94 @@ export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<
   return resultado;
 }
 
+export type ProdutoPrazo = {
+  productCode: string;
+  description: string | null;
+  saldoAtual: number;
+  saldoEmPedidoCompra: number | null;
+  previsaoChegada: string | null;
+  diasDeCobertura: number | null;
+};
+
+// Busca por código OU descrição direto em totvs_stock (catálogo inteiro,
+// ~3600 produtos) -- diferente de searchProdutosVenda (totvs_order_items,
+// só produto que já vendeu). "Prazos de produtos" precisa achar qualquer
+// item com estoque/pedido de compra, tenha vendido ou não. Mesmo padrão
+// de sanitização/limite de searchProdutosVenda (searchFilter.ts).
+export async function searchProdutosEstoque(query: string): Promise<ProdutoSugestao[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+  const safe = sanitizeOrFilterValue(trimmed);
+
+  const admin = getSupabaseAdmin();
+  const { data } = await admin
+    .from("totvs_stock")
+    .select("product_code, description")
+    .or(`product_code.ilike.%${safe}%,description.ilike.%${safe}%`)
+    .limit(15);
+
+  return (data ?? []).map((r) => ({ productCode: r.product_code, description: r.description }));
+}
+
+// Um produto só, por código exato -- resolve o card de detalhe da tela
+// "Prazos de produtos" quando a busca (searchProdutosEstoque) resolve pra
+// 1 resultado só. Mesma leitura de totvs_stock de
+// listProdutosComPedidoDeCompra, mas pra 1 código, incluindo produto sem
+// pedido de compra aberto (previsaoChegada/saldoEmPedidoCompra null).
+export async function getProdutoPrazo(productCode: string): Promise<ProdutoPrazo | null> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("totvs_stock")
+    .select("product_code, description, current_balance, purchase_order_balance, estimated_arrival_date")
+    .eq("product_code", productCode)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const saldo = (await listSaldoEstoqueProdutos([productCode])).get(productCode);
+  return {
+    productCode: data.product_code,
+    description: data.description,
+    saldoAtual: Number(data.current_balance) || 0,
+    saldoEmPedidoCompra: data.purchase_order_balance != null ? Number(data.purchase_order_balance) : null,
+    previsaoChegada: data.estimated_arrival_date,
+    diasDeCobertura: saldo?.diasDeCobertura ?? null,
+  };
+}
+
+// Tela "Prazos de produtos" (admin/assistência/SAC, ver
+// src/app/assistencia/(app)/prazos-produtos/page.tsx) -- pedido do Victor
+// 27/08/2026: "preciso de uma nova aba... coloque tudo lá" (movido de
+// dentro do card de curva em /vendas, que só quem tem a senha do painel
+// de KPIs conseguia ver). Todo produto com pedido de compra aberto
+// (fábrica → CD), ordenado pela previsão de chegada mais próxima primeiro
+// -- direto de totvs_stock (176 produtos hoje), sem precisar do join com
+// totvs_order_items que a curva de vendas usa. diasDeCobertura reaproveita
+// listSaldoEstoqueProdutos (mesma conta de sempre) pra poder destacar
+// ruptura na lista.
+export async function listProdutosComPedidoDeCompra(): Promise<ProdutoPrazo[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("totvs_stock")
+    .select("product_code, description, current_balance, purchase_order_balance, estimated_arrival_date")
+    .gt("purchase_order_balance", 0)
+    .order("estimated_arrival_date", { ascending: true, nullsFirst: false });
+  if (error) throw new Error(error.message);
+
+  const rows = data ?? [];
+  const codes = rows.map((r) => r.product_code);
+  const saldoPorProduto = await listSaldoEstoqueProdutos(codes);
+
+  return rows.map((r) => ({
+    productCode: r.product_code,
+    description: r.description,
+    saldoAtual: Number(r.current_balance) || 0,
+    saldoEmPedidoCompra: r.purchase_order_balance != null ? Number(r.purchase_order_balance) : null,
+    previsaoChegada: r.estimated_arrival_date,
+    diasDeCobertura: saldoPorProduto.get(r.product_code)?.diasDeCobertura ?? null,
+  }));
+}
+
 export type ProdutoTendencia = { variacaoPct: number | null };
 
 const TENDENCIA_SEMANAS = 4;
