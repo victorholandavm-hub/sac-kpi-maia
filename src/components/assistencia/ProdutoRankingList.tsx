@@ -36,14 +36,19 @@ function TendenciaBadge({ tendencia }: { tendencia: ProdutoTendencia | undefined
 // (mesmo animate-pulse já usado pra alerta urgente em assistencia/sac,
 // ver src/app/assistencia/sac/page.tsx), só aparece quando o saldo do CD
 // esgota antes de RUNWAY_DIAS_ALERTA dias no ritmo de venda atual.
-function RupturaTag({ diasDeCobertura }: { diasDeCobertura: number }) {
+// previsaoChegada opcional -- pedido do Victor 27/08/2026: "eu consigo
+// puxar do protheus a previsao de chegada dos produtos?". Junto da
+// ruptura é onde mais importa saber -- "vai faltar" + "chega dia X" é a
+// combinação que o comprador precisa pra decidir se vale correr atrás.
+function RupturaTag({ diasDeCobertura, previsaoChegada }: { diasDeCobertura: number; previsaoChegada: string | null }) {
   const dias = Math.max(0, Math.ceil(diasDeCobertura));
   return (
     <span
       className="text-xs font-bold px-2 py-1 rounded animate-pulse inline-block"
       style={{ background: "var(--status-critical)", color: "#fff" }}
     >
-      [ RUPTURA EM {dias} DIA{dias === 1 ? "" : "S"} ]
+      [ RUPTURA EM {dias} DIA{dias === 1 ? "" : "S"}
+      {previsaoChegada ? ` · chega ${new Date(`${previsaoChegada}T00:00:00`).toLocaleDateString("pt-BR")}` : ""} ]
     </span>
   );
 }
@@ -115,7 +120,7 @@ export function ProdutoRankingList({
                 </div>
                 {emRuptura ? (
                   <div className="px-3 pb-2.5 -mt-1">
-                    <RupturaTag diasDeCobertura={saldo!.diasDeCobertura!} />
+                    <RupturaTag diasDeCobertura={saldo!.diasDeCobertura!} previsaoChegada={saldo!.previsaoChegada} />
                   </div>
                 ) : null}
               </Link>

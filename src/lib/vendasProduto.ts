@@ -331,6 +331,15 @@ export type ProdutoSaldoEstoque = {
   // pra calcular "dias restantes" que faça sentido (mesmo com saldo baixo,
   // sem saída não é ruptura iminente), a UI trata isso não mostrando alerta.
   diasDeCobertura: number | null;
+  // Saldo em pedido de compra aberto (fábrica → CD) + previsão de chegada
+  // -- pedido do Victor 27/08/2026: "eu consigo puxar do protheus a
+  // previsao de chegada dos produtos?" (produto padrão de catálogo, não
+  // encomenda -- essa já tem prazo próprio, ver pedidosEncomenda.ts). O
+  // Protheus já manda os dois campos no mesmo WSStock que dá saldoAtual
+  // (ver syncStock, totvsSync.ts) -- só não estavam sendo lidos daqui.
+  // null = sem pedido de compra em aberto pra esse produto agora.
+  saldoEmPedidoCompra: number | null;
+  previsaoChegada: string | null;
 };
 
 const RUNWAY_DIAS_JANELA_VENDA = 30;
@@ -354,7 +363,7 @@ export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<
   // só por causa disso. Loga e devolve vazio em vez de derrubar a página.
   try {
     const [{ data: stockRows, error: stockError }, vendaPorProduto] = await Promise.all([
-      admin.from("totvs_stock").select("product_code, current_balance").in("product_code", productCodes),
+      admin.from("totvs_stock").select("product_code, current_balance, purchase_order_balance, estimated_arrival_date").in("product_code", productCodes),
       (async () => {
         const inicio = isoDateSub(RUNWAY_DIAS_JANELA_VENDA);
         const fim = isoDateSub(0);
@@ -379,17 +388,27 @@ export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<
     ]);
     if (stockError) throw new Error(stockError.message);
 
-    const saldoPorProduto = new Map<string, number>();
+    const stockPorProduto = new Map<string, { saldoAtual: number; saldoEmPedidoCompra: number | null; previsaoChegada: string | null }>();
     for (const row of stockRows ?? []) {
-      saldoPorProduto.set(row.product_code, Number(row.current_balance) || 0);
+      stockPorProduto.set(row.product_code, {
+        saldoAtual: Number(row.current_balance) || 0,
+        saldoEmPedidoCompra: row.purchase_order_balance != null ? Number(row.purchase_order_balance) : null,
+        previsaoChegada: row.estimated_arrival_date,
+      });
     }
 
     for (const code of productCodes) {
-      const saldoAtual = saldoPorProduto.get(code) ?? 0;
+      const stock = stockPorProduto.get(code);
+      const saldoAtual = stock?.saldoAtual ?? 0;
       const totalVendido = vendaPorProduto.get(code) ?? 0;
       const mediaDiaria = totalVendido / RUNWAY_DIAS_JANELA_VENDA;
       const diasDeCobertura = mediaDiaria > 0 ? saldoAtual / mediaDiaria : null;
-      resultado.set(code, { saldoAtual, diasDeCobertura });
+      resultado.set(code, {
+        saldoAtual,
+        diasDeCobertura,
+        saldoEmPedidoCompra: stock?.saldoEmPedidoCompra ?? null,
+        previsaoChegada: stock?.previsaoChegada ?? null,
+      });
     }
   } catch (err) {
     console.error("listSaldoEstoqueProdutos:", (err as Error).message);
