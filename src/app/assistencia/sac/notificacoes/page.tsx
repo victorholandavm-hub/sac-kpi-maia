@@ -10,7 +10,7 @@ import { SacTabs } from "@/components/assistencia/SacTabs";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
-import { EntregasGroupsList } from "@/components/assistencia/EntregasGroupsList";
+import { EntregasWeekGroups } from "@/components/assistencia/EntregasWeekGroups";
 import { EntregasKanbanHoje } from "@/components/assistencia/EntregasKanbanHoje";
 import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
@@ -320,9 +320,15 @@ export default async function SacNotificacoesPage({
           </p>
         </div>
       ) : (
+        // Hoje fica no Kanban (todayGroups); o resto (futuro + atrasado +
+        // sem rota) agrupado por semana -- pedido do Victor 26/08/2026:
+        // "divida os agrupamentos igual é na tela de visitas, agrupados
+        // por semana" (mesmo componente que a aba Entregas do admin usa,
+        // ver EntregasWeekGroups.tsx -- as duas telas não podem divergir
+        // de novo, ver comentário no topo deste arquivo).
         <div className="flex flex-col gap-4">
           <EntregasKanbanHoje groups={todayGroups} todayOverview={todayOverview} />
-          {restGroups.length > 0 ? <EntregasGroupsList groups={restGroups} now={now} /> : null}
+          {restGroups.length > 0 ? <EntregasWeekGroups groups={restGroups} now={now} /> : null}
         </div>
       )}
     </div>

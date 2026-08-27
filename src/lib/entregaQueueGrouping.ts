@@ -178,6 +178,16 @@ export type QueueGroup = {
   // -- groupByDate (Visitas) não agrupa por rota, não preenche.
   rotaKey?: Rota | "sem_rota";
   rotaLabel?: string;
+  // Data "crua" (YYYY-MM-DD) por trás do dateBucket -- null quando o grupo
+  // é o pseudo-dia "sem data definida" (nenhum item com scheduledDate nem
+  // approvedDeadline, ver groupByScheduledDate). Pedido do Victor
+  // 26/08/2026: agrupar a aba Entregas/notificações por semana como já é
+  // em Visitas (groupIntoWeeks, weekGrouping.ts) -- esse agrupador precisa
+  // de uma data de verdade por grupo, não do `key` composto
+  // (`${data}_${rota}`) que já existe aqui. Só existe em groupByRota --
+  // groupByDate (Visitas) não precisa, já usa a data crua como o próprio
+  // `key`.
+  dateKey?: string | null;
 };
 
 export const DATE_BUCKET_TAG: Record<DateBucketKey, { label: string; bg: string } | null> = {
@@ -217,6 +227,7 @@ export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
     for (const rotaInfo of rotaOrder) {
       const items = dateGroup.items.filter((r) => (r.rota ?? "sem_rota") === rotaInfo.key);
       if (items.length === 0) continue;
+      const rawDateKey = dateGroup.dateKey === NO_SCHEDULED_DATE_KEY ? null : dateGroup.dateKey;
       groups.push({
         key: `${dateGroup.dateKey}_${rotaInfo.key}`,
         label: `${rotaInfo.rotaLabel} · ${dateGroup.label}`,
@@ -224,10 +235,11 @@ export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
         headerText: rotaInfo.headerText,
         borderColor: rotaInfo.borderColor,
         items,
-        dateBucket: bucketByScheduledDate(dateGroup.dateKey === NO_SCHEDULED_DATE_KEY ? null : dateGroup.dateKey),
+        dateBucket: bucketByScheduledDate(rawDateKey),
         isSemRota: rotaInfo.key === "sem_rota",
         rotaKey: rotaInfo.key,
         rotaLabel: rotaInfo.rotaLabel,
+        dateKey: rawDateKey,
       });
     }
   }

@@ -7,7 +7,7 @@ import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES } from "@/
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
-import { EntregasGroupsList } from "@/components/assistencia/EntregasGroupsList";
+import { EntregasWeekGroups } from "@/components/assistencia/EntregasWeekGroups";
 import { EntregasKanbanHoje } from "@/components/assistencia/EntregasKanbanHoje";
 import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
@@ -590,10 +590,13 @@ export default async function AssistenciaQueuePage({
         </div>
       ) : showPecas ? (
         // Compartilhado com a tela de notificações do SAC -- ver
-        // EntregasKanbanHoje.tsx/EntregasGroupsList.tsx.
+        // EntregasKanbanHoje.tsx/EntregasWeekGroups.tsx. Hoje fica no
+        // Kanban (todayGroups); o resto (futuro + atrasado + sem rota)
+        // agrupado por semana -- pedido do Victor 26/08/2026: "divida os
+        // agrupamentos igual é na tela de visitas, agrupados por semana".
         <div className="flex flex-col gap-4">
           <EntregasKanbanHoje groups={todayGroups} todayOverview={todayOverview} />
-          {restGroups.length > 0 ? <EntregasGroupsList groups={restGroups} now={now} /> : null}
+          {restGroups.length > 0 ? <EntregasWeekGroups groups={restGroups} now={now} /> : null}
         </div>
       ) : (
         // Agrupado por semana -- pedido do Victor 25/08/2026: "na tela de
