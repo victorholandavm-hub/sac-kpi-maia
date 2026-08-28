@@ -479,6 +479,21 @@ export async function searchProdutosEstoque(query: string): Promise<ProdutoSuges
   return (data ?? []).map((r) => ({ productCode: r.product_code, description: r.description }));
 }
 
+// Nome do produto a partir do código -- pedido do Victor 28/08/2026: "no
+// cadastro do estoque, puxe o nome do produto pelo código do produto"
+// (formulário "Nova movimentação de estoque", ver
+// NewStockMovementForm.tsx). `ilike` sem `%` faz busca exata só que
+// insensível a maiúsculas/minúsculas -- código digitado em caixa
+// diferente da cadastrada no Protheus (aconteceu de verdade na
+// importação histórica, ex. "l001918") ainda acha o produto.
+export async function getProdutoNomePorCodigo(code: string): Promise<string | null> {
+  const trimmed = code.trim();
+  if (!trimmed) return null;
+  const admin = getSupabaseAdmin();
+  const { data } = await admin.from("totvs_stock").select("description").ilike("product_code", trimmed).maybeSingle();
+  return data?.description ?? null;
+}
+
 // Um produto só, por código exato -- resolve o card de detalhe da tela
 // "Prazos de produtos" quando a busca (searchProdutosEstoque) resolve pra
 // 1 resultado só. Mesma leitura de totvs_stock de
