@@ -61,6 +61,24 @@ export default async function PrazosProdutosPage({
     <div className="flex flex-col gap-6">
       <AssistenciaHeader title="Prazos de produtos" subtitle="Saldo no CD e previsão de chegada, direto do Protheus (produto padrão de catálogo, não encomenda)." />
 
+      {/* Aviso sobre a limitação real da API do Protheus -- pedido do
+          Victor 28/08/2026, depois de achar um produto (Roupeiro Domo)
+          com "Em pedido" divergente do que ele via direto no Protheus.
+          Causa raiz (documentada em APIs/totvs8.md, endpoint WSStock):
+          "estimatedQty, purchaseOrderBalance e estimatedArrivalDate vêm
+          do primeiro pedido de compra em aberto do produto (menor
+          C7_NUM)" -- se o produto tiver mais de um pedido de compra
+          aberto ao mesmo tempo, só o mais antigo aparece aqui, os outros
+          somem (a API não soma nem lista todos -- não tem outro
+          endpoint que traga isso). Não é bug do nosso sync, é limitação
+          da API -- "deixe o aviso, já que você nao consegue mostrar
+          todos". */}
+      <p className="text-xs rounded-lg px-3 py-2" style={{ background: "var(--brand-orange-soft)", color: "var(--text-secondary)" }}>
+        ⚠ &quot;Em pedido de compra&quot; e &quot;Previsão de chegada&quot; mostram só o <strong>primeiro</strong> pedido de compra em
+        aberto do produto (o mais antigo) -- limitação da API do Protheus, não soma nem lista os outros. Se o produto tiver mais de
+        um pedido aberto ao mesmo tempo, o número daqui pode ficar menor que o total real no Protheus.
+      </p>
+
       <form action="/assistencia/prazos-produtos" method="GET" className="flex items-center gap-2 flex-wrap">
         <input
           type="search"
