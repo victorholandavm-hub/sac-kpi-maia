@@ -1,20 +1,22 @@
 import { getAssistenciaKpiData } from "@/lib/kpiAssistencia";
 import { resolveRange } from "@/lib/dateRange";
 import { AppHeader } from "@/components/AppHeader";
+import { KpisSectionTabs } from "@/components/KpisSectionTabs";
 import { RangePicker } from "@/components/RangePicker";
 import { KpisAssistenciaView } from "@/components/KpisAssistenciaView";
 
 export const revalidate = 60;
 
-// Página própria (fora do painel de KPIs geral) -- pedido do Victor
-// 27/08/2026: "preciso que os kpis da assistencia fiquem numa aba
-// separada, sozinha" (era a 4ª aba de /kpis por um dia, ver
-// Dashboard.tsx). Título "Relatório de Assistência" (rota/arquivo
-// continuam kpis-assistencia, só o texto visível mudou -- pedido do
-// Victor 27/08/2026). Mesmo padrão de /avaliacoes (RangePicker com
-// basePath próprio, AppHeader compartilhado). Dados vêm de
-// service_requests -- domínio separado do resto do painel (conversas do
-// GHL, ver kpi.ts), ver kpiAssistencia.ts.
+// Sub-aba "Assistência" de KPIs -- pedido do Victor 27/08/2026: "os kpis
+// da aba de entregas/notificação de assistencia precisa ir mesmo lá para
+// o sac.lojasmaia.com.br e precisa estar dentro da aba KPIs e dentro
+// dessa aba subaba com SAC e outra aba Assistencia" (refinamento de
+// "preciso que os kpis da assistencia fiquem numa aba separada,
+// sozinha", pedido mais cedo no mesmo dia -- ainda é rota própria, IDs/
+// arquivo continuam kpis-assistencia, só a apresentação virou sub-aba de
+// KPIs em vez de item solto no menu, ver KpisSectionTabs.tsx/
+// AppHeader.tsx). Dados vêm de service_requests -- domínio separado do
+// resto do painel (conversas do GHL, ver kpi.ts), ver kpiAssistencia.ts.
 export default async function KpisAssistenciaPage({
   searchParams,
 }: {
@@ -27,6 +29,7 @@ export default async function KpisAssistenciaPage({
   return (
     <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
       <AppHeader />
+      <KpisSectionTabs active="assistencia" />
 
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>

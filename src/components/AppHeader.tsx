@@ -5,10 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOutDashboard } from "@/app/login/actions";
 
+// "Relatório de Assistência" saiu daqui 27/08/2026 (pedido do Victor:
+// "precisa estar dentro da aba KPIs e dentro dessa aba subaba com SAC e
+// outra aba Assistencia") -- virou sub-aba de "KPIs" (KpisSectionTabs.tsx,
+// dentro de /kpis e /kpis-assistencia), não item solto aqui. `pathname.
+// startsWith("/kpis")` já cobre as duas rotas de propósito (mesmo prefixo).
 const TABS = [
   { key: "home", label: "Início", href: "/" },
   { key: "kpis", label: "KPIs", href: "/kpis" },
-  { key: "kpis-assistencia", label: "Relatório de Assistência", href: "/kpis-assistencia" },
   { key: "clientes", label: "Clientes", href: "/clientes" },
   { key: "vendas", label: "Vendas", href: "/vendas" },
   { key: "avaliacoes", label: "Avaliações", href: "/avaliacoes" },

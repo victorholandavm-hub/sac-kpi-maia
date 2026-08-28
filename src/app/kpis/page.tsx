@@ -3,6 +3,7 @@ import { resolveRange } from "@/lib/dateRange";
 import { categoryLabel, storeLabel } from "@/lib/labels";
 import { Dashboard } from "@/components/Dashboard";
 import { AppHeader } from "@/components/AppHeader";
+import { KpisSectionTabs } from "@/components/KpisSectionTabs";
 
 export const revalidate = 60;
 
@@ -18,8 +19,9 @@ export default async function KpisPage({
   const data = await getKpiData(range, { categoryLabel, storeLabel });
   return (
     <>
-      <div className="max-w-6xl mx-auto px-6 pt-6">
+      <div className="max-w-6xl mx-auto px-6 pt-6 flex flex-col gap-4">
         <AppHeader />
+        <KpisSectionTabs active="sac" />
       </div>
       <Dashboard data={data} range={range} />
     </>
