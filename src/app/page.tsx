@@ -22,7 +22,7 @@ export default async function Home() {
             KPIs
           </h2>
           <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            Indicadores de atendimento do SAC.
+            Indicadores de atendimento do SAC — e da assistência técnica, numa sub-aba própria.
           </p>
         </Link>
         <Link
