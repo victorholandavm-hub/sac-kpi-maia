@@ -45,7 +45,17 @@ export function isShift(value: string | undefined | null): value is Shift {
 // EditServiceRequestForm.tsx/PublicRequestForm.tsx, centralizado aqui pra
 // não duplicar (ver montador-actions.ts/loja/page.tsx, que também
 // precisam disso pra pular a avaliação do "cliente").
+//
+// "Loja 216" -- pedido do Victor 28/08/2026: "nas montagens da loja de
+// campina grande, ao inves de colocaram mostruario, colocaram loja 216,
+// voce precisa classificar esses como mostruario tambem". Maia Campina
+// Grande usa esse texto como client_name (com order_code "000000", não
+// null) em vez do padrão "Mostruário — <Loja>" -- reconhecido aqui como
+// alias equivalente, central o bastante pra propagar sozinho pro filtro
+// Alvo (relatórios/indicadores/pagamento), fila, avaliação de cliente
+// etc., tudo que já usa essa função.
 export function isMostruarioRequest(orderCode: string | null | undefined, clientName: string | null | undefined): boolean {
+  if (clientName === "Loja 216") return true;
   return !orderCode && (clientName ?? "").startsWith("Mostruário — ");
 }
 

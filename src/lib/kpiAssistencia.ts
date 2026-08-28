@@ -86,6 +86,21 @@ function titleCase(s: string): string {
     .join("");
 }
 
+// Apelido/variação do mesmo conferente que a normalização de caixa acima
+// não resolve sozinha (texto genuinamente diferente, não só maiúscula/
+// minúscula) -- pedido do Victor 28/08/2026: "vinicius jp e vinicios sao
+// a mesma pessoa". Chave e valor já em caixa alta (mesmo formato da
+// chave de agrupamento) -- extensível pra próximo caso parecido, sem
+// precisar duplicar a lógica de agrupamento.
+const CONFERENTE_ALIASES: Record<string, string> = {
+  "VINICIUS JP": "VINICIOS",
+};
+
+function canonicalConferenteKey(raw: string): string {
+  const upper = raw.trim().toUpperCase();
+  return CONFERENTE_ALIASES[upper] ?? upper;
+}
+
 // Mesmo espírito do `aggregate()` de getRequestsReport (serviceRequests.ts)
 // -- agrupa por chave, guarda os chamados de cada grupo pro drill-down
 // (aqui num Record só, `ticketsByTag`, compartilhado entre todos os
@@ -200,7 +215,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   // caixa diferente, conta junto), exibe sempre em Title Case.
   const byConferente = aggregate(
     rows.filter((r) => r.causa_raiz === "erro_conferencia" && r.causa_conferente),
-    (r) => r.causa_conferente!.trim().toUpperCase(),
+    (r) => canonicalConferenteKey(r.causa_conferente!),
     titleCase,
     ticketsByTag,
     "conferente"

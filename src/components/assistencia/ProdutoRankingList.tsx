@@ -107,8 +107,13 @@ export function ProdutoRankingList({
                       {formatBRL(item.valor)}
                     </span>
                     {saldo ? (
+                      // Disponível = saldo atual - reservado (o que já foi
+                      // vendido) -- pedido do Victor 28/08/2026, corrigindo
+                      // um mislabel: antes mostrava saldoAtual (saldo
+                      // físico bruto) sob esse rótulo, sem descontar o que
+                      // já tinha venda feita em cima.
                       <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                        Disponível: {saldo.saldoAtual} un
+                        Disponível: {saldo.saldoDisponivel} un
                       </span>
                     ) : null}
                   </div>
