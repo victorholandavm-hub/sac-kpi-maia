@@ -8,7 +8,7 @@ import {
   ITEM_DESTINO_LABELS,
   ITEM_DESTINO_COLORS,
   ITEM_DESTINO_NEEDS_STORE,
-  ITEM_DESTINO_NEEDS_NOTE,
+  ITEM_DESTINO_NEEDS_TEXT,
   type ItemDestino,
 } from "@/lib/tecnicos";
 import type { Store } from "@/lib/serviceRequests";
@@ -31,20 +31,22 @@ export function TecnicoItemDestino({
   // -- pedido do Victor 21/08/2026: "enviado para mostruario... eles
   // teriam que selecionar a loja pra qual foi enviada".
   destinoLojaName: string | null;
-  // Só usado quando destino === "em_observacao" (ver
-  // ITEM_DESTINO_NEEDS_NOTE) -- pedido do Victor 24/08/2026: "abre um
-  // campo de texto livre e quando confirma ja vai para o status em
-  // observação".
+  // Só usado quando destino está em ITEM_DESTINO_NEEDS_TEXT -- pedido do
+  // Victor 24/08/2026 ("em_observacao": "abre um campo de texto livre e
+  // quando confirma ja vai para o status em observação") e 28/08/2026
+  // ("outro": "abre uma caixa de texto livre pra digitar").
   destinoObservacao: string | null;
   stores: Store[];
 }) {
   const { pending, run } = useQuickAction();
-  // "mostruario" pede a loja, "em_observacao" pede uma nota -- os únicos
-  // dois destinos que abrem um passo extra antes de confirmar, o resto
-  // continua clique único de sempre.
+  // "mostruario" pede a loja, "em_observacao"/"outro" pedem uma nota --
+  // os únicos destinos que abrem um passo extra antes de confirmar, o
+  // resto continua clique único de sempre. `pickingNote` guarda QUAL dos
+  // dois foi clicado (não só um boolean) -- precisam de placeholder e
+  // destino final diferentes no mesmo textarea.
   const [pickingStore, setPickingStore] = useState(false);
   const [storeId, setStoreId] = useState("");
-  const [pickingNote, setPickingNote] = useState(false);
+  const [pickingNote, setPickingNote] = useState<ItemDestino | null>(null);
   const [note, setNote] = useState("");
 
   if (destino) {
@@ -74,7 +76,7 @@ export function TecnicoItemDestino({
             ↩ desfazer
           </button>
         </div>
-        {destino === ITEM_DESTINO_NEEDS_NOTE && destinoObservacao ? (
+        {ITEM_DESTINO_NEEDS_TEXT.includes(destino) && destinoObservacao ? (
           <p className="text-xs whitespace-pre-line" style={{ color: "var(--text-secondary)" }}>
             {destinoObservacao}
           </p>
@@ -134,7 +136,7 @@ export function TecnicoItemDestino({
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Por que está em observação?"
+          placeholder={pickingNote === "outro" ? "Descreva a classificação…" : "Por que está em observação?"}
           rows={2}
           className="text-xs rounded border px-2 py-1.5 w-full"
           style={{ borderColor: "var(--border)" }}
@@ -146,19 +148,19 @@ export function TecnicoItemDestino({
             disabled={pending || !note.trim()}
             onClick={() =>
               run(
-                () => setItemDestino(itemId, ITEM_DESTINO_NEEDS_NOTE, undefined, note),
-                `Destino: ${ITEM_DESTINO_LABELS[ITEM_DESTINO_NEEDS_NOTE]}.`
+                () => setItemDestino(itemId, pickingNote, undefined, note),
+                `Destino: ${ITEM_DESTINO_LABELS[pickingNote]}.`
               )
             }
             className="text-xs rounded-full px-2.5 py-1 font-medium disabled:opacity-60"
-            style={{ background: ITEM_DESTINO_COLORS[ITEM_DESTINO_NEEDS_NOTE], color: "#fff" }}
+            style={{ background: ITEM_DESTINO_COLORS[pickingNote], color: "#fff" }}
           >
             Confirmar
           </button>
           <button
             type="button"
             onClick={() => {
-              setPickingNote(false);
+              setPickingNote(null);
               setNote("");
             }}
             className="text-xs underline"
@@ -181,8 +183,8 @@ export function TecnicoItemDestino({
           onClick={() =>
             d === ITEM_DESTINO_NEEDS_STORE
               ? setPickingStore(true)
-              : d === ITEM_DESTINO_NEEDS_NOTE
-                ? setPickingNote(true)
+              : ITEM_DESTINO_NEEDS_TEXT.includes(d)
+                ? setPickingNote(d)
                 : run(() => setItemDestino(itemId, d), `Destino: ${ITEM_DESTINO_LABELS[d]}.`)
           }
           className="text-xs rounded-full px-2.5 py-1 border font-medium whitespace-nowrap disabled:opacity-60"
