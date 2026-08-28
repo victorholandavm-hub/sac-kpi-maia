@@ -14,18 +14,26 @@ import {
 } from "@/lib/assistenciaLabels";
 import { CausaRaizDonutChart } from "@/components/CausaRaizDonutChart";
 
-const REQUEST_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
+// Seletor de Tipo da seção Indicadores -- pedido do Victor 28/08/2026:
+// "no filtros nao precisa ter recolhimento de peça e envio de peça e
+// notificação externa e nem vistoria. só montagem e desmontagem". Essa
+// tela é especificamente de relatório de MONTAGEM (ver
+// REQUEST_REPORT_TYPES logo abaixo, já restrito aos dois desde
+// 24/08/2026) -- os outros tipos de assistência (recolhimento/troca de
+// peça/vistoria/notificação externa) saem do seletor por não fazerem
+// sentido aqui. Com só 2 tipos sobrando, "Todos os tipos" virou
+// sinônimo exato de "Montagem/Desmontagem (junto)" -- removido daqui
+// por ser redundante, só sobrou o combinado.
+const REQUEST_TYPES = ["montagem", "desmontagem"] as const;
 
 // Opções do seletor "Tipo" da seção Indicadores -- pedido do Victor
 // 27/08/2026: "nos filtros por tipo, tenha a opção de montagem/
 // desmontagem, juntos acumulando os dois dentro de um só mas mantenha a
 // opção deles separados também". "montagem_desmontagem" é só mais uma
-// combinação de tipos (ver INDICATOR_TYPE_GROUPS), do mesmo jeito que
-// "todos" já era -- nenhum tipo sai do seletor, só ganhou essa opção
-// extra que soma Montagem + Desmontagem sem substituir as duas
-// separadas.
+// combinação de tipos (ver indicatorTypesFor) -- nenhum tipo sai do
+// seletor, só ganhou essa opção extra que soma Montagem + Desmontagem
+// sem substituir as duas separadas.
 const INDICATOR_TYPE_GROUPS: Record<string, { label: string; types: readonly RequestType[] }> = {
-  todos: { label: "todos os tipos", types: REQUEST_TYPES },
   montagem_desmontagem: { label: "montagem/desmontagem", types: ["montagem", "desmontagem"] },
 };
 
@@ -169,9 +177,8 @@ function KpiCardWhite({ label, value, barColor, big }: { label: string; value: s
 // formato reaproveitado nas 3 tabelas de indicadores por tipo (mês/
 // montador/loja) e no relatório principal (loja/tipo/vendedor/causa raiz).
 // `showType` só liga quando mais de um tipo tá misturado na mesma lista
-// ("Todos os tipos" ou "Montagem/Desmontagem" juntos) -- com um tipo só
-// selecionado, repetir o tipo em toda linha é ruído (já está no título da
-// seção).
+// ("Montagem/Desmontagem" juntos) -- com um tipo só selecionado, repetir
+// o tipo em toda linha é ruído (já está no título da seção).
 function IndicatorItemsList({ items, showType }: { items: IndicatorItem[]; showType?: boolean }) {
   return (
     <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -567,7 +574,6 @@ export default async function RelatoriosPage({
             <input type="hidden" name="to" value={dateTo} />
             <input type="hidden" name="indTab" value={indTab} />
             <select name="tipo" defaultValue={indicatorTypeKey} className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--border)" }}>
-              <option value="todos">Todos os tipos</option>
               <option value="montagem_desmontagem">Montagem/Desmontagem (junto)</option>
               {REQUEST_TYPES.map((t) => (
                 <option key={t} value={t}>
