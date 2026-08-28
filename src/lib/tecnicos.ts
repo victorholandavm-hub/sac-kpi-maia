@@ -18,7 +18,15 @@ import type { RequestType } from "./serviceRequests";
 // abre um campo de texto livre e quando confirma ja vai para o status em
 // observação". Mesmo padrão do "mostruario" (pede um dado extra antes de
 // confirmar), só que texto livre em vez de loja -- ver
-// ITEM_DESTINO_NEEDS_NOTE/destinoObservacao abaixo.
+// ITEM_DESTINO_NEEDS_TEXT/destinoObservacao abaixo.
+// "outro" -- pedido do Victor 28/08/2026: "precisa de mais uma
+// possibilidade de classificação que é 'outro' onde a equipe quando
+// selecionar abre uma caixa de texto livre pra digitar". Mesmo campo de
+// texto livre de "em_observacao" (reaproveita destino_observacao, ver
+// ITEM_DESTINO_NEEDS_TEXT abaixo) -- mas, diferente de "em_observacao",
+// "outro" NÃO vira uma fase própria: conta direto como "classificados" em
+// itemPhase() (tecnico/page.tsx), é só mais uma classificação final com
+// texto livre em vez de categoria fixa.
 export const ITEM_DESTINOS = [
   "fabrica",
   "estoque",
@@ -28,6 +36,7 @@ export const ITEM_DESTINOS = [
   "pequena_avaria",
   "peca_enviada",
   "em_observacao",
+  "outro",
 ] as const;
 export type ItemDestino = (typeof ITEM_DESTINOS)[number];
 
@@ -44,6 +53,7 @@ export const ITEM_DESTINO_LABELS: Record<ItemDestino, string> = {
   pequena_avaria: "Pequena avaria",
   peca_enviada: "Peça enviada",
   em_observacao: "Em observação",
+  outro: "Outro",
 };
 
 export const ITEM_DESTINO_COLORS: Record<ItemDestino, string> = {
@@ -55,16 +65,24 @@ export const ITEM_DESTINO_COLORS: Record<ItemDestino, string> = {
   pequena_avaria: "var(--series-5)",
   peca_enviada: "var(--brand-green)",
   em_observacao: "var(--series-3)",
+  outro: "var(--text-muted)",
 };
 
 // Único destino que precisa de um dado extra -- pra qual loja o item foi
 // enviado (ver ITEM_DESTINOS acima).
 export const ITEM_DESTINO_NEEDS_STORE: ItemDestino = "mostruario";
 
-// O outro destino que precisa de um dado extra -- por que está em
-// observação, texto livre (ver ITEM_DESTINO_NEEDS_STORE acima, mesma
-// ideia).
+// Fase própria "em observação" (ver itemPhase em tecnico/page.tsx) --
+// continua um valor único, diferente de ITEM_DESTINO_NEEDS_TEXT abaixo
+// (que também inclui "outro", mas "outro" não muda de fase).
 export const ITEM_DESTINO_NEEDS_NOTE: ItemDestino = "em_observacao";
+
+// Destinos que pedem um dado extra -- texto livre em vez de loja (ver
+// ITEM_DESTINO_NEEDS_STORE acima, mesma ideia) -- "em_observacao" (por
+// que está em observação) e "outro" (qual foi a classificação). Os dois
+// compartilham a mesma coluna destino_observacao/mesmo componente de UI
+// (TecnicoItemDestino.tsx), só o texto do placeholder muda.
+export const ITEM_DESTINO_NEEDS_TEXT: ItemDestino[] = ["em_observacao", "outro"];
 
 export type TecnicoWithPinStatus = { name: string; hasPin: boolean };
 
@@ -98,8 +116,9 @@ export type TecnicoItem = {
   // ITEM_DESTINO_NEEDS_STORE) -- pra qual loja o item foi enviado.
   destinoLojaId: string | null;
   destinoLojaName: string | null;
-  // Só preenchido quando destino === "em_observacao" (ver
-  // ITEM_DESTINO_NEEDS_NOTE) -- o motivo, texto livre.
+  // Só preenchido quando destino está em ITEM_DESTINO_NEEDS_TEXT
+  // ("em_observacao": o motivo; "outro": a classificação em si) -- texto
+  // livre.
   destinoObservacao: string | null;
 };
 
