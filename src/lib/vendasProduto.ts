@@ -326,10 +326,29 @@ export async function listRankingProdutos(range: DateRange, limit: number, categ
 }
 
 export type ProdutoSaldoEstoque = {
+  // "o que tem em estoque" -- saldo físico no CD (current_balance),
+  // independente de já estar comprometido com venda ou não.
   saldoAtual: number;
+  // "número de vendas já feitas daquele produto" (reserved_qty, WSStock)
+  // -- pedido do Victor 28/08/2026, corrigindo o entendimento anterior
+  // (esse campo existia sincronizado desde sempre em totvs_stock, mas
+  // nunca tinha sido lido daqui). Pode passar do saldoAtual (produto
+  // vendido além do que tem fisicamente no CD, aguardando reposição) --
+  // de propósito não fica negativo aqui, só saldoDisponivel reflete isso.
+  saldoReservado: number;
+  // "o que tem disponível" pra vender de novo = saldoAtual - saldoReservado
+  // -- pedido do Victor 28/08/2026: "entenda que: qtd. disponivel é o que
+  // tem disponivel, qtd. atual é o que tem em estoque e qtd. de reserva é
+  // o numero de vendas ja feitas". Sem clamp em 0 de propósito: negativo
+  // significa produto vendido além do saldo físico (oversold) -- sinal
+  // real pro comprador, não bug (708 dos 3635 produtos do catálogo estão
+  // nesse estado hoje).
+  saldoDisponivel: number;
   // null = sem venda nos últimos RUNWAY_DIAS_JANELA_VENDA dias -- não dá
   // pra calcular "dias restantes" que faça sentido (mesmo com saldo baixo,
   // sem saída não é ruptura iminente), a UI trata isso não mostrando alerta.
+  // Baseado em saldoDisponivel (não saldoAtual) -- unidade já reservada
+  // não conta como cobertura de venda futura.
   diasDeCobertura: number | null;
   // Saldo em pedido de compra aberto (fábrica → CD) + previsão de chegada
   // -- pedido do Victor 27/08/2026: "eu consigo puxar do protheus a
@@ -363,7 +382,10 @@ export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<
   // só por causa disso. Loga e devolve vazio em vez de derrubar a página.
   try {
     const [{ data: stockRows, error: stockError }, vendaPorProduto] = await Promise.all([
-      admin.from("totvs_stock").select("product_code, current_balance, purchase_order_balance, estimated_arrival_date").in("product_code", productCodes),
+      admin
+        .from("totvs_stock")
+        .select("product_code, current_balance, reserved_qty, purchase_order_balance, estimated_arrival_date")
+        .in("product_code", productCodes),
       (async () => {
         const inicio = isoDateSub(RUNWAY_DIAS_JANELA_VENDA);
         const fim = isoDateSub(0);
@@ -388,10 +410,14 @@ export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<
     ]);
     if (stockError) throw new Error(stockError.message);
 
-    const stockPorProduto = new Map<string, { saldoAtual: number; saldoEmPedidoCompra: number | null; previsaoChegada: string | null }>();
+    const stockPorProduto = new Map<
+      string,
+      { saldoAtual: number; saldoReservado: number; saldoEmPedidoCompra: number | null; previsaoChegada: string | null }
+    >();
     for (const row of stockRows ?? []) {
       stockPorProduto.set(row.product_code, {
         saldoAtual: Number(row.current_balance) || 0,
+        saldoReservado: Number(row.reserved_qty) || 0,
         saldoEmPedidoCompra: row.purchase_order_balance != null ? Number(row.purchase_order_balance) : null,
         previsaoChegada: row.estimated_arrival_date,
       });
@@ -400,11 +426,15 @@ export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<
     for (const code of productCodes) {
       const stock = stockPorProduto.get(code);
       const saldoAtual = stock?.saldoAtual ?? 0;
+      const saldoReservado = stock?.saldoReservado ?? 0;
+      const saldoDisponivel = saldoAtual - saldoReservado;
       const totalVendido = vendaPorProduto.get(code) ?? 0;
       const mediaDiaria = totalVendido / RUNWAY_DIAS_JANELA_VENDA;
-      const diasDeCobertura = mediaDiaria > 0 ? saldoAtual / mediaDiaria : null;
+      const diasDeCobertura = mediaDiaria > 0 ? saldoDisponivel / mediaDiaria : null;
       resultado.set(code, {
         saldoAtual,
+        saldoReservado,
+        saldoDisponivel,
         diasDeCobertura,
         saldoEmPedidoCompra: stock?.saldoEmPedidoCompra ?? null,
         previsaoChegada: stock?.previsaoChegada ?? null,
@@ -420,6 +450,10 @@ export type ProdutoPrazo = {
   productCode: string;
   description: string | null;
   saldoAtual: number;
+  // Ver ProdutoSaldoEstoque (mesmos campos/definições, reaproveitados
+  // aqui pra tela "Prazos de produtos" -- pedido do Victor 28/08/2026).
+  saldoReservado: number;
+  saldoDisponivel: number;
   saldoEmPedidoCompra: number | null;
   previsaoChegada: string | null;
   diasDeCobertura: number | null;
@@ -461,10 +495,13 @@ export async function getProdutoPrazo(productCode: string): Promise<ProdutoPrazo
   if (!data) return null;
 
   const saldo = (await listSaldoEstoqueProdutos([productCode])).get(productCode);
+  const saldoAtual = Number(data.current_balance) || 0;
   return {
     productCode: data.product_code,
     description: data.description,
-    saldoAtual: Number(data.current_balance) || 0,
+    saldoAtual,
+    saldoReservado: saldo?.saldoReservado ?? 0,
+    saldoDisponivel: saldo?.saldoDisponivel ?? saldoAtual,
     saldoEmPedidoCompra: data.purchase_order_balance != null ? Number(data.purchase_order_balance) : null,
     previsaoChegada: data.estimated_arrival_date,
     diasDeCobertura: saldo?.diasDeCobertura ?? null,
@@ -494,14 +531,20 @@ export async function listProdutosComPedidoDeCompra(): Promise<ProdutoPrazo[]> {
   const codes = rows.map((r) => r.product_code);
   const saldoPorProduto = await listSaldoEstoqueProdutos(codes);
 
-  return rows.map((r) => ({
-    productCode: r.product_code,
-    description: r.description,
-    saldoAtual: Number(r.current_balance) || 0,
-    saldoEmPedidoCompra: r.purchase_order_balance != null ? Number(r.purchase_order_balance) : null,
-    previsaoChegada: r.estimated_arrival_date,
-    diasDeCobertura: saldoPorProduto.get(r.product_code)?.diasDeCobertura ?? null,
-  }));
+  return rows.map((r) => {
+    const saldoAtual = Number(r.current_balance) || 0;
+    const saldo = saldoPorProduto.get(r.product_code);
+    return {
+      productCode: r.product_code,
+      description: r.description,
+      saldoAtual,
+      saldoReservado: saldo?.saldoReservado ?? 0,
+      saldoDisponivel: saldo?.saldoDisponivel ?? saldoAtual,
+      saldoEmPedidoCompra: r.purchase_order_balance != null ? Number(r.purchase_order_balance) : null,
+      previsaoChegada: r.estimated_arrival_date,
+      diasDeCobertura: saldo?.diasDeCobertura ?? null,
+    };
+  });
 }
 
 export type ProdutoTendencia = { variacaoPct: number | null };

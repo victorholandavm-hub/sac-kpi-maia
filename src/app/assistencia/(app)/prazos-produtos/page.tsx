@@ -120,6 +120,14 @@ export default async function PrazosProdutosPage({
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatTile label="Saldo no CD" value={produto.saldoAtual} suffix="un" accent="var(--series-1)" />
+            {/* Disponível = saldo atual - reservado (vendas já feitas) --
+                pedido do Victor 28/08/2026: "qtd. disponivel é o que tem
+                disponivel... qtd de reserva - qtd atual = qtd disponivel"
+                (fórmula com a ordem invertida no pedido, aplicada aqui na
+                ordem que bate com o significado -- atual menos o que já
+                foi vendido). Pode ficar negativo (produto vendido além do
+                saldo físico) -- sinal real pro comprador, sem esconder. */}
+            <StatTile label="Disponível" value={produto.saldoDisponivel} suffix="un" accent="var(--series-5)" />
             {produto.saldoEmPedidoCompra !== null ? (
               <StatTile label="Em pedido de compra" value={produto.saldoEmPedidoCompra} suffix="un" accent="var(--series-4)" />
             ) : null}
@@ -169,6 +177,9 @@ export default async function PrazosProdutosPage({
                   <div className="flex items-center gap-4 text-right shrink-0">
                     <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       Saldo CD: <strong>{p.saldoAtual}un</strong>
+                    </span>
+                    <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      Disponível: <strong>{p.saldoDisponivel}un</strong>
                     </span>
                     <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       Em pedido: <strong>{p.saldoEmPedidoCompra ?? "—"}un</strong>
