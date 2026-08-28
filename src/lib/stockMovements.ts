@@ -77,8 +77,35 @@ export function isPendingWithdrawal(m: Pick<StockMovement, "movementType" | "mov
   return m.movementType === "retirado" && !m.movementDate;
 }
 
+// Data "efetiva" de cada movimentação -- pra agrupar por semana/dia (ver
+// /assistencia/estoque) e pro filtro De/Até. Pendente de retirada não tem
+// movement_date ainda -- usa a data de lançamento (quando a assistência
+// registrou) como aproximação, senão created_at (nem sempre lançada).
+export function effectiveDateKey(m: Pick<StockMovement, "movementDate" | "loggedDate" | "createdAt">): string {
+  return m.movementDate ?? m.loggedDate ?? m.createdAt.slice(0, 10);
+}
+
+// "PED:NN" embutido no texto livre de observações (ver OBS ADRIEL na
+// planilha original) -- pedido do Victor 28/08/2026: "logo abaixo, o
+// código do produto e o número do pedido". Extrai o número pra exibir
+// separado; o resto do texto continua disponível em `notes`.
+export function extractPedido(notes: string | null): string | null {
+  if (!notes) return null;
+  const match = notes.match(/PED:\s*(\S+)/i);
+  return match ? match[1] : null;
+}
+
 export async function listStockMovements(
-  opts: { movementType?: MovementType; q?: string; onlyPendingWithdrawal?: boolean } = {}
+  opts: {
+    movementType?: MovementType;
+    q?: string;
+    onlyPendingWithdrawal?: boolean;
+    factory?: string;
+    // Responsável -- ou quem registrou (assistência) ou quem confirmou a
+    // retirada (equipe técnica), o que der pra achar primeiro. Ver
+    // listDistinctResponsibles abaixo pras opções desse filtro.
+    responsavel?: string;
+  } = {}
 ): Promise<StockMovement[]> {
   const admin = getSupabaseAdmin();
   let query = admin.from("stock_movements").select(COLUMNS).order("created_at", { ascending: false });
@@ -88,6 +115,12 @@ export async function listStockMovements(
   }
   if (opts.onlyPendingWithdrawal) {
     query = query.eq("movement_type", "retirado").is("movement_date", null);
+  }
+  if (opts.factory) {
+    query = query.eq("factory", opts.factory);
+  }
+  if (opts.responsavel) {
+    query = query.or(`responsible.eq.${opts.responsavel},withdrawn_by.eq.${opts.responsavel}`);
   }
 
   const q = opts.q?.trim();
@@ -100,4 +133,21 @@ export async function listStockMovements(
   if (error) throw new Error(error.message);
 
   return ((data ?? []) as unknown as StockMovementRow[]).map(toStockMovement);
+}
+
+// Opções do dropdown "Responsável" -- união de quem registrou
+// (responsible) e quem deu baixa (withdrawn_by), sem duplicar nome
+// repetido nos dois papéis. Dataset pequeno (~100 linhas hoje) -- não
+// vale a pena um SELECT DISTINCT no servidor, só busca as duas colunas e
+// deduplica em JS.
+export async function listDistinctResponsibles(): Promise<string[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("stock_movements").select("responsible, withdrawn_by");
+  if (error) throw new Error(error.message);
+  const names = new Set<string>();
+  for (const row of data ?? []) {
+    if (row.responsible) names.add(row.responsible);
+    if (row.withdrawn_by) names.add(row.withdrawn_by);
+  }
+  return [...names].sort((a, b) => a.localeCompare(b, "pt-BR"));
 }

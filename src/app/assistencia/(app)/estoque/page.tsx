@@ -1,44 +1,99 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
-import { listStockMovements, isMovementType, isPendingWithdrawal } from "@/lib/stockMovements";
-import { MOVEMENT_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import {
+  listStockMovements,
+  listDistinctResponsibles,
+  isMovementType,
+  effectiveDateKey,
+  type StockMovement,
+} from "@/lib/stockMovements";
+import { listSuppliers } from "@/lib/partOrders";
+import { PageHeader } from "@/components/assistencia/PageHeader";
+import { FilterPill } from "@/components/assistencia/FilterPill";
+import { FilterSelect } from "@/components/assistencia/FilterSelect";
+import { StockMovementCard } from "@/components/assistencia/StockMovementCard";
+import { groupIntoWeeks } from "@/lib/weekGrouping";
 
-function formatDateOnly(value: string | null): string {
-  if (!value) return "";
-  const [y, m, d] = value.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-function buildHref(params: { type?: string; q?: string }) {
+function buildHref(params: { type?: string; q?: string; factory?: string; responsavel?: string; from?: string; to?: string }) {
   const sp = new URLSearchParams();
   if (params.type) sp.set("type", params.type);
   if (params.q) sp.set("q", params.q);
+  if (params.factory) sp.set("factory", params.factory);
+  if (params.responsavel) sp.set("responsavel", params.responsavel);
+  if (params.from) sp.set("from", params.from);
+  if (params.to) sp.set("to", params.to);
   const qs = sp.toString();
   return qs ? `/assistencia/estoque?${qs}` : "/assistencia/estoque";
 }
 
-const FILTERS: { label: string; value: string | null }[] = [
+// Abas de status gerais -- pedido do Victor 28/08/2026 (redesign):
+// "abas superiores para os status gerais", mesmo componente FilterPill
+// já usado em /assistencia/fila. "Pendentes de retirada" não é um
+// movement_type de verdade (é retirado sem baixa ainda, ver
+// isPendingWithdrawal) -- por isso o `value` "pendente" à parte,
+// resolvido no servidor (ver onlyPending abaixo).
+const FILTERS: { label: string; value: string | null; color?: string }[] = [
   { label: "Todos", value: null },
-  { label: "Retirados", value: "retirado" },
-  { label: "Devolvidos", value: "devolvido" },
-  { label: "Reparados", value: "reparado" },
-  // Pedido do Victor 28/08/2026: assistência registra a retirada, a
-  // equipe técnica dá baixa depois (/assistencia/tecnico/estoque) --
-  // esse filtro mostra só o que a assistência ainda tá esperando a
-  // equipe técnica confirmar (isPendingWithdrawal, stockMovements.ts).
-  { label: "Pendentes de retirada", value: "pendente" },
+  { label: "Retirados", value: "retirado", color: "var(--series-5)" },
+  { label: "Devolvidos", value: "devolvido", color: "var(--status-good)" },
+  { label: "Reparados", value: "reparado", color: "var(--series-4)" },
+  { label: "Pendentes de retirada", value: "pendente", color: "var(--brand-orange)" },
 ];
+
+type DayGroup = { key: string; label: string; items: StockMovement[] };
+
+// Agrupado por dia "efetivo" (retirado/concluído; pendente usa a data de
+// lançamento) -- mesmo padrão de groupByDate em fila/page.tsx.
+function groupByDate(movements: StockMovement[]): DayGroup[] {
+  const groups: DayGroup[] = [];
+  for (const m of movements) {
+    const dateKey = effectiveDateKey(m);
+    let group = groups.find((g) => g.key === dateKey);
+    if (!group) {
+      const label = new Date(`${dateKey}T00:00:00Z`).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+      group = { key: dateKey, label, items: [] };
+      groups.push(group);
+    }
+    group.items.push(m);
+  }
+  groups.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
+  return groups;
+}
 
 export default async function EstoquePage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; q?: string }>;
+  searchParams: Promise<{ type?: string; q?: string; factory?: string; responsavel?: string; from?: string; to?: string }>;
 }) {
   redirectIfSac(await getProfile());
-  const { type, q } = await searchParams;
+  const { type, q, factory, responsavel, from, to } = await searchParams;
   const onlyPending = type === "pendente";
   const filterType = isMovementType(type) ? type : undefined;
-  const movements = await listStockMovements({ movementType: filterType, q, onlyPendingWithdrawal: onlyPending });
+  const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
+  const dateTo = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : undefined;
+
+  const [rawMovements, suppliers, responsibles] = await Promise.all([
+    listStockMovements({ movementType: filterType, q, onlyPendingWithdrawal: onlyPending, factory, responsavel }),
+    listSuppliers(),
+    listDistinctResponsibles(),
+  ]);
+  // De/Até -- data efetiva não é uma coluna de verdade (ver
+  // effectiveDateKey), então o filtro de período é em JS depois da busca,
+  // mesmo padrão de todo filtro derivado nessa base (isMostruarioRequest,
+  // filterSched em fila/page.tsx etc.).
+  const movements = rawMovements.filter((m) => {
+    const key = effectiveDateKey(m);
+    if (dateFrom && key < dateFrom) return false;
+    if (dateTo && key > dateTo) return false;
+    return true;
+  });
+
+  const groups = groupByDate(movements);
 
   return (
     <div className="flex flex-col gap-4">
@@ -56,57 +111,86 @@ export default async function EstoquePage({
         </Link>
       </div>
 
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          {FILTERS.map((f) => {
-            // Comparado contra o `type` cru (não `filterType`, que só
-            // reconhece os 3 MovementType de verdade) -- "pendente" é um
-            // filtro à parte, não um movement_type.
-            const active = (f.value ?? undefined) === (type || undefined);
-            return (
-              <Link
-                key={f.label}
-                href={buildHref({ type: f.value ?? undefined, q })}
-                className="text-xs px-3 py-1 rounded-full border"
-                style={{
-                  borderColor: "var(--border)",
-                  background: active ? "var(--surface-1)" : "transparent",
-                  color: active ? "var(--text-primary)" : "var(--text-secondary)",
-                  fontWeight: active ? 600 : 400,
-                }}
-              >
-                {f.label}
-              </Link>
-            );
-          })}
-        </div>
-        <Link
-          href="/assistencia/estoque/nova"
-          className="text-sm px-3 py-2 rounded font-medium"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-        >
-          + Nova movimentação
-        </Link>
+      {/* Título + CTA -- pedido do Victor 28/08/2026 (redesign): "seguindo
+          o padrão visual de outra tela do sistema", mesmo PageHeader já
+          usado em /assistencia/fila. */}
+      <PageHeader
+        title="Estoque"
+        description="Retiradas, devoluções e reparos de produto pra Assistência Técnica."
+        cta={
+          <Link
+            href="/assistencia/estoque/nova"
+            className="text-sm px-4 py-2.5 rounded-lg font-bold shadow-md"
+            style={{ background: "var(--brand-orange)", color: "#fff", border: "2px solid var(--brand-orange)" }}
+          >
+            + Nova movimentação
+          </Link>
+        }
+      />
+
+      {/* Abas de status -- ver FILTERS acima. */}
+      <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
+        {FILTERS.map((f) => (
+          <FilterPill
+            key={f.label}
+            label={f.label}
+            color={f.color}
+            selected={(f.value ?? undefined) === (type || undefined)}
+            href={buildHref({ type: f.value ?? undefined, q, factory, responsavel, from: dateFrom, to: dateTo })}
+          />
+        ))}
       </div>
 
+      {/* Dropdowns Fábrica/Responsável -- pedido do Victor 28/08/2026:
+          "filtros de seleção (dropdown) para lojas/operadores" -- essa
+          tela não tem loja (stock_movements não é por loja), o dado
+          equivalente aqui é Fábrica; "operadores" = Responsável (quem
+          registrou ou quem deu baixa, ver listDistinctResponsibles). */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterSelect name="factory" placeholder="Todas as fábricas" options={suppliers} />
+        <FilterSelect name="responsavel" placeholder="Todos os responsáveis" options={responsibles} />
+      </div>
+
+      {/* Busca + De/Até -- mesmo desenho de /assistencia/fila. */}
       <form action="/assistencia/estoque" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterType ? <input type="hidden" name="type" value={filterType} /> : null}
-        <input
-          type="search"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Buscar por produto, código ou cliente…"
-          className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
-          style={{ borderColor: "var(--border)" }}
-        />
-        <button
-          type="submit"
-          className="text-sm px-3 py-2 rounded border"
-          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
-        >
+        {onlyPending ? <input type="hidden" name="type" value="pendente" /> : null}
+        {factory ? <input type="hidden" name="factory" value={factory} /> : null}
+        {responsavel ? <input type="hidden" name="responsavel" value={responsavel} /> : null}
+        <div className="relative flex-1 min-w-[240px]">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-muted)" }} aria-hidden="true">
+            🔍
+          </span>
+          <input
+            type="search"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Buscar por produto, código ou cliente…"
+            className="rounded border pl-8 pr-3 py-2 text-sm w-full"
+            style={{ borderColor: "var(--border)" }}
+          />
+        </div>
+        <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+          De
+          <input type="date" name="from" defaultValue={dateFrom ?? ""} className="rounded border px-2 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
+        </label>
+        <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+          Até
+          <input type="date" name="to" defaultValue={dateTo ?? ""} className="rounded border px-2 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
+        </label>
+        <button type="submit" className="text-sm px-3 py-2 rounded border" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
           Buscar
         </button>
+        {q || dateFrom || dateTo ? (
+          <Link href={buildHref({ type: type || undefined, factory, responsavel })} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+            Limpar busca/data
+          </Link>
+        ) : null}
       </form>
+
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        {movements.length} movimentaç{movements.length === 1 ? "ão" : "ões"} encontrada{movements.length === 1 ? "" : "s"}
+      </p>
 
       {movements.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
@@ -115,88 +199,58 @@ export default async function EstoquePage({
           </p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-          {/* Colunas -- pedido do Victor 28/08/2026: "quer que fique mais
-              organizado e organizado por colunas, como são organizadas
-              as outras telas" (a versão anterior repetia "Registrado
-              por —"/"Por —" por extenso em toda linha, mesmo quando não
-              tinha essa informação -- ficava poluído com dado histórico
-              importado, que não tem responsible/withdrawnBy). */}
-          <div className="flex items-center gap-3 px-4 py-2 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--gridline)" }}>
-            <span className="flex-1 min-w-0 text-left">Produto</span>
-            <span className="w-28 shrink-0 text-right">Fábrica</span>
-            <span className="w-24 shrink-0 text-right">Data</span>
-            <span className="w-40 shrink-0 text-right">Situação</span>
-          </div>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-            {movements.map((m) => {
-              const pending = isPendingWithdrawal(m);
-              return (
-                <div key={m.id} className="flex items-start gap-3 px-4 py-3 flex-wrap">
-                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0"
-                        style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+        // Semana > dia (accordion, recolhido por padrão) -- pedido do
+        // Victor 28/08/2026: "Agrupe os cards por períodos lógicos...
+        // 'SEMANA DE X A Y'... subgrupos por dias específicos, exibindo
+        // o contador de itens". Mesmo padrão de groupIntoWeeks já usado
+        // em /assistencia/fila (aba Visitas).
+        <div className="flex flex-col gap-3">
+          {groupIntoWeeks(groups, (g) => g.key).map((week) => {
+            const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
+            return (
+              <details key={week.weekKey} className="rounded-xl overflow-hidden group/week" style={{ border: "2px solid var(--border)" }}>
+                <summary
+                  className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+                  style={{ background: "var(--surface-2)" }}
+                >
+                  <span className="text-xs shrink-0 transition-transform duration-150 group-open/week:rotate-90" style={{ color: "var(--text-secondary)" }} aria-hidden="true">
+                    ▶
+                  </span>
+                  <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
+                    {week.label}
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+                    ({weekTotal})
+                  </span>
+                </summary>
+                <div className="flex flex-col gap-3 p-3" style={{ background: "var(--surface-1)" }}>
+                  {week.days.map((group) => (
+                    <details key={group.key} className="group rounded-xl overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+                      <summary
+                        className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+                        style={{ background: "var(--brand-green)" }}
                       >
-                        {MOVEMENT_TYPE_LABELS[m.movementType] ?? m.movementType}
-                      </span>
-                      <span className="text-sm font-medium text-left" style={{ color: "var(--text-primary)" }}>
-                        {m.product}
-                      </span>
-                      {m.code ? (
-                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                          {m.code}
+                        <span className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90" style={{ color: "var(--brand-green-ink)" }} aria-hidden="true">
+                          ▶
                         </span>
-                      ) : null}
-                    </div>
-                    {m.clientName || m.volume ? (
-                      <span className="text-xs text-left" style={{ color: "var(--text-secondary)" }}>
-                        {m.clientName ?? ""}
-                        {m.clientName && m.volume ? " · " : ""}
-                        {m.volume ? `vol. ${m.volume}` : ""}
-                      </span>
-                    ) : null}
-                    {m.notes ? (
-                      <span className="text-xs text-left" style={{ color: "var(--text-muted)" }}>
-                        {m.notes}
-                      </span>
-                    ) : null}
-                  </div>
-                  <span className="w-28 shrink-0 text-right text-xs" style={{ color: "var(--text-secondary)" }}>
-                    {m.factory ?? "—"}
-                  </span>
-                  <span className="w-24 shrink-0 text-right text-xs" style={{ color: "var(--text-muted)" }}>
-                    {pending ? "—" : formatDateOnly(m.movementDate) || "—"}
-                  </span>
-                  <span className="w-40 shrink-0 text-right">
-                    {/* Pendente de retirada -- pedido do Victor 28/08/2026:
-                        "Assistencia registra e a equipe tecnica é que
-                        retira do estoque e lança a data que foi
-                        retirada". Sem movement_date ainda pra tipo
-                        "retirado" = esperando a equipe técnica dar baixa
-                        (/assistencia/tecnico/estoque). */}
-                    {pending ? (
-                      <span
-                        className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ background: "var(--brand-orange-soft)", color: "var(--brand-orange)" }}
-                      >
-                        Pendente de retirada
-                      </span>
-                    ) : (
-                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        {m.movementType === "retirado" && m.withdrawnBy
-                          ? `Retirado por ${m.withdrawnBy}`
-                          : m.responsible
-                            ? `Por ${m.responsible}`
-                            : "—"}
-                      </span>
-                    )}
-                  </span>
+                        <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--brand-green-ink)" }}>
+                          {group.label}
+                        </span>
+                        <span className="text-xs font-semibold" style={{ color: "var(--brand-green-ink)", opacity: 0.85 }}>
+                          ({group.items.length})
+                        </span>
+                      </summary>
+                      <div className="divide-y" style={{ borderColor: "var(--gridline)", background: "var(--surface-1)" }}>
+                        {group.items.map((m) => (
+                          <StockMovementCard key={m.id} m={m} />
+                        ))}
+                      </div>
+                    </details>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
+              </details>
+            );
+          })}
         </div>
       )}
     </div>
