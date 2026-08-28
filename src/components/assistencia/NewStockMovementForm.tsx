@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { createStockMovement, type StockMovementFormState } from "@/app/assistencia/estoque-actions";
+import { createStockMovement, lookupProductNameByCode, type StockMovementFormState } from "@/app/assistencia/estoque-actions";
 import { MOVEMENT_TYPE_LABELS } from "@/lib/assistenciaLabels";
 
 const TYPES = ["retirado", "devolvido", "reparado"] as const;
@@ -22,6 +22,35 @@ export function NewStockMovementForm({ factories }: { factories: string[] }) {
   const [state, formAction, pending] = useActionState<StockMovementFormState, FormData>(createStockMovement, undefined);
   const [factory, setFactory] = useState("");
   const [typeValue, setTypeValue] = useState<(typeof TYPES)[number]>("retirado");
+  // Puxa o nome do produto pelo código -- pedido do Victor 28/08/2026:
+  // "puxe o nome do produto pelo código do produto". Busca no catálogo
+  // (totvs_stock, mesma fonte de "Prazos de produtos") ao sair do campo
+  // Código -- só preenche Produto quando acha, nunca trava o campo (o
+  // catálogo é do padrão de fábrica, não cobre 100% do que passa pela
+  // assistência -- item sem correspondência continua digitável na mão).
+  const [code, setCode] = useState("");
+  const [product, setProduct] = useState("");
+  const [lookupState, setLookupState] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  async function handleCodeBlur() {
+    const trimmed = code.trim();
+    if (!trimmed) {
+      setLookupState("idle");
+      return;
+    }
+    setLookupState("loading");
+    try {
+      const name = await lookupProductNameByCode(trimmed);
+      if (name) {
+        setProduct(name);
+        setLookupState("found");
+      } else {
+        setLookupState("not_found");
+      }
+    } catch {
+      setLookupState("not_found");
+    }
+  }
 
   if (state?.success) {
     return (
@@ -59,10 +88,34 @@ export function NewStockMovementForm({ factories }: { factories: string[] }) {
             que o codigo do porduto e o codigo do cliente sejam
             obrigatrios". */}
         <Field label="Código *">
-          <input name="code" required className="rounded border px-3 py-2" style={inputStyle} />
+          <input
+            name="code"
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            onBlur={handleCodeBlur}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+          {lookupState === "loading" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Buscando produto…
+            </span>
+          ) : lookupState === "not_found" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Não achei esse código no catálogo -- digite o produto na mão.
+            </span>
+          ) : null}
         </Field>
         <Field label="Produto *">
-          <input name="product" required className="rounded border px-3 py-2" style={inputStyle} />
+          <input
+            name="product"
+            required
+            value={product}
+            onChange={(e) => setProduct(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
         </Field>
       </div>
 

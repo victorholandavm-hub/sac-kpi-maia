@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
 import { isMovementType } from "@/lib/stockMovements";
 import { getTecnicoSession } from "@/app/assistencia/tecnico-actions";
+import { getProdutoNomePorCodigo } from "@/lib/vendasProduto";
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const str = String(value ?? "").trim();
@@ -73,6 +74,18 @@ export async function createStockMovement(
 
   revalidatePath("/assistencia/estoque");
   return { success: true };
+}
+
+// Nome do produto a partir do código -- pedido do Victor 28/08/2026: "no
+// cadastro do estoque, puxe o nome do produto pelo código do produto".
+// Chamado do campo "Código" (onBlur, ver NewStockMovementForm.tsx) pra
+// preencher "Produto" sozinho -- mesma checagem de papel de
+// createStockMovement (server action é um endpoint próprio, não herda a
+// proteção da página).
+export async function lookupProductNameByCode(code: string): Promise<string | null> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  return getProdutoNomePorCodigo(code);
 }
 
 // Baixa da retirada -- pedido do Victor 28/08/2026: "Assistencia
