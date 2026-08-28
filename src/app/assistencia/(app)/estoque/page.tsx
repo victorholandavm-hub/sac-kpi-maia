@@ -116,66 +116,86 @@ export default async function EstoquePage({
         </div>
       ) : (
         <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+          {/* Colunas -- pedido do Victor 28/08/2026: "quer que fique mais
+              organizado e organizado por colunas, como são organizadas
+              as outras telas" (a versão anterior repetia "Registrado
+              por —"/"Por —" por extenso em toda linha, mesmo quando não
+              tinha essa informação -- ficava poluído com dado histórico
+              importado, que não tem responsible/withdrawnBy). */}
+          <div className="flex items-center gap-3 px-4 py-2 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--gridline)" }}>
+            <span className="flex-1 min-w-0 text-left">Produto</span>
+            <span className="w-28 shrink-0 text-right">Fábrica</span>
+            <span className="w-24 shrink-0 text-right">Data</span>
+            <span className="w-40 shrink-0 text-right">Situação</span>
+          </div>
           <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-            {movements.map((m) => (
-              <div key={m.id} className="flex items-center justify-between gap-4 p-4 flex-wrap">
-                <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className="text-xs font-medium px-2 py-0.5 rounded-full"
-                      style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
-                    >
-                      {MOVEMENT_TYPE_LABELS[m.movementType] ?? m.movementType}
-                    </span>
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                      {m.product}
-                    </span>
-                    {m.code ? (
-                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        {m.code}
+            {movements.map((m) => {
+              const pending = isPendingWithdrawal(m);
+              return (
+                <div key={m.id} className="flex items-start gap-3 px-4 py-3 flex-wrap">
+                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0"
+                        style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+                      >
+                        {MOVEMENT_TYPE_LABELS[m.movementType] ?? m.movementType}
+                      </span>
+                      <span className="text-sm font-medium text-left" style={{ color: "var(--text-primary)" }}>
+                        {m.product}
+                      </span>
+                      {m.code ? (
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          {m.code}
+                        </span>
+                      ) : null}
+                    </div>
+                    {m.clientName || m.volume ? (
+                      <span className="text-xs text-left" style={{ color: "var(--text-secondary)" }}>
+                        {m.clientName ?? ""}
+                        {m.clientName && m.volume ? " · " : ""}
+                        {m.volume ? `vol. ${m.volume}` : ""}
+                      </span>
+                    ) : null}
+                    {m.notes ? (
+                      <span className="text-xs text-left" style={{ color: "var(--text-muted)" }}>
+                        {m.notes}
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    {m.factory ? `${m.factory} · ` : ""}
-                    {m.clientName ?? ""}
-                    {m.volume ? ` · vol. ${m.volume}` : ""}
-                  </p>
-                  {m.notes ? (
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {m.notes}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                  {/* Pendente de retirada -- pedido do Victor 28/08/2026:
-                      "Assistencia registra e a equipe tecnica é que
-                      retira do estoque e lança a data que foi retirada".
-                      Sem movement_date ainda pra tipo "retirado" =
-                      esperando a equipe técnica dar baixa
-                      (/assistencia/tecnico/estoque). */}
-                  {isPendingWithdrawal(m) ? (
-                    <span
-                      className="text-xs font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: "var(--brand-orange-soft)", color: "var(--brand-orange)" }}
-                    >
-                      Pendente de retirada
-                    </span>
-                  ) : (
-                    <>
-                      <span>{formatDateOnly(m.movementDate)}</span>
-                      <span>
+                  <span className="w-28 shrink-0 text-right text-xs" style={{ color: "var(--text-secondary)" }}>
+                    {m.factory ?? "—"}
+                  </span>
+                  <span className="w-24 shrink-0 text-right text-xs" style={{ color: "var(--text-muted)" }}>
+                    {pending ? "—" : formatDateOnly(m.movementDate) || "—"}
+                  </span>
+                  <span className="w-40 shrink-0 text-right">
+                    {/* Pendente de retirada -- pedido do Victor 28/08/2026:
+                        "Assistencia registra e a equipe tecnica é que
+                        retira do estoque e lança a data que foi
+                        retirada". Sem movement_date ainda pra tipo
+                        "retirado" = esperando a equipe técnica dar baixa
+                        (/assistencia/tecnico/estoque). */}
+                    {pending ? (
+                      <span
+                        className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ background: "var(--brand-orange-soft)", color: "var(--brand-orange)" }}
+                      >
+                        Pendente de retirada
+                      </span>
+                    ) : (
+                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                         {m.movementType === "retirado" && m.withdrawnBy
                           ? `Retirado por ${m.withdrawnBy}`
                           : m.responsible
                             ? `Por ${m.responsible}`
-                            : ""}
+                            : "—"}
                       </span>
-                    </>
-                  )}
+                    )}
+                  </span>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

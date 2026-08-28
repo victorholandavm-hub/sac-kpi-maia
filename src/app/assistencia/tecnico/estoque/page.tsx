@@ -92,12 +92,25 @@ export default async function TecnicoEstoquePage({
           </div>
         ) : (
           <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+            {/* Colunas -- pedido do Victor 28/08/2026: "quer que fique
+                mais organizado e organizado por colunas, como são
+                organizadas as outras telas" -- antes repetia "Registrado
+                por —"/"Por —" por extenso mesmo sem ter essa informação
+                (dado histórico importado não tem responsible/
+                withdrawnBy). "Registrado por" saiu da lista -- não é
+                essencial pra tarefa da equipe técnica (o que pegar, pra
+                quem), só poluía. */}
+            <div className="flex items-center gap-3 px-4 py-2 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--gridline)" }}>
+              <span className="flex-1 min-w-0 text-left">Produto</span>
+              <span className="w-24 shrink-0 text-right">{showHistorico ? "Retirado em" : "Lançado em"}</span>
+              <span className="w-28 shrink-0 text-right">{showHistorico ? "Por" : ""}</span>
+            </div>
             <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
               {movements.map((m) => (
-                <div key={m.id} className="flex items-center justify-between gap-4 p-4 flex-wrap">
-                  <div className="flex flex-col gap-1 min-w-0 w-0 grow">
+                <div key={m.id} className="flex items-start gap-3 px-4 py-3 flex-wrap">
+                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                      <span className="text-sm font-medium text-left" style={{ color: "var(--text-primary)" }}>
                         {m.product}
                       </span>
                       {m.code ? (
@@ -106,27 +119,30 @@ export default async function TecnicoEstoquePage({
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                      {m.clientName ?? "—"}
-                      {m.volume ? ` · vol. ${m.volume}` : ""}
-                    </p>
-                    {m.notes ? (
-                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        {m.notes}
-                      </p>
+                    {m.clientName || m.volume ? (
+                      <span className="text-xs text-left" style={{ color: "var(--text-secondary)" }}>
+                        {m.clientName ?? ""}
+                        {m.clientName && m.volume ? " · " : ""}
+                        {m.volume ? `vol. ${m.volume}` : ""}
+                      </span>
                     ) : null}
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      Registrado por {m.responsible ?? "—"}
-                      {m.loggedDate ? ` em ${formatDateOnly(m.loggedDate)}` : ""}
-                    </p>
+                    {m.notes ? (
+                      <span className="text-xs text-left" style={{ color: "var(--text-muted)" }}>
+                        {m.notes}
+                      </span>
+                    ) : null}
                   </div>
+                  <span className="w-24 shrink-0 text-right text-xs" style={{ color: "var(--text-muted)" }}>
+                    {formatDateOnly(showHistorico ? m.movementDate : m.loggedDate)}
+                  </span>
                   {showHistorico ? (
-                    <div className="text-xs text-right shrink-0" style={{ color: "var(--text-muted)" }}>
-                      <p>Retirado em {formatDateOnly(m.movementDate)}</p>
-                      <p>Por {m.withdrawnBy ?? "—"}</p>
-                    </div>
+                    <span className="w-28 shrink-0 text-right text-xs" style={{ color: "var(--text-muted)" }}>
+                      {m.withdrawnBy ?? "—"}
+                    </span>
                   ) : (
-                    <WithdrawStockMovementButton movementId={m.id} />
+                    <span className="w-28 shrink-0 flex justify-end">
+                      <WithdrawStockMovementButton movementId={m.id} />
+                    </span>
                   )}
                 </div>
               ))}
