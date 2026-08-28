@@ -21,6 +21,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function NewStockMovementForm({ factories }: { factories: string[] }) {
   const [state, formAction, pending] = useActionState<StockMovementFormState, FormData>(createStockMovement, undefined);
   const [factory, setFactory] = useState("");
+  const [typeValue, setTypeValue] = useState<(typeof TYPES)[number]>("retirado");
 
   if (state?.success) {
     return (
@@ -38,7 +39,13 @@ export function NewStockMovementForm({ factories }: { factories: string[] }) {
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
       <Field label="Tipo de movimentação">
-        <select name="movement_type" defaultValue="retirado" className="rounded border px-3 py-2" style={inputStyle}>
+        <select
+          name="movement_type"
+          value={typeValue}
+          onChange={(e) => setTypeValue(e.target.value as (typeof TYPES)[number])}
+          className="rounded border px-3 py-2"
+          style={inputStyle}
+        >
           {TYPES.map((t) => (
             <option key={t} value={t}>
               {MOVEMENT_TYPE_LABELS[t]}
@@ -48,8 +55,11 @@ export function NewStockMovementForm({ factories }: { factories: string[] }) {
       </Field>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Código">
-          <input name="code" className="rounded border px-3 py-2" style={inputStyle} />
+        {/* Obrigatório -- pedido do Victor 28/08/2026: "preciso apenas
+            que o codigo do porduto e o codigo do cliente sejam
+            obrigatrios". */}
+        <Field label="Código *">
+          <input name="code" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
         <Field label="Produto *">
           <input name="product" required className="rounded border px-3 py-2" style={inputStyle} />
@@ -80,8 +90,8 @@ export function NewStockMovementForm({ factories }: { factories: string[] }) {
       ) : null}
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Cliente atendido">
-          <input name="client_name" className="rounded border px-3 py-2" style={inputStyle} />
+        <Field label="Cliente atendido *">
+          <input name="client_name" required className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
         <Field label="Volume">
           <input name="volume" placeholder="Ex: 1/2" className="rounded border px-3 py-2" style={inputStyle} />
@@ -96,6 +106,20 @@ export function NewStockMovementForm({ factories }: { factories: string[] }) {
           <input name="logged_date" type="date" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
       </div>
+      {/* Pra "Retirado do CD" especificamente, quem confirma a retirada
+          física de verdade e lança a data é a equipe técnica, num
+          fluxo separado ("Dar baixa", /assistencia/tecnico/estoque) --
+          pedido do Victor 28/08/2026: "Assistencia registra e a equipe
+          tecnica é que retira do estoque e lança a data que foi
+          retirada". Deixar a Data da movimentação em branco aqui é o
+          esperado nesse caso (vira "pendente de retirada" até a equipe
+          técnica dar baixa). */}
+      {typeValue === "retirado" ? (
+        <p className="text-xs -mt-2" style={{ color: "var(--text-muted)" }}>
+          Pra &quot;Retirado do CD&quot;, deixe a Data da movimentação em branco -- a equipe técnica lança essa data quando retirar
+          de verdade e der baixa.
+        </p>
+      ) : null}
 
       <Field label="Observações">
         <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />

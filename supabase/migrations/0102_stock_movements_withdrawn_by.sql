@@ -1,0 +1,12 @@
+-- Fluxo em 2 etapas pra retirada de estoque -- pedido do Victor
+-- 28/08/2026: "Assistencia registra e a equipe tecnica é que retira do
+-- estoque e lança a data que foi retirada". Assistência cria o registro
+-- (movement_type='retirado') sem `movement_date` (ainda não foi
+-- retirado de verdade); a equipe técnica (login próprio, ver
+-- tecnicoAuth.ts) "dá baixa" depois, preenchendo `movement_date` (a
+-- data real da retirada) -- `movement_date is null` já era null por
+-- padrão, vira o sinal de "pendente de retirada" pra esse tipo, sem
+-- precisar de uma coluna de status nova. `withdrawn_by` guarda quem da
+-- equipe técnica confirmou -- `responsible` continua sendo quem
+-- REGISTROU (assistência), não sobrescrito.
+alter table stock_movements add column if not exists withdrawn_by text;

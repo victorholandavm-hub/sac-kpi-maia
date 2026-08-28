@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
-import { listStockMovements, isMovementType } from "@/lib/stockMovements";
+import { listStockMovements, isMovementType, isPendingWithdrawal } from "@/lib/stockMovements";
 import { MOVEMENT_TYPE_LABELS } from "@/lib/assistenciaLabels";
 
 function formatDateOnly(value: string | null): string {
@@ -22,6 +22,11 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Retirados", value: "retirado" },
   { label: "Devolvidos", value: "devolvido" },
   { label: "Reparados", value: "reparado" },
+  // Pedido do Victor 28/08/2026: assistência registra a retirada, a
+  // equipe técnica dá baixa depois (/assistencia/tecnico/estoque) --
+  // esse filtro mostra só o que a assistência ainda tá esperando a
+  // equipe técnica confirmar (isPendingWithdrawal, stockMovements.ts).
+  { label: "Pendentes de retirada", value: "pendente" },
 ];
 
 export default async function EstoquePage({
@@ -31,8 +36,9 @@ export default async function EstoquePage({
 }) {
   redirectIfSac(await getProfile());
   const { type, q } = await searchParams;
+  const onlyPending = type === "pendente";
   const filterType = isMovementType(type) ? type : undefined;
-  const movements = await listStockMovements({ movementType: filterType, q });
+  const movements = await listStockMovements({ movementType: filterType, q, onlyPendingWithdrawal: onlyPending });
 
   return (
     <div className="flex flex-col gap-4">
@@ -52,21 +58,27 @@ export default async function EstoquePage({
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          {FILTERS.map((f) => (
-            <Link
-              key={f.label}
-              href={buildHref({ type: f.value ?? undefined, q })}
-              className="text-xs px-3 py-1 rounded-full border"
-              style={{
-                borderColor: "var(--border)",
-                background: (f.value ?? undefined) === filterType ? "var(--surface-1)" : "transparent",
-                color: (f.value ?? undefined) === filterType ? "var(--text-primary)" : "var(--text-secondary)",
-                fontWeight: (f.value ?? undefined) === filterType ? 600 : 400,
-              }}
-            >
-              {f.label}
-            </Link>
-          ))}
+          {FILTERS.map((f) => {
+            // Comparado contra o `type` cru (não `filterType`, que só
+            // reconhece os 3 MovementType de verdade) -- "pendente" é um
+            // filtro à parte, não um movement_type.
+            const active = (f.value ?? undefined) === (type || undefined);
+            return (
+              <Link
+                key={f.label}
+                href={buildHref({ type: f.value ?? undefined, q })}
+                className="text-xs px-3 py-1 rounded-full border"
+                style={{
+                  borderColor: "var(--border)",
+                  background: active ? "var(--surface-1)" : "transparent",
+                  color: active ? "var(--text-primary)" : "var(--text-secondary)",
+                  fontWeight: active ? 600 : 400,
+                }}
+              >
+                {f.label}
+              </Link>
+            );
+          })}
         </div>
         <Link
           href="/assistencia/estoque/nova"
@@ -136,8 +148,31 @@ export default async function EstoquePage({
                   ) : null}
                 </div>
                 <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                  <span>{formatDateOnly(m.movementDate)}</span>
-                  <span>{m.responsible ? `Por ${m.responsible}` : ""}</span>
+                  {/* Pendente de retirada -- pedido do Victor 28/08/2026:
+                      "Assistencia registra e a equipe tecnica é que
+                      retira do estoque e lança a data que foi retirada".
+                      Sem movement_date ainda pra tipo "retirado" =
+                      esperando a equipe técnica dar baixa
+                      (/assistencia/tecnico/estoque). */}
+                  {isPendingWithdrawal(m) ? (
+                    <span
+                      className="text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: "var(--brand-orange-soft)", color: "var(--brand-orange)" }}
+                    >
+                      Pendente de retirada
+                    </span>
+                  ) : (
+                    <>
+                      <span>{formatDateOnly(m.movementDate)}</span>
+                      <span>
+                        {m.movementType === "retirado" && m.withdrawnBy
+                          ? `Retirado por ${m.withdrawnBy}`
+                          : m.responsible
+                            ? `Por ${m.responsible}`
+                            : ""}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
