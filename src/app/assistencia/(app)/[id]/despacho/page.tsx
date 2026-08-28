@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail } from "@/lib/serviceRequests";
-import { PrintButton } from "@/components/assistencia/PrintButton";
+import { PrintButton, type PrintTarget } from "@/components/assistencia/PrintButton";
 import { DespachoCard } from "@/components/assistencia/DespachoCard";
 
 // Papel físico de hoje (pedido do Victor 17/08/2026): logo + título no
@@ -21,7 +21,13 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
     );
   }
 
-  const { request } = result;
+  const { request, events } = result;
+  // Impedir reimpressão -- pedido do Victor 28/08/2026 (ver PrintButton.tsx
+  // pro resto do racional). Admin sempre pode reimprimir ("só eu poderia
+  // imprimir mais de uma vez").
+  const isAdmin = profile.role === "admin";
+  const alreadyPrinted = events.some((e) => e.eventType === "printed");
+  const target: PrintTarget = { id: request.id, ticketNumber: request.ticketNumber, clientName: request.clientName, alreadyPrinted };
 
   // Antes travava SAC em SAC_MANAGED_TYPES (só troca/entrega de produto e
   // notificação externa) -- mas createSacRequest (actions.ts) deixa o SAC
@@ -45,7 +51,7 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
         <Link href={`/assistencia/${request.id}`} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
           ← Ver chamado completo
         </Link>
-        <PrintButton requestIds={[request.id]} />
+        <PrintButton targets={[target]} isAdmin={isAdmin} />
       </div>
 
       {/* @page/margin aqui mesmo (não no CSS global) -- só essa página
