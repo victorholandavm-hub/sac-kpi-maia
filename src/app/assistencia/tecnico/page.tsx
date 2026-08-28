@@ -123,6 +123,12 @@ export default async function TecnicoHomePage({
         <RealtimeQueueRefresher />
         <AssistenciaHeader title={`Olá, ${tecnicoName}`} subtitle="Chamados que voltaram com o motorista, com produto pra dar destino.">
           <div className="flex items-center gap-4">
+            {/* Pedido do Victor 28/08/2026: "preciso que a equipe
+                tecnica tambem tenha acesso" à tela de estoque (dar
+                baixa em retirada registrada pela assistência). */}
+            <Link href="/assistencia/tecnico/estoque" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+              Estoque
+            </Link>
             <Link href="/assistencia" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
               ← Voltar
             </Link>
