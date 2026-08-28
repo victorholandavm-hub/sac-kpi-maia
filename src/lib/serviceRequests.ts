@@ -1640,9 +1640,10 @@ export async function getRequestsReport(
 
 // Mesma ideia de ReportRowItem acima -- item cru guardado do lado de cada
 // contagem, pra dar pra expandir e ver os chamados de verdade por trás de
-// cada linha (mês/montador/loja). `type` só importa de verdade no modo
-// "todos" (ver getServiceTypeIndicators) -- com um tipo só selecionado é
-// sempre o mesmo valor repetido, mas não custa nada guardar sempre.
+// cada linha (mês/montador/loja). `type` só importa de verdade quando
+// `types` (ver getServiceTypeIndicators) tem mais de um tipo -- com um
+// tipo só, é sempre o mesmo valor repetido, mas não custa nada guardar
+// sempre.
 export type IndicatorItem = {
   id: string;
   ticketNumber: number;
@@ -1668,24 +1669,34 @@ export type ServiceTypeIndicators = {
   byStore: StoreCount[];
 };
 
-// Indicadores operacionais de UM tipo de solicitação por vez (padrão:
-// montagem), ou de TODOS os tipos juntos (type === "todos") — volume por
-// mês, por montador (com tempo médio até concluir) e por loja.
-// "todos" -- pedido do Victor 21/08/2026: "preciso que tenha uma opção no
-// seletor para 'ver tudo'" (a comparação dele entre esse total por
-// montador e a lista de Solicitações batia certinho pro tipo selecionado,
-// só que aqui só dava pra ver um tipo de cada vez -- estava correto, só
-// faltava essa opção). Complementa getRequestsReport, que já agrega todos
-// os tipos juntos mas sem quebrar por mês/montador/loja.
+// Indicadores operacionais de um ou mais tipos de solicitação juntos
+// (padrão: [montagem]) -- volume por mês, por montador (com tempo médio
+// até concluir) e por loja. Recebe uma LISTA de tipos (não mais um tipo
+// só ou o sentinela "todos") -- quem chama decide o que "todos" ou
+// "junto" significam (ver relatorios/page.tsx, RESOLVE_INDICATOR_TYPES):
+// achado do Victor 27/08/2026 revisando o relatório: com "todos os
+// tipos" selecionado, a versão antiga (`type !== "todos"` pulava o
+// filtro de tipo inteiro) buscava TODO service_requests sem exceção,
+// inclusive troca/entrega/envio de produto/peça -- que não têm
+// `assembler_name` (usam motorista, não montador) e caíam todos juntos
+// no balde "Sem montador definido", inflando esse número com chamados
+// que não têm nada a ver com montador. "Montagem/Desmontagem" (pedido
+// junto: "tenha a opção de montagem/desmontagem, juntos... mas mantenha
+// a opção deles separados também") também vira só uma lista de 2 tipos
+// aqui, sem precisar de um segundo sentinela como "todos" tinha.
+// `alvo` (mostruário/cliente) -- pedido do Victor 27/08/2026: "dentro de
+// cada loja, filtra... para mostruario e outra para cliente" -- mesmo
+// filtro que já existia só pra getRequestsReport/listPaymentItems,
+// reaproveitado aqui (mesma leitura de isMostruarioRequest).
 export async function getServiceTypeIndicators(
-  type: RequestType | "todos",
-  opts: { dateFrom?: string; dateTo?: string } = {}
+  types: RequestType[],
+  opts: { dateFrom?: string; dateTo?: string; alvo?: "mostruario" | "cliente" } = {}
 ): Promise<ServiceTypeIndicators> {
   const admin = getSupabaseAdmin();
   let query = admin
     .from("service_requests")
-    .select("id, ticket_number, store_id, type, assembler_name, status, client_name, created_at, completed_at, stores(name)");
-  if (type !== "todos") query = query.eq("type", type);
+    .select("id, ticket_number, store_id, type, assembler_name, status, client_name, order_code, created_at, completed_at, stores(name)")
+    .in("type", types);
 
   if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
   if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
@@ -1701,11 +1712,15 @@ export async function getServiceTypeIndicators(
     assembler_name: string | null;
     status: RequestStatus;
     client_name: string | null;
+    order_code: string | null;
     created_at: string;
     completed_at: string | null;
     stores: { name: string } | null;
   };
-  const rows = (data ?? []) as unknown as Row[];
+  const allRows = (data ?? []) as unknown as Row[];
+  const rows = opts.alvo
+    ? allRows.filter((r) => isMostruarioRequest(r.order_code, r.client_name) === (opts.alvo === "mostruario"))
+    : allRows;
 
   const monthMap = new Map<string, MonthCount>();
   const assemblerMap = new Map<string, { total: number; concluida: number; daysSum: number; daysCount: number; items: IndicatorItem[] }>();

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
-import { getRequestsReport, getServiceTypeIndicators, type ReportRow, type ReportRowItem, type IndicatorItem } from "@/lib/serviceRequests";
+import { getRequestsReport, getServiceTypeIndicators, type ReportRow, type ReportRowItem, type IndicatorItem, type RequestType } from "@/lib/serviceRequests";
 import { listPaymentItems, paymentStage, type PaymentItem } from "@/lib/payments";
 import { getSupplierReconciliation, type SupplierReconciliationItem } from "@/lib/supplierReturns";
 import {
@@ -15,6 +15,37 @@ import {
 import { CausaRaizDonutChart } from "@/components/CausaRaizDonutChart";
 
 const REQUEST_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "notificacao_externa"] as const;
+
+// Opções do seletor "Tipo" da seção Indicadores -- pedido do Victor
+// 27/08/2026: "nos filtros por tipo, tenha a opção de montagem/
+// desmontagem, juntos acumulando os dois dentro de um só mas mantenha a
+// opção deles separados também". "montagem_desmontagem" é só mais uma
+// combinação de tipos (ver INDICATOR_TYPE_GROUPS), do mesmo jeito que
+// "todos" já era -- nenhum tipo sai do seletor, só ganhou essa opção
+// extra que soma Montagem + Desmontagem sem substituir as duas
+// separadas.
+const INDICATOR_TYPE_GROUPS: Record<string, { label: string; types: readonly RequestType[] }> = {
+  todos: { label: "todos os tipos", types: REQUEST_TYPES },
+  montagem_desmontagem: { label: "montagem/desmontagem", types: ["montagem", "desmontagem"] },
+};
+
+function resolveIndicatorTypeKey(tipo: string | undefined): string {
+  if (tipo && tipo in INDICATOR_TYPE_GROUPS) return tipo;
+  if ((REQUEST_TYPES as readonly string[]).includes(tipo ?? "")) return tipo!;
+  return "montagem";
+}
+
+function indicatorTypesFor(key: string): RequestType[] {
+  const group = INDICATOR_TYPE_GROUPS[key];
+  if (group) return [...group.types];
+  return [key as RequestType];
+}
+
+function indicatorLabelFor(key: string): string {
+  const group = INDICATOR_TYPE_GROUPS[key];
+  if (group) return group.label;
+  return REQUEST_TYPE_LABELS[key]?.toLowerCase() ?? key;
+}
 
 // "Solicitações por período" (relatório principal: loja/tipo/vendedor/
 // causa raiz) -- pedido do Victor 24/08/2026: "nas solicitações por
@@ -84,10 +115,11 @@ function buildReportHref(params: { from?: string; to?: string; alvo?: string }) 
 }
 
 // Filtro "montagem de mostruário" x "cliente" -- pedido do Victor
-// 21/08/2026: "coloque Filtro de montagem de mostruário e cliente". Só se
-// aplica ao relatório principal (getRequestsReport tem order_code/
-// client_name na consulta; a seção de indicadores por tipo e os
-// pagamentos, não).
+// 21/08/2026: "coloque Filtro de montagem de mostruário e cliente".
+// Afeta o relatório principal (getRequestsReport), pagamento de montador
+// (listPaymentItems) e, desde 27/08/2026 (pedido do Victor: "dentro de
+// cada loja, filtra... para mostruario e outra para cliente"), a seção
+// de Indicadores também (getServiceTypeIndicators).
 const ALVO_FILTERS: { label: string; value: "mostruario" | "cliente" | undefined }[] = [
   { label: "Todos", value: undefined },
   { label: "Mostruário", value: "mostruario" },
@@ -97,7 +129,8 @@ const ALVO_FILTERS: { label: string; value: "mostruario" | "cliente" | undefined
 // Linha de detalhe de um chamado, dentro de uma linha expandida -- mesmo
 // formato reaproveitado nas 3 tabelas de indicadores por tipo (mês/
 // montador/loja) e no relatório principal (loja/tipo/vendedor/causa raiz).
-// `showType` só liga no modo "Todos os tipos" -- com um tipo só
+// `showType` só liga quando mais de um tipo tá misturado na mesma lista
+// ("Todos os tipos" ou "Montagem/Desmontagem" juntos) -- com um tipo só
 // selecionado, repetir o tipo em toda linha é ruído (já está no título da
 // seção).
 function IndicatorItemsList({ items, showType }: { items: IndicatorItem[]; showType?: boolean }) {
@@ -348,9 +381,10 @@ export default async function RelatoriosPage({
   // no seletor para 'ver tudo'" (comparou o total por montador de um tipo
   // só com a lista de Solicitações, que mostra todos os tipos juntos --
   // os números batiam certinho pro tipo selecionado, só faltava essa
-  // opção pra ver tudo de uma vez).
-  const indicatorType: (typeof REQUEST_TYPES)[number] | "todos" =
-    tipo === "todos" ? "todos" : (REQUEST_TYPES as readonly string[]).includes(tipo ?? "") ? (tipo as (typeof REQUEST_TYPES)[number]) : "montagem";
+  // opção pra ver tudo de uma vez). "Montagem/Desmontagem" junto, pedido
+  // do Victor 27/08/2026 -- ver INDICATOR_TYPE_GROUPS acima.
+  const indicatorTypeKey = resolveIndicatorTypeKey(tipo);
+  const indicatorTypes = indicatorTypesFor(indicatorTypeKey);
   const indicatorDateFrom = indFrom || sixMonthsAgoFirstDay();
   const indicatorDateTo = indTo || today();
 
@@ -362,7 +396,11 @@ export default async function RelatoriosPage({
     // liberação deve ser filtrado" (antes só filtrava a tabela de cima).
     listPaymentItems({ dateFrom, dateTo, alvo: filterAlvo }),
     getSupplierReconciliation(),
-    getServiceTypeIndicators(indicatorType, { dateFrom: indicatorDateFrom, dateTo: indicatorDateTo }),
+    // Alvo (mostruário/cliente) também vale pra Indicadores agora --
+    // pedido do Victor 27/08/2026: "dentro de cada loja, filtra... para
+    // mostruario e outra para cliente pra me mostrar a quantidade de
+    // montagem/desmontagem de cada loja".
+    getServiceTypeIndicators(indicatorTypes, { dateFrom: indicatorDateFrom, dateTo: indicatorDateTo, alvo: filterAlvo }),
   ]);
 
   const byAssembler = new Map<string, { total: number; pendente: number; pago: number; itens: number; items: PaymentItem[] }>();
@@ -454,16 +492,18 @@ export default async function RelatoriosPage({
 
       <div className="flex flex-col gap-3 rounded-lg p-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
         <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Indicadores de {indicatorType === "todos" ? "todos os tipos" : (REQUEST_TYPE_LABELS[indicatorType]?.toLowerCase() ?? indicatorType)}
+          Indicadores de {indicatorLabelFor(indicatorTypeKey)}
         </h3>
 
         <form action="/assistencia/relatorios" method="GET" className="flex items-center gap-2 flex-wrap">
           <input type="hidden" name="from" value={dateFrom} />
           <input type="hidden" name="to" value={dateTo} />
+          {filterAlvo ? <input type="hidden" name="alvo" value={filterAlvo} /> : null}
           <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
             Tipo
-            <select name="tipo" defaultValue={indicatorType} className="rounded border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }}>
+            <select name="tipo" defaultValue={indicatorTypeKey} className="rounded border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }}>
               <option value="todos">Todos os tipos</option>
+              <option value="montagem_desmontagem">Montagem/Desmontagem (junto)</option>
               {REQUEST_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {REQUEST_TYPE_LABELS[t]}
@@ -504,7 +544,7 @@ export default async function RelatoriosPage({
                     label={formatMonth(m.month)}
                     numbers={[{ value: m.total }, { value: m.concluida, color: "var(--status-good)" }]}
                   >
-                    <IndicatorItemsList items={m.items} showType={indicatorType === "todos"} />
+                    <IndicatorItemsList items={m.items} showType={indicatorTypes.length > 1} />
                   </ExpandableRow>
                 ))}
               </div>
@@ -537,7 +577,7 @@ export default async function RelatoriosPage({
                         { value: formatDays(a.avgDaysToComplete), color: "var(--text-muted)" },
                       ]}
                     >
-                      <IndicatorItemsList items={a.items} showType={indicatorType === "todos"} />
+                      <IndicatorItemsList items={a.items} showType={indicatorTypes.length > 1} />
                     </ExpandableRow>
                   ))}
                 </div>
@@ -565,7 +605,7 @@ export default async function RelatoriosPage({
                       label={s.storeName}
                       numbers={[{ value: s.total }, { value: s.concluida, color: "var(--status-good)" }]}
                     >
-                      <IndicatorItemsList items={s.items} showType={indicatorType === "todos"} />
+                      <IndicatorItemsList items={s.items} showType={indicatorTypes.length > 1} />
                     </ExpandableRow>
                   ))}
                 </div>
