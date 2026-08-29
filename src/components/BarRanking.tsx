@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Count, Coverage } from "@/lib/kpi";
 
 // Achado 27/08/2026 (KPIs da Assistência, "Chamados por produto"): label
@@ -21,13 +21,23 @@ export function BarRanking({
   data,
   coverage,
   onSelect,
+  showPercent,
 }: {
   title: string;
   data: Count[];
   coverage?: Coverage;
   onSelect?: (item: Count) => void;
+  // Percentual de cada barra sobre o total, escrito DENTRO da própria
+  // barra -- pedido do Victor 29/08/2026 (voltando atrás da lista abaixo
+  // do gráfico de rosca, que ele achou desnecessária): "só precisa
+  // colocar esse percentual dentro da barra horizontal de cada causa no
+  // grafico de 'chamados por causa raiz'". Opt-in (não muda os outros
+  // rankings que usam esse mesmo componente, tipo produto/rota/loja) --
+  // só o de causa raiz pediu isso.
+  showPercent?: boolean;
 }) {
   const height = Math.max(160, data.length * 36 + 24);
+  const total = data.reduce((sum, d) => sum + d.count, 0);
   return (
     <div
       className="rounded-lg border p-4"
@@ -82,7 +92,19 @@ export function BarRanking({
               maxBarSize={20}
               cursor={onSelect ? "pointer" : undefined}
               onClick={onSelect ? (bar: { payload?: Count }) => bar.payload && onSelect(bar.payload) : undefined}
-            />
+            >
+              {showPercent ? (
+                <LabelList
+                  dataKey="count"
+                  position="insideRight"
+                  formatter={(label: unknown) => {
+                    const value = Number(label);
+                    return total > 0 && Number.isFinite(value) ? `${((value / total) * 100).toFixed(0)}%` : "";
+                  }}
+                  style={{ fill: "#fff", fontSize: 11, fontWeight: 600 }}
+                />
+              ) : null}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       )}
