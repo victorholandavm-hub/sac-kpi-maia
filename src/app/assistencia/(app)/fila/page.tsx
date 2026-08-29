@@ -668,12 +668,16 @@ export default async function AssistenciaQueuePage({
         // compartilhado com AgendaDayGroups.tsx/EntregasWeekGroups.tsx
         // (ver weekGrouping.ts) -- agrupa por data de CRIAÇÃO do chamado
         // (groupByDate acima), não por data agendada (é o que Visitas
-        // sempre agrupou). Mês corrente não ganha o embrulho de mês (ver
-        // isCurrentMonth) -- só os já fechados, pra não esconder o que
-        // ainda tá em andamento atrás de mais um clique. Grupo nomeado
-        // (group/week) -- cada dia já usa "group" sem nome pro próprio
-        // ícone de abrir/fechar; sem o nome, abrir a semana giraria
-        // também as setas de todos os dias lá dentro, mesmo fechados.
+        // sempre agrupou). TODO mês ganha o embrulho, inclusive o
+        // corrente -- corrigido 29/08/2026 (achado do Victor: "agosto
+        // precisa ficar do mesmo jeito que setembro, com as semanas
+        // dentro"), o mês corrente só nasce ABERTO por padrão (ver
+        // defaultOpen/isCurrentMonth, MonthAccordion.tsx) pra não
+        // esconder o que ainda tá em andamento atrás de mais um clique.
+        // Grupo nomeado (group/week) -- cada dia já usa "group" sem nome
+        // pro próprio ícone de abrir/fechar; sem o nome, abrir a semana
+        // giraria também as setas de todos os dias lá dentro, mesmo
+        // fechados.
         <div className="flex flex-col gap-3">
           {visitasMonths.map((month) => {
             const weeksJsx = month.weeks.map((week) => {
@@ -736,12 +740,12 @@ export default async function AssistenciaQueuePage({
                 </details>
               );
             });
-            if (isCurrentMonth(month.monthKey, today) || visitasMonths.length === 1) {
+            if (visitasMonths.length === 1) {
               return weeksJsx;
             }
             const monthTotal = month.weeks.reduce((sum, w) => sum + w.days.reduce((s, g) => s + g.items.length, 0), 0);
             return (
-              <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal}>
+              <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal} defaultOpen={isCurrentMonth(month.monthKey, today)}>
                 {weeksJsx}
               </MonthAccordion>
             );

@@ -116,15 +116,19 @@ export function groupIntoMonths<T>(days: T[], dateKeyOf: (day: T) => string): Mo
   return months;
 }
 
-// "Fechar o mês" -- pedido do Victor 28/08/2026: só os meses que já
-// passaram (não o corrente) ganham o embrulho extra de acordeão de mês;
-// o mês corrente continua mostrando semana > dia direto, sem esconder o
-// que ainda tá em andamento atrás de mais um clique. `todayKey`
-// (YYYY-MM-DD) vem de quem chama -- essas telas já calculam isso pra
-// outra coisa (badge HOJE/ATRASADO), evita chamar `new Date()` de novo
-// aqui dentro (várias dessas telas são "use client", onde isso quebraria
-// a regra de pureza do React Compiler se fosse direto no corpo do
-// componente).
+// "Fechar o mês" -- pedido do Victor 28/08/2026: quando há mais de um mês
+// na tela, TODOS ganham o embrulho de acordeão de mês, inclusive o
+// corrente (corrigido 29/08/2026: "agosto precisa ficar do mesmo jeito
+// que setembro" -- antes só os já fechados ganhavam, o corrente ficava
+// com semanas soltas). O que ainda diferencia o mês corrente é nascer
+// ABERTO por padrão (ver `defaultOpen` em MonthAccordion.tsx, cada tela
+// passa `isCurrentMonth(...)` pra esse prop) -- não esconde o que ainda
+// tá em andamento atrás de mais um clique, mesmo estando dentro do
+// acordeão como os outros meses. `todayKey` (YYYY-MM-DD) vem de quem
+// chama -- essas telas já calculam isso pra outra coisa (badge HOJE/
+// ATRASADO), evita chamar `new Date()` de novo aqui dentro (várias
+// dessas telas são "use client", onde isso quebraria a regra de pureza
+// do React Compiler se fosse direto no corpo do componente).
 export function isCurrentMonth(monthKey: string, todayKey: string): boolean {
   return monthKey === todayKey.slice(0, 7);
 }
