@@ -556,7 +556,12 @@ const DETAIL_COLUMNS =
   // é provavelmente a causa raiz de verdade do "Sem rota" que aparecia na
   // tela do chamado (mais fundamental que o bug de ScheduleField.tsx
   // corrigido antes hoje, que só evitava apagar a rota ao SALVAR).
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed, is_pickup)";
+  // causa_raiz_detalhe faltava aqui também (mesma classe de bug do
+  // comentário acima sobre rota/rota_exception_note) -- achado 29/08/2026
+  // ao dar suporte pra editar causa raiz depois de criado (ver
+  // EditRequestForm.tsx): sem essa coluna, o texto de "Outro" digitado na
+  // criação nunca aparecia de volta no formulário de correção.
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed, is_pickup)";
 
 export async function getRequestDetail(
   id: string

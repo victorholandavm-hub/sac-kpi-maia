@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { updateRequestDetails, type FormState } from "@/app/assistencia/actions";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type ServiceRequestDetail, type Store } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, DELIVERY_REQUEST_TYPES, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -20,10 +20,14 @@ export function EditRequestForm({
   request,
   stores,
   editableTypes,
+  drivers,
+  cargas,
 }: {
   request: ServiceRequestDetail;
   stores: Store[];
   editableTypes: readonly string[];
+  drivers: string[];
+  cargas: { carga: string; label: string }[];
 }) {
   const boundAction = updateRequestDetails.bind(null, request.id);
   const [state, formAction, pending] = useActionState<FormState, FormData>(boundAction, undefined);
@@ -41,6 +45,13 @@ export function EditRequestForm({
   // visita nenhuma.
   const showMontadorInstruction = ["montagem", "desmontagem", "troca_peca", "vistoria"].includes(type);
   const showAuthorizedBy = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
+  // "Quem errou" (causa_raiz/causa_carga/causa_conferente/driver_name) só
+  // era preenchível na criação (SacCreateRequestForm.tsx) -- pedido do
+  // Victor 29/08/2026: "hoje nao consigo alterar a carga e o motorista que
+  // errou". Mesmo padrão visual/condicional de lá: erro_conferencia pede
+  // carga+conferente, erro_motorista pede carga+motorista, "outro" pede o
+  // detalhe -- só que aqui já parte do valor atual do chamado, não vazio.
+  const [causaRaiz, setCausaRaiz] = useState(request.causaRaiz ?? "");
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -162,6 +173,121 @@ export function EditRequestForm({
             style={inputStyle}
           />
         </Field>
+      ) : null}
+
+      {showAuthorizedBy ? (
+        <Field label="Quem errou (controle interno)">
+          <select
+            name="causa_raiz"
+            value={causaRaiz}
+            onChange={(e) => setCausaRaiz(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          >
+            <option value="">Não informado</option>
+            {CAUSA_RAIZ_OPTIONS.map((c) => (
+              <option key={c} value={c}>
+                {CAUSA_RAIZ_LABELS[c]}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : null}
+
+      {showAuthorizedBy && causaRaiz === "erro_conferencia" ? (
+        <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
+          <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+            Erro de conferência -- precisa registrar qual carga e quem conferiu.
+          </p>
+          <Field label="Carga *">
+            <input
+              name="causa_carga"
+              list="edit-cargas"
+              required
+              defaultValue={request.causaCarga ?? ""}
+              placeholder="Ex: 000123"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+            <datalist id="edit-cargas">
+              {cargas.map((c) => (
+                <option key={c.carga} value={c.carga}>
+                  {c.label}
+                </option>
+              ))}
+            </datalist>
+          </Field>
+          <Field label="Conferente *">
+            <input
+              name="causa_conferente"
+              required
+              defaultValue={request.causaConferente ?? ""}
+              placeholder="Nome de quem conferiu a carga"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+          </Field>
+        </div>
+      ) : null}
+
+      {showAuthorizedBy && causaRaiz === "erro_motorista" ? (
+        <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
+          <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+            Erro do motorista -- precisa registrar qual carga e quem entregou.
+          </p>
+          <Field label="Carga *">
+            <input
+              name="causa_carga"
+              list="edit-cargas"
+              required
+              defaultValue={request.causaCarga ?? ""}
+              placeholder="Ex: 000123"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+            <datalist id="edit-cargas">
+              {cargas.map((c) => (
+                <option key={c.carga} value={c.carga}>
+                  {c.label}
+                </option>
+              ))}
+            </datalist>
+          </Field>
+          <Field label="Motorista que entregou (erro) *">
+            <input
+              name="driver_name"
+              list="edit-drivers"
+              required
+              defaultValue={request.driverName ?? ""}
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+            <datalist id="edit-drivers">
+              {drivers.map((d) => (
+                <option key={d} value={d} />
+              ))}
+            </datalist>
+          </Field>
+        </div>
+      ) : null}
+
+      {showAuthorizedBy && causaRaiz === "outro" ? (
+        <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
+          <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+            Causa raiz &quot;Outro&quot; -- descreva exatamente o que houve.
+          </p>
+          <Field label="O que houve, exatamente *">
+            <textarea
+              name="causa_raiz_detalhe"
+              rows={2}
+              required
+              defaultValue={request.causaRaizDetalhe ?? ""}
+              placeholder="Descreva a causa raiz com o máximo de detalhe"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+          </Field>
+        </div>
       ) : null}
 
       {showMontadorInstruction ? (

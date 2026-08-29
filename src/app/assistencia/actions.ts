@@ -1902,11 +1902,53 @@ export async function updateRequestDetails(
   const addressNumberFields = readAddressNumberFields(formData, type);
   if (addressNumberFields.error) return { error: addressNumberFields.error };
 
+  // "Quem errou" (causa_raiz/causa_carga/causa_conferente/causa_raiz_detalhe)
+  // só dava pra preencher na criação -- pedido do Victor 29/08/2026: "hoje
+  // nao consigo alterar a carga e o motorista que errou". Mesma validação
+  // condicional de createSacRequest/createQuickRequest (linhas ~2024-2046
+  // acima) -- mas aqui o campo é opcional (o chamado pode já ter sido
+  // criado sem causa raiz nenhuma, ou ter agora com "Não informado"), então
+  // só valida os sub-campos quando uma causa que exige carga/conferente/
+  // motorista/detalhe de fato foi escolhida.
+  const isDelivery = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
+  const causaRaiz = isDelivery ? emptyToNull(formData.get("causa_raiz")) : null;
+  if (causaRaiz && !(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
+    return { error: "Causa raiz inválida." };
+  }
+  let causaCarga: string | null = null;
+  let causaConferente: string | null = null;
+  let causaRaizDetalhe: string | null = null;
+  // driver_name é campo de uso duplo (culpado do erro_motorista OU
+  // motorista da rota atual, sobrescrito por setSchedule a cada
+  // reagendamento -- ver comentário em driver-actions.ts) -- só entra no
+  // update (spread condicional abaixo) quando essa correção é
+  // especificamente sobre erro_motorista, pra não apagar o motorista de
+  // rota de verdade ao só corrigir outro campo qualquer do chamado.
+  let driverNameForError: string | undefined;
+  if (causaRaiz === "erro_conferencia") {
+    causaCarga = String(formData.get("causa_carga") ?? "").trim();
+    causaConferente = String(formData.get("causa_conferente") ?? "").trim();
+    if (!causaCarga) return { error: "Informe a carga (erro de conferência precisa registrar qual foi)." };
+    if (!causaConferente) return { error: "Informe o conferente (erro de conferência precisa registrar quem conferiu)." };
+  }
+  if (causaRaiz === "erro_motorista") {
+    causaCarga = String(formData.get("causa_carga") ?? "").trim();
+    const typedDriverName = String(formData.get("driver_name") ?? "").trim();
+    if (!causaCarga) return { error: "Informe a carga (erro do motorista precisa registrar qual foi)." };
+    if (!typedDriverName) return { error: "Informe o motorista (erro do motorista precisa registrar quem entregou)." };
+    driverNameForError = await resolveDriverName(typedDriverName);
+  }
+  if (causaRaiz === "outro") {
+    causaRaizDetalhe = String(formData.get("causa_raiz_detalhe") ?? "").trim();
+    if (!causaRaizDetalhe) return { error: "Descreva a causa raiz (obrigatório quando é \"Outro\")." };
+  }
+
   const { error } = await admin
     .from("service_requests")
     .update({
       type,
       ...(assemblerNowInvalid ? { assembler_name: null } : {}),
+      ...(driverNameForError !== undefined ? { driver_name: driverNameForError } : {}),
       store_id: storeId,
       order_code: emptyToNull(formData.get("order_code")),
       client_name: clientName,
@@ -1919,6 +1961,10 @@ export async function updateRequestDetails(
       client_neighborhood: emptyToNull(formData.get("client_neighborhood")),
       reason: emptyToNull(formData.get("reason")),
       authorized_by: emptyToNull(formData.get("authorized_by")),
+      causa_raiz: causaRaiz,
+      causa_carga: causaCarga,
+      causa_conferente: causaConferente,
+      causa_raiz_detalhe: causaRaizDetalhe,
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
       restriction_note: emptyToNull(formData.get("restriction_note")),
       client_time_restriction: emptyToNull(formData.get("client_time_restriction")),
