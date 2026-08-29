@@ -308,7 +308,14 @@ export default async function AssistenciaQueuePage({
   // de mais um clique, mesmo que não seja o mês corrente. Só embrulha
   // quando REALMENTE há mais de um mês na página (ver isCurrentMonth
   // abaixo, que continua cuidando do caso comum de vários meses juntos).
-  const visitasMonths = groupIntoMonths(groups, (g) => g.key);
+  //
+  // CUIDADO: só calcula quando `!showPecas` -- na aba Entregas `groups` é
+  // QueueGroup da ROTA (`g.key` = `${data}_${rota}`, não uma data pura),
+  // e mondayOfWeek (weekGrouping.ts) quebra com RangeError: Invalid time
+  // value ao tentar interpretar isso como data. A aba Entregas tem seu
+  // próprio agrupamento de mês dentro de EntregasWeekGroups.tsx -- não
+  // precisa (e não pode) reaproveitar esse cálculo daqui.
+  const visitasMonths = showPecas ? [] : groupIntoMonths(groups, (g) => g.key);
 
   return (
     <div className="flex flex-col gap-4">
