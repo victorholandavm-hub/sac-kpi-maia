@@ -188,7 +188,14 @@ export default async function RelatorioMontagemDetalhadoPage({
   const dateTo = to || today();
   const filterAlvo = alvo === "mostruario" || alvo === "cliente" ? alvo : undefined;
 
-  const allItems = await listPaymentItems({ dateFrom, dateTo, alvo: filterAlvo, includeNoValue: true });
+  const rawItems = await listPaymentItems({ dateFrom, dateTo, alvo: filterAlvo, includeNoValue: true });
+  // listPaymentItems traz item de QUALQUER tipo de solicitação (troca/
+  // entrega de produto, envio/recolhimento de peça também têm itens) --
+  // com includeNoValue:true (pra esse relatório mostrar até quem ainda
+  // não tem valor definido), os outros tipos entravam junto. Esse
+  // relatório é só de montagem/desmontagem (mesmo escopo do resto de
+  // /assistencia/relatorios, ver REQUEST_REPORT_TYPES lá).
+  const allItems = rawItems.filter((i) => i.type === "montagem" || i.type === "desmontagem");
 
   // Manoel é o único montador funcionário nosso, não terceirizado (ver
   // MANOEL_ONLY_ASSEMBLER/MANOEL_ONLY_TYPES, assistenciaLabels.ts) --

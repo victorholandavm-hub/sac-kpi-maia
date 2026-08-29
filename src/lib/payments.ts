@@ -1,6 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { hashPin } from "./montadorAuth";
-import { isMostruarioRequest } from "./serviceRequests";
+import { isMostruarioRequest, type RequestType } from "./serviceRequests";
 import { sanitizeOrFilterValue } from "./searchFilter";
 
 export async function listAssemblers(): Promise<string[]> {
@@ -166,6 +166,14 @@ export type PaymentItem = {
   // mundo já usa pra achar/conferir uma solicitação em qualquer outra tela
   // (ex.: "#4995"), bem mais fácil de procurar do que o UUID de requestId.
   ticketNumber: number;
+  // Também pro Relatório de montagem detalhado -- achado 29/08/2026:
+  // service_request_items não é exclusivo de montagem/desmontagem (troca/
+  // entrega de produto, envio/recolhimento de peça também têm itens, só
+  // não costumam ter unit_value definido). Com includeNoValue:true (que
+  // esse relatório usa), os itens dos outros tipos passavam a aparecer
+  // junto -- sem o `type` aqui não dava pra filtrar só montagem/
+  // desmontagem depois de buscar.
+  type: RequestType;
   requestStatus: string;
   product: string;
   quantity: number;
@@ -195,6 +203,7 @@ type PaymentItemRow = {
   request: {
     id: string;
     ticket_number: number;
+    type: RequestType;
     status: string;
     assembler_name: string | null;
     client_name: string | null;
@@ -221,7 +230,7 @@ export async function listPaymentItems(
   let query = admin
     .from("service_request_items")
     .select(
-      "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, ticket_number, status, assembler_name, client_name, order_code, created_at, stores(name))"
+      "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, ticket_number, type, status, assembler_name, client_name, order_code, created_at, stores(name))"
     )
     .order("created_at", { ascending: false });
   // Visão geral (sem montador escolhido) só mostra quem já tem valor --
@@ -243,6 +252,7 @@ export async function listPaymentItems(
       itemId: row.id,
       requestId: row.request!.id,
       ticketNumber: row.request!.ticket_number,
+      type: row.request!.type,
       requestStatus: row.request!.status,
       product: row.product,
       quantity: row.quantity,
