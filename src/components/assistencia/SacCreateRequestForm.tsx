@@ -496,7 +496,18 @@ export function SacCreateRequestForm({
 
       {showProduct ? (
         <FormSection
-          title={type === "troca_produto" ? "Produtos a entregar" : "Produto(s) e entrega"}
+          title={
+            type === "troca_produto"
+              ? "Produtos a entregar"
+              : // recolhimento_produto não entrega nada, só recolhe --
+                // achado do Victor 29/08/2026: o título "Produto(s) e
+                // entrega" ficava errado nesse tipo (o motorista vai só
+                // buscar o produto na casa do cliente, sem levar nada no
+                // lugar).
+                type === "recolhimento_produto"
+                ? "Produto(s) a recolher"
+                : "Produto(s) e entrega"
+          }
           number={3}
           hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
         >
