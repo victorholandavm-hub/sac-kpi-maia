@@ -1,70 +1,77 @@
-// Agrupamento por semana (segunda a domingo) -- extraído de
-// AgendaDayGroups.tsx (25/08/2026) pra ser compartilhado com a aba
-// Visitas (fila/page.tsx), pedido do Victor 25/08/2026: "na tela de
-// visitas preciso que fique organizado por semana, como é na tela de
-// agenda". Genérico sobre o tipo de "grupo do dia" (T) -- só precisa
-// saber extrair a data (YYYY-MM-DD) de cada um via `dateKeyOf`, já que
-// Agenda usa `{dateKey, label, items}` e Visitas usa `QueueGroup`
-// (`key`, não `dateKey`), dois tipos diferentes que não vale a pena
-// unificar só por causa disso.
+// Agrupamento por semana -- extraído de AgendaDayGroups.tsx (25/08/2026)
+// pra ser compartilhado com a aba Visitas (fila/page.tsx), pedido do
+// Victor 25/08/2026: "na tela de visitas preciso que fique organizado
+// por semana, como é na tela de agenda". Genérico sobre o tipo de "grupo
+// do dia" (T) -- só precisa saber extrair a data (YYYY-MM-DD) de cada um
+// via `dateKeyOf`, já que Agenda usa `{dateKey, label, items}` e Visitas
+// usa `QueueGroup` (`key`, não `dateKey`), dois tipos diferentes que não
+// vale a pena unificar só por causa disso.
 export type WeekGroup<T> = { weekKey: string; label: string; days: T[] };
-
-function mondayOfWeek(dateKey: string): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  const daysSinceMonday = (date.getUTCDay() + 6) % 7;
-  date.setUTCDate(date.getUTCDate() - daysSinceMonday);
-  return date.toISOString().slice(0, 10);
-}
 
 function monthKeyOf(dateKey: string): string {
   return dateKey.slice(0, 7);
 }
 
-function formatDayMonth(dateKey: string): string {
-  const [, m, d] = dateKey.split("-");
-  return `${d}/${m}`;
+function formatDayMonth(day: number, monthKey: string): string {
+  const [, m] = monthKey.split("-");
+  return `${String(day).padStart(2, "0")}/${m}`;
 }
 
-// "Semana do mês", não semana corrida -- pedido do Victor 28/08/2026:
-// "mantenha a divisão por semana mas de acordo com as semanas do mês".
-// Antes a chave da semana era só a segunda-feira daquela semana
-// corrida, o que misturava dias de meses diferentes numa mesma semana
-// quando a virada de mês caía no meio dela (ex.: semana de 26/01 a
-// 01/02 juntava janeiro com fevereiro). Namespacear a chave com o mês
-// do PRÓPRIO dia (não o mês da segunda-feira) resolve isso sozinho: dois
-// dias do mesmo mês com a mesma segunda-feira caem na mesma chave (mesma
-// semana de sempre); um dia de fevereiro cuja segunda-feira "de
-// calendário" caiu em janeiro ganha uma chave diferente de qualquer dia
-// de janeiro, indo pra sua própria semana (curta, só com os dias que já
-// são de fevereiro) -- sem precisar recalcular segunda-feira nenhuma,
-// só isolar por mês antes de agrupar.
+// Último dia de verdade do mês (28, 29, 30 ou 31) -- "dia 0 do mês
+// seguinte" é um truque padrão de Date pra isso, sem precisar de tabela
+// de dias-por-mês nem checar ano bissexto na mão.
+function lastDayOfMonth(monthKey: string): number {
+  const [y, m] = monthKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+// Semana FIXA de 7 dias corridos do mês, não segunda a domingo -- pedido
+// do Victor 29/08/2026: "agrupe cada semana com 7 dias, sempre assim:
+// dia 01 a dia 07, dia 08 a dia 14, dia 15 a dia 21, dia 22 a dia 28, dia
+// 29 a dia 30(ou 31)". Substitui o esquema anterior (semana ISO,
+// segunda-feira a domingo, namespaced por mês pra não cruzar virada de
+// mês -- pedido do Victor 28/08/2026). O novo esquema já nasce sem
+// cruzar mês nenhum (a banda é sempre um intervalo de dias DENTRO do
+// mesmo mês), então nem precisa mais desse namespace por cima -- a
+// última banda (29 em diante) pode ter só 2 ou 3 dias dependendo do mês,
+// mas nunca "vaza" pro mês seguinte. Sempre 4 ou 5 bandas por mês.
+const WEEK_BAND_STARTS = [1, 8, 15, 22, 29] as const;
+
+function weekBandStart(day: number): number {
+  let start: number = WEEK_BAND_STARTS[0];
+  for (const s of WEEK_BAND_STARTS) {
+    if (day >= s) start = s;
+  }
+  return start;
+}
+
 function weekKeyOfMonth(dateKey: string): string {
-  return `${monthKeyOf(dateKey)}_${mondayOfWeek(dateKey)}`;
+  const day = Number(dateKey.slice(8, 10));
+  return `${monthKeyOf(dateKey)}_${String(weekBandStart(day)).padStart(2, "0")}`;
 }
 
-// Rótulo usa as datas de verdade que têm chamado (não a semana inteira
-// teórica) -- sem implicar que existe algo num dia sem nenhum. Min/max de
-// verdade sobre as chaves, não "primeiro/último do array" -- os dias
-// chegam em ordem crescente (Agenda antes de 25/08/2026) OU decrescente
-// (Agenda e Visitas depois, "mais recentes primeiro") dependendo de quem
-// chama, então o rótulo não pode assumir uma direção.
+// Rótulo vem da banda FIXA em si (01-07, 08-14, ...), não do min/max das
+// datas que realmente têm chamado -- é o próprio pedido do Victor
+// (bandas sempre iguais, previsíveis, não "encolhem" conforme os dados).
+// weekKey já carrega mês + dia de início (ver weekKeyOfMonth) -- dá pra
+// recalcular o rótulo só a partir dele, sem precisar reabrir `days`.
+function weekLabelFor(weekKey: string): string {
+  const [monthKey, startStr] = weekKey.split("_");
+  const start = Number(startStr);
+  const end = Math.min(start + 6, lastDayOfMonth(monthKey));
+  return start === end ? `Semana de ${formatDayMonth(start, monthKey)}` : `Semana de ${formatDayMonth(start, monthKey)} a ${formatDayMonth(end, monthKey)}`;
+}
+
 export function groupIntoWeeks<T>(days: T[], dateKeyOf: (day: T) => string): WeekGroup<T>[] {
   const weeks: WeekGroup<T>[] = [];
   for (const day of days) {
     const weekKey = weekKeyOfMonth(dateKeyOf(day));
     let week = weeks.find((w) => w.weekKey === weekKey);
     if (!week) {
-      week = { weekKey, label: "", days: [] };
+      week = { weekKey, label: weekLabelFor(weekKey), days: [] };
       weeks.push(week);
     }
     week.days.push(day);
-  }
-  for (const week of weeks) {
-    const keys = week.days.map(dateKeyOf);
-    const first = keys.reduce((min, k) => (k < min ? k : min));
-    const last = keys.reduce((max, k) => (k > max ? k : max));
-    week.label = first === last ? `Semana de ${formatDayMonth(first)}` : `Semana de ${formatDayMonth(first)} a ${formatDayMonth(last)}`;
   }
   return weeks;
 }
@@ -74,8 +81,7 @@ export function groupIntoWeeks<T>(days: T[], dateKeyOf: (day: T) => string): Wee
 // do mês --> semana --> dia". Cada MonthGroup já vem com as semanas
 // dela prontas (groupIntoWeeks reaproveitado, não duplicado) -- quem
 // renderiza decide se embrulha isso num acordeão de mês ou mostra solto
-// (ver isCurrentMonth abaixo: o mês corrente não ganha esse embrulho a
-// mais, só os meses já fechados).
+// (ver isCurrentMonth abaixo pra saber qual mês nasce aberto).
 export type MonthGroup<T> = { monthKey: string; label: string; weeks: WeekGroup<T>[] };
 
 const MONTH_LABELS = [
@@ -102,9 +108,9 @@ export function groupIntoMonths<T>(days: T[], dateKeyOf: (day: T) => string): Mo
   const weeks = groupIntoWeeks(days, dateKeyOf);
   const months: MonthGroup<T>[] = [];
   for (const week of weeks) {
-    // weekKey é sempre "YYYY-MM_YYYY-MM-DD" (ver weekKeyOfMonth) -- o mês
-    // já está namespaced ali, sem precisar reabrir os dias da semana pra
-    // recalcular.
+    // weekKey é sempre "YYYY-MM_DD" (ver weekKeyOfMonth, DD = dia de
+    // início da banda) -- o mês já está namespaced ali, sem precisar
+    // reabrir os dias da semana pra recalcular.
     const mKey = week.weekKey.slice(0, 7);
     let month = months.find((m) => m.monthKey === mKey);
     if (!month) {
