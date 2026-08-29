@@ -101,20 +101,25 @@ export function EntregasWeekGroups({ groups, now }: { groups: QueueGroup[]; now:
   }
 
   // Mês -> semana -- pedido do Victor 28/08/2026: "quando fechar o mês,
-  // ela ficaria agrupada dentro do mês --> semana --> dia". Mês corrente
-  // não ganha o embrulho a mais (ver isCurrentMonth) -- só os já fechados.
-  // Também não embrulha quando só existe UM mês na tela inteira (mesmo
-  // ajuste feito na Agenda, AgendaDayGroups.tsx, depois que o Victor
-  // achou o acordeão sobrando lá) -- sem outro mês por perto pra
+  // ela ficaria agrupada dentro do mês --> semana --> dia". TODO mês
+  // ganha o embrulho, inclusive o corrente -- corrigido 29/08/2026
+  // (achado do Victor: "agosto precisa ficar do mesmo jeito que
+  // setembro, com as semanas dentro" -- antes o mês corrente ficava
+  // solto, com fragmentos de semana de 1 dia só tipo "Semana de 31/08"
+  // quando a semana cruza pro mês seguinte). Mês corrente só nasce
+  // ABERTO por padrão (defaultOpen, MonthAccordion.tsx) -- não esconde o
+  // que ainda tá em andamento atrás de mais um clique. Não embrulha
+  // quando só existe UM mês na tela inteira (mesmo ajuste feito na
+  // Agenda, AgendaDayGroups.tsx) -- sem outro mês por perto pra
   // "esconder", o acordeão só atrapalha.
   return (
     <div className="flex flex-col gap-3">
       {months.map((month) => {
         const weeksJsx = month.weeks.map(renderWeek);
-        if (isCurrentMonth(month.monthKey, todayKey) || months.length === 1) return weeksJsx;
+        if (months.length === 1) return weeksJsx;
         const monthTotal = month.weeks.reduce((sum, w) => sum + w.days.reduce((s, g) => s + g.items.length, 0), 0);
         return (
-          <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal}>
+          <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal} defaultOpen={isCurrentMonth(month.monthKey, todayKey)}>
             {weeksJsx}
           </MonthAccordion>
         );

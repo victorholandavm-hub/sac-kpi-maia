@@ -25,9 +25,10 @@ function isGroupOverdue(group: Group, todayKey: string): boolean {
 // primeiro por Mês ou Semana... Dentro da semana, exiba os dias" --
 // completado em 28/08/2026: "mantenha a divisão por semana mas de
 // acordo com as semanas do mês e aí quando fechar o mês, ela ficaria
-// agrupada dentro do mês --> semana --> dia" (mês corrente não ganha
-// esse embrulho a mais, só os já fechados -- ver isCurrentMonth; e só
-// embrulha se sobrar mais de um mês na tela -- ver agendaMonths abaixo).
+// agrupada dentro do mês --> semana --> dia" (só embrulha se sobrar mais
+// de um mês na tela -- ver agendaMonths abaixo; quando embrulha, o mês
+// corrente nasce ABERTO por padrão -- ver defaultOpen/isCurrentMonth,
+// MonthAccordion.tsx, corrigido 29/08/2026).
 // Só na lista empilhada do desktop (ver AgendaDayGroups abaixo) -- o
 // seletor de dia do celular já é outro paradigma (tira uma faixa
 // horizontal, não empilha), agrupar por semana/mês ali não se encaixa.
@@ -138,11 +139,15 @@ export function AgendaDayGroups({ groups, todayKey }: { groups: Group[]; todayKe
         {/* Mês -> semana (do mês) -- pedido do Victor 28/08/2026: "mantenha
             a divisão por semana mas de acordo com as semanas do mês e aí
             quando fechar o mês, ela ficaria agrupada dentro do mês -->
-            semana --> dia". Mês corrente não ganha o embrulho a mais (ver
-            isCurrentMonth) -- só os já fechados. Grupo nomeado (group/week)
-            -- DayCard já usa "group" sem nome pro próprio ícone de abrir/
-            fechar; sem o nome, abrir a semana giraria também as setas de
-            todos os dias lá dentro, mesmo fechados. */}
+            semana --> dia". TODO mês ganha o embrulho quando aparece mais
+            de um (ver agendaMonths.length acima) -- o mês corrente só
+            nasce ABERTO por padrão (defaultOpen/isCurrentMonth,
+            MonthAccordion.tsx), corrigido 29/08/2026 (achado do Victor:
+            "agosto precisa ficar do mesmo jeito que setembro, com as
+            semanas dentro"). Grupo nomeado (group/week) -- DayCard já usa
+            "group" sem nome pro próprio ícone de abrir/fechar; sem o
+            nome, abrir a semana giraria também as setas de todos os dias
+            lá dentro, mesmo fechados. */}
         {agendaMonths.map((month) => {
           const weeksJsx = month.weeks.map((week) => {
             const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
@@ -174,10 +179,10 @@ export function AgendaDayGroups({ groups, todayKey }: { groups: Group[]; todayKe
               </details>
             );
           });
-          if (isCurrentMonth(month.monthKey, todayKey) || agendaMonths.length === 1) return weeksJsx;
+          if (agendaMonths.length === 1) return weeksJsx;
           const monthTotal = month.weeks.reduce((sum, w) => sum + w.days.reduce((s, g) => s + g.items.length, 0), 0);
           return (
-            <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal}>
+            <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal} defaultOpen={isCurrentMonth(month.monthKey, todayKey)}>
               {weeksJsx}
             </MonthAccordion>
           );
