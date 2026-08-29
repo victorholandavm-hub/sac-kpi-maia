@@ -26,11 +26,13 @@ function isGroupOverdue(group: Group, todayKey: string): boolean {
 // completado em 28/08/2026: "mantenha a divisão por semana mas de
 // acordo com as semanas do mês e aí quando fechar o mês, ela ficaria
 // agrupada dentro do mês --> semana --> dia" (mês corrente não ganha
-// esse embrulho a mais, só os já fechados -- ver isCurrentMonth). Só na
-// lista empilhada do desktop (ver AgendaDayGroups abaixo) -- o seletor de
-// dia do celular já é outro paradigma (tira uma faixa horizontal, não
-// empilha), agrupar por semana/mês ali não se encaixa. groupIntoMonths
-// compartilhado com a aba Visitas (fila/page.tsx) -- ver weekGrouping.ts.
+// esse embrulho a mais, só os já fechados -- ver isCurrentMonth; e só
+// embrulha se sobrar mais de um mês na tela -- ver agendaMonths abaixo).
+// Só na lista empilhada do desktop (ver AgendaDayGroups abaixo) -- o
+// seletor de dia do celular já é outro paradigma (tira uma faixa
+// horizontal, não empilha), agrupar por semana/mês ali não se encaixa.
+// groupIntoMonths compartilhado com a aba Visitas (fila/page.tsx) -- ver
+// weekGrouping.ts.
 
 // Recolhível, recolhido por padrão -- pedido do Victor 25/08/2026: "na
 // tela de agenda, precisa por padrão estar recolhido o agrupamento".
@@ -87,6 +89,19 @@ function DayCard({ group, todayKey }: { group: Group; todayKey: string }) {
 export function AgendaDayGroups({ groups, todayKey }: { groups: Group[]; todayKey: string }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const selectedGroup = groups.find((g) => g.dateKey === selectedKey) ?? groups[0] ?? null;
+  // A Agenda já filtra por mês no próprio topo (seletor "← Agosto de 2026
+  // →", ver agenda/page.tsx: `listScheduledRequests({..., month:
+  // filterMonth})`) -- então quase sempre `groups` inteiro é de UM mês só
+  // (o que foi escolhido no seletor, não necessariamente o mês corrente
+  // de verdade). Achado do Victor 28/08/2026: navegar pro mês seguinte
+  // (ex.: Setembro) escondia TUDO atrás de um único acordeão "SETEMBRO DE
+  // 2026" recolhido -- redundante, já que o seletor de mês é a própria
+  // navegação. Só embrulha quando sobra mais de um mês na tela (acontece
+  // nos filtros "Tudo"/"Atrasado"/"Próximos 7 dias", que ignoram o
+  // seletor de mês -- ver `month: filterRange ? undefined : filterMonth`
+  // em agenda/page.tsx -- aí sim pode vir gente de meses diferentes
+  // misturada, e o acordeão volta a fazer sentido).
+  const agendaMonths = groupIntoMonths(groups, (g) => g.dateKey);
 
   return (
     <div className="flex flex-col gap-4">
@@ -128,7 +143,7 @@ export function AgendaDayGroups({ groups, todayKey }: { groups: Group[]; todayKe
             -- DayCard já usa "group" sem nome pro próprio ícone de abrir/
             fechar; sem o nome, abrir a semana giraria também as setas de
             todos os dias lá dentro, mesmo fechados. */}
-        {groupIntoMonths(groups, (g) => g.dateKey).map((month) => {
+        {agendaMonths.map((month) => {
           const weeksJsx = month.weeks.map((week) => {
             const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
             return (
@@ -159,7 +174,7 @@ export function AgendaDayGroups({ groups, todayKey }: { groups: Group[]; todayKe
               </details>
             );
           });
-          if (isCurrentMonth(month.monthKey, todayKey)) return weeksJsx;
+          if (isCurrentMonth(month.monthKey, todayKey) || agendaMonths.length === 1) return weeksJsx;
           const monthTotal = month.weeks.reduce((sum, w) => sum + w.days.reduce((s, g) => s + g.items.length, 0), 0);
           return (
             <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal}>
