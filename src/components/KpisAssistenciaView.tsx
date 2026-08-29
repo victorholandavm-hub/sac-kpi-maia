@@ -73,6 +73,16 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
         )}
       </div>
 
+      {/* Ranking próprio, não a mesma barra de "Chamados por produto" lá em
+          cima (que soma TODO motivo) -- pedido do Victor 29/08/2026:
+          "consegue colocar o ranking de produtos com mais erros de
+          fabricação nos kpis da assistencia?". Fica perto de "Quem errou"
+          por ser outro recorte da mesma causa raiz, não perto do ranking
+          geral de produto. */}
+      {data.byProductDefeitoFabricacao.length > 0 ? (
+        <BarRanking title="Produtos com mais defeito de fabricação" data={data.byProductDefeitoFabricacao} onSelect={openDrilldown} />
+      ) : null}
+
       <section className="grid md:grid-cols-2 gap-4">
         <BarRanking title="Conferente que mais errou" data={data.byConferente} onSelect={openDrilldown} />
         <div className="flex flex-col gap-2">
