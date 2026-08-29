@@ -166,6 +166,13 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
           { count: "exact" }
         )
         .in("type", DELIVERY_REQUEST_TYPES)
+        // Cancelada não conta pra nenhum KPI aqui -- pedido do Victor
+        // 29/08/2026: "as notificações de assistencia que foram canceladas
+        // não precisam aparecer nos kpis da assistencia". Chamado cancelado
+        // não virou entrega de verdade (não tem produto errado, rota que
+        // falhou, motorista que errou etc.) -- contar ele infla volumetria/
+        // rankings com algo que nem chegou a acontecer.
+        .not("status", "eq", "cancelada")
         .lte("created_at", toIso);
       if (fromIso) query = query.gte("created_at", fromIso);
       return query.range(from, to) as unknown as PromiseLike<PagedQueryResult<RequestRow>>;
