@@ -68,7 +68,12 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
             <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
               Clique numa fatia da lista abaixo pra ver os chamados.
             </p>
-            <BarRanking title="Chamados por causa raiz" data={data.byCausaRaiz} onSelect={openDrilldown} />
+            {/* Percentual dentro da própria barra -- pedido do Victor
+                29/08/2026 (voltando atrás da lista abaixo do gráfico de
+                rosca): "só precisa colocar esse percentual dentro da
+                barra horizontal de cada causa no grafico de 'chamados
+                por causa raiz'". */}
+            <BarRanking title="Chamados por causa raiz" data={data.byCausaRaiz} onSelect={openDrilldown} showPercent />
           </>
         )}
       </div>
