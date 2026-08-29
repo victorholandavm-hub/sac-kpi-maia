@@ -103,11 +103,15 @@ export function EntregasWeekGroups({ groups, now }: { groups: QueueGroup[]; now:
   // Mês -> semana -- pedido do Victor 28/08/2026: "quando fechar o mês,
   // ela ficaria agrupada dentro do mês --> semana --> dia". Mês corrente
   // não ganha o embrulho a mais (ver isCurrentMonth) -- só os já fechados.
+  // Também não embrulha quando só existe UM mês na tela inteira (mesmo
+  // ajuste feito na Agenda, AgendaDayGroups.tsx, depois que o Victor
+  // achou o acordeão sobrando lá) -- sem outro mês por perto pra
+  // "esconder", o acordeão só atrapalha.
   return (
     <div className="flex flex-col gap-3">
       {months.map((month) => {
         const weeksJsx = month.weeks.map(renderWeek);
-        if (isCurrentMonth(month.monthKey, todayKey)) return weeksJsx;
+        if (isCurrentMonth(month.monthKey, todayKey) || months.length === 1) return weeksJsx;
         const monthTotal = month.weeks.reduce((sum, w) => sum + w.days.reduce((s, g) => s + g.items.length, 0), 0);
         return (
           <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal}>

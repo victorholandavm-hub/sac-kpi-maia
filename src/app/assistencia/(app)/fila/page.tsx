@@ -300,6 +300,15 @@ export default async function AssistenciaQueuePage({
   // AssistenciaQueueGroup -- lá dentro é "use client" com hooks, onde
   // chamar Date.now() direto no corpo do render quebra a regra de pureza.
   const now = currentTimeMs();
+  // Hoisted pra fora do JSX (não dentro do .map) só pra poder checar
+  // `visitasMonths.length` -- achado do Victor 28/08/2026 testando a
+  // Agenda: quando a busca inteira só tem UM mês (ex.: filtro De/Até
+  // restrito a um mês só), embrulhar esse único mês num MonthAccordion é
+  // pura chateação -- não sobra nada "fora" pra justificar esconder atrás
+  // de mais um clique, mesmo que não seja o mês corrente. Só embrulha
+  // quando REALMENTE há mais de um mês na página (ver isCurrentMonth
+  // abaixo, que continua cuidando do caso comum de vários meses juntos).
+  const visitasMonths = groupIntoMonths(groups, (g) => g.key);
 
   return (
     <div className="flex flex-col gap-4">
@@ -659,7 +668,7 @@ export default async function AssistenciaQueuePage({
         // ícone de abrir/fechar; sem o nome, abrir a semana giraria
         // também as setas de todos os dias lá dentro, mesmo fechados.
         <div className="flex flex-col gap-3">
-          {groupIntoMonths(groups, (g) => g.key).map((month) => {
+          {visitasMonths.map((month) => {
             const weeksJsx = month.weeks.map((week) => {
               const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
               return (
@@ -720,7 +729,7 @@ export default async function AssistenciaQueuePage({
                 </details>
               );
             });
-            if (isCurrentMonth(month.monthKey, today)) {
+            if (isCurrentMonth(month.monthKey, today) || visitasMonths.length === 1) {
               return weeksJsx;
             }
             const monthTotal = month.weeks.reduce((sum, w) => sum + w.days.reduce((s, g) => s + g.items.length, 0), 0);
