@@ -1,5 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
+import { DeliveryStatusBadge, type DeliveryStatusCounts } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
 import { DELIVERY_TYPE_COLORS } from "./AssistenciaQueueGroup";
@@ -16,6 +19,20 @@ import type { ServiceRequestSummary } from "@/lib/serviceRequests";
 // Sem arrastar-e-soltar entre colunas -- não foi pedido, e mudar
 // rota/motorista de um card já tem fluxo próprio (dentro do detalhe do
 // chamado); aqui é só uma visão, mais rápida de escanear que a sanfona.
+//
+// Subabas Programado/Concluído/Cancelado DENTRO de cada coluna -- pedido
+// do Victor 29/08/2026: "tem como colocar dentro do kanban, dentro da
+// rota mesmo duas subabas de programado/concluido/cancelado? porque hoje
+// eu preciso rolar muito pra ver o que ja foi concluido e o que nao".
+// Mesmos 3 baldes que a sanfona já usa só pra CONTAR (countByDeliveryStatus,
+// DeliveryStatusBadge.tsx, pedido anterior do Victor 21/08/2026) -- aqui
+// filtram de verdade quais cards aparecem, não só mostram o número.
+// "use client" + useState por coluna (cada coluna escolhe sua aba
+// independente das outras) -- estado local, não faz sentido guardar na
+// URL (o kanban tem N colunas, uma por rota do dia). Começa em
+// "Programado": é o que precisa de atenção agora; Concluído/Cancelado já
+// estão resolvidos, só um clique de distância quando alguém quiser
+// conferir.
 
 type KanbanColumn = {
   key: string;
@@ -99,27 +116,80 @@ export function EntregasKanbanHoje({ groups, todayOverview }: { groups: QueueGro
       </span>
       <div className="flex items-start gap-3 overflow-x-auto pb-2 -mx-1 px-1">
         {columns.map((column) => (
-          <div key={column.key} className="flex flex-col rounded-xl shrink-0 w-72 overflow-hidden" style={{ border: `2px solid ${column.borderColor}` }}>
-            <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ background: column.headerBg }}>
-              <span className="text-sm font-bold" style={{ color: column.headerText }}>
-                {column.rotaLabel}
-              </span>
-              <span className="text-xs font-semibold" style={{ color: column.headerText, opacity: 0.85 }}>
-                ({column.items.length})
-              </span>
-            </div>
-            {column.driverName ? (
-              <div className="px-3 py-1 text-xs font-medium" style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
-                🚚 {column.driverName}
-              </div>
-            ) : null}
-            <div className="flex flex-col gap-2 p-2 overflow-y-auto max-h-[65vh]" style={{ background: "var(--surface-1)" }}>
-              {column.items.map((r) => (
-                <KanbanCard key={r.id} r={r} />
-              ))}
-            </div>
-          </div>
+          <KanbanColumnCard key={column.key} column={column} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+type DeliveryStatusTab = "programado" | "concluido" | "cancelado";
+
+// Mesmo balde de countByDeliveryStatus (DeliveryStatusBadge.tsx), só que
+// por item em vez de agregado -- precisa pra FILTRAR quais cards
+// aparecem em cada subaba, não só contar. Mantém a mesma regra (senão as
+// subabas e os números do cabeçalho da coluna divergiam entre si).
+function deliveryStatusTab(status: string): DeliveryStatusTab {
+  if (status === "concluida") return "concluido";
+  if (status === "cancelada") return "cancelado";
+  return "programado";
+}
+
+const STATUS_TAB_LABELS: Record<DeliveryStatusTab, string> = {
+  programado: "Programado",
+  concluido: "Concluído",
+  cancelado: "Cancelado",
+};
+
+function KanbanColumnCard({ column }: { column: KanbanColumn }) {
+  // Estado local por coluna -- cada rota escolhe sua subaba independente
+  // das outras (ver comentário no topo do arquivo). Começa em
+  // "programado" -- é o que precisa de atenção agora.
+  const [tab, setTab] = useState<DeliveryStatusTab>("programado");
+  const counts: DeliveryStatusCounts = { programado: 0, concluido: 0, cancelado: 0 };
+  for (const r of column.items) counts[deliveryStatusTab(r.status)]++;
+  const visibleItems = column.items.filter((r) => deliveryStatusTab(r.status) === tab);
+
+  return (
+    <div className="flex flex-col rounded-xl shrink-0 w-72 overflow-hidden" style={{ border: `2px solid ${column.borderColor}` }}>
+      <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ background: column.headerBg }}>
+        <span className="text-sm font-bold" style={{ color: column.headerText }}>
+          {column.rotaLabel}
+        </span>
+        <span className="text-xs font-semibold" style={{ color: column.headerText, opacity: 0.85 }}>
+          ({column.items.length})
+        </span>
+      </div>
+      {column.driverName ? (
+        <div className="px-3 py-1 text-xs font-medium" style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
+          🚚 {column.driverName}
+        </div>
+      ) : null}
+      <div className="flex items-center gap-1 px-2 pt-2" style={{ background: "var(--surface-1)" }}>
+        {(Object.keys(STATUS_TAB_LABELS) as DeliveryStatusTab[]).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className="text-[11px] px-2 py-1 rounded-full whitespace-nowrap font-medium"
+            style={
+              tab === t
+                ? { background: "var(--brand-green)", color: "var(--brand-green-ink)" }
+                : { border: "1px solid var(--border)", color: "var(--text-secondary)" }
+            }
+          >
+            {STATUS_TAB_LABELS[t]} ({counts[t]})
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-col gap-2 p-2 overflow-y-auto max-h-[65vh]" style={{ background: "var(--surface-1)" }}>
+        {visibleItems.length === 0 ? (
+          <p className="text-xs text-center py-3" style={{ color: "var(--text-muted)" }}>
+            Nada em &quot;{STATUS_TAB_LABELS[tab]}&quot; aqui.
+          </p>
+        ) : (
+          visibleItems.map((r) => <KanbanCard key={r.id} r={r} />)
+        )}
       </div>
     </div>
   );
