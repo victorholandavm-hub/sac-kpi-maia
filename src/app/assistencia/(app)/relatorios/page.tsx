@@ -541,6 +541,21 @@ export default async function RelatoriosPage({
         </div>
       </div>
 
+      {/* Botão pro relatório linha-por-linha -- pedido do Victor
+          29/08/2026: "seu antonio está achando esse numero 141 pouco
+          para o volume a pagar alto, a media 92,87 por montagem, ta
+          errado, a média é 39,49... preciso que voce coloque um botão
+          na aba de relatorio chamado relatorio de montagem detalhado".
+          Carrega o mesmo período/alvo que já tá filtrado aqui, pra não
+          o Antônio ter que reaplicar o filtro do outro lado. */}
+      <Link
+        href={`/assistencia/relatorios/montagem-detalhado?${new URLSearchParams({ from: dateFrom, to: dateTo, ...(filterAlvo ? { alvo: filterAlvo } : {}) }).toString()}`}
+        className="self-start text-sm px-4 py-2 rounded-lg font-medium"
+        style={{ background: "var(--text-primary)", color: "#fff" }}
+      >
+        📋 Relatório de montagem detalhado
+      </Link>
+
       {/* Indicadores -- redesign pedido do Victor 28/08/2026: sem borda
           externa colorida (card branco com sombra, ver CARD_STYLE), 3
           visões viram abas horizontais em vez de tabela + grid de 2

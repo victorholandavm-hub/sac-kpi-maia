@@ -161,6 +161,11 @@ export function paymentStage(requestStatus: string, paymentReleased: boolean): P
 export type PaymentItem = {
   itemId: string;
   requestId: string;
+  // Só pro Relatório de montagem detalhado (pedido do Victor 29/08/2026)
+  // conseguir mostrar o número do chamado -- é o identificador que todo
+  // mundo já usa pra achar/conferir uma solicitação em qualquer outra tela
+  // (ex.: "#4995"), bem mais fácil de procurar do que o UUID de requestId.
+  ticketNumber: number;
   requestStatus: string;
   product: string;
   quantity: number;
@@ -189,6 +194,7 @@ type PaymentItemRow = {
   payment_authorized_by: string | null;
   request: {
     id: string;
+    ticket_number: number;
     status: string;
     assembler_name: string | null;
     client_name: string | null;
@@ -215,7 +221,7 @@ export async function listPaymentItems(
   let query = admin
     .from("service_request_items")
     .select(
-      "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, status, assembler_name, client_name, order_code, created_at, stores(name))"
+      "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, ticket_number, status, assembler_name, client_name, order_code, created_at, stores(name))"
     )
     .order("created_at", { ascending: false });
   // Visão geral (sem montador escolhido) só mostra quem já tem valor --
@@ -236,6 +242,7 @@ export async function listPaymentItems(
     .map((row) => ({
       itemId: row.id,
       requestId: row.request!.id,
+      ticketNumber: row.request!.ticket_number,
       requestStatus: row.request!.status,
       product: row.product,
       quantity: row.quantity,
