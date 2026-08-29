@@ -22,7 +22,8 @@ import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia"
 import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcut";
 import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
-import { groupIntoWeeks } from "@/lib/weekGrouping";
+import { groupIntoMonths, isCurrentMonth } from "@/lib/weekGrouping";
+import { MonthAccordion } from "@/components/assistencia/MonthAccordion";
 import {
   groupByRota,
   sortGroupItems,
@@ -642,76 +643,91 @@ export default async function AssistenciaQueuePage({
           {restGroups.length > 0 ? <EntregasWeekGroups groups={restGroups} now={now} /> : null}
         </div>
       ) : (
-        // Agrupado por semana -- pedido do Victor 25/08/2026: "na tela de
-        // visitas preciso que fique organizado por semana, como é na tela
-        // de agenda". groupIntoWeeks compartilhado com AgendaDayGroups.tsx
-        // (ver weekGrouping.ts) -- mesmo visual/comportamento (recolhido
-        // por padrão, rótulo "Semana de DD/MM a DD/MM"), só que aqui
-        // agrupa por data de CRIAÇÃO do chamado (groupByDate acima), não
-        // por data agendada (é o que Visitas sempre agrupou, só ganhou
-        // mais um nível por cima agora). Grupo nomeado (group/week) --
-        // cada dia já usa "group" sem nome pro próprio ícone de abrir/
-        // fechar; sem o nome, abrir a semana giraria também as setas de
-        // todos os dias lá dentro, mesmo fechados.
+        // Agrupado por mês > semana (do mês) > dia -- pedido do Victor
+        // 25/08/2026: "na tela de visitas preciso que fique organizado
+        // por semana, como é na tela de agenda", ganhou um nível a mais
+        // em 28/08/2026: "mantenha a divisão por semana mas de acordo
+        // com as semanas do mês e aí quando fechar o mês, ela ficaria
+        // agrupada dentro do mês --> semana --> dia". groupIntoMonths
+        // compartilhado com AgendaDayGroups.tsx/EntregasWeekGroups.tsx
+        // (ver weekGrouping.ts) -- agrupa por data de CRIAÇÃO do chamado
+        // (groupByDate acima), não por data agendada (é o que Visitas
+        // sempre agrupou). Mês corrente não ganha o embrulho de mês (ver
+        // isCurrentMonth) -- só os já fechados, pra não esconder o que
+        // ainda tá em andamento atrás de mais um clique. Grupo nomeado
+        // (group/week) -- cada dia já usa "group" sem nome pro próprio
+        // ícone de abrir/fechar; sem o nome, abrir a semana giraria
+        // também as setas de todos os dias lá dentro, mesmo fechados.
         <div className="flex flex-col gap-3">
-          {groupIntoWeeks(groups, (g) => g.key).map((week) => {
-            const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
-            return (
-              <details key={week.weekKey} className="rounded-xl overflow-hidden group/week" style={{ border: "2px solid var(--border)" }}>
-                <summary
-                  className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
-                  style={{ background: "var(--surface-2)" }}
-                >
-                  <span
-                    className="text-xs shrink-0 transition-transform duration-150 group-open/week:rotate-90"
-                    style={{ color: "var(--text-secondary)" }}
-                    aria-hidden="true"
+          {groupIntoMonths(groups, (g) => g.key).map((month) => {
+            const weeksJsx = month.weeks.map((week) => {
+              const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
+              return (
+                <details key={week.weekKey} className="rounded-xl overflow-hidden group/week" style={{ border: "2px solid var(--border)" }}>
+                  <summary
+                    className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+                    style={{ background: "var(--surface-2)" }}
                   >
-                    ▶
-                  </span>
-                  <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
-                    {week.label}
-                  </span>
-                  <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
-                    ({weekTotal})
-                  </span>
-                </summary>
-                <div className="flex flex-col gap-3 p-3" style={{ background: "var(--surface-1)" }}>
-                  {week.days.map((group) => (
-                    // Recolhível -- pedido do Victor 20/08/2026: "os
-                    // agrupamentos por data (Entregas e Visitas) precisam
-                    // poder ser recolhidos, e mostrar a quantidade de
-                    // dentro quando estiver recolhido". Recolhido por
-                    // padrão -- achado do Victor 24/08/2026: "toda vez que
-                    // eu entrar em qualquer tela, as demandas agrupadas
-                    // precisam aparecer recolhidas". <details> nativo, sem
-                    // JS extra; sem `open` já nasce fechado.
-                    <details key={group.key} className="group rounded-xl overflow-hidden" style={{ border: `2px solid ${group.borderColor}` }}>
-                      <summary
-                        className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
-                        style={{ background: group.headerBg }}
-                      >
-                        <span
-                          className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
-                          style={{ color: group.headerText }}
-                          aria-hidden="true"
+                    <span
+                      className="text-xs shrink-0 transition-transform duration-150 group-open/week:rotate-90"
+                      style={{ color: "var(--text-secondary)" }}
+                      aria-hidden="true"
+                    >
+                      ▶
+                    </span>
+                    <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
+                      {week.label}
+                    </span>
+                    <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+                      ({weekTotal})
+                    </span>
+                  </summary>
+                  <div className="flex flex-col gap-3 p-3" style={{ background: "var(--surface-1)" }}>
+                    {week.days.map((group) => (
+                      // Recolhível -- pedido do Victor 20/08/2026: "os
+                      // agrupamentos por data (Entregas e Visitas) precisam
+                      // poder ser recolhidos, e mostrar a quantidade de
+                      // dentro quando estiver recolhido". Recolhido por
+                      // padrão -- achado do Victor 24/08/2026: "toda vez que
+                      // eu entrar em qualquer tela, as demandas agrupadas
+                      // precisam aparecer recolhidas". <details> nativo, sem
+                      // JS extra; sem `open` já nasce fechado.
+                      <details key={group.key} className="group rounded-xl overflow-hidden" style={{ border: `2px solid ${group.borderColor}` }}>
+                        <summary
+                          className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+                          style={{ background: group.headerBg }}
                         >
-                          ▶
-                        </span>
-                        <span className="text-sm font-bold uppercase tracking-wide" style={{ color: group.headerText }}>
-                          {group.label}
-                        </span>
-                        <span className="text-xs font-semibold" style={{ color: group.headerText, opacity: 0.85 }}>
-                          ({group.items.length})
-                        </span>
-                      </summary>
-                      <div style={{ background: "var(--surface-1)" }}>
-                        <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate={false} printable={false} showStaleBadge />
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              </details>
+                          <span
+                            className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
+                            style={{ color: group.headerText }}
+                            aria-hidden="true"
+                          >
+                            ▶
+                          </span>
+                          <span className="text-sm font-bold uppercase tracking-wide" style={{ color: group.headerText }}>
+                            {group.label}
+                          </span>
+                          <span className="text-xs font-semibold" style={{ color: group.headerText, opacity: 0.85 }}>
+                            ({group.items.length})
+                          </span>
+                        </summary>
+                        <div style={{ background: "var(--surface-1)" }}>
+                          <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate={false} printable={false} showStaleBadge />
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                </details>
+              );
+            });
+            if (isCurrentMonth(month.monthKey, today)) {
+              return weeksJsx;
+            }
+            const monthTotal = month.weeks.reduce((sum, w) => sum + w.days.reduce((s, g) => s + g.items.length, 0), 0);
+            return (
+              <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal}>
+                {weeksJsx}
+              </MonthAccordion>
             );
           })}
         </div>

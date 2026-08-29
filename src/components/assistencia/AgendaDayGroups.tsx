@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { AgendaQueueGroup } from "./AgendaQueueGroup";
-import { groupIntoWeeks } from "@/lib/weekGrouping";
+import { groupIntoMonths, isCurrentMonth } from "@/lib/weekGrouping";
+import { MonthAccordion } from "./MonthAccordion";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
 
 type Group = { dateKey: string; label: string; items: ServiceRequestSummary[] };
@@ -19,12 +20,16 @@ function isGroupOverdue(group: Group, todayKey: string): boolean {
   return group.dateKey < todayKey && hasPending;
 }
 
-// Agrupa os dias por semana (segunda a domingo) antes de renderizar --
+// Agrupa os dias por mês > semana (do mês) antes de renderizar --
 // pedido do Victor 25/08/2026 (proposta de melhorias na Agenda): "Agrupe
-// primeiro por Mês ou Semana... Dentro da semana, exiba os dias". Só na
+// primeiro por Mês ou Semana... Dentro da semana, exiba os dias" --
+// completado em 28/08/2026: "mantenha a divisão por semana mas de
+// acordo com as semanas do mês e aí quando fechar o mês, ela ficaria
+// agrupada dentro do mês --> semana --> dia" (mês corrente não ganha
+// esse embrulho a mais, só os já fechados -- ver isCurrentMonth). Só na
 // lista empilhada do desktop (ver AgendaDayGroups abaixo) -- o seletor de
 // dia do celular já é outro paradigma (tira uma faixa horizontal, não
-// empilha), agrupar por semana ali não se encaixa. groupIntoWeeks
+// empilha), agrupar por semana/mês ali não se encaixa. groupIntoMonths
 // compartilhado com a aba Visitas (fila/page.tsx) -- ver weekGrouping.ts.
 
 // Recolhível, recolhido por padrão -- pedido do Victor 25/08/2026: "na
@@ -115,38 +120,51 @@ export function AgendaDayGroups({ groups, todayKey }: { groups: Group[]; todayKe
       <div className="sm:hidden">{selectedGroup ? <DayCard group={selectedGroup} todayKey={todayKey} /> : null}</div>
 
       <div className="hidden sm:flex flex-col gap-3">
-        {/* Grupo nomeado (group/week) -- DayCard já usa "group" sem nome
-            pro próprio ícone de abrir/fechar; sem o nome, abrir a semana
-            giraria também as setas de todos os dias lá dentro, mesmo
-            fechados. */}
-        {groupIntoWeeks(groups, (g) => g.dateKey).map((week) => {
-          const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
-          return (
-            <details key={week.weekKey} className="rounded-xl overflow-hidden group/week" style={{ border: "2px solid var(--border)" }}>
-              <summary
-                className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
-                style={{ background: "var(--surface-2)" }}
-              >
-                <span
-                  className="text-xs shrink-0 transition-transform duration-150 group-open/week:rotate-90"
-                  style={{ color: "var(--text-secondary)" }}
-                  aria-hidden="true"
+        {/* Mês -> semana (do mês) -- pedido do Victor 28/08/2026: "mantenha
+            a divisão por semana mas de acordo com as semanas do mês e aí
+            quando fechar o mês, ela ficaria agrupada dentro do mês -->
+            semana --> dia". Mês corrente não ganha o embrulho a mais (ver
+            isCurrentMonth) -- só os já fechados. Grupo nomeado (group/week)
+            -- DayCard já usa "group" sem nome pro próprio ícone de abrir/
+            fechar; sem o nome, abrir a semana giraria também as setas de
+            todos os dias lá dentro, mesmo fechados. */}
+        {groupIntoMonths(groups, (g) => g.dateKey).map((month) => {
+          const weeksJsx = month.weeks.map((week) => {
+            const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
+            return (
+              <details key={week.weekKey} className="rounded-xl overflow-hidden group/week" style={{ border: "2px solid var(--border)" }}>
+                <summary
+                  className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+                  style={{ background: "var(--surface-2)" }}
                 >
-                  ▶
-                </span>
-                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
-                  {week.label}
-                </span>
-                <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
-                  ({weekTotal})
-                </span>
-              </summary>
-              <div className="flex flex-col gap-3 p-3" style={{ background: "var(--surface-1)" }}>
-                {week.days.map((g) => (
-                  <DayCard key={g.dateKey} group={g} todayKey={todayKey} />
-                ))}
-              </div>
-            </details>
+                  <span
+                    className="text-xs shrink-0 transition-transform duration-150 group-open/week:rotate-90"
+                    style={{ color: "var(--text-secondary)" }}
+                    aria-hidden="true"
+                  >
+                    ▶
+                  </span>
+                  <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
+                    {week.label}
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+                    ({weekTotal})
+                  </span>
+                </summary>
+                <div className="flex flex-col gap-3 p-3" style={{ background: "var(--surface-1)" }}>
+                  {week.days.map((g) => (
+                    <DayCard key={g.dateKey} group={g} todayKey={todayKey} />
+                  ))}
+                </div>
+              </details>
+            );
+          });
+          if (isCurrentMonth(month.monthKey, todayKey)) return weeksJsx;
+          const monthTotal = month.weeks.reduce((sum, w) => sum + w.days.reduce((s, g) => s + g.items.length, 0), 0);
+          return (
+            <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal}>
+              {weeksJsx}
+            </MonthAccordion>
           );
         })}
       </div>
