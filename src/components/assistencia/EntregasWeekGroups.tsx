@@ -1,17 +1,20 @@
 import { EntregasGroupsList } from "./EntregasGroupsList";
 import { countByDeliveryStatus } from "./DeliveryStatusBadge";
-import { groupIntoWeeks } from "@/lib/weekGrouping";
+import { groupIntoMonths, isCurrentMonth } from "@/lib/weekGrouping";
+import { MonthAccordion } from "./MonthAccordion";
 import type { QueueGroup } from "@/lib/entregaQueueGrouping";
 
-// Agrupa a aba Entregas/notificações do SAC por semana -- pedido do Victor
-// 26/08/2026: "divida os agrupamentos igual é na tela de visitas, agrupados
-// por semana, deixando de fora apenas as notificações de 'hoje' que ficam
-// no kanban". `groups` aqui já vem sem "hoje" (ver EntregasKanbanHoje pro
-// que sobrou) -- todo o resto (futuro + atrasado + sem rota) entra. Mesmo
-// `groupIntoWeeks` que Visitas já usa (weekGrouping.ts), só que precisa da
-// data crua de cada grupo (dateKey, ver entregaQueueGrouping.ts) em vez do
-// `key` composto (`${data}_${rota}`) que Entregas usa pra identificar
-// unicamente cada grupo.
+// Agrupa a aba Entregas/notificações do SAC por mês > semana (do mês) >
+// dia -- pedido do Victor 26/08/2026: "divida os agrupamentos igual é na
+// tela de visitas, agrupados por semana, deixando de fora apenas as
+// notificações de 'hoje' que ficam no kanban" + 28/08/2026: "quando
+// fechar o mês, ela ficaria agrupada dentro do mês --> semana --> dia".
+// `groups` aqui já vem sem "hoje" (ver EntregasKanbanHoje pro que sobrou)
+// -- todo o resto (futuro + atrasado + sem rota) entra. Mesmo
+// `groupIntoMonths` que Visitas já usa (weekGrouping.ts), só que precisa
+// da data crua de cada grupo (dateKey, ver entregaQueueGrouping.ts) em
+// vez do `key` composto (`${data}_${rota}`) que Entregas usa pra
+// identificar unicamente cada grupo.
 //
 // "Sem data definida" (nenhum item com scheduledDate nem approvedDeadline --
 // caso raro, não visto em produção até agora) não entra em semana nenhuma --
@@ -21,11 +24,13 @@ import type { QueueGroup } from "@/lib/entregaQueueGrouping";
 export function EntregasWeekGroups({ groups, now }: { groups: QueueGroup[]; now: number }) {
   const dated = groups.filter((g): g is QueueGroup & { dateKey: string } => !!g.dateKey);
   const undated = groups.filter((g) => !g.dateKey);
-  const weeks = groupIntoWeeks(dated, (g) => g.dateKey);
+  const months = groupIntoMonths(dated, (g) => g.dateKey);
+  // Mesmo `now` já usado pro resto da tela (badges ATRASADO etc.) -- não
+  // chama `new Date()` de novo à toa, só deriva a chave do dia daquele
+  // mesmo timestamp.
+  const todayKey = new Date(now).toISOString().slice(0, 10);
 
-  return (
-    <div className="flex flex-col gap-3">
-      {weeks.map((week) => {
+  function renderWeek(week: (typeof months)[number]["weeks"][number]) {
         // Semana "pura futuro" (só amanhã/depois, nada atrasado dentro)
         // ganha cor de destaque diferente -- pedido do Victor: "as futuras
         // você classifica do mesmo jeito, só com cor diferente". Uma
@@ -92,6 +97,22 @@ export function EntregasWeekGroups({ groups, now }: { groups: QueueGroup[]; now:
               <EntregasGroupsList groups={week.days} now={now} />
             </div>
           </details>
+        );
+  }
+
+  // Mês -> semana -- pedido do Victor 28/08/2026: "quando fechar o mês,
+  // ela ficaria agrupada dentro do mês --> semana --> dia". Mês corrente
+  // não ganha o embrulho a mais (ver isCurrentMonth) -- só os já fechados.
+  return (
+    <div className="flex flex-col gap-3">
+      {months.map((month) => {
+        const weeksJsx = month.weeks.map(renderWeek);
+        if (isCurrentMonth(month.monthKey, todayKey)) return weeksJsx;
+        const monthTotal = month.weeks.reduce((sum, w) => sum + w.days.reduce((s, g) => s + g.items.length, 0), 0);
+        return (
+          <MonthAccordion key={month.monthKey} label={month.label} total={monthTotal}>
+            {weeksJsx}
+          </MonthAccordion>
         );
       })}
       {undated.length > 0 ? <EntregasGroupsList groups={undated} now={now} /> : null}
