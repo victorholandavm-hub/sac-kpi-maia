@@ -138,6 +138,10 @@ export type AssistenciaKpiData = {
   distinctProductCount: number;
   byProduct: Count[];
   byProductGroup: Count[];
+  // Produtos com mais chamados por defeito de fabricação especificamente
+  // (causa_raiz = 'defeito_fabricacao') -- subconjunto de byProduct acima,
+  // não o mesmo ranking. Ver comentário em getAssistenciaKpiData.
+  byProductDefeitoFabricacao: Count[];
   byAgent: Count[];
   byRota: Count[];
   byStore: Count[];
@@ -258,6 +262,16 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   const grupoPorChamado = new Set<string>();
   const produtoCount = new Map<string, number>();
   const grupoCount = new Map<string, { label: string; count: number }>();
+  // Ranking própria de "produto com mais defeito de fabricação" -- pedido
+  // do Victor 29/08/2026: "consegue colocar o ranking de produtos com
+  // mais erros de fabricação nos kpis da assistencia?". Mesmo dedupe por
+  // (request_id, product) do ranking geral acima (não soma de
+  // quantidade), só que restrito às linhas com causa_raiz =
+  // 'defeito_fabricacao' -- tag própria ("produto_defeito:") pro
+  // drill-down não misturar com os chamados do ranking geral (que inclui
+  // TODOS os motivos, não só defeito de fabricação).
+  const produtoDefeitoPorChamado = new Set<string>();
+  const produtoDefeitoCount = new Map<string, number>();
   for (const item of items) {
     if (!item.product) continue;
     const parentRow = rowById.get(item.request_id);
@@ -269,6 +283,13 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
       produtoCount.set(item.product, (produtoCount.get(item.product) ?? 0) + 1);
       const produtoTag = `produto:${item.product}`;
       (ticketsByTag[produtoTag] ??= []).push(toReportRowItem(parentRow));
+    }
+
+    if (parentRow.causa_raiz === "defeito_fabricacao" && !produtoDefeitoPorChamado.has(dedupeKey)) {
+      produtoDefeitoPorChamado.add(dedupeKey);
+      produtoDefeitoCount.set(item.product, (produtoDefeitoCount.get(item.product) ?? 0) + 1);
+      const produtoDefeitoTag = `produto_defeito:${item.product}`;
+      (ticketsByTag[produtoDefeitoTag] ??= []).push(toReportRowItem(parentRow));
     }
 
     const grupo = classificarProduto(item.product);
@@ -289,6 +310,10 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   const byProductGroup: Count[] = [...grupoCount.entries()]
     .map(([key, { label, count }]) => ({ label, count, tag: `grupo:${key}` }))
     .sort((a, b) => b.count - a.count);
+  const byProductDefeitoFabricacao: Count[] = [...produtoDefeitoCount.entries()]
+    .map(([product, count]) => ({ label: product, count, tag: `produto_defeito:${product}` }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, PRODUCT_RANKING_LIMIT);
 
   return {
     totalChamados: rows.length,
@@ -296,6 +321,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     distinctProductCount: produtoCount.size,
     byProduct,
     byProductGroup,
+    byProductDefeitoFabricacao,
     byAgent,
     byRota,
     byStore,
