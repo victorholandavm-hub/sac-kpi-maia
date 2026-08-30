@@ -461,9 +461,22 @@ export default async function RelatoriosPage({
   // montado, com valor pré-definido) -- mesmo critério de "Total" na aba
   // Pagamentos (ver pagamentos/page.tsx). "Pago" é só o que já foi
   // liberado.
-  const paymentTotal = assemblerRows.reduce((sum, [, v]) => sum + v.total, 0);
-  const paymentPending = assemblerRows.reduce((sum, [, v]) => sum + v.pendente, 0);
-  const paymentPaid = assemblerRows.reduce((sum, [, v]) => sum + v.pago, 0);
+  //
+  // Manoel continua aparecendo como linha própria em "Pagamento por
+  // montador" (sortManoelLast só reordena, não remove) -- mas NÃO entra
+  // nos 3 cards de KPI acima da tabela. Achado 29/08/2026 (revisão pedida
+  // pelo Victor): esses cards não excluíam Manoel, ao contrário do
+  // Relatório de montagem detalhado (pedido explícito: "manoel nao entra
+  // nessa conta, pois é de casa"). Hoje não muda nenhum número (Manoel não
+  // tem item com valor definido ainda), mas sem essa exclusão os dois
+  // relatórios divergiriam silenciosamente no dia que algum item dele
+  // ganhasse valor, sem nenhum painel de reconciliação avisando (esse
+  // painel, ver montagem-detalhado/page.tsx, só compara "Solicitações",
+  // não "Total a pagar").
+  const paymentEntriesExcludingManoel = assemblerRows.filter(([name]) => name !== MANOEL_ONLY_ASSEMBLER);
+  const paymentTotal = paymentEntriesExcludingManoel.reduce((sum, [, v]) => sum + v.total, 0);
+  const paymentPending = paymentEntriesExcludingManoel.reduce((sum, [, v]) => sum + v.pendente, 0);
+  const paymentPaid = paymentEntriesExcludingManoel.reduce((sum, [, v]) => sum + v.pago, 0);
 
   const indicatorsByAssembler = sortManoelLast(indicators.byAssembler, (a) => a.assemblerName);
 
