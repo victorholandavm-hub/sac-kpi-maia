@@ -80,7 +80,7 @@ function groupByAssembler(items: PaymentItem[]) {
   return groups.sort((a, b) => a.assemblerName.localeCompare(b.assemblerName));
 }
 
-function StatCard({ label, value, barColor }: { label: string; value: string; barColor: string }) {
+function StatCard({ label, value, caption, barColor }: { label: string; value: string; caption?: string; barColor: string }) {
   return (
     <div
       className="flex-1 min-w-0 rounded-xl py-3 pl-4 pr-4 flex flex-col gap-1"
@@ -92,6 +92,11 @@ function StatCard({ label, value, barColor }: { label: string; value: string; ba
       <span className="text-2xl font-bold truncate" style={{ color: "var(--text-primary)" }}>
         {value}
       </span>
+      {caption ? (
+        <span className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+          {caption}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -221,7 +226,16 @@ export default async function RelatorioMontagemDetalhadoPage({
   const groups = groupByAssembler(items);
   const totalValue = items.reduce((sum, i) => sum + itemTotal(i), 0);
   const distinctRequests = new Set(items.map((i) => i.requestId)).size;
-  const avgPerItem = items.length > 0 ? totalValue / items.length : 0;
+  // Achado 29/08/2026 (revisão pedida pelo Victor): a média precisa
+  // dividir só pelos produtos que TÊM valor definido (unitValue !== null),
+  // não por `items.length` inteiro -- produto ainda "a montar" (sem valor)
+  // contribui 0 pro total, mas contava no denominador, diluindo a média
+  // pra baixo (achado via SQL: 336 produtos no período, só 300 com valor
+  // -- dividir por 336 dava R$ 40,46, o certo é R$ 45,32). Justamente o
+  // tipo de erro que esse relatório existe pra eliminar, então precisa
+  // estar certo aqui de todo jeito.
+  const pricedItems = items.filter((i) => i.unitValue !== null);
+  const avgPerItem = pricedItems.length > 0 ? totalValue / pricedItems.length : 0;
   const avgPerRequest = distinctRequests > 0 ? totalValue / distinctRequests : 0;
 
   const manoelGroups = groupByAssembler(manoelItems);
@@ -268,7 +282,16 @@ export default async function RelatorioMontagemDetalhadoPage({
         <StatCard label="Total a pagar (terceirizados)" value={formatBRL(totalValue)} barColor="var(--series-4)" />
       </div>
       <div className="grid sm:grid-cols-2 gap-4">
-        <StatCard label="Valor médio por produto (o número certo)" value={formatBRL(avgPerItem)} barColor="var(--status-good)" />
+        <StatCard
+          label="Valor médio por produto (o número certo)"
+          value={formatBRL(avgPerItem)}
+          caption={
+            pricedItems.length < items.length
+              ? `Considerando os ${pricedItems.length} produtos com valor definido, de ${items.length} no total`
+              : undefined
+          }
+          barColor="var(--status-good)"
+        />
         <StatCard label="Valor médio por solicitação (não é o mesmo)" value={formatBRL(avgPerRequest)} barColor="var(--text-muted)" />
       </div>
 
