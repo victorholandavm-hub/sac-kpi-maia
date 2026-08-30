@@ -4,7 +4,7 @@ import type { DateRange } from "./dateRange";
 import type { Count, DayCount } from "./kpi";
 import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES } from "./assistenciaLabels";
 import { ROTA_LABELS, type Rota } from "./rotas";
-import { classificarProduto } from "./vendasProduto";
+import { classificarProdutoAssistencia } from "./vendasProduto";
 import type { RequestType, RequestStatus, ReportRowItem } from "./serviceRequests";
 
 // "KPIs da Assistência" (página própria, /kpis-assistencia) -- pedido do
@@ -249,15 +249,18 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   // Produto (e grupo de produto) -- de service_request_items, dedupe por
   // (request_id, product) antes de contar: "em quantos chamados esse
   // produto apareceu", não soma de quantidade (2 unidades do mesmo
-  // produto no mesmo chamado contam 1 vez). Grupo reaproveita
-  // classificarProduto (vendasProduto.ts, mesma classificação por
-  // palavra-chave já usada em /vendas) em cima da descrição crua do
-  // item -- dedupe PRÓPRIO por (request_id, grupo), não o mesmo de
-  // produto: achado 27/08/2026 (revisão pedida pelo Victor) -- um
-  // chamado com 2 produtos DIFERENTES que caem no mesmo grupo (ex.:
-  // #4949, troca_produto com "Sofa novo" + "Sofa avariado", os dois
-  // classificam como "Sala de estar / jantar") contava esse chamado 2x
-  // no grupo, sem o dedupe à parte.
+  // produto no mesmo chamado contam 1 vez). Grupo usa
+  // classificarProdutoAssistencia (vendasProduto.ts) -- variante de
+  // classificarProduto (a mesma que /vendas usa) com um fallback extra
+  // pra descrição de PEÇA avulsa ("PORTA DIREITA N13", "1UN. ESPELHO"),
+  // comum em chamado de assistência e que antes caía tudo genérico em
+  // "Outros" -- ver comentário na função (achado 29/08/2026, pedido do
+  // Victor pra melhorar a classificação). Dedupe PRÓPRIO por (request_id,
+  // grupo), não o mesmo de produto: achado 27/08/2026 (revisão pedida
+  // pelo Victor) -- um chamado com 2 produtos DIFERENTES que caem no
+  // mesmo grupo (ex.: #4949, troca_produto com "Sofa novo" + "Sofa
+  // avariado", os dois classificam como "Sala de estar / jantar") contava
+  // esse chamado 2x no grupo, sem o dedupe à parte.
   const produtoPorChamado = new Set<string>();
   const grupoPorChamado = new Set<string>();
   const produtoCount = new Map<string, number>();
@@ -292,7 +295,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
       (ticketsByTag[produtoDefeitoTag] ??= []).push(toReportRowItem(parentRow));
     }
 
-    const grupo = classificarProduto(item.product);
+    const grupo = classificarProdutoAssistencia(item.product);
     const grupoDedupeKey = `${item.request_id}::${grupo.key}`;
     if (!grupoPorChamado.has(grupoDedupeKey)) {
       grupoPorChamado.add(grupoDedupeKey);
