@@ -382,6 +382,22 @@ export const CAUSA_RAIZ_OPTIONS = [
   "erro_sac",
   "avaria_transporte",
   "defeito_fabricacao",
+  // Opção nova -- pedido do Victor 29/08/2026: "muitas notificações de
+  // assistencia tem 'entregar peça' mas quando vai pra classificação na
+  // tela de kpis, nao sei se foi peça avariada ou se só faltou entregar
+  // a peça". Antes disso, quem criava um "Envio de peça" só tinha
+  // avaria_transporte/defeito_fabricacao pra escolher mesmo quando a peça
+  // em si nunca teve NENHUM problema físico -- só não foi incluída na
+  // entrega original (esquecimento na expedição/conferência da venda).
+  // Confirmado via SQL 29/08/2026: das 59 solicitações de envio de peça
+  // até então, 56 estavam em "defeito_fabricacao" -- bem mais provável
+  // que boa parte disso fosse na verdade peça esquecida, forçada na
+  // opção mais parecida por falta de uma melhor, distorcendo o KPI de
+  // "quem errou". Classificada como erro interno (ver
+  // CAUSA_RAIZ_ERRO_INTERNO abaixo) -- é sempre uma falha de processo
+  // (conferência/expedição não bateu o kit completo antes de enviar),
+  // nunca um defeito do fabricante ou do transporte.
+  "peca_nao_entregue",
   "solicitacao_cliente",
   "outro",
 ] as const;
@@ -394,6 +410,7 @@ export const CAUSA_RAIZ_LABELS: Record<string, string> = {
   erro_sac: "Erro do SAC",
   avaria_transporte: "Avaria no transporte",
   defeito_fabricacao: "Defeito de fabricação",
+  peca_nao_entregue: "Peça não entregue na venda (esqueceram de mandar, peça em si sem problema nenhum)",
   solicitacao_cliente: "Solicitação do cliente (desistência/arrependimento)",
   outro: "Outro",
 };
@@ -403,7 +420,16 @@ export const CAUSA_RAIZ_LABELS: Record<string, string> = {
 // do Victor 22/08/2026: "Destaque os erros operacionais internos... com
 // badges amarelas/vermelhas para chamar a atenção da gestão para o
 // retrabalho interno". Usado no relatório (badge + cor no gráfico de rosca).
-export const CAUSA_RAIZ_ERRO_INTERNO: string[] = ["erro_conferencia", "erro_motorista", "erro_loja", "erro_vendedor", "erro_sac"];
+// "peca_nao_entregue" entrou aqui 29/08/2026 -- é sempre falha de processo
+// (esquecimento), nunca causa externa.
+export const CAUSA_RAIZ_ERRO_INTERNO: string[] = [
+  "erro_conferencia",
+  "erro_motorista",
+  "erro_loja",
+  "erro_vendedor",
+  "erro_sac",
+  "peca_nao_entregue",
+];
 
 export const SAC_CATEGORIES = [
   "atraso_entrega",

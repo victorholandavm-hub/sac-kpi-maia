@@ -75,6 +75,47 @@ export function classificarProduto(description: string | null): { key: ProdutoCa
   return { key: "outros", label: "Outros" };
 }
 
+// Palavra-chave de PEÇA/componente avulso -- não é móvel nenhum, é o nome
+// da peça em si. `PRODUTO_CATEGORIAS` acima nunca bate nessas (foi feito
+// pra descrição de móvel inteiro, como sempre vem do TOTVS em /vendas) --
+// só entram aqui quando `classificarProdutoAssistencia` (abaixo) já
+// tentou o móvel inteiro primeiro e não achou.
+const PECA_AVULSA_KEYWORDS = ["PORTA", "GAVETA", "ESPELHO", "LATERAL", "PAINEL", "MOLDURA", "PRATELEIRA", "TAMPO", "ENCOSTO", "ASSENTO", "BASE ", "PUXADOR", "KIT "];
+
+// Peça avulsa costuma vir com um código de posição da planta de montagem
+// junto -- "N7", "N13" (número da peça no desenho) ou "1UN." (quantidade
+// solta, sem nome de móvel do lado) -- reforça a suspeita mesmo quando
+// nenhuma palavra da lista acima bate (ex.: "N66 LATERAL PEQ. 1UN." já
+// bate por LATERAL, mas um "BASE N2" mais seco também precisa cair aqui).
+const PECA_AVULSA_PATTERN = /\bN\d{1,3}\b|^\d+\s?UN\.?\b/;
+
+export type ProdutoAssistenciaKey = ProdutoCategoriaKey | "peca_avulsa";
+
+// Classificação de produto pras telas de assistência (troca/entrega/envio
+// de peça) -- pedido do Victor 29/08/2026: "preciso que coloque um botão
+// na aba de relatorio... você precisa melhorar essa leitura e
+// classificação das notificações de assistencia" (revisão mais ampla,
+// não só causa raiz -- ver CAUSA_RAIZ_OPTIONS, assistenciaLabels.ts).
+// Achado: em /assistencia, quem digita o produto de um chamado de PEÇA
+// geralmente descreve só a peça em si ("PORTA DIREITA N13", "1UN.
+// ESPELHO", "BASE N2"), não o móvel inteiro -- diferente de /vendas, onde
+// a descrição vem sempre completa e estruturada do TOTVS. Aplicando
+// classificarProduto puro nesses casos, tudo cai em "Outros" (confirmado:
+// era o maior grupo do gráfico "Chamados por grupo de produto",
+// escondendo que boa parte era claramente peça avulsa, só não tinha
+// palavra de móvel na descrição). Tenta o móvel inteiro primeiro (mesma
+// classificação de /vendas, sem duplicar a lista de palavras-chave) --
+// só cai no fallback de peça quando isso não bate em nada.
+export function classificarProdutoAssistencia(description: string | null): { key: ProdutoAssistenciaKey; label: string } {
+  const base = classificarProduto(description);
+  if (base.key !== "outros") return base;
+  const upper = (description ?? "").toUpperCase();
+  if (PECA_AVULSA_KEYWORDS.some((k) => upper.includes(k)) || PECA_AVULSA_PATTERN.test(upper)) {
+    return { key: "peca_avulsa", label: "Peça avulsa / componente" };
+  }
+  return base;
+}
+
 // Agrupamento por volume de transporte (logística), não por nome comercial
 // -- pergunta que importa pra quem monta carga é "isso ocupa muito espaço no
 // caminhão?", não "isso é sofá ou colchão?". Usado só no gráfico de evolução
