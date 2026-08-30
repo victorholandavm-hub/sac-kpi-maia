@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPaymentItems, paymentStage, type PaymentItem } from "@/lib/payments";
-import { MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
+import { getMontagemReconciliation } from "@/lib/serviceRequests";
+import { MANOEL_ONLY_ASSEMBLER, STATUS_LABELS } from "@/lib/assistenciaLabels";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,15 @@ export const dynamic = "force-dynamic";
 // relatorios) -- só muda a apresentação: aqui é uma lista completa,
 // sempre expandida, pensada pra conferência linha por linha, não uma
 // tela de trabalho com abas Pendente/Pago pra marcar pagamento.
+//
+// Painel de reconciliação (ver getMontagemReconciliation, serviceRequests.ts)
+// -- pergunta seguinte do Victor 29/08/2026, depois de ver esse relatório
+// funcionando: "mas porque no relatorio aparece 142 solicitações e no
+// detalhado aparece 136? Tem alguma de Manoel que entrou nesses
+// calculos?" + "preciso que coloque essas informações em algum lugar da
+// tela" (não bastava responder no chat). Explica a diferença -- nunca é
+// só Manoel, também sobra o caso raro de chamado sem produto nenhum
+// registrado (geralmente cancelado antes de ganhar item).
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -188,7 +198,10 @@ export default async function RelatorioMontagemDetalhadoPage({
   const dateTo = to || today();
   const filterAlvo = alvo === "mostruario" || alvo === "cliente" ? alvo : undefined;
 
-  const rawItems = await listPaymentItems({ dateFrom, dateTo, alvo: filterAlvo, includeNoValue: true });
+  const [rawItems, reconciliation] = await Promise.all([
+    listPaymentItems({ dateFrom, dateTo, alvo: filterAlvo, includeNoValue: true }),
+    getMontagemReconciliation({ dateFrom, dateTo, alvo: filterAlvo }),
+  ]);
   // listPaymentItems traz item de QUALQUER tipo de solicitação (troca/
   // entrega de produto, envio/recolhimento de peça também têm itens) --
   // com includeNoValue:true (pra esse relatório mostrar até quem ainda
@@ -258,6 +271,66 @@ export default async function RelatorioMontagemDetalhadoPage({
         <StatCard label="Valor médio por produto (o número certo)" value={formatBRL(avgPerItem)} barColor="var(--status-good)" />
         <StatCard label="Valor médio por solicitação (não é o mesmo)" value={formatBRL(avgPerRequest)} barColor="var(--text-muted)" />
       </div>
+
+      {/* Reconciliação com o "Solicitações no período" do relatório
+          principal -- pedido do Victor 29/08/2026: "mas porque no
+          relatorio aparece 142 solicitações e no detalhado aparece 136?
+          Tem alguma de Manoel que entrou nesses calculos?", seguido de
+          "preciso que coloque essas informações em algum lugar da
+          tela". A conta bate: total do relatório principal MENOS Manoel
+          MENOS chamado sem produto nenhum registrado (normalmente
+          cancelado antes de chegar a ter item) = o total daqui. */}
+      {reconciliation.totalRequests !== distinctRequests ? (
+        <div className="rounded-xl p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", boxShadow: "0 1px 3px rgba(11,11,11,0.08)" }}>
+          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+            Por que esse número é diferente do &quot;Solicitações no período&quot; do relatório principal?
+          </h3>
+          <div className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-secondary)" }}>
+            <div className="flex justify-between gap-4">
+              <span>Solicitações no relatório principal (qualquer montador, com ou sem produto)</span>
+              <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                {reconciliation.totalRequests}
+              </span>
+            </div>
+            {reconciliation.manoelRequests > 0 ? (
+              <div className="flex justify-between gap-4">
+                <span>(−) Manoel (equipe interna, não entra aqui)</span>
+                <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                  {reconciliation.manoelRequests}
+                </span>
+              </div>
+            ) : null}
+            {reconciliation.emptyRequests.length > 0 ? (
+              <div className="flex justify-between gap-4">
+                <span>(−) Sem produto nenhum registrado (nada pra listar aqui)</span>
+                <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                  {reconciliation.emptyRequests.length}
+                </span>
+              </div>
+            ) : null}
+            <div className="flex justify-between gap-4 pt-1" style={{ borderTop: "1px solid var(--gridline)" }}>
+              <span>(=) Solicitações neste relatório</span>
+              <span className="font-bold" style={{ color: "var(--text-primary)" }}>
+                {distinctRequests}
+              </span>
+            </div>
+          </div>
+          {reconciliation.emptyRequests.length > 0 ? (
+            <div className="flex flex-col gap-1 pt-2 mt-1" style={{ borderTop: "1px dashed var(--border)" }}>
+              <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+                Chamados sem produto registrado:
+              </span>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                {reconciliation.emptyRequests.map((r) => (
+                  <Link key={r.id} href={`/assistencia/${r.id}`} className="underline" style={{ color: "var(--text-secondary)" }}>
+                    #{r.ticketNumber} · {r.storeName} · {STATUS_LABELS[r.status] ?? r.status}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {groups.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
