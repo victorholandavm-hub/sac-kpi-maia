@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
-import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES } from "./assistenciaLabels";
+import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES, MANOEL_ONLY_ASSEMBLER } from "./assistenciaLabels";
 
 export type RequestType =
   | "montagem"
@@ -1651,6 +1651,84 @@ export async function getRequestsReport(
     byCausaRaiz: aggregate(rows, (r) => r.causa_raiz),
     totalRequests: scopedRows.length,
   };
+}
+
+export type MontagemReconciliation = {
+  // Mesmo total que getRequestsReport({types:["montagem","desmontagem"]})
+  // devolveria pro mesmo período/alvo -- todo chamado, qualquer montador,
+  // com ou sem produto registrado.
+  totalRequests: number;
+  manoelRequests: number;
+  // Terceirizado, mas sem NENHUM produto em service_request_items -- não
+  // tem o que listar no Relatório de montagem detalhado (que é por
+  // produto), mesmo contando pra `totalRequests` acima. Guarda o chamado
+  // inteiro (não só a contagem) pra dar pra mostrar quais são.
+  emptyRequests: ReportRowItem[];
+};
+
+// Explica a diferença entre "Solicitações no período" do relatório
+// principal (getRequestsReport, conta CHAMADO) e "Solicitações no
+// período" do Relatório de montagem detalhado (conta chamado de
+// TERCEIRIZADO com pelo menos 1 produto registrado) -- pedido do Victor
+// 29/08/2026: "mas porque no relatorio aparece 142 solicitações e no
+// detalhado aparece 136? Tem alguma de Manoel que entrou nesses
+// calculos?", seguido de "preciso que coloque essas informações em
+// algum lugar da tela" (não bastava explicar no chat, precisava aparecer
+// na própria tela pro Antônio ver quando quiser). A diferença nunca é só
+// Manoel -- também sobra o caso raro de chamado cancelado/incompleto sem
+// produto nenhum (a montagem foi aberta mas nunca chegou a ter item
+// adicionado, geralmente por ter sido cancelada antes disso).
+export async function getMontagemReconciliation(opts: {
+  dateFrom?: string;
+  dateTo?: string;
+  alvo?: "mostruario" | "cliente";
+}): Promise<MontagemReconciliation> {
+  const admin = getSupabaseAdmin();
+  let query = admin
+    .from("service_requests")
+    .select(
+      "id, ticket_number, type, status, assembler_name, reason, order_code, client_name, created_at, stores(name), service_request_items(id)"
+    )
+    .in("type", ["montagem", "desmontagem"]);
+  if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
+  if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  type Row = {
+    id: string;
+    ticket_number: number;
+    type: RequestType;
+    status: RequestStatus;
+    assembler_name: string | null;
+    reason: string | null;
+    order_code: string | null;
+    client_name: string | null;
+    created_at: string;
+    stores: { name: string } | null;
+    service_request_items: { id: string }[];
+  };
+  const allRows = (data ?? []) as unknown as Row[];
+  const rows = opts.alvo
+    ? allRows.filter((r) => isMostruarioRequest(r.order_code, r.client_name) === (opts.alvo === "mostruario"))
+    : allRows;
+
+  const manoelRequests = rows.filter((r) => r.assembler_name === MANOEL_ONLY_ASSEMBLER).length;
+  const emptyRequests: ReportRowItem[] = rows
+    .filter((r) => r.assembler_name !== MANOEL_ONLY_ASSEMBLER && r.service_request_items.length === 0)
+    .map((r) => ({
+      id: r.id,
+      ticketNumber: r.ticket_number,
+      type: r.type,
+      status: r.status,
+      clientName: r.client_name,
+      storeName: r.stores?.name ?? "",
+      createdAt: r.created_at,
+      reason: r.reason,
+    }));
+
+  return { totalRequests: rows.length, manoelRequests, emptyRequests };
 }
 
 // Mesma ideia de ReportRowItem acima -- item cru guardado do lado de cada
