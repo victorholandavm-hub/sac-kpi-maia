@@ -47,7 +47,9 @@ export default async function LojaTrocasPage({
 
   return (
     <ToastProvider>
-    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+    {/* Largura total -- pedido do Victor 31/08/2026, mesmo tratamento
+        das outras telas fora do grupo (app). */}
+    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
       <RealtimeQueueRefresher />
       <AssistenciaHeader title="Gerente de loja" subtitle="Trocas, entregas e notificações do SAC — só da sua loja">
         <div className="flex items-center gap-3 flex-wrap">
