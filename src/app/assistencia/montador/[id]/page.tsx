@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { getMontadorSession } from "@/app/assistencia/montador-actions";
 import { getAssemblerRequestDetail, montadorEffectiveDate, formatFullAddress, isMostruarioRequest } from "@/lib/serviceRequests";
 import { listRequestPhotos } from "@/lib/servicePhotos";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "@/components/assistencia/StatusBadge";
 import { PhotoGallery } from "@/components/assistencia/PhotoGallery";
 import { MontadorPhotoUpload } from "@/components/assistencia/MontadorPhotoUpload";
@@ -53,7 +53,15 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
   // desmontagem com item cadastrado (chamado sem item usa foto do
   // chamado inteiro, sem seção por item nenhuma -- ver
   // hasPhotoForEveryCompletedItem/hasProofPhoto em servicePhotos.ts).
-  const needsItemPhotos = (request.type === "montagem" || request.type === "desmontagem") && request.items.length > 0;
+  // Manoel fica de fora (pedido do Victor 31/08/2026: "aquelas mudanças
+  // não devem servir para manoel, apenas para os terceirizados") -- pra
+  // ele o servidor não exige foto nenhuma (montador-actions.ts), então
+  // mostrar a seção por item aqui só confundiria sem bloquear nada de
+  // verdade.
+  const needsItemPhotos =
+    (request.type === "montagem" || request.type === "desmontagem") &&
+    request.items.length > 0 &&
+    assemblerName !== MANOEL_ONLY_ASSEMBLER;
   const generalPhotos = needsItemPhotos ? photos.filter((p) => !p.itemId) : photos;
   const showCompleted = request.status === "concluida" || request.status === "cancelada";
   // QR de avaliação só faz sentido pra chamado real de cliente, já concluído
