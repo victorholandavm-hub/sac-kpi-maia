@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
+import { getPhotoForAuth, deleteRequestPhoto, hasPhotoForEveryCompletedItem, hasProofPhoto } from "@/lib/servicePhotos";
 import { recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
@@ -121,6 +121,19 @@ export async function montadorDeletePhoto(photoId: string): Promise<void> {
 // concluir, ver RatingQrCode.tsx / avaliar/actions.ts). Antes o montador
 // pedia a nota na hora ("vire o celular pro cliente avaliar"), o que dava
 // pra ele mesmo preencher a nota sem o cliente participar de verdade.
+//
+// Montagem/desmontagem (inclusive combo) não viram "concluida" direto
+// mais -- pedido do Victor 31/08/2026: "preciso que seja obrigatório que
+// o montador coloque foto de cada item... a partir de agora, o gerente
+// da loja vai precisar aprovar essa conclusão". Vão pra
+// "aguardando_aprovacao" (só vira concluida de verdade quando o gerente
+// aprova, ver lojaApproveMontagemConclusion em loja-actions.ts) e exigem
+// foto de cada item antes -- mesmo espírito de hasProofPhoto/
+// driverCompleteRequest (driver-actions.ts), só que por item em vez de
+// por chamado. Os outros tipos que o montador executa (vistoria, troca
+// de peça, envio de peça, recolhimento) continuam indo direto pra
+// concluída, sem essa fase nem exigência de foto -- não fazem parte do
+// pedido.
 export async function montadorCompleteRequest(requestId: string): Promise<void> {
   const assemblerName = await getMontadorSession();
   if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
@@ -128,7 +141,7 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, deadline_status")
+    .select("assembler_name, status, store_id, deadline_status, type")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -138,18 +151,49 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
     throw new Error("Esse chamado já foi encerrado.");
   }
 
+  const needsApproval = request.type === "montagem" || request.type === "desmontagem";
+
+  const { data: items, error: itemsError } = await admin.from("service_request_items").select("id").eq("request_id", requestId);
+  if (itemsError) throw new Error(itemsError.message);
+  const itemIds = (items ?? []).map((i) => i.id as string);
+
+  if (needsApproval) {
+    // Chamado sem item cadastrado (dado antigo/raro) usa 1 foto do
+    // chamado inteiro em vez de foto por item -- não tem item pra
+    // vincular.
+    const hasPhotos = itemIds.length > 0 ? await hasPhotoForEveryCompletedItem(itemIds) : await hasProofPhoto(requestId);
+    if (!hasPhotos) {
+      throw new Error(itemIds.length > 0 ? "Envie uma foto de cada item antes de concluir." : "Envie pelo menos uma foto antes de concluir.");
+    }
+    if (itemIds.length > 0) {
+      const { error: markError } = await admin.from("service_request_items").update({ completed: true }).eq("request_id", requestId);
+      if (markError) throw new Error(markError.message);
+    }
+  }
+
   const completedAt = new Date().toISOString();
   // Prazo não pode ficar "pendente de aprovação" pra sempre num chamado já
   // concluído (pedido do Victor 18/08/2026) -- concluir aprova
   // implicitamente com a data de hoje, mesma regra de updateStatus em
   // actions.ts (que cobre a assistência marcando concluído; aqui é o
-  // montador concluindo direto, sem passar por lá).
+  // montador concluindo direto, sem passar por lá). Mantido mesmo pra
+  // quem vai pra aguardando_aprovacao -- o prazo é sobre a VISITA
+  // acontecer, não sobre a aprovação da loja.
   const deadlineFields =
     request.deadline_status === "pendente" ? { deadline_status: "aprovado" as const, approved_deadline: completedAt.slice(0, 10) } : {};
 
+  const nextStatus = needsApproval ? "aguardando_aprovacao" : "concluida";
+  // completed_at só é gravado quando concluída de verdade -- pra
+  // montagem/desmontagem isso só acontece na aprovação do gerente
+  // (lojaApproveMontagemConclusion), não aqui. É isso que faz relatório/
+  // pagamento do montador só contarem depois de aprovado, sem precisar
+  // de nenhuma regra nova nesses dois lugares (ambos já filtram por
+  // status = 'concluida').
+  const statusFields: Record<string, unknown> = needsApproval ? { status: nextStatus } : { status: nextStatus, completed_at: completedAt };
+
   const { data: updated, error: updateError } = await admin
     .from("service_requests")
-    .update({ status: "concluida", completed_at: completedAt, ...deadlineFields })
+    .update({ ...statusFields, ...deadlineFields })
     .eq("id", requestId)
     .eq("status", request.status)
     .select("id")
@@ -162,20 +206,25 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
     actor_id: null,
     event_type: "status_changed",
     from_status: request.status,
-    to_status: "concluida",
-    note: `Concluído pelo montador ${assemblerName}.`,
+    to_status: nextStatus,
+    note: needsApproval
+      ? `Concluído pelo montador ${assemblerName}. Aguardando aprovação do gerente da loja.`
+      : `Concluído pelo montador ${assemblerName}.`,
   });
 
   await notifyLoja(request.store_id, {
     type: "status_changed",
-    title: "Solicitação: Concluída",
-    message: `Concluído pelo montador ${assemblerName}.`,
+    title: needsApproval ? "Solicitação: aguardando sua aprovação" : "Solicitação: Concluída",
+    message: needsApproval
+      ? `Montador ${assemblerName} marcou como concluído -- confirme se foi feito de verdade.`
+      : `Concluído pelo montador ${assemblerName}.`,
     link: `/assistencia/${requestId}`,
   });
 
   revalidatePath("/assistencia/montador");
   revalidatePath(`/assistencia/montador/${requestId}`);
   revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/loja");
   revalidatePath(`/assistencia/${requestId}`);
 }
 
@@ -245,7 +294,7 @@ export async function montadorCompletePartially(requestId: string, completedItem
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, ticket_number")
+    .select("assembler_name, status, store_id, ticket_number, type")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -253,6 +302,14 @@ export async function montadorCompletePartially(requestId: string, completedItem
   }
   if (request.status === "concluida" || request.status === "cancelada") {
     throw new Error("Esse chamado já foi encerrado.");
+  }
+
+  // Foto obrigatória por item também aqui -- pedido do Victor 31/08/2026,
+  // mesmo recorte de montadorCompleteRequest (só montagem/desmontagem).
+  if (request.type === "montagem" || request.type === "desmontagem") {
+    if (!(await hasPhotoForEveryCompletedItem(completedItemIds))) {
+      throw new Error("Envie uma foto de cada item marcado como feito antes de continuar.");
+    }
   }
 
   const { error: itemsError } = await admin

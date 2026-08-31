@@ -40,6 +40,7 @@ export const STATUS_LABELS: Record<string, string> = {
   aberta: "Aberta",
   em_contato: "Em contato",
   em_andamento: "Em andamento",
+  aguardando_aprovacao: "Aguardando aprovação da loja",
   remarcar: "Remarcar",
   concluida: "Concluída",
   cancelada: "Cancelada",
@@ -51,6 +52,11 @@ export const STATUS_LABELS: Record<string, string> = {
 export const STATUS_DESCRIPTIONS: Partial<Record<string, string>> = {
   em_contato: "A assistência já viu a solicitação e está avaliando os detalhes antes de agendar o atendimento.",
   em_andamento: "Já tem um montador definido e o atendimento está em andamento.",
+  // Pedido do Victor 31/08/2026: "a partir de agora, o gerente da loja vai
+  // precisar aprovar essa conclusão". Ver montadorCompleteRequest/
+  // montadorCompletePartially (montador-actions.ts) e
+  // lojaApproveMontagemConclusion (loja-actions.ts).
+  aguardando_aprovacao: "O montador marcou como concluído, esperando o gerente da loja confirmar que foi feito de verdade.",
 };
 
 // Caminho "feliz" da solicitação, pro StatusStepper -- remarcar (mostra em
@@ -60,6 +66,11 @@ export const REQUEST_STATUS_STEPS: { key: string; label: string }[] = [
   { key: "aberta", label: "Aberta" },
   { key: "em_contato", label: "Em contato" },
   { key: "em_andamento", label: "Em andamento" },
+  // Só passa por aqui de verdade montagem/desmontagem (ver
+  // aguardando_aprovacao acima) -- pros outros tipos, que nunca têm esse
+  // status, é só mais um degrau "no caminho feliz" que não se aplica, sem
+  // efeito nenhum na tela deles.
+  { key: "aguardando_aprovacao", label: "Aguardando aprovação" },
   { key: "concluida", label: "Concluída" },
 ];
 
@@ -67,6 +78,9 @@ export const STATUS_COLORS: Record<string, string> = {
   aberta: "var(--status-warning)",
   em_contato: "var(--series-5)",
   em_andamento: "var(--brand-orange)",
+  // Cor própria (amarelo/dourado) -- distinta de em_andamento (laranja) e
+  // concluida (verde), os dois vizinhos mais próximos no fluxo.
+  aguardando_aprovacao: "var(--series-3)",
   remarcar: "var(--status-critical)",
   concluida: "var(--status-good)",
   cancelada: "var(--text-muted)",

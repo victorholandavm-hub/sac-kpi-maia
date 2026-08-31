@@ -8,6 +8,7 @@ import {
   type DeadlineStatus,
 } from "@/lib/serviceRequests";
 import { LojaGerenteRatingPrompt } from "@/components/assistencia/LojaGerenteRatingPrompt";
+import { LojaApprovalCard } from "@/components/assistencia/LojaApprovalCard";
 import { getLojaStorePreference } from "@/app/assistencia/actions";
 import { getLojaGerenteSession, lojaGerenteSignOut } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
@@ -88,6 +89,9 @@ export default async function LojaHomePage({
   const storePref = store !== undefined ? store : await getLojaStorePreference();
   const storeId = storePref ?? "";
   const showCompleted = view === "concluidas";
+  // Aba "Aguardando aprovação" -- pedido do Victor 31/08/2026, ver
+  // lojaApproveMontagemConclusion (loja-actions.ts).
+  const showAwaitingApproval = view === "aguardando_aprovacao";
 
   const [stores, gerenteStoreIds] = await Promise.all([listStores(), getGerenteStoreIds(gerenteName)]);
 
@@ -103,15 +107,32 @@ export default async function LojaHomePage({
     ? stores.map((s) => s.id).filter((id) => !gerenteStoreIds.includes(id))
     : [...OWN_ASSEMBLER_STORE_IDS];
 
-  const [requests, montagemQueueIds] = await Promise.all([
+  const [requests, montagemQueueIds, awaitingApprovalCount] = await Promise.all([
     listOpenRequestsForLoja({
       storeId: storeId || undefined,
-      types: ASSISTENCIA_MANAGED_TYPES,
+      // Aguardando aprovação só existe pra montagem/desmontagem (ver
+      // needsApproval em montador-actions.ts) -- não vale a pena buscar
+      // os outros tipos, que nunca têm esse status.
+      types: showAwaitingApproval ? (["montagem", "desmontagem"] as const) : ASSISTENCIA_MANAGED_TYPES,
       onlyCompleted: showCompleted,
+      onlyAwaitingApproval: showAwaitingApproval,
       excludeOwnAssemblerStoreIds,
     }),
-    showCompleted ? Promise.resolve([]) : listOpenMontagemQueueIds(),
+    showCompleted || showAwaitingApproval ? Promise.resolve([]) : listOpenMontagemQueueIds(),
+    // Contador da aba nova -- pedido implícito de deixar visível quando
+    // tem algo esperando, mesmo sem estar nela agora. Refeito à parte
+    // (não reaproveita `requests` acima) porque nas outras 2 abas
+    // `requests` é outra coisa (aberta/concluída, tipos diferentes).
+    showAwaitingApproval
+      ? Promise.resolve(-1)
+      : listOpenRequestsForLoja({
+          storeId: storeId || undefined,
+          types: ["montagem", "desmontagem"],
+          onlyAwaitingApproval: true,
+          excludeOwnAssemblerStoreIds,
+        }).then((r) => r.length),
   ]);
+  const pendingApprovalCount = showAwaitingApproval ? requests.length : awaitingApprovalCount;
 
   const montagemPosition = new Map(montagemQueueIds.map((id, i) => [id, i + 1]));
 
@@ -178,12 +199,27 @@ export default async function LojaHomePage({
           className="text-xs px-3 py-1.5 rounded-full border"
           style={{
             borderColor: "var(--border)",
-            background: !showCompleted ? "var(--surface-1)" : "transparent",
-            color: !showCompleted ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: !showCompleted ? 600 : 400,
+            background: !showCompleted && !showAwaitingApproval ? "var(--surface-1)" : "transparent",
+            color: !showCompleted && !showAwaitingApproval ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: !showCompleted && !showAwaitingApproval ? 600 : 400,
           }}
         >
           Em aberto
+        </Link>
+        {/* Pedido do Victor 31/08/2026: montagem/desmontagem concluída
+            pelo montador só fecha de verdade depois de aprovada aqui
+            (ver LojaApprovalCard/lojaApproveMontagemConclusion). */}
+        <Link
+          href={viewHref("aguardando_aprovacao")}
+          className="text-xs px-3 py-1.5 rounded-full border"
+          style={{
+            borderColor: pendingApprovalCount > 0 && !showAwaitingApproval ? "var(--series-3)" : "var(--border)",
+            background: showAwaitingApproval ? "var(--surface-1)" : "transparent",
+            color: showAwaitingApproval ? "var(--text-primary)" : "var(--text-secondary)",
+            fontWeight: showAwaitingApproval ? 600 : 400,
+          }}
+        >
+          Aguardando aprovação{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ""}
         </Link>
         <Link
           href={viewHref("concluidas")}
@@ -199,7 +235,7 @@ export default async function LojaHomePage({
         </Link>
       </div>
 
-      {!showCompleted ? (
+      {!showCompleted && !showAwaitingApproval ? (
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <StatTile label="Em aberto" value={requests.length} />
           <StatTile label={STATUS_LABELS.aberta} value={byStatus.aberta ?? 0} />
@@ -211,8 +247,20 @@ export default async function LojaHomePage({
       {requests.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {showCompleted ? "Nenhuma solicitação concluída ainda." : "Nenhuma solicitação em aberto no momento."}
+            {showCompleted
+              ? "Nenhuma solicitação concluída ainda."
+              : showAwaitingApproval
+                ? "Nada aguardando sua aprovação no momento."
+                : "Nenhuma solicitação em aberto no momento."}
           </p>
+        </div>
+      ) : showAwaitingApproval ? (
+        // Cards próprios (com foto de cada item + aprovação), não a
+        // lista genérica abaixo -- pedido do Victor 31/08/2026.
+        <div className="flex flex-col gap-4">
+          {requests.map((r) => (
+            <LojaApprovalCard key={r.id} request={r} />
+          ))}
         </div>
       ) : (
         <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>

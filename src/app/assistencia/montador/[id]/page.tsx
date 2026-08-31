@@ -48,6 +48,13 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
   }
 
   const photos = await listRequestPhotos(request.id);
+  // Foto por item -- pedido do Victor 31/08/2026 ("obrigatório que o
+  // montador coloque foto de cada item montado"), só pra montagem/
+  // desmontagem com item cadastrado (chamado sem item usa foto do
+  // chamado inteiro, sem seção por item nenhuma -- ver
+  // hasPhotoForEveryCompletedItem/hasProofPhoto em servicePhotos.ts).
+  const needsItemPhotos = (request.type === "montagem" || request.type === "desmontagem") && request.items.length > 0;
+  const generalPhotos = needsItemPhotos ? photos.filter((p) => !p.itemId) : photos;
   const showCompleted = request.status === "concluida" || request.status === "cancelada";
   // QR de avaliação só faz sentido pra chamado real de cliente, já concluído
   // e ainda sem nota -- mostruário fica de fora (avaliação é do gerente da
@@ -199,11 +206,54 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
             Fotos
           </h3>
-          <PhotoGallery photos={photos} deleteMode="montador" currentActor={assemblerName} />
-          <MontadorPhotoUpload requestId={request.id} />
+          {needsItemPhotos ? (
+            <div className="flex flex-col gap-4">
+              {/* Uma seção por item -- pedido do Victor 31/08/2026: foto
+                  de cada item antes de concluir. O indicador aqui é só
+                  informativo (o bloqueio de verdade é no servidor, ver
+                  montadorCompleteRequest/montadorCompletePartially em
+                  montador-actions.ts). */}
+              {request.items.map((item) => {
+                const itemPhotos = photos.filter((p) => p.itemId === item.id);
+                return (
+                  <div key={item.id} className="flex flex-col gap-2 pb-4" style={{ borderBottom: "1px solid var(--gridline)" }}>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {item.quantity > 1 ? `${item.quantity}x ` : ""}
+                        {item.product}
+                      </span>
+                      {itemPhotos.length > 0 ? (
+                        <span className="text-xs font-medium" style={{ color: "var(--status-good)" }}>
+                          📷 {itemPhotos.length}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium" style={{ color: "var(--status-warning)" }}>
+                          sem foto
+                        </span>
+                      )}
+                    </div>
+                    <PhotoGallery photos={itemPhotos} deleteMode="montador" currentActor={assemblerName} />
+                    <MontadorPhotoUpload requestId={request.id} itemId={item.id} label={`Foto de "${item.product}"`} />
+                  </div>
+                );
+              })}
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                  Outras fotos (observação geral, avaria, etc. -- não conta pra exigência de foto por item)
+                </span>
+                <PhotoGallery photos={generalPhotos} deleteMode="montador" currentActor={assemblerName} />
+                <MontadorPhotoUpload requestId={request.id} label="Outra foto" />
+              </div>
+            </div>
+          ) : (
+            <>
+              <PhotoGallery photos={photos} deleteMode="montador" currentActor={assemblerName} />
+              <MontadorPhotoUpload requestId={request.id} />
+            </>
+          )}
         </div>
 
-        {!showCompleted ? (
+        {!showCompleted && request.status !== "aguardando_aprovacao" ? (
           <div
             className="rounded-lg p-4 flex flex-col gap-3"
             style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
@@ -212,6 +262,22 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
               Ações
             </h3>
             <MontadorRequestActions requestId={request.id} items={request.items} />
+          </div>
+        ) : request.status === "aguardando_aprovacao" ? (
+          // Nada mais pro montador fazer aqui -- pedido do Victor
+          // 31/08/2026: só o gerente da loja aprova a partir daqui (ver
+          // loja/page.tsx).
+          <div
+            className="rounded-lg p-4 flex flex-col gap-1"
+            style={{ background: "color-mix(in srgb, var(--series-3) 12%, var(--surface-1))", border: "2px solid var(--series-3)" }}
+          >
+            <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              ⏳ Aguardando aprovação da loja
+            </span>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              Você marcou esse chamado como concluído. O gerente da loja confirma cada item antes de fechar de
+              verdade.
+            </p>
           </div>
         ) : needsClientRatingQr ? (
           <div

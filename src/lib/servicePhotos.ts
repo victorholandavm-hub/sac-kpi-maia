@@ -56,13 +56,18 @@ export type RequestPhoto = {
   // (observação, avaria etc.). Ver driverCompleteRequest (driver-actions.ts),
   // que exige pelo menos uma com isProof antes de concluir.
   isProof: boolean;
+  // Foto de um item específico (montagem/desmontagem, pedido do Victor
+  // 31/08/2026) -- null continua significando "foto do chamado inteiro"
+  // (uso de sempre: motorista, observação geral, chamado sem item). Ver
+  // hasPhotoForEveryCompletedItem abaixo.
+  itemId: string | null;
 };
 
 export async function listRequestPhotos(requestId: string): Promise<RequestPhoto[]> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("service_request_photos")
-    .select("id, storage_path, uploaded_by, caption, created_at, is_proof")
+    .select("id, storage_path, uploaded_by, caption, created_at, is_proof, item_id")
     .eq("request_id", requestId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
@@ -75,6 +80,7 @@ export async function listRequestPhotos(requestId: string): Promise<RequestPhoto
     caption: row.caption as string | null,
     createdAt: row.created_at as string,
     isProof: !!row.is_proof,
+    itemId: row.item_id as string | null,
   }));
 }
 
@@ -90,6 +96,22 @@ export async function hasProofPhoto(requestId: string): Promise<boolean> {
     .eq("is_proof", true);
   if (error) throw new Error(error.message);
   return (count ?? 0) > 0;
+}
+
+// Todo item em `itemIds` tem pelo menos 1 foto vinculada -- pedido do
+// Victor 31/08/2026: "obrigatório que o montador coloque foto de cada
+// item montado antes de colocar como montagem concluida". Usado em
+// montadorCompleteRequest e montadorCompletePartially (montador-actions.ts)
+// pros itens que estão prestes a virar `completed: true` na mesma
+// chamada -- não confundir com `hasProofPhoto` (chamado sem NENHUM item
+// cadastrado, caso raro, usa 1 foto do chamado inteiro como esse dá).
+export async function hasPhotoForEveryCompletedItem(itemIds: string[]): Promise<boolean> {
+  if (itemIds.length === 0) return true;
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("service_request_photos").select("item_id").in("item_id", itemIds);
+  if (error) throw new Error(error.message);
+  const withPhoto = new Set((data ?? []).map((r) => r.item_id as string));
+  return itemIds.every((id) => withPhoto.has(id));
 }
 
 async function uploadPhotoBytes(requestId: string, file: File): Promise<string> {
@@ -123,6 +145,7 @@ async function insertPhotoMetadata(opts: {
   uploadedBy: string | null;
   caption?: string | null;
   isProof?: boolean;
+  itemId?: string | null;
 }): Promise<void> {
   const admin = getSupabaseAdmin();
   const caption = opts.caption?.trim() || null;
@@ -132,6 +155,7 @@ async function insertPhotoMetadata(opts: {
     uploaded_by: opts.uploadedBy,
     caption,
     is_proof: !!opts.isProof,
+    item_id: opts.itemId ?? null,
   });
   if (insertError) {
     console.error("insertPhotoMetadata failed:", insertError.message);
@@ -146,9 +170,17 @@ export async function saveRequestPhoto(opts: {
   uploadedBy: string | null;
   caption?: string | null;
   isProof?: boolean;
+  itemId?: string | null;
 }): Promise<void> {
   const path = await uploadPhotoBytes(opts.requestId, opts.file);
-  await insertPhotoMetadata({ requestId: opts.requestId, path, uploadedBy: opts.uploadedBy, caption: opts.caption, isProof: opts.isProof });
+  await insertPhotoMetadata({
+    requestId: opts.requestId,
+    path,
+    uploadedBy: opts.uploadedBy,
+    caption: opts.caption,
+    isProof: opts.isProof,
+    itemId: opts.itemId,
+  });
 }
 
 // Pra fluxos onde o anexo é obrigatório (ex.: createSacRequest) e o ticket
