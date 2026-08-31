@@ -47,18 +47,45 @@ const PANEL_WIDTH = 256; // w-64
 // menu num portal direto no <body> (fora da árvore com overflow-hidden),
 // com posição calculada a partir do retângulo do botão -- não fica mais
 // preso a nenhum overflow de ancestral, em nenhuma linha da tabela.
+//
+// Achado do Victor 31/08/2026, rodada 2 (dois problemas no print/relato
+// novo): (1) o menu "sumia" ao rolar a página DENTRO dele mesmo -- o
+// listener de scroll (pra fechar quando a página rola e a posição fica
+// desatualizada) usava capture:true no window, que também pega o scroll
+// interno da própria lista (overflow-y-auto quando tem mais opções do
+// que cabe), fechando o menu bem na hora que a pessoa tentava rolar pra
+// ver o resto das 9 opções -- corrigido ignorando scroll cujo alvo é o
+// próprio painel. (2) perto do fim da página (última notificação da
+// tela), não sobra espaço embaixo do botão pra caber o menu inteiro
+// nem rolando -- agora calcula o espaço livre acima/abaixo do botão e
+// abre o menu pra cima quando faz mais sentido, com altura máxima
+// ajustada ao espaço realmente disponível.
+type Pos = { left: number; top?: number; bottom?: number; maxHeight: number };
+
 function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => void; disabled: boolean }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<Pos | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   function openMenu() {
     const rect = triggerRef.current?.getBoundingClientRect();
-    if (rect) {
-      const left = Math.min(Math.max(8, rect.right - PANEL_WIDTH), window.innerWidth - PANEL_WIDTH - 8);
-      setPos({ top: rect.bottom + 4, left });
+    if (!rect) {
+      setOpen(true);
+      return;
     }
+    const margin = 8;
+    const gap = 4;
+    const left = Math.min(Math.max(margin, rect.right - PANEL_WIDTH), window.innerWidth - PANEL_WIDTH - margin);
+    const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
+    const spaceAbove = rect.top - gap - margin;
+    // Prefere abrir pra baixo (padrão), só vira pra cima quando embaixo
+    // não sobra nem 1 opção de altura confortável (~40px) E acima sobra
+    // mais espaço -- evita virar pra cima à toa numa linha do meio da
+    // tela só porque embaixo "só" cabem 6 das 9 opções (a lista já rola).
+    const openUp = spaceBelow < 40 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(80, Math.min(288, openUp ? spaceAbove : spaceBelow));
+    setPos(openUp ? { left, bottom: window.innerHeight - rect.top + gap, maxHeight } : { left, top: rect.bottom + gap, maxHeight });
     setOpen(true);
   }
 
@@ -73,21 +100,28 @@ function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => voi
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    // Fecha em vez de reposicionar -- mais simples e seguro do que
-    // recalcular a posição a cada evento de scroll/resize (inclusive o
-    // scroll horizontal da própria tabela).
-    function onScrollOrResize() {
+    // Fecha em vez de reposicionar quando quem rolou foi a página (ou a
+    // tabela) -- a posição calculada em relação ao botão ficaria
+    // desatualizada. Mas rolar DENTRO do próprio menu (pra ver as
+    // opções que não cabem) não deve fechar nada -- só ignora quando o
+    // alvo do scroll é o painel.
+    function onScroll(e: Event) {
+      const target = e.target as Node | null;
+      if (target && panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onResize() {
       setOpen(false);
     }
     document.addEventListener("mousedown", onClickOutside);
     document.addEventListener("keydown", onKeyDown);
-    window.addEventListener("scroll", onScrollOrResize, true);
-    window.addEventListener("resize", onScrollOrResize);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("mousedown", onClickOutside);
       document.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("scroll", onScrollOrResize, true);
-      window.removeEventListener("resize", onScrollOrResize);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
     };
   }, [open]);
 
@@ -122,9 +156,10 @@ function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => voi
               className="fixed z-50 rounded-lg py-1 shadow-lg border overflow-y-auto"
               style={{
                 top: pos.top,
+                bottom: pos.bottom,
                 left: pos.left,
                 width: PANEL_WIDTH,
-                maxHeight: "min(18rem, calc(100vh - 16px))",
+                maxHeight: pos.maxHeight,
                 background: "var(--surface-1)",
                 borderColor: "var(--border)",
               }}
