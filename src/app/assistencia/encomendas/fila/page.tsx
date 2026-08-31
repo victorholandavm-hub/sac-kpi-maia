@@ -149,7 +149,13 @@ export default async function EncomendasQueuePage({
 
   return (
     <ToastProvider>
-    <div className="max-w-4xl mx-auto p-6 flex flex-col gap-4 w-full min-w-0">
+    {/* Largura total -- pedido do Victor 31/08/2026: "faltou só a tela
+        de fila de encomendas" (fora do grupo (app), CD/fábrica não têm
+        sessão Supabase Auth -- ver comentário em requireEncomendaActor
+        acima -- por isso não pegou a mudança de (app)/layout.tsx).
+        Mesmo AssistenciaHeader de sempre, só o container que deixou de
+        limitar em max-w-4xl. */}
+    <div className="w-full p-6 flex flex-col gap-4 min-w-0">
       <RealtimeQueueRefresher
         table="pedidos_encomenda"
         eventsTable="pedido_encomenda_events"
