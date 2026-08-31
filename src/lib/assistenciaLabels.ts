@@ -398,6 +398,20 @@ export const CAUSA_RAIZ_OPTIONS = [
   // (conferência/expedição não bateu o kit completo antes de enviar),
   // nunca um defeito do fabricante ou do transporte.
   "peca_nao_entregue",
+  // Opção nova -- pedido do Victor 29/08/2026: "existe um outro problema
+  // tambem que é em relação aos produtos que foram entregues sujos x
+  // entregues avariados de fabrica, pois isso diferencia se o problema é
+  // de armazenamento/conferencia no CD ou se é defeito da fabricação".
+  // Antes disso, "sujo"/"manchado"/"mofado" não tinha causa própria --
+  // investigação via SQL 29/08/2026 achou 8 chamados com esse tipo de
+  // motivo, espalhados em 3 causas raiz DIFERENTES (3x erro_conferencia,
+  // 2x outro, 3x defeito_fabricacao) -- sem padrão nenhum, cada um
+  // escolhia o que parecia mais perto por falta de opção certa. Sujeira/
+  // mofo/mancha é sintoma de armazenamento inadequado (umidade, produto
+  // empilhado errado, tempo parado demais no CD antes de sair) -- nunca
+  // saiu da fábrica assim, então virar "defeito_fabricacao" mascarava um
+  // problema que é da própria operação do CD, não do fabricante.
+  "armazenamento_cd",
   "solicitacao_cliente",
   "outro",
 ] as const;
@@ -411,6 +425,7 @@ export const CAUSA_RAIZ_LABELS: Record<string, string> = {
   avaria_transporte: "Avaria no transporte",
   defeito_fabricacao: "Defeito de fabricação",
   peca_nao_entregue: "Peça não entregue na venda (esqueceram de mandar, peça em si sem problema nenhum)",
+  armazenamento_cd: "Produto sujo/manchado/mofado (armazenamento no CD, não é defeito de fábrica)",
   solicitacao_cliente: "Solicitação do cliente (desistência/arrependimento)",
   outro: "Outro",
 };
@@ -420,8 +435,10 @@ export const CAUSA_RAIZ_LABELS: Record<string, string> = {
 // do Victor 22/08/2026: "Destaque os erros operacionais internos... com
 // badges amarelas/vermelhas para chamar a atenção da gestão para o
 // retrabalho interno". Usado no relatório (badge + cor no gráfico de rosca).
-// "peca_nao_entregue" entrou aqui 29/08/2026 -- é sempre falha de processo
-// (esquecimento), nunca causa externa.
+// "peca_nao_entregue"/"armazenamento_cd" entraram aqui 29/08/2026 --
+// esquecimento e armazenamento inadequado são sempre falha de processo
+// do próprio time (expedição/CD), nunca causa externa (transporte,
+// fábrica) nem decisão do cliente.
 export const CAUSA_RAIZ_ERRO_INTERNO: string[] = [
   "erro_conferencia",
   "erro_motorista",
@@ -429,6 +446,7 @@ export const CAUSA_RAIZ_ERRO_INTERNO: string[] = [
   "erro_vendedor",
   "erro_sac",
   "peca_nao_entregue",
+  "armazenamento_cd",
 ];
 
 export const SAC_CATEGORIES = [
