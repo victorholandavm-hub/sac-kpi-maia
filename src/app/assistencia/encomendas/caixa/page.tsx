@@ -84,7 +84,9 @@ export default async function EncomendasCaixaPage({
   const viewHref = (v: string) => (v === "abertos" ? "/assistencia/encomendas/caixa" : `/assistencia/encomendas/caixa?view=${v}`);
 
   return (
-    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+    // Largura total -- pedido do Victor 31/08/2026, mesmo tratamento
+    // das outras telas fora do grupo (app).
+    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
       <RealtimeQueueRefresher table="pedidos_encomenda" eventsTable="pedido_encomenda_events" />
       <AssistenciaHeader
         title={`Encomendas — ${storeLabel}`}

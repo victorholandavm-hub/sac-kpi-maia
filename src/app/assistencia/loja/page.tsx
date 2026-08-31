@@ -130,7 +130,11 @@ export default async function LojaHomePage({
 
   return (
     <ToastProvider>
-    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+    {/* Largura total -- pedido do Victor 31/08/2026, mesmo tratamento
+        das outras telas fora do grupo (app) (gerente de loja não tem
+        sessão Supabase Auth aqui, login por PIN). AssistenciaHeader não
+        foi tocado. */}
+    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
       <RealtimeQueueRefresher />
       <AssistenciaHeader title="Gerente de loja" subtitle="Montagem, desmontagem, recolhimento e vistoria — todas as lojas">
         <div className="flex items-center gap-3 flex-wrap">
