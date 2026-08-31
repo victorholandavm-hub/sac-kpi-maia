@@ -16,20 +16,24 @@ import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRe
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { TecnicoItemDestino } from "@/components/assistencia/TecnicoItemDestino";
 import { TecnicoNotificationModalButton } from "@/components/assistencia/TecnicoNotificationModalButton";
-import { formatDateTimeShortBr } from "@/lib/formatDateTime";
 
 export const dynamic = "force-dynamic";
 
-// Achado do Victor 25/08/2026: essa tela mostrava "Concluído 21:57" no
-// card, mas o modal "Ver notificação completa" (que formata no navegador,
-// já no fuso local de quem tá vendo) mostrava "18:57" pro MESMO chamado --
-// 3h de diferença. Causa: formatDateTime local não passava
-// `timeZone: "America/Fortaleza"`, então rodando aqui (Server Component,
-// processo Node da VPS em UTC) saía a hora crua em UTC, sem converter --
-// mesmo bug que formatDateTime.ts já existe pra evitar em outras telas.
-function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
-  return formatDateTimeShortBr(iso);
+// Ícone sutil de loja pra coluna "Loja" -- pedido do Victor 31/08/2026.
+// Inline (não o StoreIcon de RoleIcons.tsx, que é 28px, pensado pra tela
+// de escolha de papel, grande demais pra uma célula de tabela densa).
+function StoreIconSmall() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--text-muted)" }}>
+      <path
+        d="M4 10.5V19a1 1 0 0 0 1 1h5v-5h4v5h5a1 1 0 0 0 1-1v-8.5M3 10l1.5-5.5A1 1 0 0 1 5.46 3.5h13.08a1 1 0 0 1 .96 1L21 10M3 10a2 2 0 0 0 4 0M7 10a2 2 0 0 0 4 0M11 10a2 2 0 0 0 4 0M15 10a2 2 0 0 0 4 0M19 10a2 2 0 0 0 2 0"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 // SAC (troca/entrega/recolhimento de produto, notificação externa) x
@@ -263,17 +267,28 @@ export default async function TecnicoHomePage({
                     </span>
                   </summary>
 
-                  {/* overflow-x-auto -- a tabela nunca deve empurrar a
-                      página inteira pro lado, só rolar por dentro do
-                      próprio cartão em telas mais estreitas. */}
+                  {/* Refeito do zero a pedido do Victor 31/08/2026 --
+                      "houve um erro de interpretação... você manteve as
+                      informações agrupadas como blocos verticais dentro
+                      das células, criando um visual poluído... estilo
+                      card espremido". Regra rígida: cada dado na sua
+                      própria coluna, texto corrido, sem badge/pílula,
+                      sem caixa/cartão interno nenhum -- a linha é uma
+                      faixa horizontal contínua, igual a uma planilha.
+                      Concluído/Motorista saíram da coluna 1 (não fazem
+                      parte das 6 colunas pedidas; continuam disponíveis
+                      em "Ver notificação completa"). overflow-x-auto --
+                      a tabela nunca deve empurrar a página inteira pro
+                      lado, só rolar por dentro do próprio cartão em
+                      telas mais estreitas. */}
                   <div className="rounded-lg border overflow-hidden overflow-x-auto" style={{ borderColor: "var(--border)" }}>
                     <table className="w-full border-collapse text-xs" style={{ minWidth: "880px" }}>
                       <thead>
                         <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--gridline)" }}>
-                          {["Chamado", "Origem", "Loja", "Cliente", "Produto", "Destino"].map((h) => (
+                          {["ID / Tipo", "Setor", "Loja", "Cliente", "Produto", "Destino"].map((h) => (
                             <th
                               key={h}
-                              className="px-3 py-2 text-left font-semibold uppercase tracking-wide whitespace-nowrap"
+                              className={`px-3 py-2 font-semibold uppercase tracking-wide whitespace-nowrap ${h === "Setor" ? "text-center" : "text-left"}`}
                               style={{ color: "var(--text-muted)", fontSize: "10.5px" }}
                             >
                               {h}
@@ -290,45 +305,43 @@ export default async function TecnicoHomePage({
                               borderBottom: "1px solid var(--gridline)",
                             }}
                           >
+                            {/* Coluna 1: ID / Tipo */}
                             {isFirst ? (
-                              <td className="px-3 py-2.5 align-top whitespace-nowrap" rowSpan={itemCount}>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-mono" style={{ color: "var(--text-muted)" }}>
-                                    #{r.ticketNumber}
-                                  </span>
-                                  <span className="font-bold" style={{ color: "var(--text-primary)" }}>
-                                    {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                                  </span>
+                              <td className="px-3 py-2 align-top whitespace-nowrap" rowSpan={itemCount}>
+                                <div className="font-mono" style={{ color: "var(--text-muted)" }}>
+                                  #{r.ticketNumber}
                                 </div>
-                                <div style={{ color: "var(--text-muted)" }}>
-                                  Concluído {formatDateTime(r.completedAt)} · {r.driverName ?? "—"}
+                                <div className="font-bold" style={{ color: "var(--text-primary)" }}>
+                                  {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                                 </div>
                               </td>
                             ) : null}
 
+                            {/* Coluna 2: Setor -- texto simples centralizado, sem pílula */}
                             {isFirst ? (
-                              <td className="px-3 py-2.5 align-top whitespace-nowrap" rowSpan={itemCount}>
+                              <td className="px-3 py-2 align-top text-center whitespace-nowrap" rowSpan={itemCount}>
                                 <span
-                                  className="font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-                                  style={
-                                    origemLabel(r.type) === "SAC"
-                                      ? { color: "var(--brand-orange)", background: "var(--brand-orange-soft)" }
-                                      : { color: "var(--brand-green)", background: "var(--brand-green-soft)" }
-                                  }
+                                  className="font-semibold"
+                                  style={{ color: origemLabel(r.type) === "SAC" ? "var(--brand-orange)" : "var(--brand-green)" }}
                                 >
                                   {origemLabel(r.type)}
                                 </span>
                               </td>
                             ) : null}
 
+                            {/* Coluna 3: Loja -- ícone sutil + nome */}
                             {isFirst ? (
-                              <td className="px-3 py-2.5 align-top whitespace-nowrap" style={{ color: "var(--text-secondary)" }} rowSpan={itemCount}>
-                                {r.storeName}
+                              <td className="px-3 py-2 align-top whitespace-nowrap" rowSpan={itemCount}>
+                                <span className="inline-flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
+                                  <StoreIconSmall />
+                                  {r.storeName}
+                                </span>
                               </td>
                             ) : null}
 
+                            {/* Coluna 4: Cliente */}
                             {isFirst ? (
-                              <td className="px-3 py-2.5 align-top max-w-[200px]" rowSpan={itemCount}>
+                              <td className="px-3 py-2 align-top max-w-[200px]" rowSpan={itemCount}>
                                 <div className="font-semibold truncate" style={{ color: "var(--text-primary)" }}>
                                   {r.clientName ?? "—"}
                                 </div>
@@ -341,15 +354,15 @@ export default async function TecnicoHomePage({
                               </td>
                             ) : null}
 
-                            <td className="px-3 py-2.5 align-top min-w-[200px]">
-                              <span style={{ color: "var(--text-primary)" }}>
-                                {i.quantity > 1 ? `${i.quantity}x ` : ""}
-                                {i.product}
-                              </span>
-                              {i.partCode ? <div style={{ color: "var(--text-muted)" }}>{i.partCode}</div> : null}
+                            {/* Coluna 5: Produto -- texto corrido numa linha só */}
+                            <td className="px-3 py-2 align-top min-w-[200px]" style={{ color: "var(--text-primary)" }}>
+                              {i.quantity > 1 ? `${i.quantity}x ` : ""}
+                              {i.product}
+                              {i.partCode ? <span style={{ color: "var(--text-muted)" }}> · {i.partCode}</span> : null}
                             </td>
 
-                            <td className="px-3 py-2.5 align-top">
+                            {/* Coluna 6: Destino */}
+                            <td className="px-3 py-2 align-top">
                               <TecnicoItemDestino
                                 itemId={i.id}
                                 destino={i.destino}
