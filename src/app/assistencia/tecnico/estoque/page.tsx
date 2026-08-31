@@ -3,7 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTecnicoSession, tecnicoSignOut } from "@/app/assistencia/tecnico-actions";
 import { listStockMovements, type StockMovement } from "@/lib/stockMovements";
+import { listSuppliers } from "@/lib/partOrders";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
+import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { WithdrawStockMovementButton } from "@/components/assistencia/WithdrawStockMovementButton";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +16,13 @@ function formatDateOnly(value: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
-function buildHref(view?: string) {
-  return view ? `/assistencia/tecnico/estoque?view=${view}` : "/assistencia/tecnico/estoque";
+function buildHref(params: { view?: string; q?: string; factory?: string }) {
+  const sp = new URLSearchParams();
+  if (params.view) sp.set("view", params.view);
+  if (params.q) sp.set("q", params.q);
+  if (params.factory) sp.set("factory", params.factory);
+  const qs = sp.toString();
+  return qs ? `/assistencia/tecnico/estoque?${qs}` : "/assistencia/tecnico/estoque";
 }
 
 // Cliente + volume numa linha só, truncada -- mesmo padrão da coluna
@@ -35,23 +42,29 @@ function clienteVolumeLine(m: StockMovement): string {
 export default async function TecnicoEstoquePage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; q?: string; factory?: string }>;
 }) {
   const tecnicoName = await getTecnicoSession();
   if (!tecnicoName) {
     redirect("/assistencia/tecnico/login");
   }
 
-  const { view } = await searchParams;
+  const { view, q, factory } = await searchParams;
   const showHistorico = view === "retiradas";
 
-  // Busca as duas listas em paralelo -- precisa das duas pra mostrar o
-  // contador de cada aba ao mesmo tempo (pedido do Victor 31/08/2026:
-  // "contadores numéricos limpos ao lado de cada nome"), não só da aba
-  // que está aberta agora.
-  const [pendentes, historico] = await Promise.all([
-    listStockMovements({ onlyPendingWithdrawal: true }),
-    listStockMovements({ movementType: "retirado" }).then((rows) => rows.filter((m) => m.movementDate)),
+  // Filtro por produto/código/cliente (q) e fábrica -- pedido do Victor
+  // 31/08/2026: "ficou faltando os filtros na tela de estoque". Mesmos
+  // dois filtros já usados em (app)/estoque/page.tsx (tela de
+  // assistência/admin pra essa mesma tabela) -- "responsável" e "De/Até"
+  // ficaram de fora aqui: quem retirou já aparece na própria coluna
+  // "Por" da aba Já retiradas, e a equipe técnica olha "o que tá
+  // pendente agora"/"o que retirei recentemente", não faz relatório por
+  // período. Busca as duas listas (pendentes/histórico) em paralelo --
+  // precisa das duas pra mostrar o contador de cada aba ao mesmo tempo.
+  const [pendentes, historico, suppliers] = await Promise.all([
+    listStockMovements({ onlyPendingWithdrawal: true, q, factory }),
+    listStockMovements({ movementType: "retirado", q, factory }).then((rows) => rows.filter((m) => m.movementDate)),
+    listSuppliers(),
   ]);
   const movements = showHistorico ? historico : pendentes;
 
@@ -94,6 +107,31 @@ export default async function TecnicoEstoquePage({
         </div>
 
         <div className="flex flex-col gap-3 px-6 pt-4 pb-6">
+          {/* Filtro de fábrica + busca -- mesma barra de tecnico/page.tsx. */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterSelect name="factory" placeholder="Todas as fábricas" options={suppliers} />
+            <form action="/assistencia/tecnico/estoque" method="GET" className="flex items-center gap-2 flex-1 min-w-[280px]">
+              {showHistorico ? <input type="hidden" name="view" value="retiradas" /> : null}
+              {factory ? <input type="hidden" name="factory" value={factory} /> : null}
+              <input
+                type="search"
+                name="q"
+                defaultValue={q ?? ""}
+                placeholder="Buscar por produto, código ou cliente…"
+                className="rounded border px-3 py-2 text-sm flex-1"
+                style={{ borderColor: "var(--border)" }}
+              />
+              <button type="submit" className="text-sm px-3 py-2 rounded border shrink-0" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+                Buscar
+              </button>
+              {q || factory ? (
+                <Link href={buildHref({ view: showHistorico ? "retiradas" : undefined })} className="text-xs underline shrink-0" style={{ color: "var(--text-secondary)" }}>
+                  Limpar
+                </Link>
+              ) : null}
+            </form>
+          </div>
+
           <div className="flex items-center gap-1">
             {(
               [
@@ -103,7 +141,7 @@ export default async function TecnicoEstoquePage({
             ).map(([value, label, count]) => (
               <Link
                 key={label}
-                href={buildHref(value)}
+                href={buildHref({ view: value, q, factory })}
                 className="text-sm px-3 py-1.5 rounded-t-md border-b-2"
                 style={{
                   borderColor: (value ?? undefined) === view ? "var(--brand-green)" : "transparent",
