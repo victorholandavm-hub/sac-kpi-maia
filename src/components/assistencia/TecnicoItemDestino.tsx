@@ -263,8 +263,12 @@ export function TecnicoItemDestino({
   }
 
   if (pickingStore) {
+    // Sem caixa/fundo próprio -- pedido do Victor 31/08/2026: "elimine
+    // completamente quaisquer caixas, cartões ou fundos brancos internos
+    // nas linhas". Os controles ficam soltos na própria célula, igual ao
+    // resto da tabela.
     return (
-      <div className="flex flex-col gap-1.5 w-full max-w-[230px] rounded-md border p-2" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
+      <div className="flex flex-col gap-1.5 w-full max-w-[230px]">
         <select
           value={storeId}
           onChange={(e) => setStoreId(e.target.value)}
@@ -310,8 +314,9 @@ export function TecnicoItemDestino({
   }
 
   if (pickingNote) {
+    // Mesma ideia do pickingStore acima -- sem caixa/fundo próprio.
     return (
-      <div className="flex flex-col gap-1.5 w-full max-w-[230px] rounded-md border p-2" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
+      <div className="flex flex-col gap-1.5 w-full max-w-[230px]">
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
