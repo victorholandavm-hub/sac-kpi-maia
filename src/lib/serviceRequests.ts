@@ -14,7 +14,13 @@ export type RequestType =
   | "entrega_produto"
   | "envio_peca"
   | "recolhimento_produto";
-export type RequestStatus = "aberta" | "em_contato" | "em_andamento" | "remarcar" | "concluida" | "cancelada";
+// "aguardando_aprovacao" -- pedido do Victor 31/08/2026: montagem/
+// desmontagem (inclusive combo) passam por essa fase entre o montador
+// marcar como concluído e o gerente da loja aprovar de fato (ver
+// montadorCompleteRequest/montadorCompletePartially em montador-actions.ts
+// e lojaApproveMontagemConclusion em loja-actions.ts) -- só os outros tipos
+// de chamado continuam indo direto pra "concluida".
+export type RequestStatus = "aberta" | "em_contato" | "em_andamento" | "aguardando_aprovacao" | "remarcar" | "concluida" | "cancelada";
 export type DeadlineStatus = "pendente" | "aprovado" | "recusado";
 // "urgencia" saiu daqui 27/08/2026 -- pedido do Victor: "quando coloco
 // que precisa ser no periodo da tarde, ele nao me da a opção de colocar
@@ -28,6 +34,7 @@ export const REQUEST_STATUSES: RequestStatus[] = [
   "aberta",
   "em_contato",
   "em_andamento",
+  "aguardando_aprovacao",
   "remarcar",
   "concluida",
   "cancelada",
@@ -631,7 +638,17 @@ export async function getRequestDetail(
   return { request, events };
 }
 
-export type OpenRequestForLojaItem = { product: string; quantity: number; partCode: string | null; action: ItemAction | null; isPickup: boolean };
+export type OpenRequestForLojaItem = {
+  // Pedido do Victor 31/08/2026: precisa do id pra o gerente conseguir
+  // marcar item por item na aprovação (lojaApproveMontagemConclusion) --
+  // antes esse tipo não precisava, era só exibição.
+  id: string;
+  product: string;
+  quantity: number;
+  partCode: string | null;
+  action: ItemAction | null;
+  isPickup: boolean;
+};
 
 export type OpenRequestForLoja = {
   id: string;
@@ -672,6 +689,7 @@ export async function listOpenRequestsForLoja(
     storeIds?: string[];
     types?: readonly RequestType[];
     onlyCompleted?: boolean;
+    onlyAwaitingApproval?: boolean;
     // Ver applyOwnAssemblerStoreExclusion acima.
     excludeOwnAssemblerStoreIds?: string[];
   } = {}
@@ -680,14 +698,21 @@ export async function listOpenRequestsForLoja(
   let query = admin
     .from("service_requests")
     .select(
-      "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, delivery_rating, resolution_rating, stores(name), items:service_request_items(product, quantity, part_code, item_action, is_pickup)"
+      "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, delivery_rating, resolution_rating, stores(name), items:service_request_items(id, product, quantity, part_code, item_action, is_pickup)"
     )
     .limit(OPEN_LOJA_LIMIT);
 
   if (opts.onlyCompleted) {
     query = query.eq("status", "concluida").order("completed_at", { ascending: false });
+  } else if (opts.onlyAwaitingApproval) {
+    // Aba "Aguardando aprovação" -- pedido do Victor 31/08/2026, ver
+    // lojaApproveMontagemConclusion (loja-actions.ts).
+    query = query.eq("status", "aguardando_aprovacao").order("created_at", { ascending: true });
   } else {
-    query = query.not("status", "in", "(concluida,cancelada)").order("created_at", { ascending: true });
+    // aguardando_aprovacao sai do "em aberto" padrão -- não tem ação
+    // nenhuma pro gerente fazer lá, é só ruído (o montador já fez a
+    // parte dele, falta só aprovar, que é a aba de cima).
+    query = query.not("status", "in", "(concluida,cancelada,aguardando_aprovacao)").order("created_at", { ascending: true });
   }
 
   if (opts.storeIds) {
@@ -727,7 +752,7 @@ export async function listOpenRequestsForLoja(
     delivery_rating: number | null;
     resolution_rating: number | null;
     stores: { name: string } | null;
-    items: { product: string; quantity: number; part_code: string | null; item_action: string | null; is_pickup: boolean }[] | null;
+    items: { id: string; product: string; quantity: number; part_code: string | null; item_action: string | null; is_pickup: boolean }[] | null;
   };
 
   return ((data ?? []) as unknown as Row[]).map((row) => ({
@@ -746,6 +771,7 @@ export async function listOpenRequestsForLoja(
     clientNeighborhood: row.client_neighborhood,
     productSummary: row.items && row.items.length > 0 ? row.items.map((i) => i.product).join(", ") : null,
     items: (row.items ?? []).map((i) => ({
+      id: i.id,
       product: i.product,
       quantity: i.quantity,
       partCode: i.part_code,

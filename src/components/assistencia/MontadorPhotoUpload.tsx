@@ -11,11 +11,14 @@ import { uploadPhotoRequest } from "@/lib/uploadPhotoClient";
 // muitas de uma vez que muda.
 const MAX_PHOTOS_POR_VEZ = 10;
 
-async function uploadOne(requestId: string, file: File, caption: string): Promise<void> {
+async function uploadOne(requestId: string, file: File, caption: string, itemId?: string): Promise<void> {
   const formData = new FormData();
   formData.set("photo", file);
   formData.set("caption", caption);
   formData.set("requestId", requestId);
+  // Foto de um item específico (montagem/desmontagem) -- pedido do Victor
+  // 31/08/2026. Ausente = foto do chamado inteiro, como sempre.
+  if (itemId) formData.set("itemId", itemId);
   // POST comum em vez de Server Action -- o montador quase sempre abre
   // o link de dentro do navegador embutido do WhatsApp, que tem bug
   // conhecido nesse app com o tipo de resposta em stream que Server
@@ -27,7 +30,7 @@ async function uploadOne(requestId: string, file: File, caption: string): Promis
   await uploadPhotoRequest("/api/montador/upload-photo", formData);
 }
 
-export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
+export function MontadorPhotoUpload({ requestId, itemId, label }: { requestId: string; itemId?: string; label?: string }) {
   const { pending, run, showToast } = useQuickAction();
   const [caption, setCaption] = useState("");
   const [inputKey, setInputKey] = useState(0);
@@ -49,7 +52,7 @@ export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
           // em rede ruim (obra/loja), várias uploads simultâneas competindo
           // por banda tendem a estourar timeout todas juntas em vez de só
           // uma por vez.
-          await uploadOne(requestId, selecionadas[i], caption);
+          await uploadOne(requestId, selecionadas[i], caption, itemId);
         } catch (err) {
           falhas.push(`${selecionadas[i].name || "foto"}: ${err instanceof Error ? err.message : "erro"}`);
         }
@@ -73,7 +76,7 @@ export function MontadorPhotoUpload({ requestId }: { requestId: string }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: "var(--border)" }}>
       <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-        Foto
+        {label ?? "Foto"}
       </span>
       <input
         value={caption}

@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { isMostruarioRequest } from "@/lib/serviceRequests";
+import { getGerenteStoreIds } from "@/lib/gerentes";
+import { notifyAssistencia } from "@/lib/notifications";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
@@ -136,5 +138,117 @@ export async function setLojaGerenteRating(requestId: string, deliveryRating: nu
   });
 
   revalidatePath("/assistencia/loja");
+  revalidatePath(`/assistencia/${requestId}`);
+}
+
+// Aprovação do gerente da loja pra montagem/desmontagem concluída pelo
+// montador -- pedido do Victor 31/08/2026: "a partir de agora, o gerente
+// da loja vai precisar aprovar essa conclusão, e precisa ter a opção de
+// colocar quais produtos nao foram montados/desmontados". `notDoneItemIds`
+// vazio = aprova tudo, vira "concluida" de verdade agora (não quando o
+// montador clicou -- é isso que faz pagamento/relatório do montador só
+// contarem a partir daqui, ver montadorCompleteRequest em
+// montador-actions.ts, ambos já filtram por status = 'concluida').
+// `notDoneItemIds` não vazio = reaproveita o mesmo desfecho de
+// montadorCompletePartially (itens voltam pendentes, chamado vai pra
+// "remarcar"), só que reprovado pelo gerente em vez de reportado pelo
+// próprio montador.
+export async function lojaApproveMontagemConclusion(requestId: string, notDoneItemIds: string[], note: string): Promise<void> {
+  const gerenteName = await getLojaGerenteSession();
+  if (!gerenteName) throw new Error("Sessão expirada. Faça login de novo.");
+
+  const admin = getSupabaseAdmin();
+  const { data: request, error } = await admin
+    .from("service_requests")
+    .select("status, store_id, ticket_number")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (error || !request) throw new Error("Solicitação não encontrada.");
+  if (request.status !== "aguardando_aprovacao") throw new Error("Esse chamado não está aguardando aprovação.");
+
+  // Qualquer gerente da loja pode aprovar, não só quem abriu o chamado
+  // (mesmo escopo por loja de listOpenRequestsForLoja, ver loja/page.tsx
+  // -- diferente de setLojaGerenteRating acima, que é sobre "eu mesmo
+  // pedi essa montagem de mostruário", caso mais estreito).
+  const storeIds = await getGerenteStoreIds(gerenteName);
+  if (!request.store_id || !storeIds.includes(request.store_id)) {
+    throw new Error("Essa solicitação não é da sua loja.");
+  }
+
+  const trimmedNote = note.trim();
+
+  if (notDoneItemIds.length === 0) {
+    const completedAt = new Date().toISOString();
+    const { data: updated, error: updateError } = await admin
+      .from("service_requests")
+      .update({ status: "concluida", completed_at: completedAt })
+      .eq("id", requestId)
+      .eq("status", "aguardando_aprovacao")
+      .select("id")
+      .maybeSingle();
+    if (updateError) throw new Error(updateError.message);
+    if (!updated) throw new Error("Esse chamado já foi atualizado por outra pessoa. Recarregue a página e tente de novo.");
+
+    await admin.from("service_request_events").insert({
+      request_id: requestId,
+      actor_id: null,
+      event_type: "status_changed",
+      from_status: "aguardando_aprovacao",
+      to_status: "concluida",
+      note: `Gerente ${gerenteName} aprovou a conclusão.${trimmedNote ? ` Observação: ${trimmedNote}` : ""}`,
+    });
+
+    revalidatePath("/assistencia/loja");
+    revalidatePath("/assistencia/fila");
+    revalidatePath(`/assistencia/${requestId}`);
+    return;
+  }
+
+  const { error: itemsError } = await admin
+    .from("service_request_items")
+    .update({ completed: false })
+    .eq("request_id", requestId)
+    .in("id", notDoneItemIds);
+  if (itemsError) throw new Error(itemsError.message);
+
+  const { data: updated, error: updateError } = await admin
+    .from("service_requests")
+    .update({ status: "remarcar" })
+    .eq("id", requestId)
+    .eq("status", "aguardando_aprovacao")
+    .select("id")
+    .maybeSingle();
+  if (updateError) throw new Error(updateError.message);
+  if (!updated) throw new Error("Esse chamado já foi atualizado por outra pessoa. Recarregue a página e tente de novo.");
+
+  const { data: pendingItems } = await admin
+    .from("service_request_items")
+    .select("product, quantity")
+    .eq("request_id", requestId)
+    .in("id", notDoneItemIds);
+  const label = (i: { product: string; quantity: number }) => (i.quantity > 1 ? `${i.quantity}x ${i.product}` : i.product);
+  const pendingLabels = (pendingItems ?? []).map(label);
+
+  const eventNote =
+    `Gerente ${gerenteName} não confirmou: ${pendingLabels.join(", ") || "—"}.` + (trimmedNote ? ` Observação: ${trimmedNote}` : "");
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: null,
+    event_type: "status_changed",
+    from_status: "aguardando_aprovacao",
+    to_status: "remarcar",
+    note: eventNote,
+  });
+
+  const link = `/assistencia/${requestId}`;
+  await notifyAssistencia({
+    type: "status_changed",
+    title: "Precisa remarcar",
+    message: `Chamado #${request.ticket_number} — ${eventNote}`,
+    link,
+  });
+
+  revalidatePath("/assistencia/loja");
+  revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
 }

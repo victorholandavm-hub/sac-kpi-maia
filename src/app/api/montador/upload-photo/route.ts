@@ -72,11 +72,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Selecione uma foto." }, { status: 400 });
     }
     const caption = String(formData.get("caption") ?? "");
+    // Foto de um item específico -- pedido do Victor 31/08/2026 (foto
+    // obrigatória por item de montagem/desmontagem). Vazio/ausente =
+    // foto do chamado inteiro, mesmo comportamento de sempre. Confere
+    // que o item é DESSE chamado (não de outro) -- defesa em
+    // profundidade, mesmo espírito do check de "dono" acima.
+    const itemIdRaw = formData.get("itemId");
+    const itemId = typeof itemIdRaw === "string" && itemIdRaw.trim() ? itemIdRaw.trim() : null;
+    if (itemId) {
+      const { data: item } = await admin.from("service_request_items").select("request_id").eq("id", itemId).maybeSingle();
+      if (!item || item.request_id !== requestId) {
+        console.warn("[montador-upload] item não é desse chamado", { requestId, itemId, itemRequestId: item?.request_id ?? null });
+        return NextResponse.json({ error: "Item inválido." }, { status: 400 });
+      }
+    }
 
-    console.log("[montador-upload] validado, salvando", { requestId, fileSize: file.size, fileType: file.type });
+    console.log("[montador-upload] validado, salvando", { requestId, fileSize: file.size, fileType: file.type, itemId });
 
     try {
-      await saveRequestPhoto({ requestId, file, uploadedBy: assemblerName, caption });
+      await saveRequestPhoto({ requestId, file, uploadedBy: assemblerName, caption, itemId });
     } catch (err) {
       console.error("[montador-upload] saveRequestPhoto falhou", err);
       return NextResponse.json({ error: (err as Error).message }, { status: 500 });
