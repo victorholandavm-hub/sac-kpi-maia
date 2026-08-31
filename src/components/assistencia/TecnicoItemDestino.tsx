@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { setItemDestino, clearItemDestino } from "@/app/assistencia/tecnico-actions";
 import { useQuickAction } from "./useQuickAction";
 import {
@@ -27,40 +28,78 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
+const PANEL_WIDTH = 256; // w-64
+
 // Painel "Selecionar destino..." -- pedido do Victor 31/08/2026: substituir
 // a fileira de 9 botões coloridos (poluída em linha, pior ainda numa
 // tabela densa) por um combobox de seleção única, mesmo comportamento de
 // clique. "mostruario"/"em_observacao"/"outro" continuam pedindo um passo
 // extra antes de confirmar (ver pickingStore/pickingNote mais abaixo) --
 // só a lista de opções virou um menu suspenso em vez de botões lado a lado.
+//
+// Achado do Victor 31/08/2026 (print em anexo): o menu suspenso, quando
+// aberto na última linha da tabela, ficava cortado -- o cartão que
+// arredonda os cantos da tabela usa overflow-hidden (pra cobrir os cantos
+// retos da tabela por baixo do arredondamento), e isso corta qualquer
+// coisa que "vaze" do card por cima OU por baixo, não só pros lados. Um
+// menu absolutamente posicionado dentro dessa árvore sempre ia bater
+// nesse teto quando aberto perto da borda inferior. Fix: renderiza o
+// menu num portal direto no <body> (fora da árvore com overflow-hidden),
+// com posição calculada a partir do retângulo do botão -- não fica mais
+// preso a nenhum overflow de ancestral, em nenhuma linha da tabela.
 function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => void; disabled: boolean }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  function openMenu() {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const left = Math.min(Math.max(8, rect.right - PANEL_WIDTH), window.innerWidth - PANEL_WIDTH - 8);
+      setPos({ top: rect.bottom + 4, left });
+    }
+    setOpen(true);
+  }
 
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
     }
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
+    // Fecha em vez de reposicionar -- mais simples e seguro do que
+    // recalcular a posição a cada evento de scroll/resize (inclusive o
+    // scroll horizontal da própria tabela).
+    function onScrollOrResize() {
+      setOpen(false);
+    }
     document.addEventListener("mousedown", onClickOutside);
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
     return () => {
       document.removeEventListener("mousedown", onClickOutside);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
     };
   }, [open]);
 
   return (
-    <div ref={ref} className="relative w-full max-w-[230px]">
+    <div className="relative w-full max-w-[230px]">
       <button
+        ref={triggerRef}
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? setOpen(false) : openMenu())}
         className="w-full flex items-center justify-between gap-2 rounded-md pl-2.5 pr-2 py-1.5 text-xs font-medium disabled:opacity-60"
         style={{
           background: "var(--surface-1)",
@@ -75,33 +114,44 @@ function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => voi
         <ChevronIcon open={open} />
       </button>
 
-      {open ? (
-        <div
-          role="listbox"
-          className="absolute right-0 top-[calc(100%+4px)] z-20 w-64 max-h-72 overflow-y-auto rounded-lg py-1 shadow-lg border"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-        >
-          {ITEM_DESTINOS.map((d) => (
-            <button
-              key={d}
-              type="button"
-              role="option"
-              aria-selected={false}
-              onClick={() => {
-                setOpen(false);
-                onPick(d);
+      {open && pos && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={panelRef}
+              role="listbox"
+              className="fixed z-50 rounded-lg py-1 shadow-lg border overflow-y-auto"
+              style={{
+                top: pos.top,
+                left: pos.left,
+                width: PANEL_WIDTH,
+                maxHeight: "min(18rem, calc(100vh - 16px))",
+                background: "var(--surface-1)",
+                borderColor: "var(--border)",
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left"
-              style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
-              <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: ITEM_DESTINO_COLORS[d] }} />
-              <span className="flex-1 truncate font-medium">{ITEM_DESTINO_LABELS[d]}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
+              {ITEM_DESTINOS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  role="option"
+                  aria-selected={false}
+                  onClick={() => {
+                    setOpen(false);
+                    onPick(d);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left"
+                  style={{ color: "var(--text-primary)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: ITEM_DESTINO_COLORS[d] }} />
+                  <span className="flex-1 truncate font-medium">{ITEM_DESTINO_LABELS[d]}</span>
+                </button>
+              ))}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
