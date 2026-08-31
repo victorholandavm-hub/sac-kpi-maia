@@ -1,8 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTecnicoSession, tecnicoSignOut } from "@/app/assistencia/tecnico-actions";
-import { listStockMovements } from "@/lib/stockMovements";
-import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { listStockMovements, type StockMovement } from "@/lib/stockMovements";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { WithdrawStockMovementButton } from "@/components/assistencia/WithdrawStockMovementButton";
 
@@ -16,6 +16,13 @@ function formatDateOnly(value: string | null): string {
 
 function buildHref(view?: string) {
   return view ? `/assistencia/tecnico/estoque?view=${view}` : "/assistencia/tecnico/estoque";
+}
+
+// Cliente + volume numa linha só, truncada -- mesmo padrão da coluna
+// Produto de tecnico/page.tsx (ver productLine lá).
+function clienteVolumeLine(m: StockMovement): string {
+  if (!m.clientName && !m.volume) return "—";
+  return [m.clientName, m.volume ? `vol. ${m.volume}` : null].filter(Boolean).join(" · ");
 }
 
 // Retirada de estoque pra Assistência Técnica -- pedido do Victor
@@ -38,117 +45,161 @@ export default async function TecnicoEstoquePage({
   const { view } = await searchParams;
   const showHistorico = view === "retiradas";
 
-  const movements = showHistorico
-    ? (await listStockMovements({ movementType: "retirado" })).filter((m) => m.movementDate)
-    : await listStockMovements({ onlyPendingWithdrawal: true });
+  // Busca as duas listas em paralelo -- precisa das duas pra mostrar o
+  // contador de cada aba ao mesmo tempo (pedido do Victor 31/08/2026:
+  // "contadores numéricos limpos ao lado de cada nome"), não só da aba
+  // que está aberta agora.
+  const [pendentes, historico] = await Promise.all([
+    listStockMovements({ onlyPendingWithdrawal: true }),
+    listStockMovements({ movementType: "retirado" }).then((rows) => rows.filter((m) => m.movementDate)),
+  ]);
+  const movements = showHistorico ? historico : pendentes;
 
   return (
     <ToastProvider>
-      <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-        <AssistenciaHeader
-          title={`Olá, ${tecnicoName}`}
-          subtitle="Retiradas de produto do estoque pra Assistência Técnica, registradas pela assistência -- confirme aqui quando retirar de verdade."
-        >
-          <div className="flex items-center gap-4">
-            <Link href="/assistencia/tecnico" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-              ← Voltar
-            </Link>
-            <form action={tecnicoSignOut}>
-              <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-                Sair
-              </button>
-            </form>
+      {/* Mesmo tratamento full-width da Fila de Classificação (pedido
+          do Victor 31/08/2026) -- cabeçalho próprio desta tela, não o
+          AssistenciaHeader compartilhado (evita mudar outras telas do
+          sistema de assistência que não foram pedidas). */}
+      <div className="w-full flex flex-col min-w-0">
+        <div className="w-full" style={{ background: "var(--brand-green)" }}>
+          <div className="flex items-center justify-between gap-4 px-6 py-3 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <Image
+                src="/logo.png"
+                alt="Lojas Maia"
+                width={72}
+                height={72}
+                className="h-9 w-9 object-contain rounded-full shrink-0"
+                style={{ background: "rgba(255,255,255,0.9)" }}
+              />
+              <div className="leading-tight min-w-0">
+                <h1 className="font-bold text-lg text-white truncate">Retiradas de Estoque</h1>
+                <p className="text-xs truncate" style={{ color: "rgba(255,255,255,0.78)" }}>
+                  Olá, {tecnicoName} — produto do estoque pra Assistência Técnica, registrado pela assistência.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-sm shrink-0">
+              <Link href="/assistencia/tecnico" className="underline" style={{ color: "rgba(255,255,255,0.9)" }}>
+                ← Fila de Classificação
+              </Link>
+              <form action={tecnicoSignOut}>
+                <button type="submit" className="underline" style={{ color: "rgba(255,255,255,0.9)" }}>
+                  Sair
+                </button>
+              </form>
+            </div>
           </div>
-        </AssistenciaHeader>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {(
-            [
-              [undefined, "Pendentes de retirada"],
-              ["retiradas", "Já retiradas"],
-            ] as const
-          ).map(([value, label]) => (
-            <Link
-              key={label}
-              href={buildHref(value)}
-              className="text-xs px-3 py-1.5 rounded-full border"
-              style={{
-                borderColor: "var(--border)",
-                background: (value ?? undefined) === view ? "var(--surface-1)" : "transparent",
-                color: (value ?? undefined) === view ? "var(--text-primary)" : "var(--text-secondary)",
-                fontWeight: (value ?? undefined) === view ? 600 : 400,
-              }}
-            >
-              {label}
-            </Link>
-          ))}
         </div>
 
-        {movements.length === 0 ? (
-          <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              {showHistorico ? "Nenhuma retirada confirmada ainda." : "Nenhuma retirada pendente no momento."}
-            </p>
+        <div className="flex flex-col gap-3 px-6 pt-4 pb-6">
+          <div className="flex items-center gap-1">
+            {(
+              [
+                [undefined, "Pendentes de retirada", pendentes.length],
+                ["retiradas", "Já retiradas", historico.length],
+              ] as const
+            ).map(([value, label, count]) => (
+              <Link
+                key={label}
+                href={buildHref(value)}
+                className="text-sm px-3 py-1.5 rounded-t-md border-b-2"
+                style={{
+                  borderColor: (value ?? undefined) === view ? "var(--brand-green)" : "transparent",
+                  color: (value ?? undefined) === view ? "var(--text-primary)" : "var(--text-secondary)",
+                  fontWeight: (value ?? undefined) === view ? 600 : 400,
+                }}
+              >
+                {label}
+                <span className="ml-1.5 text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                  ({count})
+                </span>
+              </Link>
+            ))}
           </div>
-        ) : (
-          <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-            {/* Colunas -- pedido do Victor 28/08/2026: "quer que fique
-                mais organizado e organizado por colunas, como são
-                organizadas as outras telas" -- antes repetia "Registrado
-                por —"/"Por —" por extenso mesmo sem ter essa informação
-                (dado histórico importado não tem responsible/
-                withdrawnBy). "Registrado por" saiu da lista -- não é
-                essencial pra tarefa da equipe técnica (o que pegar, pra
-                quem), só poluía. */}
-            <div className="flex items-center gap-3 px-4 py-2 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--gridline)" }}>
-              <span className="flex-1 min-w-0 text-left">Produto</span>
-              <span className="w-24 shrink-0 text-right">{showHistorico ? "Retirado em" : "Lançado em"}</span>
-              <span className="w-28 shrink-0 text-right">{showHistorico ? "Por" : ""}</span>
+
+          {movements.length === 0 ? (
+            <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                {showHistorico ? "Nenhuma retirada confirmada ainda." : "Nenhuma retirada pendente no momento."}
+              </p>
             </div>
-            <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-              {movements.map((m) => (
-                <div key={m.id} className="flex items-start gap-3 px-4 py-3 flex-wrap">
-                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-left" style={{ color: "var(--text-primary)" }}>
-                        {m.product}
-                      </span>
-                      {m.code ? (
-                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                          {m.code}
-                        </span>
-                      ) : null}
-                    </div>
-                    {m.clientName || m.volume ? (
-                      <span className="text-xs text-left" style={{ color: "var(--text-secondary)" }}>
-                        {m.clientName ?? ""}
-                        {m.clientName && m.volume ? " · " : ""}
-                        {m.volume ? `vol. ${m.volume}` : ""}
-                      </span>
-                    ) : null}
-                    {m.notes ? (
-                      <span className="text-xs text-left" style={{ color: "var(--text-muted)" }}>
-                        {m.notes}
-                      </span>
-                    ) : null}
-                  </div>
-                  <span className="w-24 shrink-0 text-right text-xs" style={{ color: "var(--text-muted)" }}>
-                    {formatDateOnly(showHistorico ? m.movementDate : m.loggedDate)}
-                  </span>
-                  {showHistorico ? (
-                    <span className="w-28 shrink-0 text-right text-xs" style={{ color: "var(--text-muted)" }}>
-                      {m.withdrawnBy ?? "—"}
-                    </span>
-                  ) : (
-                    <span className="w-28 shrink-0 flex justify-end">
-                      <WithdrawStockMovementButton movementId={m.id} />
-                    </span>
-                  )}
-                </div>
-              ))}
+          ) : (
+            // Grid horizontal puro, mesmo padrão de tecnico/page.tsx --
+            // cada dado na sua própria coluna, texto corrido truncado
+            // numa linha só (com title=... pro texto completo aparecer
+            // no hover), sem empilhar produto/cliente/observação um
+            // embaixo do outro dentro da mesma célula.
+            <div className="rounded-lg border overflow-hidden overflow-x-auto" style={{ borderColor: "var(--border)" }}>
+              <table className="w-full border-collapse text-xs" style={{ minWidth: "760px", tableLayout: "fixed" }}>
+                <colgroup>
+                  <col />
+                  <col style={{ width: "260px" }} />
+                  <col style={{ width: "260px" }} />
+                  <col style={{ width: "100px" }} />
+                  <col style={{ width: showHistorico ? "120px" : "140px" }} />
+                </colgroup>
+                <thead>
+                  <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--gridline)" }}>
+                    {["Produto", "Cliente / Volume", "Observação", showHistorico ? "Retirado em" : "Lançado em", showHistorico ? "Por" : ""].map((h) => (
+                      <th
+                        key={h}
+                        className="px-3 py-2 text-left font-semibold uppercase tracking-wide whitespace-nowrap"
+                        style={{ color: "var(--text-muted)", fontSize: "10.5px" }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {movements.map((m, index) => {
+                    const productLabel = m.code ? `${m.product} · ${m.code}` : m.product;
+                    const clienteVolume = clienteVolumeLine(m);
+                    return (
+                      <tr
+                        key={m.id}
+                        style={{
+                          background: index % 2 === 1 ? "var(--surface-2)" : "var(--surface-1)",
+                          borderBottom: "1px solid var(--gridline)",
+                        }}
+                      >
+                        <td className="px-3 py-2 align-top">
+                          <span className="block truncate font-medium" style={{ color: "var(--text-primary)" }} title={productLabel}>
+                            {productLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <span className="block truncate" style={{ color: "var(--text-secondary)" }} title={clienteVolume}>
+                            {clienteVolume}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <span className="block truncate" style={{ color: "var(--text-muted)" }} title={m.notes ?? ""}>
+                            {m.notes ?? "—"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 align-top whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                          {formatDateOnly(showHistorico ? m.movementDate : m.loggedDate)}
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          {showHistorico ? (
+                            <span className="block truncate" style={{ color: "var(--text-muted)" }}>
+                              {m.withdrawnBy ?? "—"}
+                            </span>
+                          ) : (
+                            <WithdrawStockMovementButton movementId={m.id} />
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </ToastProvider>
   );
