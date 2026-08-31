@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTecnicoSession, tecnicoSignOut } from "@/app/assistencia/tecnico-actions";
@@ -10,7 +11,6 @@ import {
 } from "@/lib/tecnicos";
 import { listStores } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
-import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
@@ -53,10 +53,31 @@ function origemLabel(type: TecnicoRequestView["type"]): "SAC" | "Assistência" {
 // destino de verdade.
 type Phase = "pendentes" | "observacao" | "classificados";
 
+const PHASES: { value: Phase; label: string }[] = [
+  { value: "pendentes", label: "Pendentes" },
+  { value: "observacao", label: "Em observação" },
+  { value: "classificados", label: "Já classificados" },
+];
+
 function itemPhase(destino: ItemDestino | null): Phase {
   if (destino === null) return "pendentes";
   if (destino === ITEM_DESTINO_NEEDS_NOTE) return "observacao";
   return "classificados";
+}
+
+// Quantos CHAMADOS (não itens) têm pelo menos 1 item numa fase -- mesma
+// regra de "pelo menos um item" usada pra decidir em quais abas um
+// chamado aparece (ver o filtro de `requests` mais abaixo). Contador das
+// abas -- pedido do Victor 31/08/2026: "contadores numéricos limpos ao
+// lado de cada nome". Calculado sobre a lista já filtrada por loja (mas
+// não pela busca de texto, que é um filtro mais pontual) pra não ficar
+// mostrando "Pendentes (12)" quando a loja escolhida só tem 3.
+function countByPhase(requests: TecnicoRequestView[]): Record<Phase, number> {
+  return {
+    pendentes: requests.filter((r) => r.items.some((i) => itemPhase(i.destino) === "pendentes")).length,
+    observacao: requests.filter((r) => r.items.some((i) => itemPhase(i.destino) === "observacao")).length,
+    classificados: requests.filter((r) => r.items.some((i) => itemPhase(i.destino) === "classificados")).length,
+  };
 }
 
 function buildHref(params: { view?: string; q?: string; store?: string }) {
@@ -78,6 +99,17 @@ type DateGroup = { dateKey: string; label: string; requests: TecnicoRequestView[
 // chamado tem 1 item só (118 de 139 concluídos em 31/08/2026), então o
 // rowSpan raramente entra em ação, mas evita repetir cliente/loja/chamado
 // nos poucos casos de troca com 2+ produtos.
+//
+// Achado do Victor 31/08/2026, rodada 3: pediu pra juntar os produtos de
+// um mesmo chamado numa linha só, corrida ("Mesa..., Cadeira... / Box...").
+// Isso quebraria a regra de negócio -- destino é escolhido POR ITEM (uma
+// troca pode ter um produto "voltar pro estoque" e outro "sem condições"
+// ao mesmo tempo), então um seletor só por linha não serve pra chamados
+// com mais de 1 item. Mantido 1 linha por item (única forma de garantir
+// 1 seletor de destino por item), mas a MESMA altura fixa em toda linha
+// -- ver "truncate" na coluna Produto abaixo, que resolve o problema real
+// (linha 3x mais alta que as outras por causa de descrição de produto
+// comprida) sem tocar na regra de negócio.
 type GridRow = {
   request: TecnicoRequestView;
   item: TecnicoItem;
@@ -95,6 +127,10 @@ function flattenForGrid(requests: TecnicoRequestView[], phase: Phase): GridRow[]
     });
   });
   return rows;
+}
+
+function productLine(item: TecnicoItem): string {
+  return `${item.quantity > 1 ? `${item.quantity}x ` : ""}${item.product}${item.partCode ? ` · ${item.partCode}` : ""}`;
 }
 
 // Organiza por dia de conclusão (o mesmo timestamp já usado pra ordenar a
@@ -133,19 +169,16 @@ export default async function TecnicoHomePage({
   const phase: Phase = view === "observacao" ? "observacao" : view === "classificados" ? "classificados" : "pendentes";
 
   const [todos, stores] = await Promise.all([listRequestsForTecnico(), listStores()]);
+  const byStore = store ? todos.filter((r) => r.storeId === store) : todos;
+  const tabCounts = countByPhase(byStore);
+
   // Um chamado pode ter item pendente E item já classificado ao mesmo tempo
   // (troca com 2 produtos, cada um resolvido em momento diferente) -- por
   // isso o filtro é "tem pelo menos um item nessa fase", não "todos os
   // itens", e a mesma solicitação pode aparecer em mais de uma aba.
-  let requests = todos.filter((r) => r.items.some((i) => itemPhase(i.destino) === phase));
-  // Filtro por nome/loja/produto -- pedido do Victor 24/08/2026: "coloque
-  // uma possibilidade de filtro por nome, loja, produto". Loja é um
-  // <select> à parte (ver FilterSelect abaixo); nome do cliente e produto
-  // dividem a mesma busca de texto, mesmo padrão de fila/page.tsx
-  // ("Buscar por nº do chamado, cliente, produto...").
-  if (store) {
-    requests = requests.filter((r) => r.storeId === store);
-  }
+  let requests = byStore.filter((r) => r.items.some((i) => itemPhase(i.destino) === phase));
+  // Busca por nome/produto -- pedido do Victor 24/08/2026: "coloque uma
+  // possibilidade de filtro por nome, loja, produto".
   if (q) {
     const needle = q.trim().toLowerCase();
     requests = requests.filter(
@@ -156,233 +189,264 @@ export default async function TecnicoHomePage({
 
   return (
     <ToastProvider>
-      {/* max-w-5xl (não mais max-w-3xl) -- a tabela densa pedida pelo
-          Victor 31/08/2026 ("transforme o layout... numa tabela de dados
-          de alta densidade e excelente aproveitamento horizontal") precisa
-          de mais largura que os cards antigos. Mesmo teto do layout de
-          (app)/relatorios, não um valor novo inventado só pra essa tela. */}
-      <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-        <RealtimeQueueRefresher />
-        <AssistenciaHeader title={`Olá, ${tecnicoName}`} subtitle="Chamados que voltaram com o motorista, com produto pra dar destino.">
-          <div className="flex items-center gap-4">
-            {/* Pedido do Victor 28/08/2026: "preciso que a equipe
-                tecnica tambem tenha acesso" à tela de estoque (dar
-                baixa em retirada registrada pela assistência). */}
-            <Link href="/assistencia/tecnico/estoque" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-              Estoque
-            </Link>
-            <Link href="/assistencia" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-              ← Voltar
-            </Link>
-            <form action={tecnicoSignOut}>
-              <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-                Sair
+      <RealtimeQueueRefresher />
+
+      {/* Largura total -- pedido do Victor 31/08/2026: "o container
+          principal do sistema e a barra superior verde devem ocupar
+          100% da largura da tela". Sem max-w/mx-auto nenhum -- só
+          padding interno (px-6), que não é limitação de largura, é
+          respiro em relação à borda da janela. */}
+      <div className="w-full flex flex-col min-w-0">
+        {/* Barra de marca -- verde institucional, cheia, só nesta tela
+            (não é o AssistenciaHeader compartilhado com o resto do
+            sistema de assistência -- trocar aquele componente mudaria
+            TODAS as outras telas, não só esta). */}
+        <div className="w-full" style={{ background: "var(--brand-green)" }}>
+          <div className="flex items-center justify-between gap-4 px-6 py-3 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <Image
+                src="/logo.png"
+                alt="Lojas Maia"
+                width={72}
+                height={72}
+                className="h-9 w-9 object-contain rounded-full shrink-0"
+                style={{ background: "rgba(255,255,255,0.9)" }}
+              />
+              <div className="leading-tight min-w-0">
+                <h1 className="font-bold text-lg text-white truncate">Fila de Classificação</h1>
+                <p className="text-xs truncate" style={{ color: "rgba(255,255,255,0.78)" }}>
+                  Olá, {tecnicoName} — chamados que voltaram com o motorista, com produto pra dar destino.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-sm shrink-0">
+              {/* Pedido do Victor 28/08/2026: "preciso que a equipe
+                  tecnica tambem tenha acesso" à tela de estoque (dar
+                  baixa em retirada registrada pela assistência). */}
+              <Link href="/assistencia/tecnico/estoque" className="underline" style={{ color: "rgba(255,255,255,0.9)" }}>
+                Estoque
+              </Link>
+              <Link href="/assistencia" className="underline" style={{ color: "rgba(255,255,255,0.9)" }}>
+                ← Voltar
+              </Link>
+              <form action={tecnicoSignOut}>
+                <button type="submit" className="underline" style={{ color: "rgba(255,255,255,0.9)" }}>
+                  Sair
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 px-6 pt-4 pb-6">
+          {/* Barra de busca + filtro de loja -- ampla, integrada logo
+              acima da tabela (pedido do Victor 31/08/2026). */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+            <form action="/assistencia/tecnico" method="GET" className="flex items-center gap-2 flex-1 min-w-[280px]">
+              {phase !== "pendentes" ? <input type="hidden" name="view" value={phase} /> : null}
+              {store ? <input type="hidden" name="store" value={store} /> : null}
+              <input
+                type="search"
+                name="q"
+                defaultValue={q ?? ""}
+                placeholder="Buscar por cliente ou produto…"
+                className="rounded border px-3 py-2 text-sm flex-1"
+                style={{ borderColor: "var(--border)" }}
+              />
+              <button type="submit" className="text-sm px-3 py-2 rounded border shrink-0" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+                Buscar
               </button>
+              {q || store ? (
+                <Link href={buildHref({ view: phase === "pendentes" ? undefined : phase })} className="text-xs underline shrink-0" style={{ color: "var(--text-secondary)" }}>
+                  Limpar
+                </Link>
+              ) : null}
             </form>
           </div>
-        </AssistenciaHeader>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {(
-            [
-              ["pendentes", "Pendentes"],
-              ["observacao", "Em observação"],
-              ["classificados", "Já classificados"],
-            ] as const
-          ).map(([value, label]) => (
-            <Link
-              key={value}
-              href={buildHref({ view: value === "pendentes" ? undefined : value, q, store })}
-              className="text-xs px-3 py-1.5 rounded-full border"
-              style={{
-                borderColor: "var(--border)",
-                background: phase === value ? "var(--surface-1)" : "transparent",
-                color: phase === value ? "var(--text-primary)" : "var(--text-secondary)",
-                fontWeight: phase === value ? 600 : 400,
-              }}
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
-
-        {/* Filtro por nome/loja/produto -- pedido do Victor 24/08/2026. */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
-        </div>
-
-        <form action="/assistencia/tecnico" method="GET" className="flex items-center gap-2 flex-wrap">
-          {phase !== "pendentes" ? <input type="hidden" name="view" value={phase} /> : null}
-          {store ? <input type="hidden" name="store" value={store} /> : null}
-          <input
-            type="search"
-            name="q"
-            defaultValue={q ?? ""}
-            placeholder="Buscar por cliente ou produto…"
-            className="rounded border px-3 py-2 text-sm flex-1 min-w-[200px]"
-            style={{ borderColor: "var(--border)" }}
-          />
-          <button type="submit" className="text-sm px-3 py-2 rounded border" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
-            Buscar
-          </button>
-          {q || store ? (
-            <Link href={buildHref({ view: phase === "pendentes" ? undefined : phase })} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
-              Limpar
-            </Link>
-          ) : null}
-        </form>
-
-        {requests.length === 0 ? (
-          <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              {phase === "classificados"
-                ? "Nenhum item classificado ainda."
-                : phase === "observacao"
-                  ? "Nenhum item em observação no momento."
-                  : "Nenhum item pendente no momento."}
-            </p>
+          {/* Abas -- imediatamente acima da tabela, alinhadas à
+              esquerda, contador ao lado de cada nome (pedido do Victor
+              31/08/2026). */}
+          <div className="flex items-center gap-1">
+            {PHASES.map(({ value, label }) => (
+              <Link
+                key={value}
+                href={buildHref({ view: value === "pendentes" ? undefined : value, q, store })}
+                className="text-sm px-3 py-1.5 rounded-t-md border-b-2 flex items-center gap-1.5"
+                style={{
+                  borderColor: phase === value ? "var(--brand-green)" : "transparent",
+                  color: phase === value ? "var(--text-primary)" : "var(--text-secondary)",
+                  fontWeight: phase === value ? 600 : 400,
+                }}
+              >
+                {label}
+                <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                  ({tabCounts[value]})
+                </span>
+              </Link>
+            ))}
           </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {groups.map((group) => {
-              const gridRows = flattenForGrid(group.requests, phase);
-              return (
-                // Recolhido por padrão -- achado do Victor 24/08/2026: "toda
-                // vez que eu entrar em qualquer tela, as demandas agrupadas
-                // precisam aparecer recolhidas".
-                <details key={group.dateKey} className="group flex flex-col gap-2">
-                  <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                    <span
-                      className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
-                      style={{ color: "var(--text-muted)" }}
-                      aria-hidden="true"
-                    >
-                      ▶
-                    </span>
-                    <h3 className="text-sm font-bold capitalize" style={{ color: "var(--text-primary)" }}>
-                      {group.label}
-                    </h3>
-                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      ({group.requests.length})
-                    </span>
-                  </summary>
 
-                  {/* Refeito do zero a pedido do Victor 31/08/2026 --
-                      "houve um erro de interpretação... você manteve as
-                      informações agrupadas como blocos verticais dentro
-                      das células, criando um visual poluído... estilo
-                      card espremido". Regra rígida: cada dado na sua
-                      própria coluna, texto corrido, sem badge/pílula,
-                      sem caixa/cartão interno nenhum -- a linha é uma
-                      faixa horizontal contínua, igual a uma planilha.
-                      Concluído/Motorista saíram da coluna 1 (não fazem
-                      parte das 6 colunas pedidas; continuam disponíveis
-                      em "Ver notificação completa"). overflow-x-auto --
-                      a tabela nunca deve empurrar a página inteira pro
-                      lado, só rolar por dentro do próprio cartão em
-                      telas mais estreitas. */}
-                  <div className="rounded-lg border overflow-hidden overflow-x-auto" style={{ borderColor: "var(--border)" }}>
-                    <table className="w-full border-collapse text-xs" style={{ minWidth: "880px" }}>
-                      <thead>
-                        <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--gridline)" }}>
-                          {["ID / Tipo", "Setor", "Loja", "Cliente", "Produto", "Destino"].map((h) => (
-                            <th
-                              key={h}
-                              className={`px-3 py-2 font-semibold uppercase tracking-wide whitespace-nowrap ${h === "Setor" ? "text-center" : "text-left"}`}
-                              style={{ color: "var(--text-muted)", fontSize: "10.5px" }}
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {gridRows.map(({ request: r, item: i, isFirst, itemCount, requestIndex }) => (
-                          <tr
-                            key={i.id}
-                            style={{
-                              background: requestIndex % 2 === 1 ? "var(--surface-2)" : "var(--surface-1)",
-                              borderBottom: "1px solid var(--gridline)",
-                            }}
-                          >
-                            {/* Coluna 1: ID / Tipo */}
-                            {isFirst ? (
-                              <td className="px-3 py-2 align-top whitespace-nowrap" rowSpan={itemCount}>
-                                <div className="font-mono" style={{ color: "var(--text-muted)" }}>
-                                  #{r.ticketNumber}
-                                </div>
-                                <div className="font-bold" style={{ color: "var(--text-primary)" }}>
-                                  {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                                </div>
-                              </td>
-                            ) : null}
+          {requests.length === 0 ? (
+            <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                {phase === "classificados"
+                  ? "Nenhum item classificado ainda."
+                  : phase === "observacao"
+                    ? "Nenhum item em observação no momento."
+                    : "Nenhum item pendente no momento."}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {groups.map((group) => {
+                const gridRows = flattenForGrid(group.requests, phase);
+                return (
+                  // Recolhido por padrão -- achado do Victor 24/08/2026: "toda
+                  // vez que eu entrar em qualquer tela, as demandas agrupadas
+                  // precisam aparecer recolhidas".
+                  <details key={group.dateKey} className="group flex flex-col gap-2">
+                    <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                      <span
+                        className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
+                        style={{ color: "var(--text-muted)" }}
+                        aria-hidden="true"
+                      >
+                        ▶
+                      </span>
+                      <h3 className="text-sm font-bold capitalize" style={{ color: "var(--text-primary)" }}>
+                        {group.label}
+                      </h3>
+                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        ({group.requests.length})
+                      </span>
+                    </summary>
 
-                            {/* Coluna 2: Setor -- texto simples centralizado, sem pílula */}
-                            {isFirst ? (
-                              <td className="px-3 py-2 align-top text-center whitespace-nowrap" rowSpan={itemCount}>
-                                <span
-                                  className="font-semibold"
-                                  style={{ color: origemLabel(r.type) === "SAC" ? "var(--brand-orange)" : "var(--brand-green)" }}
-                                >
-                                  {origemLabel(r.type)}
-                                </span>
-                              </td>
-                            ) : null}
-
-                            {/* Coluna 3: Loja -- ícone sutil + nome */}
-                            {isFirst ? (
-                              <td className="px-3 py-2 align-top whitespace-nowrap" rowSpan={itemCount}>
-                                <span className="inline-flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
-                                  <StoreIconSmall />
-                                  {r.storeName}
-                                </span>
-                              </td>
-                            ) : null}
-
-                            {/* Coluna 4: Cliente */}
-                            {isFirst ? (
-                              <td className="px-3 py-2 align-top max-w-[200px]" rowSpan={itemCount}>
-                                <div className="font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-                                  {r.clientName ?? "—"}
-                                </div>
-                                {r.clientCpf || r.clientPhone ? (
-                                  <div className="font-mono" style={{ color: "var(--text-muted)" }}>
-                                    {r.clientCpf ?? r.clientPhone}
-                                  </div>
-                                ) : null}
-                                <TecnicoNotificationModalButton request={r} />
-                              </td>
-                            ) : null}
-
-                            {/* Coluna 5: Produto -- texto corrido numa linha só */}
-                            <td className="px-3 py-2 align-top min-w-[200px]" style={{ color: "var(--text-primary)" }}>
-                              {i.quantity > 1 ? `${i.quantity}x ` : ""}
-                              {i.product}
-                              {i.partCode ? <span style={{ color: "var(--text-muted)" }}> · {i.partCode}</span> : null}
-                            </td>
-
-                            {/* Coluna 6: Destino */}
-                            <td className="px-3 py-2 align-top">
-                              <TecnicoItemDestino
-                                itemId={i.id}
-                                destino={i.destino}
-                                destinoDefinidoPor={i.destinoDefinidoPor}
-                                destinoDefinidoEm={i.destinoDefinidoEm}
-                                destinoLojaName={i.destinoLojaName}
-                                destinoObservacao={i.destinoObservacao}
-                                stores={stores}
-                              />
-                            </td>
+                    {/* Grid horizontal puro -- pedido do Victor 31/08/2026:
+                        "elimine qualquer empilhamento de blocos de texto
+                        dentro das células" e "fixe uma altura máxima
+                        padrão para as linhas". Toda coluna de texto corrido
+                        (Produto, Loja, Cliente) trunca numa linha só com
+                        "…" e título nativo (tooltip) com o texto completo
+                        -- é isso que garante altura uniforme, não um
+                        max-height (que não é confiável em <tr>/<td>).
+                        overflow-x-auto -- a tabela nunca deve empurrar a
+                        página inteira pro lado, só rolar por dentro do
+                        próprio cartão em telas mais estreitas. */}
+                    <div className="rounded-lg border overflow-hidden overflow-x-auto" style={{ borderColor: "var(--border)" }}>
+                      <table className="w-full border-collapse text-xs" style={{ minWidth: "880px", tableLayout: "fixed" }}>
+                        <colgroup>
+                          <col style={{ width: "140px" }} />
+                          <col style={{ width: "90px" }} />
+                          <col style={{ width: "150px" }} />
+                          <col style={{ width: "190px" }} />
+                          <col />
+                          <col style={{ width: "230px" }} />
+                        </colgroup>
+                        <thead>
+                          <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--gridline)" }}>
+                            {["ID / Tipo", "Setor", "Loja", "Cliente", "Produto", "Destino"].map((h) => (
+                              <th
+                                key={h}
+                                className={`px-3 py-2 font-semibold uppercase tracking-wide whitespace-nowrap ${h === "Setor" ? "text-center" : "text-left"}`}
+                                style={{ color: "var(--text-muted)", fontSize: "10.5px" }}
+                              >
+                                {h}
+                              </th>
+                            ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
-              );
-            })}
-          </div>
-        )}
+                        </thead>
+                        <tbody>
+                          {gridRows.map(({ request: r, item: i, isFirst, itemCount, requestIndex }) => (
+                            <tr
+                              key={i.id}
+                              style={{
+                                background: requestIndex % 2 === 1 ? "var(--surface-2)" : "var(--surface-1)",
+                                borderBottom: "1px solid var(--gridline)",
+                              }}
+                            >
+                              {/* Coluna 1: ID / Tipo */}
+                              {isFirst ? (
+                                <td className="px-3 py-2 align-top whitespace-nowrap" rowSpan={itemCount}>
+                                  <div className="font-mono" style={{ color: "var(--text-muted)" }}>
+                                    #{r.ticketNumber}
+                                  </div>
+                                  <div className="font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                                    {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+                                  </div>
+                                </td>
+                              ) : null}
+
+                              {/* Coluna 2: Setor -- texto simples centralizado, sem pílula */}
+                              {isFirst ? (
+                                <td className="px-3 py-2 align-top text-center whitespace-nowrap" rowSpan={itemCount}>
+                                  <span
+                                    className="font-semibold"
+                                    style={{ color: origemLabel(r.type) === "SAC" ? "var(--brand-orange)" : "var(--brand-green)" }}
+                                  >
+                                    {origemLabel(r.type)}
+                                  </span>
+                                </td>
+                              ) : null}
+
+                              {/* Coluna 3: Loja -- ícone sutil + nome */}
+                              {isFirst ? (
+                                <td className="px-3 py-2 align-top" rowSpan={itemCount}>
+                                  <span className="flex items-center gap-1.5 truncate" style={{ color: "var(--text-secondary)" }} title={r.storeName}>
+                                    <StoreIconSmall />
+                                    <span className="truncate">{r.storeName}</span>
+                                  </span>
+                                </td>
+                              ) : null}
+
+                              {/* Coluna 4: Cliente */}
+                              {isFirst ? (
+                                <td className="px-3 py-2 align-top" rowSpan={itemCount}>
+                                  <div className="font-semibold truncate" style={{ color: "var(--text-primary)" }} title={r.clientName ?? "—"}>
+                                    {r.clientName ?? "—"}
+                                  </div>
+                                  {r.clientCpf || r.clientPhone ? (
+                                    <div className="font-mono truncate" style={{ color: "var(--text-muted)" }}>
+                                      {r.clientCpf ?? r.clientPhone}
+                                    </div>
+                                  ) : null}
+                                  <TecnicoNotificationModalButton request={r} />
+                                </td>
+                              ) : null}
+
+                              {/* Coluna 5: Produto -- texto corrido, uma linha só, trava a altura da linha */}
+                              <td className="px-3 py-2 align-top">
+                                <span className="block truncate" style={{ color: "var(--text-primary)" }} title={productLine(i)}>
+                                  {i.quantity > 1 ? `${i.quantity}x ` : ""}
+                                  {i.product}
+                                  {i.partCode ? <span style={{ color: "var(--text-muted)" }}> · {i.partCode}</span> : null}
+                                </span>
+                              </td>
+
+                              {/* Coluna 6: Destino -- isolada, minimalista */}
+                              <td className="px-3 py-2 align-top">
+                                <TecnicoItemDestino
+                                  itemId={i.id}
+                                  destino={i.destino}
+                                  destinoDefinidoPor={i.destinoDefinidoPor}
+                                  destinoDefinidoEm={i.destinoDefinidoEm}
+                                  destinoLojaName={i.destinoLojaName}
+                                  destinoObservacao={i.destinoObservacao}
+                                  stores={stores}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </ToastProvider>
   );
