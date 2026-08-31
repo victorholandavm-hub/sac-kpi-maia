@@ -9,6 +9,7 @@ import { recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import { notifyLoja, notifyAssistencia } from "@/lib/notifications";
+import { MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import {
   MONTADOR_COOKIE_NAME,
   MONTADOR_SESSION_MAX_AGE,
@@ -134,6 +135,13 @@ export async function montadorDeletePhoto(photoId: string): Promise<void> {
 // de peça, envio de peça, recolhimento) continuam indo direto pra
 // concluída, sem essa fase nem exigência de foto -- não fazem parte do
 // pedido.
+//
+// Manoel (MANOEL_ONLY_ASSEMBLER) fica de fora dessa mudança inteira --
+// pedido do Victor 31/08/2026: "aquelas mudanças não devem servir para
+// manoel, apenas para os terceirizados". Ele é da equipe interna, não
+// terceirizado pago por peça (mesma distinção já usada em payments.ts/
+// relatorios/page.tsx) -- continua concluindo direto, sem foto por item
+// nem aprovação da loja, exatamente como era antes desse pedido.
 export async function montadorCompleteRequest(requestId: string): Promise<void> {
   const assemblerName = await getMontadorSession();
   if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
@@ -151,7 +159,8 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
     throw new Error("Esse chamado já foi encerrado.");
   }
 
-  const needsApproval = request.type === "montagem" || request.type === "desmontagem";
+  const needsApproval =
+    (request.type === "montagem" || request.type === "desmontagem") && assemblerName !== MANOEL_ONLY_ASSEMBLER;
 
   const { data: items, error: itemsError } = await admin.from("service_request_items").select("id").eq("request_id", requestId);
   if (itemsError) throw new Error(itemsError.message);
@@ -305,8 +314,9 @@ export async function montadorCompletePartially(requestId: string, completedItem
   }
 
   // Foto obrigatória por item também aqui -- pedido do Victor 31/08/2026,
-  // mesmo recorte de montadorCompleteRequest (só montagem/desmontagem).
-  if (request.type === "montagem" || request.type === "desmontagem") {
+  // mesmo recorte de montadorCompleteRequest (só montagem/desmontagem,
+  // e não pro Manoel).
+  if ((request.type === "montagem" || request.type === "desmontagem") && assemblerName !== MANOEL_ONLY_ASSEMBLER) {
     if (!(await hasPhotoForEveryCompletedItem(completedItemIds))) {
       throw new Error("Envie uma foto de cada item marcado como feito antes de continuar.");
     }
