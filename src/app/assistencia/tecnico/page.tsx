@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTecnicoSession, tecnicoSignOut } from "@/app/assistencia/tecnico-actions";
-import { listRequestsForTecnico, ITEM_DESTINO_NEEDS_NOTE, type TecnicoRequestView, type ItemDestino } from "@/lib/tecnicos";
+import {
+  listRequestsForTecnico,
+  ITEM_DESTINO_NEEDS_NOTE,
+  type TecnicoRequestView,
+  type TecnicoItem,
+  type ItemDestino,
+} from "@/lib/tecnicos";
 import { listStores } from "@/lib/serviceRequests";
 import { REQUEST_TYPE_LABELS, SAC_MANAGED_TYPES } from "@/lib/assistenciaLabels";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
@@ -59,6 +65,33 @@ function buildHref(params: { view?: string; q?: string; store?: string }) {
 }
 
 type DateGroup = { dateKey: string; label: string; requests: TecnicoRequestView[] };
+
+// Uma linha da grade = um ITEM (destino é por item, não por chamado -- ver
+// tecnicos.ts). `isFirst`/`itemCount` dizem pra tabela quando repetir as
+// colunas do chamado (Chamado/Origem/Loja/Cliente) com rowSpan em vez de
+// duplicá-las em cada linha -- pedido do Victor 31/08/2026: "transforme o
+// layout... numa tabela de dados de alta densidade". Na prática quase todo
+// chamado tem 1 item só (118 de 139 concluídos em 31/08/2026), então o
+// rowSpan raramente entra em ação, mas evita repetir cliente/loja/chamado
+// nos poucos casos de troca com 2+ produtos.
+type GridRow = {
+  request: TecnicoRequestView;
+  item: TecnicoItem;
+  isFirst: boolean;
+  itemCount: number;
+  requestIndex: number;
+};
+
+function flattenForGrid(requests: TecnicoRequestView[], phase: Phase): GridRow[] {
+  const rows: GridRow[] = [];
+  requests.forEach((request, requestIndex) => {
+    const items = request.items.filter((i) => itemPhase(i.destino) === phase);
+    items.forEach((item, i) => {
+      rows.push({ request, item, isFirst: i === 0, itemCount: items.length, requestIndex });
+    });
+  });
+  return rows;
+}
 
 // Organiza por dia de conclusão (o mesmo timestamp já usado pra ordenar a
 // lista) -- pedido do Victor 20/08/2026: "a tela da equipe tecnica precisa
@@ -119,7 +152,12 @@ export default async function TecnicoHomePage({
 
   return (
     <ToastProvider>
-      <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+      {/* max-w-5xl (não mais max-w-3xl) -- a tabela densa pedida pelo
+          Victor 31/08/2026 ("transforme o layout... numa tabela de dados
+          de alta densidade e excelente aproveitamento horizontal") precisa
+          de mais largura que os cards antigos. Mesmo teto do layout de
+          (app)/relatorios, não um valor novo inventado só pra essa tela. */}
+      <div className="max-w-5xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
         <RealtimeQueueRefresher />
         <AssistenciaHeader title={`Olá, ${tecnicoName}`} subtitle="Chamados que voltaram com o motorista, com produto pra dar destino.">
           <div className="flex items-center gap-4">
@@ -202,77 +240,116 @@ export default async function TecnicoHomePage({
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {groups.map((group) => (
-              // Recolhido por padrão -- achado do Victor 24/08/2026: "toda
-              // vez que eu entrar em qualquer tela, as demandas agrupadas
-              // precisam aparecer recolhidas".
-              <details key={group.dateKey} className="group flex flex-col gap-2">
-                <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                  <span
-                    className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
-                    style={{ color: "var(--text-muted)" }}
-                    aria-hidden="true"
-                  >
-                    ▶
-                  </span>
-                  <h3 className="text-sm font-bold capitalize" style={{ color: "var(--text-primary)" }}>
-                    {group.label}
-                  </h3>
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    ({group.requests.length})
-                  </span>
-                </summary>
-                <div className="flex flex-col gap-3">
-                  {group.requests.map((r: TecnicoRequestView) => (
-                    <div key={r.id} className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-                      <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-2.5" style={{ borderBottom: "1px solid var(--gridline)" }}>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                            #{r.ticketNumber}
-                          </span>
-                          <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-                            {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                          </span>
-                          <span
-                            className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-                            style={
-                              origemLabel(r.type) === "SAC"
-                                ? { color: "var(--brand-orange)", background: "color-mix(in srgb, var(--brand-orange) 15%, transparent)" }
-                                : { color: "var(--brand-green)", background: "color-mix(in srgb, var(--brand-green) 15%, transparent)" }
-                            }
+            {groups.map((group) => {
+              const gridRows = flattenForGrid(group.requests, phase);
+              return (
+                // Recolhido por padrão -- achado do Victor 24/08/2026: "toda
+                // vez que eu entrar em qualquer tela, as demandas agrupadas
+                // precisam aparecer recolhidas".
+                <details key={group.dateKey} className="group flex flex-col gap-2">
+                  <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                    <span
+                      className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
+                      style={{ color: "var(--text-muted)" }}
+                      aria-hidden="true"
+                    >
+                      ▶
+                    </span>
+                    <h3 className="text-sm font-bold capitalize" style={{ color: "var(--text-primary)" }}>
+                      {group.label}
+                    </h3>
+                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      ({group.requests.length})
+                    </span>
+                  </summary>
+
+                  {/* overflow-x-auto -- a tabela nunca deve empurrar a
+                      página inteira pro lado, só rolar por dentro do
+                      próprio cartão em telas mais estreitas. */}
+                  <div className="rounded-lg border overflow-hidden overflow-x-auto" style={{ borderColor: "var(--border)" }}>
+                    <table className="w-full border-collapse text-xs" style={{ minWidth: "880px" }}>
+                      <thead>
+                        <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--gridline)" }}>
+                          {["Chamado", "Origem", "Loja", "Cliente", "Produto", "Destino"].map((h) => (
+                            <th
+                              key={h}
+                              className="px-3 py-2 text-left font-semibold uppercase tracking-wide whitespace-nowrap"
+                              style={{ color: "var(--text-muted)", fontSize: "10.5px" }}
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gridRows.map(({ request: r, item: i, isFirst, itemCount, requestIndex }) => (
+                          <tr
+                            key={i.id}
+                            style={{
+                              background: requestIndex % 2 === 1 ? "var(--surface-2)" : "var(--surface-1)",
+                              borderBottom: "1px solid var(--gridline)",
+                            }}
                           >
-                            {origemLabel(r.type)}
-                          </span>
-                          <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                            {r.storeName}
-                          </span>
-                        </div>
-                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                          Concluído {formatDateTime(r.completedAt)} · {r.driverName ?? "—"}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-2 flex-wrap px-4 pt-2">
-                        <div className="flex flex-col gap-0.5">
-                          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                            Cliente: {r.clientName ?? "—"}
-                            {r.clientCpf ? ` (${r.clientCpf})` : ""}
-                          </p>
-                          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                            Solicitado por: {r.requestedByName ?? "—"}
-                          </p>
-                        </div>
-                        <TecnicoNotificationModalButton request={r} />
-                      </div>
-                      <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
-                        {r.items
-                          .filter((i) => itemPhase(i.destino) === phase)
-                          .map((i) => (
-                            <div key={i.id} className="flex items-center justify-between gap-3 flex-wrap px-4 py-3">
-                              <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+                            {isFirst ? (
+                              <td className="px-3 py-2.5 align-top whitespace-nowrap" rowSpan={itemCount}>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono" style={{ color: "var(--text-muted)" }}>
+                                    #{r.ticketNumber}
+                                  </span>
+                                  <span className="font-bold" style={{ color: "var(--text-primary)" }}>
+                                    {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+                                  </span>
+                                </div>
+                                <div style={{ color: "var(--text-muted)" }}>
+                                  Concluído {formatDateTime(r.completedAt)} · {r.driverName ?? "—"}
+                                </div>
+                              </td>
+                            ) : null}
+
+                            {isFirst ? (
+                              <td className="px-3 py-2.5 align-top whitespace-nowrap" rowSpan={itemCount}>
+                                <span
+                                  className="font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                                  style={
+                                    origemLabel(r.type) === "SAC"
+                                      ? { color: "var(--brand-orange)", background: "var(--brand-orange-soft)" }
+                                      : { color: "var(--brand-green)", background: "var(--brand-green-soft)" }
+                                  }
+                                >
+                                  {origemLabel(r.type)}
+                                </span>
+                              </td>
+                            ) : null}
+
+                            {isFirst ? (
+                              <td className="px-3 py-2.5 align-top whitespace-nowrap" style={{ color: "var(--text-secondary)" }} rowSpan={itemCount}>
+                                {r.storeName}
+                              </td>
+                            ) : null}
+
+                            {isFirst ? (
+                              <td className="px-3 py-2.5 align-top max-w-[200px]" rowSpan={itemCount}>
+                                <div className="font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+                                  {r.clientName ?? "—"}
+                                </div>
+                                {r.clientCpf || r.clientPhone ? (
+                                  <div className="font-mono" style={{ color: "var(--text-muted)" }}>
+                                    {r.clientCpf ?? r.clientPhone}
+                                  </div>
+                                ) : null}
+                                <TecnicoNotificationModalButton request={r} />
+                              </td>
+                            ) : null}
+
+                            <td className="px-3 py-2.5 align-top min-w-[200px]">
+                              <span style={{ color: "var(--text-primary)" }}>
                                 {i.quantity > 1 ? `${i.quantity}x ` : ""}
                                 {i.product}
-                                {i.partCode ? <span style={{ color: "var(--text-muted)" }}> · {i.partCode}</span> : null}
                               </span>
+                              {i.partCode ? <div style={{ color: "var(--text-muted)" }}>{i.partCode}</div> : null}
+                            </td>
+
+                            <td className="px-3 py-2.5 align-top">
                               <TecnicoItemDestino
                                 itemId={i.id}
                                 destino={i.destino}
@@ -282,14 +359,15 @@ export default async function TecnicoHomePage({
                                 destinoObservacao={i.destinoObservacao}
                                 stores={stores}
                               />
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </details>
-            ))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              );
+            })}
           </div>
         )}
       </div>
