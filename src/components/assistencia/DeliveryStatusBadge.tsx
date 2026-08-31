@@ -57,6 +57,25 @@ export function DeliveryStatusBadge({
       </span>
     );
   }
+  // Pedido do Victor 31/08/2026: "o motorista ja consegue colocar como nao
+  // consegui concluir, porem, na tela de acompanhamento nao tem nenhum
+  // status de nao concluida" -- driverReportIssue (driver-actions.ts) já
+  // gravava status='remarcar' certinho, só esse badge (pensado só pra
+  // programado/concluído/cancelado, ver comentário no topo do arquivo)
+  // não tinha um caso pra ele -- caía em "Programado"/"Não programado"
+  // pela data agendada, escondendo que o motorista já tentou e não
+  // conseguiu. Cor igual à de STATUS_COLORS.remarcar (StatusBadge.tsx,
+  // resto do sistema), pra não inventar um vermelho novo.
+  if (status === "remarcar") {
+    return (
+      <span
+        className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{ color: "#fff", background: "var(--status-critical)" }}
+      >
+        Não concluída
+      </span>
+    );
+  }
   const scheduled = isDeliveryScheduled(scheduledDate, rota);
   return (
     <span
