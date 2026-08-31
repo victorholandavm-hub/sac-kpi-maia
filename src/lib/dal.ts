@@ -50,6 +50,30 @@ export const getProfile = cache(async (): Promise<Profile> => {
   };
 });
 
+// Mesma consulta de getProfile, sem redirecionar -- pra código que precisa
+// checar "essa ação também vale pra admin/assistência" como fallback opcional
+// dentro de um fluxo cuja sessão principal é outra (ex.: gerente de loja por
+// PIN, ver lojaApproveMontagemConclusion). null quando não há sessão Supabase
+// Auth válida, em vez de mandar pra tela de login de admin/assistência.
+export const getOptionalProfile = cache(async (): Promise<Profile | null> => {
+  const supabase = await getSupabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("profiles").select("id, full_name, role, store_id").eq("id", user.id).single();
+  if (error || !data) return null;
+
+  return {
+    id: data.id,
+    fullName: data.full_name,
+    role: data.role as Role,
+    storeId: data.store_id,
+  };
+});
+
 export function requireRole(profile: Profile, ...roles: Role[]) {
   if (!roles.includes(profile.role)) {
     throw new Error(`Ação não permitida para o papel "${profile.role}".`);

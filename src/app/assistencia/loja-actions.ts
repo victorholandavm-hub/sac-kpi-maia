@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { getOptionalProfile } from "@/lib/dal";
 import { isMostruarioRequest } from "@/lib/serviceRequests";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { notifyAssistencia } from "@/lib/notifications";
@@ -154,8 +155,18 @@ export async function setLojaGerenteRating(requestId: string, deliveryRating: nu
 // "remarcar"), só que reprovado pelo gerente em vez de reportado pelo
 // próprio montador.
 export async function lojaApproveMontagemConclusion(requestId: string, notDoneItemIds: string[], note: string): Promise<void> {
+  // Pedido do Victor 31/08/2026: "alem do gerente de cada loja, a equipe de
+  // assistencia e os admins tambem podem aprovar a montagem". Sessão de
+  // gerente (PIN, por loja) continua valendo; quando não há uma, cai pro
+  // fallback opcional de sessão Supabase Auth (admin/assistência), que não
+  // fica restrito a loja nenhuma -- mesmo acesso irrestrito por loja que
+  // admin/assistência já tem no resto do sistema.
   const gerenteName = await getLojaGerenteSession();
-  if (!gerenteName) throw new Error("Sessão expirada. Faça login de novo.");
+  const profile = gerenteName ? null : await getOptionalProfile();
+  if (!gerenteName && !(profile && (profile.role === "admin" || profile.role === "assistencia"))) {
+    throw new Error("Sessão expirada. Faça login de novo.");
+  }
+  const actorLabel = gerenteName ? `Gerente ${gerenteName}` : `${profile!.fullName} (assistência)`;
 
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
@@ -169,10 +180,13 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
   // Qualquer gerente da loja pode aprovar, não só quem abriu o chamado
   // (mesmo escopo por loja de listOpenRequestsForLoja, ver loja/page.tsx
   // -- diferente de setLojaGerenteRating acima, que é sobre "eu mesmo
-  // pedi essa montagem de mostruário", caso mais estreito).
-  const storeIds = await getGerenteStoreIds(gerenteName);
-  if (!request.store_id || !storeIds.includes(request.store_id)) {
-    throw new Error("Essa solicitação não é da sua loja.");
+  // pedi essa montagem de mostruário", caso mais estreito). Admin/assistência
+  // não passa por essa checagem -- aprova de qualquer loja.
+  if (gerenteName) {
+    const storeIds = await getGerenteStoreIds(gerenteName);
+    if (!request.store_id || !storeIds.includes(request.store_id)) {
+      throw new Error("Essa solicitação não é da sua loja.");
+    }
   }
 
   const trimmedNote = note.trim();
@@ -195,7 +209,7 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
       event_type: "status_changed",
       from_status: "aguardando_aprovacao",
       to_status: "concluida",
-      note: `Gerente ${gerenteName} aprovou a conclusão.${trimmedNote ? ` Observação: ${trimmedNote}` : ""}`,
+      note: `${actorLabel} aprovou a conclusão.${trimmedNote ? ` Observação: ${trimmedNote}` : ""}`,
     });
 
     revalidatePath("/assistencia/loja");
@@ -230,7 +244,7 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
   const pendingLabels = (pendingItems ?? []).map(label);
 
   const eventNote =
-    `Gerente ${gerenteName} não confirmou: ${pendingLabels.join(", ") || "—"}.` + (trimmedNote ? ` Observação: ${trimmedNote}` : "");
+    `${actorLabel} não confirmou: ${pendingLabels.join(", ") || "—"}.` + (trimmedNote ? ` Observação: ${trimmedNote}` : "");
   await admin.from("service_request_events").insert({
     request_id: requestId,
     actor_id: null,
