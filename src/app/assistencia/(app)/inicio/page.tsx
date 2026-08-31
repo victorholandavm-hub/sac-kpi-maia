@@ -70,7 +70,11 @@ export default async function InicioPage() {
         controlado por planilha já é lançado direto aqui.
       </p>
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      {/* sm:grid-cols-2 -- lg:grid-cols-3/xl:grid-cols-4 aproveitam a
+          largura total que o layout ganhou (pedido do Victor 31/08/2026);
+          sem esses breakpoints extras os cards ficariam com espaço vazio
+          enorme dos dois lados numa tela de desktop. */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <Card href="/assistencia/fila" title="Solicitações" description="Montagem, desmontagem, recolhimento, troca de peça, vistoria e notificações.">
           <Stat label="Abertas sem contato" value={requests.openNoContact} tone={requests.openNoContact > 0 ? "var(--status-warning)" : undefined} />
           <Stat label="Aguardando aprovação de prazo" value={requests.pendingDeadline} />
