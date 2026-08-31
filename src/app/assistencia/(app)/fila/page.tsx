@@ -123,6 +123,12 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Abertas", value: "aberta" },
   { label: "Em contato", value: "em_contato" },
   { label: "Em andamento", value: "em_andamento" },
+  // Pedido do Victor 31/08/2026: "nas montagens, alem do gerente de cada
+  // loja, a equipe de assistencia e os admins tambem podem aprovar a
+  // montagem" -- esse filtro é o jeito de achar esses chamados aqui
+  // (mesmo status que a loja já vê na própria aba "Aguardando aprovação",
+  // ver loja/page.tsx).
+  { label: "Aguardando aprovação", value: "aguardando_aprovacao" },
   { label: "Concluídas", value: "concluida" },
   { label: "Canceladas", value: "cancelada" },
 ];

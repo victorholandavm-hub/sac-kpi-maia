@@ -28,6 +28,7 @@ import { EscalationRiskToggle } from "./EscalationRiskToggle";
 import { RealtimeQueueRefresher } from "./RealtimeQueueRefresher";
 import { PhotoGallery } from "./PhotoGallery";
 import { RequestPhotoUpload } from "./RequestPhotoUpload";
+import { LojaApprovalActions } from "./LojaApprovalActions";
 import type { RequestPhoto } from "@/lib/servicePhotos";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { RequestHistoryTimeline } from "./RequestHistoryTimeline";
@@ -350,6 +351,47 @@ export function RequestDetailContent({
               deadlineStatus={request.deadlineStatus}
               approvedDeadline={request.approvedDeadline}
             />
+          ) : null}
+
+          {/* Pedido do Victor 31/08/2026: "alem do gerente de cada loja, a
+              equipe de assistencia e os admins tambem podem aprovar a
+              montagem" -- mesmo componente de item por item + foto que o
+              gerente usa em /assistencia/loja (LojaApprovalCard), só que
+              aqui reaproveitando os itens/fotos que essa tela já carregou
+              (sem outra consulta). lojaApproveMontagemConclusion aceita a
+              sessão de admin/assistência como alternativa à do gerente. */}
+          {canManage && request.status === "aguardando_aprovacao" && (request.type === "montagem" || request.type === "desmontagem") ? (
+            <div
+              className="rounded-lg p-4 flex flex-col gap-3"
+              style={{ background: "var(--surface-1)", border: "2px solid var(--status-warning)" }}
+            >
+              <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                Aprovar conclusão do montador
+              </h3>
+              {request.items.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {request.items.map((item) => {
+                    const itemPhotos = photos.filter((p) => p.itemId === item.id);
+                    return (
+                      <div key={item.id} className="flex flex-col gap-1.5 pb-3" style={{ borderBottom: "1px solid var(--gridline)" }}>
+                        <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                          {item.quantity > 1 ? `${item.quantity}x ` : ""}
+                          {item.product}
+                        </span>
+                        {itemPhotos.length > 0 ? (
+                          <PhotoGallery photos={itemPhotos} />
+                        ) : (
+                          <span className="text-xs font-medium" style={{ color: "var(--status-warning)" }}>
+                            Sem foto enviada
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <LojaApprovalActions requestId={request.id} items={request.items.map((i) => ({ id: i.id, product: i.product, quantity: i.quantity }))} />
+            </div>
           ) : null}
 
           {canManage ? (
