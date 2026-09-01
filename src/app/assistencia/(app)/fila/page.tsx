@@ -22,7 +22,7 @@ import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia"
 import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcut";
 import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
-import { groupIntoMonths, isCurrentMonth } from "@/lib/weekGrouping";
+import { groupIntoMonths, isCurrentMonth, paginateMonths } from "@/lib/weekGrouping";
 import { MonthAccordion } from "@/components/assistencia/MonthAccordion";
 import {
   groupByRota,
@@ -223,8 +223,8 @@ export default async function AssistenciaQueuePage({
   // esses tipos.
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const today = new Date().toISOString().slice(0, 10);
-  const [{ items: rawRequests, total: rawTotal, pageSize }, stores, assemblers, drivers, rotaOverview, todayRequestsFull] = await Promise.all([
-    listRequests({ status: filterStatus, q, page, storeId: store, assemblerName: effectiveAssembler, types, dateFrom, dateTo, excludeOwnAssemblerStoreIds }),
+  const [{ items: rawRequests, total: rawTotal }, stores, assemblers, drivers, rotaOverview, todayRequestsFull] = await Promise.all([
+    listRequests({ status: filterStatus, q, storeId: store, assemblerName: effectiveAssembler, types, dateFrom, dateTo, excludeOwnAssemblerStoreIds, allPages: true }),
     listStores(),
     listAssemblers(),
     showPecas ? listDrivers() : Promise.resolve([]),
@@ -281,6 +281,7 @@ export default async function AssistenciaQueuePage({
   }
   const postFiltered = filterSched !== undefined || filterAlvo !== undefined || filterCity !== undefined || filterUrgente || filterSemRota;
   const total = postFiltered ? requests.length : rawTotal;
+
   // "Sem rota" primeiro, não perdido no meio do feed por data -- ver
   // pinSemRotaFirst.
   const groups = showPecas ? pinSemRotaFirst(groupByRota(requests)) : groupByDate(requests);
@@ -301,7 +302,6 @@ export default async function AssistenciaQueuePage({
   const todayGroups = showPecas ? (q ? groups.filter((g) => g.dateBucket === "hoje") : pinSemRotaFirst(groupByRota(todayRequests))) : [];
   const restGroups = showPecas ? groups.filter((g) => g.dateBucket !== "hoje") : groups;
   const todayOverview = showPecas ? (rotaOverview.find((d) => d.date === today) ?? null) : null;
-  const totalPages = postFiltered ? 1 : Math.max(1, Math.ceil(total / pageSize));
   // Calculado uma vez aqui (Server Component, sem hooks) e repassado pra
   // AssistenciaQueueGroup -- lá dentro é "use client" com hooks, onde
   // chamar Date.now() direto no corpo do render quebra a regra de pureza.
@@ -318,10 +318,42 @@ export default async function AssistenciaQueuePage({
   // CUIDADO: só calcula quando `!showPecas` -- na aba Entregas `groups` é
   // QueueGroup da ROTA (`g.key` = `${data}_${rota}`, não uma data pura),
   // e mondayOfWeek (weekGrouping.ts) quebra com RangeError: Invalid time
-  // value ao tentar interpretar isso como data. A aba Entregas tem seu
-  // próprio agrupamento de mês dentro de EntregasWeekGroups.tsx -- não
-  // precisa (e não pode) reaproveitar esse cálculo daqui.
+  // value ao tentar interpretar isso como data. A aba Entregas calcula o
+  // próprio agrupamento de mês logo abaixo (entregasMonths), a partir de
+  // `dateKey`, não de `key`.
   const visitasMonths = showPecas ? [] : groupIntoMonths(groups, (g) => g.key);
+  // Paginação por MÊS -- pedido do Victor 01/09/2026: "nas listas estão
+  // ficando 2/3 páginas sem necessidade... deixe tudo numa única página,
+  // só quando tiver mais de 3 meses". Substitui a paginação por LINHA que
+  // existia antes (REQUESTS_PAGE_SIZE=100 por página, sem relação
+  // nenhuma com quantos meses cabiam ali -- ver allPages em
+  // listRequests/serviceRequests.ts, que agora traz o conjunto completo
+  // pra isso funcionar). Desligada quando `postFiltered` (Programado/
+  // Mostruário/cidade/atrasadas/sem-rota) -- esses recortes já eram
+  // sempre "página única" antes, continuam sendo (não fazem sentido
+  // fatiados por mês, são visões estreitas de propósito).
+  const visitasPaged = !showPecas && !postFiltered ? paginateMonths(visitasMonths, page) : { pageMonths: visitasMonths, totalPages: 1 };
+  const visitasPageMonths = visitasPaged.pageMonths;
+  // Entregas: `restGroups` (sem "hoje", ver acima) já tem `dateKey` cru
+  // de cada grupo (data, sem a rota grudada -- diferente de `key`, ver
+  // CUIDADO acima). "Sem data definida" (`dateKey` null, caso raro) fica
+  // de fora do agrupamento por mês -- sempre volta pra página 1, mesmo
+  // tratamento que EntregasWeekGroups.tsx já dá pra ele.
+  const entregasDated = showPecas ? restGroups.filter((g): g is QueueGroup & { dateKey: string } => !!g.dateKey) : [];
+  const entregasUndated = showPecas ? restGroups.filter((g) => !g.dateKey) : [];
+  const entregasMonths = showPecas ? groupIntoMonths(entregasDated, (g) => g.dateKey) : [];
+  const entregasPaged = showPecas && !postFiltered ? paginateMonths(entregasMonths, page) : { pageMonths: entregasMonths, totalPages: 1 };
+  const totalPages = showPecas ? entregasPaged.totalPages : visitasPaged.totalPages;
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  // Reconstrói `restGroups` só com os meses da página atual (achata
+  // MonthGroup->WeekGroup->dias de volta pra QueueGroup[], mesma ordem de
+  // sempre -- groupIntoMonths preserva a ordem de encontro). EntregasWeekGroups
+  // segue reagrupando por mês por conta própria em cima disso (só que
+  // agora só recebe os meses que cabem nesta página), então continua sem
+  // precisar mudar nada lá.
+  const entregasPageGroups = showPecas
+    ? [...entregasPaged.pageMonths.flatMap((m) => m.weeks.flatMap((w) => w.days)), ...(currentPage === 1 ? entregasUndated : [])]
+    : [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -540,7 +572,7 @@ export default async function AssistenciaQueuePage({
 
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
         {total} solicitaç{total === 1 ? "ão" : "ões"} encontrada{total === 1 ? "" : "s"}
-        {totalPages > 1 ? ` · página ${page} de ${totalPages}` : ""}
+        {totalPages > 1 ? ` · página ${currentPage} de ${totalPages}` : ""}
       </p>
 
       {/* Filtros avançados consolidados numa barra só -- pedido do Victor
@@ -658,11 +690,14 @@ export default async function AssistenciaQueuePage({
         // Compartilhado com a tela de notificações do SAC -- ver
         // EntregasKanbanHoje.tsx/EntregasWeekGroups.tsx. Hoje fica no
         // Kanban (todayGroups); o resto (futuro + atrasado + sem rota)
-        // agrupado por semana -- pedido do Victor 26/08/2026: "divida os
-        // agrupamentos igual é na tela de visitas, agrupados por semana".
+        // agrupado por mês > semana -- pedido do Victor 26/08/2026: "divida
+        // os agrupamentos igual é na tela de visitas, agrupados por
+        // semana". Kanban de "Hoje" só na página 1 -- é sempre o mês
+        // corrente, não faz sentido repetir em toda página de meses mais
+        // antigos (ver entregasPageGroups/currentPage acima).
         <div className="flex flex-col gap-4">
-          <EntregasKanbanHoje groups={todayGroups} todayOverview={todayOverview} />
-          {restGroups.length > 0 ? <EntregasWeekGroups groups={restGroups} now={now} /> : null}
+          {currentPage === 1 ? <EntregasKanbanHoje groups={todayGroups} todayOverview={todayOverview} /> : null}
+          {entregasPageGroups.length > 0 ? <EntregasWeekGroups groups={entregasPageGroups} now={now} /> : null}
         </div>
       ) : (
         // Agrupado por mês > semana (do mês) > dia -- pedido do Victor
@@ -685,7 +720,7 @@ export default async function AssistenciaQueuePage({
         // giraria também as setas de todos os dias lá dentro, mesmo
         // fechados.
         <div className="flex flex-col gap-3">
-          {visitasMonths.map((month) => {
+          {visitasPageMonths.map((month) => {
             const weeksJsx = month.weeks.map((week) => {
               const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
               return (
@@ -761,25 +796,25 @@ export default async function AssistenciaQueuePage({
 
       {totalPages > 1 ? (
         <div className="flex items-center justify-center gap-4 pt-2">
-          {page > 1 ? (
+          {currentPage > 1 ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
+              href={buildHref({ status: filterStatus, q, page: currentPage - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
-              ← Anterior
+              ← Mês mais recente
             </Link>
           ) : null}
           <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Página {page} de {totalPages}
+            Página {currentPage} de {totalPages}
           </span>
-          {page < totalPages ? (
+          {currentPage < totalPages ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: page + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
+              href={buildHref({ status: filterStatus, q, page: currentPage + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
               className="text-sm px-3 py-2 rounded border"
               style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
             >
-              Próxima →
+              Mês mais antigo →
             </Link>
           ) : null}
         </div>

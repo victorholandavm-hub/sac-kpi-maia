@@ -352,6 +352,12 @@ function applyOwnAssemblerStoreExclusion(query: any, excludeStoreIds: string[] |
 
 export const REQUESTS_PAGE_SIZE = 100;
 
+// Teto de segurança pra `allPages` (ver listRequests abaixo) -- nunca uma
+// query 100% sem limite, mas alto o bastante pra nunca ser alcançado de
+// verdade: o histórico INTEIRO de Visitas (todos os status, sem filtro
+// nenhum) girava em torno de umas 300 linhas quando isso foi escrito.
+const ALL_PAGES_CAP = 5000;
+
 export type ListRequestsResult = {
   items: ServiceRequestSummary[];
   total: number;
@@ -373,6 +379,15 @@ export async function listRequests(
     dateTo?: string;
     // Ver applyOwnAssemblerStoreExclusion acima.
     excludeOwnAssemblerStoreIds?: string[];
+    // Busca TODAS as linhas que baterem com os filtros de uma vez (até
+    // ALL_PAGES_CAP), em vez de uma página de REQUESTS_PAGE_SIZE por
+    // chamada -- pedido do Victor 01/09/2026: fila/page.tsx (Visitas/
+    // Entregas) trocou a paginação por LINHA por paginação por MÊS (ver
+    // paginateMonths, weekGrouping.ts), que só funciona com o conjunto
+    // completo em mãos pra poder agrupar por mês primeiro e decidir
+    // depois o que cabe em cada página. `page`/`pageSize` acima são
+    // ignorados quando isso está ligado.
+    allPages?: boolean;
   } = {}
 ): Promise<ListRequestsResult> {
   const admin = getSupabaseAdmin();
@@ -440,7 +455,7 @@ export async function listRequests(
     query = query.or(orParts.join(","));
   }
 
-  query = query.range((page - 1) * pageSize, page * pageSize - 1);
+  query = opts.allPages ? query.range(0, ALL_PAGES_CAP - 1) : query.range((page - 1) * pageSize, page * pageSize - 1);
 
   const { data, error, count } = (await query) as {
     data: SummaryRow[] | null;

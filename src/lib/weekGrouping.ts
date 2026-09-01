@@ -138,3 +138,37 @@ export function groupIntoMonths<T>(days: T[], dateKeyOf: (day: T) => string): Mo
 export function isCurrentMonth(monthKey: string, todayKey: string): boolean {
   return monthKey === todayKey.slice(0, 7);
 }
+
+// Paginação por MÊS -- pedido do Victor 01/09/2026: "nas listas estão
+// ficando 2/3 páginas sem necessidade... deixe tudo numa única página,
+// só quando tiver mais de 3 meses, que aí você coloca o mês mais antigo
+// para a página seguinte e assim por diante". Substitui a paginação por
+// LINHA que existia antes (100 chamados por página, sem relação nenhuma
+// com os meses mostrados na tela -- um mês só com 150 chamados já virava
+// "página 1 de 2" no meio da semana, mesmo sem nenhum mês de verdade
+// sobrando). Usado pelas 3 telas que já agrupam por mês via
+// groupIntoMonths (Visitas/Entregas em fila/page.tsx, Agenda em
+// agenda/page.tsx): página 1 sempre cabe até 3 meses inteiros; a partir
+// do 4º mês (sempre o mais antigo que ainda não apareceu, já que
+// `months` vem ordenado do mais recente pro mais antigo), cada página
+// seguinte carrega só mais UM mês -- "e assim por diante" enquanto
+// sobrar mês mais velho.
+export function paginateMonths<T>(months: MonthGroup<T>[], page: number): { pageMonths: MonthGroup<T>[]; totalPages: number } {
+  if (months.length <= 3) return { pageMonths: months, totalPages: 1 };
+  const totalPages = months.length - 2;
+  const clampedPage = Math.min(Math.max(1, page), totalPages);
+  if (clampedPage === 1) return { pageMonths: months.slice(0, 3), totalPages };
+  return { pageMonths: [months[clampedPage + 1]], totalPages };
+}
+
+// Qual página (1-based, mesma regra de paginateMonths acima) contém um
+// mês específico -- usado pela Agenda pra abrir direto na página que tem
+// o mês corrente por padrão quando a URL não pede nenhuma página
+// explícita, no lugar da navegação "‹ Mês ›" de antes (que trocava
+// `month` na URL em vez de `page`). Mês não encontrado (raro: nenhum
+// chamado agendado nesse mês) cai na página 1.
+export function pageContainingMonth<T>(months: MonthGroup<T>[], monthKey: string): number {
+  const idx = months.findIndex((m) => m.monthKey === monthKey);
+  if (idx < 0 || idx < 3) return 1;
+  return idx - 1;
+}
