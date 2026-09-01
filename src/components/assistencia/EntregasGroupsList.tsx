@@ -24,32 +24,24 @@ export function EntregasGroupsList({ groups, now }: { groups: QueueGroup[]; now:
           // já nasce fechado. Destaque na barra da rota aberta (`open:`,
           // pseudo-classe nativa do <details>, reage sozinha ao clique) +
           // opacidade reduzida pra rota/data já passada (só `atrasado`).
-          <details
-            key={group.key}
-            className={`group rounded-xl overflow-hidden border-2 open:border-4 transition-[border-width] ${group.dateBucket === "atrasado" ? "opacity-60" : ""}`}
-            style={{ borderColor: group.borderColor }}
-          >
-            <summary
-              className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:brightness-95"
-              style={{ background: group.headerBg }}
-            >
-              <span
-                className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90"
-                style={{ color: group.headerText }}
-                aria-hidden="true"
-              >
+          // Agrupador cronológico -- Guia de Componentes Maia (Design
+          // System, 01/09/2026): "barras horizontais finas, elegantes,
+          // ocupando 100% da largura, com fontes limpas e contadores
+          // numéricos em badges neutros cinza-claros", mesmo padrão do
+          // cabeçalho de mês/semana já convertidos (MonthAccordion.tsx,
+          // EntregasWeekGroups.tsx). Substitui a barra cheia colorida por
+          // rota de antes -- a cor por rota (group.headerBg/headerText)
+          // não é mais usada aqui; a rota já está no texto do label, e as
+          // tags Atrasada/Futura/Hoje/Sem rota continuam carregando o
+          // significado semântico que importa.
+          <details key={group.key} className={`group flex flex-col gap-2 ${group.dateBucket === "atrasado" ? "opacity-60" : ""}`}>
+            <summary className="flex items-center gap-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+              <span className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400" aria-hidden="true">
                 ▶
               </span>
-              <span className="text-sm font-bold uppercase tracking-wide" style={{ color: group.headerText }}>
-                {group.label}
-              </span>
+              <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 whitespace-nowrap">{group.label}</span>
               {group.isSemRota ? (
-                <span
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                  style={{ background: "#ffffff", color: "#4B5563" }}
-                >
-                  Sem rota
-                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide bg-gray-100 text-gray-500">Sem rota</span>
               ) : group.dateBucket &&
                 DATE_BUCKET_TAG[group.dateBucket] &&
                 // "Atrasada" só faz sentido enquanto sobra algo pra
@@ -62,16 +54,17 @@ export function EntregasGroupsList({ groups, now }: { groups: QueueGroup[]; now:
                 // ainda dizem algo útil sobre a data em si.
                 !(group.dateBucket === "atrasado" && statusCounts.programado === 0) ? (
                 <span
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                  style={{ background: DATE_BUCKET_TAG[group.dateBucket]!.bg, color: "#fff" }}
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide text-white"
+                  style={{ background: DATE_BUCKET_TAG[group.dateBucket]!.bg }}
                 >
                   {DATE_BUCKET_TAG[group.dateBucket]!.label}
                 </span>
               ) : null}
-              <span className="text-xs font-semibold" style={{ color: group.headerText, opacity: 0.85 }}>
-                ({group.items.length})
+              <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
+                {group.items.length}
               </span>
-              <span className="flex items-center gap-2 text-[11px] font-medium ml-auto" style={{ color: group.headerText }}>
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="flex items-center gap-2 text-[11px] font-medium text-gray-400 whitespace-nowrap">
                 <span>
                   {statusCounts.programado} Programado{statusCounts.programado === 1 ? "" : "s"}
                 </span>
@@ -83,7 +76,7 @@ export function EntregasGroupsList({ groups, now }: { groups: QueueGroup[]; now:
                 </span>
               </span>
             </summary>
-            <div style={{ background: "#ffffff" }}>
+            <div>
               <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate printable showStaleBadge={false} />
             </div>
           </details>

@@ -85,21 +85,21 @@ function WarningTag({ icon, text, color }: { icon?: string; text: string; color:
   );
 }
 
-// Linha de tabela com 6 colunas de largura fixa (percentual), só pra aba
-// Entregas -- pedido do Victor 21/08/2026: "trave o card com larguras
-// percentuais fixas para cada dado. Assim, ao rolar a tela, o olho do
-// atendente busca o dado sempre na mesma coluna vertical". Empilha em
-// coluna única no celular (w-full) e vira linha de verdade a partir do
-// `sm:` -- larguras percentuais só fazem sentido numa tela larga o
-// bastante pra caber as 6 colunas lado a lado sem espremer.
+// Linha de tabela de verdade (não mais cards flex empilhados) -- pedido
+// do Victor 01/09/2026: "os cards verticais espremidos... destroem a
+// usabilidade em desktop... aplique o padrão de Tabela Grid Horizontal
+// de Alta Densidade e Largura Total". 6 colunas fixas: ID/Tipo, Data/
+// Período, Cliente, Produto, Logística, Ações -- mesmo espírito das
+// larguras percentuais de antes (21/08/2026: "o olho do atendente busca
+// o dado sempre na mesma coluna vertical"), só que como colunas de
+// `<table>` de verdade em vez de flex simulando colunas (que quebrava
+// pra cards empilhados em telas estreitas e ficava desalinhado).
 //
-// Coluna 1 (checkbox+setas) e coluna 6 (Ver produtos) ficam FORA do
-// <Link> -- são controles clicáveis próprios, não podem estar dentro de
-// um link (cliques neles não podem navegar pro chamado). As colunas 2-5
-// entram numa <Link style={{display:"contents"}}> -- isso faz o próprio
-// <a> não gerar caixa nenhuma no layout, então os 4 filhos viram itens
-// diretos do flex container externo (cada um com sua largura percentual
-// certa), mesmo estando dentro do link.
+// Linha inteira clicável via onClick (mesma razão de TodayRow,
+// EntregasKanbanHoje.tsx: não dá pra embrulhar <tr> num <Link>, HTML
+// inválido dentro de <table>) -- checkbox/setas (coluna própria) e
+// ProductsModalButton já param propagação, então continuam funcionando
+// sem navegar.
 function EntregaCardRow({
   r,
   i,
@@ -112,8 +112,8 @@ function EntregaCardRow({
   selected,
   onToggleSelected,
   effectiveDate,
-  showStaleBadge,
-  now,
+  needsAttention,
+  nodeRef,
 }: {
   r: ServiceRequestSummary;
   i: number;
@@ -126,159 +126,142 @@ function EntregaCardRow({
   selected: boolean;
   onToggleSelected: () => void;
   effectiveDate: string | null;
-  showStaleBadge: boolean;
-  now: number;
+  needsAttention: boolean;
+  // Callback ref pra animação FLIP de reordenar (ver `move` em
+  // AssistenciaQueueGroup) -- precisa apontar pro <tr> de verdade, não
+  // dava mais pra anexar direto de fora como antes (era um <div>).
+  nodeRef: (el: HTMLTableRowElement | null) => void;
 }) {
-  // Sempre false na prática (showStaleBadge vem false pra Entregas, ver
-  // AssistenciaQueueGroup) -- mantido genérico só caso esse componente
-  // seja reaproveitado num contexto onde volte a fazer sentido.
-  const staleOpen = showStaleBadge && r.status === "aberta" && now - new Date(r.createdAt).getTime() > 4 * 3_600_000;
+  const router = useRouter();
+  const hasLeftColumn = printable || reorderable;
+  const productSummary = r.items.map((item) => item.product).join(", ") || "—";
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-stretch gap-2 sm:gap-0">
-      {/* Coluna 1 (5%): checkbox + setas de ordenação. `sm:pr-3` em todas as
-          colunas (menos a última) -- pedido do Victor 22/08/2026: "os
-          elementos ainda variam de posição dependendo do tamanho do nome do
-          cliente". As colunas já são 100% fixas em largura (confirmado via
-          medição real: mesma coordenada X em toda notificação, mesmo com
-          nome de 40+ caracteres truncando) -- o problema era zero espaço
-          entre colunas (`sm:gap-0` no container), então um nome no limite do
-          truncamento encostava literalmente na coluna seguinte, parecendo
-          desalinhado mesmo sem estar. `pr-3` (padding interno, não gap)
-          evita esse encostamento sem risco de estourar a largura total. */}
-      {/* `sm:justify-start`, não `sm:justify-center` -- mesmo achado do
-          Victor 23/08/2026 na aba Visitas (ver VisitaCardRow): a linha toda
-          fica com a altura da coluna mais alta (geralmente a Coluna 4,
-          cliente), e checkbox+setas centralizados na altura TOTAL flutuam
-          sem alinhar com o conteúdo top-anchored da Coluna 2 (ID+status). */}
-      <div className="w-full sm:w-[5%] shrink-0 flex sm:flex-col items-center sm:justify-start gap-2 sm:gap-0.5 sm:pr-3">
-        {printable ? (
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={onToggleSelected}
-            className="rounded shrink-0"
-            aria-label={`Selecionar #${r.ticketNumber}`}
-          />
-        ) : null}
-        {reorderable ? (
-          <div className="flex sm:flex-col items-center gap-0.5 shrink-0">
-            <button
-              onClick={onMoveUp}
-              disabled={i === 0 || saving}
-              aria-label="Mover pra cima"
-              className="text-sm leading-none px-1 disabled:opacity-25 text-gray-500"
-            >
-              ▲
-            </button>
-            <button
-              onClick={onMoveDown}
-              disabled={i === orderLength - 1 || saving}
-              aria-label="Mover pra baixo"
-              className="text-sm leading-none px-1 disabled:opacity-25 text-gray-500"
-            >
-              ▼
-            </button>
+    <tr
+      ref={nodeRef}
+      onClick={() => router.push(`/assistencia/${r.id}`)}
+      className="hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+      style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
+    >
+      {hasLeftColumn ? (
+        <td className="pl-4 pr-2 py-3 align-top" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5">
+            {printable ? (
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={onToggleSelected}
+                className="rounded shrink-0"
+                aria-label={`Selecionar #${r.ticketNumber}`}
+              />
+            ) : null}
+            {reorderable ? (
+              <div className="flex flex-col shrink-0">
+                <button
+                  onClick={onMoveUp}
+                  disabled={i === 0 || saving}
+                  aria-label="Mover pra cima"
+                  className="text-xs leading-none px-1 disabled:opacity-25 text-gray-400 hover:text-gray-600"
+                >
+                  ▲
+                </button>
+                <button
+                  onClick={onMoveDown}
+                  disabled={i === orderLength - 1 || saving}
+                  aria-label="Mover pra baixo"
+                  className="text-xs leading-none px-1 disabled:opacity-25 text-gray-400 hover:text-gray-600"
+                >
+                  ▼
+                </button>
+              </div>
+            ) : null}
           </div>
-        ) : null}
-      </div>
+        </td>
+      ) : null}
 
-      {/* display:contents -- sem hover:opacity aqui, opacity não tem efeito
-          num elemento sem caixa própria (os filhos que viram itens diretos
-          do flex são o que realmente aparece). */}
-      <Link href={`/assistencia/${r.id}`} className="contents">
-        {/* Coluna 2 (12%): ID + status */}
-        <div className="w-full sm:w-[12%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start sm:pr-3">
+      {/* Coluna 1: ID / Tipo */}
+      <td className={`${hasLeftColumn ? "pl-2" : "pl-4"} pr-3 py-3 align-top whitespace-nowrap`}>
+        <div className="flex items-center gap-1.5">
           <span className="text-xs font-mono text-gray-400">#{r.ticketNumber}</span>
-          <div className="flex items-center gap-1 flex-wrap">
-            <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
-            <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
-          </div>
+          <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
         </div>
+        <span
+          className="inline-flex mt-1 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
+          style={{
+            color: `color-mix(in srgb, ${DELIVERY_TYPE_COLORS[r.type] ?? "#6B7280"} 70%, black)`,
+            background: `color-mix(in srgb, ${DELIVERY_TYPE_COLORS[r.type] ?? "#6B7280"} 14%, white)`,
+          }}
+        >
+          {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+          {r.type === "troca_produto" && r.exchangeRound > 1 ? ` · ${r.exchangeRound}ª` : ""}
+        </span>
+        <div className="mt-1">
+          <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+        </div>
+      </td>
 
-        {/* Coluna 3 (18%): tipo de serviço + data/turno */}
-        <div className="w-full sm:w-[18%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start sm:pr-3">
-          <span
-            className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-            style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "#9CA3AF", color: "#fff" }}
-          >
-            {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-            {r.type === "troca_produto" && r.exchangeRound > 1 ? ` · ${r.exchangeRound}ª` : ""}
+      {/* Coluna 2: Data / Período -- badge laranja discreto só quando
+          urgente (Guia de Componentes Maia: laranja é reservado pra
+          alerta, nunca decoração). */}
+      <td className="px-3 py-3 align-top whitespace-nowrap">
+        {effectiveDate ? (
+          <span className="text-sm font-semibold text-gray-800">
+            {formatDateOnly(effectiveDate)}
+            {effectiveDate === r.scheduledDate && r.scheduledTime ? ` · ${r.scheduledTime.slice(0, 5)}` : ""}
+            {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
           </span>
-          {/* Data em destaque -- pedido do Victor 27/08/2026: "a data nas
-              notificações fiquem maiores de mais visiveis" (antes
-              text-xs cinza apagado, quase do mesmo peso visual do "Sem
-              data"). Segue o mesmo padrão de ênfase que o nome do
-              cliente/bairro já usam na coluna ao lado (text-sm font-bold,
-              --text-primary). */}
-          <span className="text-sm font-bold whitespace-nowrap" style={{ color: "#1F2937" }}>
-            {effectiveDate ? (
-              <>
-                📅 {formatDateOnly(effectiveDate)}
-                {effectiveDate === r.scheduledDate && r.scheduledTime ? ` ${r.scheduledTime.slice(0, 5)}` : ""}
-                {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
-              </>
-            ) : (
-              <span style={{ color: "#9CA3AF" }}>Sem data</span>
-            )}
-          </span>
-          {r.urgent ? (
+        ) : (
+          <span className="text-sm text-gray-400">Sem data</span>
+        )}
+        {r.urgent ? (
+          <div className="mt-1">
             <span
-              className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-              style={{ color: "#fff", background: "var(--status-critical)" }}
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
+              style={{ color: "color-mix(in srgb, var(--brand-orange) 70%, black)", background: "color-mix(in srgb, var(--brand-orange) 16%, white)" }}
             >
               URGENTE
             </span>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
+      </td>
 
-        {/* Coluna 4 (35%): cliente em destaque, telefone, bairro +
-            observações (tag compacta, altura fixa -- ver WarningTag) --
-            pedido do Victor 21/08/2026: "padronize a tipografia do nome
-            do cliente, telefone e bairro em negrito e tamanho legível". */}
-        <div className="w-full sm:w-[35%] shrink-0 flex flex-col gap-0.5 min-w-0 sm:pr-3">
-          {/* Caixa alta -- pedido do Victor 25/08/2026 ("guia de
-              padronização"): "Nome do Cliente (Bold, caixa alta)". Só
-              visual (Tailwind `uppercase`), o dado no banco continua com
-              a grafia original. */}
-          <span className="text-sm font-bold truncate uppercase" style={{ color: "#1F2937" }}>
-            {r.clientName ?? "Sem nome de cliente"}
-          </span>
-          <span className="text-xs font-semibold truncate" style={{ color: "#4B5563" }}>
-            {r.clientPhone ?? "—"}
-          </span>
-          <span className="text-sm font-bold truncate" style={{ color: "#4B5563" }}>
-            {r.clientNeighborhood ?? "—"}
-          </span>
-          {r.clientTimeRestriction || staleOpen || r.escalationRisk || r.deadlineStatus === "pendente" ? (
-            <div className="flex items-center gap-1 flex-wrap pt-0.5">
-              {r.clientTimeRestriction ? <WarningTag icon="🕐" text={r.clientTimeRestriction} color="#8a5a00" /> : null}
-              {staleOpen ? (
-                <WarningTag
-                  icon="⏱"
-                  text={`parada há ${Math.floor((now - new Date(r.createdAt).getTime()) / 3_600_000)}h`}
-                  color="var(--status-critical)"
-                />
-              ) : null}
-              {r.escalationRisk ? <WarningTag icon="⚠" text="Risco de escalonamento" color="var(--status-critical)" /> : null}
-              {r.deadlineStatus === "pendente" ? <WarningTag icon="⚠" text="Prazo pendente" color="#8a5a00" /> : null}
-            </div>
-          ) : null}
+      {/* Coluna 3: Cliente -- nome em destaque numa linha, CPF+bairro numa
+          segunda linha pequena e cinza logo abaixo (nunca empilhado
+          telefone/bairro/CPF cada um na própria linha, pedido do
+          Victor). */}
+      <td className="px-3 py-3 align-top max-w-[220px]">
+        <div className="text-sm font-bold uppercase truncate text-gray-800">{r.clientName ?? "Sem nome de cliente"}</div>
+        <div className="text-xs text-gray-400 truncate">
+          {r.clientCpf ?? "CPF não informado"}
+          {r.clientNeighborhood ? ` · ${r.clientNeighborhood}` : ""}
         </div>
+        {r.clientTimeRestriction || r.escalationRisk || r.deadlineStatus === "pendente" ? (
+          <div className="flex items-center gap-1 flex-wrap mt-1">
+            {r.clientTimeRestriction ? <WarningTag icon="🕐" text={r.clientTimeRestriction} color="#8a5a00" /> : null}
+            {r.escalationRisk ? <WarningTag icon="⚠" text="Risco de escalonamento" color="var(--status-critical)" /> : null}
+            {r.deadlineStatus === "pendente" ? <WarningTag icon="⚠" text="Prazo pendente" color="#8a5a00" /> : null}
+          </div>
+        ) : null}
+      </td>
 
-        {/* Coluna 5 (20%): loja de origem, atendente que criou, motorista */}
-        <div className="w-full sm:w-[20%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3" style={{ color: "#9CA3AF" }}>
-          <span className="truncate">{r.storeName}</span>
-          <span className="truncate">Atendente: {r.requestedByName ?? "—"}</span>
-          <span className="truncate">{r.driverName ? `Motorista: ${r.driverName}` : "Sem motorista"}</span>
-        </div>
-      </Link>
+      {/* Coluna 4: Produto / Especificação -- texto corrido, uma linha só,
+          truncado com tooltip pro texto inteiro. */}
+      <td className="px-3 py-3 align-top text-gray-600 max-w-[280px] truncate" title={productSummary}>
+        {productSummary}
+      </td>
 
-      {/* Coluna 6 (10%): Ver produtos -- fora do <Link>, é botão próprio */}
-      <div className="w-full sm:w-[10%] shrink-0 flex items-center justify-start sm:justify-center">
+      {/* Coluna 5: Logística -- loja de origem, atendente, motorista. */}
+      <td className="px-3 py-3 align-top text-xs text-gray-400 whitespace-nowrap">
+        <div className="truncate">{r.storeName}</div>
+        <div className="truncate">Atendente: {r.requestedByName ?? "—"}</div>
+        <div className="truncate">{r.driverName ? `Motorista: ${r.driverName}` : "Sem motorista"}</div>
+      </td>
+
+      {/* Coluna 6: Ações -- só "Ver produtos", alinhado à direita. */}
+      <td className="pl-3 pr-4 py-3 align-top text-right">
         <ProductsModalButton items={r.items} />
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 }
 
@@ -575,7 +558,11 @@ export function AssistenciaQueueGroup({
   const [saving, setSaving] = useState(false);
   const [syncedItems, setSyncedItems] = useState(items);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const nodeRefs = useRef(new Map<string, HTMLDivElement>());
+  // HTMLElement genérico, não HTMLDivElement -- Entregas agora ancora em
+  // <tr> (EntregaCardRow), Visitas continua em <div> (VisitaCardRow); as
+  // duas são HTMLElement, é só o que a animação FLIP abaixo precisa
+  // (getBoundingClientRect/style).
+  const nodeRefs = useRef(new Map<string, HTMLElement>());
   const prevRects = useRef<Map<string, DOMRect> | null>(null);
 
   function toggleSelected(id: string) {
@@ -701,85 +688,115 @@ export function AssistenciaQueueGroup({
           />
         </div>
       ) : null}
-      <div className="divide-y divide-gray-100">
-      {order.map((r, i) => {
-        const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
-        // Só scheduledDate (ScheduleField) ou approvedDeadline
-        // (approveDeadline/rejectDeadline) -- as duas são decisão da
-        // assistência. De propósito SEM cair pra requestedDeadline (o pedido
-        // da loja, ainda não aprovado): mostrar isso aqui como se fosse a
-        // data definida enganaria quem tá vendo a fila -- pra esse caso já
-        // existe o badge "Prazo pendente".
-        const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
-        // "Concluída parcialmente" não é um status próprio -- vira
-        // "remarcar" com os itens já feitos marcados (ver
-        // montadorCompletePartially em montador-actions.ts).
-        const isPartialCompletion = r.status === "remarcar" && r.items.some((item) => item.completed);
-        // Só montagem/desmontagem tem valor de montador a pagar por item --
-        // confirmado com o usuário que troca de peça não entra aqui (#4588
-        // era falso positivo).
-        const showPaymentFlag = (r.type === "montagem" || r.type === "desmontagem") && (r.status === "concluida" || isPartialCompletion);
-        const paymentFlag = showPaymentFlag ? paymentValueFlag(r.items) : null;
-        // "Aberta" parada há muito tempo sem ninguém sequer entrar em
-        // contato -- indício de triagem esquecida, não de trabalho em
-        // andamento (esse já muda pra "em_contato"/"em_andamento").
-        const staleOpen = showStaleBadge && r.status === "aberta" && now - new Date(r.createdAt).getTime() > 4 * 3_600_000;
+      {showCreatedDate ? (
+        // Aba Entregas -- Tabela Grid Horizontal de Alta Densidade e
+        // Largura Total (Guia de Componentes Maia, Design System
+        // 01/09/2026), substitui os cards empilhados de antes. Cabeçalho
+        // próprio aqui (não em EntregaCardRow) -- é renderizado uma vez
+        // por grupo (cada grupo já é um dia+rota, ver EntregasGroupsList),
+        // mesmo padrão de cabeçalho repetido por instância que
+        // DeliveryItemsTable.tsx já usa.
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
+          <table className="w-full border-collapse text-sm" style={{ minWidth: "980px" }}>
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                {(printable || reorderable ? [""] : ([] as string[]))
+                  .concat(["ID / Tipo", "Data / Período", "Cliente", "Produto", "Logística", ""])
+                  .map((h, idx) => (
+                    <th key={idx} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {order.map((r, i) => {
+                const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
+                // Só scheduledDate (ScheduleField) ou approvedDeadline
+                // (approveDeadline/rejectDeadline) -- as duas são decisão
+                // da assistência. De propósito SEM cair pra
+                // requestedDeadline (o pedido da loja, ainda não
+                // aprovado): mostrar isso aqui como se fosse a data
+                // definida enganaria quem tá vendo a fila -- pra esse
+                // caso já existe o badge "Prazo pendente".
+                const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
+                return (
+                  <EntregaCardRow
+                    key={r.id}
+                    r={r}
+                    i={i}
+                    orderLength={order.length}
+                    reorderable={reorderable}
+                    saving={saving}
+                    onMoveUp={() => move(i, -1)}
+                    onMoveDown={() => move(i, 1)}
+                    printable={printable}
+                    selected={selected.has(r.id)}
+                    onToggleSelected={() => toggleSelected(r.id)}
+                    effectiveDate={effectiveDate}
+                    needsAttention={needsAttention}
+                    nodeRef={(el) => {
+                      if (el) nodeRefs.current.set(r.id, el);
+                      else nodeRefs.current.delete(r.id);
+                    }}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {order.map((r, i) => {
+            const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
+            const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
+            // "Concluída parcialmente" não é um status próprio -- vira
+            // "remarcar" com os itens já feitos marcados (ver
+            // montadorCompletePartially em montador-actions.ts).
+            const isPartialCompletion = r.status === "remarcar" && r.items.some((item) => item.completed);
+            // Só montagem/desmontagem tem valor de montador a pagar por
+            // item -- confirmado com o usuário que troca de peça não
+            // entra aqui (#4588 era falso positivo).
+            const showPaymentFlag = (r.type === "montagem" || r.type === "desmontagem") && (r.status === "concluida" || isPartialCompletion);
+            const paymentFlag = showPaymentFlag ? paymentValueFlag(r.items) : null;
+            // "Aberta" parada há muito tempo sem ninguém sequer entrar em
+            // contato -- indício de triagem esquecida, não de trabalho em
+            // andamento (esse já muda pra "em_contato"/"em_andamento").
+            const staleOpen = showStaleBadge && r.status === "aberta" && now - new Date(r.createdAt).getTime() > 4 * 3_600_000;
 
-        return (
-          <div
-            key={r.id}
-            ref={(el) => {
-              if (el) nodeRefs.current.set(r.id, el);
-              else nodeRefs.current.delete(r.id);
-            }}
-            className="flex flex-col gap-2 p-4 hover:bg-gray-50 transition-colors duration-150"
-            style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
-          >
-          {showCreatedDate ? (
-            // Aba Entregas -- tabela de 6 colunas fixas (ver EntregaCardRow
-            // acima), não o layout fluido de badges variados da Visitas.
-            // Esse componente já cuida do checkbox/setas (coluna 1) e do
-            // botão Ver produtos (coluna 6) por dentro -- nada fica de fora
-            // dele nesse ramo.
-            <EntregaCardRow
-              r={r}
-              i={i}
-              orderLength={order.length}
-              reorderable={reorderable}
-              saving={saving}
-              onMoveUp={() => move(i, -1)}
-              onMoveDown={() => move(i, 1)}
-              printable={printable}
-              selected={selected.has(r.id)}
-              onToggleSelected={() => toggleSelected(r.id)}
-              effectiveDate={effectiveDate}
-              showStaleBadge={showStaleBadge}
-              now={now}
-            />
-          ) : (
-            // Aba Visitas -- tabela de colunas fixas (ver VisitaCardRow
-            // acima), mesma ideia de Entregas: card sempre com a mesma
-            // altura, sem depender de quais avisos/campos essa notificação
-            // específica tem.
-            <VisitaCardRow
-              r={r}
-              i={i}
-              orderLength={order.length}
-              reorderable={reorderable}
-              saving={saving}
-              onMoveUp={() => move(i, -1)}
-              onMoveDown={() => move(i, 1)}
-              effectiveDate={effectiveDate}
-              staleOpen={staleOpen}
-              isPartialCompletion={isPartialCompletion}
-              paymentFlag={paymentFlag}
-              now={now}
-            />
-          )}
-          </div>
-        );
-      })}
-      </div>
+            return (
+              <div
+                key={r.id}
+                ref={(el) => {
+                  if (el) nodeRefs.current.set(r.id, el);
+                  else nodeRefs.current.delete(r.id);
+                }}
+                className="flex flex-col gap-2 p-4 hover:bg-gray-50 transition-colors duration-150"
+                style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
+              >
+                {/* Aba Visitas -- tabela de colunas fixas (ver
+                    VisitaCardRow acima), sem mudança nessa leva (só a
+                    Entregas quebrava a harmonia visual em desktop, ver
+                    EntregaCardRow). */}
+                <VisitaCardRow
+                  r={r}
+                  i={i}
+                  orderLength={order.length}
+                  reorderable={reorderable}
+                  saving={saving}
+                  onMoveUp={() => move(i, -1)}
+                  onMoveDown={() => move(i, 1)}
+                  effectiveDate={effectiveDate}
+                  staleOpen={staleOpen}
+                  isPartialCompletion={isPartialCompletion}
+                  paymentFlag={paymentFlag}
+                  now={now}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

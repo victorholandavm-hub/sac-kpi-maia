@@ -162,6 +162,11 @@ export type ServiceRequestSummary = {
   orderCode: string | null;
   clientName: string | null;
   clientPhone: string | null;
+  // Pedido do Victor 01/09/2026: coluna "Cliente" da tabela de Entregas
+  // (EntregasGroupsList/EntregaCardRow) passa a mostrar CPF junto do
+  // bairro -- não existia em ServiceRequestSummary até então (só no tipo
+  // de detalhe do chamado, DeliveryRequestDetail).
+  clientCpf: string | null;
   clientNeighborhood: string | null;
   items: RequestItem[];
   reason: string | null;
@@ -225,6 +230,7 @@ type SummaryRow = {
   order_code: string | null;
   client_name: string | null;
   client_phone: string | null;
+  client_cpf: string | null;
   client_neighborhood: string | null;
   reason: string | null;
   requested_by_name: string | null;
@@ -266,7 +272,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, item_action, completed, is_pickup)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -295,6 +301,7 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     orderCode: row.order_code,
     clientName: row.client_name,
     clientPhone: row.client_phone,
+    clientCpf: row.client_cpf,
     clientNeighborhood: row.client_neighborhood,
     items: (row.items ?? []).map(toItem),
     reason: row.reason,
