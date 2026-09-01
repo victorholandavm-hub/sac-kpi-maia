@@ -181,29 +181,6 @@ export default async function AgendaPage({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Mesma fileira de pílulas de fila/page.tsx (Visitas/Entregas) --
-          pedido do Victor 27/08/2026: "coloque agenda dentro de
-          solicitações ao lado de visitas/entregas". Agenda é rota
-          própria (filtro/dado bem diferente -- mês corrente, por
-          montador, não por rota), então cada uma das 3 páginas
-          renderiza sua própria fileira em vez de layout compartilhado
-          (mesma razão de SacTabs.tsx). */}
-      <div className="flex items-center gap-2">
-        <Link href="/assistencia/fila" className="text-base font-bold px-4 py-2 rounded-full" style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}>
-          Visitas
-        </Link>
-        <Link
-          href="/assistencia/fila?tab=pecas"
-          className="text-base font-bold px-4 py-2 rounded-full"
-          style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}
-        >
-          Entregas
-        </Link>
-        <Link href="/assistencia/agenda" className="text-base font-bold px-4 py-2 rounded-full" style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
-          Agenda
-        </Link>
-      </div>
-
       {/* Título + descrição + CTA no canto direito -- pedido do Victor
           25/08/2026 ("guia de padronização"), mesmo padrão das outras 2
           telas (fila/page.tsx, sac/notificacoes/page.tsx). */}
@@ -213,13 +190,33 @@ export default async function AgendaPage({
         cta={
           <Link
             href="/assistencia/nova-rapida"
-            className="text-sm px-3 py-2 rounded font-medium"
-            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            className="inline-flex items-center gap-1.5 text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
+            style={{ background: "var(--brand-green)" }}
           >
             + Nova visita
           </Link>
         }
       />
+
+      {/* Segmented Control -- Guia de Componentes Maia (Design System,
+          01/09/2026), mesma fileira de fila/page.tsx (Visitas/Entregas)
+          com o mesmo trilho/anatomia -- pedido do Victor 27/08/2026:
+          "coloque agenda dentro de solicitações ao lado de visitas/
+          entregas". Agenda é rota própria (filtro/dado bem diferente --
+          mês corrente, por montador, não por rota), então cada uma das 3
+          páginas renderiza sua própria fileira em vez de layout
+          compartilhado (mesma razão de SacTabs.tsx). */}
+      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
+        <Link href="/assistencia/fila" className="px-4 py-1.5 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-200">
+          Visitas
+        </Link>
+        <Link href="/assistencia/fila?tab=pecas" className="px-4 py-1.5 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-200">
+          Entregas
+        </Link>
+        <Link href="/assistencia/agenda" className="px-4 py-1.5 rounded-md text-sm font-medium bg-white text-gray-800 shadow-sm transition-all duration-200">
+          Agenda
+        </Link>
+      </div>
 
       {/* Alerta de atrasadas -- pedido do Victor 25/08/2026: "Visitas
           pendentes de datas passadas não deveriam ficar espalhadas em suas
@@ -232,19 +229,15 @@ export default async function AgendaPage({
       {overdueCount > 0 && filterRange !== "atrasado" ? (
         <Link
           href={buildHref({ range: "atrasado", ...commonParams, view })}
-          className="flex items-center gap-2 rounded-lg px-4 py-3 font-semibold text-sm"
-          style={{
-            background: "color-mix(in srgb, var(--status-critical) 12%, var(--surface-1))",
-            border: "2px solid var(--status-critical)",
-            color: "var(--text-primary)",
-          }}
+          className="flex items-center gap-2 rounded-xl border px-4 py-3 font-semibold text-sm text-gray-800 transition-colors duration-150 hover:bg-white"
+          style={{ background: "color-mix(in srgb, var(--status-critical) 8%, white)", borderColor: "var(--status-critical)" }}
         >
           <span className="text-lg" aria-hidden="true">
             ⚠️
           </span>
           Você tem {overdueCount} visita{overdueCount === 1 ? "" : "s"} pendente{overdueCount === 1 ? "" : "s"} atrasada
           {overdueCount === 1 ? "" : "s"}.
-          <span className="underline shrink-0 ml-auto" style={{ color: "var(--status-critical)" }}>
+          <span className="font-semibold shrink-0 ml-auto" style={{ color: "var(--status-critical)" }}>
             Clique para tratar →
           </span>
         </Link>
@@ -273,8 +266,7 @@ export default async function AgendaPage({
         {!filterRange && currentPage !== defaultPage ? (
           <Link
             href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined })}
-            className="text-xs underline ml-1"
-            style={{ color: "var(--text-secondary)" }}
+            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 ml-1"
           >
             hoje
           </Link>
@@ -318,7 +310,7 @@ export default async function AgendaPage({
             matchesQuery acima) -- mais limitado que a busca de
             Entregas/Solicitações, que já é feita no servidor. */}
         <div className="relative flex-1 min-w-[240px]">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-muted)" }} aria-hidden="true">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400" aria-hidden="true">
             🔍
           </span>
           <input
@@ -326,15 +318,20 @@ export default async function AgendaPage({
             name="q"
             defaultValue={q ?? ""}
             placeholder="Buscar por nº do chamado, cliente ou telefone…"
-            className="rounded border pl-8 pr-3 py-2 text-sm w-full"
-            style={{ borderColor: "var(--border)" }}
+            className="rounded-lg border border-gray-200 pl-8 pr-3 py-2 text-sm w-full text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
           />
         </div>
-        <button type="submit" className="text-sm px-3 py-2 rounded border" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+        <button
+          type="submit"
+          className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+        >
           Buscar
         </button>
         {q ? (
-          <Link href={buildHref({ range: filterRange, rota: filterRota, assembler, store, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined })} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+          <Link
+            href={buildHref({ range: filterRange, rota: filterRota, assembler, store, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined })}
+            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150"
+          >
             Limpar busca
           </Link>
         ) : null}
@@ -368,8 +365,7 @@ export default async function AgendaPage({
               ...commonParams,
               showPast: showPastResolved ? undefined : "1",
             })}
-            className="text-xs underline"
-            style={{ color: "var(--text-secondary)" }}
+            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150"
           >
             {showPastResolved ? "Ocultar dias já concluídos" : `Ver dias já concluídos (${pastResolvedCount})`}
           </Link>
@@ -377,16 +373,14 @@ export default async function AgendaPage({
       </div>
 
       {requests.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {filterRange ? "Nenhuma visita nesse período." : "Nenhuma visita agendada."}
-          </p>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">{filterRange ? "Nenhuma visita nesse período." : "Nenhuma visita agendada."}</p>
         </div>
       ) : !showKanban && groups.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">
             Só tem dias já concluídos nesse período --{" "}
-            <Link href={buildHref({ range: filterRange, ...commonParams, showPast: "1" })} className="underline">
+            <Link href={buildHref({ range: filterRange, ...commonParams, showPast: "1" })} className="font-medium text-gray-600 hover:text-gray-800 transition-colors duration-150">
               ver dias já concluídos ({pastResolvedCount})
             </Link>
             .
@@ -422,20 +416,18 @@ export default async function AgendaPage({
           {currentPage > 1 ? (
             <Link
               href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined, page: currentPage - 1 })}
-              className="text-sm px-3 py-2 rounded border"
-              style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+              className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
             >
               ← Mês mais recente
             </Link>
           ) : null}
-          <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+          <span className="text-sm text-gray-400">
             Página {currentPage} de {totalPages}
           </span>
           {currentPage < totalPages ? (
             <Link
               href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined, page: currentPage + 1 })}
-              className="text-sm px-3 py-2 rounded border"
-              style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+              className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
             >
               Mês mais antigo →
             </Link>

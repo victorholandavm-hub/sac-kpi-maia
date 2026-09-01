@@ -28,17 +28,17 @@ function Column({
   return (
     <div
       ref={setNodeRef}
-      className="rounded-xl flex flex-col gap-2 p-3 w-72 shrink-0"
+      className="rounded-xl border bg-white flex flex-col gap-2 p-3 w-72 shrink-0 shadow-sm"
       style={{
-        background: isOver ? "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" : "var(--surface-1)",
-        border: `2px solid ${highlight ? "var(--status-warning)" : "var(--brand-green)"}`,
+        background: isOver ? "color-mix(in srgb, var(--brand-green) 8%, white)" : "#ffffff",
+        borderColor: highlight ? "var(--status-warning)" : "#E5E7EB",
       }}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-bold" style={{ color: highlight ? "var(--status-warning)" : "var(--text-primary)" }}>
+        <span className="text-sm font-semibold" style={{ color: highlight ? "#8a5a00" : "#1F2937" }}>
           {title}
         </span>
-        <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ background: "var(--gridline)", color: "var(--text-secondary)" }}>
+        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
           {items.length}
         </span>
       </div>
@@ -155,14 +155,9 @@ export function AgendaKanbanBoard({ requests, assemblers }: { requests: ServiceR
       </DndContext>
 
       {undo ? (
-        <div
-          className="fixed bottom-4 right-4 z-40 flex items-center gap-3 rounded-lg border px-4 py-2.5 shadow-lg"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-        >
-          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-            {undo.label}
-          </span>
-          <button onClick={handleUndo} className="text-sm font-semibold underline" style={{ color: "var(--brand-green)" }}>
+        <div className="fixed bottom-4 right-4 z-40 flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-lg">
+          <span className="text-sm text-gray-800">{undo.label}</span>
+          <button onClick={handleUndo} className="text-sm font-semibold hover:underline" style={{ color: "#1B5E3C" }}>
             Desfazer
           </button>
         </div>
