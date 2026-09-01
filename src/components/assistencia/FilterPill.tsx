@@ -26,23 +26,37 @@ export function FilterPill({
   selected: boolean;
   color?: string;
 }) {
+  // Tag de contorno fino -- Guia de Componentes Maia (Design System,
+  // 01/09/2026): "selecionado = preenchimento sólido, não selecionado =
+  // contorno fino cinza-200". A variante `color` (pills de status, cada
+  // opção com a cor do próprio status) preenche com a cor semântica
+  // daquele status quando selecionada -- útil pra bater o olho e achar
+  // "Cancelada"/"Concluída" sem ler o texto -- em vez de forçar tudo pro
+  // mesmo verde. A variante neutra (sem `color`) segue a regra à risca:
+  // verde da marca quando selecionada, cinza-200 quando não.
+  // Cor escurecida (color-mix com preto) pro texto -- alguns status (ex.
+  // aberta, um amarelo claro) não têm contraste nenhum como texto cru
+  // sobre branco (~1.9:1, bem abaixo do mínimo de leitura). Mistura preto
+  // garante contraste em qualquer cor, sem precisar de exceção por
+  // status; usada tanto no texto (não selecionado) quanto no
+  // preenchimento sólido (selecionado, com texto branco em cima).
+  const darkColor = color ? `color-mix(in srgb, ${color} 70%, black)` : undefined;
+  const solidFill = color ? `color-mix(in srgb, ${color} 78%, black)` : undefined;
   return (
     <Link
       href={href}
-      className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
+      className="text-sm font-medium px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 transition-colors duration-150"
       style={
         color
           ? {
-              color: "var(--text-primary)",
-              background: selected ? `color-mix(in srgb, ${color} 35%, var(--surface-1))` : "transparent",
-              fontWeight: selected ? 600 : 400,
-              border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
+              color: selected ? "#fff" : darkColor,
+              background: selected ? solidFill : "#fff",
+              border: `1px solid ${selected ? "transparent" : color}`,
             }
           : {
-              border: "1px solid var(--border)",
-              background: selected ? "var(--surface-1)" : "transparent",
-              color: selected ? "var(--text-primary)" : "var(--text-secondary)",
-              fontWeight: selected ? 600 : 400,
+              color: selected ? "#fff" : "#4B5566",
+              background: selected ? "#1B5E3C" : "#fff",
+              border: `1px solid ${selected ? "transparent" : "#E5E7EB"}`,
             }
       }
     >

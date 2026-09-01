@@ -19,7 +19,7 @@ function statusBadge(m: StockMovement): { label: string; bg: string; color: stri
     return { label: "Pendente", bg: "var(--brand-orange-soft)", color: "var(--brand-orange)" };
   }
   return {
-    label: m.movementType === "retirado" ? "Já retirado" : "Concluído",
+    label: m.movementType === "retirado" ? "Confirmado" : "Concluído",
     bg: "color-mix(in srgb, var(--status-good) 20%, var(--surface-1))",
     color: "var(--status-good)",
   };
@@ -33,7 +33,7 @@ export function StockMovementCard({ m }: { m: StockMovement }) {
   // a etapa da equipe técnica (withdrawnBy), devolvido/reparado só têm
   // quem registrou (responsible). Pendente ainda não tem ninguém.
   const responsavel = pending ? null : m.movementType === "retirado" ? m.withdrawnBy : (m.withdrawnBy ?? m.responsible);
-  const dataLabel = pending ? "Aberto em" : m.movementType === "retirado" ? "Retirado em" : "Concluído em";
+  const dataLabel = pending ? "Aberto em" : m.movementType === "retirado" ? "Confirmado em" : "Concluído em";
   const dataValue = pending ? formatDateOnly(m.loggedDate) : formatDateOnly(m.movementDate);
 
   return (

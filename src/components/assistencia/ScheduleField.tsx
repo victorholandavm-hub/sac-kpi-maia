@@ -45,6 +45,7 @@ export function ScheduleField({
   rota,
   rotaExceptionNote,
   showRota,
+  editButtonVariant = "link",
 }: {
   requestId: string;
   scheduledDate: string | null;
@@ -62,6 +63,15 @@ export function ScheduleField({
   // montagem, desmontagem, vistoria e troca de peça são visita de montador
   // e não têm rota nenhuma (ver isDeliveryType em RequestDetailContent).
   showRota: boolean;
+  // "link" (padrão) -- texto discreto sublinhado, do jeito que sempre foi,
+  // pensado pra caber numa linha de tabela densa (AssistenciaQueueGroup,
+  // DriverRouteGroup, NotificacoesList). "button" -- Guia de Componentes
+  // Maia (Design System, 01/09/2026), pedido do Victor: "o botão editar
+  // tem que ficar com cara de botão na cor verde escura padrão" -- usado
+  // só na tela de detalhe do chamado (DeliveryRequestDetailContent), onde
+  // tem espaço de sobra e o campo é claramente a ação principal do card,
+  // não uma linha entre várias.
+  editButtonVariant?: "link" | "button";
 }) {
   const { pending, run } = useQuickAction();
   const [editing, setEditing] = useState(false);
@@ -168,8 +178,12 @@ export function ScheduleField({
           ) : null}
           <button
             onClick={() => setEditing(true)}
-            className="text-xs underline"
-            style={{ color: "var(--text-secondary)" }}
+            className={
+              editButtonVariant === "button"
+                ? "text-xs font-semibold rounded-lg px-3 py-1.5 text-white shadow-sm transition-all duration-200 hover:brightness-110"
+                : "text-xs underline"
+            }
+            style={editButtonVariant === "button" ? { background: "#1B5E3C" } : { color: "var(--text-secondary)" }}
           >
             {scheduledDate ? "editar" : "agendar"}
           </button>

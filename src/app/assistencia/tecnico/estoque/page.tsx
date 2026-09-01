@@ -34,11 +34,14 @@ function clienteVolumeLine(m: StockMovement): string {
 
 // Retirada de estoque pra Assistência Técnica -- pedido do Victor
 // 28/08/2026: "Assistencia registra e a equipe tecnica é que retira do
-// estoque e lança a data que foi retirada". A assistência já registra a
-// retirada em /assistencia/estoque (formulário "Nova movimentação",
-// tipo "Retirado do CD") sem preencher a data -- fica "pendente" (ver
-// isPendingWithdrawal, stockMovements.ts) até a equipe técnica confirmar
-// aqui, de verdade com o produto em mãos, e lançar a data.
+// estoque e lança a data que foi retirada" (esclarecido 01/09/2026: quem
+// retira o produto fisicamente do CD é a própria assistência -- a
+// equipe técnica confirma aqui que essa saída já foi lançada no
+// Protheus, e informa a data desse lançamento). A assistência já
+// registra a retirada em /assistencia/estoque (formulário "Nova
+// movimentação", tipo "Retirado do CD") sem preencher a data -- fica
+// "pendente" (ver isPendingWithdrawal, stockMovements.ts) até a equipe
+// técnica confirmar aqui, e lançar a data do lançamento no Protheus.
 export default async function TecnicoEstoquePage({
   searchParams,
 }: {
@@ -57,13 +60,17 @@ export default async function TecnicoEstoquePage({
   // dois filtros já usados em (app)/estoque/page.tsx (tela de
   // assistência/admin pra essa mesma tabela) -- "responsável" e "De/Até"
   // ficaram de fora aqui: quem retirou já aparece na própria coluna
-  // "Por" da aba Já retiradas, e a equipe técnica olha "o que tá
-  // pendente agora"/"o que retirei recentemente", não faz relatório por
+  // "Por" da aba Confirmadas, e a equipe técnica olha "o que tá
+  // pendente agora"/"o que confirmei recentemente", não faz relatório por
   // período. Busca as duas listas (pendentes/histórico) em paralelo --
   // precisa das duas pra mostrar o contador de cada aba ao mesmo tempo.
   const [pendentes, historico, suppliers] = await Promise.all([
     listStockMovements({ onlyPendingWithdrawal: true, q, factory }),
-    listStockMovements({ movementType: "retirado", q, factory }).then((rows) => rows.filter((m) => m.movementDate)),
+    // Confirmada = `withdrawnBy` preenchido, não `movementDate` preenchido
+    // (esclarecido 01/09/2026: ver isPendingWithdrawal em stockMovements.ts
+    // -- `movementDate` pode já vir preenchido em registros antigos/importados
+    // sem que a equipe técnica tenha realmente confirmado o lançamento).
+    listStockMovements({ movementType: "retirado", q, factory }).then((rows) => rows.filter((m) => m.withdrawnBy)),
     listSuppliers(),
   ]);
   const movements = showHistorico ? historico : pendentes;
@@ -89,7 +96,7 @@ export default async function TecnicoEstoquePage({
               <div className="leading-tight min-w-0">
                 <h1 className="font-bold text-lg text-white truncate">Retiradas de Estoque</h1>
                 <p className="text-xs truncate" style={{ color: "rgba(255,255,255,0.78)" }}>
-                  Olá, {tecnicoName} — produto do estoque pra Assistência Técnica, registrado pela assistência.
+                  Olá, {tecnicoName} — produto já retirado do CD pela assistência; confirme aqui quando o lançamento no Protheus estiver feito.
                 </p>
               </div>
             </div>
@@ -152,7 +159,7 @@ export default async function TecnicoEstoquePage({
             {(
               [
                 [undefined, "Pendentes de retirada", pendentes.length],
-                ["retiradas", "Já retiradas", historico.length],
+                ["retiradas", "Confirmadas", historico.length],
               ] as const
             ).map(([value, label, count]) => (
               <Link
@@ -191,7 +198,7 @@ export default async function TecnicoEstoquePage({
                 </colgroup>
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    {["Produto", "Cliente / Volume", "Observação", showHistorico ? "Retirado em" : "Lançado em", showHistorico ? "Por" : ""].map(
+                    {["Produto", "Cliente / Volume", "Observação", showHistorico ? "Confirmado em" : "Lançado em", showHistorico ? "Por" : ""].map(
                       (h) => (
                         <th key={h} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">
                           {h}

@@ -159,18 +159,22 @@ export function NewStockMovementForm({ factories }: { factories: string[] }) {
           <input name="logged_date" type="date" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
       </div>
-      {/* Pra "Retirado do CD" especificamente, quem confirma a retirada
-          física de verdade e lança a data é a equipe técnica, num
-          fluxo separado ("Dar baixa", /assistencia/tecnico/estoque) --
-          pedido do Victor 28/08/2026: "Assistencia registra e a equipe
-          tecnica é que retira do estoque e lança a data que foi
-          retirada". Deixar a Data da movimentação em branco aqui é o
-          esperado nesse caso (vira "pendente de retirada" até a equipe
-          técnica dar baixa). */}
+      {/* Pra "Retirado do CD" especificamente, quem retira o produto
+          fisicamente do CD é a própria assistência (aqui, ao preencher
+          este formulário) -- quem confirma que essa saída já foi lançada
+          no Protheus e informa a data desse lançamento é a equipe
+          técnica, num fluxo separado ("Dar baixa",
+          /assistencia/tecnico/estoque) -- pedido do Victor 28/08/2026:
+          "Assistencia registra e a equipe tecnica é que retira do
+          estoque e lança a data que foi retirada" (esclarecido
+          01/09/2026: a retirada física é da assistência; a equipe
+          técnica confirma o lançamento no Protheus). Deixar a Data da
+          movimentação em branco aqui é o esperado nesse caso (vira
+          "pendente de retirada" até a equipe técnica confirmar). */}
       {typeValue === "retirado" ? (
         <p className="text-xs -mt-2" style={{ color: "var(--text-muted)" }}>
-          Pra &quot;Retirado do CD&quot;, deixe a Data da movimentação em branco -- a equipe técnica lança essa data quando retirar
-          de verdade e der baixa.
+          Pra &quot;Retirado do CD&quot;, deixe a Data da movimentação em branco -- a equipe técnica lança essa data quando confirmar
+          que a saída foi registrada no Protheus.
         </p>
       ) : null}
 

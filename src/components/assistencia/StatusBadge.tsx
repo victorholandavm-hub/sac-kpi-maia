@@ -17,7 +17,7 @@ export function StatusBadge({
 }) {
   const color = STATUS_COLORS[status] ?? "var(--text-muted)";
   const description = showInfo ? STATUS_DESCRIPTIONS[status] : undefined;
-  const sizeClasses = size === "md" ? "text-sm font-bold px-3 py-1" : "text-xs font-semibold px-2 py-0.5";
+  const sizeClasses = size === "md" ? "text-sm px-3 py-1" : "text-xs px-2 py-0.5";
 
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -58,11 +58,20 @@ export function StatusBadge({
 
   return (
     <span className="inline-flex items-center gap-1">
+      {/* Preenchimento suave (14% da cor sobre branco) + texto na própria
+          cor -- Guia de Componentes Maia (Design System, 01/09/2026):
+          mesma anatomia de badge usada na tela da equipe técnica, "a cor
+          já entrega o significado antes do texto". */}
+      {/* Texto escurecido (color-mix com preto) em cima da cor crua --
+          alguns status (aberta, aguardando_aprovacao) são um amarelo claro
+          demais pra funcionar como texto direto (contraste ~1.9:1 contra
+          branco, bem abaixo do mínimo de leitura); misturar preto garante
+          contraste em qualquer cor de status, sem precisar de exceção por
+          status. O fundo continua com a cor crua (só 14%, sutil). */}
       <span
-        className={`inline-flex items-center gap-1.5 ${sizeClasses} rounded-full whitespace-nowrap`}
-        style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
+        className={`inline-flex items-center ${sizeClasses} rounded-full whitespace-nowrap font-semibold`}
+        style={{ color: `color-mix(in srgb, ${color} 70%, black)`, background: `color-mix(in srgb, ${color} 14%, white)` }}
       >
-        <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: color }} />
         {STATUS_LABELS[status] ?? status}
       </span>
       {description ? (
@@ -71,8 +80,7 @@ export function StatusBadge({
             ref={triggerRef}
             type="button"
             onClick={toggle}
-            className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold select-none"
-            style={{ color, border: `1px solid ${color}` }}
+            className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-400 border border-gray-200 hover:border-gray-300 hover:text-gray-600 transition-colors duration-150 select-none"
             aria-label={`O que significa "${STATUS_LABELS[status] ?? status}"?`}
           >
             i
@@ -80,15 +88,8 @@ export function StatusBadge({
           {open && pos && typeof document !== "undefined"
             ? createPortal(
                 <div
-                  className="fixed z-50 rounded-lg border p-2 text-xs shadow-lg"
-                  style={{
-                    top: pos.top,
-                    left: pos.left,
-                    width: POPOVER_WIDTH,
-                    background: "var(--surface-1)",
-                    borderColor: "var(--border)",
-                    color: "var(--text-secondary)",
-                  }}
+                  className="fixed z-50 rounded-lg border border-gray-200 bg-white p-2.5 text-xs text-gray-600 shadow-lg"
+                  style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
                 >
                   {description}
                 </div>,

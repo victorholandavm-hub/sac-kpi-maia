@@ -34,13 +34,34 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-        {label}
-      </span>
-      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-        {value}
-      </span>
+      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-sm text-gray-800">{value}</span>
     </div>
+  );
+}
+
+// Card branco, borda fina, sombra discreta -- Guia de Componentes Maia
+// (Design System, 01/09/2026): "painéis brancos bem estruturados", "cards
+// brancos limpos com bordas finas (shadow-sm)". Substitui o padrão antigo
+// (fundo var(--surface-1) + borda verde de 2px em toda caixa) usado nessa
+// tela inteira.
+function Card({ title, children, className = "" }: { title?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-3 ${className}`}>
+      {title ? <h3 className="text-sm font-semibold text-gray-800">{title}</h3> : null}
+      {children}
+    </div>
+  );
+}
+
+// Badge neutro (tipo, filial) -- cinza, nunca laranja/verde: essas duas
+// cores ficam reservadas pra status e alerta (Guia de Componentes Maia).
+function NeutralBadge({ children, icon }: { children: React.ReactNode; icon?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 whitespace-nowrap">
+      {icon ? <span aria-hidden="true">{icon}</span> : null}
+      {children}
+    </span>
   );
 }
 
@@ -146,48 +167,49 @@ export function DeliveryRequestDetailContent({
   return (
     <div className="flex flex-col gap-4">
       <RealtimeQueueRefresher requestId={request.id} />
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-sm font-mono" style={{ color: "var(--text-muted)" }}>
-            Chamado #{request.ticketNumber}
-          </span>
+      {/* Cabeçalho -- Guia de Componentes Maia (Design System, 01/09/2026):
+          título em destaque + badges elegantes (status, tipo, filial),
+          botões de utilidade em outline neutro à direita. "Editar e
+          salvar alterações" é o único botão sólido (primário) -- os
+          outros dois (Criar notificação, Imprimir despacho) viraram
+          outline, pra não competir em cor com ele. */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <h1 className="text-xl font-semibold text-gray-800 whitespace-nowrap">Chamado #{request.ticketNumber}</h1>
           <DeliveryStatusBadge status={request.status} scheduledDate={request.scheduledDate} rota={request.rota} />
+          <NeutralBadge>{REQUEST_TYPE_LABELS[request.type] ?? request.type}</NeutralBadge>
+          <NeutralBadge icon="🏬">{request.storeName}</NeutralBadge>
           {request.type === "troca_produto" ? (
             <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+              className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
               style={
                 request.exchangeRound > 1
-                  ? { background: "var(--status-warning)", color: "#fff" }
-                  : { color: "var(--text-secondary)", background: "color-mix(in srgb, var(--text-secondary) 15%, var(--surface-1))" }
+                  ? { background: "#F3F4F6", color: "#8a5a00" }
+                  : { background: "#F3F4F6", color: "#4B5563" }
               }
             >
               {request.exchangeRound}ª troca
             </span>
           ) : null}
-          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-            {REQUEST_TYPE_LABELS[request.type] ?? request.type} · {request.storeName}
-          </h2>
         </div>
         {canManage ? (
           <div className="flex items-center gap-2 flex-wrap">
             <Link
-              href={novaNotificacaoHref}
-              className="text-sm font-medium rounded-lg px-3 py-1.5"
-              style={{ background: "var(--brand-orange)", color: "#fff" }}
-            >
-              + Criar nova notificação
-            </Link>
-            <Link
               href={`/assistencia/${request.id}/editar`}
-              className="text-sm font-medium rounded-lg px-3 py-1.5"
-              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+              className="text-sm font-semibold rounded-lg px-3.5 py-2 text-white shadow-sm transition-all duration-200 hover:brightness-110"
+              style={{ background: "#1B5E3C" }}
             >
               Editar e salvar alterações
             </Link>
             <Link
+              href={novaNotificacaoHref}
+              className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+            >
+              + Criar nova notificação
+            </Link>
+            <Link
               href={`/assistencia/${request.id}/despacho`}
-              className="text-sm font-medium rounded-lg border px-3 py-1.5"
-              style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+              className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
             >
               Imprimir despacho
             </Link>
@@ -196,14 +218,14 @@ export function DeliveryRequestDetailContent({
       </div>
 
       {request.parentExchange || request.childExchange ? (
-        <div className="flex items-center gap-3 flex-wrap text-sm" style={{ color: "var(--text-secondary)" }}>
+        <div className="flex items-center gap-3 flex-wrap text-sm text-gray-600">
           {request.parentExchange ? (
-            <Link href={`/assistencia/${request.parentExchange.id}`} className="underline" style={{ color: "var(--brand-green)" }}>
+            <Link href={`/assistencia/${request.parentExchange.id}`} className="font-medium hover:underline" style={{ color: "#1B5E3C" }}>
               ↩ Troca anterior: #{request.parentExchange.ticketNumber} ({STATUS_LABELS[request.parentExchange.status] ?? request.parentExchange.status})
             </Link>
           ) : null}
           {request.childExchange ? (
-            <Link href={`/assistencia/${request.childExchange.id}`} className="underline" style={{ color: "var(--brand-green)" }}>
+            <Link href={`/assistencia/${request.childExchange.id}`} className="font-medium hover:underline" style={{ color: "#1B5E3C" }}>
               → Gerou nova troca: #{request.childExchange.ticketNumber} ({STATUS_LABELS[request.childExchange.status] ?? request.childExchange.status})
             </Link>
           ) : null}
@@ -225,62 +247,52 @@ export function DeliveryRequestDetailContent({
         />
       ) : null}
 
-      <div className="grid lg:grid-cols-2 gap-4 items-start">
+      {/* 2 colunas, 70/30 -- Guia de Componentes Maia (Design System,
+          01/09/2026): esquerda é dado/conteúdo, direita é painel de
+          controle e histórico. Empilha normal (uma coluna só) até "lg",
+          igual sempre foi no celular/tablet. */}
+      <div className="grid lg:grid-cols-[7fr_3fr] gap-4 items-start">
         <div className="flex flex-col gap-4">
-          <div
-            className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-          >
-            <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
-              Dados do cliente
-            </h3>
-            <Row label="Código do pedido/venda" value={request.orderCode} />
-            <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
-            <Row label="Vendedor(a)" value={request.sellerName} />
-            <Row label="Cliente" value={request.clientName} />
-            <Row label="CPF" value={request.clientCpf} />
-            <Row label="Telefone" value={request.clientPhone} />
-            <Row label="Endereço" value={formatFullAddress(request)} />
-            <Row label="Bairro" value={request.clientNeighborhood} />
-          </div>
+          {/* Blocos 1 e 2 lado a lado -- pedido do Victor 01/09/2026: "dois
+              quadrados distintos, mas lado a lado". Dados do cliente
+              empilha em coluna única aqui dentro (não mais 2 colunas) --
+              cada quadrado agora tem metade da largura de antes, e
+              Endereço/Nº da nota fiscal são campos longos demais pra
+              caber em 2 colunas estreitas sem apertar de verdade. */}
+          <div className="grid sm:grid-cols-2 gap-4 items-start">
+            {/* Bloco 1: Dados do cliente -- nome em destaque, separado do
+                resto dos campos de leitura rápida. */}
+            <Card title="Dados do cliente">
+              <span className="text-base font-semibold text-gray-800">{request.clientName ?? "Sem nome de cliente"}</span>
+              <div className="flex flex-col gap-3">
+                <Row label="CPF" value={request.clientCpf} />
+                <Row label="Telefone" value={request.clientPhone} />
+                <Row label="Bairro" value={request.clientNeighborhood} />
+                <Row label="Endereço" value={formatFullAddress(request)} />
+                <Row label="Código do pedido/venda" value={request.orderCode} />
+                <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
+                <Row label="Vendedor(a)" value={request.sellerName} />
+              </div>
+            </Card>
 
-          <DeliveryItemsTable items={request.items} requestId={request.id} canEditItems={canManage} requestType={request.type} />
-
-          <div
-            className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-          >
-            <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
-              Descrição da solicitação
-            </h3>
-            <Row label="Autorizado por" value={request.authorizedBy} />
-            <Row label="Motivo / problema" value={request.reason} />
-            <Row label="Quem errou" value={request.causaRaiz ? (CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz) : null} />
-            {causaRaizDetail ? <Row label="Detalhe" value={causaRaizDetail} /> : null}
-            <Row label="Restrição / observação" value={request.restrictionNote} />
-            <Row label="Restrição de horário do cliente" value={request.clientTimeRestriction} />
-            <Row label="Observações" value={request.notes} />
-            {request.type === "troca_produto" ? (
-              <Row label="Produto recolhido?" value={request.pickupCompleted ? "Sim" : "Ainda não"} />
+            {/* Bloco 2: Logística e rota -- pedido do Victor 01/09/2026: sai
+                da coluna direita ("painel de controle") pra virar conteúdo
+                de leitura na esquerda, junto do resto do dado do chamado.
+                Badge laranja URGENTE só quando o chamado é urgente de
+                verdade -- laranja fica reservado pra isso, não é decoração. */}
+            <Card title="Logística e rota">
+            {/* Só aparece aqui em modo leitura -- quem pode gerenciar já
+                vê o mesmo aviso dentro do próprio ScheduleField (campo
+                "urgente" editável), duplicar os dois juntos repetia o
+                mesmo selo duas vezes na tela. */}
+            {!canManage && request.urgent ? (
+              <span
+                className="inline-flex items-center self-start rounded-full px-2.5 py-1 text-xs font-bold text-white whitespace-nowrap"
+                style={{ background: "var(--brand-orange)" }}
+              >
+                🔥 URGENTE
+              </span>
             ) : null}
-            {request.deliveryRating !== null ? <Row label="Nota do cliente — entrega" value={`${request.deliveryRating}/10`} /> : null}
-            {request.resolutionRating !== null ? (
-              <Row label="Nota do cliente — resolução do problema" value={`${request.resolutionRating}/10`} />
-            ) : null}
-            <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
-            <Row label="Criada em" value={formatDateTimeBr(request.createdAt)} />
-            {request.completedAt ? <Row label="Encerrada em" value={formatDateTimeBr(request.completedAt)} /> : null}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <div
-            className="rounded-lg p-4 flex flex-col gap-3"
-            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-          >
-            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-              Rota e motorista
-            </h3>
             {canManage ? (
               <ScheduleField
                 requestId={request.id}
@@ -291,15 +303,14 @@ export function DeliveryRequestDetailContent({
                 rota={request.rota}
                 rotaExceptionNote={request.rotaExceptionNote}
                 showRota
+                editButtonVariant="button"
               />
             ) : (
               <div className="flex flex-col gap-1">
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Visita agendada
-                </span>
+                <span className="text-xs text-gray-400">Visita agendada</span>
                 <div className="flex items-center gap-2 flex-wrap">
                   <RotaBadge rota={request.rota} />
-                  <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+                  <span className="text-sm text-gray-800">
                     {request.scheduledDate
                       ? `${request.scheduledDate.split("-").reverse().join("/")}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}`
                       : "Não agendada"}
@@ -308,14 +319,10 @@ export function DeliveryRequestDetailContent({
               </div>
             )}
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Motorista
-              </span>
-              <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-                {request.driverName ?? "Nenhum motorista escolhido ainda"}
-              </span>
+              <span className="text-xs text-gray-400">Motorista</span>
+              <span className="text-sm text-gray-800">{request.driverName ?? "Nenhum motorista escolhido ainda"}</span>
               {canManage ? (
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                <span className="text-xs text-gray-400">
                   Vem da rota do dia -- pra trocar, use o painel{" "}
                   <Link href={motoristaDoDiaHref} className="underline">
                     Motorista do dia
@@ -324,28 +331,72 @@ export function DeliveryRequestDetailContent({
                 </span>
               ) : null}
             </div>
+          </Card>
           </div>
 
+          {/* Bloco 3: Produtos da solicitação. */}
+          <DeliveryItemsTable items={request.items} requestId={request.id} canEditItems={canManage} requestType={request.type} />
+
+          {/* Bloco 4: Descrição do problema, erros e fotos -- pedido do
+              Victor 01/09/2026: junta o que antes era a seção "Fotos"
+              solta no fim da página com a descrição do chamado, lado a
+              lado, num card só. */}
+          <Card title="Descrição do problema">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Row label="Autorizado por" value={request.authorizedBy} />
+              <Row label="Motivo / problema" value={request.reason} />
+              {request.causaRaiz ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-gray-400">Quem errou</span>
+                  <span
+                    className="inline-flex self-start items-center rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
+                    style={{ background: "#F3F4F6", color: "#4B5563" }}
+                  >
+                    {CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz}
+                  </span>
+                </div>
+              ) : null}
+              {causaRaizDetail ? <Row label="Detalhe" value={causaRaizDetail} /> : null}
+              <Row label="Restrição / observação" value={request.restrictionNote} />
+              <Row label="Restrição de horário do cliente" value={request.clientTimeRestriction} />
+              <Row label="Observações" value={request.notes} />
+              {request.type === "troca_produto" ? (
+                <Row label="Produto recolhido?" value={request.pickupCompleted ? "Sim" : "Ainda não"} />
+              ) : null}
+              {request.deliveryRating !== null ? <Row label="Nota do cliente — entrega" value={`${request.deliveryRating}/10`} /> : null}
+              {request.resolutionRating !== null ? (
+                <Row label="Nota do cliente — resolução do problema" value={`${request.resolutionRating}/10`} />
+              ) : null}
+              <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
+              <Row label="Criada em" value={formatDateTimeBr(request.createdAt)} />
+              {request.completedAt ? <Row label="Encerrada em" value={formatDateTimeBr(request.completedAt)} /> : null}
+            </div>
+
+            <div className="flex flex-col gap-3 pt-3 border-t border-gray-100">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Fotos</h4>
+              <PhotoGallery photos={photos} deleteMode={canManage ? "staff" : undefined} />
+              {photos.length === 0 ? <p className="text-sm text-gray-400">Nenhuma foto anexada ainda.</p> : null}
+              {canManage ? <RequestPhotoUpload requestId={request.id} /> : null}
+            </div>
+          </Card>
+        </div>
+
+        {/* Coluna direita -- painel de controle de fluxo de trabalho:
+            ações rápidas, notas rápidas (as duas dentro de
+            DeliveryRequestActions, já em cards próprios) e histórico. */}
+        <div className="flex flex-col gap-4">
           {canManage ? (
             <MobileActionSheet>
               <DeliveryRequestActions
                 requestId={request.id}
                 requestType={request.type}
                 status={request.status}
-                isAssignedToMe={request.assignedToId === profile.id}
-                hideClaim={isSacType}
                 hasChildExchange={!!request.childExchange}
               />
             </MobileActionSheet>
           ) : null}
 
-          <div
-            className="rounded-lg p-4 flex flex-col gap-3"
-            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-          >
-            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-              Histórico
-            </h3>
+          <Card title="Histórico">
             <RequestHistoryTimeline
               events={events.map((event) => ({
                 id: event.id,
@@ -356,24 +407,8 @@ export function DeliveryRequestDetailContent({
                 actionText: eventAction(event),
               }))}
             />
-          </div>
+          </Card>
         </div>
-      </div>
-
-      <div
-        className="rounded-lg p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-      >
-        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Fotos
-        </h3>
-        <PhotoGallery photos={photos} deleteMode={canManage ? "staff" : undefined} />
-        {photos.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhuma foto anexada ainda.
-          </p>
-        ) : null}
-        {canManage ? <RequestPhotoUpload requestId={request.id} /> : null}
       </div>
     </div>
   );

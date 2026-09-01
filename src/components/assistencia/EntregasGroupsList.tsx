@@ -46,7 +46,7 @@ export function EntregasGroupsList({ groups, now }: { groups: QueueGroup[]; now:
               {group.isSemRota ? (
                 <span
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                  style={{ background: "var(--surface-1)", color: "var(--text-secondary)" }}
+                  style={{ background: "#ffffff", color: "#4B5563" }}
                 >
                   Sem rota
                 </span>
@@ -83,7 +83,7 @@ export function EntregasGroupsList({ groups, now }: { groups: QueueGroup[]; now:
                 </span>
               </span>
             </summary>
-            <div style={{ background: "var(--surface-1)" }}>
+            <div style={{ background: "#ffffff" }}>
               <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate printable showStaleBadge={false} />
             </div>
           </details>

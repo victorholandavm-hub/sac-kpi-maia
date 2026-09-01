@@ -22,12 +22,14 @@ export type StockMovement = {
   loggedDate: string | null;
   notes: string | null;
   createdAt: string;
-  // Quem da equipe técnica confirmou a retirada física -- pedido do
-  // Victor 28/08/2026: "Assistencia registra e a equipe tecnica é que
-  // retira do estoque e lança a data que foi retirada" (ver
-  // withdrawStockMovement em estoque-actions.ts). Só preenchido depois
-  // da baixa -- não confundir com `responsible` (quem REGISTROU,
-  // preenchido na criação, sempre assistência/admin).
+  // Quem da equipe técnica confirmou o lançamento no Protheus -- pedido
+  // do Victor 28/08/2026 (esclarecido 01/09/2026: quem retira o produto
+  // fisicamente do CD é a ASSISTÊNCIA; a equipe técnica só confirma que
+  // essa saída já foi lançada no Protheus e informa a data desse
+  // lançamento, ver withdrawStockMovement em estoque-actions.ts). Só
+  // preenchido depois da baixa -- não confundir com `responsible` (quem
+  // REGISTROU a movimentação, preenchido na criação, sempre
+  // assistência/admin).
   withdrawnBy: string | null;
 };
 
@@ -70,11 +72,21 @@ function toStockMovement(row: StockMovementRow): StockMovement {
 
 // "Pendente de retirada" -- só faz sentido pra movement_type='retirado'
 // (é o único tipo com a etapa separada de baixa pela equipe técnica, ver
-// migration 0102): registrado por assistência sem `movement_date` ainda
-// (a equipe técnica não confirmou a retirada física). Devolvido/reparado
-// continuam de etapa única, sem essa noção de pendência.
-export function isPendingWithdrawal(m: Pick<StockMovement, "movementType" | "movementDate">): boolean {
-  return m.movementType === "retirado" && !m.movementDate;
+// migration 0102): registrado por assistência (que já retirou o produto
+// fisicamente do CD) mas a equipe técnica ainda não confirmou o
+// lançamento no Protheus. Devolvido/reparado continuam de etapa única,
+// sem essa noção de pendência.
+//
+// O critério é `withdrawnBy` vazio, NÃO `movementDate` vazio (esclarecido
+// 01/09/2026: existem registros -- boa parte importada em lote -- que já
+// nasceram com `movement_date` preenchido sem nunca ter passado pelo
+// botão "Dar baixa" da equipe técnica; o produto foi retirado fisicamente
+// do CD, mas a baixa no Protheus continua pendente de verdade.
+// `withdrawnBy` só é preenchido pelo próprio botão "Dar baixa"
+// (withdrawStockMovement, estoque-actions.ts), então é o único sinal
+// confiável de que a equipe técnica realmente confirmou).
+export function isPendingWithdrawal(m: Pick<StockMovement, "movementType" | "withdrawnBy">): boolean {
+  return m.movementType === "retirado" && !m.withdrawnBy;
 }
 
 // Data "efetiva" de cada movimentação -- pra agrupar por semana/dia (ver
@@ -101,9 +113,10 @@ export async function listStockMovements(
     q?: string;
     onlyPendingWithdrawal?: boolean;
     factory?: string;
-    // Responsável -- ou quem registrou (assistência) ou quem confirmou a
-    // retirada (equipe técnica), o que der pra achar primeiro. Ver
-    // listDistinctResponsibles abaixo pras opções desse filtro.
+    // Responsável -- ou quem registrou (assistência) ou quem confirmou o
+    // lançamento no Protheus (equipe técnica), o que der pra achar
+    // primeiro. Ver listDistinctResponsibles abaixo pras opções desse
+    // filtro.
     responsavel?: string;
   } = {}
 ): Promise<StockMovement[]> {
@@ -114,7 +127,9 @@ export async function listStockMovements(
     query = query.eq("movement_type", opts.movementType);
   }
   if (opts.onlyPendingWithdrawal) {
-    query = query.eq("movement_type", "retirado").is("movement_date", null);
+    // Mesmo critério de isPendingWithdrawal acima -- `withdrawn_by` vazio,
+    // não `movement_date` vazio (esclarecido 01/09/2026).
+    query = query.eq("movement_type", "retirado").is("withdrawn_by", null);
   }
   if (opts.factory) {
     query = query.eq("factory", opts.factory);
