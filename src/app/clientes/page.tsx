@@ -401,7 +401,12 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nível</th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Gasto acumulado</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cliente desde</th>
+                  {/* Pedido do Victor 01/09/2026: "aniversário de
+                      relacionamento, ou seja, a data da primeira compra" --
+                      mesmo dado que já era mostrado aqui (primeiraCompra,
+                      ver listClientesPorNivel), só renomeado pra deixar
+                      claro o que representa. */}
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Aniversário de relacionamento</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Dias sem comprar</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
