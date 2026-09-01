@@ -20,8 +20,8 @@ function ChevronIcon({ open }: { open: boolean }) {
     <svg
       viewBox="0 0 20 20"
       fill="none"
-      className="w-3.5 h-3.5 shrink-0"
-      style={{ color: "var(--text-muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.12s ease" }}
+      className="w-3.5 h-3.5 shrink-0 text-gray-400 transition-transform duration-150"
+      style={{ transform: open ? "rotate(180deg)" : "none" }}
     >
       <path d="M5.5 7.5L10 12L14.5 7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -134,15 +134,12 @@ function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => voi
         aria-expanded={open}
         disabled={disabled}
         onClick={() => (open ? setOpen(false) : openMenu())}
-        className="w-full flex items-center justify-between gap-2 rounded-md pl-2.5 pr-2 py-1.5 text-xs font-medium disabled:opacity-60"
-        style={{
-          background: "var(--surface-1)",
-          border: `1px solid ${open ? "var(--brand-green)" : "var(--border)"}`,
-          color: "var(--text-muted)",
-        }}
+        className={`w-full flex items-center justify-between gap-2 rounded-lg pl-2.5 pr-2 py-1.5 text-xs font-medium text-gray-500 bg-white border transition-colors duration-150 disabled:opacity-60 ${
+          open ? "border-[#1B5E3C]" : "border-gray-200 hover:border-gray-300"
+        }`}
       >
         <span className="flex items-center gap-2 min-w-0">
-          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--text-muted)" }} />
+          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0 bg-gray-300" />
           <span className="truncate">Selecionar destino…</span>
         </span>
         <ChevronIcon open={open} />
@@ -153,15 +150,13 @@ function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => voi
             <div
               ref={panelRef}
               role="listbox"
-              className="fixed z-50 rounded-lg py-1 shadow-lg border overflow-y-auto"
+              className="fixed z-50 rounded-lg py-1 shadow-lg border border-gray-200 bg-white overflow-y-auto"
               style={{
                 top: pos.top,
                 bottom: pos.bottom,
                 left: pos.left,
                 width: PANEL_WIDTH,
                 maxHeight: pos.maxHeight,
-                background: "var(--surface-1)",
-                borderColor: "var(--border)",
               }}
             >
               {ITEM_DESTINOS.map((d) => (
@@ -174,9 +169,8 @@ function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => voi
                     setOpen(false);
                     onPick(d);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left"
-                  style={{ color: "var(--text-primary)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left text-gray-800"
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: ITEM_DESTINO_COLORS[d] }} />
@@ -227,12 +221,16 @@ export function TecnicoItemDestino({
   const [note, setNote] = useState("");
 
   if (destino) {
+    // Badge preenchido suave (cor do destino a 14% sobre branco), não mais
+    // contorno colorido -- Guia de Componentes Maia (Design System,
+    // 01/09/2026): mesma anatomia de badge de status usada no resto do
+    // sistema, cor entrega o significado antes do texto.
     return (
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span
-            className="text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap"
-            style={{ color: ITEM_DESTINO_COLORS[destino], borderColor: ITEM_DESTINO_COLORS[destino] }}
+            className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+            style={{ color: ITEM_DESTINO_COLORS[destino], background: `color-mix(in srgb, ${ITEM_DESTINO_COLORS[destino]} 14%, white)` }}
           >
             {ITEM_DESTINO_LABELS[destino]}
             {destino === ITEM_DESTINO_NEEDS_STORE && destinoLojaName ? ` · ${destinoLojaName}` : ""}
@@ -241,22 +239,19 @@ export function TecnicoItemDestino({
             type="button"
             disabled={pending}
             onClick={() => run(() => clearItemDestino(itemId), "Destino desfeito -- volta pra pendente.")}
-            className="text-xs underline disabled:opacity-60 shrink-0"
-            style={{ color: "var(--text-secondary)" }}
+            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 disabled:opacity-60 shrink-0"
           >
             ↩ desfazer
           </button>
         </div>
         {destinoDefinidoPor ? (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          <span className="text-xs text-gray-400">
             {destinoDefinidoPor}
             {destinoDefinidoEm ? ` · ${formatDateTimeShortBr(destinoDefinidoEm)}` : ""}
           </span>
         ) : null}
         {ITEM_DESTINO_NEEDS_TEXT.includes(destino) && destinoObservacao ? (
-          <p className="text-xs whitespace-pre-line" style={{ color: "var(--text-secondary)" }}>
-            {destinoObservacao}
-          </p>
+          <p className="text-xs whitespace-pre-line text-gray-600">{destinoObservacao}</p>
         ) : null}
       </div>
     );
@@ -272,8 +267,7 @@ export function TecnicoItemDestino({
         <select
           value={storeId}
           onChange={(e) => setStoreId(e.target.value)}
-          className="text-xs rounded border px-2 py-1"
-          style={{ borderColor: "var(--border)" }}
+          className="text-xs rounded-lg border border-gray-200 px-2 py-1.5 text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
           autoFocus
         >
           <option value="" disabled>
@@ -292,8 +286,8 @@ export function TecnicoItemDestino({
             onClick={() =>
               run(() => setItemDestino(itemId, ITEM_DESTINO_NEEDS_STORE, storeId), `Destino: ${ITEM_DESTINO_LABELS[ITEM_DESTINO_NEEDS_STORE]}.`)
             }
-            className="text-xs rounded-full px-2.5 py-1 font-medium disabled:opacity-60"
-            style={{ background: ITEM_DESTINO_COLORS[ITEM_DESTINO_NEEDS_STORE], color: "#fff" }}
+            className="text-xs rounded-lg px-3 py-1.5 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 disabled:opacity-60 disabled:hover:brightness-100"
+            style={{ background: ITEM_DESTINO_COLORS[ITEM_DESTINO_NEEDS_STORE] }}
           >
             Confirmar
           </button>
@@ -303,8 +297,7 @@ export function TecnicoItemDestino({
               setPickingStore(false);
               setStoreId("");
             }}
-            className="text-xs underline"
-            style={{ color: "var(--text-secondary)" }}
+            className="text-xs font-medium rounded-md px-2 py-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors duration-150"
           >
             cancelar
           </button>
@@ -322,8 +315,7 @@ export function TecnicoItemDestino({
           onChange={(e) => setNote(e.target.value)}
           placeholder={pickingNote === "outro" ? "Descreva a classificação…" : "Por que está em observação?"}
           rows={2}
-          className="text-xs rounded border px-2 py-1.5 w-full"
-          style={{ borderColor: "var(--border)" }}
+          className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 w-full text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
           autoFocus
         />
         <div className="flex items-center gap-2">
@@ -336,8 +328,8 @@ export function TecnicoItemDestino({
                 `Destino: ${ITEM_DESTINO_LABELS[pickingNote]}.`
               )
             }
-            className="text-xs rounded-full px-2.5 py-1 font-medium disabled:opacity-60"
-            style={{ background: ITEM_DESTINO_COLORS[pickingNote], color: "#fff" }}
+            className="text-xs rounded-lg px-3 py-1.5 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 disabled:opacity-60 disabled:hover:brightness-100"
+            style={{ background: ITEM_DESTINO_COLORS[pickingNote] }}
           >
             Confirmar
           </button>
@@ -347,8 +339,7 @@ export function TecnicoItemDestino({
               setPickingNote(null);
               setNote("");
             }}
-            className="text-xs underline"
-            style={{ color: "var(--text-secondary)" }}
+            className="text-xs font-medium rounded-md px-2 py-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors duration-150"
           >
             cancelar
           </button>
