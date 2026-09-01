@@ -35,8 +35,9 @@ export function FilterSelect({
     <select
       value={value}
       onChange={handleChange}
-      className="rounded border px-3 py-2 text-sm"
-      style={{ borderColor: "var(--border)", color: value ? "var(--text-primary)" : "var(--text-secondary)" }}
+      className={`rounded-lg border border-gray-200 px-3.5 py-2 text-sm hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150 ${
+        value ? "text-gray-800" : "text-gray-500"
+      }`}
     >
       <option value="">{placeholder}</option>
       {normalized.map((o) => (

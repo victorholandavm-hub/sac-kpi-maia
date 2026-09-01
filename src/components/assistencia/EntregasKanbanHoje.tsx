@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DeliveryStatusBadge, type DeliveryStatusCounts } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
@@ -167,8 +167,19 @@ type FlatRow = { r: ServiceRequestSummary; rotaLabel: string; driverName: string
 // ali, só sem virar uma sétima coluna.
 function TodayRow({ row }: { row: FlatRow }) {
   const { r } = row;
+  const router = useRouter();
+  // Linha inteira clicável -- pedido do Victor 01/09/2026: "ao clicar na
+  // demanda, ela abra completa, e não apenas ao clicar em 'abrir'". Não dá
+  // pra embrulhar um <tr> inteiro num <Link> (HTML inválido dentro de
+  // <table>, o navegador expulsa a <a> pra fora e quebra o layout) --
+  // onClick no próprio <tr> + cursor-pointer é o equivalente aqui.
+  // ProductsModalButton já para propagação no próprio clique (stopPropagation),
+  // então continua abrindo só o modal, sem navegar.
   return (
-    <tr className="hover:bg-gray-50 transition-colors duration-150">
+    <tr
+      onClick={() => router.push(`/assistencia/${r.id}`)}
+      className="hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+    >
       <td className="px-4 py-3 align-top whitespace-nowrap">
         <div className="font-mono text-xs text-gray-400">#{r.ticketNumber}</div>
         <span
@@ -212,9 +223,6 @@ function TodayRow({ row }: { row: FlatRow }) {
         </div>
       </td>
       <td className="px-4 py-3 align-top">
-        <Link href={`/assistencia/${r.id}`} className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 mr-3">
-          Abrir
-        </Link>
         <ProductsModalButton items={r.items} />
       </td>
     </tr>
