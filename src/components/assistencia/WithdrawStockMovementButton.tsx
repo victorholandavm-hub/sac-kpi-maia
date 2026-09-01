@@ -25,24 +25,24 @@ export function WithdrawStockMovementButton({ movementId }: { movementId: string
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="text-xs rounded border px-2 py-1"
-          style={{ borderColor: "var(--border)" }}
+          className="text-xs rounded-lg border border-gray-200 px-2 py-1.5 text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
           autoFocus
         />
+        {/* Primário -- Guia de Componentes Maia (Design System,
+            01/09/2026): sombra sutil, hover:brightness-110. */}
         <button
           type="button"
           disabled={pending || !date}
           onClick={() => run(() => withdrawStockMovement(movementId, date), "Baixa registrada -- retirado do CD.")}
-          className="text-xs rounded-full px-2.5 py-1 font-medium disabled:opacity-60"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          className="text-xs rounded-lg px-3 py-1.5 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 disabled:opacity-60 disabled:hover:brightness-100"
+          style={{ background: "#1B5E3C" }}
         >
           Confirmar
         </button>
         <button
           type="button"
           onClick={() => setPicking(false)}
-          className="text-xs underline"
-          style={{ color: "var(--text-secondary)" }}
+          className="text-xs font-medium rounded-md px-2 py-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors duration-150"
         >
           cancelar
         </button>
@@ -55,8 +55,7 @@ export function WithdrawStockMovementButton({ movementId }: { movementId: string
       type="button"
       disabled={pending}
       onClick={() => setPicking(true)}
-      className="text-xs rounded-full px-3 py-1.5 font-medium border disabled:opacity-60 shrink-0 whitespace-nowrap"
-      style={{ borderColor: "var(--brand-green)", color: "var(--brand-green)" }}
+      className="text-xs rounded-lg px-3 py-1.5 font-medium border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 disabled:opacity-60 shrink-0 whitespace-nowrap"
     >
       Dar baixa
     </button>
