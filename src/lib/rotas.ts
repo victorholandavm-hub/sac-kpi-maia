@@ -180,8 +180,21 @@ export async function getRotaDriverAssignments(date: string): Promise<RotaDriver
 // que RotaMotoristaDoDia já busca (RotaDayOverview) -- usado pelo Kanban
 // de "Hoje" (EntregasKanbanHoje.tsx) pra mostrar quem tá em cada coluna,
 // sem duplicar a lógica de "primary vs extras" que já existia espalhada.
+//
+// Mesmo fallback pro motorista padrão (JP_DEFAULT_DRIVER) que
+// getAvailableRotasForDate já aplica -- achado do Victor 01/09/2026: o
+// card de resumo da rota Praia aparecia "Sem motorista" quando na
+// verdade é o Junior por padrão. Faltava replicar aqui a mesma regra:
+// sem NENHUMA atribuição explícita pro dia, a rota ESPERADA da semana
+// (day.expectedRota) cai no motorista padrão -- só quando não existe
+// `assignments.primary` nenhum (uma atribuição explícita, mesmo que pra
+// outra rota, sempre tem prioridade e não aciona esse fallback).
 export function driverNameForRota(day: RotaDayOverview, rota: Rota): string | null {
-  if (day.assignments.primary?.rota === rota) return day.assignments.primary.driverName;
+  if (day.assignments.primary) {
+    if (day.assignments.primary.rota === rota) return day.assignments.primary.driverName;
+  } else if (rota === day.expectedRota) {
+    return JP_DEFAULT_DRIVER;
+  }
   return day.assignments.extras.find((e) => e.rota === rota)?.driverName ?? null;
 }
 
