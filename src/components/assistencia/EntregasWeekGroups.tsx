@@ -53,47 +53,32 @@ export function EntregasWeekGroups({ groups, now }: { groups: QueueGroup[]; now:
         const hasAtrasado = week.days.some((g) => g.dateBucket === "atrasado" && countByDeliveryStatus(g.items).programado > 0);
         const isFutureWeek = hasFuture && !hasAtrasado;
         const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
+        // Agrupador cronológico -- Guia de Componentes Maia (Design
+        // System, 01/09/2026): linha fina + badge discreto, não mais um
+        // bloco cheio (verde-claro pra semana futura, cinza pras outras).
         return (
-          <details
-            key={week.weekKey}
-            className="rounded-xl overflow-hidden group/week"
-            style={{ border: `2px solid ${isFutureWeek ? "var(--brand-green)" : "var(--border)"}` }}
-          >
-            <summary
-              className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
-              style={{ background: isFutureWeek ? "var(--brand-green-soft)" : "var(--surface-2)" }}
-            >
-              <span
-                className="text-xs shrink-0 transition-transform duration-150 group-open/week:rotate-90"
-                style={{ color: "var(--text-secondary)" }}
-                aria-hidden="true"
-              >
+          <details key={week.weekKey} className="group/week flex flex-col gap-2">
+            <summary className="flex items-center gap-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+              <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/week:rotate-90 text-gray-400" aria-hidden="true">
                 ▶
               </span>
-              <span className="text-sm font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
-                {week.label}
-              </span>
+              <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 whitespace-nowrap">{week.label}</span>
               {hasAtrasado ? (
-                <span
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                  style={{ background: "var(--status-critical)", color: "#fff" }}
-                >
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide" style={{ background: "var(--status-critical)", color: "#fff" }}>
                   Atrasada
                 </span>
               ) : null}
               {isFutureWeek ? (
-                <span
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                  style={{ background: "var(--brand-green)", color: "#fff" }}
-                >
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide" style={{ background: "var(--brand-green)", color: "#fff" }}>
                   Futura
                 </span>
               ) : null}
-              <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
-                ({weekTotal})
+              <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
+                {weekTotal}
               </span>
+              <div className="flex-1 h-px bg-gray-200" />
             </summary>
-            <div className="flex flex-col gap-3 p-3" style={{ background: "var(--surface-1)" }}>
+            <div className="flex flex-col gap-3 pl-4">
               <EntregasGroupsList groups={week.days} now={now} />
             </div>
           </details>

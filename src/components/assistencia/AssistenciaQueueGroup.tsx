@@ -42,7 +42,7 @@ const PAYMENT_FLAG_LABELS: Record<PaymentFlag, string> = {
 };
 const PAYMENT_FLAG_COLORS: Record<PaymentFlag, string> = {
   none: "var(--status-critical)",
-  partial: "var(--status-warning)",
+  partial: "#8a5a00",
   complete: "var(--status-good)",
   no_items: "var(--status-critical)",
 };
@@ -69,12 +69,15 @@ export const DELIVERY_TYPE_COLORS: Record<string, string> = {
 // resto do card pra baixo) -- como a observação é texto livre (não dá pra
 // extrair "palavra-chave" de verdade sem NLP), o compromisso prático é
 // cortar com reticências e confiar no tooltip pro texto inteiro.
+// Preenchimento suave (14% da cor sobre branco) + texto na própria cor --
+// Guia de Componentes Maia (Design System, 01/09/2026), mesma anatomia de
+// badge usada em StatusBadge.tsx/tela da equipe técnica.
 function WarningTag({ icon, text, color }: { icon?: string; text: string; color: string }) {
   return (
     <span
       title={text}
       className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap truncate max-w-[9rem] cursor-help"
-      style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
+      style={{ color, background: `color-mix(in srgb, ${color} 14%, white)` }}
     >
       {icon ? `${icon} ` : ""}
       {text}
@@ -164,8 +167,7 @@ function EntregaCardRow({
               onClick={onMoveUp}
               disabled={i === 0 || saving}
               aria-label="Mover pra cima"
-              className="text-sm leading-none px-1 disabled:opacity-25"
-              style={{ color: "var(--text-secondary)" }}
+              className="text-sm leading-none px-1 disabled:opacity-25 text-gray-500"
             >
               ▲
             </button>
@@ -173,8 +175,7 @@ function EntregaCardRow({
               onClick={onMoveDown}
               disabled={i === orderLength - 1 || saving}
               aria-label="Mover pra baixo"
-              className="text-sm leading-none px-1 disabled:opacity-25"
-              style={{ color: "var(--text-secondary)" }}
+              className="text-sm leading-none px-1 disabled:opacity-25 text-gray-500"
             >
               ▼
             </button>
@@ -188,9 +189,7 @@ function EntregaCardRow({
       <Link href={`/assistencia/${r.id}`} className="contents">
         {/* Coluna 2 (12%): ID + status */}
         <div className="w-full sm:w-[12%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start sm:pr-3">
-          <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-            #{r.ticketNumber}
-          </span>
+          <span className="text-xs font-mono text-gray-400">#{r.ticketNumber}</span>
           <div className="flex items-center gap-1 flex-wrap">
             <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
             <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
@@ -201,7 +200,7 @@ function EntregaCardRow({
         <div className="w-full sm:w-[18%] shrink-0 flex flex-row sm:flex-col gap-2 sm:gap-1 min-w-0 items-center sm:items-start sm:pr-3">
           <span
             className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-            style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "var(--text-muted)", color: "#fff" }}
+            style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "#9CA3AF", color: "#fff" }}
           >
             {REQUEST_TYPE_LABELS[r.type] ?? r.type}
             {r.type === "troca_produto" && r.exchangeRound > 1 ? ` · ${r.exchangeRound}ª` : ""}
@@ -212,7 +211,7 @@ function EntregaCardRow({
               data"). Segue o mesmo padrão de ênfase que o nome do
               cliente/bairro já usam na coluna ao lado (text-sm font-bold,
               --text-primary). */}
-          <span className="text-sm font-bold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+          <span className="text-sm font-bold whitespace-nowrap" style={{ color: "#1F2937" }}>
             {effectiveDate ? (
               <>
                 📅 {formatDateOnly(effectiveDate)}
@@ -220,7 +219,7 @@ function EntregaCardRow({
                 {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
               </>
             ) : (
-              <span style={{ color: "var(--text-muted)" }}>Sem data</span>
+              <span style={{ color: "#9CA3AF" }}>Sem data</span>
             )}
           </span>
           {r.urgent ? (
@@ -242,18 +241,18 @@ function EntregaCardRow({
               padronização"): "Nome do Cliente (Bold, caixa alta)". Só
               visual (Tailwind `uppercase`), o dado no banco continua com
               a grafia original. */}
-          <span className="text-sm font-bold truncate uppercase" style={{ color: "var(--text-primary)" }}>
+          <span className="text-sm font-bold truncate uppercase" style={{ color: "#1F2937" }}>
             {r.clientName ?? "Sem nome de cliente"}
           </span>
-          <span className="text-xs font-semibold truncate" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-xs font-semibold truncate" style={{ color: "#4B5563" }}>
             {r.clientPhone ?? "—"}
           </span>
-          <span className="text-sm font-bold truncate" style={{ color: "var(--text-secondary)" }}>
+          <span className="text-sm font-bold truncate" style={{ color: "#4B5563" }}>
             {r.clientNeighborhood ?? "—"}
           </span>
           {r.clientTimeRestriction || staleOpen || r.escalationRisk || r.deadlineStatus === "pendente" ? (
             <div className="flex items-center gap-1 flex-wrap pt-0.5">
-              {r.clientTimeRestriction ? <WarningTag icon="🕐" text={r.clientTimeRestriction} color="var(--status-warning)" /> : null}
+              {r.clientTimeRestriction ? <WarningTag icon="🕐" text={r.clientTimeRestriction} color="#8a5a00" /> : null}
               {staleOpen ? (
                 <WarningTag
                   icon="⏱"
@@ -262,13 +261,13 @@ function EntregaCardRow({
                 />
               ) : null}
               {r.escalationRisk ? <WarningTag icon="⚠" text="Risco de escalonamento" color="var(--status-critical)" /> : null}
-              {r.deadlineStatus === "pendente" ? <WarningTag icon="⚠" text="Prazo pendente" color="var(--status-warning)" /> : null}
+              {r.deadlineStatus === "pendente" ? <WarningTag icon="⚠" text="Prazo pendente" color="#8a5a00" /> : null}
             </div>
           ) : null}
         </div>
 
         {/* Coluna 5 (20%): loja de origem, atendente que criou, motorista */}
-        <div className="w-full sm:w-[20%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3" style={{ color: "var(--text-muted)" }}>
+        <div className="w-full sm:w-[20%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3" style={{ color: "#9CA3AF" }}>
           <span className="truncate">{r.storeName}</span>
           <span className="truncate">Atendente: {r.requestedByName ?? "—"}</span>
           <span className="truncate">{r.driverName ? `Motorista: ${r.driverName}` : "Sem motorista"}</span>
@@ -351,7 +350,7 @@ function VisitaCardRow({
                 disabled={i === 0 || saving}
                 aria-label="Mover pra cima"
                 className="text-sm leading-none px-1 disabled:opacity-25"
-                style={{ color: "var(--text-secondary)" }}
+                style={{ color: "#4B5563" }}
               >
                 ▲
               </button>
@@ -360,7 +359,7 @@ function VisitaCardRow({
                 disabled={i === orderLength - 1 || saving}
                 aria-label="Mover pra baixo"
                 className="text-sm leading-none px-1 disabled:opacity-25"
-                style={{ color: "var(--text-secondary)" }}
+                style={{ color: "#4B5563" }}
               >
                 ▼
               </button>
@@ -376,13 +375,13 @@ function VisitaCardRow({
               <StatusBadge status={r.status} />
               <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
             </div>
-            <span className="text-sm font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+            <span className="text-sm font-medium whitespace-nowrap" style={{ color: "#1F2937" }}>
               {REQUEST_TYPE_LABELS[r.type] ?? r.type}
             </span>
             {r.comboMontagemDesmontagem ? (
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
+                style={{ color: "#8a4c0d", background: "color-mix(in srgb, var(--brand-orange) 14%, white)" }}
               >
                 {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
               </span>
@@ -390,7 +389,7 @@ function VisitaCardRow({
             {isPartialCompletion ? (
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
+                style={{ color: "#8a4c0d", background: "color-mix(in srgb, var(--brand-orange) 14%, white)" }}
               >
                 ◐ Parcial
               </span>
@@ -406,16 +405,16 @@ function VisitaCardRow({
           <div className="w-full sm:w-[28%] shrink-0 flex flex-col gap-0.5 min-w-0 sm:pr-3">
             {/* Caixa alta -- mesmo pedido/motivo de EntregaCardRow (ver
                 acima), guia de padronização 25/08/2026. */}
-            <span className="text-sm font-bold truncate uppercase" style={{ color: "var(--text-primary)" }}>
+            <span className="text-sm font-bold truncate uppercase" style={{ color: "#1F2937" }}>
               {r.clientName ?? "Sem nome de cliente"}
             </span>
-            <span className="text-xs font-semibold truncate" style={{ color: "var(--text-secondary)" }}>
+            <span className="text-xs font-semibold truncate" style={{ color: "#4B5563" }}>
               {r.clientPhone ?? "—"}
             </span>
-            <span className="text-sm font-bold truncate" style={{ color: "var(--text-secondary)" }}>
+            <span className="text-sm font-bold truncate" style={{ color: "#4B5563" }}>
               📍 {r.clientNeighborhood ?? "—"}
             </span>
-            <span className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+            <span className="text-xs truncate" style={{ color: "#9CA3AF" }}>
               🏬 {r.storeName}
             </span>
           </div>
@@ -430,7 +429,7 @@ function VisitaCardRow({
               tambem para identificar o montador". */}
           <div className="w-full sm:w-[16%] shrink-0 flex items-center min-w-0 sm:pr-3">
             {r.assemblerName ? (
-              <span className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+              <span className="text-sm font-semibold truncate" style={{ color: "#1F2937" }}>
                 🔧 {r.assemblerName}
               </span>
             ) : (
@@ -444,7 +443,7 @@ function VisitaCardRow({
           </div>
 
           {/* Coluna 4 (17%): datas de abertura e previsão */}
-          <div className="w-full sm:w-[17%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3" style={{ color: "var(--text-muted)" }}>
+          <div className="w-full sm:w-[17%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3" style={{ color: "#9CA3AF" }}>
             <span className="whitespace-nowrap">Aberta {new Date(r.createdAt).toLocaleDateString("pt-BR")}</span>
             {effectiveDate ? (
               <span className="whitespace-nowrap">
@@ -496,12 +495,12 @@ function VisitaCardRow({
                   title={r.montadorInstruction}
                   onClick={() => setInstructionOpen((v) => !v)}
                   className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap cursor-pointer"
-                  style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))" }}
+                  style={{ color: "#8a5a00", background: "color-mix(in srgb, var(--status-warning) 14%, white)" }}
                 >
                   📋 Instrução
                 </button>
               ) : null}
-              {r.clientTimeRestriction ? <WarningTag icon="🕐" text={r.clientTimeRestriction} color="var(--status-warning)" /> : null}
+              {r.clientTimeRestriction ? <WarningTag icon="🕐" text={r.clientTimeRestriction} color="#8a5a00" /> : null}
               {staleOpen ? (
                 <WarningTag
                   icon="⏱"
@@ -510,7 +509,7 @@ function VisitaCardRow({
                 />
               ) : null}
               {r.escalationRisk ? <WarningTag icon="⚠" text="Risco de escalonamento" color="var(--status-critical)" /> : null}
-              {r.deadlineStatus === "pendente" ? <WarningTag icon="⚠" text="Prazo pendente" color="var(--status-warning)" /> : null}
+              {r.deadlineStatus === "pendente" ? <WarningTag icon="⚠" text="Prazo pendente" color="#8a5a00" /> : null}
               {paymentFlag ? <WarningTag text={PAYMENT_FLAG_LABELS[paymentFlag]} color={PAYMENT_FLAG_COLORS[paymentFlag]} /> : null}
             </div>
           ) : null}
@@ -521,9 +520,9 @@ function VisitaCardRow({
       {instructionOpen && r.montadorInstruction ? (
         <div
           className="rounded-lg p-2.5 sm:ml-[4%]"
-          style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
+          style={{ background: "color-mix(in srgb, var(--status-warning) 12%, #ffffff)", border: "2px solid var(--status-warning)" }}
         >
-          <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-primary)" }}>
+          <p className="text-sm whitespace-pre-line" style={{ color: "#1F2937" }}>
             {r.montadorInstruction}
           </p>
         </div>
@@ -655,7 +654,7 @@ export function AssistenciaQueueGroup({
     <div className="flex flex-col gap-2">
       {printable ? (
         <div className="flex items-center gap-3 flex-wrap px-4 pt-2">
-          <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
+          <label className="flex items-center gap-1.5 text-xs" style={{ color: "#4B5563" }}>
             <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
             Selecionar todas
           </label>
@@ -671,16 +670,16 @@ export function AssistenciaQueueGroup({
       {printable && selected.size > 0 ? (
         <div
           className="fixed bottom-20 sm:bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:left-auto z-40 flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg flex-wrap"
-          style={{ background: "var(--surface-1)", borderColor: "var(--brand-green)" }}
+          style={{ background: "#ffffff", borderColor: "var(--brand-green)" }}
         >
-          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          <span className="text-sm font-medium" style={{ color: "#1F2937" }}>
             {selected.size} selecionada{selected.size === 1 ? "" : "s"}
           </span>
           <Link
             href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
             target="_blank"
             className="text-sm rounded-full px-3 py-1.5 font-medium border"
-            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+            style={{ borderColor: "#E5E7EB", color: "#4B5563" }}
           >
             🖨️ Imprimir selecionados
           </Link>
@@ -702,7 +701,7 @@ export function AssistenciaQueueGroup({
           />
         </div>
       ) : null}
-      <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+      <div className="divide-y divide-gray-100">
       {order.map((r, i) => {
         const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
         // Só scheduledDate (ScheduleField) ou approvedDeadline
@@ -733,7 +732,7 @@ export function AssistenciaQueueGroup({
               if (el) nodeRefs.current.set(r.id, el);
               else nodeRefs.current.delete(r.id);
             }}
-            className="flex flex-col gap-2 p-4"
+            className="flex flex-col gap-2 p-4 hover:bg-gray-50 transition-colors duration-150"
             style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
           >
           {showCreatedDate ? (

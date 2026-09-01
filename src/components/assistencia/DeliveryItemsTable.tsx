@@ -14,6 +14,9 @@ import type { RequestItem, RequestType } from "@/lib/serviceRequests";
 // aqui era só confundir (pedido do Victor 17/08/2026, depois de ver "a
 // montar"/"definir valor" numa troca de produto). Só produto, código e
 // quantidade -- adicionar/remover pra quem gerencia o chamado.
+// Tabela compacta -- Guia de Componentes Maia (Design System, 01/09/2026):
+// "Código, Descrição do Produto, Quantidade... botão discreto". Substitui
+// a lista de linhas soltas de antes por colunas de verdade.
 function ItemRow({ item, requestId, canEditItems }: { item: RequestItem; requestId: string; canEditItems: boolean }) {
   const { pending, run } = useQuickAction();
 
@@ -23,18 +26,18 @@ function ItemRow({ item, requestId, canEditItems }: { item: RequestItem; request
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 py-2" style={{ borderTop: "1px solid var(--gridline)" }}>
-      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-        {item.quantity > 1 ? `${item.quantity}x ` : ""}
-        {item.product}
-        {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
-      </span>
-      {canEditItems ? (
-        <button onClick={remove} disabled={pending} className="text-xs underline disabled:opacity-60" style={{ color: "var(--status-critical)" }}>
-          remover
-        </button>
-      ) : null}
-    </div>
+    <tr className="border-t border-gray-100">
+      <td className="py-2 pr-3 text-xs font-mono text-gray-400 whitespace-nowrap">{item.partCode ?? "—"}</td>
+      <td className="py-2 pr-3 text-sm text-gray-800">{item.product}</td>
+      <td className="py-2 pr-3 text-sm text-gray-600 text-right whitespace-nowrap">{item.quantity}</td>
+      <td className="py-2 text-right whitespace-nowrap">
+        {canEditItems ? (
+          <button onClick={remove} disabled={pending} className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 disabled:opacity-60">
+            remover
+          </button>
+        ) : null}
+      </td>
+    </tr>
   );
 }
 
@@ -88,27 +91,24 @@ function AddItemForm({ requestId, isPickup }: { requestId: string; isPickup?: bo
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap pt-2" style={{ borderTop: "1px solid var(--gridline)" }}>
+    <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-gray-100">
       <div className="flex flex-col gap-0.5">
         <input
           value={partCode}
           onChange={(e) => setPartCode(e.target.value)}
           placeholder="Código (opcional)"
-          className="rounded border px-2 py-1 text-sm w-32"
-          style={{ borderColor: "var(--border)" }}
+          className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm w-32 text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
         />
         {productLookupStatus === "loading" ? (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Buscando…
-          </span>
+          <span className="text-xs text-gray-400">Buscando…</span>
         ) : productLookupStatus === "found" ? (
           <span className="text-xs" style={{ color: "var(--status-good)" }}>
             Produto encontrado.
           </span>
         ) : productLookupStatus === "not_found" ? (
-          <span className="text-xs flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+          <span className="text-xs flex items-center gap-1.5 text-gray-400">
             Código não encontrado.
-            <button type="button" onClick={() => runProductLookup(partCode)} className="underline" style={{ color: "var(--text-secondary)" }}>
+            <button type="button" onClick={() => runProductLookup(partCode)} className="font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150">
               🔄 Tentar de novo
             </button>
           </span>
@@ -118,22 +118,22 @@ function AddItemForm({ requestId, isPickup }: { requestId: string; isPickup?: bo
         value={product}
         onChange={(e) => setProduct(e.target.value)}
         placeholder="Produto"
-        className="rounded border px-2 py-1 text-sm flex-1 min-w-[140px]"
-        style={{ borderColor: "var(--border)" }}
+        className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm flex-1 min-w-[140px] text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
       />
       <input
         value={quantity}
         onChange={(e) => setQuantity(e.target.value)}
         type="number"
         min={1}
-        className="rounded border px-2 py-1 text-sm w-16"
-        style={{ borderColor: "var(--border)" }}
+        className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm w-16 text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
       />
+      {/* Botão discreto -- Guia de Componentes Maia: outline neutro, não
+          sólido (a única ação sólida da tela é "Editar e salvar
+          alterações", no cabeçalho). */}
       <button
         onClick={add}
         disabled={pending}
-        className="text-xs rounded px-2 py-1.5 font-medium disabled:opacity-60"
-        style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+        className="text-xs rounded-lg px-3 py-1.5 font-medium border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 disabled:opacity-60"
       >
         + Adicionar produto
       </button>
@@ -160,15 +160,30 @@ export function DeliveryItemsTable({
 }) {
   if (items.length === 0 && !canEditItems) return null;
 
+  const thead = (
+    <thead>
+      <tr>
+        {["Código", "Produto", "Qtd.", ""].map((h) => (
+          <th key={h} className={`pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400 ${h === "Qtd." || h === "" ? "text-right" : "text-left"}`}>
+            {h}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+
   if (requestType !== "troca_produto") {
     return (
-      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-        <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Produtos
-        </span>
-        {items.map((item) => (
-          <ItemRow key={item.id} item={item} requestId={requestId} canEditItems={canEditItems} />
-        ))}
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-1">
+        <h3 className="text-sm font-semibold text-gray-800">Produtos</h3>
+        <table className="w-full">
+          {thead}
+          <tbody>
+            {items.map((item) => (
+              <ItemRow key={item.id} item={item} requestId={requestId} canEditItems={canEditItems} />
+            ))}
+          </tbody>
+        </table>
         {canEditItems ? <AddItemForm requestId={requestId} /> : null}
       </div>
     );
@@ -178,23 +193,29 @@ export function DeliveryItemsTable({
   const pickupItems = items.filter((item) => item.isPickup);
 
   return (
-    <div className="rounded-lg p-4 flex flex-col gap-3" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Produtos a entregar
-        </span>
-        {deliveryItems.map((item) => (
-          <ItemRow key={item.id} item={item} requestId={requestId} canEditItems={canEditItems} />
-        ))}
+        <h3 className="text-sm font-semibold text-gray-800">Produtos a entregar</h3>
+        <table className="w-full">
+          {thead}
+          <tbody>
+            {deliveryItems.map((item) => (
+              <ItemRow key={item.id} item={item} requestId={requestId} canEditItems={canEditItems} />
+            ))}
+          </tbody>
+        </table>
         {canEditItems ? <AddItemForm requestId={requestId} isPickup={false} /> : null}
       </div>
-      <div className="flex flex-col gap-1 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
-        <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Produtos a recolher
-        </span>
-        {pickupItems.map((item) => (
-          <ItemRow key={item.id} item={item} requestId={requestId} canEditItems={canEditItems} />
-        ))}
+      <div className="flex flex-col gap-1 pt-3 border-t border-gray-100">
+        <h3 className="text-sm font-semibold text-gray-800">Produtos a recolher</h3>
+        <table className="w-full">
+          {thead}
+          <tbody>
+            {pickupItems.map((item) => (
+              <ItemRow key={item.id} item={item} requestId={requestId} canEditItems={canEditItems} />
+            ))}
+          </tbody>
+        </table>
         {canEditItems ? <AddItemForm requestId={requestId} isPickup /> : null}
       </div>
     </div>

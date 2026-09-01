@@ -24,29 +24,25 @@ export function MonthAccordion({
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
+  // Agrupador cronológico -- Guia de Componentes Maia (Design System,
+  // 01/09/2026): "fim das barras pretas gigantes gritando o nome do
+  // mês... uma linha fina, tipografia limpa e um indicador numérico
+  // discreto em formato de badge". Substitui a barra preta cheia
+  // (background: var(--text-primary), texto branco caixa alta) que
+  // existia antes.
   return (
-    <details open={defaultOpen} className="rounded-xl overflow-hidden group/month" style={{ border: "2px solid var(--text-primary)" }}>
-      <summary
-        className="px-4 py-2.5 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden"
-        style={{ background: "var(--text-primary)" }}
-      >
-        <span
-          className="text-xs shrink-0 transition-transform duration-150 group-open/month:rotate-90"
-          style={{ color: "var(--surface-1)" }}
-          aria-hidden="true"
-        >
+    <details open={defaultOpen} className="group/month flex flex-col gap-2">
+      <summary className="flex items-center gap-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/month:rotate-90 text-gray-400" aria-hidden="true">
           ▶
         </span>
-        <span className="text-base font-extrabold uppercase tracking-wide" style={{ color: "var(--surface-1)" }}>
-          {label}
+        <span className="text-sm font-semibold uppercase tracking-wider text-gray-500 whitespace-nowrap">{label}</span>
+        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
+          {total}
         </span>
-        <span className="text-xs font-semibold" style={{ color: "var(--surface-1)", opacity: 0.8 }}>
-          ({total})
-        </span>
+        <div className="flex-1 h-px bg-gray-200" />
       </summary>
-      <div className="flex flex-col gap-3 p-3" style={{ background: "var(--surface-2)" }}>
-        {children}
-      </div>
+      <div className="flex flex-col gap-3">{children}</div>
     </details>
   );
 }

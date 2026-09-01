@@ -90,7 +90,10 @@ export async function lookupProductNameByCode(code: string): Promise<string | nu
 
 // Baixa da retirada -- pedido do Victor 28/08/2026: "Assistencia
 // registra e a equipe tecnica é que retira do estoque e lança a data
-// que foi retirada". Sessão de EQUIPE TÉCNICA (tecnicoAuth.ts, cookie
+// que foi retirada" (esclarecido 01/09/2026: quem retira o produto
+// fisicamente do CD é a própria assistência -- a equipe técnica confirma
+// aqui que essa saída já foi lançada no Protheus, e informa a data desse
+// lançamento). Sessão de EQUIPE TÉCNICA (tecnicoAuth.ts, cookie
 // próprio -- não é o mesmo login de assistência/admin que cria o
 // registro), não profiles/getProfile -- por isso importa
 // getTecnicoSession de tecnico-actions.ts em vez de requireRole.
@@ -102,12 +105,17 @@ export async function withdrawStockMovement(movementId: string, withdrawnDate: s
   const admin = getSupabaseAdmin();
   const { data: movement, error: fetchError } = await admin
     .from("stock_movements")
-    .select("id, movement_type, movement_date")
+    .select("id, movement_type, withdrawn_by")
     .eq("id", movementId)
     .maybeSingle();
   if (fetchError || !movement) throw new Error("Movimentação não encontrada.");
   if (movement.movement_type !== "retirado") throw new Error("Só dá pra dar baixa em retirada.");
-  if (movement.movement_date) throw new Error("Essa retirada já foi baixada.");
+  // Checa `withdrawn_by`, não `movement_date` (esclarecido 01/09/2026):
+  // `movement_date` pode já vir preenchido em registros antigos/importados
+  // sem que a equipe técnica tenha realmente confirmado -- nesse caso a
+  // baixa aqui SUBSTITUI essa data antiga pela data real do lançamento no
+  // Protheus (ver isPendingWithdrawal, stockMovements.ts).
+  if (movement.withdrawn_by) throw new Error("Essa retirada já foi baixada.");
 
   const { error } = await admin
     .from("stock_movements")

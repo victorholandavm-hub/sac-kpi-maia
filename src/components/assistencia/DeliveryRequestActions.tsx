@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { claimRequest, updateStatus, addNote, createExchangeChild } from "@/app/assistencia/actions";
+import { updateStatus, addNote, createExchangeChild } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
 import { CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
 
@@ -26,15 +26,11 @@ export function DeliveryRequestActions({
   requestId,
   requestType,
   status,
-  isAssignedToMe,
-  hideClaim = false,
   hasChildExchange = false,
 }: {
   requestId: string;
   requestType: string;
   status: string;
-  isAssignedToMe: boolean;
-  hideClaim?: boolean;
   hasChildExchange?: boolean;
 }) {
   const router = useRouter();
@@ -114,68 +110,63 @@ export function DeliveryRequestActions({
   }
 
   return (
-    <div
-      className="flex flex-col gap-3 rounded-lg p-4"
-      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-    >
-      <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-        Ações
-      </h3>
+    <>
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-3">
+      {/* Ações rápidas -- Guia de Componentes Maia (Design System,
+          01/09/2026): "grupo vertical de botões bem definidos" no lugar
+          da fileira de botões cinzas/coloridos soltos, cada um outline
+          colorido por semântica (verde/âmbar/vermelho). Sem "Assumir pra
+          mim" aqui -- pedido do Victor 01/09/2026: "nas entregas, o
+          assumir para mim nao faz sentido, pois aquela notificação ja
+          fica vinculada a quem a criou no sistema" (diferente de visita
+          de montagem, ver RequestActions.tsx, que continua com claim --
+          lá faz sentido, um montador pode pegar um chamado de outro). */}
+      <h3 className="text-sm font-semibold text-gray-800">Ações rápidas</h3>
 
-      {!hideClaim && !isAssignedToMe ? (
-        <button
-          disabled={pending}
-          onClick={() => run(() => claimRequest(requestId), "Solicitação assumida.")}
-          className="text-sm rounded px-3 py-2 self-start disabled:opacity-60"
-          style={{ background: "var(--brand-orange)", color: "#fff" }}
-        >
-          Assumir para mim
-        </button>
-      ) : null}
-
-      {!isFinal ? (
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            disabled={pending}
-            onClick={() => run(() => updateStatus(requestId, "concluida"), "Marcado como concluída.")}
-            className="text-sm rounded px-3 py-2 font-medium disabled:opacity-60"
-            style={{ background: "var(--status-good)", color: "#fff" }}
-          >
-            Marcar como Concluída
-          </button>
-          {status !== "remarcar" ? (
+      <div className="flex flex-col gap-2">
+        {!isFinal ? (
+          <>
             <button
               disabled={pending}
-              onClick={() => setAskingRemarcarReason(true)}
-              className="text-sm rounded px-3 py-2 disabled:opacity-60"
-              style={{ background: "color-mix(in srgb, var(--status-warning) 35%, var(--surface-1))", color: "var(--text-primary)" }}
+              onClick={() => run(() => updateStatus(requestId, "concluida"), "Marcado como concluída.")}
+              className="text-sm rounded-lg px-3.5 py-2.5 font-medium border-2 transition-colors duration-150 disabled:opacity-60"
+              style={{ borderColor: "var(--status-good)", color: "var(--status-good)" }}
             >
-              Marcar como Remarcar
+              Marcar como Concluída
             </button>
-          ) : null}
+            {status !== "remarcar" ? (
+              <button
+                disabled={pending}
+                onClick={() => setAskingRemarcarReason(true)}
+                className="text-sm rounded-lg px-3.5 py-2.5 font-medium border-2 transition-colors duration-150 disabled:opacity-60"
+                style={{ borderColor: "var(--status-warning)", color: "#8a5a00" }}
+              >
+                Remarcar
+              </button>
+            ) : null}
+            <button
+              disabled={pending}
+              onClick={() => run(() => updateStatus(requestId, "cancelada"), "Marcado como cancelada.")}
+              className="text-sm rounded-lg px-3.5 py-2.5 font-medium border-2 transition-colors duration-150 disabled:opacity-60"
+              style={{ borderColor: "var(--status-critical)", color: "var(--status-critical)" }}
+            >
+              Cancelar
+            </button>
+          </>
+        ) : !canRequestNewExchange ? (
           <button
             disabled={pending}
-            onClick={() => run(() => updateStatus(requestId, "cancelada"), "Marcado como cancelada.")}
-            className="text-sm rounded px-3 py-2 disabled:opacity-60"
-            style={{ background: "color-mix(in srgb, var(--status-critical) 35%, var(--surface-1))", color: "var(--text-primary)" }}
+            onClick={() => run(() => updateStatus(requestId, "aberta"), "Status revertido para aberta.")}
+            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 self-start disabled:opacity-60"
           >
-            Marcar como Cancelada
+            ↩ Reverter pra Aberta (marquei errado)
           </button>
-        </div>
-      ) : !canRequestNewExchange ? (
-        <button
-          disabled={pending}
-          onClick={() => run(() => updateStatus(requestId, "aberta"), "Status revertido para aberta.")}
-          className="text-xs underline self-start disabled:opacity-60"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          ↩ Reverter pra Aberta (marquei errado)
-        </button>
-      ) : null}
+        ) : null}
+      </div>
 
       {askingRemarcarReason ? (
-        <div className="flex flex-col gap-2 rounded border p-3" style={{ borderColor: "var(--status-warning)" }}>
-          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+        <div className="flex flex-col gap-2 rounded-lg border-2 p-3" style={{ borderColor: "var(--status-warning)" }}>
+          <span className="text-sm" style={{ color: "#1F2937" }}>
             Qual o motivo da remarcação?
           </span>
           <textarea
@@ -183,8 +174,8 @@ export function DeliveryRequestActions({
             onChange={(e) => setRemarcarReason(e.target.value)}
             rows={2}
             placeholder="Ex: cliente ausente, endereço errado, precisa de nova data…"
-            className="rounded border px-3 py-2 text-sm"
-            style={{ borderColor: "var(--border)" }}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            style={{ borderColor: "#E5E7EB" }}
             autoFocus
           />
           <div className="flex items-center gap-2">
@@ -201,8 +192,7 @@ export function DeliveryRequestActions({
                 setAskingRemarcarReason(false);
                 setRemarcarReason("");
               }}
-              className="text-sm underline"
-              style={{ color: "var(--text-secondary)" }}
+              className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150"
             >
               cancelar
             </button>
@@ -222,8 +212,8 @@ export function DeliveryRequestActions({
       ) : null}
 
       {askingNovaTroca && sameProduct === null ? (
-        <div className="flex flex-col gap-2 rounded border p-3" style={{ borderColor: "var(--status-warning)" }}>
-          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+        <div className="flex flex-col gap-2 rounded-lg border-2 p-3" style={{ borderColor: "var(--status-warning)" }}>
+          <span className="text-sm" style={{ color: "#1F2937" }}>
             A nova troca é pelo mesmo produto ou o cliente quer outro?
           </span>
           <div className="flex items-center gap-2 flex-wrap">
@@ -237,11 +227,11 @@ export function DeliveryRequestActions({
             <button
               onClick={() => setSameProduct(false)}
               className="text-sm rounded px-3 py-2 border"
-              style={{ borderColor: "var(--status-warning)", color: "var(--text-primary)" }}
+              style={{ borderColor: "var(--status-warning)", color: "#1F2937" }}
             >
               Outro produto
             </button>
-            <button onClick={resetNovaTroca} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            <button onClick={resetNovaTroca} className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150">
               cancelar
             </button>
           </div>
@@ -249,8 +239,8 @@ export function DeliveryRequestActions({
       ) : null}
 
       {askingNovaTroca && sameProduct !== null ? (
-        <div className="flex flex-col gap-2 rounded border p-3" style={{ borderColor: "var(--status-warning)" }}>
-          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+        <div className="flex flex-col gap-2 rounded-lg border-2 p-3" style={{ borderColor: "var(--status-warning)" }}>
+          <span className="text-sm" style={{ color: "#1F2937" }}>
             {sameProduct ? "Mesmo produto" : "Outro produto"} — o que aconteceu com o produto trocado?
           </span>
           <textarea
@@ -258,15 +248,15 @@ export function DeliveryRequestActions({
             onChange={(e) => setNovaTrocaReason(e.target.value)}
             rows={2}
             placeholder="Ex: veio com a mesma avaria, cliente decidiu trocar de modelo…"
-            className="rounded border px-3 py-2 text-sm"
-            style={{ borderColor: "var(--border)" }}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            style={{ borderColor: "#E5E7EB" }}
             autoFocus
           />
           <select
             value={novaTrocaCausaRaiz}
             onChange={(e) => setNovaTrocaCausaRaiz(e.target.value)}
-            className="rounded border px-3 py-2 text-sm"
-            style={{ borderColor: "var(--border)" }}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            style={{ borderColor: "#E5E7EB" }}
           >
             <option value="" disabled>
               Quem errou (controle interno) *
@@ -283,15 +273,15 @@ export function DeliveryRequestActions({
                 value={novaTrocaCarga}
                 onChange={(e) => setNovaTrocaCarga(e.target.value)}
                 placeholder="Carga *"
-                className="rounded border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--border)" }}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+                style={{ borderColor: "#E5E7EB" }}
               />
               <input
                 value={novaTrocaConferente}
                 onChange={(e) => setNovaTrocaConferente(e.target.value)}
                 placeholder="Conferente *"
-                className="rounded border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--border)" }}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+                style={{ borderColor: "#E5E7EB" }}
               />
             </div>
           ) : null}
@@ -301,15 +291,15 @@ export function DeliveryRequestActions({
                 value={novaTrocaCarga}
                 onChange={(e) => setNovaTrocaCarga(e.target.value)}
                 placeholder="Carga *"
-                className="rounded border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--border)" }}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+                style={{ borderColor: "#E5E7EB" }}
               />
               <input
                 value={novaTrocaDriverName}
                 onChange={(e) => setNovaTrocaDriverName(e.target.value)}
                 placeholder="Motorista que entregou (erro) *"
-                className="rounded border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--border)" }}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+                style={{ borderColor: "#E5E7EB" }}
               />
             </div>
           ) : null}
@@ -319,8 +309,8 @@ export function DeliveryRequestActions({
               onChange={(e) => setNovaTrocaCausaRaizDetalhe(e.target.value)}
               rows={2}
               placeholder="O que houve, exatamente? *"
-              className="rounded border px-3 py-2 text-sm"
-              style={{ borderColor: "var(--border)" }}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+              style={{ borderColor: "#E5E7EB" }}
             />
           ) : null}
           <div className="flex items-center gap-2">
@@ -337,36 +327,40 @@ export function DeliveryRequestActions({
             >
               Confirmar nova troca
             </button>
-            <button onClick={resetNovaTroca} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            <button onClick={resetNovaTroca} className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150">
               cancelar
             </button>
           </div>
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-2">
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={2}
-          placeholder="Adicionar observação…"
-          className="rounded border px-3 py-2 text-sm"
-          style={{ borderColor: "var(--border)" }}
-        />
-        <button
-          disabled={pending || !note.trim()}
-          onClick={() =>
-            run(async () => {
-              await addNote(requestId, note);
-              setNote("");
-            }, "Nota adicionada.")
-          }
-          className="text-sm rounded px-3 py-2 self-start border disabled:opacity-60"
-          style={{ borderColor: "var(--border)" }}
-        >
-          Adicionar nota
-        </button>
-      </div>
     </div>
+
+    {/* Notas rápidas -- bloco próprio, separado das ações de status (Guia
+        de Componentes Maia): "campo de texto compacto para adicionar
+        observações". */}
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-2">
+      <h3 className="text-sm font-semibold text-gray-800">Notas rápidas</h3>
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        rows={2}
+        placeholder="Adicionar observação…"
+        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+      />
+      <button
+        disabled={pending || !note.trim()}
+        onClick={() =>
+          run(async () => {
+            await addNote(requestId, note);
+            setNote("");
+          }, "Nota adicionada.")
+        }
+        className="text-sm rounded-lg px-3.5 py-2 self-start border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 disabled:opacity-60"
+      >
+        Adicionar nota
+      </button>
+    </div>
+    </>
   );
 }

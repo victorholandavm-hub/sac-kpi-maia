@@ -11,34 +11,27 @@ import { driverNameForRota, JP_EXTRA_ROTA, type RotaDayOverview } from "@/lib/ro
 import type { QueueGroup } from "@/lib/entregaQueueGrouping";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
 
-// Quadro Kanban só pro dia de HOJE -- pedido do Victor 25/08/2026: "Para a
-// operação de Hoje, um quadro estilo Kanban funciona muito bem: Coluna Sem
-// Rota, Coluna por rota (com o motorista), ...". Os outros dias continuam
-// na sanfona de sempre (EntregasGroupsList.tsx) -- só hoje é operação em
-// tempo real o bastante pra justificar ver tudo lado a lado de uma vez.
-// Sem arrastar-e-soltar entre colunas -- não foi pedido, e mudar
-// rota/motorista de um card já tem fluxo próprio (dentro do detalhe do
-// chamado); aqui é só uma visão, mais rápida de escanear que a sanfona.
+// Quadro do dia de HOJE -- pedido do Victor 25/08/2026: "Para a operação
+// de Hoje, um quadro estilo Kanban funciona muito bem: Coluna Sem Rota,
+// Coluna por rota (com o motorista), ...". Os outros dias continuam na
+// sanfona de sempre (EntregasGroupsList.tsx) -- só hoje é operação em
+// tempo real o bastante pra justificar ver tudo de uma vez.
 //
-// Subabas Programado/Concluído/Cancelado DENTRO de cada coluna -- pedido
-// do Victor 29/08/2026: "tem como colocar dentro do kanban, dentro da
-// rota mesmo duas subabas de programado/concluido/cancelado? porque hoje
-// eu preciso rolar muito pra ver o que ja foi concluido e o que nao".
-// Mesmos 3 baldes que a sanfona já usa só pra CONTAR (countByDeliveryStatus,
-// DeliveryStatusBadge.tsx, pedido anterior do Victor 21/08/2026) -- aqui
-// filtram de verdade quais cards aparecem, não só mostram o número.
-// "use client" + useState por coluna (cada coluna escolhe sua aba
-// independente das outras) -- estado local, não faz sentido guardar na
-// URL (o kanban tem N colunas, uma por rota do dia). Começa em
-// "Programado": é o que precisa de atenção agora; Concluído/Cancelado já
-// estão resolvidos, só um clique de distância quando alguém quiser
-// conferir.
-
+// Reformulado 01/09/2026 -- pedido do Victor: "em vez de caixas verticais
+// empilhadas, crie uma linha horizontal de cards resumidos... cada card
+// de rota deve ter apenas mini-badges discretos com a contagem" + "exiba
+// a listagem em formato de Tabela Grid Horizontal Limpa". O Kanban de
+// colunas com cartão por chamado (um por rota, rolagem lateral) virou
+// duas peças: (1) uma fileira de cards de RESUMO por rota (só contagem +
+// motorista, sem lista de chamado nenhuma dentro) e (2) uma tabela única,
+// achatada, com todos os chamados de hoje juntos -- "Rota/Motorista"
+// passa a ser só mais uma COLUNA da tabela, não mais o critério de
+// agrupamento visual. As subabas Programado/Concluído/Cancelado (pedido
+// do Victor 29/08/2026, ver abaixo) deixam de ser por coluna e viram um
+// filtro único acima da tabela -- mesma função, um lugar só.
 type KanbanColumn = {
   key: string;
   rotaLabel: string;
-  headerBg: string;
-  headerText: string;
   borderColor: string;
   items: ServiceRequestSummary[];
   driverName: string | null;
@@ -55,10 +48,10 @@ type KanbanColumn = {
 // Ajuste pedido em seguida, mesma conversa: "eu prefiro que seja dois
 // cards diferentes no kanban, um para cada motorista" -- em vez de um card
 // com o motorista errado (ou, na correção anterior, o nome certo repetido
-// dentro de cada linha), o grupo "extra" agora vira uma COLUNA POR
-// MOTORISTA, cada uma com seu cabeçalho certo -- mesmo tratamento visual
-// que as rotas fixas (praia/sul/centro/CG) já tinham (um motorista, um
-// cabeçalho). Rotas fixas continuam uma coluna só, sem mudança.
+// dentro de cada linha), o grupo "extra" agora vira um CARD POR MOTORISTA,
+// cada um com seu cabeçalho certo -- mesmo tratamento que as rotas fixas
+// (praia/sul/centro/CG) já tinham (um motorista, um card). Rotas fixas
+// continuam um card só, sem mudança.
 function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | null): KanbanColumn[] {
   return groups.flatMap((group): KanbanColumn[] => {
     if (group.rotaKey === JP_EXTRA_ROTA) {
@@ -82,8 +75,6 @@ function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | nul
         .map(([driverKey, items]) => ({
           key: `${group.key}_${driverKey || "sem_motorista"}`,
           rotaLabel: group.rotaLabel ?? group.label,
-          headerBg: group.headerBg,
-          headerText: group.headerText,
           borderColor: group.borderColor,
           items,
           driverName: driverKey || null,
@@ -95,8 +86,6 @@ function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | nul
       {
         key: group.key,
         rotaLabel: group.rotaLabel ?? group.label,
-        headerBg: group.headerBg,
-        headerText: group.headerText,
         borderColor: group.borderColor,
         items: group.items,
         driverName,
@@ -105,140 +94,204 @@ function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | nul
   });
 }
 
-export function EntregasKanbanHoje({ groups, todayOverview }: { groups: QueueGroup[]; todayOverview: RotaDayOverview | null }) {
-  if (groups.length === 0) return null;
-  const columns = buildColumns(groups, todayOverview);
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-        📌 Hoje
-      </span>
-      <div className="flex items-start gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-        {columns.map((column) => (
-          <KanbanColumnCard key={column.key} column={column} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-type DeliveryStatusTab = "programado" | "concluido" | "cancelado";
+type DeliveryStatusTab = "todos" | "programado" | "concluido" | "cancelado";
 
 // Mesmo balde de countByDeliveryStatus (DeliveryStatusBadge.tsx), só que
-// por item em vez de agregado -- precisa pra FILTRAR quais cards
-// aparecem em cada subaba, não só contar. Mantém a mesma regra (senão as
-// subabas e os números do cabeçalho da coluna divergiam entre si).
-function deliveryStatusTab(status: string): DeliveryStatusTab {
+// por item em vez de agregado -- precisa pra FILTRAR quais linhas
+// aparecem em cada aba, não só contar. Mantém a mesma regra (senão a
+// aba e os números do resumo por rota divergiam entre si).
+function deliveryStatusTab(status: string): Exclude<DeliveryStatusTab, "todos"> {
   if (status === "concluida") return "concluido";
   if (status === "cancelada") return "cancelado";
   return "programado";
 }
 
 const STATUS_TAB_LABELS: Record<DeliveryStatusTab, string> = {
+  todos: "Todos",
   programado: "Programado",
   concluido: "Concluído",
   cancelado: "Cancelado",
 };
 
-function KanbanColumnCard({ column }: { column: KanbanColumn }) {
-  // Estado local por coluna -- cada rota escolhe sua subaba independente
-  // das outras (ver comentário no topo do arquivo). Começa em
-  // "programado" -- é o que precisa de atenção agora.
-  const [tab, setTab] = useState<DeliveryStatusTab>("programado");
+// Badge de contagem discreto -- Guia de Componentes Maia (Design System,
+// 01/09/2026): "mini-badges discretos com a contagem, de forma muito
+// limpa". Cinza neutro pro estado padrão (Programado), verde suave pra
+// Concluído, cinza apagado pra Cancelado -- mesma régua de cor de
+// StatusBadge.tsx, sem inventar paleta nova só pra esse resumo.
+function CountBadge({ label, count, tone }: { label: string; count: number; tone: "neutral" | "good" | "muted" }) {
+  const styles =
+    tone === "good"
+      ? { background: "#E8F0EC", color: "#164A30" }
+      : tone === "muted"
+        ? { background: "#F3F4F6", color: "#9CA3AF" }
+        : { background: "#F3F4F6", color: "#4B5563" };
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap" style={styles}>
+      {count} {label}
+    </span>
+  );
+}
+
+// Card de RESUMO por rota -- linha horizontal (grid), não mais coluna de
+// Kanban com cartão por chamado dentro. Só o essencial pra bater o olho:
+// rota, motorista, três contagens.
+function RouteSummaryCard({ column }: { column: KanbanColumn }) {
   const counts: DeliveryStatusCounts = { programado: 0, concluido: 0, cancelado: 0 };
   for (const r of column.items) counts[deliveryStatusTab(r.status)]++;
-  const visibleItems = column.items.filter((r) => deliveryStatusTab(r.status) === tab);
 
   return (
-    <div className="flex flex-col rounded-xl shrink-0 w-72 overflow-hidden" style={{ border: `2px solid ${column.borderColor}` }}>
-      <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ background: column.headerBg }}>
-        <span className="text-sm font-bold" style={{ color: column.headerText }}>
-          {column.rotaLabel}
-        </span>
-        <span className="text-xs font-semibold" style={{ color: column.headerText, opacity: 0.85 }}>
-          ({column.items.length})
+    <div className="rounded-xl border border-gray-200 bg-white p-4 flex flex-col gap-3" style={{ borderLeft: `3px solid ${column.borderColor}` }}>
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-sm font-semibold text-gray-800">{column.rotaLabel}</span>
+        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500 shrink-0">
+          {column.items.length}
         </span>
       </div>
-      {column.driverName ? (
-        <div className="px-3 py-1 text-xs font-medium" style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
-          🚚 {column.driverName}
-        </div>
-      ) : null}
-      <div className="flex items-center gap-1 px-2 pt-2" style={{ background: "var(--surface-1)" }}>
-        {(Object.keys(STATUS_TAB_LABELS) as DeliveryStatusTab[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className="text-[11px] px-2 py-1 rounded-full whitespace-nowrap font-medium"
-            style={
-              tab === t
-                ? { background: "var(--brand-green)", color: "var(--brand-green-ink)" }
-                : { border: "1px solid var(--border)", color: "var(--text-secondary)" }
-            }
-          >
-            {STATUS_TAB_LABELS[t]} ({counts[t]})
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-col gap-2 p-2 overflow-y-auto max-h-[65vh]" style={{ background: "var(--surface-1)" }}>
-        {visibleItems.length === 0 ? (
-          <p className="text-xs text-center py-3" style={{ color: "var(--text-muted)" }}>
-            Nada em &quot;{STATUS_TAB_LABELS[tab]}&quot; aqui.
-          </p>
-        ) : (
-          visibleItems.map((r) => <KanbanCard key={r.id} r={r} />)
-        )}
+      <span className="text-xs text-gray-500">{column.driverName ? `🚚 ${column.driverName}` : "Sem motorista"}</span>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <CountBadge label="programado" count={counts.programado} tone="neutral" />
+        <CountBadge label="concluído" count={counts.concluido} tone="good" />
+        <CountBadge label="cancelado" count={counts.cancelado} tone="muted" />
       </div>
     </div>
   );
 }
 
-// Card compacto, empilhado -- diferente do EntregaCardRow (fila/sanfona),
-// pensado pra ficar largo (linha inteira, 6 colunas percentuais); numa
-// coluna de Kanban de ~280px isso ficaria ilegível, então é um card
-// vertical novo, não reaproveitado dali.
-function KanbanCard({ r }: { r: ServiceRequestSummary }) {
+type FlatRow = { r: ServiceRequestSummary; rotaLabel: string; driverName: string | null };
+
+// Linha da tabela -- Guia de Componentes Maia: "ID/Tipo, Cliente (Nome +
+// Telefone menor abaixo), Produto (texto corrido em linha), Rota/
+// Motorista Atual, Situação, Ações (link sutil 'Ver produtos')". Avisos
+// que antes eram tags à parte (urgente, "novo desde") viram indicadores
+// compactos dentro da própria coluna Situação -- a informação continua
+// ali, só sem virar uma sétima coluna.
+function TodayRow({ row }: { row: FlatRow }) {
+  const { r } = row;
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg p-2.5 shadow-sm" style={{ background: "var(--surface-1)", border: "1px solid var(--gridline)" }}>
-      {/* Campos que navegam pro chamado -- display:contents (mesmo padrão
-          de EntregaCardRow/VisitaCardRow) pra Ver produtos, fora do link,
-          continuar clicável sem disparar navegação. */}
-      <Link href={`/assistencia/${r.id}`} className="contents">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-            #{r.ticketNumber}
-          </span>
-          <div className="flex items-center gap-1">
-            <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
-            <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
-          </div>
+    <tr className="hover:bg-gray-50 transition-colors duration-150">
+      <td className="px-4 py-3 align-top whitespace-nowrap">
+        <div className="font-mono text-xs text-gray-400">#{r.ticketNumber}</div>
+        <span
+          className="inline-flex mt-1 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white whitespace-nowrap"
+          style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "#9CA3AF" }}
+        >
+          {REQUEST_TYPE_LABELS[r.type] ?? r.type}
+        </span>
+      </td>
+      <td className="px-4 py-3 align-top">
+        <div className="flex items-center gap-1.5">
+          <span className="font-medium text-gray-800 truncate">{r.clientName ?? "Sem nome de cliente"}</span>
+          <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
         </div>
-        {/* Caixa alta -- pedido do Victor 25/08/2026 ("guia de
-            padronização"): "Nome do Cliente (Bold, caixa alta)", mesmo
-            tratamento de AssistenciaQueueGroup.tsx. */}
-        <span className="text-sm font-bold truncate uppercase" style={{ color: "var(--text-primary)" }}>
-          {r.clientName ?? "Sem nome de cliente"}
-        </span>
-        <span className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
-          {r.clientPhone ?? "—"} · {r.clientNeighborhood ?? "—"}
-        </span>
+        {/* Telefone + bairro -- mesma dupla que o card antigo mostrava
+            (bairro tinha sumido na reformulação de 01/09/2026, restaurado
+            aqui: continua sendo dado que a rota/motorista precisa). */}
+        <div className="text-xs text-gray-400 font-mono">
+          {r.clientPhone ?? "—"}
+          {r.clientNeighborhood ? ` · ${r.clientNeighborhood}` : ""}
+        </div>
+      </td>
+      <td className="px-4 py-3 align-top text-gray-600 max-w-[260px] truncate" title={r.items.map((i) => i.product).join(", ")}>
+        {r.items.map((i) => i.product).join(", ") || "—"}
+      </td>
+      <td className="px-4 py-3 align-top text-gray-600 whitespace-nowrap">
+        <div>{row.rotaLabel}</div>
+        <div className="text-xs text-gray-400">{row.driverName ? `🚚 ${row.driverName}` : "Sem motorista"}</div>
+      </td>
+      <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span
-            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-            style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "var(--text-muted)", color: "#fff" }}
-          >
-            {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-          </span>
-          {r.scheduledTime ? (
-            <span className="text-[10px] whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-              🕐 {r.scheduledTime.slice(0, 5)}
+          <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+          {/* Horário agendado -- também tinha sumido na reformulação,
+              restaurado (o card antigo mostrava "🕐 HH:MM"). */}
+          {r.scheduledTime ? <span className="text-[10px] text-gray-400 whitespace-nowrap">🕐 {r.scheduledTime.slice(0, 5)}</span> : null}
+          {r.urgent ? (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap text-white" style={{ background: "var(--status-critical)" }}>
+              URGENTE
             </span>
           ) : null}
         </div>
-      </Link>
-      <ProductsModalButton items={r.items} />
+      </td>
+      <td className="px-4 py-3 align-top">
+        <Link href={`/assistencia/${r.id}`} className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 mr-3">
+          Abrir
+        </Link>
+        <ProductsModalButton items={r.items} />
+      </td>
+    </tr>
+  );
+}
+
+export function EntregasKanbanHoje({ groups, todayOverview }: { groups: QueueGroup[]; todayOverview: RotaDayOverview | null }) {
+  const [tab, setTab] = useState<DeliveryStatusTab>("todos");
+  if (groups.length === 0) return null;
+  const columns = buildColumns(groups, todayOverview);
+
+  const allRows: FlatRow[] = columns.flatMap((column) =>
+    column.items.map((r) => ({ r, rotaLabel: column.rotaLabel, driverName: column.driverName }))
+  );
+  const counts: DeliveryStatusCounts = { programado: 0, concluido: 0, cancelado: 0 };
+  for (const row of allRows) counts[deliveryStatusTab(row.r.status)]++;
+  const visibleRows = tab === "todos" ? allRows : allRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">📌 Hoje</span>
+
+      {/* Resumo horizontal por rota -- grid de 4 colunas em telas largas,
+          empilha em telas menores. Só contagem + motorista, sem lista de
+          chamado nenhuma dentro (essa mudou pra tabela única abaixo). */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {columns.map((column) => (
+          <RouteSummaryCard key={column.key} column={column} />
+        ))}
+      </div>
+
+      {/* Filtro único Todos/Programado/Concluído/Cancelado -- substitui as
+          subabas por coluna de antes (pedido do Victor 29/08/2026), agora
+          um lugar só pra tabela achatada inteira. */}
+      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
+        {(Object.keys(STATUS_TAB_LABELS) as DeliveryStatusTab[]).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+              tab === t ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {STATUS_TAB_LABELS[t]}
+            {t !== "todos" ? <span className="ml-1 text-xs font-mono text-gray-400">({counts[t as Exclude<DeliveryStatusTab, "todos">]})</span> : null}
+          </button>
+        ))}
+      </div>
+
+      {/* Tabela Grid Horizontal Limpa -- Guia de Componentes Maia (Design
+          System, 01/09/2026): fim das caixas de texto espremidas do
+          Kanban antigo. */}
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-100">
+              {["ID / Tipo", "Cliente", "Produto", "Rota / Motorista", "Situação", ""].map((h) => (
+                <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {visibleRows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
+                  Nada em &quot;{STATUS_TAB_LABELS[tab]}&quot; aqui.
+                </td>
+              </tr>
+            ) : (
+              visibleRows.map((row) => <TodayRow key={row.r.id} row={row} />)
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

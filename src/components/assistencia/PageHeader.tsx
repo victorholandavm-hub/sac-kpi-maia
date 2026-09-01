@@ -9,15 +9,12 @@
 export function PageHeader({ title, description, cta }: { title: string; description?: string; cta?: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 flex-wrap">
+      {/* Guia de Componentes Maia (Design System, 01/09/2026): título em
+          cinza-800 (nunca preto puro), descrição em cinza-500 -- mesma
+          escala tipográfica da tela da equipe técnica. */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
-          {title}
-        </h1>
-        {description ? (
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            {description}
-          </p>
-        ) : null}
+        <h1 className="text-xl font-semibold text-gray-800">{title}</h1>
+        {description ? <p className="text-sm text-gray-500">{description}</p> : null}
       </div>
       {cta}
     </div>
