@@ -9,26 +9,20 @@ import { AgendaDayGroups } from "@/components/assistencia/AgendaDayGroups";
 import { AgendaKanbanBoard } from "@/components/assistencia/AgendaKanbanBoard";
 import { JP_PRIMARY_ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
 import { DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
+import { groupIntoMonths, paginateMonths, pageContainingMonth } from "@/lib/weekGrouping";
 
-// Mês corrente + navegação </> -- pedido do Victor 25/08/2026: "Se a
-// opção padrão for 'Tudo', limite por padrão ao mês corrente" +
-// "[ < ] Agosto 2026 [ > ]". Só usado quando nenhum filtro de período
-// (Atrasado/Hoje/Semana) está escolhido -- esses três já são recortes de
-// data explícitos, não fazem sentido combinados com navegação de mês.
+// Mês corrente -- usado só pra saber em qual PÁGINA (ver paginateMonths/
+// pageContainingMonth, weekGrouping.ts) o mês corrente cai por padrão,
+// quando "Tudo" está selecionado e nenhuma página foi pedida na URL.
+// Antes disso era usado também pra restringir a busca a um mês só, com
+// navegação "[ < ] Agosto 2026 [ > ]" -- pedido do Victor 01/09/2026:
+// "nas listas estão ficando 2/3 páginas sem necessidade... deixe tudo
+// numa única página, só quando tiver mais de 3 meses" trocou aquela
+// navegação por mês pela mesma paginação por mês que Visitas/Entregas
+// passaram a usar (ver fila/page.tsx) -- até 3 meses cabem juntos numa
+// página só, sem precisar clicar mês a mês.
 function currentMonthKey(): string {
   return new Date().toISOString().slice(0, 7);
-}
-
-function addMonthsToKey(monthKey: string, delta: number): string {
-  const [y, m] = monthKey.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-function monthLabel(monthKey: string): string {
-  const [y, m] = monthKey.split("-").map(Number);
-  const label = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
-  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 // Mesmo critério de isGroupOverdue (AgendaDayGroups.tsx) -- "ainda tem
@@ -75,13 +69,13 @@ const FILTERS: { label: string; value: AgendaRange | null }[] = [
   { label: "Próximos 7 dias", value: "semana" },
 ];
 
-function buildHref(params: { range?: string; rota?: string; assembler?: string; view?: string; month?: string; showPast?: string; store?: string; q?: string }) {
+function buildHref(params: { range?: string; rota?: string; assembler?: string; view?: string; page?: number; showPast?: string; store?: string; q?: string }) {
   const sp = new URLSearchParams();
   if (params.range) sp.set("range", params.range);
   if (params.rota) sp.set("rota", params.rota);
   if (params.assembler) sp.set("assembler", params.assembler);
   if (params.view) sp.set("view", params.view);
-  if (params.month) sp.set("month", params.month);
+  if (params.page && params.page > 1) sp.set("page", String(params.page));
   if (params.showPast) sp.set("showPast", params.showPast);
   if (params.store) sp.set("store", params.store);
   if (params.q) sp.set("q", params.q);
@@ -104,22 +98,25 @@ function matchesQuery(r: ServiceRequestSummary, q: string): boolean {
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; rota?: string; assembler?: string; view?: string; month?: string; showPast?: string; store?: string; q?: string }>;
+  searchParams: Promise<{ range?: string; rota?: string; assembler?: string; view?: string; page?: string; showPast?: string; store?: string; q?: string }>;
 }) {
   redirectIfSac(await getProfile());
-  const { range, rota, assembler, view, month, showPast, store, q } = await searchParams;
+  const { range, rota, assembler, view, page: pageParam, showPast, store, q } = await searchParams;
   const filterRange = (["atrasado", "hoje", "semana"] as const).includes(range as AgendaRange)
     ? (range as AgendaRange)
     : undefined;
   const filterRota = isRota(rota) ? rota : undefined;
   const showKanban = view === "montador";
-  // Mês corrente por padrão -- só entra em jogo quando "Tudo" está
-  // selecionado (Atrasado/Hoje/Semana já são recortes de data próprios).
-  const filterMonth = /^\d{4}-\d{2}$/.test(month ?? "") ? month! : currentMonthKey();
   const showPastResolved = showPast === "1";
   const filterQ = q?.trim().toLowerCase() || undefined;
+  // "Tudo" (nenhum range escolhido) busca TODO o histórico agendado, sem
+  // recorte de mês nenhum -- listScheduledRequests já não paginava por
+  // linha (sempre trouxe tudo que tem scheduled_date/approved_deadline),
+  // só ficava restrito a 1 mês por vez aqui na página (ver `filterMonth`
+  // de antes, removido). Agrupamento por mês + paginação por página
+  // (ver allMonths/pageGroups abaixo) assume esse papel agora.
   const [allRequests, assemblers, stores, overdueRaw] = await Promise.all([
-    listScheduledRequests({ range: filterRange, month: filterRange ? undefined : filterMonth }),
+    listScheduledRequests({ range: filterRange }),
     listAssemblers(),
     listStores(),
     // Sempre busca as atrasadas de verdade (sem limite de mês) pro alerta
@@ -157,6 +154,26 @@ export default async function AgendaPage({
   if (!showPastResolved) {
     groups = groups.filter((g) => !(g.dateKey < todayKey && !hasPendingItems(g.items)));
   }
+
+  // Paginação por MÊS -- pedido do Victor 01/09/2026 (mesma regra de
+  // fila/page.tsx, ver paginateMonths/weekGrouping.ts): até 3 meses
+  // cabem juntos numa página só; a partir do 4º, um mês por página.
+  // Só entra em jogo em "Tudo" -- Atrasado/Hoje/Semana já são recortes
+  // de data próprios, não fazem sentido fatiados por mês (mesmo critério
+  // de `postFiltered` em fila/page.tsx). Sem página explícita na URL,
+  // abre direto na página que contém o mês corrente (equivalente ao
+  // "mês corrente por padrão" de antes, mas permitindo ver os meses
+  // vizinhos juntos em vez de só um por vez).
+  const allMonths = !filterRange ? groupIntoMonths(groups, (g) => g.dateKey) : [];
+  const requestedPage = /^\d+$/.test(pageParam ?? "") ? parseInt(pageParam!, 10) : undefined;
+  const defaultPage = pageContainingMonth(allMonths, currentMonthKey());
+  const { pageMonths, totalPages } = !filterRange ? paginateMonths(allMonths, requestedPage ?? defaultPage) : { pageMonths: [], totalPages: 1 };
+  const currentPage = Math.min(Math.max(1, requestedPage ?? defaultPage), totalPages);
+  const pageGroups = filterRange ? groups : pageMonths.flatMap((m) => m.weeks.flatMap((w) => w.days));
+  // Kanban por montador segue o mesmo recorte de página -- sem isso,
+  // "Tudo" + Kanban mostraria todo o histórico de uma vez, sem relação
+  // com o que a visão "Por dia" ao lado está mostrando.
+  const pageRequests = filterRange ? requests : pageGroups.flatMap((g) => g.items);
 
   // Repassado em praticamente todo buildHref abaixo -- rota/montador já
   // faziam isso individualmente; loja/busca (novos) entram do mesmo jeito.
@@ -245,44 +262,22 @@ export default async function AgendaPage({
             href={buildHref({ range: f.value ?? undefined, ...commonParams, view: showKanban ? "montador" : undefined })}
           />
         ))}
-        {/* Navegação de mês </> -- só faz sentido em "Tudo" (Atrasado/Hoje/
-            Semana já são recortes de data próprios, não usam mês).
-            Particularidade mantida de propósito (pedido do Victor
-            25/08/2026, "guia de padronização": "Agenda: Manter o foco na
-            distribuição cronológica") -- não vira paginação genérica de
-            página 1/2/3 como Solicitações, o recorte por mês já cumpre
-            esse papel aqui. */}
-        {!filterRange ? (
-          <div className="flex items-center gap-1 ml-1">
-            <Link
-              href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined, month: addMonthsToKey(filterMonth, -1) })}
-              aria-label="Mês anterior"
-              className="text-sm px-2 py-1 rounded border"
-              style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-            >
-              ←
-            </Link>
-            <span className="text-xs font-semibold px-1 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-              {monthLabel(filterMonth)}
-            </span>
-            <Link
-              href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined, month: addMonthsToKey(filterMonth, 1) })}
-              aria-label="Próximo mês"
-              className="text-sm px-2 py-1 rounded border"
-              style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-            >
-              →
-            </Link>
-            {filterMonth !== currentMonthKey() ? (
-              <Link
-                href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined })}
-                className="text-xs underline"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                hoje
-              </Link>
-            ) : null}
-          </div>
+        {/* Atalho "hoje" -- só faz sentido em "Tudo" (Atrasado/Hoje/Semana
+            já são recortes de data próprios). Antes disso era navegação
+            "[ < ] Mês [ > ]" um mês por vez -- pedido do Victor
+            01/09/2026: passou a mostrar até 3 meses juntos numa página só
+            (mesma regra de Visitas/Entregas, ver paginateMonths acima),
+            então só falta um jeito de voltar direto pra página com o mês
+            corrente quando o usuário navegou pra outra (ver Anterior/
+            Próxima no rodapé da lista, abaixo). */}
+        {!filterRange && currentPage !== defaultPage ? (
+          <Link
+            href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined })}
+            className="text-xs underline ml-1"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            hoje
+          </Link>
         ) : null}
       </div>
 
@@ -295,7 +290,7 @@ export default async function AgendaPage({
             key={f.label}
             label={f.label}
             selected={f.value === filterRota}
-            href={buildHref({ range: filterRange, ...commonParams, rota: f.value, view: showKanban ? "montador" : undefined, month: filterRange ? undefined : filterMonth })}
+            href={buildHref({ range: filterRange, ...commonParams, rota: f.value, view: showKanban ? "montador" : undefined })}
           />
         ))}
       </div>
@@ -317,7 +312,6 @@ export default async function AgendaPage({
         {assembler ? <input type="hidden" name="assembler" value={assembler} /> : null}
         {store ? <input type="hidden" name="store" value={store} /> : null}
         {showKanban ? <input type="hidden" name="view" value="montador" /> : null}
-        {!filterRange ? <input type="hidden" name="month" value={filterMonth} /> : null}
         {showPastResolved ? <input type="hidden" name="showPast" value="1" /> : null}
         {/* Ícone de lupa -- mesmo padrão de fila/page.tsx/notificacoes
             (ver lá). Só cobre cliente/telefone/nº do chamado/loja (ver
@@ -340,7 +334,7 @@ export default async function AgendaPage({
           Buscar
         </button>
         {q ? (
-          <Link href={buildHref({ range: filterRange, rota: filterRota, assembler, store, view: showKanban ? "montador" : undefined, month: filterRange ? undefined : filterMonth, showPast: showPastResolved ? "1" : undefined })} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+          <Link href={buildHref({ range: filterRange, rota: filterRota, assembler, store, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined })} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
             Limpar busca
           </Link>
         ) : null}
@@ -355,12 +349,12 @@ export default async function AgendaPage({
           <FilterPill
             label="Por dia"
             selected={!showKanban}
-            href={buildHref({ range: filterRange, ...commonParams, month: filterRange ? undefined : filterMonth })}
+            href={buildHref({ range: filterRange, ...commonParams })}
           />
           <FilterPill
             label="Por montador"
             selected={showKanban}
-            href={buildHref({ range: filterRange, ...commonParams, view: "montador", month: filterRange ? undefined : filterMonth })}
+            href={buildHref({ range: filterRange, ...commonParams, view: "montador" })}
           />
         </div>
         {/* Dias já concluídos ficam escondidos por padrão -- pedido do
@@ -372,7 +366,6 @@ export default async function AgendaPage({
             href={buildHref({
               range: filterRange,
               ...commonParams,
-              month: filterRange ? undefined : filterMonth,
               showPast: showPastResolved ? undefined : "1",
             })}
             className="text-xs underline"
@@ -386,17 +379,14 @@ export default async function AgendaPage({
       {requests.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {filterRange ? "Nenhuma visita nesse período." : "Nenhuma visita agendada nesse mês."}
+            {filterRange ? "Nenhuma visita nesse período." : "Nenhuma visita agendada."}
           </p>
         </div>
       ) : !showKanban && groups.length === 0 ? (
         <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Só tem dias já concluídos nesse período --{" "}
-            <Link
-              href={buildHref({ range: filterRange, ...commonParams, month: filterRange ? undefined : filterMonth, showPast: "1" })}
-              className="underline"
-            >
+            <Link href={buildHref({ range: filterRange, ...commonParams, showPast: "1" })} className="underline">
               ver dias já concluídos ({pastResolvedCount})
             </Link>
             .
@@ -410,15 +400,48 @@ export default async function AgendaPage({
               Também exclui os tipos que saem de motorista (troca/entrega de
               produto, envio de peça): esse Kanban arrasta pra reatribuir
               MONTADOR (setAssemblerName) -- não faz sentido um chamado de
-              motorista aparecer aqui, ele não tem montador nenhum pra trocar. */}
+              motorista aparecer aqui, ele não tem montador nenhum pra trocar.
+              `pageRequests` (não `requests`) -- segue o mesmo recorte de
+              página que "Por dia" ao lado, ver pageRequests acima. */}
           <AgendaKanbanBoard
-            requests={requests.filter((r) => !(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type))}
+            requests={pageRequests.filter((r) => !(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type))}
             assemblers={assemblers.filter(isAssistenciaControlledAssembler)}
           />
         </div>
       ) : (
-        <AgendaDayGroups groups={groups} todayKey={todayKey} />
+        <AgendaDayGroups groups={pageGroups} todayKey={todayKey} />
       )}
+
+      {/* Anterior/Próxima por MÊS (não por linha) -- mesma paginação de
+          fila/page.tsx (ver paginateMonths, weekGrouping.ts). Só aparece
+          em "Tudo" com mais de 3 meses de dados agendados -- Atrasado/
+          Hoje/Semana nunca paginam (mesmo critério de `postFiltered` em
+          fila/page.tsx: são recortes estreitos de propósito). */}
+      {!filterRange && totalPages > 1 ? (
+        <div className="flex items-center justify-center gap-4 pt-2">
+          {currentPage > 1 ? (
+            <Link
+              href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined, page: currentPage - 1 })}
+              className="text-sm px-3 py-2 rounded border"
+              style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+            >
+              ← Mês mais recente
+            </Link>
+          ) : null}
+          <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Página {currentPage} de {totalPages}
+          </span>
+          {currentPage < totalPages ? (
+            <Link
+              href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined, page: currentPage + 1 })}
+              className="text-sm px-3 py-2 rounded border"
+              style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+            >
+              Mês mais antigo →
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
