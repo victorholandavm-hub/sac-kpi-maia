@@ -46,6 +46,11 @@ export function PaymentItemEditor({
   const [authValue, setAuthValue] = useState(item.paymentAuthorizedBy ?? "");
 
   const isConcluded = item.requestStatus === "concluida";
+  // Montador já marcou como feito, mas o gerente da loja ainda não aprovou
+  // -- só a partir da aprovação (status vira "concluida") é que o Antonio
+  // pode definir valor/liberar pagamento. Até lá, aparece na lista (pra não
+  // sumir sem explicação), só sem a opção de mexer em valor.
+  const isAwaitingApproval = item.requestStatus === "aguardando_aprovacao";
   const total = item.unitValue !== null ? item.unitValue * item.quantity : null;
 
   function saveValue() {
@@ -116,7 +121,7 @@ export function PaymentItemEditor({
                 Salvar
               </button>
             </>
-          ) : canEdit ? (
+          ) : canEdit && !isAwaitingApproval ? (
             <button onClick={() => setEditing(true)} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
               {total !== null ? formatBRL(total) : "definir valor"}
             </button>
@@ -150,6 +155,14 @@ export function PaymentItemEditor({
                 {item.paymentReleased ? "✓ Pago" : "Pendente"}
               </span>
             )
+          ) : isAwaitingApproval ? (
+            <span
+              className="text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap"
+              style={{ color: "var(--series-3)", borderColor: "var(--series-3)" }}
+              title="O montador marcou como concluído, esperando o gerente da loja confirmar."
+            >
+              Aguardando aprovação do gerente
+            </span>
           ) : (
             <span
               className="text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap"

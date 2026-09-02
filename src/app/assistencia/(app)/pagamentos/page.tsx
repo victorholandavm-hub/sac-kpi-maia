@@ -55,10 +55,17 @@ export default async function PagamentosPage({
   ]);
   // Esconde "ainda em andamento e sem valor" -- isso não é acionável (a
   // montagem nem terminou) e seria só ruído. O que precisa de atenção do
-  // Antonio é quem já tem valor (qualquer status) ou quem já concluiu mas
-  // ainda não tem valor -- essa segunda parte é justamente o que estava
-  // faltando aparecer.
-  const allItems = rawItems.filter((i) => i.unitValue !== null || i.requestStatus === "concluida");
+  // Antonio é quem já tem valor (qualquer status), quem já concluiu mas
+  // ainda não tem valor, ou quem tá esperando o gerente aprovar -- essa
+  // última também precisa aparecer (só sem a opção de definir valor ainda,
+  // ver isAwaitingApproval em PaymentItemEditor.tsx), senão o chamado some
+  // da tela do Antonio inteiro enquanto aguarda a loja (achado testando o
+  // fluxo ao vivo 02/09/2026 -- pedido original do Victor era "enquanto
+  // isso, na tela do seu antonio deve aparecer que está pendente de
+  // aprovação do gerente").
+  const allItems = rawItems.filter(
+    (i) => i.unitValue !== null || i.requestStatus === "concluida" || i.requestStatus === "aguardando_aprovacao"
+  );
   const items = pendentes ? allItems.filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente") : allItems;
   const groups = groupByAssembler(items);
   const grandTotal = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
