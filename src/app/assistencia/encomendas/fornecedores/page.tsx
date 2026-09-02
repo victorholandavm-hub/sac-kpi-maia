@@ -5,6 +5,7 @@ import { listPedidosFornecedor, isPedidoFornecedorStatus } from "@/lib/pedidosFo
 import { PEDIDO_FORNECEDOR_STATUS_LABELS } from "@/lib/assistenciaLabels";
 import { PedidoFornecedorStatusBadge } from "@/components/assistencia/PedidoFornecedorStatusBadge";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
@@ -50,12 +51,12 @@ export default async function PedidosFornecedorPage({
         <div className="flex items-center gap-3">
           <Link
             href="/assistencia/encomendas/fornecedores/novo"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
-            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
+            style={{ background: "#1B5E3C" }}
           >
             + Novo pedido
           </Link>
-          <Link href="/assistencia/encomendas/fila" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+          <Link href="/assistencia/encomendas/fila" className="text-sm underline text-gray-500 hover:text-gray-700">
             ← Fila de encomendas
           </Link>
         </div>
@@ -66,27 +67,18 @@ export default async function PedidosFornecedorPage({
           className="rounded-lg p-4"
           style={{ background: "color-mix(in srgb, var(--status-good) 20%, var(--surface-1))", border: "2px solid var(--status-good)" }}
         >
-          <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            Pedido enviado com sucesso!{pedido ? ` Pedido #${pedido}.` : ""}
-          </p>
+          <p className="text-sm font-medium text-gray-800">Pedido enviado com sucesso!{pedido ? ` Pedido #${pedido}.` : ""}</p>
         </div>
       ) : null}
 
       <div className="flex items-center gap-2 flex-wrap">
         {FILTERS.map((f) => (
-          <Link
+          <FilterPill
             key={f.label}
             href={buildHref({ status: f.value ?? undefined, fornecedor })}
-            className="text-xs px-3 py-1 rounded-full border"
-            style={{
-              borderColor: "var(--border)",
-              background: (f.value ?? undefined) === filterStatus ? "var(--surface-1)" : "transparent",
-              color: (f.value ?? undefined) === filterStatus ? "var(--text-primary)" : "var(--text-secondary)",
-              fontWeight: (f.value ?? undefined) === filterStatus ? 600 : 400,
-            }}
-          >
-            {f.label}
-          </Link>
+            label={f.label}
+            selected={(f.value ?? undefined) === filterStatus}
+          />
         ))}
       </div>
 
@@ -95,27 +87,23 @@ export default async function PedidosFornecedorPage({
       </div>
 
       {pedidos.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhum pedido encontrado.
-          </p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">Nenhum pedido encontrado.</p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100">
             {pedidos.map((p) => {
               const atrasado = p.status === "pedido_feito" && !!p.expectedAt && p.expectedAt < today;
               return (
                 <Link
                   key={p.id}
                   href={`/assistencia/encomendas/fornecedores/${p.id}`}
-                  className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
+                  className="flex items-center justify-between gap-4 p-4 flex-wrap hover:bg-gray-50 transition-colors duration-150"
                 >
                   <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                        #{p.pedidoNumber}
-                      </span>
+                      <span className="text-xs font-mono text-gray-400">#{p.pedidoNumber}</span>
                       <PedidoFornecedorStatusBadge status={p.status} />
                       {atrasado ? (
                         <span
@@ -125,15 +113,11 @@ export default async function PedidosFornecedorPage({
                           Atrasado
                         </span>
                       ) : null}
-                      <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                        {p.fornecedor}
-                      </span>
+                      <span className="text-sm font-medium text-gray-800">{p.fornecedor}</span>
                     </div>
-                    <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                      {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
-                    </p>
+                    <p className="text-sm truncate text-gray-500">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                  <div className="flex flex-col items-end gap-1 text-xs text-gray-400">
                     <span>{formatDateTimeBr(p.createdAt)}</span>
                     <span>Pedido por {p.requestedByName}</span>
                     {p.expectedAt ? (
@@ -155,7 +139,7 @@ export default async function PedidosFornecedorPage({
         </div>
       )}
 
-      <p className="text-xs text-center" style={{ color: "var(--text-muted)" }}>
+      <p className="text-xs text-center text-gray-400">
         {actor.name} · {actor.role === "cd" ? "CD" : actor.role === "admin" ? "Administrador" : "Assistência"}
       </p>
     </div>

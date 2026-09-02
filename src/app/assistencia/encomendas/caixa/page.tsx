@@ -17,6 +17,7 @@ import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomend
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
 import { LojaTabs } from "@/components/assistencia/LojaTabs";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { NotificationBell } from "@/components/assistencia/NotificationBell";
 import { listLojaNotificationsAction } from "@/app/assistencia/notifications-actions";
@@ -96,13 +97,13 @@ export default async function EncomendasCaixaPage({
           <NotificationBell fetchAction={listLojaNotificationsAction} storageKey="loja" />
           <Link
             href="/assistencia/encomendas/solicitar"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
-            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
+            style={{ background: "#1B5E3C" }}
           >
             + Novo pedido
           </Link>
           <form action={signOutAction}>
-            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            <button type="submit" className="text-sm underline text-gray-500 hover:text-gray-700">
               Sair
             </button>
           </form>
@@ -112,30 +113,8 @@ export default async function EncomendasCaixaPage({
       {requester.kind === "gerente" ? <LojaTabs /> : null}
 
       <div className="flex items-center gap-2">
-        <Link
-          href={viewHref("abertos")}
-          className="text-xs px-3 py-1.5 rounded-full border"
-          style={{
-            borderColor: "var(--border)",
-            background: !showCompleted ? "var(--surface-1)" : "transparent",
-            color: !showCompleted ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: !showCompleted ? 600 : 400,
-          }}
-        >
-          Em aberto
-        </Link>
-        <Link
-          href={viewHref("concluidos")}
-          className="text-xs px-3 py-1.5 rounded-full border"
-          style={{
-            borderColor: "var(--border)",
-            background: showCompleted ? "var(--surface-1)" : "transparent",
-            color: showCompleted ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: showCompleted ? 600 : 400,
-          }}
-        >
-          Entregues/cancelados
-        </Link>
+        <FilterPill href={viewHref("abertos")} label="Em aberto" selected={!showCompleted} />
+        <FilterPill href={viewHref("concluidos")} label="Entregues/cancelados" selected={showCompleted} />
       </div>
 
       {!showCompleted ? (
@@ -148,14 +127,14 @@ export default async function EncomendasCaixaPage({
       ) : null}
 
       {pedidos.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">
             {showCompleted ? "Nenhum pedido entregue/cancelado ainda." : "Nenhum pedido em aberto no momento."}
           </p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100">
             {pedidos.map((p: PedidoEncomendaSummary) => (
               <details key={p.id} className="p-4">
                 <summary className="flex items-start gap-2 cursor-pointer list-none">
@@ -175,17 +154,13 @@ export default async function EncomendasCaixaPage({
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-1 min-w-0">
                   <div className="flex flex-col gap-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
-                        #{p.pedidoNumber}
-                      </span>
+                      <span className="text-xs font-mono font-semibold text-gray-500">#{p.pedidoNumber}</span>
                       <PedidoEncomendaStatusBadge status={p.status} />
                     </div>
-                    <p className="text-sm" style={{ color: "var(--text-primary)" }}>
-                      {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
-                    </p>
+                    <p className="text-sm text-gray-800">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
                   </div>
                   <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
-                    <span className="text-xs font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <span className="text-xs font-bold whitespace-nowrap text-gray-500">
                       {new Date(p.createdAt).toLocaleDateString("pt-BR")}
                     </span>
                     {p.prazoCdLoja ? (
@@ -193,18 +168,18 @@ export default async function EncomendasCaixaPage({
                         Na loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : p.prazoFabricaCd ? (
-                      <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      <span className="text-xs font-medium whitespace-nowrap text-gray-500">
                         No CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : null}
                   </div>
                   </div>
                 </summary>
-                <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid var(--gridline)" }}>
-                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                <div className="mt-3 pt-3 flex flex-col gap-2 border-t border-gray-100">
+                  <p className="text-xs text-gray-500">
                     Fornecedor: {p.fornecedorTipo === "fabrica_externa" ? `Externo: ${p.fornecedorExterno}` : p.fabricaNome}
                   </p>
-                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                  <p className="text-xs text-gray-500">
                     Solicitado por: {p.requestedByName}
                     {storeIds.length > 1 ? ` (${p.storeName})` : ""}
                   </p>
@@ -217,37 +192,16 @@ export default async function EncomendasCaixaPage({
                       Editar pedido
                     </Link>
                   ) : null}
-                  {p.vendedorName ? (
-                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                      Vendedor: {p.vendedorName}
-                    </p>
-                  ) : null}
-                  {p.clienteCodigo ? (
-                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                      Código do cliente: {p.clienteCodigo}
-                    </p>
-                  ) : null}
-                  {p.carga ? (
-                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                      Carga: {p.carga}
-                    </p>
-                  ) : null}
-                  {p.nfE ? (
-                    <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                      NF-e: {p.nfE}
-                    </p>
-                  ) : null}
+                  {p.vendedorName ? <p className="text-xs text-gray-500">Vendedor: {p.vendedorName}</p> : null}
+                  {p.clienteCodigo ? <p className="text-xs text-gray-500">Código do cliente: {p.clienteCodigo}</p> : null}
+                  {p.carga ? <p className="text-xs text-gray-500">Carga: {p.carga}</p> : null}
+                  {p.nfE ? <p className="text-xs text-gray-500">NF-e: {p.nfE}</p> : null}
                   {(photosByPedido.get(p.id) ?? []).length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {(photosByPedido.get(p.id) ?? []).map((photo) => (
                         <a key={photo.id} href={photo.url} target="_blank" rel="noopener noreferrer">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={photo.url}
-                            alt="Cupom fiscal"
-                            className="h-20 w-20 object-cover rounded border"
-                            style={{ borderColor: "var(--border)" }}
-                          />
+                          <img src={photo.url} alt="Cupom fiscal" className="h-20 w-20 object-cover rounded-lg border border-gray-200" />
                         </a>
                       ))}
                     </div>
@@ -262,8 +216,7 @@ export default async function EncomendasCaixaPage({
 
       <Link
         href={requester.kind === "gerente" ? "/assistencia/loja" : "/assistencia/encomendas"}
-        className="text-sm underline self-center"
-        style={{ color: "var(--text-secondary)" }}
+        className="text-sm underline self-center text-gray-500 hover:text-gray-700"
       >
         ← Voltar
       </Link>

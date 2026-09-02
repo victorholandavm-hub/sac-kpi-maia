@@ -718,10 +718,12 @@ export function SacCreateRequestForm({
           </Field>
         ) : null}
 
-        {isDelivery && causaRaiz === "erro_conferencia" ? (
+        {isDelivery && (causaRaiz === "erro_conferencia" || causaRaiz === "sujeira_conferencia") ? (
           <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
             <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
-              Erro de conferência -- precisa registrar qual carga e quem conferiu antes de seguir.
+              {causaRaiz === "sujeira_conferencia"
+                ? "Sujeira não barrada na conferência -- precisa registrar qual carga e quem conferiu antes de seguir."
+                : "Erro de conferência -- precisa registrar qual carga e quem conferiu antes de seguir."}
             </p>
             <Field label="Carga *">
               <input

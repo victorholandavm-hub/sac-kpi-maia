@@ -3,6 +3,7 @@ import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPartOrders, listSuppliers, isPartOrderStatus, type PartOrder } from "@/lib/partOrders";
 import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 
 function StatusBadge({ status }: { status: string }) {
   const color = PART_ORDER_STATUS_COLORS[status] ?? "var(--text-muted)";
@@ -67,13 +68,23 @@ export default async function PecasQueuePage({
           3 rotas próprias, dado/filtro cada uma o seu -- sem layout
           compartilhado, cada página renderiza sua própria fileira. */}
       <div className="flex items-center gap-2">
-        <Link href="/assistencia/pecas" className="text-base font-bold px-4 py-2 rounded-full" style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
+        <Link
+          href="/assistencia/pecas"
+          className="text-sm font-semibold px-4 py-2 rounded-full text-white shadow-sm"
+          style={{ background: "color-mix(in srgb, var(--brand-green) 78%, black)" }}
+        >
           Peças
         </Link>
-        <Link href="/assistencia/fornecedores" className="text-base font-bold px-4 py-2 rounded-full" style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}>
+        <Link
+          href="/assistencia/fornecedores"
+          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+        >
           Fornecedores
         </Link>
-        <Link href="/assistencia/estoque" className="text-base font-bold px-4 py-2 rounded-full" style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}>
+        <Link
+          href="/assistencia/estoque"
+          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+        >
           Estoque
         </Link>
       </div>
@@ -81,25 +92,18 @@ export default async function PecasQueuePage({
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           {FILTERS.map((f) => (
-            <Link
+            <FilterPill
               key={f.label}
+              label={f.label}
+              selected={(f.value ?? undefined) === filterStatus}
               href={buildHref({ status: f.value ?? undefined, q, supplier })}
-              className="text-xs px-3 py-1 rounded-full border"
-              style={{
-                borderColor: "var(--border)",
-                background: (f.value ?? undefined) === filterStatus ? "var(--surface-1)" : "transparent",
-                color: (f.value ?? undefined) === filterStatus ? "var(--text-primary)" : "var(--text-secondary)",
-                fontWeight: (f.value ?? undefined) === filterStatus ? 600 : 400,
-              }}
-            >
-              {f.label}
-            </Link>
+            />
           ))}
         </div>
         <Link
           href="/assistencia/pecas/nova"
-          className="text-sm px-3 py-2 rounded font-medium"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
+          style={{ background: "#1B5E3C" }}
         >
           + Novo pedido de peça
         </Link>
@@ -117,63 +121,44 @@ export default async function PecasQueuePage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Buscar por cliente, produto, peça ou código…"
-          className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
-          style={{ borderColor: "var(--border)" }}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm flex-1 min-w-[240px]"
         />
-        <button
-          type="submit"
-          className="text-sm px-3 py-2 rounded border"
-          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
-        >
+        <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-800">
           Buscar
         </button>
         {q ? (
-          <Link
-            href={buildHref({ status: filterStatus, supplier })}
-            className="text-xs underline"
-            style={{ color: "var(--text-secondary)" }}
-          >
+          <Link href={buildHref({ status: filterStatus, supplier })} className="text-xs underline text-gray-500 hover:text-gray-700">
             Limpar busca
           </Link>
         ) : null}
       </form>
 
       {orders.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhum pedido de peça encontrado.
-          </p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">Nenhum pedido de peça encontrado.</p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100">
             {orders.map((o) => (
               <Link
                 key={o.id}
                 href={`/assistencia/pecas/${o.id}`}
-                className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
+                className="flex items-center justify-between gap-4 p-4 flex-wrap hover:bg-gray-50 transition-colors duration-150"
               >
                 <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                      #{o.ticketNumber}
-                    </span>
+                    <span className="text-xs font-mono text-gray-400">#{o.ticketNumber}</span>
                     <StatusBadge status={o.status} />
-                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                      {o.partName}
-                    </span>
-                    {o.supplier ? (
-                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        {o.supplier}
-                      </span>
-                    ) : null}
+                    <span className="text-sm font-medium text-gray-800">{o.partName}</span>
+                    {o.supplier ? <span className="text-xs text-gray-400">{o.supplier}</span> : null}
                   </div>
-                  <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
+                  <p className="text-sm truncate text-gray-500">
                     {o.clientName ?? "Sem cliente"}
                     {o.product ? ` · ${o.product}` : ""}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                <div className="flex flex-col items-end gap-1 text-xs text-gray-400">
                   {o.status !== "encerrado" ? (
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"

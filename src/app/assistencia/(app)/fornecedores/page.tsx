@@ -4,6 +4,7 @@ import { listSupplierReturns, isSupplierReturnStatus, type SupplierReturn } from
 import { listSuppliers } from "@/lib/partOrders";
 import { SUPPLIER_RETURN_STATUS_LABELS, SUPPLIER_RETURN_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 
 function formatBRL(value: number | null) {
   if (value === null) return "—";
@@ -69,13 +70,23 @@ export default async function FornecedoresPage({
       {/* "Controle Assistência" -- pedido do Victor 27/08/2026, mesmo
           desenho de pecas/page.tsx (ver lá). */}
       <div className="flex items-center gap-2">
-        <Link href="/assistencia/pecas" className="text-base font-bold px-4 py-2 rounded-full" style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}>
+        <Link
+          href="/assistencia/pecas"
+          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+        >
           Peças
         </Link>
-        <Link href="/assistencia/fornecedores" className="text-base font-bold px-4 py-2 rounded-full" style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
+        <Link
+          href="/assistencia/fornecedores"
+          className="text-sm font-semibold px-4 py-2 rounded-full text-white shadow-sm"
+          style={{ background: "color-mix(in srgb, var(--brand-green) 78%, black)" }}
+        >
           Fornecedores
         </Link>
-        <Link href="/assistencia/estoque" className="text-base font-bold px-4 py-2 rounded-full" style={{ border: "2px solid var(--border)", color: "var(--text-secondary)" }}>
+        <Link
+          href="/assistencia/estoque"
+          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+        >
           Estoque
         </Link>
       </div>
@@ -83,25 +94,18 @@ export default async function FornecedoresPage({
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           {FILTERS.map((f) => (
-            <Link
+            <FilterPill
               key={f.label}
+              label={f.label}
+              selected={(f.value ?? undefined) === filterStatus}
               href={buildHref({ status: f.value ?? undefined, q, supplier })}
-              className="text-xs px-3 py-1 rounded-full border"
-              style={{
-                borderColor: "var(--border)",
-                background: (f.value ?? undefined) === filterStatus ? "var(--surface-1)" : "transparent",
-                color: (f.value ?? undefined) === filterStatus ? "var(--text-primary)" : "var(--text-secondary)",
-                fontWeight: (f.value ?? undefined) === filterStatus ? 600 : 400,
-              }}
-            >
-              {f.label}
-            </Link>
+            />
           ))}
         </div>
         <Link
           href="/assistencia/fornecedores/nova"
-          className="text-sm px-3 py-2 rounded font-medium"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
+          style={{ background: "#1B5E3C" }}
         >
           + Nova remessa
         </Link>
@@ -119,36 +123,31 @@ export default async function FornecedoresPage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Buscar por peça, produto ou nota fiscal…"
-          className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
-          style={{ borderColor: "var(--border)" }}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm flex-1 min-w-[240px]"
         />
-        <button type="submit" className="text-sm px-3 py-2 rounded border" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+        <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-800">
           Buscar
         </button>
       </form>
 
       {returns.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhuma remessa encontrada.
-          </p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">Nenhuma remessa encontrada.</p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100">
             {returns.map((r) => {
               const overdue = r.status !== "finalizado" && isOverdue(r.expectedReturnAt);
               return (
                 <Link
                   key={r.id}
                   href={`/assistencia/fornecedores/${r.id}`}
-                  className="flex items-center justify-between gap-4 p-4 flex-wrap hover:opacity-80"
+                  className="flex items-center justify-between gap-4 p-4 flex-wrap hover:bg-gray-50 transition-colors duration-150"
                 >
                   <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
-                        #{r.ticketNumber}
-                      </span>
+                      <span className="text-xs font-mono text-gray-400">#{r.ticketNumber}</span>
                       <StatusBadge status={r.status} />
                       {overdue ? (
                         <span
@@ -158,21 +157,15 @@ export default async function FornecedoresPage({
                           Atrasado
                         </span>
                       ) : null}
-                      <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                        {r.partName}
-                      </span>
-                      {r.supplier ? (
-                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                          {r.supplier}
-                        </span>
-                      ) : null}
+                      <span className="text-sm font-medium text-gray-800">{r.partName}</span>
+                      {r.supplier ? <span className="text-xs text-gray-400">{r.supplier}</span> : null}
                     </div>
-                    <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
+                    <p className="text-sm truncate text-gray-500">
                       {r.product ?? "Sem produto"}
                       {r.invoiceNumber ? ` · NF ${r.invoiceNumber}` : ""}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                  <div className="flex flex-col items-end gap-1 text-xs text-gray-400">
                     <span>Faturado: {formatBRL(r.invoiceValue)}</span>
                     {r.status !== "finalizado" ? <span>{daysSince(r.createdAt)} dias</span> : null}
                   </div>

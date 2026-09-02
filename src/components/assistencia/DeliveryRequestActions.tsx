@@ -267,7 +267,7 @@ export function DeliveryRequestActions({
               </option>
             ))}
           </select>
-          {novaTrocaCausaRaiz === "erro_conferencia" ? (
+          {novaTrocaCausaRaiz === "erro_conferencia" || novaTrocaCausaRaiz === "sujeira_conferencia" ? (
             <div className="grid sm:grid-cols-2 gap-2">
               <input
                 value={novaTrocaCarga}

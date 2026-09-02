@@ -98,70 +98,60 @@ export function AssemblerPaymentGroup({
   const storeGroups = groupByStore(activeItems);
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-between gap-3 px-4 py-3 w-full text-left"
-        style={open ? { borderBottom: "1px solid var(--gridline)" } : undefined}
+        className={`flex items-center justify-between gap-3 px-4 py-3 w-full text-left ${open ? "border-b border-gray-100" : ""}`}
       >
-        <span className="flex items-center gap-2 text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          <span aria-hidden style={{ color: "var(--brand-green)" }}>
+        <span className="flex items-center gap-2 text-sm font-bold text-gray-800">
+          <span aria-hidden className="text-gray-400">
             {open ? "▾" : "▸"}
           </span>
           {assemblerName}
-          <span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>
+          <span className="text-xs font-normal text-gray-400">
             ({items.length} {items.length === 1 ? "item" : "itens"})
           </span>
         </span>
-        <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          {formatBRL(total)}
-        </span>
+        <span className="text-sm text-gray-500">{formatBRL(total)}</span>
       </button>
 
       {open ? (
-        <div className="flex items-stretch" style={{ borderBottom: "1px solid var(--gridline)" }}>
+        <div className="flex items-stretch border-b border-gray-100">
           <button
             type="button"
             onClick={() => setTab("pendentes")}
             className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2"
             style={{
-              background: tab === "pendentes" ? "color-mix(in srgb, var(--status-warning) 15%, var(--surface-1))" : "transparent",
+              background: tab === "pendentes" ? "color-mix(in srgb, var(--status-warning) 15%, white)" : "transparent",
               borderBottom: tab === "pendentes" ? "3px solid var(--status-warning)" : "3px solid transparent",
             }}
           >
-            <span className="text-xs font-bold" style={{ color: tab === "pendentes" ? "var(--status-warning)" : "var(--text-secondary)" }}>
-              Pendentes de pagamento ({pendentesItems.length})
+            <span className="text-xs font-bold" style={{ color: tab === "pendentes" ? "var(--status-warning)" : undefined }}>
+              <span className={tab === "pendentes" ? "" : "text-gray-500"}>Pendentes de pagamento ({pendentesItems.length})</span>
             </span>
-            <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-              {formatBRL(pendentesTotal)}
-            </span>
+            <span className="text-sm font-bold text-gray-800">{formatBRL(pendentesTotal)}</span>
           </button>
           <button
             type="button"
             onClick={() => setTab("pagos")}
             className="flex-1 flex flex-col items-center gap-0.5 px-3 py-2"
             style={{
-              background: tab === "pagos" ? "color-mix(in srgb, var(--status-good) 15%, var(--surface-1))" : "transparent",
+              background: tab === "pagos" ? "color-mix(in srgb, var(--status-good) 15%, white)" : "transparent",
               borderBottom: tab === "pagos" ? "3px solid var(--status-good)" : "3px solid transparent",
             }}
           >
-            <span className="text-xs font-bold" style={{ color: tab === "pagos" ? "var(--status-good)" : "var(--text-secondary)" }}>
-              Pagos ({pagosItems.length})
+            <span className="text-xs font-bold" style={{ color: tab === "pagos" ? "var(--status-good)" : undefined }}>
+              <span className={tab === "pagos" ? "" : "text-gray-500"}>Pagos ({pagosItems.length})</span>
             </span>
-            <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-              {formatBRL(pagosTotal)}
-            </span>
+            <span className="text-sm font-bold text-gray-800">{formatBRL(pagosTotal)}</span>
           </button>
         </div>
       ) : null}
 
       {open && tab === "pendentes" && canEdit && eligibleIds.length > 0 ? (
-        <div
-          className="flex items-center gap-3 px-4 py-2 flex-wrap"
-          style={{ background: "var(--surface-2, var(--gridline))", borderBottom: "1px solid var(--gridline)" }}
-        >
-          <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
+        <div className="flex items-center gap-3 px-4 py-2 flex-wrap bg-gray-50 border-b border-gray-100">
+          <label className="flex items-center gap-1.5 text-xs text-gray-500">
             <input
               type="checkbox"
               checked={selected.size === eligibleIds.length}
@@ -172,7 +162,7 @@ export function AssemblerPaymentGroup({
           </label>
           {selected.size > 0 ? (
             <>
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              <span className="text-xs text-gray-400">
                 {selected.size} selecionado{selected.size > 1 ? "s" : ""}
               </span>
               <button
@@ -184,7 +174,7 @@ export function AssemblerPaymentGroup({
               >
                 {pending ? "Marcando…" : "Marcar como pago"}
               </button>
-              <button type="button" onClick={() => setSelected(new Set())} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+              <button type="button" onClick={() => setSelected(new Set())} className="text-xs underline text-gray-500 hover:text-gray-700">
                 limpar seleção
               </button>
             </>
@@ -194,18 +184,16 @@ export function AssemblerPaymentGroup({
 
       {open
         ? (storeGroups.length === 0 ? (
-            <p className="px-4 py-4 text-sm text-center" style={{ color: "var(--text-muted)" }}>
+            <p className="px-4 py-4 text-sm text-center text-gray-400">
               {tab === "pendentes" ? "Nada pendente de pagamento." : "Nada pago ainda."}
             </p>
           ) : (
             storeGroups.map((storeGroup) => (
               <div key={storeGroup.storeName}>
-                <div className="px-4 py-1.5" style={{ background: "var(--surface-2, var(--gridline))" }}>
-                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-                    {storeGroup.storeName}
-                  </span>
+                <div className="px-4 py-1.5 bg-gray-50">
+                  <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{storeGroup.storeName}</span>
                 </div>
-                <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                <div className="divide-y divide-gray-100">
                   {storeGroup.items.map((item) => (
                     <PaymentItemEditor
                       key={item.itemId}

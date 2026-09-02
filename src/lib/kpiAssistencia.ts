@@ -225,7 +225,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   // Ver titleCase acima -- agrupa por nome em caixa alta (mesma pessoa,
   // caixa diferente, conta junto), exibe sempre em Title Case.
   const byConferente = aggregate(
-    rows.filter((r) => r.causa_raiz === "erro_conferencia" && r.causa_conferente),
+    rows.filter((r) => (r.causa_raiz === "erro_conferencia" || r.causa_raiz === "sujeira_conferencia") && r.causa_conferente),
     (r) => canonicalConferenteKey(r.causa_conferente!),
     titleCase,
     ticketsByTag,

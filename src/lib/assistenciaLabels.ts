@@ -446,6 +446,17 @@ export const CAUSA_RAIZ_OPTIONS = [
   // saiu da fábrica assim, então virar "defeito_fabricacao" mascarava um
   // problema que é da própria operação do CD, não do fabricante.
   "armazenamento_cd",
+  // Opção nova -- pedido do Victor 02/09/2026: "quando o motivo é que o
+  // produto foi sujo, so tem a opção de colocar que foi culpa de
+  // armazenamento, quando na verdade, quando o produto sai sujo, pode ser
+  // culpa do conferente tambem". "armazenamento_cd" (acima) cobre sujeira
+  // que já veio do jeito que o produto foi guardado no CD -- essa aqui é
+  // o outro caso: o produto já estava sujo/manchado/mofado e o conferente
+  // não barrou antes de sair. Mesma estrutura de "erro_conferencia" (carga
+  // + conferente obrigatórios, ver SacCreateRequestForm.tsx/actions.ts),
+  // só que classificada à parte pra não misturar "produto errado saiu"
+  // com "produto sujo passou pela conferência".
+  "sujeira_conferencia",
   "solicitacao_cliente",
   "outro",
 ] as const;
@@ -460,6 +471,7 @@ export const CAUSA_RAIZ_LABELS: Record<string, string> = {
   defeito_fabricacao: "Defeito de fabricação",
   peca_nao_entregue: "Peça não entregue na venda (esqueceram de mandar, peça em si sem problema nenhum)",
   armazenamento_cd: "Produto sujo/manchado/mofado (armazenamento no CD, não é defeito de fábrica)",
+  sujeira_conferencia: "Produto sujo/manchado/mofado (não foi barrado na conferência antes de sair)",
   solicitacao_cliente: "Solicitação do cliente (desistência/arrependimento)",
   outro: "Outro",
 };
@@ -481,6 +493,7 @@ export const CAUSA_RAIZ_ERRO_INTERNO: string[] = [
   "erro_sac",
   "peca_nao_entregue",
   "armazenamento_cd",
+  "sujeira_conferencia",
 ];
 
 export const SAC_CATEGORIES = [
