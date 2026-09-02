@@ -1047,11 +1047,11 @@ export async function createExchangeChild(
   let causaConferente: string | null = null;
   let driverNameForError: string | null = null;
   let causaRaizDetalhe: string | null = null;
-  if (opts.causaRaiz === "erro_conferencia") {
+  if (opts.causaRaiz === "erro_conferencia" || opts.causaRaiz === "sujeira_conferencia") {
     causaCarga = (opts.causaCarga ?? "").trim();
     causaConferente = (opts.causaConferente ?? "").trim();
-    if (!causaCarga) throw new Error("Informe a carga (erro de conferência precisa registrar qual foi).");
-    if (!causaConferente) throw new Error("Informe o conferente (erro de conferência precisa registrar quem conferiu).");
+    if (!causaCarga) throw new Error("Informe a carga (precisa registrar qual foi).");
+    if (!causaConferente) throw new Error("Informe o conferente (precisa registrar quem conferiu).");
   }
   if (opts.causaRaiz === "erro_motorista") {
     causaCarga = (opts.causaCarga ?? "").trim();
@@ -1926,11 +1926,11 @@ export async function updateRequestDetails(
   // especificamente sobre erro_motorista, pra não apagar o motorista de
   // rota de verdade ao só corrigir outro campo qualquer do chamado.
   let driverNameForError: string | undefined;
-  if (causaRaiz === "erro_conferencia") {
+  if (causaRaiz === "erro_conferencia" || causaRaiz === "sujeira_conferencia") {
     causaCarga = String(formData.get("causa_carga") ?? "").trim();
     causaConferente = String(formData.get("causa_conferente") ?? "").trim();
-    if (!causaCarga) return { error: "Informe a carga (erro de conferência precisa registrar qual foi)." };
-    if (!causaConferente) return { error: "Informe o conferente (erro de conferência precisa registrar quem conferiu)." };
+    if (!causaCarga) return { error: "Informe a carga (precisa registrar qual foi)." };
+    if (!causaConferente) return { error: "Informe o conferente (precisa registrar quem conferiu)." };
   }
   if (causaRaiz === "erro_motorista") {
     causaCarga = String(formData.get("causa_carga") ?? "").trim();
@@ -2072,11 +2072,11 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
       return { error: "Selecione quem errou." };
     }
-    if (causaRaiz === "erro_conferencia") {
+    if (causaRaiz === "erro_conferencia" || causaRaiz === "sujeira_conferencia") {
       causaCarga = String(formData.get("causa_carga") ?? "").trim();
       causaConferente = String(formData.get("causa_conferente") ?? "").trim();
-      if (!causaCarga) return { error: "Informe a carga (erro de conferência precisa registrar qual foi)." };
-      if (!causaConferente) return { error: "Informe o conferente (erro de conferência precisa registrar quem conferiu)." };
+      if (!causaCarga) return { error: "Informe a carga (precisa registrar qual foi)." };
+      if (!causaConferente) return { error: "Informe o conferente (precisa registrar quem conferiu)." };
     }
     if (causaRaiz === "erro_motorista") {
       causaCarga = String(formData.get("causa_carga") ?? "").trim();
@@ -2368,11 +2368,11 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
       return { error: "Selecione quem errou." };
     }
-    if (causaRaiz === "erro_conferencia") {
+    if (causaRaiz === "erro_conferencia" || causaRaiz === "sujeira_conferencia") {
       causaCarga = String(formData.get("causa_carga") ?? "").trim();
       causaConferente = String(formData.get("causa_conferente") ?? "").trim();
-      if (!causaCarga) return { error: "Informe a carga (erro de conferência precisa registrar qual foi)." };
-      if (!causaConferente) return { error: "Informe o conferente (erro de conferência precisa registrar quem conferiu)." };
+      if (!causaCarga) return { error: "Informe a carga (precisa registrar qual foi)." };
+      if (!causaConferente) return { error: "Informe o conferente (precisa registrar quem conferiu)." };
     }
     if (causaRaiz === "erro_motorista") {
       causaCarga = String(formData.get("causa_carga") ?? "").trim();

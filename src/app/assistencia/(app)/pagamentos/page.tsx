@@ -3,6 +3,7 @@ import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPaymentItems, listAssemblers, paymentStage, type PaymentItem } from "@/lib/payments";
 import { PAYMENTS_CONTROLLER_NAME } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 import { PaymentsExportButton } from "@/components/assistencia/PaymentsExportButton";
 import { AssemblerPaymentGroup } from "@/components/assistencia/AssemblerPaymentGroup";
 
@@ -82,54 +83,32 @@ export default async function PagamentosPage({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <Link
-            href={buildHref({ assembler, from, to })}
-            className="text-xs px-3 py-1 rounded-full border"
-            style={{
-              borderColor: "var(--border)",
-              background: !pendentes ? "var(--surface-1)" : "transparent",
-              color: !pendentes ? "var(--text-primary)" : "var(--text-secondary)",
-              fontWeight: !pendentes ? 600 : 400,
-            }}
-          >
-            Todos
-          </Link>
-          <Link
-            href={buildHref({ pendentes: "1", assembler, from, to })}
-            className="text-xs px-3 py-1 rounded-full border"
-            style={{
-              borderColor: "var(--border)",
-              background: pendentes ? "var(--surface-1)" : "transparent",
-              color: pendentes ? "var(--text-primary)" : "var(--text-secondary)",
-              fontWeight: pendentes ? 600 : 400,
-            }}
-          >
-            Só pendentes de liberação
-          </Link>
+          <FilterPill label="Todos" selected={!pendentes} href={buildHref({ assembler, from, to })} />
+          <FilterPill label="Só pendentes de liberação" selected={!!pendentes} href={buildHref({ pendentes: "1", assembler, from, to })} />
           <FilterSelect name="assembler" placeholder="Todos os montadores" options={assemblers} />
           <form action="/assistencia/pagamentos" method="GET" className="flex items-center gap-2 flex-wrap">
             {pendentes ? <input type="hidden" name="pendentes" value={pendentes} /> : null}
             {assembler ? <input type="hidden" name="assembler" value={assembler} /> : null}
-            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap text-gray-500">
               De
-              <input type="date" name="from" defaultValue={from ?? ""} className="rounded border px-2 py-1 text-xs" style={{ borderColor: "var(--border)" }} />
+              <input type="date" name="from" defaultValue={from ?? ""} className="rounded-lg border border-gray-200 px-2 py-1 text-xs" />
             </label>
-            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap text-gray-500">
               Até
-              <input type="date" name="to" defaultValue={to ?? ""} className="rounded border px-2 py-1 text-xs" style={{ borderColor: "var(--border)" }} />
+              <input type="date" name="to" defaultValue={to ?? ""} className="rounded-lg border border-gray-200 px-2 py-1 text-xs" />
             </label>
-            <button type="submit" className="text-xs px-3 py-1.5 rounded border font-medium whitespace-nowrap" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+            <button type="submit" className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 font-medium whitespace-nowrap text-gray-800">
               Aplicar
             </button>
             {from || to ? (
-              <Link href={buildHref({ pendentes, assembler })} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+              <Link href={buildHref({ pendentes, assembler })} className="text-xs underline text-gray-500 hover:text-gray-700">
                 Limpar data
               </Link>
             ) : null}
           </form>
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          <div className="text-sm text-gray-500">
             Total: <strong>{formatBRL(grandTotal)}</strong> · Pago:{" "}
             <strong style={{ color: "var(--status-good)" }}>{formatBRL(paidTotal)}</strong> · Pendente:{" "}
             <strong style={{ color: "var(--status-warning)" }}>{formatBRL(pendingTotal)}</strong>
@@ -137,8 +116,8 @@ export default async function PagamentosPage({
           {canExport ? <PaymentsExportButton items={items} /> : null}
           <Link
             href="/assistencia/nova-rapida"
-            className="text-sm px-3 py-2 rounded font-medium whitespace-nowrap"
-            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
+            style={{ background: "#1B5E3C" }}
           >
             + Nova
           </Link>
@@ -146,8 +125,8 @@ export default async function PagamentosPage({
       </div>
 
       {groups.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">
             {assembler
               ? "Nenhuma montagem desse montador encontrada."
               : pendentes

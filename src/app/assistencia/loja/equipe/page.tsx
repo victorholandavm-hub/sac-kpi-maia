@@ -38,18 +38,13 @@ export default async function LojaEquipePage() {
     <div className="w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Equipe da loja" subtitle="Cadastre a caixa que lança encomenda" />
 
-      <Link href="/assistencia/loja" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
+      <Link href="/assistencia/loja" className="text-sm underline self-start text-gray-500 hover:text-gray-700">
         ← Voltar
       </Link>
 
-      <section
-        className="rounded-lg p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-      >
-        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Caixas
-        </h3>
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+      <section className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-2">
+        <h3 className="text-sm font-semibold text-gray-800">Caixas</h3>
+        <p className="text-xs text-gray-400">
           Cada caixa tem seu próprio PIN e entra com nome + PIN em{" "}
           <span className="font-mono">/assistencia/encomendas/caixa/login</span>.
         </p>
@@ -59,40 +54,24 @@ export default async function LojaEquipePage() {
               <EquipeCaixaPinField name={c.name} storeName={c.storeName} hasPin={c.hasPin} ativo={c.ativo} />
             </li>
           ))}
-          {caixas.length === 0 ? (
-            <li className="text-sm" style={{ color: "var(--text-muted)" }}>
-              Nenhuma caixa cadastrada ainda.
-            </li>
-          ) : null}
+          {caixas.length === 0 ? <li className="text-sm text-gray-400">Nenhuma caixa cadastrada ainda.</li> : null}
         </ul>
         <AddEquipeCaixaForm stores={stores} />
       </section>
 
-      <section
-        className="rounded-lg p-4 flex flex-col gap-2"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-      >
-        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Montadores
-        </h3>
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+      <section className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-2">
+        <h3 className="text-sm font-semibold text-gray-800">Montadores</h3>
+        <p className="text-xs text-gray-400">
           Cadastre o montador da sua loja com PIN — ele entra com nome + PIN em{" "}
           <span className="font-mono">/assistencia/montador/login</span>.
         </p>
         <ul className="flex flex-col gap-2">
           {assemblers.map((a) => (
-            <li key={a.name} className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              {a.name}{" "}
-              <span style={{ color: "var(--text-muted)" }}>
-                — {a.storeName ?? "disponível em todas as lojas"}
-              </span>
+            <li key={a.name} className="text-sm text-gray-500">
+              {a.name} <span className="text-gray-400">— {a.storeName ?? "disponível em todas as lojas"}</span>
             </li>
           ))}
-          {assemblers.length === 0 ? (
-            <li className="text-sm" style={{ color: "var(--text-muted)" }}>
-              Nenhum montador cadastrado ainda.
-            </li>
-          ) : null}
+          {assemblers.length === 0 ? <li className="text-sm text-gray-400">Nenhum montador cadastrado ainda.</li> : null}
         </ul>
         <AddEquipeMontadorForm stores={stores} />
       </section>

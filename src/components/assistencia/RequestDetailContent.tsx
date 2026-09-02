@@ -267,10 +267,10 @@ export function RequestDetailContent({
             <div className="grid sm:grid-cols-2 gap-4">
               <Row label="Motivo" value={request.reason} />
               {request.causaRaiz ? <Row label="Causa raiz" value={CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz} /> : null}
-              {request.causaRaiz === "erro_conferencia" ? (
+              {request.causaRaiz === "erro_conferencia" || request.causaRaiz === "sujeira_conferencia" ? (
                 <>
-                  <Row label="Carga (erro de conferência)" value={request.causaCarga} />
-                  <Row label="Conferente (erro de conferência)" value={request.causaConferente} />
+                  <Row label="Carga" value={request.causaCarga} />
+                  <Row label="Conferente" value={request.causaConferente} />
                 </>
               ) : null}
               {request.causaRaiz === "erro_motorista" ? <Row label="Carga (erro do motorista)" value={request.causaCarga} /> : null}

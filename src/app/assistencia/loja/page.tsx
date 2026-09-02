@@ -18,6 +18,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
 import { LojaStoreFilter } from "@/components/assistencia/LojaStoreFilter";
 import { LojaTabs } from "@/components/assistencia/LojaTabs";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 import { LojaDeadlineControl } from "@/components/assistencia/LojaDeadlineControl";
 import { ProductsModalButton } from "@/components/assistencia/ProductsModalButton";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
@@ -58,11 +59,7 @@ function ReadOnlyDeadline({
   const color = DEADLINE_STATUS_COLOR[deadlineStatus] ?? "var(--text-muted)";
 
   if (!shownDate) {
-    return (
-      <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-        Sem prazo definido
-      </span>
-    );
+    return <span className="text-xs font-medium text-gray-500">Sem prazo definido</span>;
   }
 
   return (
@@ -162,27 +159,22 @@ export default async function LojaHomePage({
           <NotificationBell fetchAction={listLojaNotificationsAction} storageKey="loja" />
           <Link
             href="/assistencia/solicitar"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
-            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
+            style={{ background: "#1B5E3C" }}
           >
             + Nova solicitação
           </Link>
           <Link
             href="/assistencia/encomendas/solicitar"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap border"
-            style={{ borderColor: "var(--brand-green)", color: "var(--brand-green)" }}
+            className="text-sm px-4 py-2.5 rounded-lg font-medium whitespace-nowrap border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
           >
             + Nova encomenda
           </Link>
-          <Link
-            href="/assistencia/loja/equipe"
-            className="text-sm underline whitespace-nowrap"
-            style={{ color: "var(--text-secondary)" }}
-          >
+          <Link href="/assistencia/loja/equipe" className="text-sm underline whitespace-nowrap text-gray-500 hover:text-gray-700">
             Equipe da loja
           </Link>
           <form action={lojaGerenteSignOut}>
-            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            <button type="submit" className="text-sm underline text-gray-500 hover:text-gray-700">
               Sair
             </button>
           </form>
@@ -193,46 +185,21 @@ export default async function LojaHomePage({
 
       <LojaStoreFilter stores={stores} selectedStoreId={storeId} />
 
-      <div className="flex items-center gap-2">
-        <Link
-          href={viewHref("abertas")}
-          className="text-xs px-3 py-1.5 rounded-full border"
-          style={{
-            borderColor: "var(--border)",
-            background: !showCompleted && !showAwaitingApproval ? "var(--surface-1)" : "transparent",
-            color: !showCompleted && !showAwaitingApproval ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: !showCompleted && !showAwaitingApproval ? 600 : 400,
-          }}
-        >
-          Em aberto
-        </Link>
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterPill href={viewHref("abertas")} label="Em aberto" selected={!showCompleted && !showAwaitingApproval} />
         {/* Pedido do Victor 31/08/2026: montagem/desmontagem concluída
             pelo montador só fecha de verdade depois de aprovada aqui
-            (ver LojaApprovalCard/lojaApproveMontagemConclusion). */}
-        <Link
+            (ver LojaApprovalCard/lojaApproveMontagemConclusion). Cor
+            própria (series-3) só quando tem pendência e a aba não está
+            selecionada -- mesmo espírito de antes, via a variante `color`
+            de FilterPill. */}
+        <FilterPill
           href={viewHref("aguardando_aprovacao")}
-          className="text-xs px-3 py-1.5 rounded-full border"
-          style={{
-            borderColor: pendingApprovalCount > 0 && !showAwaitingApproval ? "var(--series-3)" : "var(--border)",
-            background: showAwaitingApproval ? "var(--surface-1)" : "transparent",
-            color: showAwaitingApproval ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: showAwaitingApproval ? 600 : 400,
-          }}
-        >
-          Aguardando aprovação{pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ""}
-        </Link>
-        <Link
-          href={viewHref("concluidas")}
-          className="text-xs px-3 py-1.5 rounded-full border"
-          style={{
-            borderColor: "var(--border)",
-            background: showCompleted ? "var(--surface-1)" : "transparent",
-            color: showCompleted ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: showCompleted ? 600 : 400,
-          }}
-        >
-          Concluídas
-        </Link>
+          label={`Aguardando aprovação${pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ""}`}
+          selected={showAwaitingApproval}
+          color={pendingApprovalCount > 0 ? "var(--series-3)" : undefined}
+        />
+        <FilterPill href={viewHref("concluidas")} label="Concluídas" selected={showCompleted} />
       </div>
 
       {!showCompleted && !showAwaitingApproval ? (
@@ -245,8 +212,8 @@ export default async function LojaHomePage({
       ) : null}
 
       {requests.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">
             {showCompleted
               ? "Nenhuma solicitação concluída ainda."
               : showAwaitingApproval
@@ -263,8 +230,8 @@ export default async function LojaHomePage({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100">
             {requests.map((r) => {
               const isOwnStore = gerenteStoreIds.includes(r.storeId);
               const isOwnRequest = r.requestedByName === gerenteName;
@@ -282,7 +249,7 @@ export default async function LojaHomePage({
                   className={isOwnRequest ? "flex items-start gap-3 p-4 rounded-lg m-2 flex-wrap" : "flex items-start gap-3 p-4 flex-wrap"}
                   style={
                     isOwnRequest
-                      ? { background: "var(--brand-green-soft)", border: "2px solid var(--brand-green)" }
+                      ? { background: "color-mix(in srgb, var(--brand-green) 6%, white)", border: "1px solid var(--brand-green)" }
                       : undefined
                   }
                 >
@@ -302,18 +269,12 @@ export default async function LojaHomePage({
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 flex-1 min-w-0">
                   <div className="flex flex-col gap-1.5 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
-                        #{r.ticketNumber}
-                      </span>
+                      <span className="text-xs font-mono font-semibold text-gray-500">#{r.ticketNumber}</span>
                       <StatusBadge status={r.status} showInfo size={isOwnRequest ? "md" : "sm"} />
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                        {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-                      </span>
-                      <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                        · {r.storeName}
-                      </span>
+                      <span className="text-sm font-semibold text-gray-800">{REQUEST_TYPE_LABELS[r.type] ?? r.type}</span>
+                      <span className="text-xs font-medium text-gray-500">· {r.storeName}</span>
                       {isOwnRequest ? (
                         <span
                           className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
@@ -322,30 +283,21 @@ export default async function LojaHomePage({
                           Sua solicitação
                         </span>
                       ) : r.requestedByName ? (
-                        <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                          · Solicitado por{" "}
-                          <span className="font-bold" style={{ color: "var(--text-primary)" }}>
-                            {r.requestedByName}
-                          </span>
+                        <span className="text-xs font-medium text-gray-500">
+                          · Solicitado por <span className="font-bold text-gray-800">{r.requestedByName}</span>
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-sm font-medium break-words" style={{ color: "var(--text-primary)" }}>
+                    <p className="text-sm font-medium break-words text-gray-800">
                       {r.clientName ?? "Sem nome de cliente"}
                       {r.clientPhone ? ` · 📞 ${r.clientPhone}` : ""}
                       {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
                     </p>
-                    {r.assemblerName ? (
-                      <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                        Montador: {r.assemblerName}
-                      </p>
-                    ) : null}
+                    {r.assemblerName ? <p className="text-xs font-medium text-gray-500">Montador: {r.assemblerName}</p> : null}
                     {r.items.length > 0 ? <ProductsModalButton items={r.items} /> : null}
                   </div>
-                  <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0 pt-3 mt-1 border-t sm:pt-0 sm:mt-0 sm:border-t-0 w-full sm:w-auto justify-between sm:justify-start" style={{ borderColor: "var(--gridline)" }}>
-                    <span className="text-xs font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {dateLabel}
-                    </span>
+                  <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0 pt-3 mt-1 border-t border-gray-100 sm:pt-0 sm:mt-0 sm:border-t-0 w-full sm:w-auto justify-between sm:justify-start">
+                    <span className="text-xs font-bold whitespace-nowrap text-gray-500">{dateLabel}</span>
                     {!showCompleted ? (
                       isOwnStore ? (
                         <LojaDeadlineControl
@@ -386,7 +338,7 @@ export default async function LojaHomePage({
         </div>
       )}
 
-      <Link href="/assistencia" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
+      <Link href="/assistencia" className="text-sm underline self-center text-gray-500 hover:text-gray-700">
         ← Voltar
       </Link>
     </div>

@@ -16,6 +16,7 @@ import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomend
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
 import { StatTile } from "@/components/StatTile";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
 
@@ -124,13 +125,13 @@ export default async function EncomendasSacPage({
         <div className="flex items-center gap-3">
           <Link
             href="/assistencia/encomendas/solicitar"
-            className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
-            style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+            className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
+            style={{ background: "#1B5E3C" }}
           >
             + Nova encomenda
           </Link>
           <form action={signOut}>
-            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            <button type="submit" className="text-sm underline text-gray-500 hover:text-gray-700">
               Sair
             </button>
           </form>
@@ -140,46 +141,13 @@ export default async function EncomendasSacPage({
       <SacTabs active="encomendas" />
 
       <div className="flex items-center gap-2 flex-wrap">
-        <Link
-          href={viewHref("abertos")}
-          className="text-xs px-3 py-1.5 rounded-full border"
-          style={{
-            borderColor: "var(--border)",
-            background: !showCompleted && !showAll ? "var(--surface-1)" : "transparent",
-            color: !showCompleted && !showAll ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: !showCompleted && !showAll ? 600 : 400,
-          }}
-        >
-          Minhas em aberto
-        </Link>
-        <Link
-          href={viewHref("concluidos")}
-          className="text-xs px-3 py-1.5 rounded-full border"
-          style={{
-            borderColor: "var(--border)",
-            background: showCompleted ? "var(--surface-1)" : "transparent",
-            color: showCompleted ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: showCompleted ? 600 : 400,
-          }}
-        >
-          Minhas entregues/canceladas
-        </Link>
-        <Link
-          href={viewHref("todas")}
-          className="text-xs px-3 py-1.5 rounded-full border"
-          style={{
-            borderColor: "var(--border)",
-            background: showAll ? "var(--surface-1)" : "transparent",
-            color: showAll ? "var(--text-primary)" : "var(--text-secondary)",
-            fontWeight: showAll ? 600 : 400,
-          }}
-        >
-          Todas as encomendas
-        </Link>
+        <FilterPill href={viewHref("abertos")} label="Minhas em aberto" selected={!showCompleted && !showAll} />
+        <FilterPill href={viewHref("concluidos")} label="Minhas entregues/canceladas" selected={showCompleted} />
+        <FilterPill href={viewHref("todas")} label="Todas as encomendas" selected={showAll} />
       </div>
 
       {showAll ? (
-        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <p className="text-sm text-gray-400">
           Visão só de acompanhamento — quem gerencia cada pedido continua sendo a loja, o CD e a fábrica.
         </p>
       ) : null}
@@ -194,8 +162,8 @@ export default async function EncomendasSacPage({
       ) : null}
 
       {pedidos.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">
             {showAll ? "Nenhuma encomenda lançada ainda." : showCompleted ? "Nenhum pedido entregue/cancelado ainda." : "Nenhum pedido em aberto no momento."}
           </p>
         </div>
@@ -208,15 +176,9 @@ export default async function EncomendasSacPage({
               // precisam aparecer recolhidas".
               <details key={group.dateKey} className="group flex flex-col gap-1.5">
                 <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                  <span className="inline-block transition-transform group-open:rotate-90" style={{ color: "var(--text-muted)" }}>
-                    ▶
-                  </span>
-                  <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {group.label}
-                  </span>
-                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    ({group.pedidos.length})
-                  </span>
+                  <span className="inline-block transition-transform group-open:rotate-90 text-gray-400">▶</span>
+                  <span className="text-sm font-semibold text-gray-800">{group.label}</span>
+                  <span className="text-xs text-gray-400">({group.pedidos.length})</span>
                 </summary>
                 <PedidosDetailGroup
                   pedidos={group.pedidos}
@@ -240,7 +202,7 @@ export default async function EncomendasSacPage({
         </div>
       )}
 
-      <Link href="/assistencia/sac" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
+      <Link href="/assistencia/sac" className="text-sm underline self-center text-gray-500 hover:text-gray-700">
         ← Voltar
       </Link>
     </div>
@@ -261,8 +223,8 @@ function PedidosDetailGroup({
   photosByPedido: Awaited<ReturnType<typeof listEncomendaPhotosForPedidos>>;
 }) {
   return (
-    <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-      <div className="divide-y" style={{ borderColor: "var(--brand-green)" }}>
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="divide-y divide-gray-100">
         {pedidos.map((p: PedidoEncomendaSummary) => (
           <details key={p.id} className="p-4">
             <summary className="flex items-start gap-2 cursor-pointer list-none">
@@ -280,20 +242,14 @@ function PedidosDetailGroup({
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-1 min-w-0">
                 <div className="flex flex-col gap-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono font-semibold" style={{ color: "var(--text-secondary)" }}>
-                      #{p.pedidoNumber}
-                    </span>
+                    <span className="text-xs font-mono font-semibold text-gray-500">#{p.pedidoNumber}</span>
                     <PedidoEncomendaStatusBadge status={p.status} />
-                    <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-                      {p.storeName}
-                    </span>
+                    <span className="text-xs font-medium text-gray-500">{p.storeName}</span>
                   </div>
-                  <p className="text-sm" style={{ color: "var(--text-primary)" }}>
-                    {p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}
-                  </p>
+                  <p className="text-sm text-gray-800">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
                 </div>
                 <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
-                  <span className="text-xs font-bold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                  <span className="text-xs font-bold whitespace-nowrap text-gray-500">
                     {new Date(p.createdAt).toLocaleDateString("pt-BR")}
                   </span>
                   {p.prazoCdLoja ? (
@@ -301,15 +257,15 @@ function PedidosDetailGroup({
                       Na loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
                     </span>
                   ) : p.prazoFabricaCd ? (
-                    <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                    <span className="text-xs font-medium whitespace-nowrap text-gray-500">
                       No CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
                     </span>
                   ) : null}
                 </div>
               </div>
             </summary>
-            <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid var(--gridline)" }}>
-              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            <div className="mt-3 pt-3 flex flex-col gap-2 border-t border-gray-100">
+              <p className="text-xs text-gray-500">
                 Fornecedor: {p.fornecedorTipo === "fabrica_externa" ? `Externo: ${p.fornecedorExterno}` : p.fabricaNome}
               </p>
               {canEditPedido(requester, p) ? (
@@ -321,37 +277,16 @@ function PedidosDetailGroup({
                   Editar pedido
                 </Link>
               ) : null}
-              {p.vendedorName ? (
-                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                  Vendedor: {p.vendedorName}
-                </p>
-              ) : null}
-              {p.clienteCodigo ? (
-                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                  Código do cliente: {p.clienteCodigo}
-                </p>
-              ) : null}
-              {p.carga ? (
-                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                  Carga: {p.carga}
-                </p>
-              ) : null}
-              {p.nfE ? (
-                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                  NF-e: {p.nfE}
-                </p>
-              ) : null}
+              {p.vendedorName ? <p className="text-xs text-gray-500">Vendedor: {p.vendedorName}</p> : null}
+              {p.clienteCodigo ? <p className="text-xs text-gray-500">Código do cliente: {p.clienteCodigo}</p> : null}
+              {p.carga ? <p className="text-xs text-gray-500">Carga: {p.carga}</p> : null}
+              {p.nfE ? <p className="text-xs text-gray-500">NF-e: {p.nfE}</p> : null}
               {(photosByPedido.get(p.id) ?? []).length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {(photosByPedido.get(p.id) ?? []).map((photo) => (
                     <a key={photo.id} href={photo.url} target="_blank" rel="noopener noreferrer">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={photo.url}
-                        alt="Cupom fiscal"
-                        className="h-20 w-20 object-cover rounded border"
-                        style={{ borderColor: "var(--border)" }}
-                      />
+                      <img src={photo.url} alt="Cupom fiscal" className="h-20 w-20 object-cover rounded-lg border border-gray-200" />
                     </a>
                   ))}
                 </div>

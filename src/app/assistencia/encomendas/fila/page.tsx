@@ -12,6 +12,7 @@ import { encomendaCanAdvance, nextQuickAdvance } from "@/lib/dal";
 import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 import { ROLE_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PedidoEncomendaFilaList } from "@/components/assistencia/PedidoEncomendaFilaList";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 import { FabricaProducaoView } from "@/components/assistencia/FabricaProducaoView";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -165,7 +166,7 @@ export default async function EncomendasQueuePage({
       <AssistenciaHeader title="Fila de encomendas" subtitle={`${actor.name} · ${ROLE_LABELS[actor.role] ?? actor.role}`}>
         <div className="flex items-center gap-4">
           {actor.role === "admin" || actor.role === "assistencia" ? (
-            <Link href="/assistencia/inicio" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            <Link href="/assistencia/inicio" className="text-sm underline text-gray-500 hover:text-gray-700">
               ← Voltar
             </Link>
           ) : null}
@@ -178,7 +179,7 @@ export default async function EncomendasQueuePage({
             </Link>
           ) : null}
           {actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia" ? (
-            <Link href="/assistencia/encomendas/fornecedores" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            <Link href="/assistencia/encomendas/fornecedores" className="text-sm underline text-gray-500 hover:text-gray-700">
               Pedidos a fornecedores
             </Link>
           ) : null}
@@ -197,7 +198,7 @@ export default async function EncomendasQueuePage({
             </form>
           ) : null}
           <form action={signOutAction}>
-            <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            <button type="submit" className="text-sm underline text-gray-500 hover:text-gray-700">
               Sair
             </button>
           </form>
@@ -219,35 +220,19 @@ export default async function EncomendasQueuePage({
             const activeValue = showAllStatuses ? "todos" : (filterStatus ?? null);
             const selected = (f.value ?? null) === activeValue;
             const isStatusPill = !!f.value && f.value !== "todos";
-            const color = isStatusPill ? PEDIDO_ENCOMENDA_STATUS_COLORS[f.value as string] ?? "var(--text-secondary)" : "var(--text-secondary)";
             // Contador visual em cada chip -- pedido do Victor 22/08/2026:
             // "torne-os em Chips com Contadores Visuais (ex: Em Produção
             // (14))". "Em andamento" soma os status ainda abertos, "Todos" é
             // o total, cada status individual usa a própria contagem.
             const count = f.value === null ? openCount : f.value === "todos" ? allForCounts.length : (statusCounts.get(f.value) ?? 0);
             return (
-              <Link
+              <FilterPill
                 key={f.label}
                 href={buildHref({ status: f.value ?? undefined, store, fornecedor, q, view })}
-                className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
-                style={
-                  isStatusPill
-                    ? {
-                        color: "var(--text-primary)",
-                        background: selected ? `color-mix(in srgb, ${color} 35%, var(--surface-1))` : "transparent",
-                        fontWeight: selected ? 600 : 400,
-                        border: `1px solid ${selected ? "transparent" : `color-mix(in srgb, ${color} 40%, transparent)`}`,
-                      }
-                    : {
-                        border: "1px solid var(--border)",
-                        background: selected ? "var(--surface-1)" : "transparent",
-                        color: selected ? "var(--text-primary)" : "var(--text-secondary)",
-                        fontWeight: selected ? 600 : 400,
-                      }
-                }
-              >
-                {f.label} ({count})
-              </Link>
+                label={`${f.label} (${count})`}
+                selected={selected}
+                color={isStatusPill ? PEDIDO_ENCOMENDA_STATUS_COLORS[f.value as string] : undefined}
+              />
             );
           })}
         </div>
@@ -262,22 +247,13 @@ export default async function EncomendasQueuePage({
             name="q"
             defaultValue={q ?? ""}
             placeholder="Buscar por nº do pedido, cliente ou produto…"
-            className="rounded border px-3 py-2 text-sm flex-1 min-w-[240px]"
-            style={{ borderColor: "var(--border)" }}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm flex-1 min-w-[240px]"
           />
-          <button
-            type="submit"
-            className="text-sm px-3 py-2 rounded border"
-            style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
-          >
+          <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-800">
             Buscar
           </button>
           {q ? (
-            <Link
-              href={buildHref({ status, store, fornecedor, view })}
-              className="text-xs underline"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <Link href={buildHref({ status, store, fornecedor, view })} className="text-xs underline text-gray-500 hover:text-gray-700">
               Limpar busca
             </Link>
           ) : null}
@@ -286,24 +262,14 @@ export default async function EncomendasQueuePage({
 
       {showFornecedorFilter ? (
         <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
-          {FORNECEDOR_FILTERS.map((f) => {
-            const selected = (f.value ?? undefined) === fornecedor;
-            return (
-              <Link
-                key={f.label}
-                href={buildHref({ status, store, fornecedor: f.value ?? undefined, q, view })}
-                className="text-xs px-3 py-1 rounded-full whitespace-nowrap shrink-0"
-                style={{
-                  border: "1px solid var(--border)",
-                  background: selected ? "var(--surface-1)" : "transparent",
-                  color: selected ? "var(--text-primary)" : "var(--text-secondary)",
-                  fontWeight: selected ? 600 : 400,
-                }}
-              >
-                {f.label}
-              </Link>
-            );
-          })}
+          {FORNECEDOR_FILTERS.map((f) => (
+            <FilterPill
+              key={f.label}
+              href={buildHref({ status, store, fornecedor: f.value ?? undefined, q, view })}
+              label={f.label}
+              selected={(f.value ?? undefined) === fornecedor}
+            />
+          ))}
         </div>
       ) : null}
 
@@ -315,21 +281,17 @@ export default async function EncomendasQueuePage({
           FabricaProducaoView.tsx. */}
       <Link
         href={buildHref({ status, store, fornecedor, q, view: fabricaView ? undefined : "fabrica" })}
-        className="text-sm px-3 py-2 rounded font-medium whitespace-nowrap self-start"
-        style={
-          fabricaView
-            ? { background: "var(--brand-orange)", color: "#fff" }
-            : { border: "1px solid var(--brand-orange)", color: "var(--brand-orange)" }
-        }
+        className={`text-sm px-3.5 py-2 rounded-lg font-medium whitespace-nowrap self-start transition-all duration-200 ${
+          fabricaView ? "text-white shadow-sm hover:brightness-110" : "border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800"
+        }`}
+        style={fabricaView ? { background: "var(--brand-orange)" } : undefined}
       >
         {fabricaView ? "📋 Voltar para visão por pedido" : "🏭 Alternar para visão fábrica"}
       </Link>
 
       {pedidos.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhum pedido encontrado.
-          </p>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">Nenhum pedido encontrado.</p>
         </div>
       ) : fabricaView ? (
         <FabricaProducaoView pedidos={pedidos} />

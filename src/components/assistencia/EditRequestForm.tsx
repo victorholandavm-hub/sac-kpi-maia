@@ -194,10 +194,12 @@ export function EditRequestForm({
         </Field>
       ) : null}
 
-      {showAuthorizedBy && causaRaiz === "erro_conferencia" ? (
+      {showAuthorizedBy && (causaRaiz === "erro_conferencia" || causaRaiz === "sujeira_conferencia") ? (
         <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
           <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
-            Erro de conferência -- precisa registrar qual carga e quem conferiu.
+            {causaRaiz === "sujeira_conferencia"
+              ? "Sujeira não barrada na conferência -- precisa registrar qual carga e quem conferiu."
+              : "Erro de conferência -- precisa registrar qual carga e quem conferiu."}
           </p>
           <Field label="Carga *">
             <input

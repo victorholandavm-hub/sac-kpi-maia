@@ -160,15 +160,11 @@ const ALVO_FILTERS: { label: string; value: "mostruario" | "cliente" | undefined
 function KpiCardWhite({ label, value, barColor, big }: { label: string; value: string; barColor: string; big?: boolean }) {
   return (
     <div
-      className="flex-1 min-w-0 rounded-xl py-3 pl-4 pr-4 flex flex-col gap-1"
-      style={{ background: "var(--surface-1)", borderLeft: `4px solid ${barColor}`, boxShadow: "0 1px 3px rgba(11,11,11,0.08)" }}
+      className="flex-1 min-w-0 rounded-xl py-3 pl-4 pr-4 flex flex-col gap-1 bg-white shadow-sm"
+      style={{ borderLeft: `4px solid ${barColor}` }}
     >
-      <span className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-        {label}
-      </span>
-      <span className={big ? "text-3xl font-bold truncate" : "text-2xl font-bold truncate"} style={{ color: "var(--text-primary)" }}>
-        {value}
-      </span>
+      <span className="text-sm truncate text-gray-500">{label}</span>
+      <span className={`${big ? "text-3xl" : "text-2xl"} font-bold truncate text-gray-800`}>{value}</span>
     </div>
   );
 }
@@ -181,14 +177,14 @@ function KpiCardWhite({ label, value, barColor, big }: { label: string; value: s
 // o tipo em toda linha é ruído (já está no título da seção).
 function IndicatorItemsList({ items, showType }: { items: IndicatorItem[]; showType?: boolean }) {
   return (
-    <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
+    <div className="flex flex-col divide-y divide-gray-100">
       {items.map((it) => (
         <div key={it.id} className="pl-6 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
-          <span className="truncate text-left" style={{ color: "var(--text-primary)" }}>
+          <span className="truncate text-left text-gray-800">
             #{it.ticketNumber}
             {showType ? ` · ${REQUEST_TYPE_LABELS[it.type] ?? it.type}` : ""} · {it.clientName ?? "Sem cliente"} · {formatDateBr(it.createdAt)}
           </span>
-          <span className="shrink-0 font-medium text-right" style={{ color: STATUS_COLORS[it.status] ?? "var(--text-muted)" }}>
+          <span className="shrink-0 font-medium text-right" style={{ color: STATUS_COLORS[it.status] ?? "#9ca3af" }}>
             {STATUS_LABELS[it.status] ?? it.status}
           </span>
         </div>
@@ -202,14 +198,14 @@ function IndicatorItemsList({ items, showType }: { items: IndicatorItem[]; showT
 // indicadores, que já filtram por um tipo só).
 function ReportRowItemsList({ items }: { items: ReportRowItem[] }) {
   return (
-    <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
+    <div className="flex flex-col divide-y divide-gray-100">
       {items.map((it) => (
         <div key={it.id} className="pl-6 pr-4 py-1.5 flex flex-col gap-0.5 text-xs">
           <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-left" style={{ color: "var(--text-primary)" }}>
+            <span className="truncate text-left text-gray-800">
               #{it.ticketNumber} · {REQUEST_TYPE_LABELS[it.type] ?? it.type} · {it.storeName} · {formatDateBr(it.createdAt)}
             </span>
-            <span className="shrink-0 font-medium text-right" style={{ color: STATUS_COLORS[it.status] ?? "var(--text-muted)" }}>
+            <span className="shrink-0 font-medium text-right" style={{ color: STATUS_COLORS[it.status] ?? "#9ca3af" }}>
               {STATUS_LABELS[it.status] ?? it.status}
             </span>
           </div>
@@ -220,7 +216,7 @@ function ReportRowItemsList({ items }: { items: ReportRowItem[] }) {
               não dizia o quê -- `reason` é a descrição livre do
               problema, preenchida na criação do chamado. */}
           {it.reason ? (
-            <span className="truncate text-left" style={{ color: "var(--text-secondary)" }} title={it.reason}>
+            <span className="truncate text-left text-gray-500" title={it.reason}>
               {it.reason}
             </span>
           ) : null}
@@ -237,7 +233,7 @@ function ReportRowItemsList({ items }: { items: ReportRowItem[] }) {
 // começa direto na borda esquerda do card.
 function ColumnsHeader({ columns }: { columns: string[] }) {
   return (
-    <div className="flex items-center gap-2 px-4 py-2 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--gridline)" }}>
+    <div className="flex items-center gap-2 px-4 py-2 text-xs text-gray-400 border-b border-gray-100">
       <span className="flex-1 min-w-0 text-left">{columns[0]}</span>
       {columns.slice(1).map((c) => (
         <span key={c} className="w-20 shrink-0 text-right">
@@ -269,14 +265,12 @@ function ExpandableRow({
           já vem separada pelo divide-y do container pai -- aqui só sobra
           o hover pra indicar que a linha é clicável (expande o detalhe
           dos chamados por trás). */}
-      <summary
-        className="flex items-center gap-2 px-4 py-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-[var(--surface-2)]"
-      >
-        <span className="flex-1 min-w-0 flex items-center gap-1.5 text-sm text-left" style={{ color: "var(--text-primary)" }}>
+      <summary className="flex items-center gap-2 px-4 py-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-gray-50">
+        <span className="flex-1 min-w-0 flex items-center gap-1.5 text-sm text-left text-gray-800">
           {typeof label === "string" ? <span className="truncate">{label}</span> : label}
         </span>
         {numbers.map((n, i) => (
-          <span key={i} className="w-20 shrink-0 text-right text-sm" style={{ color: n.color ?? "var(--text-primary)" }}>
+          <span key={i} className="w-20 shrink-0 text-right text-sm" style={{ color: n.color ?? "#1f2937" }}>
             {n.value}
           </span>
         ))}
@@ -291,7 +285,7 @@ function ExpandableRow({
 // reconciliação) -- redesign pedido do Victor 28/08/2026: "remova o
 // contorno/borda cinza externa... fundos brancos com sombras suaves".
 // Substitui a antiga borda grossa `2px solid var(--brand-green)`.
-const CARD_STYLE: React.CSSProperties = { background: "var(--surface-1)", boxShadow: "0 1px 3px rgba(11,11,11,0.08)" };
+const CARD_CLASS = "rounded-xl border border-gray-200 bg-white shadow-sm";
 
 // Linhas além do Top 5 ficam recolhidas num "Ver todos" -- pedido do Victor
 // 22/08/2026: "Nas tabelas longas... exiba os Top 5 inicialmente e insira
@@ -327,7 +321,7 @@ function ReportTable({
         numbers={[
           { value: r.total },
           { value: r.concluida, color: "var(--status-good)" },
-          { value: r.cancelada, color: "var(--text-muted)" },
+          { value: r.cancelada, color: "#9ca3af" },
         ]}
       >
         <ReportRowItemsList items={r.items} />
@@ -336,30 +330,30 @@ function ReportTable({
   }
 
   return (
-    <details className="rounded-xl overflow-hidden" style={CARD_STYLE}>
-      <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
+    <details className={`${CARD_CLASS} overflow-hidden`}>
+      <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 border-b border-gray-100">
         {title} ({rows.length})
       </summary>
       {rows.length === 0 ? (
-        <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
+        <p className="text-sm p-4 text-gray-400">
           {emptyMessage}
         </p>
       ) : (
         <div>
           <ColumnsHeader columns={[keyLabel, "Total", "Concluídas", "Canceladas"]} />
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+          <div className="divide-y divide-gray-100">
             {visible.map(renderRow)}
           </div>
           {hidden.length > 0 ? (
             <details className="group/vertodos">
               <summary
-                className="text-xs font-semibold cursor-pointer list-none px-4 py-2.5 text-center"
-                style={{ color: "var(--brand-green)", borderTop: "1px solid var(--gridline)" }}
+                className="text-xs font-semibold cursor-pointer list-none px-4 py-2.5 text-center border-t border-gray-100"
+                style={{ color: "var(--brand-green)" }}
               >
                 <span className="group-open/vertodos:hidden">Ver todos ({hidden.length})</span>
                 <span className="hidden group-open/vertodos:inline">Mostrar menos</span>
               </summary>
-              <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+              <div className="divide-y divide-gray-100">
                 {hidden.map(renderRow)}
               </div>
             </details>
@@ -394,12 +388,10 @@ function PaymentProgressBar({ pago, total }: { pago: number; total: number }) {
   const pct = total > 0 ? Math.min(100, Math.round((pago / total) * 100)) : 0;
   return (
     <div className="flex items-center gap-2 px-4 pb-2">
-      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-gray-100">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--status-good)" }} />
       </div>
-      <span className="text-[11px] shrink-0" style={{ color: "var(--text-muted)" }}>
-        {pct}% pago
-      </span>
+      <span className="text-[11px] shrink-0 text-gray-400">{pct}% pago</span>
     </div>
   );
 }
@@ -492,21 +484,19 @@ export default async function RelatoriosPage({
           direita. */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
-            Relatórios
-          </h1>
-          {/* Segmented control -- pílulas com fundo cinza claro
-              (var(--surface-2)) e a selecionada com fundo escuro
-              (var(--text-primary)). */}
-          <div className="inline-flex rounded-full p-1 flex-wrap" style={{ background: "var(--surface-2)" }}>
+          <h1 className="text-xl font-bold text-gray-800">Relatórios</h1>
+          {/* Segmented control -- pílulas com fundo cinza claro e a
+              selecionada com fundo verde sólido (mesmo padrão de segmented
+              control usado no resto do Design System). */}
+          <div className="inline-flex rounded-full p-1 flex-wrap bg-gray-100">
             {ALVO_FILTERS.map((f) => {
               const selected = f.value === filterAlvo;
               return (
                 <Link
                   key={f.label}
                   href={buildReportHref({ from: dateFrom, to: dateTo, tipo: indicatorTypeKey, indTab, alvo: f.value })}
-                  className="text-sm font-medium px-4 py-1.5 rounded-full whitespace-nowrap"
-                  style={selected ? { background: "var(--text-primary)", color: "#fff" } : { color: "var(--text-secondary)" }}
+                  className={`text-sm font-medium px-4 py-1.5 rounded-full whitespace-nowrap ${selected ? "text-white shadow-sm" : "text-gray-500"}`}
+                  style={selected ? { background: "color-mix(in srgb, var(--brand-green) 78%, black)" } : undefined}
                 >
                   {f.label}
                 </Link>
@@ -519,15 +509,15 @@ export default async function RelatoriosPage({
           {hiddenAlvo}
           <input type="hidden" name="tipo" value={indicatorTypeKey} />
           <input type="hidden" name="indTab" value={indTab} />
-          <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+          <label className="flex items-center gap-2 text-sm text-gray-500">
             De
-            <input type="date" name="from" defaultValue={dateFrom} className="rounded border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
+            <input type="date" name="from" defaultValue={dateFrom} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
           </label>
-          <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
+          <label className="flex items-center gap-2 text-sm text-gray-500">
             Até
-            <input type="date" name="to" defaultValue={dateTo} className="rounded border px-3 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
+            <input type="date" name="to" defaultValue={dateTo} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
           </label>
-          <button type="submit" className="text-sm px-3 py-2 rounded border" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+          <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-800">
             Aplicar
           </button>
         </form>
@@ -542,9 +532,9 @@ export default async function RelatoriosPage({
           evidenciar que um se decompõe no outro. */}
       <div className="grid sm:grid-cols-4 gap-4 items-stretch">
         <KpiCardWhite label="Solicitações no período" value={String(report.totalRequests)} barColor="var(--series-5)" />
-        <div className="sm:col-span-3 flex flex-col sm:flex-row gap-3 rounded-xl p-3" style={{ background: "var(--surface-2)" }}>
+        <div className="sm:col-span-3 flex flex-col sm:flex-row gap-3 rounded-xl p-3 bg-gray-100">
           <KpiCardWhite label="Total a pagar a montadores" value={formatBRL(paymentTotal)} barColor="var(--series-4)" big />
-          <div className="hidden sm:flex items-center px-1 text-xl" style={{ color: "var(--text-muted)" }} aria-hidden="true">
+          <div className="hidden sm:flex items-center px-1 text-xl text-gray-400" aria-hidden="true">
             →
           </div>
           <div className="flex gap-3 flex-1">
@@ -563,23 +553,21 @@ export default async function RelatoriosPage({
           o Antônio ter que reaplicar o filtro do outro lado. */}
       <Link
         href={`/assistencia/relatorios/montagem-detalhado?${new URLSearchParams({ from: dateFrom, to: dateTo, ...(filterAlvo ? { alvo: filterAlvo } : {}) }).toString()}`}
-        className="self-start text-sm px-4 py-2 rounded-lg font-medium"
-        style={{ background: "var(--text-primary)", color: "#fff" }}
+        className="self-start text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
+        style={{ background: "#1B5E3C" }}
       >
         📋 Relatório de montagem detalhado
       </Link>
 
       {/* Indicadores -- redesign pedido do Victor 28/08/2026: sem borda
-          externa colorida (card branco com sombra, ver CARD_STYLE), 3
+          externa colorida (card branco com sombra, ver CARD_CLASS), 3
           visões viram abas horizontais em vez de tabela + grid de 2
           colunas. Seletor de Tipo continua existindo, reposicionado pro
           canto direito da barra de abas. */}
-      <div className="flex flex-col gap-3 rounded-xl p-4" style={CARD_STYLE}>
-        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Indicadores de {indicatorLabelFor(indicatorTypeKey)}
-        </h3>
+      <div className={`flex flex-col gap-3 rounded-xl p-4 ${CARD_CLASS}`}>
+        <h3 className="text-sm font-bold text-gray-800">Indicadores de {indicatorLabelFor(indicatorTypeKey)}</h3>
 
-        <div className="flex items-center justify-between gap-3 flex-wrap" style={{ borderBottom: "1px solid var(--gridline)" }}>
+        <div className="flex items-center justify-between gap-3 flex-wrap border-b border-gray-100">
           <div className="flex items-center gap-1 flex-wrap">
             {INDICATOR_TABS.map((t) => {
               const active = t.key === indTab;
@@ -587,8 +575,8 @@ export default async function RelatoriosPage({
                 <Link
                   key={t.key}
                   href={buildReportHref({ from: dateFrom, to: dateTo, alvo: filterAlvo, tipo: indicatorTypeKey, indTab: t.key })}
-                  className="text-sm font-medium px-3 py-2 -mb-px border-b-2 whitespace-nowrap"
-                  style={active ? { borderColor: "var(--brand-green)", color: "var(--text-primary)" } : { borderColor: "transparent", color: "var(--text-muted)" }}
+                  className={`text-sm font-medium px-3 py-2 -mb-px border-b-2 whitespace-nowrap ${active ? "text-gray-800" : "border-transparent text-gray-400"}`}
+                  style={active ? { borderColor: "var(--brand-green)" } : undefined}
                 >
                   {t.label}
                 </Link>
@@ -601,7 +589,7 @@ export default async function RelatoriosPage({
             <input type="hidden" name="from" value={dateFrom} />
             <input type="hidden" name="to" value={dateTo} />
             <input type="hidden" name="indTab" value={indTab} />
-            <select name="tipo" defaultValue={indicatorTypeKey} className="rounded border px-2 py-1.5 text-sm" style={{ borderColor: "var(--border)" }}>
+            <select name="tipo" defaultValue={indicatorTypeKey} className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
               <option value="montagem_desmontagem">Montagem/Desmontagem (junto)</option>
               {REQUEST_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -609,7 +597,7 @@ export default async function RelatoriosPage({
                 </option>
               ))}
             </select>
-            <button type="submit" className="text-xs px-2.5 py-1.5 rounded border" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+            <button type="submit" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-800">
               Aplicar
             </button>
           </form>
@@ -617,13 +605,13 @@ export default async function RelatoriosPage({
 
         {indTab === "mensal" ? (
           indicators.byMonth.length === 0 ? (
-            <p className="text-sm py-6 text-center" style={{ color: "var(--text-muted)" }}>
+            <p className="text-sm py-6 text-center text-gray-400">
               Nenhuma solicitação desse tipo no período.
             </p>
           ) : (
             <div>
               <ColumnsHeader columns={["Mês", "Total", "Concluídas"]} />
-              <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+              <div className="divide-y divide-gray-100">
                 {indicators.byMonth.map((m) => (
                   <ExpandableRow key={m.month} label={formatMonth(m.month)} numbers={[{ value: m.total }, { value: m.concluida, color: "var(--status-good)" }]}>
                     <IndicatorItemsList items={m.items} showType={indicatorTypes.length > 1} />
@@ -636,13 +624,13 @@ export default async function RelatoriosPage({
 
         {indTab === "montador" ? (
           indicatorsByAssembler.length === 0 ? (
-            <p className="text-sm py-6 text-center" style={{ color: "var(--text-muted)" }}>
+            <p className="text-sm py-6 text-center text-gray-400">
               Nenhuma solicitação desse tipo no período.
             </p>
           ) : (
             <div>
               <ColumnsHeader columns={["Montador", "Total", "Concluídas", "Tempo médio (dias)"]} />
-              <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+              <div className="divide-y divide-gray-100">
                 {indicatorsByAssembler.map((a) => (
                   <ExpandableRow
                     key={a.assemblerName}
@@ -650,7 +638,7 @@ export default async function RelatoriosPage({
                     numbers={[
                       { value: a.total },
                       { value: a.concluida, color: "var(--status-good)" },
-                      { value: formatDaysNumber(a.avgDaysToComplete), color: "var(--text-muted)" },
+                      { value: formatDaysNumber(a.avgDaysToComplete), color: "#9ca3af" },
                     ]}
                   >
                     <IndicatorItemsList items={a.items} showType={indicatorTypes.length > 1} />
@@ -663,13 +651,13 @@ export default async function RelatoriosPage({
 
         {indTab === "loja" ? (
           indicators.byStore.length === 0 ? (
-            <p className="text-sm py-6 text-center" style={{ color: "var(--text-muted)" }}>
+            <p className="text-sm py-6 text-center text-gray-400">
               Nenhuma solicitação desse tipo no período.
             </p>
           ) : (
             <div>
               <ColumnsHeader columns={["Loja", "Total", "Concluídas"]} />
-              <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+              <div className="divide-y divide-gray-100">
                 {indicators.byStore.map((s) => (
                   <ExpandableRow key={s.storeId} label={s.storeName} numbers={[{ value: s.total }, { value: s.concluida, color: "var(--status-good)" }]}>
                     <IndicatorItemsList items={s.items} showType={indicatorTypes.length > 1} />
@@ -696,18 +684,18 @@ export default async function RelatoriosPage({
           Solicitações por Vendedor". */}
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         <div className="flex flex-col gap-4">
-          <details className="rounded-xl overflow-hidden" style={CARD_STYLE}>
-            <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
+          <details className={`${CARD_CLASS} overflow-hidden`}>
+            <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 border-b border-gray-100">
               Pagamento por montador ({assemblerRows.length})
             </summary>
             {assemblerRows.length === 0 ? (
-              <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
+              <p className="text-sm p-4 text-gray-400">
                 Nenhum pagamento no período.
               </p>
             ) : (
               <div>
                 <ColumnsHeader columns={["Montador", "Itens", "Total", "Pago", "Pendente"]} />
-                <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                <div className="divide-y divide-gray-100">
                   {assemblerRows.map(([name, v]) => (
                     <div key={name}>
                       <ExpandableRow
@@ -716,13 +704,13 @@ export default async function RelatoriosPage({
                           { value: v.itens },
                           { value: formatBRL(v.total) },
                           { value: formatBRL(v.pago), color: "var(--status-good)" },
-                          { value: formatBRL(v.pendente), color: v.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" },
+                          { value: formatBRL(v.pendente), color: v.pendente > 0 ? "var(--status-warning)" : "#9ca3af" },
                         ]}
                       >
-                        <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
+                        <div className="flex flex-col divide-y divide-gray-100">
                           {v.items.map((it) => (
                             <div key={it.itemId} className="pl-6 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
-                              <span className="truncate text-left" style={{ color: "var(--text-primary)" }}>
+                              <span className="truncate text-left text-gray-800">
                                 {it.product} · {it.quantity}x · {it.clientName ?? it.storeName} · {formatDateBr(it.createdAt)}
                               </span>
                               <span
@@ -746,12 +734,12 @@ export default async function RelatoriosPage({
           {/* Gráfico de rosca + tags de retrabalho interno -- pedido do
               Victor 22/08/2026 (ver ErroInternoBadge/CausaRaizDonutChart
               acima). */}
-          <details className="rounded-xl overflow-hidden" style={CARD_STYLE}>
-            <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
+          <details className={`${CARD_CLASS} overflow-hidden`}>
+            <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 border-b border-gray-100">
               Trocas de produto por causa raiz ({report.byCausaRaiz.length})
             </summary>
             {report.byCausaRaiz.length === 0 ? (
-              <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
+              <p className="text-sm p-4 text-gray-400">
                 Nenhuma troca de produto com causa raiz registrada nesse período.
               </p>
             ) : (
@@ -762,7 +750,7 @@ export default async function RelatoriosPage({
                   />
                 </div>
                 <ColumnsHeader columns={["Causa raiz", "Total", "Concluídas", "Canceladas"]} />
-                <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                <div className="divide-y divide-gray-100">
                   {report.byCausaRaiz.map((r) => (
                     <ExpandableRow
                       key={r.key}
@@ -777,7 +765,7 @@ export default async function RelatoriosPage({
                       numbers={[
                         { value: r.total },
                         { value: r.concluida, color: "var(--status-good)" },
-                        { value: r.cancelada, color: "var(--text-muted)" },
+                        { value: r.cancelada, color: "#9ca3af" },
                       ]}
                     >
                       <ReportRowItemsList items={r.items} />
@@ -801,18 +789,18 @@ export default async function RelatoriosPage({
         </div>
       </div>
 
-      <details className="rounded-xl overflow-hidden" style={CARD_STYLE}>
-        <summary className="text-base font-bold cursor-pointer px-4 py-3" style={{ color: "var(--text-primary)", borderBottom: "1px solid var(--gridline)" }}>
+      <details className={`${CARD_CLASS} overflow-hidden`}>
+        <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 border-b border-gray-100">
           Reconciliação com fornecedor ({supplierReconciliation.length}) — acumulado, todas as remessas
         </summary>
         {supplierReconciliation.length === 0 ? (
-          <p className="text-sm p-4" style={{ color: "var(--text-muted)" }}>
+          <p className="text-sm p-4 text-gray-400">
             Nenhuma remessa registrada ainda.
           </p>
         ) : (
           <div>
             <ColumnsHeader columns={["Fornecedor", "Em devolução", "Faturado", "Reembolsado", "Pendente"]} />
-            <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+            <div className="divide-y divide-gray-100">
               {supplierReconciliation.map((r) => (
                 <ExpandableRow
                   key={r.supplier}
@@ -821,7 +809,7 @@ export default async function RelatoriosPage({
                     { value: formatBRL(r.emDevolucao) },
                     { value: formatBRL(r.faturado) },
                     { value: formatBRL(r.reembolsado), color: "var(--status-good)" },
-                    { value: formatBRL(r.pendente), color: r.pendente > 0 ? "var(--status-warning)" : "var(--text-muted)" },
+                    { value: formatBRL(r.pendente), color: r.pendente > 0 ? "var(--status-warning)" : "#9ca3af" },
                   ]}
                 >
                   <SupplierReturnItemsList items={r.items} />
@@ -837,14 +825,14 @@ export default async function RelatoriosPage({
 
 function SupplierReturnItemsList({ items }: { items: SupplierReconciliationItem[] }) {
   return (
-    <div className="flex flex-col divide-y" style={{ borderColor: "var(--gridline)" }}>
+    <div className="flex flex-col divide-y divide-gray-100">
       {items.map((it) => (
         <div key={it.id} className="pl-6 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
-          <span className="truncate text-left" style={{ color: "var(--text-primary)" }}>
+          <span className="truncate text-left text-gray-800">
             #{it.ticketNumber} · {it.partName}
             {it.invoiceValue !== null ? ` · ${formatBRL(it.invoiceValue)}` : ""}
           </span>
-          <span className="shrink-0 font-medium text-right" style={{ color: "var(--text-muted)" }}>
+          <span className="shrink-0 font-medium text-right text-gray-400">
             {SUPPLIER_RETURN_STATUS_LABELS[it.status] ?? it.status}
           </span>
         </div>

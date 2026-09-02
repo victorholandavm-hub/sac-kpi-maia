@@ -21,12 +21,8 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-        {label}
-      </span>
-      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-        {value}
-      </span>
+      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-sm text-gray-800">{value}</span>
     </div>
   );
 }
@@ -42,32 +38,19 @@ export default async function SupplierReturnDetailPage({ params }: { params: Pro
   const supplierReturn = await getSupplierReturn(id);
 
   if (!supplierReturn) {
-    return (
-      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        Remessa não encontrada.
-      </p>
-    );
+    return <p className="text-sm text-gray-400">Remessa não encontrada.</p>;
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-sm font-mono" style={{ color: "var(--text-muted)" }}>
-          Chamado #{supplierReturn.ticketNumber}
-        </span>
+        <span className="text-sm font-mono text-gray-400">Chamado #{supplierReturn.ticketNumber}</span>
         <StatusBadge status={supplierReturn.status} />
-        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-          {supplierReturn.partName}
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-800">{supplierReturn.partName}</h2>
       </div>
 
-      <div
-        className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-      >
-        <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
-          Detalhes
-        </h3>
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 grid sm:grid-cols-2 gap-4">
+        <h3 className="text-sm font-semibold text-gray-800 sm:col-span-2">Detalhes</h3>
         <Row label="Produto do cliente" value={supplierReturn.product} />
         <Row label="Fornecedor" value={supplierReturn.supplier} />
         <Row label="Nº da nota fiscal" value={supplierReturn.invoiceNumber} />
@@ -86,13 +69,9 @@ export default async function SupplierReturnDetailPage({ params }: { params: Pro
       <SupplierReturnActions returnId={supplierReturn.id} status={supplierReturn.status} />
 
       {supplierReturn.notes ? (
-        <div className="rounded-lg p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-          <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-            Observações
-          </h3>
-          <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-secondary)" }}>
-            {supplierReturn.notes}
-          </p>
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-2">
+          <h3 className="text-sm font-semibold text-gray-800">Observações</h3>
+          <p className="text-sm whitespace-pre-line text-gray-500">{supplierReturn.notes}</p>
         </div>
       ) : null}
     </div>

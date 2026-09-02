@@ -152,7 +152,7 @@ export function DeliveryRequestDetailContent({
   const novaNotificacaoHref = profile.role === "sac" ? "/assistencia/sac/nova" : "/assistencia/nova-entrega";
 
   const causaRaizDetail =
-    request.causaRaiz === "erro_conferencia"
+    request.causaRaiz === "erro_conferencia" || request.causaRaiz === "sujeira_conferencia"
       ? [request.causaCarga ? `Carga: ${request.causaCarga}` : null, request.causaConferente ? `Conferente: ${request.causaConferente}` : null]
           .filter(Boolean)
           .join(" · ")
