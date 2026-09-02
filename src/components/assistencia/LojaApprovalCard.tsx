@@ -47,9 +47,17 @@ export async function LojaApprovalCard({ request }: { request: OpenRequestForLoj
               </span>
               {itemPhotos.length > 0 ? (
                 <PhotoGallery photos={itemPhotos} />
-              ) : (
+              ) : item.completed ? (
                 <span className="text-xs font-medium" style={{ color: "var(--status-warning)" }}>
                   Sem foto enviada
+                </span>
+              ) : (
+                // Conclusão parcial (pedido do Victor 02/09/2026): item que o
+                // montador ainda nem tentou -- diferente de "sem foto" (que
+                // seria uma inconsistência, já que foto é obrigatória pra
+                // marcar como feito), aqui é esperado não ter foto nenhuma.
+                <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+                  Ainda não foi feito pelo montador
                 </span>
               )}
             </div>
@@ -59,7 +67,7 @@ export async function LojaApprovalCard({ request }: { request: OpenRequestForLoj
 
       <LojaApprovalActions
         requestId={request.id}
-        items={request.items.map((i) => ({ id: i.id, product: i.product, quantity: i.quantity }))}
+        items={request.items.map((i) => ({ id: i.id, product: i.product, quantity: i.quantity, completed: i.completed }))}
       />
     </div>
   );
