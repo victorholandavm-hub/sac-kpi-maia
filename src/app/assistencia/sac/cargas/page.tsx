@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
-import { listCargasRecentes, listPedidosSemCarga, type CargaGroup, type PedidoSemCarga } from "@/lib/cargas";
+import { listPedidosSemCarga, getCargaTrocasSac, CARGA_TROCAS_SAC, type CargaGroup, type PedidoSemCarga } from "@/lib/cargas";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
 import { CargaProblemaField } from "@/components/assistencia/CargaProblemaField";
@@ -18,10 +18,11 @@ function diasDesde(value: string): number {
 }
 
 // "Pendente de carga" -- pedido do Victor 02/09/2026: "clientes que
-// compraram nos últimos 5 dias e ainda não estão em carga". Seção nova, ao
-// lado da lista de cargas já despachadas (que continua igual, com
-// motorista/problemas) -- não substitui, complementa: aqui é quem ainda nem
-// entrou numa viagem.
+// compraram nos últimos 3 dias [era 5, ajustado no mesmo dia] e ainda não
+// estão em carga [ou foram tirados dela]". Era uma seção ao lado da lista
+// de cargas já despachadas -- essa lista saiu da tela (mesmo pedido, "não
+// precisa aparecer as cargas em andamento"), sobrou só isso como aba
+// padrão + a sub-aba da carga 004440 (ver CargasSubTabs).
 function PendenteCargaTable({ pedidos }: { pedidos: PedidoSemCarga[] }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
@@ -128,46 +129,85 @@ function CargaCard({ group }: { group: CargaGroup }) {
   );
 }
 
-export default async function CargasPage() {
+// Sub-aba dentro de Cargas -- pedido do Victor 02/09/2026: "não precisa
+// aparecer as cargas em andamento, apenas a primeira parte [Pendente de
+// carga]... preciso que tenha uma sub aba dentro dela, apenas com a carga
+// de número 004440". Via searchParam (não useState) pra continuar 100%
+// Server Component -- cada aba só busca o próprio dado, sem buscar as
+// cargas em andamento à toa (que nem aparecem mais em lugar nenhum).
+type CargasTab = "pendente" | "trocas";
+
+function CargasSubTabs({ active }: { active: CargasTab }) {
+  const tabs: { key: CargasTab; label: string; href: string }[] = [
+    { key: "pendente", label: "Pendente de carga", href: "/assistencia/sac/cargas" },
+    { key: "trocas", label: `Trocas p/ SAC (Carga ${CARGA_TROCAS_SAC})`, href: "/assistencia/sac/cargas?aba=trocas" },
+  ];
+  return (
+    <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
+      {tabs.map((t) => (
+        <Link
+          key={t.key}
+          href={t.href}
+          className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+            active === t.key ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+          style={active === t.key ? { background: "color-mix(in srgb, var(--brand-green) 78%, black)" } : undefined}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+export default async function CargasPage({ searchParams }: { searchParams: Promise<{ aba?: string }> }) {
   const profile = await getProfile();
   if (profile.role !== "sac" && profile.role !== "admin") redirect("/assistencia/inicio");
 
-  const [grupos, pendentes] = await Promise.all([listCargasRecentes(), listPedidosSemCarga()]);
+  const { aba } = await searchParams;
+  const activeTab: CargasTab = aba === "trocas" ? "trocas" : "pendente";
+
+  const [pendentes, cargaTrocas] = await Promise.all([
+    activeTab === "pendente" ? listPedidosSemCarga() : Promise.resolve<PedidoSemCarga[]>([]),
+    activeTab === "trocas" ? getCargaTrocasSac() : Promise.resolve<CargaGroup | null>(null),
+  ]);
 
   return (
     <div className="w-full p-6 flex flex-col gap-6 min-w-0">
-      <AssistenciaHeader title="Cargas" subtitle="Cargas dos últimos 30 dias — motorista, conferente e problemas encontrados." />
+      <AssistenciaHeader title="Cargas" subtitle="Clientes que compraram e ainda não entraram em carga, e a carga de trocas da logística." />
 
       <SacTabs active="cargas" />
+      <CargasSubTabs active={activeTab} />
 
-      <div className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-gray-800">
-          Pendente de carga <span className="font-normal text-gray-400">({pendentes.length})</span>
-        </h2>
-        <p className="text-xs text-gray-400">Comprou nos últimos 5 dias e ainda não entrou em nenhuma carga/viagem.</p>
-        {pendentes.length === 0 ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-            <p className="text-sm text-gray-400">Nenhum pedido pendente de carga nos últimos 5 dias.</p>
-          </div>
-        ) : (
-          <PendenteCargaTable pedidos={pendentes} />
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold text-gray-800">Cargas em andamento</h2>
-        {grupos.length === 0 ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-            <p className="text-sm text-gray-400">Nenhuma carga nos últimos 30 dias.</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {grupos.map((g) => (
-              <CargaCard key={g.carga} group={g} />
-            ))}
-          </div>
-        )}
-      </div>
+      {activeTab === "pendente" ? (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-gray-800">
+            Pendente de carga <span className="font-normal text-gray-400">({pendentes.length})</span>
+          </h2>
+          <p className="text-xs text-gray-400">
+            Comprou nos últimos 3 dias e ainda não entrou em nenhuma carga/viagem, ou foi tirado da carga que tinha.
+          </p>
+          {pendentes.length === 0 ? (
+            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+              <p className="text-sm text-gray-400">Nenhum pedido pendente de carga no momento.</p>
+            </div>
+          ) : (
+            <PendenteCargaTable pedidos={pendentes} />
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-gray-800">Trocas p/ SAC — Carga {CARGA_TROCAS_SAC}</h2>
+          <p className="text-xs text-gray-400">Carga fixa onde a logística coloca as trocas que precisam de ação do SAC.</p>
+          {!cargaTrocas ? (
+            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+              <p className="text-sm text-gray-400">Nada na carga {CARGA_TROCAS_SAC} no momento.</p>
+            </div>
+          ) : (
+            <CargaCard group={cargaTrocas} />
+          )}
+        </div>
+      )}
 
       <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 self-center">
         ← Voltar
