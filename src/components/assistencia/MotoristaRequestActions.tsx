@@ -20,10 +20,12 @@ export function MotoristaRequestActions({
   pickupCompleted: boolean;
   requestType: string;
 }) {
-  // Recolhimento só existe pra troca_produto (recolher o errado + entregar o
-  // certo) — entrega_produto/envio_peca são entrega em etapa única, sem nada
-  // pra recolher na casa do cliente.
-  const hasPickup = requestType === "troca_produto";
+  // Recolhimento existe pra troca_produto (recolher o errado + entregar o
+  // certo) e pra envio_recolhimento_peca (pedido do Victor 02/09/2026, mesma
+  // ideia de PEÇA em vez de produto) -- entrega_produto/envio_peca/
+  // recolhimento (avulsos) são etapa única, sem nada pra recolher/entregar
+  // junto na mesma visita.
+  const hasPickup = requestType === "troca_produto" || requestType === "envio_recolhimento_peca";
   const { pending, run, showToast } = useQuickAction();
   const [mode, setMode] = useState<Mode>(null);
   const [issueReason, setIssueReason] = useState("");

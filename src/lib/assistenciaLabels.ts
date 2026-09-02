@@ -9,6 +9,12 @@ export const REQUEST_TYPE_LABELS: Record<string, string> = {
   entrega_produto: "Entrega de produto",
   envio_peca: "Envio de peça",
   recolhimento_produto: "Recolhimento de produto",
+  // Pedido do Victor 02/09/2026: "além de envio de peça, recolhimento de
+  // peça, a opção é: Envio de peça com recolhimento de peça" -- visita
+  // combinada, o motorista leva uma peça E recolhe outra na mesma ida (like
+  // troca_produto, mas de PEÇA em vez de produto -- mesmo mecanismo de
+  // is_pickup por item, ver DeliveryItemsTable.tsx).
+  envio_recolhimento_peca: "Envio de peça com recolhimento de peça",
 };
 
 // Rótulo específico pra tela do motorista -- pedido do Victor 18/08/2026:
@@ -23,6 +29,7 @@ export const DRIVER_TYPE_LABELS: Record<string, string> = {
   envio_peca: "Recolhimento ou entrega de peça",
   recolhimento: "Recolhimento de peça",
   recolhimento_produto: "Recolhimento de produto",
+  envio_recolhimento_peca: "Envio e recolhimento de peça",
 };
 
 // Cor suave por tipo de visita -- só usado na agenda (ver AgendaQueueGroup),
@@ -190,7 +197,17 @@ export const SAC_MANAGED_TYPES = ["troca_produto", "entrega_produto", "recolhime
 
 // Complemento de SAC_MANAGED_TYPES — únicos tipos que o papel "assistencia"
 // gerencia (admin continua com acesso total aos dois grupos, como supervisão).
-export const ASSISTENCIA_MANAGED_TYPES = ["montagem", "desmontagem", "recolhimento", "troca_peca", "vistoria", "envio_peca"] as const;
+// "envio_recolhimento_peca" (pedido do Victor 02/09/2026) entrou aqui pelo
+// mesmo motivo de envio_peca/recolhimento -- combina os dois numa visita só.
+export const ASSISTENCIA_MANAGED_TYPES = [
+  "montagem",
+  "desmontagem",
+  "recolhimento",
+  "troca_peca",
+  "vistoria",
+  "envio_peca",
+  "envio_recolhimento_peca",
+] as const;
 
 // Pedido do Victor 27/08/2026 (achado por ele: "algumas notificações de
 // assistencia os atendentes do sac nao estao conseguindo editar ou
@@ -210,7 +227,9 @@ export const ASSISTENCIA_MANAGED_TYPES = ["montagem", "desmontagem", "recolhimen
 // manageableTypesForRole abaixo, [id]/page.tsx, [id]/editar/page.tsx e
 // DeliveryRequestDetailContent.tsx -- os únicos lugares que devem
 // enxergar esse conjunto.
-export const SAC_ALSO_MANAGED_TYPES = ["envio_peca", "recolhimento"] as const;
+// "envio_recolhimento_peca" entrou aqui em 02/09/2026, mesma razão de
+// envio_peca/recolhimento -- é literalmente a combinação dos dois.
+export const SAC_ALSO_MANAGED_TYPES = ["envio_peca", "recolhimento", "envio_recolhimento_peca"] as const;
 
 // Espelho de SAC_ALSO_MANAGED_TYPES, direção contrária -- pedido do
 // Victor 27/08/2026: testou como Iasmyn (assistência) tentando editar
@@ -273,6 +292,7 @@ export const DELIVERY_REQUEST_TYPES = [
   "envio_peca",
   "recolhimento",
   "recolhimento_produto",
+  "envio_recolhimento_peca",
 ] as const;
 
 // O outro lado do corte acima -- montagem/desmontagem/vistoria/troca de

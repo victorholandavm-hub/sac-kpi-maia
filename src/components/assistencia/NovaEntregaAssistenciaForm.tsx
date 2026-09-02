@@ -16,10 +16,12 @@ import { FormSection } from "./FormSection";
 
 const inputStyle = { borderColor: "var(--border)" };
 
-// Assistência cria os dois tipos de peça que vão por motorista -- troca de
+// Assistência cria os três tipos de peça que vão por motorista -- troca de
 // peça continua sendo visita de montador, não entra aqui (pedido do Victor
 // 18/08/2026, confirmado depois de eu ter classificado errado).
-const ENTREGA_TYPES = ["recolhimento", "envio_peca"] as const;
+// "envio_recolhimento_peca" (pedido do Victor 02/09/2026) -- visita
+// combinada, uma peça vai e outra volta na mesma ida do motorista.
+const ENTREGA_TYPES = ["recolhimento", "envio_peca", "envio_recolhimento_peca"] as const;
 type EntregaType = (typeof ENTREGA_TYPES)[number];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -34,6 +36,124 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 type Item = { product: string; quantity: number; code: string };
 type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
 const blankItem = (): Item => ({ product: "", quantity: 1, code: "" });
+
+// Hook local -- peça a enviar e peça a recolher (combo envio_recolhimento_peca)
+// usam exatamente o mesmo estado e as mesmas 4 funções, só duas instâncias
+// separadas (mesmo padrão de useItemsList em SacCreateRequestForm.tsx, pro
+// combo troca_produto entregar/recolher de PRODUTO).
+function useItemsList() {
+  const [items, setItems] = useState<Item[]>([blankItem()]);
+  const [lookupStatus, setLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
+
+  function update(index: number, patch: Partial<Item>) {
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
+  function add() {
+    setItems((prev) => [...prev, blankItem()]);
+  }
+  function remove(index: number) {
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  }
+  function lookup(index: number, code: string) {
+    if (!code.trim()) {
+      setLookupStatus((prev) => ({ ...prev, [index]: "idle" }));
+      return;
+    }
+    setLookupStatus((prev) => ({ ...prev, [index]: "loading" }));
+    withRetry(() => lookupTotvsProductForTeam(code))
+      .then((match) => {
+        if (!match || !match.description) {
+          setLookupStatus((prev) => ({ ...prev, [index]: "not_found" }));
+          return;
+        }
+        update(index, { product: match.description! });
+        setLookupStatus((prev) => ({ ...prev, [index]: "found" }));
+      })
+      .catch(() => setLookupStatus((prev) => ({ ...prev, [index]: "not_found" })));
+  }
+
+  return { items, lookupStatus, update, add, remove, lookup };
+}
+
+function ItemsFields({
+  items,
+  lookupStatus,
+  onUpdate,
+  onAdd,
+  onRemove,
+  onLookup,
+  namePrefix,
+  productLabel,
+}: {
+  items: Item[];
+  lookupStatus: Record<number, ProductLookupStatus>;
+  onUpdate: (index: number, patch: Partial<Item>) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  onLookup: (index: number, code: string) => void;
+  namePrefix: string;
+  productLabel: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((item, i) => (
+        <div key={i} className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              name={`${namePrefix}_code`}
+              value={item.code}
+              onChange={(e) => onUpdate(i, { code: e.target.value })}
+              onBlur={(e) => onLookup(i, e.target.value)}
+              placeholder="Código"
+              className="w-28 rounded border px-2 py-2"
+              style={inputStyle}
+            />
+            <input
+              name={`${namePrefix}_product`}
+              value={item.product}
+              onChange={(e) => onUpdate(i, { product: e.target.value })}
+              required
+              placeholder={productLabel}
+              className="flex-1 min-w-[140px] rounded border px-2 py-2"
+              style={inputStyle}
+            />
+            <input
+              name={`${namePrefix}_quantity`}
+              type="number"
+              min={1}
+              value={item.quantity}
+              onChange={(e) => onUpdate(i, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+              className="w-16 rounded border px-2 py-2"
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              onClick={() => onRemove(i)}
+              disabled={items.length === 1}
+              className="text-sm px-2 py-2 disabled:opacity-40"
+              style={{ color: "var(--status-critical)" }}
+              aria-label="Remover item"
+            >
+              remover
+            </button>
+          </div>
+          {lookupStatus[i] === "loading" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Buscando…
+            </span>
+          ) : lookupStatus[i] === "not_found" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Código não encontrado.
+            </span>
+          ) : null}
+        </div>
+      ))}
+      <button type="button" onClick={onAdd} className="text-sm self-start underline" style={{ color: "var(--text-secondary)" }}>
+        + adicionar produto
+      </button>
+    </div>
+  );
+}
 
 // "Nova entrega" da Assistência -- recolhimento e envio de peça (pedido do
 // Victor 18/08/2026: aba de entregas separada da aba de visitas, cada uma
@@ -134,35 +254,19 @@ export function NovaEntregaAssistenciaForm({
   const effectiveLoadingRotas = hasDateContext && loadingRotas;
   const previewDriverName = effectiveAvailableRotas.find((r) => r.id === selectedRotaId)?.driverName ?? null;
 
-  const [items, setItems] = useState<Item[]>([blankItem()]);
-  const [itemsLookupStatus, setItemsLookupStatus] = useState<Record<number, ProductLookupStatus>>({});
-
-  function update(index: number, patch: Partial<Item>) {
-    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
-  }
-  function add() {
-    setItems((prev) => [...prev, blankItem()]);
-  }
-  function remove(index: number) {
-    setItems((prev) => prev.filter((_, i) => i !== index));
-  }
-  function lookup(index: number, code: string) {
-    if (!code.trim()) {
-      setItemsLookupStatus((prev) => ({ ...prev, [index]: "idle" }));
-      return;
-    }
-    setItemsLookupStatus((prev) => ({ ...prev, [index]: "loading" }));
-    withRetry(() => lookupTotvsProductForTeam(code))
-      .then((match) => {
-        if (!match || !match.description) {
-          setItemsLookupStatus((prev) => ({ ...prev, [index]: "not_found" }));
-          return;
-        }
-        update(index, { product: match.description! });
-        setItemsLookupStatus((prev) => ({ ...prev, [index]: "found" }));
-      })
-      .catch(() => setItemsLookupStatus((prev) => ({ ...prev, [index]: "not_found" })));
-  }
+  const { items, lookupStatus: itemsLookupStatus, update, add, remove, lookup } = useItemsList();
+  // Só usada quando type === "envio_recolhimento_peca" -- mas o hook
+  // precisa ser chamado sempre, sem condição (mesmo motivo de
+  // SacCreateRequestForm.tsx).
+  const {
+    items: pickupItems,
+    lookupStatus: pickupItemsLookupStatus,
+    update: updatePickup,
+    add: addPickup,
+    remove: removePickup,
+    lookup: lookupPickup,
+  } = useItemsList();
+  const isEnvioRecolhimento = type === "envio_recolhimento_peca";
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -331,68 +435,41 @@ export function NovaEntregaAssistenciaForm({
         ) : null}
       </FormSection>
 
-      <FormSection
-        title={type === "recolhimento" ? "Peça a recolher" : "Peça a enviar"}
-        number={3}
+      <FormSection title={type === "recolhimento" ? "Peça a recolher" : "Peça a enviar"} number={3}
         hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
       >
-        <div className="flex flex-col gap-2">
-          {items.map((item, i) => (
-            <div key={i} className="flex flex-col gap-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <input
-                  name="item_code"
-                  value={item.code}
-                  onChange={(e) => update(i, { code: e.target.value })}
-                  onBlur={(e) => lookup(i, e.target.value)}
-                  placeholder="Código"
-                  className="w-28 rounded border px-2 py-2"
-                  style={inputStyle}
-                />
-                <input
-                  name="item_product"
-                  value={item.product}
-                  onChange={(e) => update(i, { product: e.target.value })}
-                  required
-                  placeholder="Ex: Puxador de roupeiro"
-                  className="flex-1 min-w-[140px] rounded border px-2 py-2"
-                  style={inputStyle}
-                />
-                <input
-                  name="item_quantity"
-                  type="number"
-                  min={1}
-                  value={item.quantity}
-                  onChange={(e) => update(i, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                  className="w-16 rounded border px-2 py-2"
-                  style={inputStyle}
-                />
-                <button
-                  type="button"
-                  onClick={() => remove(i)}
-                  disabled={items.length === 1}
-                  className="text-sm px-2 py-2 disabled:opacity-40"
-                  style={{ color: "var(--status-critical)" }}
-                  aria-label="Remover item"
-                >
-                  remover
-                </button>
-              </div>
-              {itemsLookupStatus[i] === "loading" ? (
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Buscando…
-                </span>
-              ) : itemsLookupStatus[i] === "not_found" ? (
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Código não encontrado.
-                </span>
-              ) : null}
-            </div>
-          ))}
-          <button type="button" onClick={add} className="text-sm self-start underline" style={{ color: "var(--text-secondary)" }}>
-            + adicionar produto
-          </button>
-        </div>
+        <ItemsFields
+          items={items}
+          lookupStatus={itemsLookupStatus}
+          onUpdate={update}
+          onAdd={add}
+          onRemove={remove}
+          onLookup={lookup}
+          namePrefix="item"
+          productLabel="Ex: Puxador de roupeiro"
+        />
+
+        {/* Combo envio+recolhimento (pedido do Victor 02/09/2026) -- 2ª
+            lista, obrigatória, igual ao "Produtos a recolher" que
+            troca_produto já tem em SacCreateRequestForm.tsx. Server action
+            (createQuickRequest) também exige pelo menos 1 item aqui. */}
+        {isEnvioRecolhimento ? (
+          <div className="flex flex-col gap-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+            <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              Peça a recolher *
+            </span>
+            <ItemsFields
+              items={pickupItems}
+              lookupStatus={pickupItemsLookupStatus}
+              onUpdate={updatePickup}
+              onAdd={addPickup}
+              onRemove={removePickup}
+              onLookup={lookupPickup}
+              namePrefix="pickup_item"
+              productLabel="Ex: Puxador de roupeiro (a recolher)"
+            />
+          </div>
+        ) : null}
       </FormSection>
 
       <FormSection title="Motivo e responsáveis" number={4}>

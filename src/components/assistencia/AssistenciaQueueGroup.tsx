@@ -58,6 +58,9 @@ export const DELIVERY_TYPE_COLORS: Record<string, string> = {
   envio_peca: "var(--series-1)",
   recolhimento: "var(--series-4)",
   recolhimento_produto: "var(--series-5)",
+  // Pedido do Victor 02/09/2026 -- series-7 (verde-água), não series-6
+  // (vermelho, reservado pra alerta/crítico em outros lugares do app).
+  envio_recolhimento_peca: "var(--series-7)",
 };
 
 // Tag compacta de aviso -- pedido do Victor 21/08/2026: "Mantenha a

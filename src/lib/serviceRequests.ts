@@ -14,7 +14,11 @@ export type RequestType =
   | "troca_produto"
   | "entrega_produto"
   | "envio_peca"
-  | "recolhimento_produto";
+  | "recolhimento_produto"
+  // Pedido do Victor 02/09/2026: "Envio de peça com recolhimento de peça"
+  // -- visita combinada, motorista leva uma peça E recolhe outra, mesmo
+  // mecanismo de is_pickup por item que troca_produto já usa.
+  | "envio_recolhimento_peca";
 // "aguardando_aprovacao" -- pedido do Victor 31/08/2026: montagem/
 // desmontagem (inclusive combo) passam por essa fase entre o montador
 // marcar como concluído e o gerente da loja aprovar de fato (ver
@@ -89,6 +93,7 @@ export const ADDRESS_NUMBER_REQUIRED_TYPES: RequestType[] = [
   "entrega_produto",
   "envio_peca",
   "recolhimento_produto",
+  "envio_recolhimento_peca",
 ];
 
 // Usado em toda tela que exibe o endereço (detalhe do chamado, montador,
@@ -394,6 +399,13 @@ export async function listRequests(
     storeId?: string;
     assemblerName?: string;
     types?: RequestType[];
+    // Filtro "Origem: Assistência" (ver ENTREGA_TYPES_ASSISTENCIA,
+    // entregaQueueGrouping.ts) restrito a quem de fato é da assistência --
+    // pedido do Victor 02/09/2026: "quando filtro a origem para assistencia,
+    // deve aparecer apenas o que foi solicitado por iasmyn e luis". Filtro
+    // por type sozinho não bastava (outros papéis também criam esses tipos
+    // às vezes). Ver ASSISTENCIA_ORIGEM_REQUESTERS, entregaQueueGrouping.ts.
+    requestedByNames?: string[];
     // YYYY-MM-DD, valida antes de interpolar (mesmo padrão de listDayLoad) --
     // filtra por created_at, sempre no fuso de João Pessoa (ver formatDateTime.ts).
     dateFrom?: string;
@@ -485,9 +497,23 @@ export async function listRequests(
   };
   if (error) throw new Error(error.message);
 
+  // requestedByNames filtra em JS, não na query -- requestedByName na
+  // prática vem do JOIN com profiles (requester.full_name), não da coluna
+  // crua requested_by_name (que só existe pra quem pediu SEM sessão de
+  // staff, ex.: gerente de loja); filtrar direto na query bateria só na
+  // coluna crua e nunca acharia ninguém da equipe (ver toSummary acima).
+  // Sempre usado com allPages:true (só fila/page.tsx e
+  // sac/notificacoes/page.tsx passam isso, ambas repaginam tudo em JS
+  // depois), então `total` refletir o pós-filtro aqui é o comportamento
+  // certo pros dois casos que existem hoje.
+  let items = ((data ?? []) as unknown as SummaryRow[]).map(toSummary);
+  if (opts.requestedByNames && opts.requestedByNames.length > 0) {
+    items = items.filter((r) => !!r.requestedByName && opts.requestedByNames!.includes(r.requestedByName));
+  }
+
   return {
-    items: ((data ?? []) as unknown as SummaryRow[]).map(toSummary),
-    total: count ?? 0,
+    items,
+    total: opts.requestedByNames && opts.requestedByNames.length > 0 ? items.length : (count ?? 0),
     page,
     pageSize,
   };
@@ -507,7 +533,7 @@ export async function listRequests(
 // o que sobrou na fatia da página atual.
 export async function listRequestsScheduledOn(
   date: string,
-  opts: { storeId?: string; types?: RequestType[]; status?: RequestStatus } = {}
+  opts: { storeId?: string; types?: RequestType[]; status?: RequestStatus; requestedByNames?: string[] } = {}
 ): Promise<ServiceRequestSummary[]> {
   const admin = getSupabaseAdmin();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -519,7 +545,12 @@ export async function listRequestsScheduledOn(
   const { data, error } = (await query) as { data: SummaryRow[] | null; error: { message: string } | null };
   if (error) throw new Error(error.message);
 
-  return ((data ?? []) as unknown as SummaryRow[]).map(toSummary);
+  const items = ((data ?? []) as unknown as SummaryRow[]).map(toSummary);
+  // Mesmo motivo/filtro em JS de listRequests acima.
+  if (opts.requestedByNames && opts.requestedByNames.length > 0) {
+    return items.filter((r) => !!r.requestedByName && opts.requestedByNames!.includes(r.requestedByName));
+  }
+  return items;
 }
 
 export type ServiceRequestDetail = ServiceRequestSummary & {
