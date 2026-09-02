@@ -37,6 +37,7 @@ import {
   ENTREGA_TYPES,
   ENTREGA_TYPES_SAC,
   ENTREGA_TYPES_ASSISTENCIA,
+  ASSISTENCIA_ORIGEM_REQUESTERS,
 } from "@/lib/entregaQueueGrouping";
 
 // Aba "Visitas" -- agrupado por data de criação, mais novo pro mais antigo.
@@ -221,6 +222,8 @@ export default async function AssistenciaQueuePage({
         ? ENTREGA_TYPES_ASSISTENCIA
         : ENTREGA_TYPES
     : VISITA_TYPES;
+  // Ver ASSISTENCIA_ORIGEM_REQUESTERS, entregaQueueGrouping.ts.
+  const filterRequestedByNames = showPecas && filterOrigem === "assistencia" ? ASSISTENCIA_ORIGEM_REQUESTERS : undefined;
   // Entrega de peça não tem montador (é motorista) -- ignora um valor de
   // "assembler" que tenha sobrado na URL de antes de trocar de aba, senão
   // filtra por um campo que essas linhas nunca preenchem e a lista some
@@ -234,14 +237,27 @@ export default async function AssistenciaQueuePage({
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const today = new Date().toISOString().slice(0, 10);
   const [{ items: rawRequests, total: rawTotal }, stores, assemblers, drivers, rotaOverview, todayRequestsFull] = await Promise.all([
-    listRequests({ status: filterStatus, q, storeId: store, assemblerName: effectiveAssembler, types, dateFrom, dateTo, excludeOwnAssemblerStoreIds, allPages: true }),
+    listRequests({
+      status: filterStatus,
+      q,
+      storeId: store,
+      assemblerName: effectiveAssembler,
+      types,
+      requestedByNames: filterRequestedByNames,
+      dateFrom,
+      dateTo,
+      excludeOwnAssemblerStoreIds,
+      allPages: true,
+    }),
     listStores(),
     listAssemblers(),
     showPecas ? listDrivers() : Promise.resolve([]),
     showPecas ? getRotaWeekOverview(startOfRotaWeek(today), 14) : Promise.resolve([]),
     // Board "Hoje" (EntregasKanbanHoje, ver todayGroups abaixo) busca à
     // parte, sem paginação -- ver listRequestsScheduledOn.
-    showPecas ? listRequestsScheduledOn(today, { storeId: store, types, status: filterStatus }) : Promise.resolve([]),
+    showPecas
+      ? listRequestsScheduledOn(today, { storeId: store, types, status: filterStatus, requestedByNames: filterRequestedByNames })
+      : Promise.resolve([]),
   ]);
   // Programado/Não programado não são status de verdade no banco (ver
   // ENTREGA_FILTERS acima) -- `.eq("status", "aberta")` já rolou no

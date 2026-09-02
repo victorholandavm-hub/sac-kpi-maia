@@ -193,11 +193,12 @@ export function DriverRouteGroup({
                       Urgente!
                     </span>
                   ) : null}
-                  {/* Recolhimento só existe pra troca_produto (recolhe o
-                      errado + entrega o certo) -- entrega_produto e envio de
-                      peça são entrega em etapa única, sem nada pra recolher
-                      (mesma regra de MotoristaRequestActions.tsx). */}
-                  {!showCompleted && r.type === "troca_produto" && !r.pickupCompleted ? (
+                  {/* Recolhimento existe pra troca_produto (recolhe o errado
+                      + entrega o certo) e envio_recolhimento_peca (pedido do
+                      Victor 02/09/2026) -- os outros tipos são etapa única,
+                      sem nada pra recolher (mesma regra de
+                      MotoristaRequestActions.tsx). */}
+                  {!showCompleted && (r.type === "troca_produto" || r.type === "envio_recolhimento_peca") && !r.pickupCompleted ? (
                     <span
                       className="text-xs font-medium px-2 py-0.5 rounded-full"
                       style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}

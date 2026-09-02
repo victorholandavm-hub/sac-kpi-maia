@@ -36,6 +36,16 @@ export const ORIGEM_FILTERS: { label: string; value: "sac" | "assistencia" | nul
   { label: "Assistência", value: "assistencia" },
 ];
 
+// Pedido do Victor 02/09/2026: "quando filtro a origem para assistencia,
+// deve aparecer apenas o que foi solicitado por iasmyn e luis" -- filtrar
+// só por ENTREGA_TYPES_ASSISTENCIA (tipo) não bastava, outros papéis também
+// criam envio_peca/recolhimento/envio_recolhimento_peca às vezes. Usado
+// junto de ENTREGA_TYPES_ASSISTENCIA como requestedByNames em
+// listRequests/listRequestsScheduledOn (serviceRequests.ts) -- os únicos 2
+// lugares que aplicam o filtro "Origem" (fila/page.tsx e
+// sac/notificacoes/page.tsx).
+export const ASSISTENCIA_ORIGEM_REQUESTERS = ["Iasmyn", "Luis"];
+
 // Filtro por cidade -- pedido do Victor 24/08/2026: "filtro por cidade"
 // (depois de perguntar se as telas de acompanhamento já tinham divisão
 // por Campina Grande -- o agrupamento por rota já mostra separado

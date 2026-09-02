@@ -134,11 +134,12 @@ export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
         {request.clientTimeRestriction ? <Field label="⏰ Restrição de horário" value={request.clientTimeRestriction} /> : null}
       </div>
 
-      {/* Troca com recolhimento (troca_produto) vira duas tabelas -- o
-          motorista precisa saber separado o que entrega do que recolhe,
-          não uma lista só misturada. Pedido do Victor 26/08/2026. Outros
-          tipos continuam com uma tabela só, igual sempre foi. */}
-      {request.type === "troca_produto" ? (
+      {/* Troca com recolhimento (troca_produto) e envio de peça com
+          recolhimento de peça (envio_recolhimento_peca, pedido do Victor
+          02/09/2026) viram duas tabelas -- o motorista precisa saber
+          separado o que entrega do que recolhe, não uma lista só misturada.
+          Outros tipos continuam com uma tabela só, igual sempre foi. */}
+      {request.type === "troca_produto" || request.type === "envio_recolhimento_peca" ? (
         <>
           <SectionTitle>Produtos a entregar</SectionTitle>
           <ProductTable items={request.items.filter((item) => !item.isPickup)} />

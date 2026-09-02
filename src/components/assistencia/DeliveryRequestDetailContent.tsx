@@ -360,8 +360,11 @@ export function DeliveryRequestDetailContent({
               <Row label="Restrição / observação" value={request.restrictionNote} />
               <Row label="Restrição de horário do cliente" value={request.clientTimeRestriction} />
               <Row label="Observações" value={request.notes} />
-              {request.type === "troca_produto" ? (
-                <Row label="Produto recolhido?" value={request.pickupCompleted ? "Sim" : "Ainda não"} />
+              {request.type === "troca_produto" || request.type === "envio_recolhimento_peca" ? (
+                <Row
+                  label={request.type === "envio_recolhimento_peca" ? "Peça recolhida?" : "Produto recolhido?"}
+                  value={request.pickupCompleted ? "Sim" : "Ainda não"}
+                />
               ) : null}
               {request.deliveryRating !== null ? <Row label="Nota do cliente — entrega" value={`${request.deliveryRating}/10`} /> : null}
               {request.resolutionRating !== null ? (

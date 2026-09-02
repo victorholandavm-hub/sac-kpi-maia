@@ -100,9 +100,9 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
               Urgente!
             </span>
           ) : null}
-          {/* Recolhimento só existe pra troca_produto -- mesma regra de
-              MotoristaRequestActions.tsx/DriverRouteGroup.tsx. */}
-          {!showCompleted && request.type === "troca_produto" && !request.pickupCompleted ? (
+          {/* Recolhimento existe pra troca_produto e envio_recolhimento_peca
+              -- mesma regra de MotoristaRequestActions.tsx/DriverRouteGroup.tsx. */}
+          {!showCompleted && (request.type === "troca_produto" || request.type === "envio_recolhimento_peca") && !request.pickupCompleted ? (
             <span
               className="text-xs font-medium px-2 py-0.5 rounded-full"
               style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
@@ -132,7 +132,10 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
             Detalhes
           </h3>
           <Row label="Cliente" value={request.clientName} />
-          <Row label={request.type === "envio_peca" ? "Peça a entregar" : "Produto a entregar"} value={request.deliverySummary} />
+          <Row
+            label={request.type === "envio_peca" || request.type === "envio_recolhimento_peca" ? "Peça a entregar" : "Produto a entregar"}
+            value={request.deliverySummary}
+          />
           {/* Só aparece pra troca_produto (recolhimento de verdade) --
               pedido do Victor 26/08/2026: "obrigatorio colocar os produtos
               que deverão ser entregues e os produtos que deverão ser

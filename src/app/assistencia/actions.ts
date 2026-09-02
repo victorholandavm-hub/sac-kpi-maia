@@ -46,6 +46,7 @@ const REQUEST_TYPES = [
   "desmontagem",
   "recolhimento",
   "envio_peca",
+  "envio_recolhimento_peca",
   "troca_peca",
   "vistoria",
   "notificacao_externa",
@@ -2150,18 +2151,33 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
 
   const primaryItemsResult = parseItems("item");
   if ("error" in primaryItemsResult) return { error: primaryItemsResult.error };
-  const primaryItems = primaryItemsResult.map((item) => ({ ...item, action: primaryAction }));
+  const primaryItems = primaryItemsResult.map((item) => ({ ...item, action: primaryAction, isPickup: false }));
 
   let secondaryItems: (typeof primaryItems)[number][] = [];
   if (comboMontagemDesmontagem) {
     const secondaryItemsResult = parseItems("item_secondary");
     if ("error" in secondaryItemsResult) return { error: secondaryItemsResult.error };
-    secondaryItems = secondaryItemsResult.map((item) => ({ ...item, action: secondaryAction }));
+    secondaryItems = secondaryItemsResult.map((item) => ({ ...item, action: secondaryAction, isPickup: false }));
     if (secondaryItems.length === 0) {
       return { error: `Informe pelo menos um produto pra ${secondaryAction === "montar" ? "montar" : "desmontar"} (a outra ação da visita combo).` };
     }
   }
-  const items = [...primaryItems, ...secondaryItems];
+
+  // "Envio de peça com recolhimento de peça" (pedido do Victor 02/09/2026)
+  // -- mesmo mecanismo de troca_produto (createSacRequest): "item" continua
+  // sendo a peça a ENVIAR, "pickup_item" é a peça a RECOLHER, cada lista
+  // com pelo menos 1 item. is_pickup (não item_action) é quem marca a
+  // diferença aqui -- DeliveryItemsTable.tsx já sabe separar as duas listas
+  // por esse campo.
+  let pickupItems: (typeof primaryItems)[number][] = [];
+  if (type === "envio_recolhimento_peca") {
+    if (primaryItems.length === 0) return { error: "Informe pelo menos uma peça a enviar." };
+    const pickupItemsResult = parseItems("pickup_item");
+    if ("error" in pickupItemsResult) return { error: pickupItemsResult.error };
+    pickupItems = pickupItemsResult.map((item) => ({ ...item, action: null, isPickup: true }));
+    if (pickupItems.length === 0) return { error: "Informe pelo menos uma peça a recolher." };
+  }
+  const items = [...primaryItems, ...secondaryItems, ...pickupItems];
 
   // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
   // pra montagem/desmontagem -- antes era só uma sugestão pra autopreencher
@@ -2233,6 +2249,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
         quantity: item.quantity,
         unit_value: item.unitValue,
         item_action: item.action,
+        is_pickup: item.isPickup,
       }))
     );
     if (itemsError) {

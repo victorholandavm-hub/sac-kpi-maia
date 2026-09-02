@@ -150,15 +150,18 @@ export function DeliveryItemsTable({
   items: RequestItem[];
   requestId: string;
   canEditItems: boolean;
-  // "Troca com recolhimento" (troca_produto) é o único tipo com
-  // recolhimento de verdade -- pedido do Victor 26/08/2026: separa a
-  // lista em "A entregar"/"A recolher" só pra esse tipo, cada uma com seu
+  // "Troca com recolhimento" (troca_produto) e "Envio de peça com
+  // recolhimento de peça" (envio_recolhimento_peca, pedido do Victor
+  // 02/09/2026) são os únicos tipos com recolhimento de verdade -- separa a
+  // lista em "A entregar"/"A recolher" só pra esses dois, cada uma com seu
   // próprio formulário de adicionar (já marcando isPickup certo, sem
   // seletor visível pra não dar pra escolher errado). Pros outros tipos,
   // sem mudança nenhuma -- lista única, igual sempre foi.
   requestType: RequestType;
 }) {
   if (items.length === 0 && !canEditItems) return null;
+
+  const hasPickupSplit = requestType === "troca_produto" || requestType === "envio_recolhimento_peca";
 
   const thead = (
     <thead>
@@ -172,7 +175,7 @@ export function DeliveryItemsTable({
     </thead>
   );
 
-  if (requestType !== "troca_produto") {
+  if (!hasPickupSplit) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-1">
         <h3 className="text-sm font-semibold text-gray-800">Produtos</h3>

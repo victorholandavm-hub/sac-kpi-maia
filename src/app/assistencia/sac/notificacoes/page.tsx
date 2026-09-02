@@ -26,6 +26,7 @@ import {
   ENTREGA_TYPES,
   ENTREGA_TYPES_SAC,
   ENTREGA_TYPES_ASSISTENCIA,
+  ASSISTENCIA_ORIGEM_REQUESTERS,
 } from "@/lib/entregaQueueGrouping";
 
 export const dynamic = "force-dynamic";
@@ -114,10 +115,12 @@ export default async function SacNotificacoesPage({
   // Pill "sem rota" -- mesmo padrão de fila/page.tsx (ver lá).
   const filterSemRota = semrota === "1";
   const types = filterOrigem === "sac" ? ENTREGA_TYPES_SAC : filterOrigem === "assistencia" ? ENTREGA_TYPES_ASSISTENCIA : ENTREGA_TYPES;
+  // Ver ASSISTENCIA_ORIGEM_REQUESTERS, entregaQueueGrouping.ts.
+  const filterRequestedByNames = filterOrigem === "assistencia" ? ASSISTENCIA_ORIGEM_REQUESTERS : undefined;
   const today = new Date().toISOString().slice(0, 10);
 
   const [{ items: rawRequests }, stores, drivers, rotaOverview, todayRequestsFull] = await Promise.all([
-    listRequests({ status: filterStatus, q, storeId: store, types, dateFrom, dateTo }),
+    listRequests({ status: filterStatus, q, storeId: store, types, requestedByNames: filterRequestedByNames, dateFrom, dateTo }),
     listStores(),
     listDrivers(),
     getRotaWeekOverview(startOfRotaWeek(today), 14),
@@ -128,7 +131,7 @@ export default async function SacNotificacoesPage({
     // nenhuma, então um chamado fora das 100 mais recentes por criação
     // simplesmente nunca aparecia). Ver listRequestsScheduledOn/
     // fila/page.tsx (mesmo motivo, mesma correção).
-    listRequestsScheduledOn(today, { storeId: store, types, status: filterStatus }),
+    listRequestsScheduledOn(today, { storeId: store, types, status: filterStatus, requestedByNames: filterRequestedByNames }),
   ]);
   // Mesmo raciocínio de fila/page.tsx: Programado/Não programado não são
   // status de verdade no banco, só dá pra separar em JS depois da busca.
