@@ -188,20 +188,14 @@ export function RotaMotoristaDoDia({
       <button
         type="button"
         onClick={() => setShowAllDays((e) => !e)}
-        className="text-xs rounded-md px-3 py-1.5 border font-semibold self-start mt-1 shadow-sm"
-        style={{ background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }}
+        className="text-xs rounded-lg px-3 py-1.5 border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 self-start mt-1"
       >
         {showAllDays ? "Mostrar menos dias" : "Mostrar mais dias"}
       </button>
     </>
   );
 
-  const description = (
-    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-      A rota segue o padrão da semana -- só escolha o motorista. Clique no lápis pra mudar a rota de um dia
-      específico.
-    </p>
-  );
+  const description = <p className="text-xs text-gray-400">A rota segue o padrão da semana -- só escolha o motorista. Clique no lápis pra mudar a rota de um dia específico.</p>;
 
   // Modo compact (Everton/Samuel, só 2 células) já é enxuto por natureza --
   // continua fixo, sem retrátil. O painel cheio (fila de Entregas/
@@ -213,10 +207,8 @@ export function RotaMotoristaDoDia({
   // mesmo fechado -- não precisa abrir só pra saber quem tá na rota hoje.
   if (compact) {
     return (
-      <div className="rounded-lg p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Motorista do dia
-        </h3>
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-2">
+        <h3 className="text-sm font-semibold text-gray-800">Motorista do dia</h3>
         {description}
         {body}
       </div>
@@ -248,25 +240,18 @@ function RotaMotoristaDoDiaModalTrigger({
 
   return (
     <>
-      <div
-        className="rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-      >
-        <span className="text-sm font-bold shrink-0" style={{ color: "var(--text-primary)" }}>
-          🚚 Motorista do dia
-        </span>
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
+        <span className="text-sm font-semibold text-gray-800 shrink-0">🚚 Motorista do dia</span>
         {todayEntry ? (
-          <span className="text-xs truncate flex-1 min-w-0" style={{ color: "var(--text-secondary)" }}>
-            {daySummaryLabel(todayEntry)}
-          </span>
+          <span className="text-xs truncate flex-1 min-w-0 text-gray-500">{daySummaryLabel(todayEntry)}</span>
         ) : (
           <span className="flex-1 min-w-0" />
         )}
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="text-xs rounded-md px-3 py-2 font-bold shrink-0 shadow-sm"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          className="text-xs rounded-lg px-3.5 py-2 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 shrink-0"
+          style={{ background: "#1B5E3C" }}
         >
           🚚 Gestão de Motoristas &amp; Escala
         </button>
@@ -283,18 +268,11 @@ function RotaMotoristaDoDiaModalTrigger({
           <div
             role="dialog"
             aria-modal="true"
-            className="fixed inset-x-4 top-[6vh] z-50 mx-auto max-w-4xl max-h-[88vh] overflow-y-auto rounded-lg border p-4 shadow-lg flex flex-col gap-2"
-            style={{ background: "var(--surface-1)", borderColor: "var(--brand-green)" }}
+            className="fixed inset-x-4 top-[6vh] z-50 mx-auto max-w-4xl max-h-[88vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-4 shadow-lg flex flex-col gap-2"
           >
             <div className="flex items-center justify-between gap-4">
-              <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-                🚚 Gestão de Motoristas &amp; Escala
-              </h3>
-              <button
-                onClick={() => setOpen(false)}
-                className="text-xs px-2 py-1 rounded"
-                style={{ color: "var(--text-muted)" }}
-              >
+              <h3 className="text-sm font-semibold text-gray-800">🚚 Gestão de Motoristas &amp; Escala</h3>
+              <button onClick={() => setOpen(false)} className="text-xs px-2 py-1 rounded text-gray-400 hover:text-gray-600">
                 Fechar
               </button>
             </div>
@@ -498,15 +476,15 @@ function RotaDayCell({
         // "Hoje" precisa se destacar de verdade no calendário -- pedido do
         // Victor 19/08/2026 ("cor um pouco mais forte na rota do dia"),
         // var(--surface-2) sozinho era sutil demais pra bater o olho.
-        border: isToday ? "2px solid var(--brand-green)" : "1px solid var(--gridline)",
-        background: isToday ? "color-mix(in srgb, var(--brand-green) 14%, var(--surface-1))" : "var(--surface-1)",
+        border: isToday ? "2px solid var(--brand-green)" : "1px solid #E5E7EB",
+        background: isToday ? "color-mix(in srgb, var(--brand-green) 8%, white)" : "#ffffff",
         opacity: isPast ? 0.3 : 1,
       }}
     >
       {/* Dia da semana sempre visível na própria célula -- antes só
           aparecia no mobile, sincronizado com um cabeçalho de 7 colunas
           fixas que não existe mais (ver grid flexível acima). */}
-      <span className={`${headerTextClass} truncate`} style={{ color: "var(--text-primary)" }}>
+      <span className={`${headerTextClass} truncate text-gray-800`}>
         {weekdayLabel} {dateLabel}
         {isToday ? " · hoje" : ""}
       </span>

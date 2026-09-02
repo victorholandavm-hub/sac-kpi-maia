@@ -27,12 +27,12 @@ export default async function SacNovaSolicitacaoPage() {
   return (
     <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="Nova entrega" subtitle="Troca/entrega de produto, envio de peça ou notificação externa.">
-        <Link href="/assistencia/sac" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+        <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150">
           ← Voltar
         </Link>
       </AssistenciaHeader>
 
-      <Link href="/assistencia/sac/nova-visita" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
+      <Link href="/assistencia/sac/nova-visita" className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150 self-start">
         Precisa de montagem ou desmontagem? Vá pra Nova visita →
       </Link>
       {/* Recolhimento de PEÇA é domínio da Assistência (ver
@@ -40,7 +40,7 @@ export default async function SacNovaSolicitacaoPage() {
           (supervisão dos dois times) ganha esse atalho, espelhando o de
           /assistencia/nova-entrega (pedido do Victor 19/08/2026). */}
       {profile.role === "admin" ? (
-        <Link href="/assistencia/nova-entrega" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
+        <Link href="/assistencia/nova-entrega" className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150 self-start">
           Precisa de recolhimento de peça? Vá pra Nova entrega da Assistência →
         </Link>
       ) : null}

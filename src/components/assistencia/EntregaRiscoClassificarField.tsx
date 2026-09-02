@@ -25,27 +25,20 @@ export function EntregaRiscoClassificarField({
 
   if (!editing) {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+      <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
         {classificacao ? (
           <>
-            <p className="text-sm" style={{ color: "var(--text-primary)" }}>
-              {classificacao.note || "Sem observação registrada."}
-            </p>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Reavaliar em:{" "}
-              <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                {classificacao.reavaliarEm ? formatDate(classificacao.reavaliarEm) : "não definida"}
-              </span>
+            <p className="text-sm text-gray-800">{classificacao.note || "Sem observação registrada."}</p>
+            <p className="text-xs text-gray-400">
+              Reavaliar em: <span className="font-semibold text-gray-800">{classificacao.reavaliarEm ? formatDate(classificacao.reavaliarEm) : "não definida"}</span>
               {" · "}
               {classificacao.classifiedByName}
             </p>
           </>
         ) : (
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Ainda não classificado.
-          </p>
+          <p className="text-sm text-gray-400">Ainda não classificado.</p>
         )}
-        <button onClick={() => setEditing(true)} className="text-xs underline self-start" style={{ color: "var(--text-secondary)" }}>
+        <button onClick={() => setEditing(true)} className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150 self-start">
           {classificacao ? "editar classificação" : "classificar"}
         </button>
       </div>
@@ -53,23 +46,21 @@ export function EntregaRiscoClassificarField({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+    <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
         rows={2}
         placeholder="O que foi verificado, novo prazo combinado com o cliente…"
-        className="rounded border px-3 py-2 text-sm"
-        style={{ borderColor: "var(--border)" }}
+        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
       />
-      <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+      <label className="flex items-center gap-2 text-sm text-gray-800">
         Reavaliar em
         <input
           type="date"
           value={reavaliarEm}
           onChange={(e) => setReavaliarEm(e.target.value)}
-          className="rounded border px-3 py-2 text-sm"
-          style={{ borderColor: "var(--border)" }}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
         />
       </label>
       <div className="flex items-center gap-2 flex-wrap">
@@ -81,8 +72,8 @@ export function EntregaRiscoClassificarField({
               setEditing(false);
             }, "Classificação salva.")
           }
-          className="text-xs rounded px-3 py-2 disabled:opacity-60"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          className="text-xs rounded-lg px-3.5 py-2 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 disabled:opacity-60"
+          style={{ background: "#1B5E3C" }}
         >
           Salvar classificação
         </button>
@@ -92,8 +83,7 @@ export function EntregaRiscoClassificarField({
             setNote(classificacao?.note ?? "");
             setReavaliarEm(classificacao?.reavaliarEm ?? "");
           }}
-          className="text-xs underline"
-          style={{ color: "var(--text-secondary)" }}
+          className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150"
         >
           cancelar
         </button>

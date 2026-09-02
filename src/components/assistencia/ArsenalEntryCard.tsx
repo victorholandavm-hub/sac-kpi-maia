@@ -38,16 +38,12 @@ export function ArsenalEntryCard({ entry, canEdit }: { entry: ArsenalEntry; canE
 
   return (
     <div
-      className="rounded-lg border p-4 flex flex-col gap-2"
+      className="rounded-xl border bg-white shadow-sm p-4 flex flex-col gap-2"
       style={{
-        background: isHighlighted ? `color-mix(in srgb, ${highlightColor} 10%, var(--surface-1))` : "var(--surface-1)",
-        borderColor: isHighlighted ? `color-mix(in srgb, ${highlightColor} 40%, transparent)` : "var(--border)",
+        background: isHighlighted ? `color-mix(in srgb, ${highlightColor} 6%, white)` : "#ffffff",
+        borderColor: isHighlighted ? `color-mix(in srgb, ${highlightColor} 40%, transparent)` : "#E5E7EB",
         borderLeft: `${isHighlighted ? 4 : 3}px solid ${
-          isHighlighted
-            ? highlightColor
-            : entry.active
-              ? `color-mix(in srgb, ${categoryColor} 55%, transparent)`
-              : "var(--border)"
+          isHighlighted ? highlightColor : entry.active ? `color-mix(in srgb, ${categoryColor} 55%, transparent)` : "#E5E7EB"
         }`,
       }}
     >
@@ -58,21 +54,13 @@ export function ArsenalEntryCard({ entry, canEdit }: { entry: ArsenalEntry; canE
         </span>
       ) : null}
       <div className="flex items-start justify-between gap-2">
-        <h3
-          className="text-base font-bold leading-snug"
-          style={{ color: !entry.active ? "var(--text-muted)" : isHighlighted ? highlightColor : categoryColor }}
-        >
+        <h3 className="text-base font-semibold leading-snug" style={{ color: !entry.active ? "#9CA3AF" : isHighlighted ? highlightColor : categoryColor }}>
           {entry.title}
-          {!entry.active ? (
-            <span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>
-              {" "}
-              (inativa)
-            </span>
-          ) : null}
+          {!entry.active ? <span className="text-xs font-normal text-gray-400"> (inativa)</span> : null}
         </h3>
         {canEdit ? (
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => setEditing(true)} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+          <div className="flex items-center gap-3 shrink-0">
+            <button onClick={() => setEditing(true)} className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150">
               editar
             </button>
             <button
@@ -83,7 +71,7 @@ export function ArsenalEntryCard({ entry, canEdit }: { entry: ArsenalEntry; canE
                   entry.active ? "Entrada desativada." : "Entrada reativada."
                 )
               }
-              className="text-xs underline disabled:opacity-60"
+              className="text-xs font-medium transition-colors duration-150 disabled:opacity-60"
               style={{ color: entry.active ? "var(--status-critical)" : "var(--status-good)" }}
             >
               {entry.active ? "desativar" : "reativar"}
@@ -91,17 +79,11 @@ export function ArsenalEntryCard({ entry, canEdit }: { entry: ArsenalEntry; canE
           </div>
         ) : null}
       </div>
-      <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-        {entry.body}
-      </p>
+      <p className="text-sm whitespace-pre-wrap leading-relaxed text-gray-600">{entry.body}</p>
       {keywordList.length > 0 ? (
         <div className="flex items-center gap-1.5 flex-wrap pt-1">
           {keywordList.map((k) => (
-            <span
-              key={k}
-              className="text-xs px-2 py-0.5 rounded-full"
-              style={{ background: "var(--background)", color: "var(--text-muted)" }}
-            >
+            <span key={k} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
               {k}
             </span>
           ))}
