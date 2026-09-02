@@ -18,6 +18,19 @@ export async function setItemUnitValue(itemId: string, requestId: string, unitVa
   if (!Number.isFinite(unitValue) || unitValue < 0) throw new Error("Valor inválido.");
 
   const admin = getSupabaseAdmin();
+
+  // Montador concluiu mas o gerente da loja ainda não aprovou -- mesma trava
+  // de espírito do "só libera pagamento depois de concluída" abaixo em
+  // setItemPaymentReleased, só que aplicada mais cedo: nem o valor pode ser
+  // definido enquanto a aprovação estiver pendente (pedido do Victor
+  // 02/09/2026, confirmado testando o fluxo ao vivo). Pra qualquer status
+  // anterior a isso (aberta, em_andamento etc.) continua permitido definir
+  // valor adiantado, como já era -- a trava é só nessa janela específica.
+  const { data: request } = await admin.from("service_requests").select("status").eq("id", requestId).single();
+  if (request?.status === "aguardando_aprovacao") {
+    throw new Error("Essa montagem ainda está aguardando a aprovação do gerente da loja.");
+  }
+
   const { data: item } = await admin.from("service_request_items").select("product").eq("id", itemId).single();
 
   const { error } = await admin.from("service_request_items").update({ unit_value: unitValue }).eq("id", itemId);
