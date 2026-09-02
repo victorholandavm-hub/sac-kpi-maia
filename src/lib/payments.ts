@@ -1,14 +1,22 @@
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { hashPin } from "./montadorAuth";
 import { isMostruarioRequest, type RequestType } from "./serviceRequests";
 import { sanitizeOrFilterValue } from "./searchFilter";
 
-export async function listAssemblers(): Promise<string[]> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("assemblers").select("name").order("name");
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((a) => a.name as string);
-}
+// Cacheado 60s -- mesmo motivo/pedido de listStores (serviceRequests.ts):
+// lista de referência que quase nunca muda, mas era buscada do zero (com
+// a latência de rede real da VPS até o Supabase) em toda troca de tela.
+export const listAssemblers = unstable_cache(
+  async (): Promise<string[]> => {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.from("assemblers").select("name").order("name");
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((a) => a.name as string);
+  },
+  ["list-assemblers"],
+  { revalidate: 60 }
+);
 
 // A assistência só gerencia os montadores da região dela -- o resto (Bayeux,
 // Santa Rita etc.) é de unidades do interior, cada uma com sua própria
@@ -118,12 +126,17 @@ export async function listAssemblersWithPinStatus(): Promise<AssemblerWithPinSta
   return (data ?? []).map((a) => ({ name: a.name as string, hasPin: !!a.pin_hash }));
 }
 
-export async function listDrivers(): Promise<string[]> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("drivers").select("name").order("name");
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((d) => d.name as string);
-}
+// Cacheado 60s -- mesmo motivo de listAssemblers acima.
+export const listDrivers = unstable_cache(
+  async (): Promise<string[]> => {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.from("drivers").select("name").order("name");
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((d) => d.name as string);
+  },
+  ["list-drivers"],
+  { revalidate: 60 }
+);
 
 export type DriverWithPinStatus = { name: string; hasPin: boolean };
 

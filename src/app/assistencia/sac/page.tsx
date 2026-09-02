@@ -66,33 +66,24 @@ export default async function SacHomePage({
 
       <SacTabs active="solicitacoes" />
 
-      {/* Cards de destaque -- Guia de Componentes Maia (Design System,
-          01/09/2026): cards brancos com borda fina + sombra sutil no
-          lugar do preenchimento sólido cheio de antes. Arsenal continua
-          com o acento laranja (é uma ação, não um alerta); Entregas em
-          risco continua pulsando/sólida vermelha só quando há alerta de
-          verdade -- essa é uma cor de alerta legítima, não decoração. */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Link
-          href="/assistencia/sac/arsenal"
-          className="rounded-xl border border-gray-200 bg-white shadow-sm p-5 flex flex-col justify-center gap-1 hover:border-gray-300 transition-colors duration-150"
-        >
-          <span className="text-lg font-semibold" style={{ color: "var(--brand-orange)" }}>
-            Arsenal do SAC
-          </span>
-          <span className="text-sm text-gray-500">Scripts, políticas e respostas prontas</span>
-        </Link>
-        <Link
-          href="/assistencia/sac/entregas-risco"
-          className={`rounded-xl p-5 flex items-center justify-between gap-4 shadow-sm transition-colors duration-150 ${riscos.alerta > 0 ? "animate-pulse text-white" : "border border-gray-200 bg-white hover:border-gray-300 text-gray-800"}`}
-          style={riscos.alerta > 0 ? { background: "var(--status-critical)" } : undefined}
-        >
-          <span className="text-lg font-semibold">Entregas em risco</span>
-          <span className="text-4xl font-bold" style={{ fontVariantNumeric: "tabular-nums" }}>
-            {riscos.alerta}
-          </span>
-        </Link>
-      </div>
+      {/* Arsenal do SAC -- pedido do Victor 02/09/2026: "deixe o Arsenal
+          do SAC num botão menor, pode ser apenas um quadrado" (era um
+          card de destaque em linha inteira, grande demais pra uma ação
+          secundária). Vira um quadrado pequeno, self-start, não mais
+          metade da largura da tela. Badge "Entregas em risco" removida
+          da tela (pedido do Victor) -- a métrica de acompanhamento
+          continua na linha de indicadores abaixo. */}
+      <Link
+        href="/assistencia/sac/arsenal"
+        className="w-24 h-24 rounded-xl border border-gray-200 bg-white shadow-sm flex flex-col items-center justify-center gap-1 hover:border-gray-300 transition-colors duration-150 shrink-0"
+      >
+        <span className="text-2xl" aria-hidden="true">
+          📚
+        </span>
+        <span className="text-xs font-semibold text-center leading-tight" style={{ color: "var(--brand-orange)" }}>
+          Arsenal do SAC
+        </span>
+      </Link>
 
       {/* Indicadores numéricos -- desktop mostra 4 colunas lado a lado,
           mobile colapsa pra 2 (mesma convenção de sm: do resto do app). */}

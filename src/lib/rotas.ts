@@ -1,3 +1,4 @@
+import { unstable_cache, updateTag } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 
 // "cg_centro_norte_leste"/"cg_sul_oeste" -- rotas de Campina Grande,
@@ -129,23 +130,41 @@ export function isRota(value: string | null | undefined): value is Rota {
 // padrão (Praia seg/qui, Sul ter/sex, Centro qua/sáb).
 export type RotaWeekdayConfig = Record<number, Rota | null>;
 
-export async function getRotaWeekdayConfig(): Promise<RotaWeekdayConfig> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("rota_weekday_config").select("weekday, rota").order("weekday");
-  if (error) throw new Error(error.message);
+// Cacheado 60s (+ invalidação imediata via updateTag, ver setRotaWeekday
+// abaixo) -- pedido do Victor 02/09/2026: "praticamente todas as
+// mudanças de tela estão demorando muito". Config admin, muda
+// raríssimas vezes, mas era buscada do zero (2 idas sequenciais ao
+// Supabase -- essa aqui, DEPOIS a consulta principal) em getRotaWeekOverview
+// e getAvailableRotasForDate toda vez, com a latência real de rede entre a
+// VPS e o Supabase (~200ms por ida). updateTag (Next.js 16, chamado só
+// dentro de Server Action -- ver setRotaWeekday em admin-actions.ts)
+// garante que uma mudança de verdade aparece na hora, sem esperar
+// nenhuma janela de cache -- só quem nunca mudou nada é que se
+// beneficia do cache puro de 60s.
+const ROTA_WEEKDAY_CONFIG_TAG = "rota-weekday-config";
 
-  const config: RotaWeekdayConfig = { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
-  for (const row of data ?? []) {
-    config[row.weekday] = isRota(row.rota) ? row.rota : null;
-  }
-  return config;
-}
+export const getRotaWeekdayConfig = unstable_cache(
+  async (): Promise<RotaWeekdayConfig> => {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.from("rota_weekday_config").select("weekday, rota").order("weekday");
+    if (error) throw new Error(error.message);
+
+    const config: RotaWeekdayConfig = { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
+    for (const row of data ?? []) {
+      config[row.weekday] = isRota(row.rota) ? row.rota : null;
+    }
+    return config;
+  },
+  ["rota-weekday-config"],
+  { revalidate: 60, tags: [ROTA_WEEKDAY_CONFIG_TAG] }
+);
 
 export async function setRotaWeekday(weekday: number, rota: Rota | null): Promise<void> {
   if (weekday < 0 || weekday > 6) throw new Error("Dia da semana inválido.");
   const admin = getSupabaseAdmin();
   const { error } = await admin.from("rota_weekday_config").upsert({ weekday, rota }, { onConflict: "weekday" });
   if (error) throw new Error(error.message);
+  updateTag(ROTA_WEEKDAY_CONFIG_TAG);
 }
 
 // Quem dirige cada rota numa data específica -- ver setRotaDriverAssignment
