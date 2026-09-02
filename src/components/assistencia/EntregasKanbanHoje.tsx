@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { DeliveryStatusBadge, type DeliveryStatusCounts } from "./DeliveryStatusBadge";
+import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
 import { DELIVERY_TYPE_COLORS } from "./AssistenciaQueueGroup";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
-import { driverNameForRota, JP_EXTRA_ROTA, type RotaDayOverview } from "@/lib/rotas";
+import { driverNameForRota, JP_EXTRA_ROTA, type Rota, type RotaDayOverview } from "@/lib/rotas";
 import type { QueueGroup } from "@/lib/entregaQueueGrouping";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
 
@@ -35,6 +35,10 @@ type KanbanColumn = {
   borderColor: string;
   items: ServiceRequestSummary[];
   driverName: string | null;
+  // Rota "crua" por trás do card -- só serve pra achar a rota padrão do dia
+  // (ver defaultRota em EntregasKanbanHoje) e pré-selecionar o card certo;
+  // não aparece em nenhum texto (isso já é rotaLabel).
+  rotaKey?: Rota | "sem_rota";
 };
 
 // "Rota extra" genérica (ver JP_EXTRA_ROTA, rotas.ts) pode ter mais de um
@@ -78,6 +82,7 @@ function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | nul
           borderColor: group.borderColor,
           items,
           driverName: driverKey || null,
+          rotaKey: group.rotaKey,
         }));
     }
     const driverName =
@@ -89,20 +94,30 @@ function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | nul
         borderColor: group.borderColor,
         items: group.items,
         driverName,
+        rotaKey: group.rotaKey,
       },
     ];
   });
 }
 
-type DeliveryStatusTab = "todos" | "programado" | "concluido" | "cancelado";
+type DeliveryStatusTab = "todos" | "programado" | "concluido" | "cancelado" | "nao_concluido";
+type HojeStatusCounts = Record<Exclude<DeliveryStatusTab, "todos">, number>;
 
-// Mesmo balde de countByDeliveryStatus (DeliveryStatusBadge.tsx), só que
-// por item em vez de agregado -- precisa pra FILTRAR quais linhas
-// aparecem em cada aba, não só contar. Mantém a mesma regra (senão a
-// aba e os números do resumo por rota divergiam entre si).
+// Achado do Victor 02/09/2026 testando a aba nova: "só deve aparecer os que
+// foram marcados como não concluído... no não concluido está tambem os
+// programados". O motorista já tem como reportar "não consegui concluir"
+// (driverReportIssue, driver-actions.ts) e isso grava status='remarcar' --
+// é exatamente o mesmo status que já vira o badge "Não concluída" em cada
+// linha da tabela (ver DeliveryStatusBadge.tsx). Antes esse status caía no
+// balde "programado" aqui (mesmo raciocínio "senão" de countByDeliveryStatus,
+// DeliveryStatusBadge.tsx) -- por isso remarcados apareciam junto dos
+// programados de verdade. Agora "remarcar" tem balde próprio, e essa função
+// já cobre as 4 abas reais sozinha (não precisa mais de uma checagem à
+// parte pra "não concluído").
 function deliveryStatusTab(status: string): Exclude<DeliveryStatusTab, "todos"> {
   if (status === "concluida") return "concluido";
   if (status === "cancelada") return "cancelado";
+  if (status === "remarcar") return "nao_concluido";
   return "programado";
 }
 
@@ -111,32 +126,39 @@ const STATUS_TAB_LABELS: Record<DeliveryStatusTab, string> = {
   programado: "Programado",
   concluido: "Concluído",
   cancelado: "Cancelado",
+  nao_concluido: "Não concluído",
 };
 
 // Mesma cor de cada opção equivalente na fileira de filtros de cima
 // (ENTREGA_FILTERS, entregaQueueGrouping.ts: Todas/Programado/Concluídas/
 // Canceladas) -- pedido do Victor 02/09/2026: quando a aba está
 // selecionada, fica com a cor real dessa mesma régua; não selecionada
-// continua neutra, do jeito que já era.
+// continua neutra, do jeito que já era. "Não concluído" usa a mesma cor
+// do badge "Não concluída" por linha (DeliveryStatusBadge.tsx,
+// var(--status-critical)) -- mesmo status, mesma cor.
 const STATUS_TAB_COLORS: Record<DeliveryStatusTab, string> = {
   todos: "var(--text-secondary)",
   programado: "var(--brand-green)",
   concluido: "var(--status-good)",
   cancelado: "var(--text-muted)",
+  nao_concluido: "var(--status-critical)",
 };
 
 // Badge de contagem discreto -- Guia de Componentes Maia (Design System,
 // 01/09/2026): "mini-badges discretos com a contagem, de forma muito
 // limpa". Cinza neutro pro estado padrão (Programado), verde suave pra
-// Concluído, cinza apagado pra Cancelado -- mesma régua de cor de
+// Concluído, cinza apagado pra Cancelado, vermelho suave pra Não concluído
+// (mesma família de cor do badge por linha) -- mesma régua de cor de
 // StatusBadge.tsx, sem inventar paleta nova só pra esse resumo.
-function CountBadge({ label, count, tone }: { label: string; count: number; tone: "neutral" | "good" | "muted" }) {
+function CountBadge({ label, count, tone }: { label: string; count: number; tone: "neutral" | "good" | "muted" | "warning" }) {
   const styles =
     tone === "good"
       ? { background: "#E8F0EC", color: "#164A30" }
       : tone === "muted"
         ? { background: "#F3F4F6", color: "#9CA3AF" }
-        : { background: "#F3F4F6", color: "#4B5563" };
+        : tone === "warning"
+          ? { background: "#FBE7E6", color: "#B3261E" }
+          : { background: "#F3F4F6", color: "#4B5563" };
   return (
     <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap" style={styles}>
       {count} {label}
@@ -146,15 +168,45 @@ function CountBadge({ label, count, tone }: { label: string; count: number; tone
 
 // Card de RESUMO por rota -- linha horizontal (grid), não mais coluna de
 // Kanban com cartão por chamado dentro. Só o essencial pra bater o olho:
-// rota, motorista, três contagens.
-function RouteSummaryCard({ column }: { column: KanbanColumn }) {
-  const counts: DeliveryStatusCounts = { programado: 0, concluido: 0, cancelado: 0 };
+// rota, motorista, três contagens. Clicável (pedido do Victor 02/09/2026:
+// "clicar na badge maior... e na lista abaixo aparecer só daquela rota...
+// ficaria essa badge destacada, bem de leve") -- filtra a tabela abaixo pra
+// só essa rota/motorista, com um destaque sutil (borda + fundo levemente
+// tingidos de verde, não um preenchimento forte) marcando qual está ativa.
+function RouteSummaryCard({ column, selected, onToggle }: { column: KanbanColumn; selected: boolean; onToggle: () => void }) {
+  const counts: HojeStatusCounts = { programado: 0, concluido: 0, cancelado: 0, nao_concluido: 0 };
   for (const r of column.items) counts[deliveryStatusTab(r.status)]++;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 flex flex-col gap-3" style={{ borderLeft: `3px solid ${column.borderColor}` }}>
+    <button
+      type="button"
+      onClick={onToggle}
+      className="text-left w-full rounded-xl border p-4 flex flex-col gap-3 cursor-pointer transition-colors"
+      style={{
+        borderColor: selected ? "var(--brand-green)" : "#E5E7EB",
+        borderLeft: `3px solid ${column.borderColor}`,
+        background: selected ? "color-mix(in srgb, var(--brand-green) 10%, white)" : "#fff",
+        // Destaque mais forte que só a borda/fundo levemente tingidos --
+        // achado do Victor 02/09/2026 testando: "precisa estar um pouco
+        // mais destacada, para o usuario perceber qual rota está
+        // selecionada". Anel + check ficam óbvios de bater o olho, sem
+        // virar preenchimento sólido forte.
+        boxShadow: selected ? "0 0 0 2px var(--brand-green)" : "none",
+      }}
+    >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-semibold text-gray-800">{column.rotaLabel}</span>
+        <span className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+          {selected ? (
+            <span
+              className="inline-flex items-center justify-center h-4 w-4 rounded-full text-white text-[10px] font-bold shrink-0"
+              style={{ background: "var(--brand-green)" }}
+              aria-hidden
+            >
+              ✓
+            </span>
+          ) : null}
+          {column.rotaLabel}
+        </span>
         <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500 shrink-0">
           {column.items.length}
         </span>
@@ -164,12 +216,13 @@ function RouteSummaryCard({ column }: { column: KanbanColumn }) {
         <CountBadge label="programado" count={counts.programado} tone="neutral" />
         <CountBadge label="concluído" count={counts.concluido} tone="good" />
         <CountBadge label="cancelado" count={counts.cancelado} tone="muted" />
+        <CountBadge label="não concluído" count={counts.nao_concluido} tone="warning" />
       </div>
-    </div>
+    </button>
   );
 }
 
-type FlatRow = { r: ServiceRequestSummary; rotaLabel: string; driverName: string | null };
+type FlatRow = { r: ServiceRequestSummary; rotaLabel: string; driverName: string | null; columnKey: string };
 
 // Linha da tabela -- Guia de Componentes Maia: "ID/Tipo, Cliente (Nome +
 // Telefone menor abaixo), Produto (texto corrido em linha), Rota/
@@ -263,16 +316,27 @@ export function EntregasKanbanHoje({
   // que também busca `groups`/`todayOverview`).
   motoristaAction?: React.ReactNode;
 }) {
-  const [tab, setTab] = useState<DeliveryStatusTab>("todos");
-  if (groups.length === 0) return null;
   const columns = buildColumns(groups, todayOverview);
+  // Rota padrão do dia -- pedido do Victor 02/09/2026: "a rota padrão do
+  // dia já deve vir selecionada como padrão". A atribuição de fato pra hoje
+  // (assignments.primary) tem prioridade sobre o padrão da semana
+  // (expectedRota) quando alguém já trocou a rota do dia por exceção --
+  // mesma prioridade que driverNameForRota já usa acima.
+  const defaultRota = todayOverview ? (todayOverview.assignments.primary?.rota ?? todayOverview.expectedRota) : null;
+  const defaultColumnKey = columns.find((c) => c.rotaKey === defaultRota)?.key ?? null;
+  const [tab, setTab] = useState<DeliveryStatusTab>("todos");
+  // Clicar de novo na rota já selecionada limpa o filtro (volta a mostrar
+  // todas) -- clicar numa rota diferente troca pra ela.
+  const [selectedRotaKey, setSelectedRotaKey] = useState<string | null>(defaultColumnKey);
+  if (groups.length === 0) return null;
 
   const allRows: FlatRow[] = columns.flatMap((column) =>
-    column.items.map((r) => ({ r, rotaLabel: column.rotaLabel, driverName: column.driverName }))
+    column.items.map((r) => ({ r, rotaLabel: column.rotaLabel, driverName: column.driverName, columnKey: column.key }))
   );
-  const counts: DeliveryStatusCounts = { programado: 0, concluido: 0, cancelado: 0 };
-  for (const row of allRows) counts[deliveryStatusTab(row.r.status)]++;
-  const visibleRows = tab === "todos" ? allRows : allRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
+  const rotaRows = selectedRotaKey ? allRows.filter((row) => row.columnKey === selectedRotaKey) : allRows;
+  const counts: HojeStatusCounts = { programado: 0, concluido: 0, cancelado: 0, nao_concluido: 0 };
+  for (const row of rotaRows) counts[deliveryStatusTab(row.r.status)]++;
+  const visibleRows = tab === "todos" ? rotaRows : rotaRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
 
   return (
     <div className="flex flex-col gap-3">
@@ -296,14 +360,20 @@ export function EntregasKanbanHoje({
           chamado nenhuma dentro (essa mudou pra tabela única abaixo). */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {columns.map((column) => (
-          <RouteSummaryCard key={column.key} column={column} />
+          <RouteSummaryCard
+            key={column.key}
+            column={column}
+            selected={selectedRotaKey === column.key}
+            onToggle={() => setSelectedRotaKey((prev) => (prev === column.key ? null : column.key))}
+          />
         ))}
       </div>
 
-      {/* Filtro único Todos/Programado/Concluído/Cancelado -- substitui as
-          subabas por coluna de antes (pedido do Victor 29/08/2026), agora
-          um lugar só pra tabela achatada inteira. */}
-      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
+      {/* Filtro único Todos/Programado/Concluído/Cancelado/Não concluído --
+          substitui as subabas por coluna de antes (pedido do Victor
+          29/08/2026), agora um lugar só pra tabela achatada inteira. Os
+          números respeitam o filtro de rota escolhido acima (ver rotaRows). */}
+      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start flex-wrap">
         {(Object.keys(STATUS_TAB_LABELS) as DeliveryStatusTab[]).map((t) => (
           <button
             key={t}
@@ -316,9 +386,7 @@ export function EntregasKanbanHoje({
           >
             {STATUS_TAB_LABELS[t]}
             {t !== "todos" ? (
-              <span className={`ml-1 text-xs font-mono ${tab === t ? "text-white/80" : "text-gray-400"}`}>
-                ({counts[t as Exclude<DeliveryStatusTab, "todos">]})
-              </span>
+              <span className={`ml-1 text-xs font-mono ${tab === t ? "text-white/80" : "text-gray-400"}`}>({counts[t]})</span>
             ) : null}
           </button>
         ))}

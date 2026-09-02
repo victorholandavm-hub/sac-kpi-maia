@@ -290,11 +290,24 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
 }
 
 // Visita rendeu só parte dos itens (ex.: montou 2 dos 4 móveis) -- marca
-// esses como feitos e joga o chamado pra "remarcar", igual montadorReportIssue,
-// pra assistência decidir a nova data do que sobrou (montador não escolhe
-// data, mesma regra de sempre). Diferente de "não consegui montar": aqui
-// teve progresso de verdade, então fica registrado item por item em vez de
-// só um motivo em texto livre.
+// esses como feitos e o resto continua pendente, pra assistência remarcar
+// (montador não escolhe data, mesma regra de sempre).
+//
+// Pedido do Victor 02/09/2026, testando o fluxo: "quando o montador colocar
+// como concluido parcialmente, deve aparecer para o gerente aprovar os que
+// ja foram feitos... e o fluxo de remarcação deve seguir normalmente" --
+// os itens que TIVERAM progresso agora passam pela mesma aprovação da loja
+// que a conclusão total já tinha (needsApproval, mesmo recorte de
+// montadorCompleteRequest: só montagem/desmontagem, não pro Manoel), em vez
+// de ir direto pra "remarcar". lojaApproveMontagemConclusion já cuida do
+// resto sozinha: como os itens NÃO marcados aqui continuam completed=false,
+// eles sempre entram no `notDoneItemIds` que a tela do gerente manda de
+// volta (ver LojaApprovalActions.tsx) -- então mesmo que o gerente aprove
+// tudo que o montador marcou, o chamado cai em "remarcar" de qualquer jeito
+// (nunca vira "concluida" sozinho), exatamente o "seguir normalmente" que
+// o Victor pediu, sem precisar de nenhuma lógica nova nessa outra função.
+// Pra quem não precisa de aprovação (outros tipos, ou o Manoel), nada muda:
+// vai direto pra "remarcar" como sempre foi.
 export async function montadorCompletePartially(requestId: string, completedItemIds: string[], note: string): Promise<void> {
   const assemblerName = await getMontadorSession();
   if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
@@ -313,10 +326,11 @@ export async function montadorCompletePartially(requestId: string, completedItem
     throw new Error("Esse chamado já foi encerrado.");
   }
 
+  const needsApproval = (request.type === "montagem" || request.type === "desmontagem") && assemblerName !== MANOEL_ONLY_ASSEMBLER;
+
   // Foto obrigatória por item também aqui -- pedido do Victor 31/08/2026,
-  // mesmo recorte de montadorCompleteRequest (só montagem/desmontagem,
-  // e não pro Manoel).
-  if ((request.type === "montagem" || request.type === "desmontagem") && assemblerName !== MANOEL_ONLY_ASSEMBLER) {
+  // mesmo recorte de montadorCompleteRequest.
+  if (needsApproval) {
     if (!(await hasPhotoForEveryCompletedItem(completedItemIds))) {
       throw new Error("Envie uma foto de cada item marcado como feito antes de continuar.");
     }
@@ -329,9 +343,10 @@ export async function montadorCompletePartially(requestId: string, completedItem
     .in("id", completedItemIds);
   if (itemsError) throw new Error(itemsError.message);
 
+  const nextStatus = needsApproval ? "aguardando_aprovacao" : "remarcar";
   const { data: updated, error: updateError } = await admin
     .from("service_requests")
-    .update({ status: "remarcar" })
+    .update({ status: nextStatus })
     .eq("id", requestId)
     .eq("status", request.status)
     .select("id")
@@ -356,13 +371,26 @@ export async function montadorCompletePartially(requestId: string, completedItem
     actor_id: null,
     event_type: "status_changed",
     from_status: request.status,
-    to_status: "remarcar",
+    to_status: nextStatus,
     note: eventNote,
   });
 
   const link = `/assistencia/${requestId}`;
-  await notifyLoja(request.store_id, { type: "status_changed", title: "Solicitação: Concluída parcialmente", message: eventNote, link });
-  await notifyAssistencia({ type: "status_changed", title: "Precisa remarcar", message: `Chamado #${request.ticket_number} — ${eventNote}`, link });
+  await notifyLoja(request.store_id, {
+    type: "status_changed",
+    title: needsApproval ? "Solicitação: aguardando sua aprovação (parcial)" : "Solicitação: Concluída parcialmente",
+    message: needsApproval
+      ? `Montador ${assemblerName} concluiu parte dos itens -- confirme o que foi feito de verdade. ${eventNote}`
+      : eventNote,
+    link,
+  });
+  // Assistência só precisa saber agora se já dá pra remarcar (sem
+  // aprovação, ou não-montagem) -- quando precisa de aprovação, ela só fica
+  // sabendo depois que o gerente decidir (lojaApproveMontagemConclusion já
+  // notifica assistência nesse caso).
+  if (!needsApproval) {
+    await notifyAssistencia({ type: "status_changed", title: "Precisa remarcar", message: `Chamado #${request.ticket_number} — ${eventNote}`, link });
+  }
 
   revalidatePath("/assistencia/montador");
   revalidatePath(`/assistencia/montador/${requestId}`);

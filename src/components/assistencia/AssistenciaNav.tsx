@@ -16,6 +16,11 @@ const TABS = [
   { label: "Solicitações", href: "/assistencia/fila", matches: ["/assistencia/fila", "/assistencia/agenda"] },
   { label: "Controle Assistência", href: "/assistencia/pecas", matches: ["/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
   { label: "Encomendas", href: "/assistencia/encomendas/fila" },
+  // Pedido do Victor 02/09/2026: "a aba de cargas que aparece para o sac,
+  // também apareça para mim" -- a rota já era acessível pro admin (ver
+  // guard em sac/cargas/page.tsx), só faltava um link fora do menu do SAC
+  // (SacTabs.tsx) pra chegar nela.
+  { label: "Cargas", href: "/assistencia/sac/cargas" },
   { label: "Pagamentos", href: "/assistencia/pagamentos" },
   { label: "Prazos de produtos", href: "/assistencia/prazos-produtos" },
   { label: "Relatórios", href: "/assistencia/relatorios" },

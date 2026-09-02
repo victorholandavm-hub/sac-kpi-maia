@@ -684,6 +684,12 @@ export type OpenRequestForLojaItem = {
   partCode: string | null;
   action: ItemAction | null;
   isPickup: boolean;
+  // Pedido do Victor 02/09/2026: conclusão PARCIAL do montador também
+  // precisa passar pela aprovação da loja -- LojaApprovalActions.tsx usa
+  // isso pra pré-marcar só quem o montador realmente disse que fez (não
+  // mais "todo mundo marcado", que só fazia sentido quando só a conclusão
+  // TOTAL passava por aqui).
+  completed: boolean;
 };
 
 export type OpenRequestForLoja = {
@@ -734,7 +740,7 @@ export async function listOpenRequestsForLoja(
   let query = admin
     .from("service_requests")
     .select(
-      "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, delivery_rating, resolution_rating, stores(name), items:service_request_items(id, product, quantity, part_code, item_action, is_pickup)"
+      "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_neighborhood, created_at, completed_at, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, requested_by_name, delivery_rating, resolution_rating, stores(name), items:service_request_items(id, product, quantity, part_code, item_action, is_pickup, completed)"
     )
     .limit(OPEN_LOJA_LIMIT);
 
@@ -788,7 +794,9 @@ export async function listOpenRequestsForLoja(
     delivery_rating: number | null;
     resolution_rating: number | null;
     stores: { name: string } | null;
-    items: { id: string; product: string; quantity: number; part_code: string | null; item_action: string | null; is_pickup: boolean }[] | null;
+    items:
+      | { id: string; product: string; quantity: number; part_code: string | null; item_action: string | null; is_pickup: boolean; completed: boolean }[]
+      | null;
   };
 
   return ((data ?? []) as unknown as Row[]).map((row) => ({
@@ -813,6 +821,7 @@ export async function listOpenRequestsForLoja(
       partCode: i.part_code,
       action: i.item_action === "montar" || i.item_action === "desmontar" ? (i.item_action as ItemAction) : null,
       isPickup: i.is_pickup,
+      completed: i.completed,
     })),
     createdAt: row.created_at,
     completedAt: row.completed_at,

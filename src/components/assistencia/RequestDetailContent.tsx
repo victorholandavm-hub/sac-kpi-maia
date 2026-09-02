@@ -380,9 +380,13 @@ export function RequestDetailContent({
                         </span>
                         {itemPhotos.length > 0 ? (
                           <PhotoGallery photos={itemPhotos} />
-                        ) : (
+                        ) : item.completed ? (
                           <span className="text-xs font-medium" style={{ color: "var(--status-warning)" }}>
                             Sem foto enviada
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+                            Ainda não foi feito pelo montador
                           </span>
                         )}
                       </div>
@@ -390,7 +394,10 @@ export function RequestDetailContent({
                   })}
                 </div>
               ) : null}
-              <LojaApprovalActions requestId={request.id} items={request.items.map((i) => ({ id: i.id, product: i.product, quantity: i.quantity }))} />
+              <LojaApprovalActions
+                requestId={request.id}
+                items={request.items.map((i) => ({ id: i.id, product: i.product, quantity: i.quantity, completed: i.completed }))}
+              />
             </div>
           ) : null}
 

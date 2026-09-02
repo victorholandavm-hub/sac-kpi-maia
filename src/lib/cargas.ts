@@ -171,25 +171,41 @@ type PedidoSemCargaRow = {
   client_cpf_cnpj: string | null;
   status_atual: string | null;
   first_seen_at: string;
-  totvs_delivery_cargas: { carga: string }[] | null;
+  total_cargas: number | null;
 };
 
 const PEDIDOS_SEM_CARGA_COLUMNS =
-  "pedido, filial_venda, loja, client_id, client_name, client_cpf_cnpj, status_atual, first_seen_at, totvs_delivery_cargas(carga)";
+  "pedido, filial_venda, loja, client_id, client_name, client_cpf_cnpj, status_atual, first_seen_at, total_cargas";
 
-const DIAS_RECENTES_SEM_CARGA = 5;
+// 3 dias (era 5 -- pedido do Victor 02/09/2026 depois de ver a lista em
+// uso: "os pendente de carga seja com 3 dias").
+const DIAS_RECENTES_SEM_CARGA = 3;
 
 // "Pendente de carga" -- pedido do Victor 02/09/2026: "clientes que
-// compraram nos últimos 5 dias e ainda não estão em carga". Diferente de
-// listCargasRecentes acima (que só lista quem JÁ tem carga, com o motorista/
-// veículo da viagem) -- aqui é o oposto: pedido cujo embed
-// totvs_delivery_cargas nunca teve nenhuma linha, então ainda não entrou em
-// viagem nenhuma. "Comprou" é aproximado por first_seen_at (1ª vez que o
-// sync viu o pedido) -- sem carga nenhuma ainda não existe nota fiscal pra
-// cruzar com totvs_orders (mesma limitação/fallback que baselineFor,
-// entregasRisco.ts, usa quando nenhuma carga do pedido tem nota fiscal
-// ainda). Ordenado do mais antigo pro mais recente -- quem está esperando
-// há mais tempo aparece primeiro, é o mais urgente de resolver.
+// compraram nos últimos 3 dias [era 5, ajustado no mesmo dia] e ainda não
+// estão em carga ou foram tirados da carga". Diferente de listCargasRecentes
+// acima (que só lista quem JÁ tem carga, com o motorista/veículo da viagem)
+// -- aqui é o oposto.
+//
+// `total_cargas` (coluna própria em totvs_deliveries, ver upsertDelivery em
+// totvsSync.ts) é o que o TOTVS reportou na ÚLTIMA sincronização -- zero
+// cobre os dois casos pedidos pelo Victor de uma vez só: nunca teve carga
+// nenhuma, OU tinha e foi retirado dela depois. Checar só o embed
+// totvs_delivery_cargas seria suficiente HOJE (upsertDelivery em
+// totvsSync.ts agora apaga a linha antiga quando o TOTVS para de reportar
+// aquela carga pro pedido, achado do Victor comparando contra o Protheus
+// direto -- ver comentário lá), mas total_cargas continua sendo a fonte mais
+// direta (vem pronto do TOTVS, sem depender do join). Por isso a busca
+// também inclui quem teve risk_trigger_at recente (não só first_seen_at
+// recente) -- senão um pedido comprado há mais de 3 dias que acabou de ser
+// retirado da carga nunca entraria na consulta.
+//
+// "Comprou" é aproximado por first_seen_at (1ª vez que o sync viu o pedido)
+// -- sem carga nenhuma ainda não existe nota fiscal pra cruzar com
+// totvs_orders (mesma limitação/fallback que baselineFor, entregasRisco.ts,
+// usa quando nenhuma carga do pedido tem nota fiscal ainda). Ordenado do
+// mais antigo pro mais recente -- quem está esperando há mais tempo aparece
+// primeiro, é o mais urgente de resolver.
 export async function listPedidosSemCarga(): Promise<PedidoSemCarga[]> {
   const admin = getSupabaseAdmin();
   const cutoff = new Date(Date.now() - DIAS_RECENTES_SEM_CARGA * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -199,13 +215,13 @@ export async function listPedidosSemCarga(): Promise<PedidoSemCarga[]> {
       admin
         .from("totvs_deliveries")
         .select(PEDIDOS_SEM_CARGA_COLUMNS, { count: "exact" })
-        .gte("first_seen_at", cutoff)
+        .or(`first_seen_at.gte.${cutoff},risk_trigger_at.gte.${cutoff}`)
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<PedidoSemCargaRow>>,
     { pageSize: 1000 }
   );
 
   return rows
-    .filter((r) => (r.totvs_delivery_cargas ?? []).length === 0)
+    .filter((r) => (r.total_cargas ?? 0) === 0)
     .filter((r) => !PEDIDO_ENCERRADO_LABELS.includes(r.status_atual ?? ""))
     .map((r) => ({
       pedido: r.pedido,
@@ -218,6 +234,22 @@ export async function listPedidosSemCarga(): Promise<PedidoSemCarga[]> {
       compradoEm: r.first_seen_at.slice(0, 10),
     }))
     .sort((a, b) => a.compradoEm.localeCompare(b.compradoEm));
+}
+
+// Carga fixa que a logística usa como "caixa de entrada" de trocas pro SAC
+// resolver (pedido do Victor 02/09/2026: "carga de número 004440 que é onde
+// o pessoal da logistica coloca as trocas que precisa que o SAC faça") --
+// não é uma viagem/data específica como as outras (por isso não tem
+// dt_previsao real, cai no fallback `.is.null` de listCargasRecentes de
+// qualquer forma), é mais um quadro compartilhado. Reaproveita
+// listCargasRecentes (já busca 30 dias + sem-data) em vez de uma query
+// própria -- mais simples, e a carga 004440 sempre vai estar dentro dessa
+// janela por ser um bucket vivo, não uma viagem que "vence".
+export const CARGA_TROCAS_SAC = "004440";
+
+export async function getCargaTrocasSac(): Promise<CargaGroup | null> {
+  const cargas = await listCargasRecentes();
+  return cargas.find((c) => c.carga === CARGA_TROCAS_SAC) ?? null;
 }
 
 export async function addCargaProblema(

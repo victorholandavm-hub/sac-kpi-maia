@@ -150,10 +150,14 @@ export async function setLojaGerenteRating(requestId: string, deliveryRating: nu
 // montador clicou -- é isso que faz pagamento/relatório do montador só
 // contarem a partir daqui, ver montadorCompleteRequest em
 // montador-actions.ts, ambos já filtram por status = 'concluida').
-// `notDoneItemIds` não vazio = reaproveita o mesmo desfecho de
-// montadorCompletePartially (itens voltam pendentes, chamado vai pra
-// "remarcar"), só que reprovado pelo gerente em vez de reportado pelo
-// próprio montador.
+// `notDoneItemIds` não vazio = chamado vai pra "remarcar" (mesmo desfecho
+// que montadorCompletePartially já tinha). Dois jeitos de um item cair
+// aqui: o gerente desmarcou algo que o montador tinha marcado como feito
+// (reprovado), ou o montador nunca chegou a marcar aquele item pra começo
+// de conversa -- ver LojaApprovalActions.tsx: itens não marcados pelo
+// montador entram nessa lista automaticamente, então uma conclusão
+// PARCIAL nunca vira "concluida" só porque o gerente aprovou o que foi
+// mostrado -- sempre sobra pendência real (pedido do Victor 02/09/2026).
 export async function lojaApproveMontagemConclusion(requestId: string, notDoneItemIds: string[], note: string): Promise<void> {
   // Pedido do Victor 31/08/2026: "alem do gerente de cada loja, a equipe de
   // assistencia e os admins tambem podem aprovar a montagem". Sessão de

@@ -897,6 +897,30 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
     if (cargaError) errors.push(`delivery ${d.order} carga ${c.carga}: ${cargaError.message}`);
   }
 
+  // Remove da tabela de junção qualquer carga que EXISTIA antes
+  // (existingCargas, capturado no topo da função) mas não veio mais nesse
+  // sync -- achado do Victor 02/09/2026 comparando a tela "Trocas p/ SAC"
+  // (carga 004440) direto contra o Protheus: a tela mostrava 11 pedidos,
+  // o Protheus só tinha 5 (+ 1 novo que nem aparecia ainda). O upsert acima
+  // só ESCREVE o que veio no payload -- nunca apagava a linha antiga quando
+  // o TOTVS parava de reportar aquela carga pro pedido (pedido retirado da
+  // carga, ou carga finalizada/reaproveitada), então ela ficava órfã pra
+  // sempre e continuava aparecendo em qualquer tela que lista cargas
+  // (CargaCard, listCargasRecentes/getCargaTrocasSac, cargas.ts). Seguro
+  // rodar depois do detectDeliveryRiskTrigger acima: ele já usou o snapshot
+  // de existingCargas ANTES de qualquer escrita, então apagar agora não
+  // muda o diff que ele calculou.
+  const incomingCargaCodes = new Set((d.cargas ?? []).map((c) => c.carga));
+  const staleCargaCodes = existingCargas.map((e) => e.carga).filter((carga) => !incomingCargaCodes.has(carga));
+  if (staleCargaCodes.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("totvs_delivery_cargas")
+      .delete()
+      .eq("delivery_id", deliveryRow.id)
+      .in("carga", staleCargaCodes);
+    if (deleteError) errors.push(`delivery ${d.order} remover carga(s) antiga(s): ${deleteError.message}`);
+  }
+
   if (trigger) {
     await supabase
       .from("totvs_deliveries")
