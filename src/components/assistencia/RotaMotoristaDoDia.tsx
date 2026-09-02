@@ -94,6 +94,7 @@ export function RotaMotoristaDoDia({
   actions = DEFAULT_ACTIONS,
   compact,
   defaultDriver,
+  buttonOnly,
 }: {
   today: string;
   initialOverview: RotaDayOverview[];
@@ -119,6 +120,15 @@ export function RotaMotoristaDoDia({
   // agendamento (Junior, ver comentário lá), não é mais só decoração
   // visual sem efeito nenhum.
   defaultDriver?: string;
+  // Só o botão "Gestão de Motoristas & Escala", sem a barra (rótulo +
+  // resumo de uma linha) em volta -- pedido do Victor 02/09/2026: "a
+  // gestao de motorista e escala deve ficar ao lado de 'hoje' e só o
+  // botão". Usado quando esse componente é passado como `motoristaAction`
+  // pra EntregasKanbanHoje.tsx (renderiza ao lado do rótulo "📌 Hoje"),
+  // no lugar da barra própria que ficava solta acima do quadro -- só
+  // existe no modo não-compact (Everton/Samuel continuam com a barra
+  // recolhível de sempre).
+  buttonOnly?: boolean;
 }) {
   const [overview, setOverview] = useState<RotaDayOverview[]>(initialOverview);
   // Recolhido por padrão, só uma fileira de dias -- achado do Victor
@@ -217,7 +227,7 @@ export function RotaMotoristaDoDia({
 
   const todayEntry = overview.find((d) => d.date === today) ?? sortedOverview[0] ?? null;
 
-  return <RotaMotoristaDoDiaModalTrigger todayEntry={todayEntry} description={description} body={body} />;
+  return <RotaMotoristaDoDiaModalTrigger todayEntry={todayEntry} description={description} body={body} buttonOnly={buttonOnly} />;
 }
 
 // Painel completo vira modal -- pedido do Victor 25/08/2026 (revisão da
@@ -231,31 +241,46 @@ function RotaMotoristaDoDiaModalTrigger({
   todayEntry,
   description,
   body,
+  buttonOnly,
 }: {
   todayEntry: RotaDayOverview | null;
   description: React.ReactNode;
   body: React.ReactNode;
+  buttonOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
+  const triggerButton = (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className="text-xs rounded-lg px-3.5 py-2 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 shrink-0"
+      style={{ background: "#1B5E3C" }}
+    >
+      🚚 Gestão de Motoristas &amp; Escala
+    </button>
+  );
+
   return (
     <>
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
-        <span className="text-sm font-semibold text-gray-800 shrink-0">🚚 Motorista do dia</span>
-        {todayEntry ? (
-          <span className="text-xs truncate flex-1 min-w-0 text-gray-500">{daySummaryLabel(todayEntry)}</span>
-        ) : (
-          <span className="flex-1 min-w-0" />
-        )}
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="text-xs rounded-lg px-3.5 py-2 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 shrink-0"
-          style={{ background: "#1B5E3C" }}
-        >
-          🚚 Gestão de Motoristas &amp; Escala
-        </button>
-      </div>
+      {/* Modo "só botão" -- pedido do Victor 02/09/2026: "ao lado de
+          'hoje' e só o botão" -- some a barra com rótulo + resumo,
+          usada quando esse gatilho é passado pra dentro de
+          EntregasKanbanHoje.tsx (ao lado do "📌 Hoje"). Modal continua
+          o mesmo. */}
+      {buttonOnly ? (
+        triggerButton
+      ) : (
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-semibold text-gray-800 shrink-0">🚚 Motorista do dia</span>
+          {todayEntry ? (
+            <span className="text-xs truncate flex-1 min-w-0 text-gray-500">{daySummaryLabel(todayEntry)}</span>
+          ) : (
+            <span className="flex-1 min-w-0" />
+          )}
+          {triggerButton}
+        </div>
+      )}
 
       {open ? (
         <>

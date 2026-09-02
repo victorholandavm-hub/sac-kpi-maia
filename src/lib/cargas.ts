@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
+import { PEDIDO_ENCERRADO_LABELS } from "./entregasRisco";
 
 // Tela "Cargas" do SAC/admin (ver 0072_carga_conferente_e_problemas.sql):
 // lista as cargas sincronizadas do TOTVS dos últimos DIAS_RETROATIVOS dias,
@@ -146,6 +147,77 @@ export async function listCargasRecentes(): Promise<CargaGroup[]> {
   }
 
   return [...groups.values()].sort((a, b) => (b.dtPrevisao ?? "").localeCompare(a.dtPrevisao ?? ""));
+}
+
+export type PedidoSemCarga = {
+  pedido: string;
+  filialVenda: string;
+  loja: string | null;
+  clienteNome: string | null;
+  clienteCodigo: string | null;
+  clienteDocumento: string | null;
+  statusAtual: string | null;
+  // Data "efetiva" da compra -- ver comentário na função abaixo (mesma
+  // limitação/fallback de baselineFor, entregasRisco.ts).
+  compradoEm: string;
+};
+
+type PedidoSemCargaRow = {
+  pedido: string;
+  filial_venda: string;
+  loja: string | null;
+  client_id: string | null;
+  client_name: string | null;
+  client_cpf_cnpj: string | null;
+  status_atual: string | null;
+  first_seen_at: string;
+  totvs_delivery_cargas: { carga: string }[] | null;
+};
+
+const PEDIDOS_SEM_CARGA_COLUMNS =
+  "pedido, filial_venda, loja, client_id, client_name, client_cpf_cnpj, status_atual, first_seen_at, totvs_delivery_cargas(carga)";
+
+const DIAS_RECENTES_SEM_CARGA = 5;
+
+// "Pendente de carga" -- pedido do Victor 02/09/2026: "clientes que
+// compraram nos últimos 5 dias e ainda não estão em carga". Diferente de
+// listCargasRecentes acima (que só lista quem JÁ tem carga, com o motorista/
+// veículo da viagem) -- aqui é o oposto: pedido cujo embed
+// totvs_delivery_cargas nunca teve nenhuma linha, então ainda não entrou em
+// viagem nenhuma. "Comprou" é aproximado por first_seen_at (1ª vez que o
+// sync viu o pedido) -- sem carga nenhuma ainda não existe nota fiscal pra
+// cruzar com totvs_orders (mesma limitação/fallback que baselineFor,
+// entregasRisco.ts, usa quando nenhuma carga do pedido tem nota fiscal
+// ainda). Ordenado do mais antigo pro mais recente -- quem está esperando
+// há mais tempo aparece primeiro, é o mais urgente de resolver.
+export async function listPedidosSemCarga(): Promise<PedidoSemCarga[]> {
+  const admin = getSupabaseAdmin();
+  const cutoff = new Date(Date.now() - DIAS_RECENTES_SEM_CARGA * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const rows = await fetchAllPagesParallel<PedidoSemCargaRow>(
+    (from, to) =>
+      admin
+        .from("totvs_deliveries")
+        .select(PEDIDOS_SEM_CARGA_COLUMNS, { count: "exact" })
+        .gte("first_seen_at", cutoff)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<PedidoSemCargaRow>>,
+    { pageSize: 1000 }
+  );
+
+  return rows
+    .filter((r) => (r.totvs_delivery_cargas ?? []).length === 0)
+    .filter((r) => !PEDIDO_ENCERRADO_LABELS.includes(r.status_atual ?? ""))
+    .map((r) => ({
+      pedido: r.pedido,
+      filialVenda: r.filial_venda,
+      loja: r.loja,
+      clienteNome: r.client_name,
+      clienteCodigo: r.client_id,
+      clienteDocumento: r.client_cpf_cnpj,
+      statusAtual: r.status_atual,
+      compradoEm: r.first_seen_at.slice(0, 10),
+    }))
+    .sort((a, b) => a.compradoEm.localeCompare(b.compradoEm));
 }
 
 export async function addCargaProblema(
