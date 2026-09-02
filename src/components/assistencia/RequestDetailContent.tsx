@@ -37,12 +37,8 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-        {label}
-      </span>
-      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-        {value}
-      </span>
+      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-sm text-gray-800">{value}</span>
     </div>
   );
 }
@@ -51,6 +47,32 @@ function formatDateOnly(value: string | null | undefined) {
   if (!value) return null;
   const [y, m, d] = value.split("-");
   return `${d}/${m}/${y}`;
+}
+
+// Card branco, borda fina, sombra discreta -- Guia de Componentes Maia
+// (Design System, 01/09/2026), mesmo componente local de
+// DeliveryRequestDetailContent.tsx. Substitui o padrão antigo (fundo
+// var(--surface-1) + borda verde de 2px em toda caixa) usado nessa tela
+// inteira -- era a metade que ainda não tinha recebido esse tratamento
+// (achado revisando as telas 02/09/2026: mesma rota /assistencia/[id],
+// duas linguagens visuais diferentes dependendo do tipo do chamado).
+function Card({ title, children, className = "" }: { title?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-3 ${className}`}>
+      {title ? <h3 className="text-sm font-semibold text-gray-800">{title}</h3> : null}
+      {children}
+    </div>
+  );
+}
+
+// Badge neutro (tipo, filial) -- mesmo de DeliveryRequestDetailContent.tsx.
+function NeutralBadge({ children, icon }: { children: React.ReactNode; icon?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 whitespace-nowrap">
+      {icon ? <span aria-hidden="true">{icon}</span> : null}
+      {children}
+    </span>
+  );
 }
 
 // Só a ação, sem o nome do autor -- o nome fica em negrito, separado, na
@@ -102,11 +124,7 @@ export function RequestDetailContent({
   photos: RequestPhoto[];
 }) {
   if (!result) {
-    return (
-      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        Solicitação não encontrada.
-      </p>
-    );
+    return <p className="text-sm text-gray-400">Solicitação não encontrada.</p>;
   }
 
   const { request, events } = result;
@@ -125,45 +143,44 @@ export function RequestDetailContent({
   return (
     <div className="flex flex-col gap-4">
       <RealtimeQueueRefresher requestId={request.id} />
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-sm font-mono" style={{ color: "var(--text-muted)" }}>
-            Chamado #{request.ticketNumber}
-          </span>
+      {/* Cabeçalho -- Guia de Componentes Maia (Design System, 01/09/2026):
+          título em destaque + badges elegantes (status, tipo, filial),
+          botões de utilidade em outline neutro à direita. "Editar e
+          salvar alterações" é o único botão sólido (primário), mesma
+          convenção de DeliveryRequestDetailContent.tsx. */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <h1 className="text-xl font-semibold text-gray-800 whitespace-nowrap">Chamado #{request.ticketNumber}</h1>
           <StatusBadge status={request.status} />
-          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-            {REQUEST_TYPE_LABELS[request.type] ?? request.type} · {request.storeName}
-          </h2>
+          <NeutralBadge>{REQUEST_TYPE_LABELS[request.type] ?? request.type}</NeutralBadge>
+          <NeutralBadge icon="🏬">{request.storeName}</NeutralBadge>
         </div>
         {canManage ? (
           <div className="flex items-center gap-2 flex-wrap">
             <Link
-              href={novaNotificacaoHref}
-              className="text-sm font-medium rounded-lg px-3 py-1.5"
-              style={{ background: "var(--brand-orange)", color: "#fff" }}
-            >
-              + Criar nova notificação
-            </Link>
-            <Link
               href={`/assistencia/${request.id}/editar`}
-              className="text-sm font-medium rounded-lg px-3 py-1.5"
-              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+              className="text-sm font-semibold rounded-lg px-3.5 py-2 text-white shadow-sm transition-all duration-200 hover:brightness-110"
+              style={{ background: "#1B5E3C" }}
             >
               Editar e salvar alterações
+            </Link>
+            <Link
+              href={novaNotificacaoHref}
+              className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+            >
+              + Criar nova notificação
             </Link>
             {profile.role !== "sac" ? (
               <Link
                 href={`/assistencia/pecas/nova?service_request_id=${request.id}`}
-                className="text-sm font-medium rounded-lg border px-3 py-1.5"
-                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
               >
                 Solicitar peça
               </Link>
             ) : null}
             <Link
               href={`/assistencia/${request.id}/despacho`}
-              className="text-sm font-medium rounded-lg border px-3 py-1.5"
-              style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+              className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
             >
               Imprimir despacho
             </Link>
@@ -177,26 +194,26 @@ export function RequestDetailContent({
 
       {/* 2 colunas no desktop -- esquerda é leitura (cliente/pedido/produtos/
           detalhes), direita é ação/acompanhamento (responsável, prazo, ações,
-          histórico). Empilha normal (uma coluna só) até "lg", igual sempre
-          foi no celular/tablet. */}
+          histórico). 50/50 (não 7fr/3fr como em DeliveryRequestDetailContent)
+          porque essa família de chamado carrega bem mais blocos na coluna
+          direita (responsável, prazo, aprovação, ações, combo, escalonamento,
+          histórico) -- precisa de mais espaço que a versão de entrega.
+          Empilha normal (uma coluna só) até "lg", igual sempre foi no
+          celular/tablet. */}
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         <div className="flex flex-col gap-4">
-          <div
-            className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-          >
-            <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
-              Pedido e cliente
-            </h3>
-            <Row label="Código do pedido/venda" value={request.orderCode} />
-            <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
-            <Row label="Vendedor(a)" value={request.sellerName} />
-            <Row label="Cliente" value={request.clientName} />
-            <Row label="CPF" value={request.clientCpf} />
-            <Row label="Telefone" value={request.clientPhone} />
-            <Row label="Endereço" value={formatFullAddress(request)} />
-            <Row label="Bairro" value={request.clientNeighborhood} />
-          </div>
+          <Card title="Pedido e cliente">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Row label="Código do pedido/venda" value={request.orderCode} />
+              <Row label="Nº da nota fiscal" value={request.invoiceNumber} />
+              <Row label="Vendedor(a)" value={request.sellerName} />
+              <Row label="Cliente" value={request.clientName} />
+              <Row label="CPF" value={request.clientCpf} />
+              <Row label="Telefone" value={request.clientPhone} />
+              <Row label="Endereço" value={formatFullAddress(request)} />
+              <Row label="Bairro" value={request.clientNeighborhood} />
+            </div>
+          </Card>
 
           {canManage ? (
             <RequestItemsTable
@@ -208,16 +225,10 @@ export function RequestDetailContent({
               canEditItems={profile.role === "admin" || profile.role === "assistencia"}
             />
           ) : request.items.length > 0 ? (
-            <div
-              className="rounded-lg p-4 flex flex-col gap-2"
-              style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-            >
-              <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-                Produtos
-              </span>
+            <Card title="Produtos">
               <ul className="flex flex-col gap-1">
                 {request.items.map((item) => (
-                  <li key={item.id} className="text-sm" style={{ color: "var(--text-primary)" }}>
+                  <li key={item.id} className="text-sm text-gray-800">
                     {item.completed ? (
                       <span
                         className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
@@ -240,100 +251,102 @@ export function RequestDetailContent({
                     ) : null}
                     {item.quantity > 1 ? `${item.quantity}x ` : ""}
                     {item.product}
-                    {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
+                    {item.partCode ? <span className="text-gray-400"> · cód. {item.partCode}</span> : null}
                   </li>
                 ))}
               </ul>
-            </div>
+            </Card>
           ) : null}
 
-          <div
-            className="rounded-lg p-4 grid sm:grid-cols-2 gap-4"
-            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-          >
-            <h3 className="text-sm font-bold sm:col-span-2" style={{ color: "var(--text-primary)" }}>
-              Atendimento — o que a assistência precisa acompanhar
-            </h3>
-            <Row label="Motivo" value={request.reason} />
-            {request.causaRaiz ? <Row label="Causa raiz" value={CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz} /> : null}
-            {request.causaRaiz === "erro_conferencia" ? (
-              <>
-                <Row label="Carga (erro de conferência)" value={request.causaCarga} />
-                <Row label="Conferente (erro de conferência)" value={request.causaConferente} />
-              </>
-            ) : null}
-            {request.causaRaiz === "erro_motorista" ? <Row label="Carga (erro do motorista)" value={request.causaCarga} /> : null}
-            <Row label="Restrição / observação" value={request.restrictionNote} />
-            <Row label="Observações" value={request.notes} />
-            <Row label="Solicitado por" value={request.requestedByName} />
-            <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
-            {(request.type === "montagem" || request.type === "desmontagem") && !canManage ? (
+          {/* Descrição/atendimento + Fotos no mesmo card -- pedido do Victor
+              01/09/2026 (mesma mudança já feita em
+              DeliveryRequestDetailContent.tsx): junta o que antes era a
+              seção "Fotos" solta no fim da página com a descrição do
+              chamado, lado a lado, num card só. */}
+          <Card title="Atendimento — o que a assistência precisa acompanhar">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Row label="Motivo" value={request.reason} />
+              {request.causaRaiz ? <Row label="Causa raiz" value={CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz} /> : null}
+              {request.causaRaiz === "erro_conferencia" ? (
+                <>
+                  <Row label="Carga (erro de conferência)" value={request.causaCarga} />
+                  <Row label="Conferente (erro de conferência)" value={request.causaConferente} />
+                </>
+              ) : null}
+              {request.causaRaiz === "erro_motorista" ? <Row label="Carga (erro do motorista)" value={request.causaCarga} /> : null}
+              <Row label="Restrição / observação" value={request.restrictionNote} />
+              <Row label="Observações" value={request.notes} />
+              <Row label="Solicitado por" value={request.requestedByName} />
+              <Row label="Responsável (sistema)" value={request.assignedToName ?? "Sem responsável"} />
+              {(request.type === "montagem" || request.type === "desmontagem") && !canManage ? (
+                <Row
+                  label={request.type === "montagem" ? "Também precisa desmontar o antigo?" : "Também precisa montar o novo?"}
+                  value={request.comboMontagemDesmontagem ? "Sim" : "Não"}
+                />
+              ) : null}
+              {request.type === "montagem" && request.deliveryRating !== null ? (
+                <Row label="Nota do cliente — montagem" value={`${request.deliveryRating}/10`} />
+              ) : null}
+              {request.type === "montagem" && request.resolutionRating !== null ? (
+                <Row label="Nota do cliente — resolução do problema" value={`${request.resolutionRating}/10`} />
+              ) : null}
+              {canManage ? (
+                <ScheduleField
+                  requestId={request.id}
+                  scheduledDate={request.scheduledDate}
+                  scheduledTime={request.scheduledTime}
+                  shift={request.shift}
+                  urgent={request.urgent}
+                  rota={null}
+                  rotaExceptionNote={null}
+                  showRota={false}
+                />
+              ) : (
+                <Row
+                  label="Visita agendada"
+                  value={
+                    request.scheduledDate
+                      ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}${request.urgent ? " · URGENTE" : ""}`
+                      : null
+                  }
+                />
+              )}
+              <Row label="Prazo pedido" value={formatDateOnly(request.requestedDeadline)} />
+              <Row label="Status do prazo" value={DEADLINE_STATUS_LABELS[request.deadlineStatus]} />
               <Row
-                label={request.type === "montagem" ? "Também precisa desmontar o antigo?" : "Também precisa montar o novo?"}
-                value={request.comboMontagemDesmontagem ? "Sim" : "Não"}
+                label={request.deadlineStatus === "recusado" ? "Nova data proposta" : "Prazo aprovado"}
+                value={formatDateOnly(request.approvedDeadline)}
               />
-            ) : null}
-            {request.type === "montagem" && request.deliveryRating !== null ? (
-              <Row label="Nota do cliente — montagem" value={`${request.deliveryRating}/10`} />
-            ) : null}
-            {request.type === "montagem" && request.resolutionRating !== null ? (
-              <Row label="Nota do cliente — resolução do problema" value={`${request.resolutionRating}/10`} />
-            ) : null}
-            {canManage ? (
-              <ScheduleField
-                requestId={request.id}
-                scheduledDate={request.scheduledDate}
-                scheduledTime={request.scheduledTime}
-                shift={request.shift}
-                urgent={request.urgent}
-                rota={null}
-                rotaExceptionNote={null}
-                showRota={false}
-              />
-            ) : (
-              <Row
-                label="Visita agendada"
-                value={
-                  request.scheduledDate
-                    ? `${formatDateOnly(request.scheduledDate)}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}${request.shift ? ` · ${SHIFT_LABELS[request.shift]}` : ""}${request.urgent ? " · URGENTE" : ""}`
-                    : null
-                }
-              />
-            )}
-            <Row label="Prazo pedido" value={formatDateOnly(request.requestedDeadline)} />
-            <Row label="Status do prazo" value={DEADLINE_STATUS_LABELS[request.deadlineStatus]} />
-            <Row
-              label={request.deadlineStatus === "recusado" ? "Nova data proposta" : "Prazo aprovado"}
-              value={formatDateOnly(request.approvedDeadline)}
-            />
-            {request.type === "notificacao_externa" ? (
-              <>
-                <Row label="Protocolo" value={request.protocolNumber} />
-                {canManage ? (
-                  <SacCategoryField requestId={request.id} value={request.sacCategory} />
-                ) : (
-                  <Row label="Categoria SAC" value={request.sacCategory ? SAC_CATEGORY_LABELS[request.sacCategory] : null} />
-                )}
-                {canManage ? (
-                  <LegalDeadlineField requestId={request.id} legalDeadline={request.legalDeadline} />
-                ) : (
-                  <Row label="Prazo legal" value={formatDateOnly(request.legalDeadline)} />
-                )}
-              </>
-            ) : null}
-            <Row label="Criada em" value={formatDateTimeBr(request.createdAt)} />
-            {request.completedAt ? <Row label="Encerrada em" value={formatDateTimeBr(request.completedAt)} /> : null}
-          </div>
+              {request.type === "notificacao_externa" ? (
+                <>
+                  <Row label="Protocolo" value={request.protocolNumber} />
+                  {canManage ? (
+                    <SacCategoryField requestId={request.id} value={request.sacCategory} />
+                  ) : (
+                    <Row label="Categoria SAC" value={request.sacCategory ? SAC_CATEGORY_LABELS[request.sacCategory] : null} />
+                  )}
+                  {canManage ? (
+                    <LegalDeadlineField requestId={request.id} legalDeadline={request.legalDeadline} />
+                  ) : (
+                    <Row label="Prazo legal" value={formatDateOnly(request.legalDeadline)} />
+                  )}
+                </>
+              ) : null}
+              <Row label="Criada em" value={formatDateTimeBr(request.createdAt)} />
+              {request.completedAt ? <Row label="Encerrada em" value={formatDateTimeBr(request.completedAt)} /> : null}
+            </div>
+
+            <div className="flex flex-col gap-3 pt-3 border-t border-gray-100">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Fotos</h4>
+              <PhotoGallery photos={photos} deleteMode={canManage ? "staff" : undefined} />
+              {photos.length === 0 ? <p className="text-sm text-gray-400">Nenhuma foto anexada ainda.</p> : null}
+              {canManage ? <RequestPhotoUpload requestId={request.id} /> : null}
+            </div>
+          </Card>
         </div>
 
         <div className="flex flex-col gap-4">
-          <div
-            className="rounded-lg p-4 flex flex-col gap-2"
-            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-          >
-            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-              Responsável pelo atendimento
-            </h3>
+          <Card title="Responsável pelo atendimento">
             {canManage ? (
               <>
                 <AssemblerNameField requestId={request.id} requestType={request.type} value={request.assemblerName} assemblers={assemblers} />
@@ -342,7 +355,7 @@ export function RequestDetailContent({
             ) : (
               <Row label="Nome do montador" value={request.assemblerName ?? "Não definido"} />
             )}
-          </div>
+          </Card>
 
           {canManage ? (
             <DeadlineActions
@@ -361,20 +374,14 @@ export function RequestDetailContent({
               (sem outra consulta). lojaApproveMontagemConclusion aceita a
               sessão de admin/assistência como alternativa à do gerente. */}
           {canManage && request.status === "aguardando_aprovacao" && (request.type === "montagem" || request.type === "desmontagem") ? (
-            <div
-              className="rounded-lg p-4 flex flex-col gap-3"
-              style={{ background: "var(--surface-1)", border: "2px solid var(--status-warning)" }}
-            >
-              <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-                Aprovar conclusão do montador
-              </h3>
+            <Card title="Aprovar conclusão do montador">
               {request.items.length > 0 ? (
                 <div className="flex flex-col gap-3">
                   {request.items.map((item) => {
                     const itemPhotos = photos.filter((p) => p.itemId === item.id);
                     return (
-                      <div key={item.id} className="flex flex-col gap-1.5 pb-3" style={{ borderBottom: "1px solid var(--gridline)" }}>
-                        <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                      <div key={item.id} className="flex flex-col gap-1.5 pb-3 border-b border-gray-100">
+                        <span className="text-sm font-semibold text-gray-800">
                           {item.quantity > 1 ? `${item.quantity}x ` : ""}
                           {item.product}
                         </span>
@@ -385,9 +392,7 @@ export function RequestDetailContent({
                             Sem foto enviada
                           </span>
                         ) : (
-                          <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-                            Ainda não foi feito pelo montador
-                          </span>
+                          <span className="text-xs font-medium text-gray-400">Ainda não foi feito pelo montador</span>
                         )}
                       </div>
                     );
@@ -398,7 +403,7 @@ export function RequestDetailContent({
                 requestId={request.id}
                 items={request.items.map((i) => ({ id: i.id, product: i.product, quantity: i.quantity, completed: i.completed }))}
               />
-            </div>
+            </Card>
           ) : null}
 
           {canManage ? (
@@ -423,13 +428,7 @@ export function RequestDetailContent({
             <EscalationRiskToggle requestId={request.id} atRisk={request.escalationRisk} />
           ) : null}
 
-          <div
-            className="rounded-lg p-4 flex flex-col gap-3"
-            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-          >
-            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-              Histórico
-            </h3>
+          <Card title="Histórico">
             <RequestHistoryTimeline
               events={events.map((event) => ({
                 id: event.id,
@@ -440,24 +439,8 @@ export function RequestDetailContent({
                 actionText: eventAction(event),
               }))}
             />
-          </div>
+          </Card>
         </div>
-      </div>
-
-      <div
-        className="rounded-lg p-4 flex flex-col gap-3"
-        style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-      >
-        <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Fotos
-        </h3>
-        <PhotoGallery photos={photos} deleteMode={canManage ? "staff" : undefined} />
-        {photos.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhuma foto anexada ainda.
-          </p>
-        ) : null}
-        {canManage ? <RequestPhotoUpload requestId={request.id} /> : null}
       </div>
     </div>
   );
