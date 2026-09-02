@@ -16,11 +16,12 @@ import { groupIntoMonths, paginateMonths, pageContainingMonth } from "@/lib/week
 // quando "Tudo" está selecionado e nenhuma página foi pedida na URL.
 // Antes disso era usado também pra restringir a busca a um mês só, com
 // navegação "[ < ] Agosto 2026 [ > ]" -- pedido do Victor 01/09/2026:
-// "nas listas estão ficando 2/3 páginas sem necessidade... deixe tudo
-// numa única página, só quando tiver mais de 3 meses" trocou aquela
+// "nas listas estão ficando 2/3 páginas sem necessidade" trocou aquela
 // navegação por mês pela mesma paginação por mês que Visitas/Entregas
-// passaram a usar (ver fila/page.tsx) -- até 3 meses cabem juntos numa
-// página só, sem precisar clicar mês a mês.
+// passaram a usar (ver fila/page.tsx) -- um mês por página (achado do
+// Victor 02/09/2026: "deixe só o mês de setembro na primeira pagina,
+// agosto pode ir para a segunda"), sem precisar clicar mês a mês pra
+// navegar dentro do mesmo.
 function currentMonthKey(): string {
   return new Date().toISOString().slice(0, 7);
 }
@@ -156,14 +157,12 @@ export default async function AgendaPage({
   }
 
   // Paginação por MÊS -- pedido do Victor 01/09/2026 (mesma regra de
-  // fila/page.tsx, ver paginateMonths/weekGrouping.ts): até 3 meses
-  // cabem juntos numa página só; a partir do 4º, um mês por página.
-  // Só entra em jogo em "Tudo" -- Atrasado/Hoje/Semana já são recortes
-  // de data próprios, não fazem sentido fatiados por mês (mesmo critério
-  // de `postFiltered` em fila/page.tsx). Sem página explícita na URL,
-  // abre direto na página que contém o mês corrente (equivalente ao
-  // "mês corrente por padrão" de antes, mas permitindo ver os meses
-  // vizinhos juntos em vez de só um por vez).
+  // fila/page.tsx, ver paginateMonths/weekGrouping.ts): um mês por
+  // página. Só entra em jogo em "Tudo" -- Atrasado/Hoje/Semana já são
+  // recortes de data próprios, não fazem sentido fatiados por mês (mesmo
+  // critério de `postFiltered` em fila/page.tsx). Sem página explícita
+  // na URL, abre direto na página que contém o mês corrente (equivalente
+  // ao "mês corrente por padrão" de antes).
   const allMonths = !filterRange ? groupIntoMonths(groups, (g) => g.dateKey) : [];
   const requestedPage = /^\d+$/.test(pageParam ?? "") ? parseInt(pageParam!, 10) : undefined;
   const defaultPage = pageContainingMonth(allMonths, currentMonthKey());
@@ -198,14 +197,14 @@ export default async function AgendaPage({
         }
       />
 
-      {/* Segmented control de volta (pedido do Victor 02/09/2026: "acabou
-          tirando o quadrado... nao precisava"), mesma fileira de
-          fila/page.tsx (Visitas/Entregas) -- pedido do Victor 27/08/2026:
-          "coloque agenda dentro de solicitações ao lado de visitas/
-          entregas". Agenda é rota própria (filtro/dado bem diferente --
-          mês corrente, por montador, não por rota), então cada uma das 3
-          páginas renderiza sua própria fileira em vez de layout
-          compartilhado (mesma razão de SacTabs.tsx). */}
+      {/* Segmented control -- mesma fileira de fila/page.tsx (Visitas/
+          Entregas) -- pedido do Victor 27/08/2026: "coloque agenda
+          dentro de solicitações ao lado de visitas/entregas". Ativo =
+          quadrado VERDE + letra branca (achado do Victor 02/09/2026: ver
+          fila/page.tsx). Agenda é rota própria (filtro/dado bem
+          diferente -- mês corrente, por montador, não por rota), então
+          cada uma das 3 páginas renderiza sua própria fileira em vez de
+          layout compartilhado (mesma razão de SacTabs.tsx). */}
       <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
         <Link href="/assistencia/fila" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-200">
           Visitas
@@ -213,7 +212,11 @@ export default async function AgendaPage({
         <Link href="/assistencia/fila?tab=pecas" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-200">
           Entregas
         </Link>
-        <Link href="/assistencia/agenda" className="px-4 py-1.5 rounded-md text-sm font-semibold bg-white shadow-sm transition-all duration-200" style={{ color: "#1B5E3C" }}>
+        <Link
+          href="/assistencia/agenda"
+          className="px-4 py-1.5 rounded-md text-sm font-semibold text-white shadow-sm transition-all duration-200"
+          style={{ background: "#1B5E3C" }}
+        >
           Agenda
         </Link>
       </div>
@@ -258,11 +261,11 @@ export default async function AgendaPage({
         {/* Atalho "hoje" -- só faz sentido em "Tudo" (Atrasado/Hoje/Semana
             já são recortes de data próprios). Antes disso era navegação
             "[ < ] Mês [ > ]" um mês por vez -- pedido do Victor
-            01/09/2026: passou a mostrar até 3 meses juntos numa página só
-            (mesma regra de Visitas/Entregas, ver paginateMonths acima),
-            então só falta um jeito de voltar direto pra página com o mês
-            corrente quando o usuário navegou pra outra (ver Anterior/
-            Próxima no rodapé da lista, abaixo). */}
+            01/09/2026: virou a mesma paginação por mês de Visitas/
+            Entregas (ver paginateMonths acima), então só falta um jeito
+            de voltar direto pra página com o mês corrente quando o
+            usuário navegou pra outra (ver Anterior/Próxima no rodapé da
+            lista, abaixo). */}
         {!filterRange && currentPage !== defaultPage ? (
           <Link
             href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined })}
@@ -408,7 +411,7 @@ export default async function AgendaPage({
 
       {/* Anterior/Próxima por MÊS (não por linha) -- mesma paginação de
           fila/page.tsx (ver paginateMonths, weekGrouping.ts). Só aparece
-          em "Tudo" com mais de 3 meses de dados agendados -- Atrasado/
+          em "Tudo" com mais de 1 mês de dados agendados -- Atrasado/
           Hoje/Semana nunca paginam (mesmo critério de `postFiltered` em
           fila/page.tsx: são recortes estreitos de propósito). */}
       {!filterRange && totalPages > 1 ? (

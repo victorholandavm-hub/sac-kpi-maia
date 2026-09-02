@@ -30,19 +30,21 @@ export function MonthAccordion({
   // discreto em formato de badge". Substitui a barra preta cheia
   // (background: var(--text-primary), texto branco caixa alta) que
   // existia antes. Rótulo do mês com "quadrado" (pílula branca com
-  // sombra) + letra verde -- pedido do Victor 02/09/2026, mesmo
-  // tratamento do indicador ativo do segmented control Visitas/
-  // Entregas/Agenda ao lado.
+  // sombra) + letra verde -- pedido do Victor 02/09/2026. Recolhido
+  // fica assim; ABERTO (mostrando as semanas) inverte pra quadrado
+  // VERDE + letra branca -- achado seguinte do Victor: "quando estiver
+  // recolhido mantem do jeito que está, mas quando for aberto... deve
+  // ficar com o quadrado verde e letras cinza ou branca" (mesmo
+  // contraste do indicador ativo do segmented control Visitas/Entregas/
+  // Agenda ao lado). `group-open/month:` -- mesmo mecanismo CSS puro que
+  // já gira a seta ▶, sem precisar de estado/JS extra.
   return (
     <details open={defaultOpen} className="group/month flex flex-col gap-2">
       <summary className="flex items-center gap-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/month:rotate-90 text-gray-400" aria-hidden="true">
           ▶
         </span>
-        <span
-          className="text-sm font-semibold uppercase tracking-wider whitespace-nowrap rounded-md bg-white shadow-sm px-2.5 py-1"
-          style={{ color: "#1B5E3C" }}
-        >
+        <span className="text-sm font-semibold uppercase tracking-wider whitespace-nowrap rounded-md shadow-sm px-2.5 py-1 bg-white text-[#1B5E3C] group-open/month:bg-[#1B5E3C] group-open/month:text-white">
           {label}
         </span>
         <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
