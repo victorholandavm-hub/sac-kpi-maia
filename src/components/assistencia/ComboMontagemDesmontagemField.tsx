@@ -21,15 +21,9 @@ export function ComboMontagemDesmontagemField({
   const complemento = type === "montagem" ? "desmontagem do móvel antigo" : "montagem do móvel novo";
 
   return (
-    <div
-      className="flex items-center justify-between gap-2 rounded-lg p-4"
-      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-    >
-      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-        Também precisa de {complemento} nessa visita:{" "}
-        <span style={{ fontWeight: 600, color: value ? "var(--brand-orange)" : "var(--text-muted)" }}>
-          {value ? "Sim" : "Não"}
-        </span>
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
+      <span className="text-sm text-gray-800">
+        Também precisa de {complemento} nessa visita: <span className="font-semibold">{value ? "Sim" : "Não"}</span>
       </span>
       <button
         disabled={pending}
@@ -39,8 +33,7 @@ export function ComboMontagemDesmontagemField({
             value ? "Removido." : "Adicionado."
           )
         }
-        className="text-xs underline shrink-0 disabled:opacity-60"
-        style={{ color: "var(--text-secondary)" }}
+        className="text-xs underline shrink-0 text-gray-500 hover:text-gray-700 disabled:opacity-60"
       >
         {value ? "remover" : "adicionar"}
       </button>

@@ -151,20 +151,15 @@ export function RequestActions({
   const previousStatus = PREVIOUS_STATUS[status] ?? null;
 
   return (
-    <div
-      className="flex flex-col gap-3 rounded-lg p-4"
-      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-    >
-      <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-        Ações
-      </h3>
+    <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
+      <h3 className="text-sm font-semibold text-gray-800">Ações</h3>
 
       {!hideClaim && !isAssignedToMe ? (
         <button
           disabled={pending}
           onClick={() => run(() => claimRequest(requestId), "Solicitação assumida.")}
-          className="text-sm rounded px-3 py-2 self-start disabled:opacity-60"
-          style={{ background: "var(--brand-orange)", color: "#fff" }}
+          className="text-sm font-semibold rounded-lg px-3.5 py-2 self-start text-white shadow-sm transition-all duration-200 hover:brightness-110 disabled:opacity-60"
+          style={{ background: "var(--brand-orange)" }}
         >
           Assumir para mim
         </button>
@@ -190,7 +185,7 @@ export function RequestActions({
                     ? setAskingRemarcarReason(true)
                     : run(() => updateStatus(requestId, s), `Status atualizado para ${STATUS_LABELS[s] ?? s}.`)
                 }
-                className={`text-sm rounded px-3 py-2 disabled:opacity-60 ${isPrimary ? "font-medium" : ""}`}
+                className={`text-sm rounded-lg px-3 py-2 disabled:opacity-60 ${isPrimary ? "font-medium" : ""}`}
                 style={
                   isPrimary
                     ? { background: color, color: "#fff" }
@@ -213,8 +208,7 @@ export function RequestActions({
               `Status revertido para ${STATUS_LABELS[previousStatus] ?? previousStatus}.`
             )
           }
-          className="text-xs underline self-start disabled:opacity-60"
-          style={{ color: "var(--text-secondary)" }}
+          className="text-xs underline self-start text-gray-500 hover:text-gray-700 disabled:opacity-60"
         >
           ↩ Reverter pra {STATUS_LABELS[previousStatus] ?? previousStatus} (marquei errado)
         </button>
@@ -224,7 +218,7 @@ export function RequestActions({
         <button
           disabled={pending}
           onClick={() => setAskingNovaTroca(true)}
-          className="text-sm rounded px-3 py-2 self-start disabled:opacity-60"
+          className="text-sm rounded-lg px-3 py-2 self-start disabled:opacity-60"
           style={{ background: "var(--status-warning)", color: "#fff" }}
         >
           🔁 Produto trocado veio com problema — pedir nova troca
@@ -232,26 +226,24 @@ export function RequestActions({
       ) : null}
 
       {askingNovaTroca && sameProduct === null ? (
-        <div className="flex flex-col gap-2 rounded border p-3" style={{ borderColor: "var(--status-warning)" }}>
-          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-            A nova troca é pelo mesmo produto ou o cliente quer outro?
-          </span>
+        <div className="flex flex-col gap-2 rounded-xl border p-3" style={{ borderColor: "var(--status-warning)" }}>
+          <span className="text-sm text-gray-800">A nova troca é pelo mesmo produto ou o cliente quer outro?</span>
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setSameProduct(true)}
-              className="text-sm rounded px-3 py-2"
+              className="text-sm rounded-lg px-3 py-2"
               style={{ background: "var(--status-warning)", color: "#fff" }}
             >
               Mesmo produto
             </button>
             <button
               onClick={() => setSameProduct(false)}
-              className="text-sm rounded px-3 py-2 border"
-              style={{ borderColor: "var(--status-warning)", color: "var(--text-primary)" }}
+              className="text-sm rounded-lg px-3 py-2 border text-gray-800"
+              style={{ borderColor: "var(--status-warning)" }}
             >
               Outro produto
             </button>
-            <button onClick={resetNovaTroca} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            <button onClick={resetNovaTroca} className="text-sm underline text-gray-500 hover:text-gray-700">
               cancelar
             </button>
           </div>
@@ -259,8 +251,8 @@ export function RequestActions({
       ) : null}
 
       {askingNovaTroca && sameProduct !== null ? (
-        <div className="flex flex-col gap-2 rounded border p-3" style={{ borderColor: "var(--status-warning)" }}>
-          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+        <div className="flex flex-col gap-2 rounded-xl border p-3" style={{ borderColor: "var(--status-warning)" }}>
+          <span className="text-sm text-gray-800">
             {sameProduct ? "Mesmo produto" : "Outro produto"} — o que aconteceu com o produto trocado?
           </span>
           <textarea
@@ -268,15 +260,13 @@ export function RequestActions({
             onChange={(e) => setNovaTrocaReason(e.target.value)}
             rows={2}
             placeholder="Ex: veio com a mesma avaria, cliente decidiu trocar de modelo…"
-            className="rounded border px-3 py-2 text-sm"
-            style={{ borderColor: "var(--border)" }}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
             autoFocus
           />
           <select
             value={novaTrocaCausaRaiz}
             onChange={(e) => setNovaTrocaCausaRaiz(e.target.value)}
-            className="rounded border px-3 py-2 text-sm"
-            style={{ borderColor: "var(--border)" }}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
           >
             <option value="" disabled>
               Quem errou (controle interno) *
@@ -293,15 +283,13 @@ export function RequestActions({
                 value={novaTrocaCarga}
                 onChange={(e) => setNovaTrocaCarga(e.target.value)}
                 placeholder="Carga *"
-                className="rounded border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--border)" }}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
               />
               <input
                 value={novaTrocaConferente}
                 onChange={(e) => setNovaTrocaConferente(e.target.value)}
                 placeholder="Conferente *"
-                className="rounded border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--border)" }}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
               />
             </div>
           ) : null}
@@ -311,15 +299,13 @@ export function RequestActions({
                 value={novaTrocaCarga}
                 onChange={(e) => setNovaTrocaCarga(e.target.value)}
                 placeholder="Carga *"
-                className="rounded border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--border)" }}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
               />
               <input
                 value={novaTrocaDriverName}
                 onChange={(e) => setNovaTrocaDriverName(e.target.value)}
                 placeholder="Motorista que entregou (erro) *"
-                className="rounded border px-3 py-2 text-sm"
-                style={{ borderColor: "var(--border)" }}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
               />
             </div>
           ) : null}
@@ -329,8 +315,7 @@ export function RequestActions({
               onChange={(e) => setNovaTrocaCausaRaizDetalhe(e.target.value)}
               rows={2}
               placeholder="O que houve, exatamente? *"
-              className="rounded border px-3 py-2 text-sm"
-              style={{ borderColor: "var(--border)" }}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
             />
           ) : null}
           <div className="flex items-center gap-2">
@@ -342,12 +327,12 @@ export function RequestActions({
                 (novaTrocaCausaRaiz === "outro" && !novaTrocaCausaRaizDetalhe.trim())
               }
               onClick={confirmNovaTroca}
-              className="text-sm rounded px-3 py-2 disabled:opacity-60"
+              className="text-sm rounded-lg px-3 py-2 disabled:opacity-60"
               style={{ background: "var(--status-warning)", color: "#fff" }}
             >
               Confirmar nova troca
             </button>
-            <button onClick={resetNovaTroca} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            <button onClick={resetNovaTroca} className="text-sm underline text-gray-500 hover:text-gray-700">
               cancelar
             </button>
           </div>
@@ -355,24 +340,21 @@ export function RequestActions({
       ) : null}
 
       {askingRemarcarReason ? (
-        <div className="flex flex-col gap-2 rounded border p-3" style={{ borderColor: "var(--status-critical)" }}>
-          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-            Qual o motivo da remarcação?
-          </span>
+        <div className="flex flex-col gap-2 rounded-xl border p-3" style={{ borderColor: "var(--status-critical)" }}>
+          <span className="text-sm text-gray-800">Qual o motivo da remarcação?</span>
           <textarea
             value={remarcarReason}
             onChange={(e) => setRemarcarReason(e.target.value)}
             rows={2}
             placeholder="Ex: cliente ausente, chovendo, técnico sem tempo…"
-            className="rounded border px-3 py-2 text-sm"
-            style={{ borderColor: "var(--border)" }}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
             autoFocus
           />
           <div className="flex items-center gap-2">
             <button
               disabled={pending || !remarcarReason.trim()}
               onClick={confirmRemarcar}
-              className="text-sm rounded px-3 py-2 disabled:opacity-60"
+              className="text-sm rounded-lg px-3 py-2 disabled:opacity-60"
               style={{ background: "var(--status-critical)", color: "#fff" }}
             >
               Confirmar remarcação
@@ -382,8 +364,7 @@ export function RequestActions({
                 setAskingRemarcarReason(false);
                 setRemarcarReason("");
               }}
-              className="text-sm underline"
-              style={{ color: "var(--text-secondary)" }}
+              className="text-sm underline text-gray-500 hover:text-gray-700"
             >
               cancelar
             </button>
@@ -397,8 +378,7 @@ export function RequestActions({
           onChange={(e) => setNote(e.target.value)}
           rows={2}
           placeholder="Adicionar observação…"
-          className="rounded border px-3 py-2 text-sm"
-          style={{ borderColor: "var(--border)" }}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
         />
         <button
           disabled={pending || !note.trim()}
@@ -408,8 +388,7 @@ export function RequestActions({
               setNote("");
             }, "Nota adicionada.")
           }
-          className="text-sm rounded px-3 py-2 self-start border disabled:opacity-60"
-          style={{ borderColor: "var(--border)" }}
+          className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 self-start text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 disabled:opacity-60"
         >
           Adicionar nota
         </button>

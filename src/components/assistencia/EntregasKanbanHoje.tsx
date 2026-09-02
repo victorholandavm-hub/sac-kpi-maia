@@ -336,7 +336,15 @@ export function EntregasKanbanHoje({
   const rotaRows = selectedRotaKey ? allRows.filter((row) => row.columnKey === selectedRotaKey) : allRows;
   const counts: HojeStatusCounts = { programado: 0, concluido: 0, cancelado: 0, nao_concluido: 0 };
   for (const row of rotaRows) counts[deliveryStatusTab(row.r.status)]++;
-  const visibleRows = tab === "todos" ? rotaRows : rotaRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
+  // Aba "Todos" -- pedido do Victor 02/09/2026: "coloque para baixo os que
+  // forem sendo concluidos e fique em cima os ainda programados". `.sort` é
+  // estável (garantido desde ES2019), então só separa concluído do resto --
+  // a ordem original (por rota, depois por chamado) continua intacta dentro
+  // de cada grupo, só empurra concluído pro fim da lista.
+  const visibleRows =
+    tab === "todos"
+      ? [...rotaRows].sort((a, b) => (a.r.status === "concluida" ? 1 : 0) - (b.r.status === "concluida" ? 1 : 0))
+      : rotaRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
 
   return (
     <div className="flex flex-col gap-3">
