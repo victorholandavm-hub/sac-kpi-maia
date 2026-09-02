@@ -73,8 +73,8 @@ function ItemRow({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 py-2 flex-wrap" style={{ borderTop: "1px solid var(--gridline)" }}>
-      <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+    <div className="flex items-center justify-between gap-3 py-2 flex-wrap border-t border-gray-100">
+      <span className="text-sm text-gray-800">
         {item.completed ? (
           <span
             className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
@@ -96,7 +96,7 @@ function ItemRow({
         ) : null}
         {item.quantity > 1 ? `${item.quantity}x ` : ""}
         {item.product}
-        {item.partCode ? <span style={{ color: "var(--text-muted)" }}> · cód. {item.partCode}</span> : null}
+        {item.partCode ? <span className="text-gray-400"> · cód. {item.partCode}</span> : null}
         {canEditItems ? (
           <button
             onClick={remove}
@@ -115,27 +115,24 @@ function ItemRow({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="Valor unit."
-              className="w-24 rounded border px-2 py-1 text-sm"
-              style={{ borderColor: "var(--border)" }}
+              className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-sm"
               autoFocus
             />
             <button
               disabled={pending}
               onClick={saveValue}
-              className="text-xs rounded px-2 py-1 disabled:opacity-60"
+              className="text-xs rounded-lg px-2 py-1 font-medium disabled:opacity-60"
               style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
             >
               Salvar
             </button>
           </>
         ) : canEditValues ? (
-          <button onClick={() => setEditing(true)} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+          <button onClick={() => setEditing(true)} className="text-sm underline text-gray-500 hover:text-gray-700">
             {total !== null ? formatBRL(total) : "definir valor"}
           </button>
         ) : (
-          <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            {total !== null ? formatBRL(total) : "Sem valor definido"}
-          </span>
+          <span className="text-sm text-gray-500">{total !== null ? formatBRL(total) : "Sem valor definido"}</span>
         )}
         {isConcluded ? (
           canEditValues ? (
@@ -164,44 +161,40 @@ function ItemRow({
           )
         ) : (
           <span
-            className="text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap"
-            style={{ color: "var(--text-muted)", borderColor: "var(--border)" }}
+            className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-400 whitespace-nowrap"
             title="Só é possível liberar o pagamento depois que a montagem for concluída."
           >
             A montar
           </span>
         )}
         {item.paymentReleased && item.paymentReleasedAt ? (
-          <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-            pago em {formatDate(item.paymentReleasedAt)}
-          </span>
+          <span className="text-xs whitespace-nowrap text-gray-400">pago em {formatDate(item.paymentReleasedAt)}</span>
         ) : null}
       </div>
-      <div className="flex items-center gap-2 w-full text-xs" style={{ color: "var(--text-muted)" }}>
+      <div className="flex items-center gap-2 w-full text-xs text-gray-400">
         <span>Autorizado por (gerente):</span>
         {editingAuth ? (
           <>
             <input
               value={authValue}
               onChange={(e) => setAuthValue(e.target.value)}
-              className="w-40 rounded border px-2 py-1 text-xs"
-              style={{ borderColor: "var(--border)" }}
+              className="w-40 rounded-lg border border-gray-200 px-2 py-1 text-xs"
               autoFocus
             />
             <button
               disabled={pending}
               onClick={saveAuth}
-              className="rounded px-2 py-1 disabled:opacity-60"
+              className="rounded-lg px-2 py-1 font-medium disabled:opacity-60"
               style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
             >
               Salvar
             </button>
-            <button onClick={() => setEditingAuth(false)} className="underline">
+            <button onClick={() => setEditingAuth(false)} className="underline text-gray-500 hover:text-gray-700">
               cancelar
             </button>
           </>
         ) : canEditValues ? (
-          <button onClick={() => setEditingAuth(true)} className="underline" style={{ color: "var(--text-secondary)" }}>
+          <button onClick={() => setEditingAuth(true)} className="underline text-gray-500 hover:text-gray-700">
             {item.paymentAuthorizedBy ?? "definir"}
           </button>
         ) : (
@@ -274,32 +267,24 @@ function AddItemForm({ requestId, requestType }: { requestId: string; requestTyp
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap pt-2" style={{ borderTop: "1px solid var(--gridline)" }}>
+    <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-gray-100">
       <div className="flex flex-col gap-0.5">
         <input
           value={partCode}
           onChange={(e) => setPartCode(e.target.value)}
           placeholder="Código (opcional)"
-          className="rounded border px-2 py-1 text-sm w-32"
-          style={{ borderColor: "var(--border)" }}
+          className="rounded-lg border border-gray-200 px-2 py-1 text-sm w-32"
         />
         {productLookupStatus === "loading" ? (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Buscando…
-          </span>
+          <span className="text-xs text-gray-400">Buscando…</span>
         ) : productLookupStatus === "found" ? (
           <span className="text-xs" style={{ color: "var(--status-good)" }}>
             Produto encontrado.
           </span>
         ) : productLookupStatus === "not_found" ? (
-          <span className="text-xs flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+          <span className="text-xs flex items-center gap-1.5 text-gray-400">
             Código não encontrado.
-            <button
-              type="button"
-              onClick={() => runProductLookup(partCode)}
-              className="underline"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <button type="button" onClick={() => runProductLookup(partCode)} className="underline text-gray-500 hover:text-gray-700">
               🔄 Tentar de novo
             </button>
           </span>
@@ -309,23 +294,20 @@ function AddItemForm({ requestId, requestType }: { requestId: string; requestTyp
         value={product}
         onChange={(e) => setProduct(e.target.value)}
         placeholder="Produto"
-        className="rounded border px-2 py-1 text-sm flex-1 min-w-[140px]"
-        style={{ borderColor: "var(--border)" }}
+        className="rounded-lg border border-gray-200 px-2 py-1 text-sm flex-1 min-w-[140px]"
       />
       <input
         value={quantity}
         onChange={(e) => setQuantity(e.target.value)}
         type="number"
         min={1}
-        className="rounded border px-2 py-1 text-sm w-16"
-        style={{ borderColor: "var(--border)" }}
+        className="rounded-lg border border-gray-200 px-2 py-1 text-sm w-16"
       />
       {showAction ? (
         <select
           value={action}
           onChange={(e) => setAction(e.target.value as "montar" | "desmontar")}
-          className="rounded border px-2 py-1 text-sm"
-          style={{ borderColor: "var(--border)" }}
+          className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
         >
           <option value="montar">Montar</option>
           <option value="desmontar">Desmontar</option>
@@ -334,7 +316,7 @@ function AddItemForm({ requestId, requestType }: { requestId: string; requestTyp
       <button
         onClick={add}
         disabled={pending}
-        className="text-xs rounded px-2 py-1.5 font-medium disabled:opacity-60"
+        className="text-xs rounded-lg px-2 py-1.5 font-medium disabled:opacity-60"
         style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
       >
         + Adicionar produto
@@ -362,19 +344,10 @@ export function RequestItemsTable({
   const total = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
 
   return (
-    <div
-      className="rounded-lg p-4 flex flex-col gap-1"
-      style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
-    >
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-1">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          Produtos
-        </span>
-        {total > 0 ? (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Total: {formatBRL(total)}
-          </span>
-        ) : null}
+        <span className="text-sm font-semibold text-gray-800">Produtos</span>
+        {total > 0 ? <span className="text-xs text-gray-400">Total: {formatBRL(total)}</span> : null}
       </div>
       {items.map((item) => (
         <ItemRow
