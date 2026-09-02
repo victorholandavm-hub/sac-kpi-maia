@@ -250,10 +250,14 @@ function EntregaCardRow({
         {productSummary}
       </td>
 
-      {/* Coluna 5: Logística -- loja de origem, atendente, motorista. */}
+      {/* Coluna 5: Logística -- loja de origem, atendente, responsável,
+          motorista. "Responsável" -- pedido do Victor 02/09/2026: "que
+          apareça quem é o responsável por aquela demanda já na lista, sem
+          precisar entrar na demanda". */}
       <td className="px-3 py-3 align-top text-xs text-gray-400 whitespace-nowrap">
         <div className="truncate">{r.storeName}</div>
         <div className="truncate">Atendente: {r.requestedByName ?? "—"}</div>
+        <div className="truncate">Responsável: {r.assignedToName ?? "—"}</div>
         <div className="truncate">{r.driverName ? `Motorista: ${r.driverName}` : "Sem motorista"}</div>
       </td>
 
@@ -402,15 +406,18 @@ function VisitaCardRow({
             </span>
           </div>
 
-          {/* Coluna 3 (16%): montador responsável -- tag vermelha quando
-              não tem, pedido do Victor: "Em vez de deixar a palavra Não
-              definido em cinza apagado, use uma tag em destaque (ex: Sem
-              Montador) para atrair o olho do operador imediatamente".
-              🔧 identifica que é o montador (não outro tipo de nome/pessoa
-              na linha) -- pedido do Victor 23/08/2026: "coloque, no
-              bairro, aquele pino de localização que tinha e coloque algo
-              tambem para identificar o montador". */}
-          <div className="w-full sm:w-[16%] shrink-0 flex items-center min-w-0 sm:pr-3">
+          {/* Coluna 3 (16%): montador + responsável -- tag vermelha quando
+              não tem montador, pedido do Victor: "Em vez de deixar a
+              palavra Não definido em cinza apagado, use uma tag em
+              destaque (ex: Sem Montador) para atrair o olho do operador
+              imediatamente". 🔧 identifica que é o montador (não outro
+              tipo de nome/pessoa na linha) -- pedido do Victor 23/08/2026:
+              "coloque, no bairro, aquele pino de localização que tinha e
+              coloque algo tambem para identificar o montador". Responsável
+              (assignedToName) empilhado embaixo -- pedido do Victor
+              02/09/2026: "que apareça quem é o responsável por aquela
+              demanda já na lista, sem precisar entrar na demanda". */}
+          <div className="w-full sm:w-[16%] shrink-0 flex flex-col items-start justify-center gap-1 min-w-0 sm:pr-3">
             {r.assemblerName ? (
               <span className="text-sm font-semibold truncate" style={{ color: "#1F2937" }}>
                 🔧 {r.assemblerName}
@@ -423,6 +430,9 @@ function VisitaCardRow({
                 ⚠️ Sem Montador
               </span>
             )}
+            <span className="text-xs truncate" style={{ color: "#9CA3AF" }}>
+              Responsável: {r.assignedToName ?? "—"}
+            </span>
           </div>
 
           {/* Coluna 4 (17%): datas de abertura e previsão */}

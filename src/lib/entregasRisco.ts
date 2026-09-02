@@ -32,7 +32,10 @@ export const RESOLVIDO_LABELS = ["Entregue", "Entregue Parcial"];
 // pedidoJaEntregue, que olha status da CARGA, não do pedido) -- esse
 // array aqui é só pro filtro inicial de "vale a pena nem considerar pra
 // risco".
-const PEDIDO_ENCERRADO_LABELS = [...RESOLVIDO_LABELS, "Cancelada"];
+// Exportado -- reaproveitado por cargas.ts (listPedidosSemCarga, pedido do
+// Victor 02/09/2026) pro mesmo filtro "vale a pena considerar" -- um pedido
+// cancelado ou já entregue não deveria aparecer como "pendente de carga".
+export const PEDIDO_ENCERRADO_LABELS = [...RESOLVIDO_LABELS, "Cancelada"];
 const PRAZO_DIAS_UTEIS = 5;
 
 export type EntregaRiscoCarga = {

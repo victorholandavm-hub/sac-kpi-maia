@@ -186,12 +186,6 @@ export default async function SacNotificacoesPage({
         }
       />
 
-      {/* Mesmo painel de /assistencia/fila (aba Entregas) -- SAC não
-          alcança a fila da assistência, precisa desse atalho aqui também
-          pra não depender de pedir pra assistência mudar o motorista do
-          dia. Junior como motorista padrão -- pedido do Victor 21/08/2026. */}
-      <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} />
-
       {/* Linha 1 do guia de padronização -- mesmo desenho/motivo de
           fila/page.tsx (aba Entregas, ver lá). */}
       <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
@@ -341,7 +335,19 @@ export default async function SacNotificacoesPage({
         // ver EntregasWeekGroups.tsx -- as duas telas não podem divergir
         // de novo, ver comentário no topo deste arquivo).
         <div className="flex flex-col gap-4">
-          <EntregasKanbanHoje groups={todayGroups} todayOverview={todayOverview} />
+          {/* motoristaAction -- SAC não alcança a fila da assistência,
+              precisa desse atalho aqui também pra não depender de pedir
+              pra assistência mudar o motorista do dia (Junior como
+              padrão, pedido do Victor 21/08/2026). Botão (não a barra
+              inteira) ao lado de "📌 Hoje" -- pedido do Victor 02/09/2026:
+              "deve ficar ao lado de 'hoje' e só o botão". */}
+          <EntregasKanbanHoje
+            groups={todayGroups}
+            todayOverview={todayOverview}
+            motoristaAction={
+              <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly />
+            }
+          />
           {restGroups.length > 0 ? <EntregasWeekGroups groups={restGroups} now={now} /> : null}
         </div>
       )}

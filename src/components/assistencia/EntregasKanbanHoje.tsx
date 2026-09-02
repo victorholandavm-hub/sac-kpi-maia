@@ -212,6 +212,9 @@ function TodayRow({ row }: { row: FlatRow }) {
       <td className="px-4 py-3 align-top text-gray-600 whitespace-nowrap">
         <div>{row.rotaLabel}</div>
         <div className="text-xs text-gray-400">{row.driverName ? `🚚 ${row.driverName}` : "Sem motorista"}</div>
+        {/* Responsável -- pedido do Victor 02/09/2026: "que apareça quem é
+            o responsável por aquela demanda já na lista". */}
+        <div className="text-xs text-gray-400">Responsável: {r.assignedToName ?? "—"}</div>
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -233,7 +236,21 @@ function TodayRow({ row }: { row: FlatRow }) {
   );
 }
 
-export function EntregasKanbanHoje({ groups, todayOverview }: { groups: QueueGroup[]; todayOverview: RotaDayOverview | null }) {
+export function EntregasKanbanHoje({
+  groups,
+  todayOverview,
+  motoristaAction,
+}: {
+  groups: QueueGroup[];
+  todayOverview: RotaDayOverview | null;
+  // Botão "Gestão de Motoristas & Escala" (RotaMotoristaDoDia, modo
+  // buttonOnly) -- pedido do Victor 02/09/2026: "deve ficar ao lado de
+  // 'hoje' e só o botão". Renderizado como slot em vez de importado
+  // direto aqui pra não criar dependência circular de dados (o botão
+  // precisa de today/overview/drivers, que já vêm resolvidos na página
+  // que também busca `groups`/`todayOverview`).
+  motoristaAction?: React.ReactNode;
+}) {
   const [tab, setTab] = useState<DeliveryStatusTab>("todos");
   if (groups.length === 0) return null;
   const columns = buildColumns(groups, todayOverview);
@@ -249,13 +266,18 @@ export function EntregasKanbanHoje({ groups, todayOverview }: { groups: QueueGro
     <div className="flex flex-col gap-3">
       {/* Quadrado verde + letra branca -- pedido do Victor 02/09/2026,
           mesmo tratamento do indicador ativo do segmented control
-          Visitas/Entregas/Agenda e do mês aberto (MonthAccordion.tsx). */}
-      <span
-        className="self-start text-xs font-semibold uppercase tracking-wider text-white rounded-md shadow-sm px-2.5 py-1"
-        style={{ background: "#1B5E3C" }}
-      >
-        📌 Hoje
-      </span>
+          Visitas/Entregas/Agenda e do mês aberto (MonthAccordion.tsx).
+          "Gestão de Motoristas & Escala" ao lado -- pedido do Victor
+          02/09/2026: "deve ficar ao lado de 'hoje' e só o botão". */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span
+          className="text-xs font-semibold uppercase tracking-wider text-white rounded-md shadow-sm px-2.5 py-1"
+          style={{ background: "#1B5E3C" }}
+        >
+          📌 Hoje
+        </span>
+        {motoristaAction}
+      </div>
 
       {/* Resumo horizontal por rota -- grid de 4 colunas em telas largas,
           empilha em telas menores. Só contagem + motorista, sem lista de

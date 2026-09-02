@@ -457,15 +457,6 @@ export default async function AssistenciaQueuePage({
         </Link>
       </div>
 
-      {/* Junior como motorista padrão da rota de João Pessoa -- pedido do
-          Victor 26/08/2026: "coloque por padrão, o motorista junior na
-          rota do dia de joao pessoa". Já valia só pra aba de notificação
-          do SAC (pedido do Victor 21/08/2026) -- agora vale aqui também,
-          a aba Entregas da própria assistência. Só preenche quando o dia
-          ainda não tem motorista salvo (ver defaultDriver em
-          RotaMotoristaDoDia.tsx) -- não sobrescreve atribuição já feita. */}
-      {showPecas ? <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} /> : null}
-
       {/* Linha 1 do guia de padronização: filtros rápidos por status, com
           contador -- pedido do Victor 25/08/2026 ("guia de padronização"):
           "Botões estilo Pill/Badge para filtro rápido com contadores
@@ -710,7 +701,21 @@ export default async function AssistenciaQueuePage({
         // corrente, não faz sentido repetir em toda página de meses mais
         // antigos (ver entregasPageGroups/currentPage acima).
         <div className="flex flex-col gap-4">
-          {currentPage === 1 ? <EntregasKanbanHoje groups={todayGroups} todayOverview={todayOverview} /> : null}
+          {/* motoristaAction -- pedido do Victor 26/08/2026: Junior como
+              motorista padrão de João Pessoa quando o dia ainda não tem
+              atribuição (defaultDriver em RotaMotoristaDoDia.tsx). Botão
+              (não a barra inteira, ver buttonOnly) ao lado de "📌 Hoje" --
+              pedido do Victor 02/09/2026: "deve ficar ao lado de 'hoje' e
+              só o botão". */}
+          {currentPage === 1 ? (
+            <EntregasKanbanHoje
+              groups={todayGroups}
+              todayOverview={todayOverview}
+              motoristaAction={
+                <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly />
+              }
+            />
+          ) : null}
           {entregasPageGroups.length > 0 ? <EntregasWeekGroups groups={entregasPageGroups} now={now} /> : null}
         </div>
       ) : (
