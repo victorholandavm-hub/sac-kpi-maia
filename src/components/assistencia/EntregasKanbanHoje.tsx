@@ -113,6 +113,18 @@ const STATUS_TAB_LABELS: Record<DeliveryStatusTab, string> = {
   cancelado: "Cancelado",
 };
 
+// Mesma cor de cada opção equivalente na fileira de filtros de cima
+// (ENTREGA_FILTERS, entregaQueueGrouping.ts: Todas/Programado/Concluídas/
+// Canceladas) -- pedido do Victor 02/09/2026: quando a aba está
+// selecionada, fica com a cor real dessa mesma régua; não selecionada
+// continua neutra, do jeito que já era.
+const STATUS_TAB_COLORS: Record<DeliveryStatusTab, string> = {
+  todos: "var(--text-secondary)",
+  programado: "var(--brand-green)",
+  concluido: "var(--status-good)",
+  cancelado: "var(--text-muted)",
+};
+
 // Badge de contagem discreto -- Guia de Componentes Maia (Design System,
 // 01/09/2026): "mini-badges discretos com a contagem, de forma muito
 // limpa". Cinza neutro pro estado padrão (Programado), verde suave pra
@@ -298,11 +310,16 @@ export function EntregasKanbanHoje({
             type="button"
             onClick={() => setTab(t)}
             className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-              tab === t ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              tab === t ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
+            style={tab === t ? { background: `color-mix(in srgb, ${STATUS_TAB_COLORS[t]} 78%, black)` } : undefined}
           >
             {STATUS_TAB_LABELS[t]}
-            {t !== "todos" ? <span className="ml-1 text-xs font-mono text-gray-400">({counts[t as Exclude<DeliveryStatusTab, "todos">]})</span> : null}
+            {t !== "todos" ? (
+              <span className={`ml-1 text-xs font-mono ${tab === t ? "text-white/80" : "text-gray-400"}`}>
+                ({counts[t as Exclude<DeliveryStatusTab, "todos">]})
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
