@@ -126,7 +126,7 @@ export default async function EntregasRiscoPage() {
   const acompanhamentos = items.filter((i) => i.nivel === "acompanhamento");
 
   return (
-    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Entregas em risco" subtitle="Pedidos que podem atrasar — verifique a situação e avise o cliente antes do prazo." />
 
       <Section title="Alerta" items={alertas} atendentes={atendentes} emptyMessage="Nenhum pedido em alerta no momento." />

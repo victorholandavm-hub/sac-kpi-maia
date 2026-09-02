@@ -25,7 +25,7 @@ export default async function SacNovaSolicitacaoPage() {
   }));
 
   return (
-    <div className="max-w-2xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Nova entrega" subtitle="Troca/entrega de produto, envio de peça ou notificação externa.">
         <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150">
           ← Voltar
