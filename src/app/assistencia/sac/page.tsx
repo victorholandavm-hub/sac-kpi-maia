@@ -52,7 +52,7 @@ export default async function SacHomePage({
   const requests = showCompleted ? items : items.filter((r) => r.status !== "concluida" && r.status !== "cancelada");
 
   return (
-    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="SAC — Lojas Maia" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`}>
         <div className="flex items-center gap-3">
           <NotificationBell fetchAction={listSacNotificationsAction} storageKey="sac" />

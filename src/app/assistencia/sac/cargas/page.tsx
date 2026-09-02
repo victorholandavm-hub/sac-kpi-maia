@@ -77,7 +77,7 @@ export default async function CargasPage() {
   const grupos = await listCargasRecentes();
 
   return (
-    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
+    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Cargas" subtitle="Cargas dos últimos 30 dias — motorista, conferente e problemas encontrados." />
 
       <SacTabs active="cargas" />
