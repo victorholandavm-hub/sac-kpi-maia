@@ -85,6 +85,7 @@ function buildHref(params: {
   city?: string;
   urgente?: string;
   semrota?: string;
+  semmontador?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -98,6 +99,7 @@ function buildHref(params: {
   if (params.sched) sp.set("sched", params.sched);
   if (params.alvo) sp.set("alvo", params.alvo);
   if (params.city) sp.set("city", params.city);
+  if (params.semmontador) sp.set("semmontador", params.semmontador);
   if (params.urgente) sp.set("urgente", params.urgente);
   if (params.semrota) sp.set("semrota", params.semrota);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
@@ -163,11 +165,12 @@ export default async function AssistenciaQueuePage({
     city?: string;
     urgente?: string;
     semrota?: string;
+    semmontador?: string;
   }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo, city, urgente, semrota } = await searchParams;
+  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo, city, urgente, semrota, semmontador } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
@@ -187,6 +190,13 @@ export default async function AssistenciaQueuePage({
   // Clientes x Mostruário (ver ALVO_FILTERS acima) -- só existe na aba
   // Visitas, mesmo padrão de filterOrigem/filterSched pras outras abas.
   const filterAlvo: "cliente" | "mostruario" | undefined = !showPecas && (alvo === "cliente" || alvo === "mostruario") ? alvo : undefined;
+  // "Sem montador" -- pedido do Victor 02/09/2026: "ao lado de
+  // 'canceladas' coloque mais um filtro 'sem montador', para a
+  // assistencia conseguir filtrar mais rápido". Só existe na aba
+  // Visitas (Entregas não tem montador, tem motorista) -- mesmo padrão
+  // de filterAlvo/filterCity: não é uma coluna/status real, filtro em
+  // JS depois da busca (ver aplicação abaixo).
+  const filterSemMontador = !showPecas && semmontador === "1";
   // Filtro por cidade (ver CITY_FILTERS) -- só existe dentro da aba
   // Entregas, mesmo padrão das outras. Visitas não usa esse filtro --
   // Campina Grande não tem rota de visita técnica (montador), só de
@@ -256,6 +266,12 @@ export default async function AssistenciaQueuePage({
   if (filterAlvo !== undefined) {
     requests = requests.filter((r) => isMostruarioRequest(r.orderCode, r.clientName) === (filterAlvo === "mostruario"));
   }
+  // "Sem montador" -- só entre as ainda em aberto (concluída/cancelada não
+  // precisa mais de ninguém), mesmo critério do badge "⚠️ Sem Montador"
+  // que já existe em cada card (VisitaCardRow, AssistenciaQueueGroup.tsx).
+  if (filterSemMontador) {
+    requests = requests.filter((r) => !r.assemblerName && r.status !== "concluida" && r.status !== "cancelada");
+  }
   // Cidade não é coluna no banco -- é derivada da rota (ver ROTA_CITY em
   // rotas.ts), mesmo raciocínio de filterSched/filterAlvo acima: filtro
   // em JS depois da busca. Sem rota ainda (`r.rota === null`) não entra
@@ -279,7 +295,7 @@ export default async function AssistenciaQueuePage({
   } else if (filterSemRota) {
     requests = filterSemRotaOpen(rawRequests);
   }
-  const postFiltered = filterSched !== undefined || filterAlvo !== undefined || filterCity !== undefined || filterUrgente || filterSemRota;
+  const postFiltered = filterSched !== undefined || filterAlvo !== undefined || filterCity !== undefined || filterUrgente || filterSemRota || filterSemMontador;
   const total = postFiltered ? requests.length : rawTotal;
 
   // "Sem rota" primeiro, não perdido no meio do feed por data -- ver
@@ -399,26 +415,23 @@ export default async function AssistenciaQueuePage({
         }
       />
 
-      {/* Segmented Control -- Guia de Componentes Maia (Design System,
-          01/09/2026): trilho cinza, indicador branco com sombra sutil.
-          Substitui as pílulas cheias de antes -- a troca entre Visitas/
-          Entregas/Agenda continua a navegação mais importante da tela,
-          agora com a mesma anatomia usada em toda a tela da equipe
-          técnica, em vez de um par de botões sólidos verde/contorno. */}
-      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
+      {/* Abas em texto puro -- pedido do Victor 02/09/2026: "fiquem com a
+          cor verde, apenas a palavra, assim como os meses" (mesma
+          minimalismo estrutural do rótulo de mês -- MonthAccordion.tsx --
+          só a palavra, sem pílula/trilho por trás). Substitui o
+          segmented control (trilho cinza + indicador branco) de antes. */}
+      <div className="flex items-center gap-5 self-start">
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-            !showPecas ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
-          }`}
+          className={`text-sm font-semibold transition-colors duration-150 ${!showPecas ? "" : "text-gray-500 hover:text-gray-700"}`}
+          style={!showPecas ? { color: "#1B5E3C" } : undefined}
         >
           Visitas
         </Link>
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, sched: schedParam, city: filterCity })}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-            showPecas ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
-          }`}
+          className={`text-sm font-semibold transition-colors duration-150 ${showPecas ? "" : "text-gray-500 hover:text-gray-700"}`}
+          style={showPecas ? { color: "#1B5E3C" } : undefined}
         >
           Entregas
         </Link>
@@ -430,8 +443,8 @@ export default async function AssistenciaQueuePage({
             sem tentar herdar os filtros desta tela (não fazem sentido lá),
             mesma ideia de agenda/page.tsx repassar essa mesma fileira de
             volta pra Visitas/Entregas. Nunca "ativa" aqui (essa página
-            nunca É a Agenda) -- fica sempre no estado neutro do trilho. */}
-        <Link href="/assistencia/agenda" className="px-4 py-1.5 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-200">
+            nunca É a Agenda) -- fica sempre no estado neutro/cinza. */}
+        <Link href="/assistencia/agenda" className="text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-150">
           Agenda
         </Link>
       </div>
@@ -483,6 +496,22 @@ export default async function AssistenciaQueuePage({
                 href={buildHref({ status: f.value ?? undefined, q, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
               />
             ))}
+        {/* "Sem montador" -- pedido do Victor 02/09/2026, ao lado de
+            Canceladas, pra achar rápido visita em aberto sem montador
+            atribuído (mesmo lugar/estilo dos outros pills de status, não
+            um alerta pulsante como "pra remarcar"/"sem rota" -- é um
+            filtro de rotina, não uma urgência). */}
+        {!showPecas ? (
+          <FilterPill
+            label="Sem montador"
+            selected={filterSemMontador}
+            href={
+              filterSemMontador
+                ? buildHref({ q, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })
+                : buildHref({ q, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo, semmontador: "1" })
+            }
+          />
+        ) : null}
         {/* Badge "pra remarcar" -- pedido do Victor 25/08/2026: "nao
             gostei da badge gigante... colocar uma badge em vermelho com
             a quantidade a remarcar ao lado de Todas/Programado/Não

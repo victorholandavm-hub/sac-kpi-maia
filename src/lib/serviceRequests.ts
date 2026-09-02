@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
@@ -109,12 +110,25 @@ export function formatFullAddress(input: {
 
 export type Store = { id: string; name: string };
 
-export async function listStores(): Promise<Store[]> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("stores").select("id, name").order("id");
-  if (error) throw new Error(error.message);
-  return data ?? [];
-}
+// Cacheado 60s -- pedido do Victor 02/09/2026: "praticamente todas as
+// mudanças de tela estão demorando muito, tem que melhorar o desempenho".
+// Achado: ~200ms de latência de rede por consulta entre a VPS e o
+// Supabase (região diferente) -- toda tela de operação faz várias
+// consultas em paralelo (Promise.all), e listas de referência como lojas
+// (que quase nunca mudam) pagavam essa latência do zero a cada navegação.
+// 60s é curto o bastante pra uma loja nova aparecer quase na hora em
+// qualquer lugar que a use, mas já evita repetir a mesma consulta em toda
+// troca de tela.
+export const listStores = unstable_cache(
+  async (): Promise<Store[]> => {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.from("stores").select("id, name").order("id");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  },
+  ["list-stores"],
+  { revalidate: 60 }
+);
 
 export type ItemAction = "montar" | "desmontar";
 
