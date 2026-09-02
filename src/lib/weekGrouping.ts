@@ -139,26 +139,23 @@ export function isCurrentMonth(monthKey: string, todayKey: string): boolean {
   return monthKey === todayKey.slice(0, 7);
 }
 
-// Paginação por MÊS -- pedido do Victor 01/09/2026: "nas listas estão
-// ficando 2/3 páginas sem necessidade... deixe tudo numa única página,
-// só quando tiver mais de 3 meses, que aí você coloca o mês mais antigo
-// para a página seguinte e assim por diante". Substitui a paginação por
-// LINHA que existia antes (100 chamados por página, sem relação nenhuma
-// com os meses mostrados na tela -- um mês só com 150 chamados já virava
-// "página 1 de 2" no meio da semana, mesmo sem nenhum mês de verdade
-// sobrando). Usado pelas 3 telas que já agrupam por mês via
-// groupIntoMonths (Visitas/Entregas em fila/page.tsx, Agenda em
-// agenda/page.tsx): página 1 sempre cabe até 3 meses inteiros; a partir
-// do 4º mês (sempre o mais antigo que ainda não apareceu, já que
-// `months` vem ordenado do mais recente pro mais antigo), cada página
-// seguinte carrega só mais UM mês -- "e assim por diante" enquanto
-// sobrar mês mais velho.
+// Paginação por MÊS -- pedido original do Victor 01/09/2026: "nas listas
+// estão ficando 2/3 páginas sem necessidade... deixe tudo numa única
+// página, só quando tiver mais de 3 meses". Corrigido 02/09/2026 (achado
+// do Victor: "deixe só o mês de setembro na primeira pagina, agosto pode
+// ir para a segunda") -- um mês por página, sempre, sem empacotar os 3
+// mais recentes juntos na página 1 (regra antiga). Substitui a
+// paginação por LINHA que existia antes (100 chamados por página, sem
+// relação nenhuma com os meses mostrados na tela). Usado pelas 3 telas
+// que já agrupam por mês via groupIntoMonths (Visitas/Entregas em
+// fila/page.tsx, Agenda em agenda/page.tsx): página 1 = mês mais
+// recente, página 2 = o seguinte (mais antigo), e assim por diante --
+// `months` já vem ordenado do mais recente pro mais antigo.
 export function paginateMonths<T>(months: MonthGroup<T>[], page: number): { pageMonths: MonthGroup<T>[]; totalPages: number } {
-  if (months.length <= 3) return { pageMonths: months, totalPages: 1 };
-  const totalPages = months.length - 2;
+  if (months.length <= 1) return { pageMonths: months, totalPages: 1 };
+  const totalPages = months.length;
   const clampedPage = Math.min(Math.max(1, page), totalPages);
-  if (clampedPage === 1) return { pageMonths: months.slice(0, 3), totalPages };
-  return { pageMonths: [months[clampedPage + 1]], totalPages };
+  return { pageMonths: [months[clampedPage - 1]], totalPages };
 }
 
 // Qual página (1-based, mesma regra de paginateMonths acima) contém um
@@ -169,6 +166,6 @@ export function paginateMonths<T>(months: MonthGroup<T>[], page: number): { page
 // chamado agendado nesse mês) cai na página 1.
 export function pageContainingMonth<T>(months: MonthGroup<T>[], monthKey: string): number {
   const idx = months.findIndex((m) => m.monthKey === monthKey);
-  if (idx < 0 || idx < 3) return 1;
-  return idx - 1;
+  if (idx < 0) return 1;
+  return idx + 1;
 }

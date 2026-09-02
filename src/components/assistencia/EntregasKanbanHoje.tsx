@@ -175,10 +175,14 @@ function TodayRow({ row }: { row: FlatRow }) {
   // onClick no próprio <tr> + cursor-pointer é o equivalente aqui.
   // ProductsModalButton já para propagação no próprio clique (stopPropagation),
   // então continua abrindo só o modal, sem navegar.
+  // Concluída fica levemente apagada -- pedido do Victor 02/09/2026:
+  // "as que estiverem como concluída devem ficar levemente apagadas em
+  // relação as outras" -- só concluída, cancelada/programado continuam
+  // no contraste normal.
   return (
     <tr
       onClick={() => router.push(`/assistencia/${r.id}`)}
-      className="hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+      className={`hover:bg-gray-50 transition-colors duration-150 cursor-pointer ${r.status === "concluida" ? "opacity-60" : ""}`}
     >
       <td className="px-4 py-3 align-top whitespace-nowrap">
         <div className="font-mono text-xs text-gray-400">#{r.ticketNumber}</div>
@@ -243,7 +247,15 @@ export function EntregasKanbanHoje({ groups, todayOverview }: { groups: QueueGro
 
   return (
     <div className="flex flex-col gap-3">
-      <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">📌 Hoje</span>
+      {/* Quadrado verde + letra branca -- pedido do Victor 02/09/2026,
+          mesmo tratamento do indicador ativo do segmented control
+          Visitas/Entregas/Agenda e do mês aberto (MonthAccordion.tsx). */}
+      <span
+        className="self-start text-xs font-semibold uppercase tracking-wider text-white rounded-md shadow-sm px-2.5 py-1"
+        style={{ background: "#1B5E3C" }}
+      >
+        📌 Hoje
+      </span>
 
       {/* Resumo horizontal por rota -- grid de 4 colunas em telas largas,
           empilha em telas menores. Só contagem + motorista, sem lista de

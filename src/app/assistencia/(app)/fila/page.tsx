@@ -339,12 +339,15 @@ export default async function AssistenciaQueuePage({
   // `dateKey`, não de `key`.
   const visitasMonths = showPecas ? [] : groupIntoMonths(groups, (g) => g.key);
   // Paginação por MÊS -- pedido do Victor 01/09/2026: "nas listas estão
-  // ficando 2/3 páginas sem necessidade... deixe tudo numa única página,
-  // só quando tiver mais de 3 meses". Substitui a paginação por LINHA que
-  // existia antes (REQUESTS_PAGE_SIZE=100 por página, sem relação
+  // ficando 2/3 páginas sem necessidade". Substitui a paginação por LINHA
+  // que existia antes (REQUESTS_PAGE_SIZE=100 por página, sem relação
   // nenhuma com quantos meses cabiam ali -- ver allPages em
   // listRequests/serviceRequests.ts, que agora traz o conjunto completo
-  // pra isso funcionar). Desligada quando `postFiltered` (Programado/
+  // pra isso funcionar). Um mês por página, sempre (achado do Victor
+  // 02/09/2026: "deixe só o mês de setembro na primeira pagina, agosto
+  // pode ir para a segunda" -- corrigiu a regra original, que empacotava
+  // os 3 meses mais recentes juntos na página 1, ver paginateMonths em
+  // weekGrouping.ts). Desligada quando `postFiltered` (Programado/
   // Mostruário/cidade/atrasadas/sem-rota) -- esses recortes já eram
   // sempre "página única" antes, continuam sendo (não fazem sentido
   // fatiados por mês, são visões estreitas de propósito).
@@ -415,27 +418,28 @@ export default async function AssistenciaQueuePage({
         }
       />
 
-      {/* Segmented control de volta (pedido do Victor 02/09/2026: "acabou
-          tirando o quadrado que estava... nao precisava" -- o trilho
-          cinza + indicador branco continua, mesmo padrão de Todos/
-          Programado/Concluído/Cancelado ao lado), só a cor do texto
-          ativo que virou verde (era cinza-800). */}
+      {/* Segmented control -- trilho cinza continua, mesmo padrão de
+          Todos/Programado/Concluído/Cancelado ao lado. Ativo = quadrado
+          VERDE + letra branca (achado do Victor 02/09/2026: "quando uma
+          aba estiver selecionada, ela precisa ficar com o quadrado em
+          verde e as letras brancas ou cinzas" -- inverte a primeira
+          tentativa, que era quadrado branco + letra verde). */}
       <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
           className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
-            !showPecas ? "bg-white shadow-sm" : "text-gray-500 hover:text-gray-700"
+            !showPecas ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-700"
           }`}
-          style={!showPecas ? { color: "#1B5E3C" } : undefined}
+          style={!showPecas ? { background: "#1B5E3C" } : undefined}
         >
           Visitas
         </Link>
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, sched: schedParam, city: filterCity })}
           className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
-            showPecas ? "bg-white shadow-sm" : "text-gray-500 hover:text-gray-700"
+            showPecas ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-700"
           }`}
-          style={showPecas ? { color: "#1B5E3C" } : undefined}
+          style={showPecas ? { background: "#1B5E3C" } : undefined}
         >
           Entregas
         </Link>
