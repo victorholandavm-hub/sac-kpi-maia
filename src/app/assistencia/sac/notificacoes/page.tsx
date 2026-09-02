@@ -178,8 +178,8 @@ export default async function SacNotificacoesPage({
         cta={
           <Link
             href="/assistencia/sac/nova"
-            className="text-sm px-4 py-2.5 rounded-lg font-bold shadow-md"
-            style={{ background: "var(--brand-orange)", color: "#fff", border: "2px solid var(--brand-orange)" }}
+            className="inline-flex items-center gap-1.5 text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
+            style={{ background: "var(--brand-orange)" }}
           >
             + Nova solicitação
           </Link>
@@ -226,12 +226,8 @@ export default async function SacNotificacoesPage({
                 ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
                 : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, urgente: "1" })
             }
-            className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold ${filterUrgente ? "" : "animate-pulse"}`}
-            style={{
-              background: "var(--status-critical)",
-              color: "#fff",
-              border: filterUrgente ? "2px solid var(--text-primary)" : "2px solid var(--status-critical)",
-            }}
+            className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold text-white transition-colors duration-150 ${filterUrgente ? "" : "animate-pulse"}`}
+            style={{ background: "var(--status-critical)", border: `2px solid ${filterUrgente ? "#1F2937" : "var(--status-critical)"}` }}
           >
             ⚠ {overdueCount} pra remarcar
           </Link>
@@ -245,19 +241,15 @@ export default async function SacNotificacoesPage({
                 ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
                 : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, semrota: "1" })
             }
-            className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-bold"
-            style={{
-              background: "var(--status-warning)",
-              color: "#fff",
-              border: filterSemRota ? "2px solid var(--text-primary)" : "2px solid var(--status-warning)",
-            }}
+            className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold text-white transition-colors duration-150"
+            style={{ background: "var(--status-warning)", border: `2px solid ${filterSemRota ? "#1F2937" : "var(--status-warning)"}` }}
           >
             🧭 {semRotaCount} sem rota
           </Link>
         ) : null}
       </div>
 
-      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+      <p className="text-xs text-gray-400">
         {requests.length} solicitaç{requests.length === 1 ? "ão" : "ões"} encontrada{requests.length === 1 ? "" : "s"}
       </p>
 
@@ -292,7 +284,7 @@ export default async function SacNotificacoesPage({
         {filterSemRota ? <input type="hidden" name="semrota" value="1" /> : null}
         {/* Ícone de lupa -- mesmo padrão de fila/page.tsx (ver lá). */}
         <div className="relative flex-1 min-w-[240px]">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-muted)" }} aria-hidden="true">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400" aria-hidden="true">
             🔍
           </span>
           <input
@@ -300,26 +292,37 @@ export default async function SacNotificacoesPage({
             name="q"
             defaultValue={q ?? ""}
             placeholder="Buscar por nº do chamado, cliente, produto, CPF ou telefone…"
-            className="rounded border pl-8 pr-3 py-2 text-sm w-full"
-            style={{ borderColor: "var(--border)" }}
+            className="rounded-lg border border-gray-200 pl-8 pr-3 py-2 text-sm w-full text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
           />
         </div>
-        <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500">
           De
-          <input type="date" name="from" defaultValue={dateFrom ?? ""} className="rounded border px-2 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
+          <input
+            type="date"
+            name="from"
+            defaultValue={dateFrom ?? ""}
+            className="rounded-lg border border-gray-200 px-2 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+          />
         </label>
-        <label className="flex items-center gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500">
           Até
-          <input type="date" name="to" defaultValue={dateTo ?? ""} className="rounded border px-2 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
+          <input
+            type="date"
+            name="to"
+            defaultValue={dateTo ?? ""}
+            className="rounded-lg border border-gray-200 px-2 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+          />
         </label>
-        <button type="submit" className="text-sm px-3 py-2 rounded border" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+        <button
+          type="submit"
+          className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+        >
           Buscar
         </button>
         {q || dateFrom || dateTo ? (
           <Link
             href={buildHref({ status: filterStatus, store, origem: filterOrigem, sched: schedParam, city: filterCity, urgente: filterUrgente ? "1" : undefined, semrota: filterSemRota ? "1" : undefined })}
-            className="text-xs underline"
-            style={{ color: "var(--text-secondary)" }}
+            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150"
           >
             Limpar busca/data
           </Link>
@@ -327,10 +330,8 @@ export default async function SacNotificacoesPage({
       </form>
 
       {requests.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhuma solicitação encontrada.
-          </p>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">Nenhuma solicitação encontrada.</p>
         </div>
       ) : (
         // Hoje fica no Kanban (todayGroups); o resto (futuro + atrasado +

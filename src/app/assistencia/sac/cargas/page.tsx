@@ -17,72 +17,50 @@ function CargaCard({ group }: { group: CargaGroup }) {
   const totalProblemas = group.pedidos.reduce((n, p) => n + p.problemas.length, 0);
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}>
-      <div className="flex items-start justify-between gap-3 flex-wrap p-4 pb-3" style={{ borderBottom: "1px solid var(--gridline)" }}>
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-start justify-between gap-3 flex-wrap p-4 pb-3 border-b border-gray-100">
         <div className="flex flex-col gap-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-              Carga {group.carga}
-            </span>
-            {group.statusCarga ? (
-              <span
-                className="text-xs font-medium px-2 py-0.5 rounded-full"
-                style={{ background: "var(--gridline)", color: "var(--text-secondary)" }}
-              >
-                {group.statusCarga}
-              </span>
-            ) : null}
+            <span className="text-sm font-semibold text-gray-800">Carga {group.carga}</span>
+            {group.statusCarga ? <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{group.statusCarga}</span> : null}
             {totalProblemas > 0 ? (
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--status-critical)", color: "#fff" }}>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: "var(--status-critical)" }}>
                 {totalProblemas} problema{totalProblemas === 1 ? "" : "s"}
               </span>
             ) : null}
           </div>
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          <span className="text-xs text-gray-400">
             Previsão {formatDate(group.dtPrevisao)}
             {group.motoristaNome ? ` · Motorista: ${group.motoristaNome}` : ""}
           </span>
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          <span className="text-xs text-gray-400">
             {group.transportadora ? `${group.transportadora}` : ""}
             {group.veiculo ? ` · Veículo ${group.veiculo}` : ""}
           </span>
         </div>
       </div>
 
-      <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+      <div className="divide-y divide-gray-100">
         {group.pedidos.map((p) => (
           <div key={p.cargaRowId} className="flex flex-col gap-2 p-4">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                <span className="text-xs font-mono text-gray-400">
                   Pedido {p.pedido} · Filial {p.filialVenda}
                 </span>
-                <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                <span className="text-sm font-medium text-gray-800">
                   {p.clienteNome ?? "Cliente não identificado"}
-                  {p.clienteCodigo ? (
-                    <span className="text-xs font-mono font-normal" style={{ color: "var(--text-muted)" }}>
-                      {" "}
-                      #{p.clienteCodigo}
-                    </span>
-                  ) : null}
+                  {p.clienteCodigo ? <span className="text-xs font-mono font-normal text-gray-400"> #{p.clienteCodigo}</span> : null}
                 </span>
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                <span className="text-xs text-gray-400">
                   {p.clienteDocumento ?? "—"}
                   {p.loja ? ` · ${p.loja}` : ""}
                 </span>
               </div>
-              {p.statusEntrega ? (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0" style={{ background: "var(--gridline)", color: "var(--text-secondary)" }}>
-                  {p.statusEntrega}
-                </span>
-              ) : null}
+              {p.statusEntrega ? <span className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 bg-gray-100 text-gray-500">{p.statusEntrega}</span> : null}
             </div>
 
-            {p.ocorrenciaDescricao ? (
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                Ocorrência TOTVS: {p.ocorrenciaDescricao}
-              </p>
-            ) : null}
+            {p.ocorrenciaDescricao ? <p className="text-xs text-gray-400">Ocorrência TOTVS: {p.ocorrenciaDescricao}</p> : null}
 
             <CargaProblemaField cargaRowId={p.cargaRowId} problemas={p.problemas} />
           </div>
@@ -105,10 +83,8 @@ export default async function CargasPage() {
       <SacTabs active="cargas" />
 
       {grupos.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Nenhuma carga nos últimos 30 dias.
-          </p>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">Nenhuma carga nos últimos 30 dias.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -118,7 +94,7 @@ export default async function CargasPage() {
         </div>
       )}
 
-      <Link href="/assistencia/sac" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
+      <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 self-center">
         ← Voltar
       </Link>
     </div>

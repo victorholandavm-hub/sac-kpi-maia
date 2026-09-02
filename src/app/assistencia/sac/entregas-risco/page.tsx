@@ -29,7 +29,7 @@ function SyncStaleness({ syncedAt }: { syncedAt: string }) {
   const dias = diasDesde(syncedAt);
   const stale = dias >= SYNC_STALE_WARNING_DAYS;
   return (
-    <p className="text-xs" style={stale ? { color: "var(--status-critical)", fontWeight: 600 } : { color: "var(--text-muted)" }}>
+    <p className={`text-xs ${stale ? "font-semibold" : "text-gray-400"}`} style={stale ? { color: "var(--status-critical)" } : undefined}>
       {stale
         ? `⚠ Dado da TOTVS sem atualizar há ${dias} dias — confira direto no Protheus antes de agir.`
         : dias === 0
@@ -45,21 +45,16 @@ function EntregaRiscoCard({ item, atendentes }: { item: EntregaRiscoItem; atende
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex flex-col gap-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+            <span className="text-xs font-mono text-gray-400">
               Pedido {item.pedido} · Filial {item.filialVenda}
             </span>
             <EntregaRiscoNivelBadge nivel={item.nivel} />
           </div>
-          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+          <span className="text-sm font-medium text-gray-800">
             {item.clienteNome ?? "Cliente não identificado"}
-            {item.clienteCodigo ? (
-              <span className="text-xs font-mono font-normal" style={{ color: "var(--text-muted)" }}>
-                {" "}
-                #{item.clienteCodigo}
-              </span>
-            ) : null}
+            {item.clienteCodigo ? <span className="text-xs font-mono font-normal text-gray-400"> #{item.clienteCodigo}</span> : null}
           </span>
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          <span className="text-xs text-gray-400">
             {item.clienteDocumento ?? "—"}
             {item.clienteBairro || item.clienteMunicipio ? ` · ${[item.clienteBairro, item.clienteMunicipio, item.clienteUf].filter(Boolean).join(", ")}` : ""}
             {item.loja ? ` · ${item.loja}` : ""}
@@ -67,12 +62,10 @@ function EntregaRiscoCard({ item, atendentes }: { item: EntregaRiscoItem; atende
         </div>
       </div>
 
-      <p className="text-sm" style={{ color: "var(--text-primary)" }}>
-        {item.motivo}
-      </p>
+      <p className="text-sm text-gray-800">{item.motivo}</p>
 
       {item.cargaAtual ? (
-        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        <p className="text-xs text-gray-400">
           Carga {item.cargaAtual.carga} · {item.cargaAtual.statusCarga ?? "—"}
           {item.cargaAtual.dtPrevisao ? ` · previsão ${formatDate(item.cargaAtual.dtPrevisao)}` : ""}
           {item.cargaAtual.motoristaNome ? ` · ${item.cargaAtual.motoristaNome}` : ""}
@@ -80,7 +73,7 @@ function EntregaRiscoCard({ item, atendentes }: { item: EntregaRiscoItem; atende
         </p>
       ) : null}
 
-      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+      <p className="text-xs text-gray-400">
         {item.baselineOrigem === "nota_fiscal" ? `Venda em ${formatDate(item.baselineData)} (nota fiscal)` : `Visto pela 1ª vez em ${formatDate(item.baselineData)} (estimado)`}
       </p>
       <SyncStaleness syncedAt={item.syncedAt} />
@@ -104,18 +97,16 @@ function Section({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+      <h3 className="text-sm font-semibold text-gray-800">
         {title} ({items.length})
       </h3>
       {items.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {emptyMessage}
-          </p>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">{emptyMessage}</p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-          <div className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100">
             {items.map((item) => (
               <EntregaRiscoCard key={`${item.pedido}-${item.filialVenda}`} item={item} atendentes={atendentes} />
             ))}
@@ -141,7 +132,7 @@ export default async function EntregasRiscoPage() {
       <Section title="Alerta" items={alertas} atendentes={atendentes} emptyMessage="Nenhum pedido em alerta no momento." />
       <Section title="Acompanhamento" items={acompanhamentos} atendentes={atendentes} emptyMessage="Nenhum pedido em acompanhamento no momento." />
 
-      <Link href="/assistencia/sac" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
+      <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 self-center">
         ← Voltar
       </Link>
     </div>

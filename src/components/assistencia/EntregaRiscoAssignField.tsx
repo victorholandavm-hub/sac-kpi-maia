@@ -19,7 +19,7 @@ export function EntregaRiscoAssignField({
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span style={{ color: "var(--text-muted)" }}>Atendente:</span>
+      <span className="text-gray-400">Atendente:</span>
       <select
         disabled={pending}
         value={assignedTo?.id ?? ""}
@@ -31,8 +31,7 @@ export function EntregaRiscoAssignField({
             value ? `Atribuído a ${nome}.` : "Atribuição removida."
           );
         }}
-        className="rounded border px-2 py-1 text-sm disabled:opacity-60"
-        style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+        className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150 disabled:opacity-60"
       >
         <option value="">Não atribuído</option>
         {atendentes.map((a) => (

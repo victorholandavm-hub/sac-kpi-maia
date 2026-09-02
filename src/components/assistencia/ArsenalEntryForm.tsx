@@ -33,55 +33,30 @@ export function ArsenalEntryForm({ entry, onCancel }: { entry?: ArsenalEntry; on
     }, entry ? "Entrada atualizada." : "Entrada criada.");
   }
 
+  const fieldClass =
+    "rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150";
+
   return (
-    <div className="rounded-lg border p-4 flex flex-col gap-2" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-      {!entry ? (
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Nova entrada
-        </h3>
-      ) : null}
-      <select
-        value={category}
-        onChange={(e) => setCategory(e.target.value as ArsenalCategory)}
-        className="rounded border px-3 py-2 text-sm"
-        style={{ borderColor: "var(--border)" }}
-      >
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-2">
+      {!entry ? <h3 className="text-sm font-semibold text-gray-800">Nova entrada</h3> : null}
+      <select value={category} onChange={(e) => setCategory(e.target.value as ArsenalCategory)} className={fieldClass}>
         {ARSENAL_CATEGORIES.map((c) => (
           <option key={c} value={c}>
             {ARSENAL_CATEGORY_LABELS[c]}
           </option>
         ))}
       </select>
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Título"
-        className="rounded border px-3 py-2 text-sm"
-        style={{ borderColor: "var(--border)" }}
-      />
-      <textarea
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        rows={5}
-        placeholder="Conteúdo"
-        className="rounded border px-3 py-2 text-sm"
-        style={{ borderColor: "var(--border)" }}
-      />
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título" className={fieldClass} />
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={5} placeholder="Conteúdo" className={fieldClass} />
       <input
         value={keywords}
         onChange={(e) => setKeywords(e.target.value)}
         placeholder="Palavras-chave (opcional, separadas por vírgula — sinônimos que o time realmente usa)"
-        className="rounded border px-3 py-2 text-sm"
-        style={{ borderColor: "var(--border)" }}
+        className={fieldClass}
       />
-      <label className="flex flex-col gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+      <label className="flex flex-col gap-1 text-xs text-gray-500">
         Destaque
-        <select
-          value={highlightType}
-          onChange={(e) => setHighlightType(e.target.value as ArsenalHighlightType)}
-          className="rounded border px-3 py-2 text-sm"
-          style={{ borderColor: "var(--border)" }}
-        >
+        <select value={highlightType} onChange={(e) => setHighlightType(e.target.value as ArsenalHighlightType)} className={fieldClass}>
           <option value="normal">Nenhum (padrão)</option>
           {ARSENAL_HIGHLIGHT_TYPES.filter((t) => t !== "normal").map((t) => (
             <option key={t} value={t}>
@@ -90,17 +65,17 @@ export function ArsenalEntryForm({ entry, onCancel }: { entry?: ArsenalEntry; on
           ))}
         </select>
       </label>
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap">
         <button
           disabled={pending || !title.trim() || !body.trim()}
           onClick={submit}
-          className="text-xs rounded px-3 py-2 disabled:opacity-60"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          className="text-xs rounded-lg px-3.5 py-2 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 disabled:opacity-60"
+          style={{ background: "#1B5E3C" }}
         >
           {pending ? "Salvando…" : entry ? "Salvar" : "Criar entrada"}
         </button>
         {onCancel ? (
-          <button onClick={onCancel} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+          <button onClick={onCancel} className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150">
             cancelar
           </button>
         ) : null}

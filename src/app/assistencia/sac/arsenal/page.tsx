@@ -49,14 +49,9 @@ export default async function ArsenalSacPage({
     <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="Arsenal do SAC" subtitle="Base de conhecimento — contatos, garantias e CDC" />
 
-      <form
-        action="/assistencia/sac/arsenal"
-        method="GET"
-        className="flex items-center gap-2 rounded-lg border p-2"
-        style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-      >
+      <form action="/assistencia/sac/arsenal" method="GET" className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2">
         {filterCategory ? <input type="hidden" name="category" value={filterCategory} /> : null}
-        <span className="pl-2 text-lg" aria-hidden>
+        <span className="pl-2 text-lg text-gray-400" aria-hidden>
           🔍
         </span>
         <input
@@ -64,13 +59,12 @@ export default async function ArsenalSacPage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Buscar por assunto, contato, produto, artigo do CDC…"
-          className="text-base flex-1 min-w-[200px] bg-transparent outline-none py-1.5"
-          style={{ color: "var(--text-primary)" }}
+          className="text-base flex-1 min-w-[200px] bg-transparent outline-none py-1.5 text-gray-800 placeholder:text-gray-400"
         />
         <button
           type="submit"
-          className="text-sm px-4 py-2 rounded font-medium whitespace-nowrap"
-          style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+          className="text-sm px-4 py-2 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 whitespace-nowrap"
+          style={{ background: "var(--brand-green)" }}
         >
           Buscar
         </button>
@@ -79,12 +73,10 @@ export default async function ArsenalSacPage({
       <div className="flex items-center gap-2 flex-wrap">
         <Link
           href={buildHref({ q })}
-          className="text-xs px-3 py-1.5 rounded-full border font-medium"
-          style={{
-            borderColor: "var(--border)",
-            background: !filterCategory ? "var(--surface-1)" : "transparent",
-            color: !filterCategory ? "var(--text-primary)" : "var(--text-secondary)",
-          }}
+          className={`text-xs px-3.5 py-1.5 rounded-full font-medium transition-colors duration-150 ${
+            !filterCategory ? "text-white" : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"
+          }`}
+          style={!filterCategory ? { background: "var(--brand-green)" } : undefined}
         >
           Todas
         </Link>
@@ -95,13 +87,12 @@ export default async function ArsenalSacPage({
             <Link
               key={c}
               href={buildHref({ q, category: active ? undefined : c })}
-              className="text-xs px-3 py-1.5 rounded-full border font-medium whitespace-nowrap"
-              style={{
-                borderColor: active ? color : "var(--border)",
-                background: active ? `color-mix(in srgb, ${color} 14%, var(--surface-1))` : "transparent",
-                color: active ? color : "var(--text-secondary)",
-                fontWeight: active ? 600 : 400,
-              }}
+              className="text-xs px-3.5 py-1.5 rounded-full font-medium whitespace-nowrap transition-colors duration-150"
+              style={
+                active
+                  ? { color: "#fff", background: `color-mix(in srgb, ${color} 78%, black)`, border: "1px solid transparent" }
+                  : { color: `color-mix(in srgb, ${color} 70%, black)`, background: "#fff", border: `1px solid ${color}` }
+              }
             >
               {ARSENAL_CATEGORY_LABELS[c]}
             </Link>
@@ -110,8 +101,7 @@ export default async function ArsenalSacPage({
         {profile.role === "admin" && !trimmedQ ? (
           <Link
             href={showInactive ? "/assistencia/sac/arsenal" : "/assistencia/sac/arsenal?inactive=1"}
-            className="text-xs px-3 py-1.5 rounded-full border ml-auto"
-            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 ml-auto"
           >
             {showInactive ? "ocultar inativas" : "mostrar inativas"}
           </Link>
@@ -121,10 +111,8 @@ export default async function ArsenalSacPage({
       {profile.role === "admin" ? <ArsenalEntryForm /> : null}
 
       {grouped.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            {trimmedQ ? "Nada encontrado pra esse termo." : "Nenhuma entrada cadastrada ainda."}
-          </p>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+          <p className="text-sm text-gray-400">{trimmedQ ? "Nada encontrado pra esse termo." : "Nenhuma entrada cadastrada ainda."}</p>
         </div>
       ) : (
         grouped.map((g) => (
@@ -142,7 +130,7 @@ export default async function ArsenalSacPage({
         ))
       )}
 
-      <Link href="/assistencia/sac" className="text-sm underline self-center" style={{ color: "var(--text-secondary)" }}>
+      <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 self-center">
         ← Voltar
       </Link>
     </div>
