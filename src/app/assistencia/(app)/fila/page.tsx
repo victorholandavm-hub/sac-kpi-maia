@@ -415,22 +415,26 @@ export default async function AssistenciaQueuePage({
         }
       />
 
-      {/* Abas em texto puro -- pedido do Victor 02/09/2026: "fiquem com a
-          cor verde, apenas a palavra, assim como os meses" (mesma
-          minimalismo estrutural do rótulo de mês -- MonthAccordion.tsx --
-          só a palavra, sem pílula/trilho por trás). Substitui o
-          segmented control (trilho cinza + indicador branco) de antes. */}
-      <div className="flex items-center gap-5 self-start">
+      {/* Segmented control de volta (pedido do Victor 02/09/2026: "acabou
+          tirando o quadrado que estava... nao precisava" -- o trilho
+          cinza + indicador branco continua, mesmo padrão de Todos/
+          Programado/Concluído/Cancelado ao lado), só a cor do texto
+          ativo que virou verde (era cinza-800). */}
+      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
-          className={`text-sm font-semibold transition-colors duration-150 ${!showPecas ? "" : "text-gray-500 hover:text-gray-700"}`}
+          className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
+            !showPecas ? "bg-white shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
           style={!showPecas ? { color: "#1B5E3C" } : undefined}
         >
           Visitas
         </Link>
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, sched: schedParam, city: filterCity })}
-          className={`text-sm font-semibold transition-colors duration-150 ${showPecas ? "" : "text-gray-500 hover:text-gray-700"}`}
+          className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
+            showPecas ? "bg-white shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
           style={showPecas ? { color: "#1B5E3C" } : undefined}
         >
           Entregas
@@ -443,8 +447,8 @@ export default async function AssistenciaQueuePage({
             sem tentar herdar os filtros desta tela (não fazem sentido lá),
             mesma ideia de agenda/page.tsx repassar essa mesma fileira de
             volta pra Visitas/Entregas. Nunca "ativa" aqui (essa página
-            nunca É a Agenda) -- fica sempre no estado neutro/cinza. */}
-        <Link href="/assistencia/agenda" className="text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-150">
+            nunca É a Agenda) -- fica sempre no estado neutro do trilho. */}
+        <Link href="/assistencia/agenda" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-200">
           Agenda
         </Link>
       </div>
