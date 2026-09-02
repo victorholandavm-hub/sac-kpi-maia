@@ -195,6 +195,9 @@ export function QuickCreateRequestForm({
           return;
         }
         setClientName(match.name);
+        // CPF ficava faltando aqui -- achado do Victor 02/09/2026, ver mesmo
+        // comentário em SacCreateRequestForm.tsx.
+        setClientCpf(match.cpfCnpj);
         if (match.phone1) setClientPhone(match.phone1);
         if (match.addressStreet) setClientAddress(match.addressStreet);
         if (match.addressNeighborhood) setClientNeighborhood(match.addressNeighborhood);

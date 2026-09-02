@@ -288,6 +288,12 @@ export function SacCreateRequestForm({
           return;
         }
         setClientName(match.name);
+        // CPF ficava faltando aqui -- achado do Victor 02/09/2026: "nenhum
+        // cliente ou produto está aparecendo, quando colocamos o codigo
+        // deles" (o campo CPF fica logo abaixo do código, então continuar
+        // vazio dava a impressão de que nada tinha sido preenchido, mesmo
+        // com nome/telefone/endereço funcionando normalmente).
+        setClientCpf(match.cpfCnpj);
         if (match.phone1) setClientPhone(match.phone1);
         if (match.addressStreet) setClientAddress(match.addressStreet);
         if (match.addressNumber) setAddressNumber(match.addressNumber);

@@ -145,6 +145,9 @@ export function SacNovaVisitaForm({ stores }: { stores: Store[] }) {
           return;
         }
         setClientName(match.name);
+        // CPF ficava faltando aqui -- achado do Victor 02/09/2026, ver mesmo
+        // comentário em SacCreateRequestForm.tsx.
+        setClientCpf(match.cpfCnpj);
         if (match.phone1) setClientPhone(match.phone1);
         if (match.addressStreet) setClientAddress(match.addressStreet);
         if (match.addressNumber) setAddressNumber(match.addressNumber);
