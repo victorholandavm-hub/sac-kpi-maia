@@ -250,12 +250,14 @@ function RotaMotoristaDoDiaModalTrigger({
 }) {
   const [open, setOpen] = useState(false);
 
+  {/* Secundário (outline) -- pedido do Victor 02/09/2026: "fundo branco,
+      borda verde e letra verde" (era sólido verde com letra branca). */}
   const triggerButton = (
     <button
       type="button"
       onClick={() => setOpen(true)}
-      className="text-xs rounded-lg px-3.5 py-2 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 shrink-0"
-      style={{ background: "#1B5E3C" }}
+      className="text-xs rounded-lg px-3.5 py-2 font-semibold bg-white border-2 shadow-sm transition-colors duration-150 hover:bg-gray-50 shrink-0"
+      style={{ borderColor: "#1B5E3C", color: "#1B5E3C" }}
     >
       🚚 Gestão de Motoristas &amp; Escala
     </button>
