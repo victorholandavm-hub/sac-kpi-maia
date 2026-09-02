@@ -29,14 +29,22 @@ export function MonthAccordion({
   // mês... uma linha fina, tipografia limpa e um indicador numérico
   // discreto em formato de badge". Substitui a barra preta cheia
   // (background: var(--text-primary), texto branco caixa alta) que
-  // existia antes.
+  // existia antes. Rótulo do mês com "quadrado" (pílula branca com
+  // sombra) + letra verde -- pedido do Victor 02/09/2026, mesmo
+  // tratamento do indicador ativo do segmented control Visitas/
+  // Entregas/Agenda ao lado.
   return (
     <details open={defaultOpen} className="group/month flex flex-col gap-2">
       <summary className="flex items-center gap-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/month:rotate-90 text-gray-400" aria-hidden="true">
           ▶
         </span>
-        <span className="text-sm font-semibold uppercase tracking-wider text-gray-500 whitespace-nowrap">{label}</span>
+        <span
+          className="text-sm font-semibold uppercase tracking-wider whitespace-nowrap rounded-md bg-white shadow-sm px-2.5 py-1"
+          style={{ color: "#1B5E3C" }}
+        >
+          {label}
+        </span>
         <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
           {total}
         </span>

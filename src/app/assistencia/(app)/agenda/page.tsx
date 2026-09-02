@@ -198,23 +198,22 @@ export default async function AgendaPage({
         }
       />
 
-      {/* Abas em texto puro -- pedido do Victor 02/09/2026: "fiquem com a
-          cor verde, apenas a palavra, assim como os meses" (mesmo
-          minimalismo estrutural do rótulo de mês -- MonthAccordion.tsx),
-          mesma fileira de fila/page.tsx (Visitas/Entregas) -- pedido do
-          Victor 27/08/2026: "coloque agenda dentro de solicitações ao
-          lado de visitas/entregas". Agenda é rota própria (filtro/dado
-          bem diferente -- mês corrente, por montador, não por rota),
-          então cada uma das 3 páginas renderiza sua própria fileira em
-          vez de layout compartilhado (mesma razão de SacTabs.tsx). */}
-      <div className="flex items-center gap-5 self-start">
-        <Link href="/assistencia/fila" className="text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-150">
+      {/* Segmented control de volta (pedido do Victor 02/09/2026: "acabou
+          tirando o quadrado... nao precisava"), mesma fileira de
+          fila/page.tsx (Visitas/Entregas) -- pedido do Victor 27/08/2026:
+          "coloque agenda dentro de solicitações ao lado de visitas/
+          entregas". Agenda é rota própria (filtro/dado bem diferente --
+          mês corrente, por montador, não por rota), então cada uma das 3
+          páginas renderiza sua própria fileira em vez de layout
+          compartilhado (mesma razão de SacTabs.tsx). */}
+      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
+        <Link href="/assistencia/fila" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-200">
           Visitas
         </Link>
-        <Link href="/assistencia/fila?tab=pecas" className="text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-150">
+        <Link href="/assistencia/fila?tab=pecas" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-200">
           Entregas
         </Link>
-        <Link href="/assistencia/agenda" className="text-sm font-semibold" style={{ color: "#1B5E3C" }}>
+        <Link href="/assistencia/agenda" className="px-4 py-1.5 rounded-md text-sm font-semibold bg-white shadow-sm transition-all duration-200" style={{ color: "#1B5E3C" }}>
           Agenda
         </Link>
       </div>
