@@ -151,8 +151,8 @@ export function RequestActions({
   const previousStatus = PREVIOUS_STATUS[status] ?? null;
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
-      <h3 className="text-sm font-semibold text-gray-800">Ações</h3>
+    <div className="flex flex-col gap-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4">
+      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Ações</h3>
 
       {!hideClaim && !isAssignedToMe ? (
         <button
@@ -208,7 +208,7 @@ export function RequestActions({
               `Status revertido para ${STATUS_LABELS[previousStatus] ?? previousStatus}.`
             )
           }
-          className="text-xs underline self-start text-gray-500 hover:text-gray-700 disabled:opacity-60"
+          className="text-xs underline self-start text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-60"
         >
           ↩ Reverter pra {STATUS_LABELS[previousStatus] ?? previousStatus} (marquei errado)
         </button>
@@ -227,7 +227,7 @@ export function RequestActions({
 
       {askingNovaTroca && sameProduct === null ? (
         <div className="flex flex-col gap-2 rounded-xl border p-3" style={{ borderColor: "var(--status-warning)" }}>
-          <span className="text-sm text-gray-800">A nova troca é pelo mesmo produto ou o cliente quer outro?</span>
+          <span className="text-sm text-gray-800 dark:text-gray-100">A nova troca é pelo mesmo produto ou o cliente quer outro?</span>
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setSameProduct(true)}
@@ -238,12 +238,12 @@ export function RequestActions({
             </button>
             <button
               onClick={() => setSameProduct(false)}
-              className="text-sm rounded-lg px-3 py-2 border text-gray-800"
+              className="text-sm rounded-lg px-3 py-2 border text-gray-800 dark:text-gray-100"
               style={{ borderColor: "var(--status-warning)" }}
             >
               Outro produto
             </button>
-            <button onClick={resetNovaTroca} className="text-sm underline text-gray-500 hover:text-gray-700">
+            <button onClick={resetNovaTroca} className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               cancelar
             </button>
           </div>
@@ -252,7 +252,7 @@ export function RequestActions({
 
       {askingNovaTroca && sameProduct !== null ? (
         <div className="flex flex-col gap-2 rounded-xl border p-3" style={{ borderColor: "var(--status-warning)" }}>
-          <span className="text-sm text-gray-800">
+          <span className="text-sm text-gray-800 dark:text-gray-100">
             {sameProduct ? "Mesmo produto" : "Outro produto"} — o que aconteceu com o produto trocado?
           </span>
           <textarea
@@ -260,13 +260,13 @@ export function RequestActions({
             onChange={(e) => setNovaTrocaReason(e.target.value)}
             rows={2}
             placeholder="Ex: veio com a mesma avaria, cliente decidiu trocar de modelo…"
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm"
             autoFocus
           />
           <select
             value={novaTrocaCausaRaiz}
             onChange={(e) => setNovaTrocaCausaRaiz(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm"
           >
             <option value="" disabled>
               Quem errou (controle interno) *
@@ -283,13 +283,13 @@ export function RequestActions({
                 value={novaTrocaCarga}
                 onChange={(e) => setNovaTrocaCarga(e.target.value)}
                 placeholder="Carga *"
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm"
               />
               <input
                 value={novaTrocaConferente}
                 onChange={(e) => setNovaTrocaConferente(e.target.value)}
                 placeholder="Conferente *"
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm"
               />
             </div>
           ) : null}
@@ -299,13 +299,13 @@ export function RequestActions({
                 value={novaTrocaCarga}
                 onChange={(e) => setNovaTrocaCarga(e.target.value)}
                 placeholder="Carga *"
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm"
               />
               <input
                 value={novaTrocaDriverName}
                 onChange={(e) => setNovaTrocaDriverName(e.target.value)}
                 placeholder="Motorista que entregou (erro) *"
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm"
               />
             </div>
           ) : null}
@@ -315,7 +315,7 @@ export function RequestActions({
               onChange={(e) => setNovaTrocaCausaRaizDetalhe(e.target.value)}
               rows={2}
               placeholder="O que houve, exatamente? *"
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm"
             />
           ) : null}
           <div className="flex items-center gap-2">
@@ -332,7 +332,7 @@ export function RequestActions({
             >
               Confirmar nova troca
             </button>
-            <button onClick={resetNovaTroca} className="text-sm underline text-gray-500 hover:text-gray-700">
+            <button onClick={resetNovaTroca} className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               cancelar
             </button>
           </div>
@@ -341,13 +341,13 @@ export function RequestActions({
 
       {askingRemarcarReason ? (
         <div className="flex flex-col gap-2 rounded-xl border p-3" style={{ borderColor: "var(--status-critical)" }}>
-          <span className="text-sm text-gray-800">Qual o motivo da remarcação?</span>
+          <span className="text-sm text-gray-800 dark:text-gray-100">Qual o motivo da remarcação?</span>
           <textarea
             value={remarcarReason}
             onChange={(e) => setRemarcarReason(e.target.value)}
             rows={2}
             placeholder="Ex: cliente ausente, chovendo, técnico sem tempo…"
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm"
             autoFocus
           />
           <div className="flex items-center gap-2">
@@ -364,7 +364,7 @@ export function RequestActions({
                 setAskingRemarcarReason(false);
                 setRemarcarReason("");
               }}
-              className="text-sm underline text-gray-500 hover:text-gray-700"
+              className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             >
               cancelar
             </button>
@@ -378,7 +378,7 @@ export function RequestActions({
           onChange={(e) => setNote(e.target.value)}
           rows={2}
           placeholder="Adicionar observação…"
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm"
         />
         <button
           disabled={pending || !note.trim()}
@@ -388,7 +388,7 @@ export function RequestActions({
               setNote("");
             }, "Nota adicionada.")
           }
-          className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 self-start text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 disabled:opacity-60"
+          className="text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2 self-start text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150 disabled:opacity-60"
         >
           Adicionar nota
         </button>

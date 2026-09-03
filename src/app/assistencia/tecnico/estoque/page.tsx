@@ -105,14 +105,14 @@ export default async function TecnicoEstoquePage({
             <div className="flex items-center gap-1 text-sm shrink-0">
               <Link
                 href="/assistencia/tecnico"
-                className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors duration-150"
+                className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white dark:hover:bg-gray-700/10 transition-colors duration-150"
               >
                 ← Fila de Classificação
               </Link>
               <form action={tecnicoSignOut}>
                 <button
                   type="submit"
-                  className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors duration-150"
+                  className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white dark:hover:bg-gray-700/10 transition-colors duration-150"
                 >
                   Sair
                 </button>
@@ -133,18 +133,18 @@ export default async function TecnicoEstoquePage({
                 name="q"
                 defaultValue={q ?? ""}
                 placeholder="Buscar por produto, código ou cliente…"
-                className="rounded-lg border border-gray-200 px-3.5 py-2 text-sm flex-1 text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2 text-sm flex-1 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
               />
               <button
                 type="submit"
-                className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 shrink-0"
+                className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150 shrink-0"
               >
                 Buscar
               </button>
               {q || factory ? (
                 <Link
                   href={buildHref({ view: showHistorico ? "retiradas" : undefined })}
-                  className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 shrink-0"
+                  className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 shrink-0"
                 >
                   Limpar
                 </Link>
@@ -155,7 +155,7 @@ export default async function TecnicoEstoquePage({
           {/* Segmented Control -- mesmo componente de tecnico/page.tsx
               (Guia de Componentes Maia, Design System 01/09/2026): duas
               opções trocando o contexto inteiro da tabela abaixo. */}
-          <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
+          <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start">
             {(
               [
                 [undefined, "Pendentes de retirada", pendentes.length],
@@ -166,18 +166,18 @@ export default async function TecnicoEstoquePage({
                 key={label}
                 href={buildHref({ view: value, q, factory })}
                 className={`px-3.5 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-all duration-200 ${
-                  (value ?? undefined) === view ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  (value ?? undefined) === view ? "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 }`}
               >
                 {label}
-                <span className="text-xs font-mono text-gray-400">({count})</span>
+                <span className="text-xs font-mono text-gray-400 dark:text-gray-500">({count})</span>
               </Link>
             ))}
           </div>
 
           {movements.length === 0 ? (
-            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-              <p className="text-sm text-gray-400">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+              <p className="text-sm text-gray-400 dark:text-gray-500">
                 {showHistorico ? "Nenhuma retirada confirmada ainda." : "Nenhuma retirada pendente no momento."}
               </p>
             </div>
@@ -187,7 +187,7 @@ export default async function TecnicoEstoquePage({
             // numa linha só (com title=... pro texto completo aparecer
             // no hover), sem empilhar produto/cliente/observação um
             // embaixo do outro dentro da mesma célula.
-            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden overflow-x-auto">
               <table className="w-full border-collapse text-xs" style={{ minWidth: "760px", tableLayout: "fixed" }}>
                 <colgroup>
                   <col />
@@ -197,43 +197,43 @@ export default async function TecnicoEstoquePage({
                   <col style={{ width: showHistorico ? "120px" : "140px" }} />
                 </colgroup>
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
+                  <tr className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
                     {["Produto", "Cliente / Volume", "Observação", showHistorico ? "Confirmado em" : "Lançado em", showHistorico ? "Por" : ""].map(
                       (h) => (
-                        <th key={h} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">
+                        <th key={h} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 whitespace-nowrap">
                           {h}
                         </th>
                       )
                     )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {movements.map((m) => {
                     const productLabel = m.code ? `${m.product} · ${m.code}` : m.product;
                     const clienteVolume = clienteVolumeLine(m);
                     return (
-                      <tr key={m.id} className="hover:bg-gray-50 transition-colors duration-150">
+                      <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
                         <td className="px-3 py-2.5 align-top">
-                          <span className="block truncate font-medium text-gray-800" title={productLabel}>
+                          <span className="block truncate font-medium text-gray-800 dark:text-gray-100" title={productLabel}>
                             {productLabel}
                           </span>
                         </td>
                         <td className="px-3 py-2.5 align-top">
-                          <span className="block truncate text-gray-600" title={clienteVolume}>
+                          <span className="block truncate text-gray-600 dark:text-gray-300" title={clienteVolume}>
                             {clienteVolume}
                           </span>
                         </td>
                         <td className="px-3 py-2.5 align-top">
-                          <span className="block truncate text-gray-400" title={m.notes ?? ""}>
+                          <span className="block truncate text-gray-400 dark:text-gray-500" title={m.notes ?? ""}>
                             {m.notes ?? "—"}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5 align-top whitespace-nowrap text-gray-400">
+                        <td className="px-3 py-2.5 align-top whitespace-nowrap text-gray-400 dark:text-gray-500">
                           {formatDateOnly(showHistorico ? m.movementDate : m.loggedDate)}
                         </td>
                         <td className="px-3 py-2.5 align-top">
                           {showHistorico ? (
-                            <span className="block truncate text-gray-400">{m.withdrawnBy ?? "—"}</span>
+                            <span className="block truncate text-gray-400 dark:text-gray-500">{m.withdrawnBy ?? "—"}</span>
                           ) : (
                             <WithdrawStockMovementButton movementId={m.id} />
                           )}

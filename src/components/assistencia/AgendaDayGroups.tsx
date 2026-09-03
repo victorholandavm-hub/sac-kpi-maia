@@ -49,13 +49,13 @@ function DayCard({ group, todayKey }: { group: Group; todayKey: string }) {
   const isOverdue = isGroupOverdue(group, todayKey);
   const isToday = group.dateKey === todayKey;
   return (
-    <details className="group rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <summary className="px-4 py-2.5 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-gray-50 transition-colors duration-150">
-        <span className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400" aria-hidden="true">
+    <details className="group rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+      <summary className="px-4 py-2.5 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+        <span className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400 dark:text-gray-500" aria-hidden="true">
           ▶
         </span>
-        <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">{group.label}</span>
-        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">{group.label}</span>
+        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
           {group.items.length}
         </span>
         {isToday ? (
@@ -68,7 +68,7 @@ function DayCard({ group, todayKey }: { group: Group; todayKey: string }) {
           </span>
         ) : null}
       </summary>
-      <div className="border-t border-gray-100">
+      <div className="border-t border-gray-100 dark:border-gray-700">
         <AgendaQueueGroup items={group.items} isOverdue={isOverdue} />
       </div>
     </details>
@@ -109,7 +109,7 @@ export function AgendaDayGroups({ groups, todayKey }: { groups: Group[]; todayKe
               key={g.dateKey}
               onClick={() => setSelectedKey(g.dateKey)}
               className={`flex flex-col items-center gap-0.5 rounded-lg px-3 py-2 shrink-0 transition-colors duration-150 ${
-                selected ? "text-white shadow-sm" : "bg-white border hover:border-gray-300"
+                selected ? "text-white shadow-sm" : "bg-white dark:bg-gray-800 border hover:border-gray-300 dark:hover:border-gray-500"
               }`}
               style={
                 selected
@@ -149,14 +149,14 @@ export function AgendaDayGroups({ groups, todayKey }: { groups: Group[]; todayKe
               // (fila/page.tsx), no lugar do bloco cinza cheio de antes.
               <details key={week.weekKey} className="group/week flex flex-col gap-2">
                 <summary className="flex items-center gap-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                  <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/week:rotate-90 text-gray-400" aria-hidden="true">
+                  <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/week:rotate-90 text-gray-400 dark:text-gray-500" aria-hidden="true">
                     ▶
                   </span>
-                  <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 whitespace-nowrap">{week.label}</span>
-                  <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
+                  <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 whitespace-nowrap">{week.label}</span>
+                  <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
                     {weekTotal}
                   </span>
-                  <div className="flex-1 h-px bg-gray-200" />
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
                 </summary>
                 <div className="flex flex-col gap-2 pl-4">
                   {week.days.map((g) => (

@@ -18,12 +18,12 @@ export default async function SacNovaVisitaPage() {
   return (
     <div className="w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Nova visita" subtitle="Montagem ou desmontagem — só o intake, a assistência atribui o montador depois.">
-        <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150">
+        <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150">
           ← Voltar
         </Link>
       </AssistenciaHeader>
 
-      <Link href="/assistencia/sac/nova" className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150 self-start">
+      <Link href="/assistencia/sac/nova" className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150 self-start">
         Precisa de troca/entrega de produto, envio de peça ou notificação externa? Vá pra Nova entrega →
       </Link>
 

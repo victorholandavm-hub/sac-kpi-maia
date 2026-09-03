@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOutDashboard } from "@/app/login/actions";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // "Relatório de Assistência" saiu daqui 27/08/2026 (pedido do Victor:
 // "precisa estar dentro da aba KPIs e dentro dessa aba subaba com SAC e
@@ -43,6 +44,7 @@ export function AppHeader() {
           );
         })}
       </nav>
+      <ThemeToggle />
       <form action={signOutDashboard}>
         <button type="submit" className="text-sm underline shrink-0" style={{ color: "var(--text-secondary)" }}>
           Sair

@@ -160,11 +160,11 @@ const ALVO_FILTERS: { label: string; value: "mostruario" | "cliente" | undefined
 function KpiCardWhite({ label, value, barColor, big }: { label: string; value: string; barColor: string; big?: boolean }) {
   return (
     <div
-      className="flex-1 min-w-0 rounded-xl py-3 pl-4 pr-4 flex flex-col gap-1 bg-white shadow-sm"
+      className="flex-1 min-w-0 rounded-xl py-3 pl-4 pr-4 flex flex-col gap-1 bg-white dark:bg-gray-800 shadow-sm"
       style={{ borderLeft: `4px solid ${barColor}` }}
     >
-      <span className="text-sm truncate text-gray-500">{label}</span>
-      <span className={`${big ? "text-3xl" : "text-2xl"} font-bold truncate text-gray-800`}>{value}</span>
+      <span className="text-sm truncate text-gray-500 dark:text-gray-400">{label}</span>
+      <span className={`${big ? "text-3xl" : "text-2xl"} font-bold truncate text-gray-800 dark:text-gray-100`}>{value}</span>
     </div>
   );
 }
@@ -177,10 +177,10 @@ function KpiCardWhite({ label, value, barColor, big }: { label: string; value: s
 // o tipo em toda linha é ruído (já está no título da seção).
 function IndicatorItemsList({ items, showType }: { items: IndicatorItem[]; showType?: boolean }) {
   return (
-    <div className="flex flex-col divide-y divide-gray-100">
+    <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
       {items.map((it) => (
         <div key={it.id} className="pl-6 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
-          <span className="truncate text-left text-gray-800">
+          <span className="truncate text-left text-gray-800 dark:text-gray-100">
             #{it.ticketNumber}
             {showType ? ` · ${REQUEST_TYPE_LABELS[it.type] ?? it.type}` : ""} · {it.clientName ?? "Sem cliente"} · {formatDateBr(it.createdAt)}
           </span>
@@ -198,11 +198,11 @@ function IndicatorItemsList({ items, showType }: { items: IndicatorItem[]; showT
 // indicadores, que já filtram por um tipo só).
 function ReportRowItemsList({ items }: { items: ReportRowItem[] }) {
   return (
-    <div className="flex flex-col divide-y divide-gray-100">
+    <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
       {items.map((it) => (
         <div key={it.id} className="pl-6 pr-4 py-1.5 flex flex-col gap-0.5 text-xs">
           <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-left text-gray-800">
+            <span className="truncate text-left text-gray-800 dark:text-gray-100">
               #{it.ticketNumber} · {REQUEST_TYPE_LABELS[it.type] ?? it.type} · {it.storeName} · {formatDateBr(it.createdAt)}
             </span>
             <span className="shrink-0 font-medium text-right" style={{ color: STATUS_COLORS[it.status] ?? "#9ca3af" }}>
@@ -216,7 +216,7 @@ function ReportRowItemsList({ items }: { items: ReportRowItem[] }) {
               não dizia o quê -- `reason` é a descrição livre do
               problema, preenchida na criação do chamado. */}
           {it.reason ? (
-            <span className="truncate text-left text-gray-500" title={it.reason}>
+            <span className="truncate text-left text-gray-500 dark:text-gray-400" title={it.reason}>
               {it.reason}
             </span>
           ) : null}
@@ -233,7 +233,7 @@ function ReportRowItemsList({ items }: { items: ReportRowItem[] }) {
 // começa direto na borda esquerda do card.
 function ColumnsHeader({ columns }: { columns: string[] }) {
   return (
-    <div className="flex items-center gap-2 px-4 py-2 text-xs text-gray-400 border-b border-gray-100">
+    <div className="flex items-center gap-2 px-4 py-2 text-xs text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">
       <span className="flex-1 min-w-0 text-left">{columns[0]}</span>
       {columns.slice(1).map((c) => (
         <span key={c} className="w-20 shrink-0 text-right">
@@ -265,8 +265,8 @@ function ExpandableRow({
           já vem separada pelo divide-y do container pai -- aqui só sobra
           o hover pra indicar que a linha é clicável (expande o detalhe
           dos chamados por trás). */}
-      <summary className="flex items-center gap-2 px-4 py-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-gray-50">
-        <span className="flex-1 min-w-0 flex items-center gap-1.5 text-sm text-left text-gray-800">
+      <summary className="flex items-center gap-2 px-4 py-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-gray-50 dark:hover:bg-gray-700">
+        <span className="flex-1 min-w-0 flex items-center gap-1.5 text-sm text-left text-gray-800 dark:text-gray-100">
           {typeof label === "string" ? <span className="truncate">{label}</span> : label}
         </span>
         {numbers.map((n, i) => (
@@ -285,7 +285,7 @@ function ExpandableRow({
 // reconciliação) -- redesign pedido do Victor 28/08/2026: "remova o
 // contorno/borda cinza externa... fundos brancos com sombras suaves".
 // Substitui a antiga borda grossa `2px solid var(--brand-green)`.
-const CARD_CLASS = "rounded-xl border border-gray-200 bg-white shadow-sm";
+const CARD_CLASS = "rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm";
 
 // Linhas além do Top 5 ficam recolhidas num "Ver todos" -- pedido do Victor
 // 22/08/2026: "Nas tabelas longas... exiba os Top 5 inicialmente e insira
@@ -331,29 +331,29 @@ function ReportTable({
 
   return (
     <details className={`${CARD_CLASS} overflow-hidden`}>
-      <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 border-b border-gray-100">
+      <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
         {title} ({rows.length})
       </summary>
       {rows.length === 0 ? (
-        <p className="text-sm p-4 text-gray-400">
+        <p className="text-sm p-4 text-gray-400 dark:text-gray-500">
           {emptyMessage}
         </p>
       ) : (
         <div>
           <ColumnsHeader columns={[keyLabel, "Total", "Concluídas", "Canceladas"]} />
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {visible.map(renderRow)}
           </div>
           {hidden.length > 0 ? (
             <details className="group/vertodos">
               <summary
-                className="text-xs font-semibold cursor-pointer list-none px-4 py-2.5 text-center border-t border-gray-100"
+                className="text-xs font-semibold cursor-pointer list-none px-4 py-2.5 text-center border-t border-gray-100 dark:border-gray-700"
                 style={{ color: "var(--brand-green)" }}
               >
                 <span className="group-open/vertodos:hidden">Ver todos ({hidden.length})</span>
                 <span className="hidden group-open/vertodos:inline">Mostrar menos</span>
               </summary>
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {hidden.map(renderRow)}
               </div>
             </details>
@@ -388,10 +388,10 @@ function PaymentProgressBar({ pago, total }: { pago: number; total: number }) {
   const pct = total > 0 ? Math.min(100, Math.round((pago / total) * 100)) : 0;
   return (
     <div className="flex items-center gap-2 px-4 pb-2">
-      <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-gray-100">
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--status-good)" }} />
       </div>
-      <span className="text-[11px] shrink-0 text-gray-400">{pct}% pago</span>
+      <span className="text-[11px] shrink-0 text-gray-400 dark:text-gray-500">{pct}% pago</span>
     </div>
   );
 }
@@ -484,18 +484,18 @@ export default async function RelatoriosPage({
           direita. */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-xl font-bold text-gray-800">Relatórios</h1>
+          <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">Relatórios</h1>
           {/* Segmented control -- pílulas com fundo cinza claro e a
               selecionada com fundo verde sólido (mesmo padrão de segmented
               control usado no resto do Design System). */}
-          <div className="inline-flex rounded-full p-1 flex-wrap bg-gray-100">
+          <div className="inline-flex rounded-full p-1 flex-wrap bg-gray-100 dark:bg-gray-700">
             {ALVO_FILTERS.map((f) => {
               const selected = f.value === filterAlvo;
               return (
                 <Link
                   key={f.label}
                   href={buildReportHref({ from: dateFrom, to: dateTo, tipo: indicatorTypeKey, indTab, alvo: f.value })}
-                  className={`text-sm font-medium px-4 py-1.5 rounded-full whitespace-nowrap ${selected ? "text-white shadow-sm" : "text-gray-500"}`}
+                  className={`text-sm font-medium px-4 py-1.5 rounded-full whitespace-nowrap ${selected ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400"}`}
                   style={selected ? { background: "color-mix(in srgb, var(--brand-green) 78%, black)" } : undefined}
                 >
                   {f.label}
@@ -509,15 +509,15 @@ export default async function RelatoriosPage({
           {hiddenAlvo}
           <input type="hidden" name="tipo" value={indicatorTypeKey} />
           <input type="hidden" name="indTab" value={indTab} />
-          <label className="flex items-center gap-2 text-sm text-gray-500">
+          <label className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             De
-            <input type="date" name="from" defaultValue={dateFrom} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            <input type="date" name="from" defaultValue={dateFrom} className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm" />
           </label>
-          <label className="flex items-center gap-2 text-sm text-gray-500">
+          <label className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             Até
-            <input type="date" name="to" defaultValue={dateTo} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            <input type="date" name="to" defaultValue={dateTo} className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm" />
           </label>
-          <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-800">
+          <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100">
             Aplicar
           </button>
         </form>
@@ -532,9 +532,9 @@ export default async function RelatoriosPage({
           evidenciar que um se decompõe no outro. */}
       <div className="grid sm:grid-cols-4 gap-4 items-stretch">
         <KpiCardWhite label="Solicitações no período" value={String(report.totalRequests)} barColor="var(--series-5)" />
-        <div className="sm:col-span-3 flex flex-col sm:flex-row gap-3 rounded-xl p-3 bg-gray-100">
+        <div className="sm:col-span-3 flex flex-col sm:flex-row gap-3 rounded-xl p-3 bg-gray-100 dark:bg-gray-700">
           <KpiCardWhite label="Total a pagar a montadores" value={formatBRL(paymentTotal)} barColor="var(--series-4)" big />
-          <div className="hidden sm:flex items-center px-1 text-xl text-gray-400" aria-hidden="true">
+          <div className="hidden sm:flex items-center px-1 text-xl text-gray-400 dark:text-gray-500" aria-hidden="true">
             →
           </div>
           <div className="flex gap-3 flex-1">
@@ -565,9 +565,9 @@ export default async function RelatoriosPage({
           colunas. Seletor de Tipo continua existindo, reposicionado pro
           canto direito da barra de abas. */}
       <div className={`flex flex-col gap-3 rounded-xl p-4 ${CARD_CLASS}`}>
-        <h3 className="text-sm font-bold text-gray-800">Indicadores de {indicatorLabelFor(indicatorTypeKey)}</h3>
+        <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">Indicadores de {indicatorLabelFor(indicatorTypeKey)}</h3>
 
-        <div className="flex items-center justify-between gap-3 flex-wrap border-b border-gray-100">
+        <div className="flex items-center justify-between gap-3 flex-wrap border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-1 flex-wrap">
             {INDICATOR_TABS.map((t) => {
               const active = t.key === indTab;
@@ -575,7 +575,7 @@ export default async function RelatoriosPage({
                 <Link
                   key={t.key}
                   href={buildReportHref({ from: dateFrom, to: dateTo, alvo: filterAlvo, tipo: indicatorTypeKey, indTab: t.key })}
-                  className={`text-sm font-medium px-3 py-2 -mb-px border-b-2 whitespace-nowrap ${active ? "text-gray-800" : "border-transparent text-gray-400"}`}
+                  className={`text-sm font-medium px-3 py-2 -mb-px border-b-2 whitespace-nowrap ${active ? "text-gray-800 dark:text-gray-100" : "border-transparent text-gray-400 dark:text-gray-500"}`}
                   style={active ? { borderColor: "var(--brand-green)" } : undefined}
                 >
                   {t.label}
@@ -589,7 +589,7 @@ export default async function RelatoriosPage({
             <input type="hidden" name="from" value={dateFrom} />
             <input type="hidden" name="to" value={dateTo} />
             <input type="hidden" name="indTab" value={indTab} />
-            <select name="tipo" defaultValue={indicatorTypeKey} className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
+            <select name="tipo" defaultValue={indicatorTypeKey} className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-sm">
               <option value="montagem_desmontagem">Montagem/Desmontagem (junto)</option>
               {REQUEST_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -597,7 +597,7 @@ export default async function RelatoriosPage({
                 </option>
               ))}
             </select>
-            <button type="submit" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-800">
+            <button type="submit" className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100">
               Aplicar
             </button>
           </form>
@@ -605,13 +605,13 @@ export default async function RelatoriosPage({
 
         {indTab === "mensal" ? (
           indicators.byMonth.length === 0 ? (
-            <p className="text-sm py-6 text-center text-gray-400">
+            <p className="text-sm py-6 text-center text-gray-400 dark:text-gray-500">
               Nenhuma solicitação desse tipo no período.
             </p>
           ) : (
             <div>
               <ColumnsHeader columns={["Mês", "Total", "Concluídas"]} />
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {indicators.byMonth.map((m) => (
                   <ExpandableRow key={m.month} label={formatMonth(m.month)} numbers={[{ value: m.total }, { value: m.concluida, color: "var(--status-good)" }]}>
                     <IndicatorItemsList items={m.items} showType={indicatorTypes.length > 1} />
@@ -624,13 +624,13 @@ export default async function RelatoriosPage({
 
         {indTab === "montador" ? (
           indicatorsByAssembler.length === 0 ? (
-            <p className="text-sm py-6 text-center text-gray-400">
+            <p className="text-sm py-6 text-center text-gray-400 dark:text-gray-500">
               Nenhuma solicitação desse tipo no período.
             </p>
           ) : (
             <div>
               <ColumnsHeader columns={["Montador", "Total", "Concluídas", "Tempo médio (dias)"]} />
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {indicatorsByAssembler.map((a) => (
                   <ExpandableRow
                     key={a.assemblerName}
@@ -651,13 +651,13 @@ export default async function RelatoriosPage({
 
         {indTab === "loja" ? (
           indicators.byStore.length === 0 ? (
-            <p className="text-sm py-6 text-center text-gray-400">
+            <p className="text-sm py-6 text-center text-gray-400 dark:text-gray-500">
               Nenhuma solicitação desse tipo no período.
             </p>
           ) : (
             <div>
               <ColumnsHeader columns={["Loja", "Total", "Concluídas"]} />
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {indicators.byStore.map((s) => (
                   <ExpandableRow key={s.storeId} label={s.storeName} numbers={[{ value: s.total }, { value: s.concluida, color: "var(--status-good)" }]}>
                     <IndicatorItemsList items={s.items} showType={indicatorTypes.length > 1} />
@@ -685,17 +685,17 @@ export default async function RelatoriosPage({
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         <div className="flex flex-col gap-4">
           <details className={`${CARD_CLASS} overflow-hidden`}>
-            <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 border-b border-gray-100">
+            <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
               Pagamento por montador ({assemblerRows.length})
             </summary>
             {assemblerRows.length === 0 ? (
-              <p className="text-sm p-4 text-gray-400">
+              <p className="text-sm p-4 text-gray-400 dark:text-gray-500">
                 Nenhum pagamento no período.
               </p>
             ) : (
               <div>
                 <ColumnsHeader columns={["Montador", "Itens", "Total", "Pago", "Pendente"]} />
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-gray-100 dark:divide-gray-700">
                   {assemblerRows.map(([name, v]) => (
                     <div key={name}>
                       <ExpandableRow
@@ -707,10 +707,10 @@ export default async function RelatoriosPage({
                           { value: formatBRL(v.pendente), color: v.pendente > 0 ? "var(--status-warning)" : "#9ca3af" },
                         ]}
                       >
-                        <div className="flex flex-col divide-y divide-gray-100">
+                        <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
                           {v.items.map((it) => (
                             <div key={it.itemId} className="pl-6 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
-                              <span className="truncate text-left text-gray-800">
+                              <span className="truncate text-left text-gray-800 dark:text-gray-100">
                                 {it.product} · {it.quantity}x · {it.clientName ?? it.storeName} · {formatDateBr(it.createdAt)}
                               </span>
                               <span
@@ -735,11 +735,11 @@ export default async function RelatoriosPage({
               Victor 22/08/2026 (ver ErroInternoBadge/CausaRaizDonutChart
               acima). */}
           <details className={`${CARD_CLASS} overflow-hidden`}>
-            <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 border-b border-gray-100">
+            <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
               Trocas de produto por causa raiz ({report.byCausaRaiz.length})
             </summary>
             {report.byCausaRaiz.length === 0 ? (
-              <p className="text-sm p-4 text-gray-400">
+              <p className="text-sm p-4 text-gray-400 dark:text-gray-500">
                 Nenhuma troca de produto com causa raiz registrada nesse período.
               </p>
             ) : (
@@ -750,7 +750,7 @@ export default async function RelatoriosPage({
                   />
                 </div>
                 <ColumnsHeader columns={["Causa raiz", "Total", "Concluídas", "Canceladas"]} />
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-gray-100 dark:divide-gray-700">
                   {report.byCausaRaiz.map((r) => (
                     <ExpandableRow
                       key={r.key}
@@ -790,17 +790,17 @@ export default async function RelatoriosPage({
       </div>
 
       <details className={`${CARD_CLASS} overflow-hidden`}>
-        <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 border-b border-gray-100">
+        <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
           Reconciliação com fornecedor ({supplierReconciliation.length}) — acumulado, todas as remessas
         </summary>
         {supplierReconciliation.length === 0 ? (
-          <p className="text-sm p-4 text-gray-400">
+          <p className="text-sm p-4 text-gray-400 dark:text-gray-500">
             Nenhuma remessa registrada ainda.
           </p>
         ) : (
           <div>
             <ColumnsHeader columns={["Fornecedor", "Em devolução", "Faturado", "Reembolsado", "Pendente"]} />
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
               {supplierReconciliation.map((r) => (
                 <ExpandableRow
                   key={r.supplier}
@@ -825,14 +825,14 @@ export default async function RelatoriosPage({
 
 function SupplierReturnItemsList({ items }: { items: SupplierReconciliationItem[] }) {
   return (
-    <div className="flex flex-col divide-y divide-gray-100">
+    <div className="flex flex-col divide-y divide-gray-100 dark:divide-gray-700">
       {items.map((it) => (
         <div key={it.id} className="pl-6 pr-4 py-1.5 flex items-center justify-between gap-2 text-xs">
-          <span className="truncate text-left text-gray-800">
+          <span className="truncate text-left text-gray-800 dark:text-gray-100">
             #{it.ticketNumber} · {it.partName}
             {it.invoiceValue !== null ? ` · ${formatBRL(it.invoiceValue)}` : ""}
           </span>
-          <span className="shrink-0 font-medium text-right text-gray-400">
+          <span className="shrink-0 font-medium text-right text-gray-400 dark:text-gray-500">
             {SUPPLIER_RETURN_STATUS_LABELS[it.status] ?? it.status}
           </span>
         </div>

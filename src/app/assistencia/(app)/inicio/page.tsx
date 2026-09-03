@@ -15,11 +15,11 @@ import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRe
 function Stat({ label, value, warn }: { label: string; value: number; warn?: boolean }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-2xl font-bold text-gray-800 flex items-center gap-1.5">
+      <span className="text-2xl font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1.5">
         {value}
         {warn && value > 0 ? <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: "var(--status-warning)" }} aria-hidden /> : null}
       </span>
-      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
     </div>
   );
 }
@@ -48,12 +48,12 @@ function Card({
   return (
     <Link
       href={href}
-      className="rounded-xl border border-gray-200 bg-white shadow-sm p-5 flex flex-col gap-3 hover:border-gray-300 transition-colors duration-150"
+      className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-5 flex flex-col gap-3 hover:border-gray-300 dark:hover:border-gray-500 transition-colors duration-150"
       style={accent ? { borderLeft: `3px solid ${accent}` } : undefined}
     >
       <div>
-        <h3 className="text-base font-bold text-gray-800">{title}</h3>
-        <p className="text-sm mt-0.5 text-gray-400">{description}</p>
+        <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">{title}</h3>
+        <p className="text-sm mt-0.5 text-gray-400 dark:text-gray-500">{description}</p>
       </div>
       {children ? <div className="flex flex-wrap gap-5">{children}</div> : null}
     </Link>

@@ -1,13 +1,21 @@
 @import "tailwindcss";
 
+/* Modo noturno -- pedido do Victor 02/09/2026: "preciso que você tenha a
+   opção do modo noturno em todo o sistema". Alternado por classe (.dark na
+   <html>, ver ThemeToggle.tsx), não só por prefers-color-scheme do SO --
+   assim o usuário escolhe de propósito, independente do sistema. Isso faz
+   o `dark:` do Tailwind responder à classe em vez da media query padrão. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  /* Sem isso, o Chrome do Android (e outros navegadores com "tema escuro
+  /* Tema claro (padrão) -- ver bloco .dark logo abaixo pro escuro. Sem
+     isso, o Chrome do Android (e outros navegadores com "tema escuro
      forçado" pra sites que não avisam) reescreve as cores de campos de
      formulário por conta própria -- o valor do input continua lá, só que
      pode ficar com o texto na mesma cor do fundo, invisível, mesmo com o
      dado certo (ver relato: "editar" trazia os campos parecendo vazios).
-     O site sempre foi pensado só pra tema claro, então declarar isso
-     deixa explícito e tira o navegador da jogada. */
+     Declarar `color-scheme` explícito (aqui e em .dark) tira o navegador
+     dessa decisão nos dois temas. */
   color-scheme: light;
   --background: #f7f8f6;
   --foreground: #0b0b0b;
@@ -49,6 +57,71 @@
   --brand-orange-soft: #fdf1e4;
 }
 
+/* Tema escuro -- mesmas variáveis do :root acima, redefinidas. Qualquer
+   tela que já usa var(--text-primary)/var(--surface-1)/etc. (a maioria do
+   sistema) ganha o modo noturno de graça só com isso; as telas já
+   convertidas pro Design System Tier 2 (classes Tailwind cinzas cruas,
+   text-gray-800/bg-white/border-gray-200 etc.) precisam do par `dark:`
+   direto na classe -- ver esse padrão nas telas mais novas
+   (loja/encomendas/estoque/admin/relatórios). Cores de marca/status/série
+   ficam quase iguais nos dois temas (já têm contraste bom em fundo claro
+   OU escuro) -- só os poucos casos claramente baixo-contraste em fundo
+   escuro (ex.: amarelo, violeta) ganham um leve ajuste. */
+.dark {
+  color-scheme: dark;
+  /* Revisado 03/09/2026 -- pedido do Victor: "a cor de fundo que ficou
+     forte" (a 1ª versão, #101210, era perto demais do preto puro, alto
+     contraste demais com os cards). Paleta mais suave/neutra (slate),
+     igual à referência que ele mandou -- fundo e cards mais claros,
+     diferença de um pro outro mais sutil. */
+  --background: #14161b;
+  --foreground: #e7e8ea;
+
+  --surface-1: #1c1f25;
+  --surface-2: #262a31;
+  --text-primary: #e7e8ea;
+  --text-secondary: #a3a6ac;
+  --text-muted: #75787f;
+  --gridline: #33373f;
+  --axis: #4b4f58;
+  --border: rgba(255, 255, 255, 0.1);
+
+  /* Revisado pela 3ª vez 03/09/2026 -- pedido do Victor: "ainda nao ta
+     legal, acho que ficaria melhor deixar sem cor diferente nessa versao
+     dark, deixar tudo num cor só ou levemente diferente os status".
+     Rodada anterior só dessaturava, mas ainda eram 8 matizes diferentes
+     (--series-1..8) pra tipo/rota/categoria -- essas viram TODAS a mesma
+     cor neutra agora (sem matiz nenhum, só var(--text-secondary) puro),
+     já que servem só de etiqueta/identificação visual, não de status de
+     verdade -- quem diferencia é o texto do badge, não a cor.
+     --status-* (bom/atenção/crítico) continuam com UM POUCO de matiz
+     entre si (pedido explícito: "levemente diferente os status") porque
+     esses sim comunicam um estado real (concluído x cancelado x precisa
+     atenção) -- mas a mistura desce de 65% pra 30% da cor crua (bem mais
+     cinza, beirando monocromático, só o suficiente pra notar a diferença
+     sem gritar). --brand-green/--brand-orange continuam de fora
+     (botão sólido/CTA precisa continuar vívido). */
+  --series-1: var(--text-secondary);
+  --series-2: var(--text-secondary);
+  --series-3: var(--text-secondary);
+  --series-4: var(--text-secondary);
+  --series-5: var(--text-secondary);
+  --series-6: var(--text-secondary);
+  --series-7: var(--text-secondary);
+  --series-8: var(--text-secondary);
+
+  --status-good: color-mix(in srgb, #0ca30c 30%, var(--text-secondary));
+  --status-warning: color-mix(in srgb, #fab219 30%, var(--text-secondary));
+  --status-serious: color-mix(in srgb, #ec835a 30%, var(--text-secondary));
+  --status-critical: color-mix(in srgb, #d03b3b 30%, var(--text-secondary));
+
+  --brand-green: #2e8158;
+  --brand-green-ink: #ffffff;
+  --brand-orange: #f2871a;
+  --brand-green-soft: rgba(46, 129, 88, 0.18);
+  --brand-orange-soft: rgba(242, 135, 26, 0.16);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -60,6 +133,25 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Fallback de tema pra qualquer <input>/<select>/<textarea> das ~480
+   ocorrências no app -- pedido do Victor 02/09/2026 (modo noturno em todo
+   o sistema). A maioria nunca teve `bg-white` explícito (só herdava o
+   branco padrão do navegador, que já combinava com o resto claro) -- sem
+   isso, todo campo de formulário continuaria branco/opaco em cima de um
+   fundo escuro no modo noturno. Especificidade de seletor de elemento é
+   menor que classe do Tailwind, então isso só entra em campo onde não tem
+   `bg-*`/`text-*` mais específico já sobrescrevendo. */
+input,
+select,
+textarea {
+  background-color: var(--surface-1);
+  color: var(--text-primary);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
 }
 
 /* Removido de propósito: qualquer regra de overflow/overscroll-behavior

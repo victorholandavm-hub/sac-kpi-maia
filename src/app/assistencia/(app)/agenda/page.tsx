@@ -205,11 +205,11 @@ export default async function AgendaPage({
           diferente -- mês corrente, por montador, não por rota), então
           cada uma das 3 páginas renderiza sua própria fileira em vez de
           layout compartilhado (mesma razão de SacTabs.tsx). */}
-      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
-        <Link href="/assistencia/fila" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-200">
+      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start">
+        <Link href="/assistencia/fila" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
           Visitas
         </Link>
-        <Link href="/assistencia/fila?tab=pecas" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-200">
+        <Link href="/assistencia/fila?tab=pecas" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
           Entregas
         </Link>
         <Link
@@ -232,8 +232,8 @@ export default async function AgendaPage({
       {overdueCount > 0 && filterRange !== "atrasado" ? (
         <Link
           href={buildHref({ range: "atrasado", ...commonParams, view })}
-          className="flex items-center gap-2 rounded-xl border px-4 py-3 font-semibold text-sm text-gray-800 transition-colors duration-150 hover:bg-white"
-          style={{ background: "color-mix(in srgb, var(--status-critical) 8%, white)", borderColor: "var(--status-critical)" }}
+          className="flex items-center gap-2 rounded-xl border px-4 py-3 font-semibold text-sm text-gray-800 dark:text-gray-100 transition-colors duration-150 hover:bg-white dark:hover:bg-gray-700"
+          style={{ background: "color-mix(in srgb, var(--status-critical) 8%, var(--surface-1))", borderColor: "var(--status-critical)" }}
         >
           <span className="text-lg" aria-hidden="true">
             ⚠️
@@ -269,7 +269,7 @@ export default async function AgendaPage({
         {!filterRange && currentPage !== defaultPage ? (
           <Link
             href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined })}
-            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 ml-1"
+            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 ml-1"
           >
             hoje
           </Link>
@@ -313,7 +313,7 @@ export default async function AgendaPage({
             matchesQuery acima) -- mais limitado que a busca de
             Entregas/Solicitações, que já é feita no servidor. */}
         <div className="relative flex-1 min-w-[240px]">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400" aria-hidden="true">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500" aria-hidden="true">
             🔍
           </span>
           <input
@@ -321,19 +321,19 @@ export default async function AgendaPage({
             name="q"
             defaultValue={q ?? ""}
             placeholder="Buscar por nº do chamado, cliente ou telefone…"
-            className="rounded-lg border border-gray-200 pl-8 pr-3 py-2 text-sm w-full text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 pl-8 pr-3 py-2 text-sm w-full text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
           />
         </div>
         <button
           type="submit"
-          className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+          className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
         >
           Buscar
         </button>
         {q ? (
           <Link
             href={buildHref({ range: filterRange, rota: filterRota, assembler, store, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined })}
-            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150"
+            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
           >
             Limpar busca
           </Link>
@@ -368,7 +368,7 @@ export default async function AgendaPage({
               ...commonParams,
               showPast: showPastResolved ? undefined : "1",
             })}
-            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150"
+            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
           >
             {showPastResolved ? "Ocultar dias já concluídos" : `Ver dias já concluídos (${pastResolvedCount})`}
           </Link>
@@ -376,14 +376,14 @@ export default async function AgendaPage({
       </div>
 
       {requests.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">{filterRange ? "Nenhuma visita nesse período." : "Nenhuma visita agendada."}</p>
+        <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">{filterRange ? "Nenhuma visita nesse período." : "Nenhuma visita agendada."}</p>
         </div>
       ) : !showKanban && groups.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">
             Só tem dias já concluídos nesse período --{" "}
-            <Link href={buildHref({ range: filterRange, ...commonParams, showPast: "1" })} className="font-medium text-gray-600 hover:text-gray-800 transition-colors duration-150">
+            <Link href={buildHref({ range: filterRange, ...commonParams, showPast: "1" })} className="font-medium text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150">
               ver dias já concluídos ({pastResolvedCount})
             </Link>
             .
@@ -419,18 +419,18 @@ export default async function AgendaPage({
           {currentPage > 1 ? (
             <Link
               href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined, page: currentPage - 1 })}
-              className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+              className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
             >
               ← Mês mais recente
             </Link>
           ) : null}
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-gray-400 dark:text-gray-500">
             Página {currentPage} de {totalPages}
           </span>
           {currentPage < totalPages ? (
             <Link
               href={buildHref({ ...commonParams, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined, page: currentPage + 1 })}
-              className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+              className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
             >
               Mês mais antigo →
             </Link>

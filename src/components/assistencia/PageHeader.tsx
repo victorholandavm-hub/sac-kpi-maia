@@ -13,8 +13,8 @@ export function PageHeader({ title, description, cta }: { title: string; descrip
           cinza-800 (nunca preto puro), descrição em cinza-500 -- mesma
           escala tipográfica da tela da equipe técnica. */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold text-gray-800">{title}</h1>
-        {description ? <p className="text-sm text-gray-500">{description}</p> : null}
+        <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100">{title}</h1>
+        {description ? <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p> : null}
       </div>
       {cta}
     </div>

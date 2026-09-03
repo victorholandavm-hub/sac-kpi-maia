@@ -21,8 +21,8 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-gray-400">{label}</span>
-      <span className="text-sm text-gray-800">{value}</span>
+      <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
+      <span className="text-sm text-gray-800 dark:text-gray-100">{value}</span>
     </div>
   );
 }
@@ -56,20 +56,20 @@ export function TecnicoNotificationModalButton({ request }: { request: TecnicoRe
           <div
             role="dialog"
             aria-modal="true"
-            className="fixed inset-x-4 top-[10vh] z-50 mx-auto max-w-sm max-h-[75vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-4 shadow-lg flex flex-col gap-3"
+            className="fixed inset-x-4 top-[10vh] z-50 mx-auto max-w-sm max-h-[75vh] overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 shadow-lg flex flex-col gap-3"
           >
             <div className="flex items-start justify-between gap-4">
-              <span className="text-xs font-mono text-gray-400">#{request.ticketNumber}</span>
+              <span className="text-xs font-mono text-gray-400 dark:text-gray-500">#{request.ticketNumber}</span>
               <button
                 aria-label="Fechar"
                 onClick={() => setOpen(false)}
-                className="text-xs px-2 py-1 rounded-md shrink-0 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors duration-150"
+                className="text-xs px-2 py-1 rounded-md shrink-0 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
               >
                 Fechar
               </button>
             </div>
 
-            <h3 className="text-base font-semibold text-gray-800">
+            <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100">
               {REQUEST_TYPE_LABELS[request.type] ?? request.type} · {request.storeName}
             </h3>
 

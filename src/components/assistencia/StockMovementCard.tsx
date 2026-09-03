@@ -46,19 +46,19 @@ export function StockMovementCard({ m }: { m: StockMovement }) {
         >
           {status.label}
         </span>
-        <span className="text-sm text-gray-500">{MOVEMENT_TYPE_LABELS[m.movementType] ?? m.movementType}</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">{MOVEMENT_TYPE_LABELS[m.movementType] ?? m.movementType}</span>
       </div>
 
       {/* Coluna 2: produto (nome em destaque, código+pedido, cliente/fábrica) */}
       <div className="w-full sm:w-[38%] shrink-0 flex flex-col gap-0.5 min-w-0 sm:pr-3">
-        <span className="text-sm font-bold truncate uppercase text-gray-800">{m.product}</span>
-        <span className="text-xs truncate text-gray-500">
+        <span className="text-sm font-bold truncate uppercase text-gray-800 dark:text-gray-100">{m.product}</span>
+        <span className="text-xs truncate text-gray-500 dark:text-gray-400">
           {m.code ?? "—"}
           {pedido ? ` · Pedido ${pedido}` : ""}
         </span>
-        {m.clientName ? <span className="text-xs truncate text-gray-400">👤 {m.clientName}</span> : null}
+        {m.clientName ? <span className="text-xs truncate text-gray-400 dark:text-gray-500">👤 {m.clientName}</span> : null}
         {m.factory ? (
-          <span className="text-xs truncate text-gray-400">
+          <span className="text-xs truncate text-gray-400 dark:text-gray-500">
             🏭 {m.factory}
             {m.volume ? ` · vol. ${m.volume}` : ""}
           </span>
@@ -68,23 +68,23 @@ export function StockMovementCard({ m }: { m: StockMovement }) {
       {/* Coluna 3: responsável pela retirada/registro */}
       <div className="w-full sm:w-[18%] shrink-0 flex items-center min-w-0 sm:pr-3">
         {responsavel ? (
-          <span className="text-sm font-semibold truncate text-gray-800">🧑‍🔧 {responsavel}</span>
+          <span className="text-sm font-semibold truncate text-gray-800 dark:text-gray-100">🧑‍🔧 {responsavel}</span>
         ) : (
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap bg-gray-100 text-gray-400">Sem responsável</span>
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500">Sem responsável</span>
         )}
       </div>
 
       {/* Coluna 4: data + ação (ver detalhes/observações) */}
       <div className="w-full sm:w-[28%] shrink-0 flex flex-col gap-1 min-w-0 items-start sm:items-end">
-        <span className="text-xs whitespace-nowrap text-gray-400">
+        <span className="text-xs whitespace-nowrap text-gray-400 dark:text-gray-500">
           {dataLabel}: {dataValue ?? "—"}
         </span>
         {m.notes ? (
           <details className="group/details">
-            <summary className="text-xs font-medium px-2 py-1 rounded-full border border-gray-200 text-gray-500 cursor-pointer list-none [&::-webkit-details-marker]:hidden whitespace-nowrap">
+            <summary className="text-xs font-medium px-2 py-1 rounded-full border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 cursor-pointer list-none [&::-webkit-details-marker]:hidden whitespace-nowrap">
               📋 Ver detalhes
             </summary>
-            <p className="text-xs whitespace-pre-line mt-1.5 rounded-lg p-2 max-w-xs sm:text-right bg-gray-50 text-gray-500">{m.notes}</p>
+            <p className="text-xs whitespace-pre-line mt-1.5 rounded-lg p-2 max-w-xs sm:text-right bg-gray-50 dark:bg-gray-700/40 text-gray-500 dark:text-gray-400">{m.notes}</p>
           </details>
         ) : null}
       </div>

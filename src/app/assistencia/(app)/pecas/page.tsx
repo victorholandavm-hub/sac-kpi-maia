@@ -77,13 +77,13 @@ export default async function PecasQueuePage({
         </Link>
         <Link
           href="/assistencia/fornecedores"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
         >
           Fornecedores
         </Link>
         <Link
           href="/assistencia/estoque"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
         >
           Estoque
         </Link>
@@ -121,44 +121,44 @@ export default async function PecasQueuePage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Buscar por cliente, produto, peça ou código…"
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm flex-1 min-w-[240px]"
+          className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm flex-1 min-w-[240px]"
         />
-        <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-800">
+        <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100">
           Buscar
         </button>
         {q ? (
-          <Link href={buildHref({ status: filterStatus, supplier })} className="text-xs underline text-gray-500 hover:text-gray-700">
+          <Link href={buildHref({ status: filterStatus, supplier })} className="text-xs underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             Limpar busca
           </Link>
         ) : null}
       </form>
 
       {orders.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">Nenhum pedido de peça encontrado.</p>
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">Nenhum pedido de peça encontrado.</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-          <div className="divide-y divide-gray-100">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {orders.map((o) => (
               <Link
                 key={o.id}
                 href={`/assistencia/pecas/${o.id}`}
-                className="flex items-center justify-between gap-4 p-4 flex-wrap hover:bg-gray-50 transition-colors duration-150"
+                className="flex items-center justify-between gap-4 p-4 flex-wrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
               >
                 <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono text-gray-400">#{o.ticketNumber}</span>
+                    <span className="text-xs font-mono text-gray-400 dark:text-gray-500">#{o.ticketNumber}</span>
                     <StatusBadge status={o.status} />
-                    <span className="text-sm font-medium text-gray-800">{o.partName}</span>
-                    {o.supplier ? <span className="text-xs text-gray-400">{o.supplier}</span> : null}
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{o.partName}</span>
+                    {o.supplier ? <span className="text-xs text-gray-400 dark:text-gray-500">{o.supplier}</span> : null}
                   </div>
-                  <p className="text-sm truncate text-gray-500">
+                  <p className="text-sm truncate text-gray-500 dark:text-gray-400">
                     {o.clientName ?? "Sem cliente"}
                     {o.product ? ` · ${o.product}` : ""}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-1 text-xs text-gray-400">
+                <div className="flex flex-col items-end gap-1 text-xs text-gray-400 dark:text-gray-500">
                   {o.status !== "encerrado" ? (
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"

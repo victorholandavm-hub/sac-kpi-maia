@@ -20,7 +20,7 @@ function ChevronIcon({ open }: { open: boolean }) {
     <svg
       viewBox="0 0 20 20"
       fill="none"
-      className="w-3.5 h-3.5 shrink-0 text-gray-400 transition-transform duration-150"
+      className="w-3.5 h-3.5 shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-150"
       style={{ transform: open ? "rotate(180deg)" : "none" }}
     >
       <path d="M5.5 7.5L10 12L14.5 7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -134,12 +134,12 @@ function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => voi
         aria-expanded={open}
         disabled={disabled}
         onClick={() => (open ? setOpen(false) : openMenu())}
-        className={`w-full flex items-center justify-between gap-2 rounded-lg pl-2.5 pr-2 py-1.5 text-xs font-medium text-gray-500 bg-white border transition-colors duration-150 disabled:opacity-60 ${
-          open ? "border-[#1B5E3C]" : "border-gray-200 hover:border-gray-300"
+        className={`w-full flex items-center justify-between gap-2 rounded-lg pl-2.5 pr-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border transition-colors duration-150 disabled:opacity-60 ${
+          open ? "border-[#1B5E3C]" : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
         }`}
       >
         <span className="flex items-center gap-2 min-w-0">
-          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0 bg-gray-300" />
+          <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0 bg-gray-300 dark:bg-gray-500" />
           <span className="truncate">Selecionar destino…</span>
         </span>
         <ChevronIcon open={open} />
@@ -150,7 +150,7 @@ function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => voi
             <div
               ref={panelRef}
               role="listbox"
-              className="fixed z-50 rounded-lg py-1 shadow-lg border border-gray-200 bg-white overflow-y-auto"
+              className="fixed z-50 rounded-lg py-1 shadow-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 overflow-y-auto"
               style={{
                 top: pos.top,
                 bottom: pos.bottom,
@@ -169,8 +169,8 @@ function DestinoDropdown({ onPick, disabled }: { onPick: (d: ItemDestino) => voi
                     setOpen(false);
                     onPick(d);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left text-gray-800"
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#F9FAFB")}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left text-gray-800 dark:text-gray-100"
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: ITEM_DESTINO_COLORS[d] }} />
@@ -230,7 +230,7 @@ export function TecnicoItemDestino({
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-            style={{ color: ITEM_DESTINO_COLORS[destino], background: `color-mix(in srgb, ${ITEM_DESTINO_COLORS[destino]} 14%, white)` }}
+            style={{ color: ITEM_DESTINO_COLORS[destino], background: `color-mix(in srgb, ${ITEM_DESTINO_COLORS[destino]} 14%, var(--surface-1))` }}
           >
             {ITEM_DESTINO_LABELS[destino]}
             {destino === ITEM_DESTINO_NEEDS_STORE && destinoLojaName ? ` · ${destinoLojaName}` : ""}
@@ -239,19 +239,19 @@ export function TecnicoItemDestino({
             type="button"
             disabled={pending}
             onClick={() => run(() => clearItemDestino(itemId), "Destino desfeito -- volta pra pendente.")}
-            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 disabled:opacity-60 shrink-0"
+            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 disabled:opacity-60 shrink-0"
           >
             ↩ desfazer
           </button>
         </div>
         {destinoDefinidoPor ? (
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-400 dark:text-gray-500">
             {destinoDefinidoPor}
             {destinoDefinidoEm ? ` · ${formatDateTimeShortBr(destinoDefinidoEm)}` : ""}
           </span>
         ) : null}
         {ITEM_DESTINO_NEEDS_TEXT.includes(destino) && destinoObservacao ? (
-          <p className="text-xs whitespace-pre-line text-gray-600">{destinoObservacao}</p>
+          <p className="text-xs whitespace-pre-line text-gray-600 dark:text-gray-300">{destinoObservacao}</p>
         ) : null}
       </div>
     );
@@ -267,7 +267,7 @@ export function TecnicoItemDestino({
         <select
           value={storeId}
           onChange={(e) => setStoreId(e.target.value)}
-          className="text-xs rounded-lg border border-gray-200 px-2 py-1.5 text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+          className="text-xs rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
           autoFocus
         >
           <option value="" disabled>
@@ -297,7 +297,7 @@ export function TecnicoItemDestino({
               setPickingStore(false);
               setStoreId("");
             }}
-            className="text-xs font-medium rounded-md px-2 py-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors duration-150"
+            className="text-xs font-medium rounded-md px-2 py-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150"
           >
             cancelar
           </button>
@@ -315,7 +315,7 @@ export function TecnicoItemDestino({
           onChange={(e) => setNote(e.target.value)}
           placeholder={pickingNote === "outro" ? "Descreva a classificação…" : "Por que está em observação?"}
           rows={2}
-          className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 w-full text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+          className="text-xs rounded-lg border border-gray-200 dark:border-gray-600 px-2.5 py-1.5 w-full text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
           autoFocus
         />
         <div className="flex items-center gap-2">
@@ -339,7 +339,7 @@ export function TecnicoItemDestino({
               setPickingNote(null);
               setNote("");
             }}
-            className="text-xs font-medium rounded-md px-2 py-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors duration-150"
+            className="text-xs font-medium rounded-md px-2 py-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150"
           >
             cancelar
           </button>

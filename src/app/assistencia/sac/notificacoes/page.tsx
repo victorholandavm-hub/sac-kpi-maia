@@ -10,10 +10,11 @@ import { SacTabs } from "@/components/assistencia/SacTabs";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
-import { EntregasWeekGroups } from "@/components/assistencia/EntregasWeekGroups";
+import { EntregasFlatList } from "@/components/assistencia/EntregasFlatList";
 import { EntregasKanbanHoje } from "@/components/assistencia/EntregasKanbanHoje";
 import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
+import { DateRangeQuickFilter } from "@/components/assistencia/DateRangeQuickFilter";
 import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import {
   groupByRota,
@@ -30,12 +31,6 @@ import {
 } from "@/lib/entregaQueueGrouping";
 
 export const dynamic = "force-dynamic";
-
-// Isolado numa função à parte (não direto no corpo do componente) --
-// Date.now() é impuro (mesmo padrão de fila/page.tsx/admin/page.tsx).
-function currentTimeMs(): number {
-  return Date.now();
-}
 
 function buildHref(params: {
   status?: string;
@@ -120,7 +115,9 @@ export default async function SacNotificacoesPage({
   const today = new Date().toISOString().slice(0, 10);
 
   const [{ items: rawRequests }, stores, drivers, rotaOverview, todayRequestsFull] = await Promise.all([
-    listRequests({ status: filterStatus, q, storeId: store, types, requestedByNames: filterRequestedByNames, dateFrom, dateTo }),
+    // Filtra De/Até por data AGENDADA, não de criação -- mesmo motivo/pedido
+    // de fila/page.tsx (03/09/2026, ver dateField em serviceRequests.ts).
+    listRequests({ status: filterStatus, q, storeId: store, types, requestedByNames: filterRequestedByNames, dateFrom, dateTo, dateField: "scheduled_date" }),
     listStores(),
     listDrivers(),
     getRotaWeekOverview(startOfRotaWeek(today), 14),
@@ -161,7 +158,15 @@ export default async function SacNotificacoesPage({
   const todayGroups = q ? groups.filter((g) => g.dateBucket === "hoje") : pinSemRotaFirst(groupByRota(todayRequests));
   const restGroups = groups.filter((g) => g.dateBucket !== "hoje");
   const todayOverview = rotaOverview.find((d) => d.date === today) ?? null;
-  const now = currentTimeMs();
+  // Ver mesmo raciocínio/pedido em fila/page.tsx (03/09/2026): com
+  // qualquer filtro ativo, "Hoje" some e sobra só a lista achatada com o
+  // resultado do filtro inteiro.
+  const hasActiveFilter = !!(filterStatus || filterOrigem || filterSched !== undefined || filterCity || filterUrgente || filterSemRota || q || store || dateFrom || dateTo);
+  // Exceção "Hoje" sozinho -- mesmo raciocínio/pedido de fila/page.tsx
+  // (03/09/2026, ver lá): mostra o board completo (cards de rota + abas),
+  // sem a lista achatada do resto embaixo.
+  const isHojePresetOnly =
+    dateFrom === today && dateTo === today && !filterStatus && !filterOrigem && filterSched === undefined && !filterCity && !filterUrgente && !filterSemRota && !q && !store;
 
   return (
     <div className="w-full p-6 flex flex-col gap-4 min-w-0">
@@ -189,6 +194,9 @@ export default async function SacNotificacoesPage({
         }
       />
 
+      {/* Todos os filtros agrupados num retângulo só -- mesmo pedido/motivo
+          de fila/page.tsx (03/09/2026, ver lá). */}
+      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 dark:border-gray-600 p-4">
       {/* Linha 1 do guia de padronização -- mesmo desenho/motivo de
           fila/page.tsx (aba Entregas, ver lá). */}
       <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
@@ -202,8 +210,10 @@ export default async function SacNotificacoesPage({
               status: f.value.status ?? undefined,
               q,
               store,
-              from: dateFrom,
-              to: dateTo,
+              // "Todas" limpa o período ativo -- mesmo motivo/pedido de
+              // fila/page.tsx (03/09/2026, ver lá).
+              from: f.label === "Todas" ? undefined : dateFrom,
+              to: f.label === "Todas" ? undefined : dateTo,
               origem: filterOrigem,
               sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
               city: filterCity,
@@ -223,8 +233,14 @@ export default async function SacNotificacoesPage({
                 ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
                 : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, urgente: "1" })
             }
-            className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold text-white transition-colors duration-150 ${filterUrgente ? "" : "animate-pulse"}`}
-            style={{ background: "var(--status-critical)", border: `2px solid ${filterUrgente ? "#1F2937" : "var(--status-critical)"}` }}
+            className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold transition-colors duration-150 ${filterUrgente ? "" : "animate-pulse"}`}
+            style={{
+              // light-dark() -- mesmo motivo/desenho de fila/page.tsx (ver
+              // lá): "cores muito fortes no dark", 03/09/2026.
+              color: "light-dark(#fff, color-mix(in srgb, var(--status-critical) 88%, var(--foreground)))",
+              background: "light-dark(var(--status-critical), color-mix(in srgb, var(--status-critical) 26%, var(--surface-1)))",
+              border: `2px solid ${filterUrgente ? "var(--foreground)" : "light-dark(var(--status-critical), color-mix(in srgb, var(--status-critical) 26%, var(--surface-1)))"}`,
+            }}
           >
             ⚠ {overdueCount} pra remarcar
           </Link>
@@ -238,15 +254,19 @@ export default async function SacNotificacoesPage({
                 ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
                 : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, semrota: "1" })
             }
-            className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold text-white transition-colors duration-150"
-            style={{ background: "var(--status-warning)", border: `2px solid ${filterSemRota ? "#1F2937" : "var(--status-warning)"}` }}
+            className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold transition-colors duration-150"
+            style={{
+              color: "light-dark(#fff, color-mix(in srgb, var(--status-warning) 88%, var(--foreground)))",
+              background: "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))",
+              border: `2px solid ${filterSemRota ? "var(--foreground)" : "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))"}`,
+            }}
           >
             🧭 {semRotaCount} sem rota
           </Link>
         ) : null}
       </div>
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-400 dark:text-gray-500">
         {requests.length} solicitaç{requests.length === 1 ? "ão" : "ões"} encontrada{requests.length === 1 ? "" : "s"}
       </p>
 
@@ -271,6 +291,27 @@ export default async function SacNotificacoesPage({
         />
       </div>
 
+      {/* Atalhos de período -- mesmo desenho/motivo de fila/page.tsx (ver
+          lá). */}
+      <DateRangeQuickFilter
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        buildHref={(range) =>
+          buildHref({
+            status: filterStatus,
+            q,
+            store,
+            origem: filterOrigem,
+            sched: schedParam,
+            city: filterCity,
+            urgente: filterUrgente ? "1" : undefined,
+            semrota: filterSemRota ? "1" : undefined,
+            from: range.from,
+            to: range.to,
+          })
+        }
+      />
+
       <form action="/assistencia/sac/notificacoes" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
         {store ? <input type="hidden" name="store" value={store} /> : null}
@@ -281,7 +322,7 @@ export default async function SacNotificacoesPage({
         {filterSemRota ? <input type="hidden" name="semrota" value="1" /> : null}
         {/* Ícone de lupa -- mesmo padrão de fila/page.tsx (ver lá). */}
         <div className="relative flex-1 min-w-[240px]">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400" aria-hidden="true">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500" aria-hidden="true">
             🔍
           </span>
           <input
@@ -289,69 +330,76 @@ export default async function SacNotificacoesPage({
             name="q"
             defaultValue={q ?? ""}
             placeholder="Buscar por nº do chamado, cliente, produto, CPF ou telefone…"
-            className="rounded-lg border border-gray-200 pl-8 pr-3 py-2 text-sm w-full text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 pl-8 pr-3 py-2 text-sm w-full text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
           />
         </div>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
           De
           <input
             type="date"
             name="from"
             defaultValue={dateFrom ?? ""}
-            className="rounded-lg border border-gray-200 px-2 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
           />
         </label>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
           Até
           <input
             type="date"
             name="to"
             defaultValue={dateTo ?? ""}
-            className="rounded-lg border border-gray-200 px-2 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
           />
         </label>
         <button
           type="submit"
-          className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+          className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
         >
           Buscar
         </button>
         {q || dateFrom || dateTo ? (
           <Link
             href={buildHref({ status: filterStatus, store, origem: filterOrigem, sched: schedParam, city: filterCity, urgente: filterUrgente ? "1" : undefined, semrota: filterSemRota ? "1" : undefined })}
-            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150"
+            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
           >
             Limpar busca/data
           </Link>
         ) : null}
       </form>
+      </div>
+      {/* fecha o retângulo de filtros aberto acima */}
 
       {requests.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">Nenhuma solicitação encontrada.</p>
+        <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">Nenhuma solicitação encontrada.</p>
         </div>
       ) : (
-        // Hoje fica no Kanban (todayGroups); o resto (futuro + atrasado +
-        // sem rota) agrupado por semana -- pedido do Victor 26/08/2026:
-        // "divida os agrupamentos igual é na tela de visitas, agrupados
-        // por semana" (mesmo componente que a aba Entregas do admin usa,
-        // ver EntregasWeekGroups.tsx -- as duas telas não podem divergir
-        // de novo, ver comentário no topo deste arquivo).
+        // Lista única -- mesmo pedido/raciocínio de fila/page.tsx
+        // (03/09/2026, ver hasActiveFilter acima): sem filtro, "Hoje"
+        // (Kanban de rota) fica em cima, resto achatado embaixo, sem
+        // semana/mês. Com filtro ativo, "Hoje" some e sobra só a lista
+        // achatada com o resultado do filtro inteiro.
         <div className="flex flex-col gap-4">
-          {/* motoristaAction -- SAC não alcança a fila da assistência,
-              precisa desse atalho aqui também pra não depender de pedir
-              pra assistência mudar o motorista do dia (Junior como
-              padrão, pedido do Victor 21/08/2026). Botão (não a barra
-              inteira) ao lado de "📌 Hoje" -- pedido do Victor 02/09/2026:
-              "deve ficar ao lado de 'hoje' e só o botão". */}
-          <EntregasKanbanHoje
-            groups={todayGroups}
-            todayOverview={todayOverview}
-            motoristaAction={
-              <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly />
-            }
-          />
-          {restGroups.length > 0 ? <EntregasWeekGroups groups={restGroups} now={now} /> : null}
+          {!hasActiveFilter || isHojePresetOnly ? (
+            <>
+              {/* motoristaAction -- SAC não alcança a fila da assistência,
+                  precisa desse atalho aqui também pra não depender de pedir
+                  pra assistência mudar o motorista do dia (Junior como
+                  padrão, pedido do Victor 21/08/2026). Botão (não a barra
+                  inteira) ao lado de "📌 Hoje" -- pedido do Victor 02/09/2026:
+                  "deve ficar ao lado de 'hoje' e só o botão". */}
+              <EntregasKanbanHoje
+                groups={todayGroups}
+                todayOverview={todayOverview}
+                motoristaAction={
+                  <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly />
+                }
+              />
+              {!hasActiveFilter ? <EntregasFlatList items={restGroups.flatMap((g) => g.items)} /> : null}
+            </>
+          ) : (
+            <EntregasFlatList items={requests} />
+          )}
         </div>
       )}
     </div>

@@ -35,8 +35,8 @@ export function FilterSelect({
     <select
       value={value}
       onChange={handleChange}
-      className={`rounded-lg border border-gray-200 px-3.5 py-2 text-sm hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150 ${
-        value ? "text-gray-800" : "text-gray-500"
+      className={`rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2 text-sm hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150 ${
+        value ? "text-gray-800 dark:text-gray-100" : "text-gray-500 dark:text-gray-400"
       }`}
     >
       <option value="">{placeholder}</option>

@@ -41,7 +41,7 @@ export function RequestHistoryTimeline({ events }: { events: HistoryEvent[] }) {
           style={
             onlyManual
               ? { background: "#1B5E3C", color: "#ffffff", borderColor: "#1B5E3C" }
-              : { borderColor: "#E5E7EB", color: "#4B5563" }
+              : { borderColor: "var(--border)", color: "var(--text-secondary)" }
           }
         >
           {onlyManual ? `✓ Só notas manuais (${manualCount})` : `Mostrar só notas manuais (${manualCount})`}
@@ -55,20 +55,20 @@ export function RequestHistoryTimeline({ events }: { events: HistoryEvent[] }) {
                 último item não tem linha embaixo. */}
             <div className="flex flex-col items-center shrink-0">
               <div className="w-2.5 h-2.5 rounded-full mt-1.5" style={{ background: "#1B5E3C" }} />
-              {i < shown.length - 1 ? <div className="w-px flex-1" style={{ background: "#F3F4F6" }} /> : null}
+              {i < shown.length - 1 ? <div className="w-px flex-1" style={{ background: "var(--gridline)" }} /> : null}
             </div>
             <div className="flex flex-col gap-0.5 pb-4 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm" style={{ color: "#1F2937" }}>
-                  <strong style={{ color: "#4B5563", fontWeight: 600 }}>{event.actorName ?? "Alguém"}</strong>{" "}
+                <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+                  <strong style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{event.actorName ?? "Alguém"}</strong>{" "}
                   {event.actionText}
                 </span>
               </div>
-              <span className="text-xs" style={{ color: "#9CA3AF" }}>
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                 {formatDateTimeBr(event.createdAt)}
               </span>
               {event.note ? (
-                <p className="text-sm" style={{ color: "#4B5563" }}>
+                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                   {event.note}
                 </p>
               ) : null}

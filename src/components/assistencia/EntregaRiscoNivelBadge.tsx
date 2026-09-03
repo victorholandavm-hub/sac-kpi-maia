@@ -8,7 +8,7 @@ export function EntregaRiscoNivelBadge({ nivel }: { nivel: string }) {
   return (
     <span
       className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-      style={{ color: `color-mix(in srgb, ${color} 70%, black)`, background: `color-mix(in srgb, ${color} 14%, white)` }}
+      style={{ color: `color-mix(in srgb, ${color} 70%, var(--foreground))`, background: `color-mix(in srgb, ${color} 14%, var(--surface-1))` }}
     >
       {ENTREGA_RISCO_NIVEL_LABELS[nivel] ?? nivel}
     </span>

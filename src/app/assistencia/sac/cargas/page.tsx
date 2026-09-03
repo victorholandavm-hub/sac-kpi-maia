@@ -25,44 +25,44 @@ function diasDesde(value: string): number {
 // padrão + a sub-aba da carga 004440 (ver CargasSubTabs).
 function PendenteCargaTable({ pedidos }: { pedidos: PedidoSemCarga[] }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
+    <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden overflow-x-auto">
       <table className="w-full border-collapse text-sm" style={{ minWidth: "640px" }}>
         <thead>
-          <tr className="bg-gray-50 border-b border-gray-100">
+          <tr className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
             {["Pedido / Filial", "Cliente", "Loja", "Comprado em", ""].map((h) => (
-              <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">
+              <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 whitespace-nowrap">
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
           {pedidos.map((p) => {
             const dias = diasDesde(p.compradoEm);
             return (
-              <tr key={`${p.pedido}-${p.filialVenda}`} className="hover:bg-gray-50 transition-colors duration-150">
-                <td className="px-4 py-3 align-top whitespace-nowrap font-mono text-xs text-gray-400">
+              <tr key={`${p.pedido}-${p.filialVenda}`} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                <td className="px-4 py-3 align-top whitespace-nowrap font-mono text-xs text-gray-400 dark:text-gray-500">
                   {p.pedido} · {p.filialVenda}
                 </td>
                 <td className="px-4 py-3 align-top">
-                  <div className="font-medium text-gray-800 truncate">{p.clienteNome ?? "Cliente não identificado"}</div>
-                  <div className="text-xs text-gray-400">{p.clienteDocumento ?? "—"}</div>
+                  <div className="font-medium text-gray-800 dark:text-gray-100 truncate">{p.clienteNome ?? "Cliente não identificado"}</div>
+                  <div className="text-xs text-gray-400 dark:text-gray-500">{p.clienteDocumento ?? "—"}</div>
                 </td>
-                <td className="px-4 py-3 align-top text-gray-600 whitespace-nowrap">{p.loja ?? "—"}</td>
+                <td className="px-4 py-3 align-top text-gray-600 dark:text-gray-300 whitespace-nowrap">{p.loja ?? "—"}</td>
                 <td className="px-4 py-3 align-top whitespace-nowrap">
-                  <span className="text-gray-800">{formatDate(p.compradoEm)}</span>
+                  <span className="text-gray-800 dark:text-gray-100">{formatDate(p.compradoEm)}</span>
                   <span
                     className="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
                     style={
                       dias >= 3
-                        ? { color: "color-mix(in srgb, var(--status-critical) 70%, black)", background: "color-mix(in srgb, var(--status-critical) 14%, white)" }
-                        : { background: "#F3F4F6", color: "#6B7280" }
+                        ? { color: "color-mix(in srgb, var(--status-critical) 70%, var(--foreground))", background: "color-mix(in srgb, var(--status-critical) 14%, var(--surface-1))" }
+                        : { background: "var(--surface-2)", color: "var(--text-muted)" }
                     }
                   >
                     {dias === 0 ? "hoje" : `${dias}d`}
                   </span>
                 </td>
-                <td className="px-4 py-3 align-top text-right text-xs text-gray-400 whitespace-nowrap">{p.statusAtual ?? "—"}</td>
+                <td className="px-4 py-3 align-top text-right text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{p.statusAtual ?? "—"}</td>
               </tr>
             );
           })}
@@ -76,50 +76,50 @@ function CargaCard({ group }: { group: CargaGroup }) {
   const totalProblemas = group.pedidos.reduce((n, p) => n + p.problemas.length, 0);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-start justify-between gap-3 flex-wrap p-4 pb-3 border-b border-gray-100">
+    <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+      <div className="flex items-start justify-between gap-3 flex-wrap p-4 pb-3 border-b border-gray-100 dark:border-gray-700">
         <div className="flex flex-col gap-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-gray-800">Carga {group.carga}</span>
-            {group.statusCarga ? <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{group.statusCarga}</span> : null}
+            <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">Carga {group.carga}</span>
+            {group.statusCarga ? <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">{group.statusCarga}</span> : null}
             {totalProblemas > 0 ? (
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: "var(--status-critical)" }}>
                 {totalProblemas} problema{totalProblemas === 1 ? "" : "s"}
               </span>
             ) : null}
           </div>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-400 dark:text-gray-500">
             Previsão {formatDate(group.dtPrevisao)}
             {group.motoristaNome ? ` · Motorista: ${group.motoristaNome}` : ""}
           </span>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-400 dark:text-gray-500">
             {group.transportadora ? `${group.transportadora}` : ""}
             {group.veiculo ? ` · Veículo ${group.veiculo}` : ""}
           </span>
         </div>
       </div>
 
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-gray-100 dark:divide-gray-700">
         {group.pedidos.map((p) => (
           <div key={p.cargaRowId} className="flex flex-col gap-2 p-4">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-xs font-mono text-gray-400">
+                <span className="text-xs font-mono text-gray-400 dark:text-gray-500">
                   Pedido {p.pedido} · Filial {p.filialVenda}
                 </span>
-                <span className="text-sm font-medium text-gray-800">
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
                   {p.clienteNome ?? "Cliente não identificado"}
-                  {p.clienteCodigo ? <span className="text-xs font-mono font-normal text-gray-400"> #{p.clienteCodigo}</span> : null}
+                  {p.clienteCodigo ? <span className="text-xs font-mono font-normal text-gray-400 dark:text-gray-500"> #{p.clienteCodigo}</span> : null}
                 </span>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-400 dark:text-gray-500">
                   {p.clienteDocumento ?? "—"}
                   {p.loja ? ` · ${p.loja}` : ""}
                 </span>
               </div>
-              {p.statusEntrega ? <span className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 bg-gray-100 text-gray-500">{p.statusEntrega}</span> : null}
+              {p.statusEntrega ? <span className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">{p.statusEntrega}</span> : null}
             </div>
 
-            {p.ocorrenciaDescricao ? <p className="text-xs text-gray-400">Ocorrência TOTVS: {p.ocorrenciaDescricao}</p> : null}
+            {p.ocorrenciaDescricao ? <p className="text-xs text-gray-400 dark:text-gray-500">Ocorrência TOTVS: {p.ocorrenciaDescricao}</p> : null}
 
             <CargaProblemaField cargaRowId={p.cargaRowId} problemas={p.problemas} />
           </div>
@@ -143,13 +143,13 @@ function CargasSubTabs({ active }: { active: CargasTab }) {
     { key: "trocas", label: `Trocas p/ SAC (Carga ${CARGA_TROCAS_SAC})`, href: "/assistencia/sac/cargas?aba=trocas" },
   ];
   return (
-    <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
+    <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start">
       {tabs.map((t) => (
         <Link
           key={t.key}
           href={t.href}
           className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-            active === t.key ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-700"
+            active === t.key ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           }`}
           style={active === t.key ? { background: "color-mix(in srgb, var(--brand-green) 78%, black)" } : undefined}
         >
@@ -181,15 +181,15 @@ export default async function CargasPage({ searchParams }: { searchParams: Promi
 
       {activeTab === "pendente" ? (
         <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-gray-800">
-            Pendente de carga <span className="font-normal text-gray-400">({pendentes.length})</span>
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+            Pendente de carga <span className="font-normal text-gray-400 dark:text-gray-500">({pendentes.length})</span>
           </h2>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Comprou nos últimos 3 dias e ainda não entrou em nenhuma carga/viagem, ou foi tirado da carga que tinha.
           </p>
           {pendentes.length === 0 ? (
-            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-              <p className="text-sm text-gray-400">Nenhum pedido pendente de carga no momento.</p>
+            <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+              <p className="text-sm text-gray-400 dark:text-gray-500">Nenhum pedido pendente de carga no momento.</p>
             </div>
           ) : (
             <PendenteCargaTable pedidos={pendentes} />
@@ -197,11 +197,11 @@ export default async function CargasPage({ searchParams }: { searchParams: Promi
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-gray-800">Trocas p/ SAC — Carga {CARGA_TROCAS_SAC}</h2>
-          <p className="text-xs text-gray-400">Carga fixa onde a logística coloca as trocas que precisam de ação do SAC.</p>
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Trocas p/ SAC — Carga {CARGA_TROCAS_SAC}</h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Carga fixa onde a logística coloca as trocas que precisam de ação do SAC.</p>
           {!cargaTrocas ? (
-            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-              <p className="text-sm text-gray-400">Nada na carga {CARGA_TROCAS_SAC} no momento.</p>
+            <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+              <p className="text-sm text-gray-400 dark:text-gray-500">Nada na carga {CARGA_TROCAS_SAC} no momento.</p>
             </div>
           ) : (
             <CargaCard group={cargaTrocas} />
@@ -209,7 +209,7 @@ export default async function CargasPage({ searchParams }: { searchParams: Promi
         </div>
       )}
 
-      <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 self-center">
+      <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 self-center">
         ← Voltar
       </Link>
     </div>

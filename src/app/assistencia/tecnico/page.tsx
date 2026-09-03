@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 // de escolha de papel, grande demais pra uma célula de tabela densa).
 function StoreIconSmall() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5 shrink-0 text-gray-400">
+    <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5 shrink-0 text-gray-400 dark:text-gray-500">
       <path
         d="M4 10.5V19a1 1 0 0 0 1 1h5v-5h4v5h5a1 1 0 0 0 1-1v-8.5M3 10l1.5-5.5A1 1 0 0 1 5.46 3.5h13.08a1 1 0 0 1 .96 1L21 10M3 10a2 2 0 0 0 4 0M7 10a2 2 0 0 0 4 0M11 10a2 2 0 0 0 4 0M15 10a2 2 0 0 0 4 0M19 10a2 2 0 0 0 2 0"
         stroke="currentColor"
@@ -222,27 +222,27 @@ export default async function TecnicoHomePage({
             {/* Ações do cabeçalho como pílulas ghost (vidro fosco), não
                 mais link sublinhado solto -- Guia de Componentes Maia
                 (Design System, 01/09/2026): barra de navegação com
-                "estado ativo em vidro fosco sutil (bg-white/15)". */}
+                "estado ativo em vidro fosco sutil (bg-white dark:bg-gray-800/15)". */}
             <div className="flex items-center gap-1 text-sm shrink-0">
               {/* Pedido do Victor 28/08/2026: "preciso que a equipe
                   tecnica tambem tenha acesso" à tela de estoque (dar
                   baixa em retirada registrada pela assistência). */}
               <Link
                 href="/assistencia/tecnico/estoque"
-                className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors duration-150"
+                className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white dark:hover:bg-gray-700/10 transition-colors duration-150"
               >
                 Estoque
               </Link>
               <Link
                 href="/assistencia"
-                className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors duration-150"
+                className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white dark:hover:bg-gray-700/10 transition-colors duration-150"
               >
                 ← Voltar
               </Link>
               <form action={tecnicoSignOut}>
                 <button
                   type="submit"
-                  className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors duration-150"
+                  className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white dark:hover:bg-gray-700/10 transition-colors duration-150"
                 >
                   Sair
                 </button>
@@ -264,21 +264,21 @@ export default async function TecnicoHomePage({
                 name="q"
                 defaultValue={q ?? ""}
                 placeholder="Buscar por cliente ou produto…"
-                className="rounded-lg border border-gray-200 px-3.5 py-2 text-sm flex-1 text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2 text-sm flex-1 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
               />
               {/* Botão secundário (outline) -- Guia de Componentes Maia:
                   "ações de apoio nunca competem em cor com o botão
                   primário -- contorno fino, elevação zero". */}
               <button
                 type="submit"
-                className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 shrink-0"
+                className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150 shrink-0"
               >
                 Buscar
               </button>
               {q || store ? (
                 <Link
                   href={buildHref({ view: phase === "pendentes" ? undefined : phase })}
-                  className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 shrink-0"
+                  className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 shrink-0"
                 >
                   Limpar
                 </Link>
@@ -292,24 +292,24 @@ export default async function TecnicoHomePage({
               Substitui a aba de sublinhado de antes -- as 3 fases são
               exatamente esse caso de uso (nunca mais que 2-4 opções,
               trocando o contexto inteiro da tabela abaixo). */}
-          <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
+          <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start">
             {PHASES.map(({ value, label }) => (
               <Link
                 key={value}
                 href={buildHref({ view: value === "pendentes" ? undefined : value, q, store })}
                 className={`px-3.5 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-all duration-200 ${
-                  phase === value ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  phase === value ? "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 }`}
               >
                 {label}
-                <span className="text-xs font-mono text-gray-400">({tabCounts[value]})</span>
+                <span className="text-xs font-mono text-gray-400 dark:text-gray-500">({tabCounts[value]})</span>
               </Link>
             ))}
           </div>
 
           {requests.length === 0 ? (
-            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-              <p className="text-sm text-gray-400">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+              <p className="text-sm text-gray-400 dark:text-gray-500">
                 {phase === "classificados"
                   ? "Nenhum item classificado ainda."
                   : phase === "observacao"
@@ -332,18 +332,18 @@ export default async function TecnicoHomePage({
                   <details key={group.dateKey} className="group flex flex-col gap-2">
                     <summary className="flex items-center gap-3 py-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                       <span
-                        className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400"
+                        className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400 dark:text-gray-500"
                         aria-hidden="true"
                       >
                         ▶
                       </span>
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 capitalize whitespace-nowrap">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 capitalize whitespace-nowrap">
                         {group.label}
                       </h3>
-                      <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
+                      <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
                         {group.requests.length}
                       </span>
-                      <div className="flex-1 h-px bg-gray-200" />
+                      <div className="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
                     </summary>
 
                     {/* Grid horizontal puro -- pedido do Victor 31/08/2026:
@@ -357,7 +357,7 @@ export default async function TecnicoHomePage({
                         overflow-x-auto -- a tabela nunca deve empurrar a
                         página inteira pro lado, só rolar por dentro do
                         próprio cartão em telas mais estreitas. */}
-                    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
+                    <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden overflow-x-auto">
                       <table className="w-full border-collapse text-xs" style={{ minWidth: "880px", tableLayout: "fixed" }}>
                         <colgroup>
                           <col style={{ width: "140px" }} />
@@ -368,25 +368,25 @@ export default async function TecnicoHomePage({
                           <col style={{ width: "230px" }} />
                         </colgroup>
                         <thead>
-                          <tr className="bg-gray-50 border-b border-gray-100">
+                          <tr className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
                             {["ID / Tipo", "Setor", "Loja", "Cliente", "Produto", "Destino"].map((h) => (
                               <th
                                 key={h}
-                                className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap ${h === "Setor" ? "text-center" : "text-left"}`}
+                                className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 whitespace-nowrap ${h === "Setor" ? "text-center" : "text-left"}`}
                               >
                                 {h}
                               </th>
                             ))}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                           {gridRows.map(({ request: r, item: i, isFirst, itemCount }) => (
-                            <tr key={i.id} className="group/row hover:bg-gray-50 transition-colors duration-150">
+                            <tr key={i.id} className="group/row hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
                               {/* Coluna 1: ID / Tipo */}
                               {isFirst ? (
                                 <td className="px-3 py-2.5 align-top whitespace-nowrap" rowSpan={itemCount}>
-                                  <div className="font-mono text-gray-400">#{r.ticketNumber}</div>
-                                  <div className="font-semibold truncate text-gray-800">{REQUEST_TYPE_LABELS[r.type] ?? r.type}</div>
+                                  <div className="font-mono text-gray-400 dark:text-gray-500">#{r.ticketNumber}</div>
+                                  <div className="font-semibold truncate text-gray-800 dark:text-gray-100">{REQUEST_TYPE_LABELS[r.type] ?? r.type}</div>
                                 </td>
                               ) : null}
 
@@ -400,8 +400,8 @@ export default async function TecnicoHomePage({
                                     className="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold"
                                     style={
                                       origemLabel(r.type) === "SAC"
-                                        ? { background: "#F3F4F6", color: "#4B5566" }
-                                        : { background: "#E8F0EC", color: "#164A30" }
+                                        ? { background: "var(--surface-2)", color: "var(--text-secondary)" }
+                                        : { background: "color-mix(in srgb, var(--brand-green) 16%, var(--surface-1))", color: "var(--brand-green)" }
                                     }
                                   >
                                     {origemLabel(r.type)}
@@ -412,7 +412,7 @@ export default async function TecnicoHomePage({
                               {/* Coluna 3: Loja -- ícone sutil + nome */}
                               {isFirst ? (
                                 <td className="px-3 py-2.5 align-top" rowSpan={itemCount}>
-                                  <span className="flex items-center gap-1.5 truncate text-gray-600" title={r.storeName}>
+                                  <span className="flex items-center gap-1.5 truncate text-gray-600 dark:text-gray-300" title={r.storeName}>
                                     <StoreIconSmall />
                                     <span className="truncate">{r.storeName}</span>
                                   </span>
@@ -422,11 +422,11 @@ export default async function TecnicoHomePage({
                               {/* Coluna 4: Cliente */}
                               {isFirst ? (
                                 <td className="px-3 py-2.5 align-top" rowSpan={itemCount}>
-                                  <div className="font-medium truncate text-gray-800" title={r.clientName ?? "—"}>
+                                  <div className="font-medium truncate text-gray-800 dark:text-gray-100" title={r.clientName ?? "—"}>
                                     {r.clientName ?? "—"}
                                   </div>
                                   {r.clientCpf || r.clientPhone ? (
-                                    <div className="font-mono truncate text-xs text-gray-400">{r.clientCpf ?? r.clientPhone}</div>
+                                    <div className="font-mono truncate text-xs text-gray-400 dark:text-gray-500">{r.clientCpf ?? r.clientPhone}</div>
                                   ) : null}
                                   <TecnicoNotificationModalButton request={r} />
                                 </td>
@@ -434,10 +434,10 @@ export default async function TecnicoHomePage({
 
                               {/* Coluna 5: Produto -- texto corrido, uma linha só, trava a altura da linha */}
                               <td className="px-3 py-2.5 align-top">
-                                <span className="block truncate text-gray-700" title={productLine(i)}>
+                                <span className="block truncate text-gray-700 dark:text-gray-200" title={productLine(i)}>
                                   {i.quantity > 1 ? `${i.quantity}x ` : ""}
                                   {i.product}
-                                  {i.partCode ? <span className="text-gray-400"> · {i.partCode}</span> : null}
+                                  {i.partCode ? <span className="text-gray-400 dark:text-gray-500"> · {i.partCode}</span> : null}
                                 </span>
                               </td>
 

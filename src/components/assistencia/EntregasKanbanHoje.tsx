@@ -151,16 +151,25 @@ const STATUS_TAB_COLORS: Record<DeliveryStatusTab, string> = {
 // (mesma família de cor do badge por linha) -- mesma régua de cor de
 // StatusBadge.tsx, sem inventar paleta nova só pra esse resumo.
 function CountBadge({ label, count, tone }: { label: string; count: number; tone: "neutral" | "good" | "muted" | "warning" }) {
-  const styles =
+  // Tingido a partir dos tokens de status (mesmo padrão de StatusBadge.tsx)
+  // em vez de hex cru -- pedido do Victor 03/09/2026: "ainda tem bastante
+  // cor forte dos filtros e status... deixar menos dolorido aos olhos, já
+  // que é a versão dark". Hex fixo (ex.: #E8F0EC) sempre dava um tom pastel
+  // claro, correto só no tema claro -- misturando com var(--surface-1) em
+  // vez de branco cru, o mesmo badge fica sutil nos dois temas.
+  const accent =
     tone === "good"
-      ? { background: "#E8F0EC", color: "#164A30" }
-      : tone === "muted"
-        ? { background: "#F3F4F6", color: "#9CA3AF" }
-        : tone === "warning"
-          ? { background: "#FBE7E6", color: "#B3261E" }
-          : { background: "#F3F4F6", color: "#4B5563" };
+      ? "var(--status-good)"
+      : tone === "warning"
+        ? "var(--status-critical)"
+        : tone === "muted"
+          ? "var(--text-muted)"
+          : "var(--text-secondary)";
   return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap" style={styles}>
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
+      style={{ background: `color-mix(in srgb, ${accent} 16%, var(--surface-1))`, color: accent }}
+    >
       {count} {label}
     </span>
   );
@@ -183,9 +192,9 @@ function RouteSummaryCard({ column, selected, onToggle }: { column: KanbanColumn
       onClick={onToggle}
       className="text-left w-full rounded-xl border p-4 flex flex-col gap-3 cursor-pointer transition-colors"
       style={{
-        borderColor: selected ? "var(--brand-green)" : "#E5E7EB",
+        borderColor: selected ? "var(--brand-green)" : "var(--border)",
         borderLeft: `3px solid ${column.borderColor}`,
-        background: selected ? "color-mix(in srgb, var(--brand-green) 10%, white)" : "#fff",
+        background: selected ? "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" : "var(--surface-1)",
         // Destaque mais forte que só a borda/fundo levemente tingidos --
         // achado do Victor 02/09/2026 testando: "precisa estar um pouco
         // mais destacada, para o usuario perceber qual rota está
@@ -195,7 +204,10 @@ function RouteSummaryCard({ column, selected, onToggle }: { column: KanbanColumn
       }}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+        {/* Letras brancas no escuro -- pedido do Victor 03/09/2026: "preciso
+            que as letras do botão das rotas sejam brancas" (esse card é um
+            <button>, o nome da rota é o texto principal dele). */}
+        <span className="text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-1.5">
           {selected ? (
             <span
               className="inline-flex items-center justify-center h-4 w-4 rounded-full text-white text-[10px] font-bold shrink-0"
@@ -207,11 +219,11 @@ function RouteSummaryCard({ column, selected, onToggle }: { column: KanbanColumn
           ) : null}
           {column.rotaLabel}
         </span>
-        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500 shrink-0">
+        <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400 shrink-0">
           {column.items.length}
         </span>
       </div>
-      <span className="text-xs text-gray-500">{column.driverName ? `🚚 ${column.driverName}` : "Sem motorista"}</span>
+      <span className="text-xs text-gray-500 dark:text-gray-400">{column.driverName ? `🚚 ${column.driverName}` : "Sem motorista"}</span>
       <div className="flex items-center gap-1.5 flex-wrap">
         <CountBadge label="programado" count={counts.programado} tone="neutral" />
         <CountBadge label="concluído" count={counts.concluido} tone="good" />
@@ -247,10 +259,10 @@ function TodayRow({ row }: { row: FlatRow }) {
   return (
     <tr
       onClick={() => router.push(`/assistencia/${r.id}`)}
-      className={`hover:bg-gray-50 transition-colors duration-150 cursor-pointer ${r.status === "concluida" ? "opacity-60" : ""}`}
+      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer ${r.status === "concluida" ? "opacity-60" : ""}`}
     >
       <td className="px-4 py-3 align-top whitespace-nowrap">
-        <div className="font-mono text-xs text-gray-400">#{r.ticketNumber}</div>
+        <div className="font-mono text-xs text-gray-400 dark:text-gray-500">#{r.ticketNumber}</div>
         <span
           className="inline-flex mt-1 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white whitespace-nowrap"
           style={{ background: DELIVERY_TYPE_COLORS[r.type] ?? "#9CA3AF" }}
@@ -260,33 +272,33 @@ function TodayRow({ row }: { row: FlatRow }) {
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5">
-          <span className="font-medium text-gray-800 truncate">{r.clientName ?? "Sem nome de cliente"}</span>
+          <span className="font-medium text-gray-800 dark:text-gray-100 truncate">{r.clientName ?? "Sem nome de cliente"}</span>
           <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
         </div>
         {/* Telefone + bairro -- mesma dupla que o card antigo mostrava
             (bairro tinha sumido na reformulação de 01/09/2026, restaurado
             aqui: continua sendo dado que a rota/motorista precisa). */}
-        <div className="text-xs text-gray-400 font-mono">
+        <div className="text-xs text-gray-400 dark:text-gray-500 font-mono">
           {r.clientPhone ?? "—"}
           {r.clientNeighborhood ? ` · ${r.clientNeighborhood}` : ""}
         </div>
       </td>
-      <td className="px-4 py-3 align-top text-gray-600 max-w-[260px] truncate" title={r.items.map((i) => i.product).join(", ")}>
+      <td className="px-4 py-3 align-top text-gray-600 dark:text-gray-300 max-w-[260px] truncate" title={r.items.map((i) => i.product).join(", ")}>
         {r.items.map((i) => i.product).join(", ") || "—"}
       </td>
-      <td className="px-4 py-3 align-top text-gray-600 whitespace-nowrap">
+      <td className="px-4 py-3 align-top text-gray-600 dark:text-gray-300 whitespace-nowrap">
         <div>{row.rotaLabel}</div>
-        <div className="text-xs text-gray-400">{row.driverName ? `🚚 ${row.driverName}` : "Sem motorista"}</div>
+        <div className="text-xs text-gray-400 dark:text-gray-500">{row.driverName ? `🚚 ${row.driverName}` : "Sem motorista"}</div>
         {/* Responsável -- pedido do Victor 02/09/2026: "que apareça quem é
             o responsável por aquela demanda já na lista". */}
-        <div className="text-xs text-gray-400">Responsável: {r.assignedToName ?? "—"}</div>
+        <div className="text-xs text-gray-400 dark:text-gray-500">Responsável: {r.assignedToName ?? "—"}</div>
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5 flex-wrap">
           <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
           {/* Horário agendado -- também tinha sumido na reformulação,
               restaurado (o card antigo mostrava "🕐 HH:MM"). */}
-          {r.scheduledTime ? <span className="text-[10px] text-gray-400 whitespace-nowrap">🕐 {r.scheduledTime.slice(0, 5)}</span> : null}
+          {r.scheduledTime ? <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap">🕐 {r.scheduledTime.slice(0, 5)}</span> : null}
           {r.urgent ? (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap text-white" style={{ background: "var(--status-critical)" }}>
               URGENTE
@@ -381,20 +393,20 @@ export function EntregasKanbanHoje({
           substitui as subabas por coluna de antes (pedido do Victor
           29/08/2026), agora um lugar só pra tabela achatada inteira. Os
           números respeitam o filtro de rota escolhido acima (ver rotaRows). */}
-      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start flex-wrap">
+      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start flex-wrap">
         {(Object.keys(STATUS_TAB_LABELS) as DeliveryStatusTab[]).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
             className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-              tab === t ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-700"
+              tab === t ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             }`}
             style={tab === t ? { background: `color-mix(in srgb, ${STATUS_TAB_COLORS[t]} 78%, black)` } : undefined}
           >
             {STATUS_TAB_LABELS[t]}
             {t !== "todos" ? (
-              <span className={`ml-1 text-xs font-mono ${tab === t ? "text-white/80" : "text-gray-400"}`}>({counts[t]})</span>
+              <span className={`ml-1 text-xs font-mono ${tab === t ? "text-white/80" : "text-gray-400 dark:text-gray-500"}`}>({counts[t]})</span>
             ) : null}
           </button>
         ))}
@@ -403,21 +415,21 @@ export function EntregasKanbanHoje({
       {/* Tabela Grid Horizontal Limpa -- Guia de Componentes Maia (Design
           System, 01/09/2026): fim das caixas de texto espremidas do
           Kanban antigo. */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-100">
+            <tr className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
               {["ID / Tipo", "Cliente", "Produto", "Rota / Motorista", "Situação", ""].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">
+                <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 whitespace-nowrap">
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {visibleRows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
                   Nada em &quot;{STATUS_TAB_LABELS[tab]}&quot; aqui.
                 </td>
               </tr>

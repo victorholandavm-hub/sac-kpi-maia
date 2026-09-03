@@ -14,13 +14,13 @@ export default function SacLoginPage() {
             <h1 className="text-xl font-semibold" style={{ color: "var(--brand-green)" }}>
               SAC
             </h1>
-            <p className="text-sm mt-1 text-gray-500">Entre com seu nome e PIN.</p>
+            <p className="text-sm mt-1 text-gray-500 dark:text-gray-400">Entre com seu nome e PIN.</p>
           </div>
         </div>
 
         <SacLoginForm />
 
-        <Link href="/assistencia" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 text-center">
+        <Link href="/assistencia" className="text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 text-center">
           ← Voltar
         </Link>
       </div>

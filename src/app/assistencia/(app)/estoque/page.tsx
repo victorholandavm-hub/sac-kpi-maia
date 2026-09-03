@@ -102,13 +102,13 @@ export default async function EstoquePage({
       <div className="flex items-center gap-2">
         <Link
           href="/assistencia/pecas"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
         >
           Peças
         </Link>
         <Link
           href="/assistencia/fornecedores"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
         >
           Fornecedores
         </Link>
@@ -168,7 +168,7 @@ export default async function EstoquePage({
         {factory ? <input type="hidden" name="factory" value={factory} /> : null}
         {responsavel ? <input type="hidden" name="responsavel" value={responsavel} /> : null}
         <div className="relative flex-1 min-w-[240px]">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400" aria-hidden="true">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500" aria-hidden="true">
             🔍
           </span>
           <input
@@ -176,34 +176,34 @@ export default async function EstoquePage({
             name="q"
             defaultValue={q ?? ""}
             placeholder="Buscar por produto, código ou cliente…"
-            className="rounded-lg border border-gray-200 pl-8 pr-3 py-2 text-sm w-full"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 pl-8 pr-3 py-2 text-sm w-full"
           />
         </div>
-        <label className="flex items-center gap-1 text-xs text-gray-500">
+        <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
           De
-          <input type="date" name="from" defaultValue={dateFrom ?? ""} className="rounded-lg border border-gray-200 px-2 py-2 text-sm" />
+          <input type="date" name="from" defaultValue={dateFrom ?? ""} className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-2 text-sm" />
         </label>
-        <label className="flex items-center gap-1 text-xs text-gray-500">
+        <label className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
           Até
-          <input type="date" name="to" defaultValue={dateTo ?? ""} className="rounded-lg border border-gray-200 px-2 py-2 text-sm" />
+          <input type="date" name="to" defaultValue={dateTo ?? ""} className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-2 text-sm" />
         </label>
-        <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-800">
+        <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100">
           Buscar
         </button>
         {q || dateFrom || dateTo ? (
-          <Link href={buildHref({ type: type || undefined, factory, responsavel })} className="text-xs underline text-gray-500 hover:text-gray-700">
+          <Link href={buildHref({ type: type || undefined, factory, responsavel })} className="text-xs underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             Limpar busca/data
           </Link>
         ) : null}
       </form>
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-400 dark:text-gray-500">
         {movements.length} movimentaç{movements.length === 1 ? "ão" : "ões"} encontrada{movements.length === 1 ? "" : "s"}
       </p>
 
       {movements.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">Nenhuma movimentação encontrada.</p>
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">Nenhuma movimentação encontrada.</p>
         </div>
       ) : (
         // Semana > dia (accordion, recolhido por padrão) -- pedido do
@@ -215,29 +215,29 @@ export default async function EstoquePage({
           {groupIntoWeeks(groups, (g) => g.key).map((week) => {
             const weekTotal = week.days.reduce((sum, g) => sum + g.items.length, 0);
             return (
-              <details key={week.weekKey} className="rounded-xl overflow-hidden border border-gray-200 group/week">
-                <summary className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                  <span className="text-xs shrink-0 transition-transform duration-150 group-open/week:rotate-90 text-gray-400" aria-hidden="true">
+              <details key={week.weekKey} className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 group/week">
+                <summary className="px-4 py-2.5 bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                  <span className="text-xs shrink-0 transition-transform duration-150 group-open/week:rotate-90 text-gray-400 dark:text-gray-500" aria-hidden="true">
                     ▶
                   </span>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">{week.label}</span>
-                  <span className="text-xs font-semibold text-gray-400">({weekTotal})</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{week.label}</span>
+                  <span className="text-xs font-semibold text-gray-400 dark:text-gray-500">({weekTotal})</span>
                 </summary>
-                <div className="flex flex-col gap-3 p-3 bg-white">
+                <div className="flex flex-col gap-3 p-3 bg-white dark:bg-gray-800">
                   {week.days.map((group) => (
-                    <details key={group.key} className="group rounded-lg overflow-hidden border border-gray-200 bg-white">
+                    <details key={group.key} className="group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
                       <summary className="px-4 py-2 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                        <span className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400" aria-hidden="true">
+                        <span className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400 dark:text-gray-500" aria-hidden="true">
                           ▶
                         </span>
                         {/* Recolhido = branco/texto verde, aberto = verde
                             sólido/texto branco -- mesmo tratamento de
                             MonthAccordion.tsx (Design System, 02/09/2026). */}
-                        <span className="text-sm font-bold uppercase tracking-wide rounded-md shadow-sm px-2.5 py-1 bg-white text-[#1B5E3C] group-open:bg-[#1B5E3C] group-open:text-white">
+                        <span className="text-sm font-bold uppercase tracking-wide rounded-md shadow-sm px-2.5 py-1 bg-white dark:bg-gray-800 text-[#1B5E3C] group-open:bg-[#1B5E3C] group-open:text-white">
                           {group.label} ({group.items.length})
                         </span>
                       </summary>
-                      <div className="divide-y divide-gray-100 bg-white">
+                      <div className="divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-800">
                         {group.items.map((m) => (
                           <StockMovementCard key={m.id} m={m} />
                         ))}

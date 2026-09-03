@@ -67,10 +67,16 @@ export function StatusBadge({
           demais pra funcionar como texto direto (contraste ~1.9:1 contra
           branco, bem abaixo do mínimo de leitura); misturar preto garante
           contraste em qualquer cor de status, sem precisar de exceção por
-          status. O fundo continua com a cor crua (só 14%, sutil). */}
+          status. O fundo continua com a cor crua (só 14%, sutil).
+          Revisado 03/09/2026 (modo noturno, "cor forte... dolorido aos
+          olhos"): mistura com var(--foreground) em vez de preto cru --
+          escurece no tema claro (foreground quase-preto) e clareia sozinho
+          no escuro (foreground quase-branco), mesmo raciocínio de
+          FilterPill.tsx. Preto fixo dava texto escuro em cima de fundo
+          escuro no modo noturno, sem contraste nenhum. */}
       <span
         className={`inline-flex items-center ${sizeClasses} rounded-full whitespace-nowrap font-semibold`}
-        style={{ color: `color-mix(in srgb, ${color} 70%, black)`, background: `color-mix(in srgb, ${color} 14%, white)` }}
+        style={{ color: `color-mix(in srgb, ${color} 70%, var(--foreground))`, background: `color-mix(in srgb, ${color} 14%, var(--surface-1))` }}
       >
         {STATUS_LABELS[status] ?? status}
       </span>
@@ -80,7 +86,7 @@ export function StatusBadge({
             ref={triggerRef}
             type="button"
             onClick={toggle}
-            className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-400 border border-gray-200 hover:border-gray-300 hover:text-gray-600 transition-colors duration-150 select-none"
+            className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 select-none"
             aria-label={`O que significa "${STATUS_LABELS[status] ?? status}"?`}
           >
             i
@@ -88,7 +94,7 @@ export function StatusBadge({
           {open && pos && typeof document !== "undefined"
             ? createPortal(
                 <div
-                  className="fixed z-50 rounded-lg border border-gray-200 bg-white p-2.5 text-xs text-gray-600 shadow-lg"
+                  className="fixed z-50 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-2.5 text-xs text-gray-600 dark:text-gray-300 shadow-lg"
                   style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
                 >
                   {description}

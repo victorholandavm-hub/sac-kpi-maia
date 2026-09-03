@@ -73,8 +73,8 @@ function ItemRow({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 py-2 flex-wrap border-t border-gray-100">
-      <span className="text-sm text-gray-800">
+    <div className="flex items-center justify-between gap-3 py-2 flex-wrap border-t border-gray-100 dark:border-gray-700">
+      <span className="text-sm text-gray-800 dark:text-gray-100">
         {item.completed ? (
           <span
             className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
@@ -96,7 +96,7 @@ function ItemRow({
         ) : null}
         {item.quantity > 1 ? `${item.quantity}x ` : ""}
         {item.product}
-        {item.partCode ? <span className="text-gray-400"> · cód. {item.partCode}</span> : null}
+        {item.partCode ? <span className="text-gray-400 dark:text-gray-500"> · cód. {item.partCode}</span> : null}
         {canEditItems ? (
           <button
             onClick={remove}
@@ -115,7 +115,7 @@ function ItemRow({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="Valor unit."
-              className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-sm"
+              className="w-24 rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-sm"
               autoFocus
             />
             <button
@@ -128,11 +128,11 @@ function ItemRow({
             </button>
           </>
         ) : canEditValues ? (
-          <button onClick={() => setEditing(true)} className="text-sm underline text-gray-500 hover:text-gray-700">
+          <button onClick={() => setEditing(true)} className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             {total !== null ? formatBRL(total) : "definir valor"}
           </button>
         ) : (
-          <span className="text-sm text-gray-500">{total !== null ? formatBRL(total) : "Sem valor definido"}</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">{total !== null ? formatBRL(total) : "Sem valor definido"}</span>
         )}
         {isConcluded ? (
           canEditValues ? (
@@ -161,24 +161,24 @@ function ItemRow({
           )
         ) : (
           <span
-            className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-400 whitespace-nowrap"
+            className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 whitespace-nowrap"
             title="Só é possível liberar o pagamento depois que a montagem for concluída."
           >
             A montar
           </span>
         )}
         {item.paymentReleased && item.paymentReleasedAt ? (
-          <span className="text-xs whitespace-nowrap text-gray-400">pago em {formatDate(item.paymentReleasedAt)}</span>
+          <span className="text-xs whitespace-nowrap text-gray-400 dark:text-gray-500">pago em {formatDate(item.paymentReleasedAt)}</span>
         ) : null}
       </div>
-      <div className="flex items-center gap-2 w-full text-xs text-gray-400">
+      <div className="flex items-center gap-2 w-full text-xs text-gray-400 dark:text-gray-500">
         <span>Autorizado por (gerente):</span>
         {editingAuth ? (
           <>
             <input
               value={authValue}
               onChange={(e) => setAuthValue(e.target.value)}
-              className="w-40 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+              className="w-40 rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-xs"
               autoFocus
             />
             <button
@@ -189,12 +189,12 @@ function ItemRow({
             >
               Salvar
             </button>
-            <button onClick={() => setEditingAuth(false)} className="underline text-gray-500 hover:text-gray-700">
+            <button onClick={() => setEditingAuth(false)} className="underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               cancelar
             </button>
           </>
         ) : canEditValues ? (
-          <button onClick={() => setEditingAuth(true)} className="underline text-gray-500 hover:text-gray-700">
+          <button onClick={() => setEditingAuth(true)} className="underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             {item.paymentAuthorizedBy ?? "definir"}
           </button>
         ) : (
@@ -267,24 +267,24 @@ function AddItemForm({ requestId, requestType }: { requestId: string; requestTyp
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-gray-100">
+    <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-gray-100 dark:border-gray-700">
       <div className="flex flex-col gap-0.5">
         <input
           value={partCode}
           onChange={(e) => setPartCode(e.target.value)}
           placeholder="Código (opcional)"
-          className="rounded-lg border border-gray-200 px-2 py-1 text-sm w-32"
+          className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-sm w-32"
         />
         {productLookupStatus === "loading" ? (
-          <span className="text-xs text-gray-400">Buscando…</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">Buscando…</span>
         ) : productLookupStatus === "found" ? (
           <span className="text-xs" style={{ color: "var(--status-good)" }}>
             Produto encontrado.
           </span>
         ) : productLookupStatus === "not_found" ? (
-          <span className="text-xs flex items-center gap-1.5 text-gray-400">
+          <span className="text-xs flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
             Código não encontrado.
-            <button type="button" onClick={() => runProductLookup(partCode)} className="underline text-gray-500 hover:text-gray-700">
+            <button type="button" onClick={() => runProductLookup(partCode)} className="underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               🔄 Tentar de novo
             </button>
           </span>
@@ -294,20 +294,20 @@ function AddItemForm({ requestId, requestType }: { requestId: string; requestTyp
         value={product}
         onChange={(e) => setProduct(e.target.value)}
         placeholder="Produto"
-        className="rounded-lg border border-gray-200 px-2 py-1 text-sm flex-1 min-w-[140px]"
+        className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-sm flex-1 min-w-[140px]"
       />
       <input
         value={quantity}
         onChange={(e) => setQuantity(e.target.value)}
         type="number"
         min={1}
-        className="rounded-lg border border-gray-200 px-2 py-1 text-sm w-16"
+        className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-sm w-16"
       />
       {showAction ? (
         <select
           value={action}
           onChange={(e) => setAction(e.target.value as "montar" | "desmontar")}
-          className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
+          className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-sm"
         >
           <option value="montar">Montar</option>
           <option value="desmontar">Desmontar</option>
@@ -344,10 +344,10 @@ export function RequestItemsTable({
   const total = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-1">
+    <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 flex flex-col gap-1">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-gray-800">Produtos</span>
-        {total > 0 ? <span className="text-xs text-gray-400">Total: {formatBRL(total)}</span> : null}
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">Produtos</span>
+        {total > 0 ? <span className="text-xs text-gray-400 dark:text-gray-500">Total: {formatBRL(total)}</span> : null}
       </div>
       {items.map((item) => (
         <ItemRow

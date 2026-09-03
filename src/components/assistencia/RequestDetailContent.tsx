@@ -37,8 +37,8 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-gray-400">{label}</span>
-      <span className="text-sm text-gray-800">{value}</span>
+      <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
+      <span className="text-sm text-gray-800 dark:text-gray-100">{value}</span>
     </div>
   );
 }
@@ -58,8 +58,8 @@ function formatDateOnly(value: string | null | undefined) {
 // duas linguagens visuais diferentes dependendo do tipo do chamado).
 function Card({ title, children, className = "" }: { title?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-3 ${className}`}>
-      {title ? <h3 className="text-sm font-semibold text-gray-800">{title}</h3> : null}
+    <div className={`rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 flex flex-col gap-3 ${className}`}>
+      {title ? <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{title}</h3> : null}
       {children}
     </div>
   );
@@ -68,7 +68,7 @@ function Card({ title, children, className = "" }: { title?: string; children: R
 // Badge neutro (tipo, filial) -- mesmo de DeliveryRequestDetailContent.tsx.
 function NeutralBadge({ children, icon }: { children: React.ReactNode; icon?: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap">
       {icon ? <span aria-hidden="true">{icon}</span> : null}
       {children}
     </span>
@@ -124,7 +124,7 @@ export function RequestDetailContent({
   photos: RequestPhoto[];
 }) {
   if (!result) {
-    return <p className="text-sm text-gray-400">Solicitação não encontrada.</p>;
+    return <p className="text-sm text-gray-400 dark:text-gray-500">Solicitação não encontrada.</p>;
   }
 
   const { request, events } = result;
@@ -150,7 +150,7 @@ export function RequestDetailContent({
           convenção de DeliveryRequestDetailContent.tsx. */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2.5 flex-wrap">
-          <h1 className="text-xl font-semibold text-gray-800 whitespace-nowrap">Chamado #{request.ticketNumber}</h1>
+          <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">Chamado #{request.ticketNumber}</h1>
           <StatusBadge status={request.status} />
           <NeutralBadge>{REQUEST_TYPE_LABELS[request.type] ?? request.type}</NeutralBadge>
           <NeutralBadge icon="🏬">{request.storeName}</NeutralBadge>
@@ -166,21 +166,21 @@ export function RequestDetailContent({
             </Link>
             <Link
               href={novaNotificacaoHref}
-              className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+              className="text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
             >
               + Criar nova notificação
             </Link>
             {profile.role !== "sac" ? (
               <Link
                 href={`/assistencia/pecas/nova?service_request_id=${request.id}`}
-                className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+                className="text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
               >
                 Solicitar peça
               </Link>
             ) : null}
             <Link
               href={`/assistencia/${request.id}/despacho`}
-              className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+              className="text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
             >
               Imprimir despacho
             </Link>
@@ -228,7 +228,7 @@ export function RequestDetailContent({
             <Card title="Produtos">
               <ul className="flex flex-col gap-1">
                 {request.items.map((item) => (
-                  <li key={item.id} className="text-sm text-gray-800">
+                  <li key={item.id} className="text-sm text-gray-800 dark:text-gray-100">
                     {item.completed ? (
                       <span
                         className="text-xs font-bold px-1.5 py-0.5 rounded mr-1.5"
@@ -251,7 +251,7 @@ export function RequestDetailContent({
                     ) : null}
                     {item.quantity > 1 ? `${item.quantity}x ` : ""}
                     {item.product}
-                    {item.partCode ? <span className="text-gray-400"> · cód. {item.partCode}</span> : null}
+                    {item.partCode ? <span className="text-gray-400 dark:text-gray-500"> · cód. {item.partCode}</span> : null}
                   </li>
                 ))}
               </ul>
@@ -336,10 +336,10 @@ export function RequestDetailContent({
               {request.completedAt ? <Row label="Encerrada em" value={formatDateTimeBr(request.completedAt)} /> : null}
             </div>
 
-            <div className="flex flex-col gap-3 pt-3 border-t border-gray-100">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Fotos</h4>
+            <div className="flex flex-col gap-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Fotos</h4>
               <PhotoGallery photos={photos} deleteMode={canManage ? "staff" : undefined} />
-              {photos.length === 0 ? <p className="text-sm text-gray-400">Nenhuma foto anexada ainda.</p> : null}
+              {photos.length === 0 ? <p className="text-sm text-gray-400 dark:text-gray-500">Nenhuma foto anexada ainda.</p> : null}
               {canManage ? <RequestPhotoUpload requestId={request.id} /> : null}
             </div>
           </Card>
@@ -380,8 +380,8 @@ export function RequestDetailContent({
                   {request.items.map((item) => {
                     const itemPhotos = photos.filter((p) => p.itemId === item.id);
                     return (
-                      <div key={item.id} className="flex flex-col gap-1.5 pb-3 border-b border-gray-100">
-                        <span className="text-sm font-semibold text-gray-800">
+                      <div key={item.id} className="flex flex-col gap-1.5 pb-3 border-b border-gray-100 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                           {item.quantity > 1 ? `${item.quantity}x ` : ""}
                           {item.product}
                         </span>
@@ -392,7 +392,7 @@ export function RequestDetailContent({
                             Sem foto enviada
                           </span>
                         ) : (
-                          <span className="text-xs font-medium text-gray-400">Ainda não foi feito pelo montador</span>
+                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Ainda não foi feito pelo montador</span>
                         )}
                       </div>
                     );

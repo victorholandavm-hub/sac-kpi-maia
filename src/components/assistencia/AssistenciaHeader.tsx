@@ -1,4 +1,6 @@
 import Image from "next/image";
+import { ThemeToggle } from "@/components/ThemeToggle";
+
 export function AssistenciaHeader({
   title,
   subtitle,
@@ -26,7 +28,10 @@ export function AssistenciaHeader({
           ) : null}
         </div>
       </div>
-      {children}
+      <div className="flex items-center gap-3">
+        <ThemeToggle />
+        {children}
+      </div>
     </header>
   );
 }

@@ -39,8 +39,8 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-gray-400">{label}</span>
-      <span className="text-sm text-gray-800">{value}</span>
+      <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
+      <span className="text-sm text-gray-800 dark:text-gray-100">{value}</span>
     </div>
   );
 }
@@ -53,7 +53,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
   if (!result) {
     return (
       <div className="max-w-3xl mx-auto p-6">
-        <p className="text-sm text-gray-400">Pedido não encontrado.</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">Pedido não encontrado.</p>
       </div>
     );
   }
@@ -72,14 +72,14 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
     <div className="max-w-5xl mx-auto p-6 flex flex-col gap-4 w-full min-w-0">
       <RealtimeQueueRefresher requestId={pedido.id} table="pedidos_encomenda" eventsTable="pedido_encomenda_events" eventsIdColumn="pedido_id" />
 
-      <Link href="/assistencia/encomendas/fila" className="text-sm underline self-start text-gray-500 hover:text-gray-700">
+      <Link href="/assistencia/encomendas/fila" className="text-sm underline self-start text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
         ← Voltar pra fila
       </Link>
 
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-sm font-mono text-gray-400">Pedido #{pedido.pedidoNumber}</span>
+        <span className="text-sm font-mono text-gray-400 dark:text-gray-500">Pedido #{pedido.pedidoNumber}</span>
         <PedidoEncomendaStatusBadge status={pedido.status} />
-        <h2 className="text-lg font-semibold text-gray-800">{pedido.storeName}</h2>
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{pedido.storeName}</h2>
       </div>
 
       {pedido.status !== "cancelado" && pedido.status !== "negado" && pedido.status !== "recebido_cd" ? (
@@ -87,10 +87,10 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
       ) : null}
 
       {pedido.prazoFabricaCd || pedido.prazoCdLoja ? (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 grid sm:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 grid sm:grid-cols-2 gap-4">
           {pedido.prazoFabricaCd ? (
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-gray-400">Prazo fábrica → CD</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">Prazo fábrica → CD</span>
               <span className="text-xl" style={prazoUrgencyStyle(pedido.prazoFabricaCd)}>
                 🕐 {new Date(`${pedido.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
               </span>
@@ -98,7 +98,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
           ) : null}
           {pedido.prazoCdLoja ? (
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-gray-400">Prazo CD → loja</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">Prazo CD → loja</span>
               <span className="text-xl" style={prazoUrgencyStyle(pedido.prazoCdLoja)}>
                 🕐 {new Date(`${pedido.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
               </span>
@@ -115,7 +115,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
           <FormSection title="Produtos">
             <ul className="flex flex-col gap-1">
               {pedido.items.map((item) => (
-                <li key={item.id} className="text-sm text-gray-800">
+                <li key={item.id} className="text-sm text-gray-800 dark:text-gray-100">
                   {item.quantidade}x {item.produtoDescricao}
                 </li>
               ))}
@@ -141,7 +141,7 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
                 {photos.map((p) => (
                   <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.url} alt="Cupom fiscal" className="h-32 w-32 object-cover rounded-lg border border-gray-200" />
+                    <img src={p.url} alt="Cupom fiscal" className="h-32 w-32 object-cover rounded-lg border border-gray-200 dark:border-gray-600" />
                   </a>
                 ))}
               </div>

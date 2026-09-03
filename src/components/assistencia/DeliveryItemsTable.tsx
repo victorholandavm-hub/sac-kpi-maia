@@ -26,13 +26,13 @@ function ItemRow({ item, requestId, canEditItems }: { item: RequestItem; request
   }
 
   return (
-    <tr className="border-t border-gray-100">
-      <td className="py-2 pr-3 text-xs font-mono text-gray-400 whitespace-nowrap">{item.partCode ?? "—"}</td>
-      <td className="py-2 pr-3 text-sm text-gray-800">{item.product}</td>
-      <td className="py-2 pr-3 text-sm text-gray-600 text-right whitespace-nowrap">{item.quantity}</td>
+    <tr className="border-t border-gray-100 dark:border-gray-700">
+      <td className="py-2 pr-3 text-xs font-mono text-gray-400 dark:text-gray-500 whitespace-nowrap">{item.partCode ?? "—"}</td>
+      <td className="py-2 pr-3 text-sm text-gray-800 dark:text-gray-100">{item.product}</td>
+      <td className="py-2 pr-3 text-sm text-gray-600 dark:text-gray-300 text-right whitespace-nowrap">{item.quantity}</td>
       <td className="py-2 text-right whitespace-nowrap">
         {canEditItems ? (
-          <button onClick={remove} disabled={pending} className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 disabled:opacity-60">
+          <button onClick={remove} disabled={pending} className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 disabled:opacity-60">
             remover
           </button>
         ) : null}
@@ -91,24 +91,24 @@ function AddItemForm({ requestId, isPickup }: { requestId: string; isPickup?: bo
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-gray-100">
+    <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-gray-100 dark:border-gray-700">
       <div className="flex flex-col gap-0.5">
         <input
           value={partCode}
           onChange={(e) => setPartCode(e.target.value)}
           placeholder="Código (opcional)"
-          className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm w-32 text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+          className="rounded-lg border border-gray-200 dark:border-gray-600 px-2.5 py-1.5 text-sm w-32 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
         />
         {productLookupStatus === "loading" ? (
-          <span className="text-xs text-gray-400">Buscando…</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">Buscando…</span>
         ) : productLookupStatus === "found" ? (
           <span className="text-xs" style={{ color: "var(--status-good)" }}>
             Produto encontrado.
           </span>
         ) : productLookupStatus === "not_found" ? (
-          <span className="text-xs flex items-center gap-1.5 text-gray-400">
+          <span className="text-xs flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
             Código não encontrado.
-            <button type="button" onClick={() => runProductLookup(partCode)} className="font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150">
+            <button type="button" onClick={() => runProductLookup(partCode)} className="font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150">
               🔄 Tentar de novo
             </button>
           </span>
@@ -118,14 +118,14 @@ function AddItemForm({ requestId, isPickup }: { requestId: string; isPickup?: bo
         value={product}
         onChange={(e) => setProduct(e.target.value)}
         placeholder="Produto"
-        className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm flex-1 min-w-[140px] text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+        className="rounded-lg border border-gray-200 dark:border-gray-600 px-2.5 py-1.5 text-sm flex-1 min-w-[140px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
       />
       <input
         value={quantity}
         onChange={(e) => setQuantity(e.target.value)}
         type="number"
         min={1}
-        className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm w-16 text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+        className="rounded-lg border border-gray-200 dark:border-gray-600 px-2.5 py-1.5 text-sm w-16 text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
       />
       {/* Botão discreto -- Guia de Componentes Maia: outline neutro, não
           sólido (a única ação sólida da tela é "Editar e salvar
@@ -133,7 +133,7 @@ function AddItemForm({ requestId, isPickup }: { requestId: string; isPickup?: bo
       <button
         onClick={add}
         disabled={pending}
-        className="text-xs rounded-lg px-3 py-1.5 font-medium border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 disabled:opacity-60"
+        className="text-xs rounded-lg px-3 py-1.5 font-medium border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150 disabled:opacity-60"
       >
         + Adicionar produto
       </button>
@@ -167,7 +167,7 @@ export function DeliveryItemsTable({
     <thead>
       <tr>
         {["Código", "Produto", "Qtd.", ""].map((h) => (
-          <th key={h} className={`pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400 ${h === "Qtd." || h === "" ? "text-right" : "text-left"}`}>
+          <th key={h} className={`pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 ${h === "Qtd." || h === "" ? "text-right" : "text-left"}`}>
             {h}
           </th>
         ))}
@@ -177,8 +177,8 @@ export function DeliveryItemsTable({
 
   if (!hasPickupSplit) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-gray-800">Produtos</h3>
+      <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 flex flex-col gap-1">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Produtos</h3>
         <table className="w-full">
           {thead}
           <tbody>
@@ -196,9 +196,9 @@ export function DeliveryItemsTable({
   const pickupItems = items.filter((item) => item.isPickup);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-4">
+    <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-gray-800">Produtos a entregar</h3>
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Produtos a entregar</h3>
         <table className="w-full">
           {thead}
           <tbody>
@@ -209,8 +209,8 @@ export function DeliveryItemsTable({
         </table>
         {canEditItems ? <AddItemForm requestId={requestId} isPickup={false} /> : null}
       </div>
-      <div className="flex flex-col gap-1 pt-3 border-t border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-800">Produtos a recolher</h3>
+      <div className="flex flex-col gap-1 pt-3 border-t border-gray-100 dark:border-gray-700">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Produtos a recolher</h3>
         <table className="w-full">
           {thead}
           <tbody>

@@ -23,8 +23,8 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-gray-400">{label}</span>
-      <span className="text-sm text-gray-800">{value}</span>
+      <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
+      <span className="text-sm text-gray-800 dark:text-gray-100">{value}</span>
     </div>
   );
 }
@@ -35,19 +35,19 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
   const order = await getPartOrder(id);
 
   if (!order) {
-    return <p className="text-sm text-gray-400">Pedido de peça não encontrado.</p>;
+    return <p className="text-sm text-gray-400 dark:text-gray-500">Pedido de peça não encontrado.</p>;
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-sm font-mono text-gray-400">Chamado #{order.ticketNumber}</span>
+        <span className="text-sm font-mono text-gray-400 dark:text-gray-500">Chamado #{order.ticketNumber}</span>
         <StatusBadge status={order.status} />
-        <h2 className="text-lg font-semibold text-gray-800">{order.partName}</h2>
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{order.partName}</h2>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 grid sm:grid-cols-2 gap-4">
-        <h3 className="text-sm font-semibold text-gray-800 sm:col-span-2">Detalhes</h3>
+      <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 grid sm:grid-cols-2 gap-4">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 sm:col-span-2">Detalhes</h3>
         <Row label="Código da peça" value={order.partCode} />
         <Row label="Cor" value={order.color} />
         <Row label="Fornecedor" value={order.supplier} />
@@ -71,8 +71,8 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
         ) : null}
         {order.serviceRequestId ? (
           <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-gray-400">Solicitação vinculada</span>
-            <Link href={`/assistencia/${order.serviceRequestId}`} className="text-sm underline text-gray-800 hover:text-gray-600">
+            <span className="text-xs text-gray-400 dark:text-gray-500">Solicitação vinculada</span>
+            <Link href={`/assistencia/${order.serviceRequestId}`} className="text-sm underline text-gray-800 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300">
               Ver solicitação
             </Link>
           </div>
@@ -82,9 +82,9 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
       <PartOrderActions orderId={order.id} status={order.status} />
 
       {order.notes ? (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-gray-800">Observações</h3>
-          <p className="text-sm whitespace-pre-line text-gray-500">{order.notes}</p>
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 flex flex-col gap-2">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Observações</h3>
+          <p className="text-sm whitespace-pre-line text-gray-500 dark:text-gray-400">{order.notes}</p>
         </div>
       ) : null}
     </div>
