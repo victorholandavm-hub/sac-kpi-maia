@@ -115,26 +115,50 @@ export type TotvsProductMatch = {
   manufacturer: string | null;
 };
 
-// Busca exata por código do produto nos itens de venda já sincronizados do
-// TOTVS -- não existe um catálogo de produtos separado, então usamos o
-// histórico de vendas como fonte (um código de produto tem descrição estável,
-// então qualquer venda passada serve pra autopreencher).
+// Bug real, achado pelo Victor 03/09/2026: "ainda não encontro produto e
+// cliente pelo código". Causa: essa função só buscava em totvs_order_items
+// (itens de venda já sincronizados), e o comentário original dizia "não
+// existe um catálogo de produtos separado" -- mas existe, sim: totvs_stock
+// (sincronizado por syncStock em totvsSync.ts) é o catálogo completo do
+// Protheus, com todo produto que tem posição de estoque, vendido ou não.
+// Conferido em produção: totvs_order_items só tem 2.030 produtos distintos
+// (só o que apareceu numa venda já sincronizada, dentro da janela de dias
+// que syncOrders cobre) contra 71.326 em totvs_stock -- exatamente o mesmo
+// tipo de gap já resolvido pra cliente logo acima (findTotvsClientByCode),
+// só que aqui nunca tinha ganhado o fallback equivalente.
 export async function findTotvsProductByCode(code: string): Promise<TotvsProductMatch | null> {
   const trimmed = code.trim();
   if (!trimmed) return null;
 
   const admin = getSupabaseAdmin();
-  const { data } = await admin
+  const { data: stock } = await admin
+    .from("totvs_stock")
+    .select("product_code, description, manufacturer")
+    .eq("product_code", trimmed)
+    .maybeSingle();
+
+  if (stock) {
+    return {
+      productCode: stock.product_code ?? trimmed,
+      description: stock.description,
+      manufacturer: stock.manufacturer,
+    };
+  }
+
+  // Fallback: produto sem posição de estoque atual (ex.: descontinuado) mas
+  // que já apareceu em alguma venda sincronizada -- mesmo espírito do
+  // fallback de cliente acima, cobre o que o catálogo de estoque não pega.
+  const { data: item } = await admin
     .from("totvs_order_items")
     .select("product, description, manufacturer")
     .eq("product", trimmed)
     .limit(1)
     .maybeSingle();
 
-  if (!data) return null;
+  if (!item) return null;
   return {
-    productCode: data.product ?? trimmed,
-    description: data.description,
-    manufacturer: data.manufacturer,
+    productCode: item.product ?? trimmed,
+    description: item.description,
+    manufacturer: item.manufacturer,
   };
 }
