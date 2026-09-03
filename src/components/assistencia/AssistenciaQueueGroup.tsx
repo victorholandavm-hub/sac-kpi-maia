@@ -42,7 +42,14 @@ const PAYMENT_FLAG_LABELS: Record<PaymentFlag, string> = {
 };
 const PAYMENT_FLAG_COLORS: Record<PaymentFlag, string> = {
   none: "var(--status-critical)",
-  partial: "#8a5a00",
+  // Achado do Victor 03/09/2026 (aba Visitas, print em anexo): esse tom
+  // (e os outros #8a5a00/#8a4c0d deste arquivo) era fixo, sem variante pro
+  // modo escuro -- mesma cor exata nos dois temas, só que pensada pra
+  // contraste em fundo claro, sem ajuste nenhum pro escuro (a cor errada
+  // que apareceu no print). light-dark() mantém o tom claro idêntico
+  // (nenhuma mudança visual nesse tema) e usa var(--status-warning) --
+  // já ajustado pro modo escuro em globals.css -- só no escuro.
+  partial: "light-dark(#8a5a00, var(--status-warning))",
   complete: "var(--status-good)",
   no_items: "var(--status-critical)",
 };
@@ -240,9 +247,13 @@ function EntregaCardRow({
         </div>
         {r.clientTimeRestriction || r.escalationRisk || r.deadlineStatus === "pendente" ? (
           <div className="flex items-center gap-1 flex-wrap mt-1">
-            {r.clientTimeRestriction ? <WarningTag icon="🕐" text={r.clientTimeRestriction} color="#8a5a00" /> : null}
+            {r.clientTimeRestriction ? (
+              <WarningTag icon="🕐" text={r.clientTimeRestriction} color="light-dark(#8a5a00, var(--status-warning))" />
+            ) : null}
             {r.escalationRisk ? <WarningTag icon="⚠" text="Risco de escalonamento" color="var(--status-critical)" /> : null}
-            {r.deadlineStatus === "pendente" ? <WarningTag icon="⚠" text="Prazo pendente" color="#8a5a00" /> : null}
+            {r.deadlineStatus === "pendente" ? (
+              <WarningTag icon="⚠" text="Prazo pendente" color="light-dark(#8a5a00, var(--status-warning))" />
+            ) : null}
           </div>
         ) : null}
       </td>
@@ -339,8 +350,7 @@ function VisitaCardRow({
                 onClick={onMoveUp}
                 disabled={i === 0 || saving}
                 aria-label="Mover pra cima"
-                className="text-sm leading-none px-1 disabled:opacity-25"
-                style={{ color: "#4B5563" }}
+                className="text-sm leading-none px-1 disabled:opacity-25 text-gray-600 dark:text-gray-300"
               >
                 ▲
               </button>
@@ -348,8 +358,7 @@ function VisitaCardRow({
                 onClick={onMoveDown}
                 disabled={i === orderLength - 1 || saving}
                 aria-label="Mover pra baixo"
-                className="text-sm leading-none px-1 disabled:opacity-25"
-                style={{ color: "#4B5563" }}
+                className="text-sm leading-none px-1 disabled:opacity-25 text-gray-600 dark:text-gray-300"
               >
                 ▼
               </button>
@@ -365,13 +374,16 @@ function VisitaCardRow({
               <StatusBadge status={r.status} />
               <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
             </div>
-            <span className="text-sm font-medium whitespace-nowrap" style={{ color: "#1F2937" }}>
+            <span className="text-sm font-medium whitespace-nowrap text-gray-800 dark:text-gray-100">
               {REQUEST_TYPE_LABELS[r.type] ?? r.type}
             </span>
             {r.comboMontagemDesmontagem ? (
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                style={{ color: "#8a4c0d", background: "color-mix(in srgb, var(--brand-orange) 14%, var(--surface-1))" }}
+                style={{
+                  color: "light-dark(#8a4c0d, var(--brand-orange))",
+                  background: "color-mix(in srgb, var(--brand-orange) 14%, var(--surface-1))",
+                }}
               >
                 {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
               </span>
@@ -379,7 +391,10 @@ function VisitaCardRow({
             {isPartialCompletion ? (
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                style={{ color: "#8a4c0d", background: "color-mix(in srgb, var(--brand-orange) 14%, var(--surface-1))" }}
+                style={{
+                  color: "light-dark(#8a4c0d, var(--brand-orange))",
+                  background: "color-mix(in srgb, var(--brand-orange) 14%, var(--surface-1))",
+                }}
               >
                 ◐ Parcial
               </span>
@@ -395,16 +410,16 @@ function VisitaCardRow({
           <div className="w-full sm:w-[28%] shrink-0 flex flex-col gap-0.5 min-w-0 sm:pr-3">
             {/* Caixa alta -- mesmo pedido/motivo de EntregaCardRow (ver
                 acima), guia de padronização 25/08/2026. */}
-            <span className="text-sm font-bold truncate uppercase" style={{ color: "#1F2937" }}>
+            <span className="text-sm font-bold truncate uppercase text-gray-800 dark:text-gray-100">
               {r.clientName ?? "Sem nome de cliente"}
             </span>
-            <span className="text-xs font-semibold truncate" style={{ color: "#4B5563" }}>
+            <span className="text-xs font-semibold truncate text-gray-600 dark:text-gray-300">
               {r.clientPhone ?? "—"}
             </span>
-            <span className="text-sm font-bold truncate" style={{ color: "#4B5563" }}>
+            <span className="text-sm font-bold truncate text-gray-600 dark:text-gray-300">
               📍 {r.clientNeighborhood ?? "—"}
             </span>
-            <span className="text-xs truncate" style={{ color: "#9CA3AF" }}>
+            <span className="text-xs truncate text-gray-400 dark:text-gray-500">
               🏬 {r.storeName}
             </span>
           </div>
@@ -422,7 +437,7 @@ function VisitaCardRow({
               demanda já na lista, sem precisar entrar na demanda". */}
           <div className="w-full sm:w-[16%] shrink-0 flex flex-col items-start justify-center gap-1 min-w-0 sm:pr-3">
             {r.assemblerName ? (
-              <span className="text-sm font-semibold truncate" style={{ color: "#1F2937" }}>
+              <span className="text-sm font-semibold truncate text-gray-800 dark:text-gray-100">
                 🔧 {r.assemblerName}
               </span>
             ) : (
@@ -433,13 +448,13 @@ function VisitaCardRow({
                 ⚠️ Sem Montador
               </span>
             )}
-            <span className="text-xs truncate" style={{ color: "#9CA3AF" }}>
+            <span className="text-xs truncate text-gray-400 dark:text-gray-500">
               Responsável: {r.assignedToName ?? "—"}
             </span>
           </div>
 
           {/* Coluna 4 (17%): datas de abertura e previsão */}
-          <div className="w-full sm:w-[17%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3" style={{ color: "#9CA3AF" }}>
+          <div className="w-full sm:w-[17%] shrink-0 flex flex-col gap-0.5 min-w-0 text-xs sm:pr-3 text-gray-400 dark:text-gray-500">
             <span className="whitespace-nowrap">Aberta {new Date(r.createdAt).toLocaleDateString("pt-BR")}</span>
             {effectiveDate ? (
               <span className="whitespace-nowrap">
@@ -491,12 +506,17 @@ function VisitaCardRow({
                   title={r.montadorInstruction}
                   onClick={() => setInstructionOpen((v) => !v)}
                   className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap cursor-pointer"
-                  style={{ color: "#8a5a00", background: "color-mix(in srgb, var(--status-warning) 14%, var(--surface-1))" }}
+                  style={{
+                    color: "light-dark(#8a5a00, var(--status-warning))",
+                    background: "color-mix(in srgb, var(--status-warning) 14%, var(--surface-1))",
+                  }}
                 >
                   📋 Instrução
                 </button>
               ) : null}
-              {r.clientTimeRestriction ? <WarningTag icon="🕐" text={r.clientTimeRestriction} color="#8a5a00" /> : null}
+              {r.clientTimeRestriction ? (
+              <WarningTag icon="🕐" text={r.clientTimeRestriction} color="light-dark(#8a5a00, var(--status-warning))" />
+            ) : null}
               {staleOpen ? (
                 <WarningTag
                   icon="⏱"
@@ -505,7 +525,9 @@ function VisitaCardRow({
                 />
               ) : null}
               {r.escalationRisk ? <WarningTag icon="⚠" text="Risco de escalonamento" color="var(--status-critical)" /> : null}
-              {r.deadlineStatus === "pendente" ? <WarningTag icon="⚠" text="Prazo pendente" color="#8a5a00" /> : null}
+              {r.deadlineStatus === "pendente" ? (
+              <WarningTag icon="⚠" text="Prazo pendente" color="light-dark(#8a5a00, var(--status-warning))" />
+            ) : null}
               {paymentFlag ? <WarningTag text={PAYMENT_FLAG_LABELS[paymentFlag]} color={PAYMENT_FLAG_COLORS[paymentFlag]} /> : null}
             </div>
           ) : null}
@@ -516,9 +538,9 @@ function VisitaCardRow({
       {instructionOpen && r.montadorInstruction ? (
         <div
           className="rounded-lg p-2.5 sm:ml-[4%]"
-          style={{ background: "color-mix(in srgb, var(--status-warning) 12%, #ffffff)", border: "2px solid var(--status-warning)" }}
+          style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "2px solid var(--status-warning)" }}
         >
-          <p className="text-sm whitespace-pre-line" style={{ color: "#1F2937" }}>
+          <p className="text-sm whitespace-pre-line" style={{ color: "var(--text-primary)" }}>
             {r.montadorInstruction}
           </p>
         </div>
@@ -654,7 +676,7 @@ export function AssistenciaQueueGroup({
     <div className="flex flex-col gap-2">
       {printable ? (
         <div className="flex items-center gap-3 flex-wrap px-4 pt-2">
-          <label className="flex items-center gap-1.5 text-xs" style={{ color: "#4B5563" }}>
+          <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
             <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
             Selecionar todas
           </label>
