@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateStatus, addNote, createExchangeChild } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
-import { CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
+import { CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES, DELIVERY_ITEM_NOUN } from "@/lib/assistenciaLabels";
 
 // Ações específicas de troca/entrega/envio de peça e recolhimento
 // (DELIVERY_REQUEST_TYPES) -- separado de RequestActions.tsx de propósito
@@ -49,11 +49,24 @@ export function DeliveryRequestActions({
   const [novaTrocaCausaRaizDetalhe, setNovaTrocaCausaRaizDetalhe] = useState("");
 
   const isFinal = status === "concluida" || status === "cancelada";
-  // Produto trocado pode voltar com defeito de novo -- em vez de reabrir o
-  // mesmo chamado (perdia a 1ª troca), cria um chamado novo ligado a esse
-  // (ver createExchangeChild no servidor). Ao confirmar, navega pro chamado
-  // novo -- é ele que passa a ser o "atual" da conversa com o cliente.
-  const canRequestNewExchange = requestType === "troca_produto" && status === "concluida" && !hasChildExchange;
+  // Produto/peça entregue pode voltar com problema de novo -- em vez de
+  // reabrir o mesmo chamado (perdia a 1ª rodada), cria um chamado novo
+  // ligado a esse (ver createExchangeChild no servidor). Ao confirmar,
+  // navega pro chamado novo -- é ele que passa a ser o "atual" da conversa
+  // com o cliente.
+  // Generalizado 03/09/2026 (achado do Victor: "todas as notificações de
+  // assistência deve poder colocar que deu errado... hoje só pode se for
+  // troca de produto. envio de peça também acontece isso") -- antes só
+  // troca_produto, agora qualquer DELIVERY_REQUEST_TYPES (mesma checagem
+  // já generalizada no servidor, ver createExchangeChild).
+  const canRequestNewExchange =
+    (DELIVERY_REQUEST_TYPES as readonly string[]).includes(requestType) && status === "concluida" && !hasChildExchange;
+  const itemNoun = DELIVERY_ITEM_NOUN[requestType] ?? "produto";
+  // "peça" é feminino, "produto" é masculino -- concordância pros textos
+  // abaixo ("mesmo produto"/"mesma peça", "outro produto"/"outra peça").
+  const isFem = itemNoun === "peça";
+  const mesmoWord = isFem ? "mesma" : "mesmo";
+  const outroWord = isFem ? "Outra" : "Outro";
 
   function resetNovaTroca() {
     setAskingNovaTroca(false);
@@ -207,14 +220,14 @@ export function DeliveryRequestActions({
           className="text-sm rounded px-3 py-2 self-start disabled:opacity-60"
           style={{ background: "var(--status-warning)", color: "#fff" }}
         >
-          🔁 Produto trocado veio com problema — pedir nova troca
+          🔁 {itemNoun === "peça" ? "Peça" : "Produto"} entregue veio com problema — pedir nova troca
         </button>
       ) : null}
 
       {askingNovaTroca && sameProduct === null ? (
         <div className="flex flex-col gap-2 rounded-lg border-2 p-3" style={{ borderColor: "var(--status-warning)" }}>
           <span className="text-sm" style={{ color: "#1F2937" }}>
-            A nova troca é pelo mesmo produto ou o cliente quer outro?
+            A nova troca é pel{isFem ? "a" : "o"} {mesmoWord} {itemNoun} ou o cliente quer outr{isFem ? "a" : "o"}?
           </span>
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -222,14 +235,14 @@ export function DeliveryRequestActions({
               className="text-sm rounded px-3 py-2"
               style={{ background: "var(--status-warning)", color: "#fff" }}
             >
-              Mesmo produto
+              {isFem ? "Mesma" : "Mesmo"} {itemNoun}
             </button>
             <button
               onClick={() => setSameProduct(false)}
               className="text-sm rounded px-3 py-2 border"
               style={{ borderColor: "var(--status-warning)", color: "#1F2937" }}
             >
-              Outro produto
+              {outroWord} {itemNoun}
             </button>
             <button onClick={resetNovaTroca} className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150">
               cancelar
@@ -241,7 +254,7 @@ export function DeliveryRequestActions({
       {askingNovaTroca && sameProduct !== null ? (
         <div className="flex flex-col gap-2 rounded-lg border-2 p-3" style={{ borderColor: "var(--status-warning)" }}>
           <span className="text-sm" style={{ color: "#1F2937" }}>
-            {sameProduct ? "Mesmo produto" : "Outro produto"} — o que aconteceu com o produto trocado?
+            {sameProduct ? `${isFem ? "Mesma" : "Mesmo"} ${itemNoun}` : `${outroWord} ${itemNoun}`} — o que aconteceu com {isFem ? "a" : "o"} {itemNoun} anterior?
           </span>
           <textarea
             value={novaTrocaReason}

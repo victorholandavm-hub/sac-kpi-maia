@@ -16,6 +16,7 @@ import {
   REQUEST_TYPE_LABELS,
   STATUS_LABELS,
   DELIVERY_REQUEST_TYPES,
+  DELIVERY_ITEM_NOUN,
   ALL_REQUEST_TYPES,
   CAUSA_RAIZ_OPTIONS,
 } from "@/lib/assistenciaLabels";
@@ -1041,7 +1042,14 @@ export async function createExchangeChild(
     .single();
   if (fetchError || !parent) throw new Error("Solicitação não encontrada.");
   requireManageAccess(profile, parent.type);
-  if (parent.type !== "troca_produto") throw new Error("Nova troca só se aplica a chamados de troca de produto.");
+  // Generalizado 03/09/2026 (achado do Victor: "todas as notificações de
+  // assistência deve poder colocar que deu errado... hoje só pode se for
+  // troca de produto. envio de peça também acontece isso") -- antes só
+  // troca_produto, agora qualquer tipo de entrega/envio/recolhimento
+  // (DELIVERY_REQUEST_TYPES) pode gerar uma 2ª rodada.
+  if (!(DELIVERY_REQUEST_TYPES as readonly string[]).includes(parent.type)) {
+    throw new Error("Nova troca só se aplica a chamados de entrega, envio ou recolhimento.");
+  }
   if (parent.status !== "concluida") throw new Error("Só dá pra pedir uma nova troca depois que a troca anterior foi concluída.");
 
   let causaCarga: string | null = null;
@@ -1084,7 +1092,11 @@ export async function createExchangeChild(
     .from("service_requests")
     .insert({
       id: childId,
-      type: "troca_produto",
+      // Mesmo tipo do pai -- pedido do Victor 03/09/2026 (generalização
+      // acima): antes travado em "troca_produto" mesmo quando o pai era
+      // envio_peca/entrega_produto/etc., o que teria trocado o tipo do
+      // chamado no meio da cadeia.
+      type: parent.type,
       store_id: parent.store_id,
       requested_by: profile.id,
       // Responsável já entra quem criou -- pedido do Victor 19/08/2026:
@@ -1144,12 +1156,13 @@ export async function createExchangeChild(
     if (itemsError) throw new Error(`Troca criada (#${child.ticket_number}), mas falhou ao copiar os itens: ${itemsError.message}`);
   }
 
+  const itemNoun = DELIVERY_ITEM_NOUN[parent.type] ?? "produto";
   await admin.from("service_request_events").insert([
     {
       request_id: requestId,
       actor_id: profile.id,
       event_type: "note_added",
-      note: `Gerou nova troca (${nextRound}ª rodada, chamado #${child.ticket_number}) -- produto trocado anteriormente apresentou problema: ${reasonTrimmed}`,
+      note: `Gerou nova troca (${nextRound}ª rodada, chamado #${child.ticket_number}) -- ${itemNoun} anterior apresentou problema: ${reasonTrimmed}`,
     },
     {
       request_id: childId,

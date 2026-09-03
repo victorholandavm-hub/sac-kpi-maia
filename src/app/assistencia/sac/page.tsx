@@ -195,12 +195,14 @@ export default async function SacHomePage({
                         Recolher produto
                       </span>
                     ) : null}
-                    {r.type === "troca_produto" && r.exchangeRound > 1 ? (
+                    {/* Generalizado 03/09/2026 -- "nova troca" não é mais só
+                        de troca_produto (ver createExchangeChild, actions.ts). */}
+                    {r.exchangeRound > 1 ? (
                       <span
                         className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
                         style={{ color: "#8a5a00", background: "color-mix(in srgb, var(--status-warning) 14%, var(--surface-1))" }}
                       >
-                        {r.exchangeRound}ª troca
+                        {r.exchangeRound}ª rodada
                       </span>
                     ) : null}
                   </div>

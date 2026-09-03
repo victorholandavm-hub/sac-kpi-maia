@@ -8,6 +8,7 @@ import {
   SAC_ALSO_MANAGED_TYPES,
   ASSISTENCIA_MANAGED_TYPES,
   ASSISTENCIA_ALSO_MANAGED_TYPES,
+  DELIVERY_REQUEST_TYPES,
   CAUSA_RAIZ_LABELS,
 } from "@/lib/assistenciaLabels";
 import { DeliveryStatusBadge, isDeliveryScheduled } from "./DeliveryStatusBadge";
@@ -179,16 +180,20 @@ export function DeliveryRequestDetailContent({
           <DeliveryStatusBadge status={request.status} scheduledDate={request.scheduledDate} rota={request.rota} />
           <NeutralBadge>{REQUEST_TYPE_LABELS[request.type] ?? request.type}</NeutralBadge>
           <NeutralBadge icon="🏬">{request.storeName}</NeutralBadge>
-          {request.type === "troca_produto" ? (
+          {/* Generalizado 03/09/2026 -- "nova troca" não é mais só de
+              troca_produto (ver createExchangeChild, actions.ts). Antes
+              mostrava esse selo sempre (inclusive "1ª troca" cinza) só pra
+              troca_produto -- valia a pena porque QUALQUER troca_produto já
+              nasce "rodada 1" de um conceito que é central pro tipo. Pros
+              outros tipos (entrega_produto, envio_peca etc.) isso viraria
+              ruído numa entrega comum que nunca vai ter 2ª rodada -- só
+              aparece quando já é de fato uma 2ª rodada em diante. */}
+          {(DELIVERY_REQUEST_TYPES as readonly string[]).includes(request.type) && request.exchangeRound > 1 ? (
             <span
               className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
-              style={
-                request.exchangeRound > 1
-                  ? { background: "color-mix(in srgb, var(--status-warning) 16%, var(--surface-1))", color: "color-mix(in srgb, var(--status-warning) 70%, var(--foreground))" }
-                  : { background: "var(--surface-2)", color: "var(--text-secondary)" }
-              }
+              style={{ background: "color-mix(in srgb, var(--status-warning) 16%, var(--surface-1))", color: "color-mix(in srgb, var(--status-warning) 70%, var(--foreground))" }}
             >
-              {request.exchangeRound}ª troca
+              {request.exchangeRound}ª rodada
             </span>
           ) : null}
         </div>

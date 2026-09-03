@@ -177,7 +177,7 @@ export function DriverRouteGroup({
                       className="text-xs font-semibold px-2 py-0.5 rounded-full"
                       style={{ color: "#fff", background: "var(--status-warning)" }}
                     >
-                      {r.exchangeRound}ª troca
+                      {r.exchangeRound}ª rodada
                     </span>
                   ) : null}
                   {showDriverName ? (
