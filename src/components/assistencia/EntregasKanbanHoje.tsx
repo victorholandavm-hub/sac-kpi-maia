@@ -116,7 +116,7 @@ function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | nul
 
 // Mesma regra que já pré-selecionava a rota do dia em "Hoje" (ver
 // defaultRota/defaultColumnKey em EntregasKanbanHoje) -- extraída pra
-// reaproveitar também quando um dos "Próximos 5 dias" é escolhido (ver
+// reaproveitar também quando um dos "Próximas rotas" (próximos 7 dias) é escolhido (ver
 // selectDay), pra abrir cada dia já com a rota esperada dele em foco.
 function defaultColumnKeyFor(columns: KanbanColumn[], overview: RotaDayOverview | null): string | null {
   const rota = overview ? (overview.assignments.primary?.rota ?? overview.expectedRota) : null;
@@ -345,7 +345,7 @@ export function EntregasKanbanHoje({
 }: {
   groups: QueueGroup[];
   todayOverview: RotaDayOverview | null;
-  // Data de hoje (YYYY-MM-DD) -- só pra calcular os próximos 5 dias do
+  // Data de hoje (YYYY-MM-DD) -- só pra calcular os próximos 7 dias do
   // botão "Próximas rotas" abaixo (ver upcomingDates). Overview (motorista
   // esperado de cada um desses dias) já vem pronto de getRotaWeekOverview
   // (rotaOverview, 14 dias a partir de hoje, ver fila/page.tsx) -- só os
@@ -385,7 +385,8 @@ export function EntregasKanbanHoje({
   const [viewDate, setViewDate] = useState<string | null>(null);
   const [dayGroupsCache, setDayGroupsCache] = useState<Record<string, QueueGroup[]>>({});
   const [loadingDate, setLoadingDate] = useState<string | null>(null);
-  const upcomingDates = Array.from({ length: 5 }, (_, i) => addDays(today, i + 1));
+  // 7 dias -- pedido do Victor 03/09/2026 (revisão do pedido original de 5).
+  const upcomingDates = Array.from({ length: 7 }, (_, i) => addDays(today, i + 1));
 
   async function selectDay(date: string) {
     if (viewDate === date) {
@@ -443,11 +444,11 @@ export function EntregasKanbanHoje({
           mesmo tratamento do indicador ativo do segmented control
           Visitas/Entregas/Agenda e do mês aberto (MonthAccordion.tsx).
           "Gestão de Motoristas & Escala" ao lado -- pedido do Victor
-          02/09/2026: "deve ficar ao lado de 'hoje' e só o botão".
-          "Próximas rotas" ao lado -- pedido do Victor 03/09/2026 (ver
-          selectDay acima). Selo muda pra mostrar qual dia está em foco --
-          sem isso, olhando só os cards de rota abaixo não dava pra saber
-          se ainda é "Hoje" ou já é um dos próximos dias escolhido. */}
+          02/09/2026: "deve ficar ao lado de 'hoje' e só o botão". Selo
+          muda pra mostrar qual dia está em foco (ver "Próximas rotas"
+          abaixo, junto do filtro de status) -- sem isso, olhando só os
+          cards de rota não dava pra saber se ainda é "Hoje" ou já é um
+          dos próximos dias escolhido. */}
       <div className="flex items-center gap-3 flex-wrap">
         <span
           className="text-xs font-semibold uppercase tracking-wider text-white rounded-md shadow-sm px-2.5 py-1"
@@ -456,24 +457,83 @@ export function EntregasKanbanHoje({
           {viewDate ? `📅 ${WEEKDAY_SHORT[new Date(`${viewDate}T00:00:00Z`).getUTCDay()]} ${shortDateLabel(viewDate)}` : "📌 Hoje"}
         </span>
         {motoristaAction}
+      </div>
+
+      {/* Resumo horizontal por rota -- grid de 4 colunas em telas largas,
+          empilha em telas menores. Só contagem + motorista, sem lista de
+          chamado nenhuma dentro (essa mudou pra tabela única abaixo). */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {columns.map((column) => (
+          <RouteSummaryCard
+            key={column.key}
+            column={column}
+            selected={selectedRotaKey === column.key}
+            onToggle={() => setSelectedRotaKey((prev) => (prev === column.key ? null : column.key))}
+          />
+        ))}
+      </div>
+
+      {/* Filtro único Todos/Programado/Concluído/Cancelado/Não concluído --
+          substitui as subabas por coluna de antes (pedido do Victor
+          29/08/2026), agora um lugar só pra tabela achatada inteira. Os
+          números respeitam o filtro de rota escolhido acima (ver rotaRows).
+          "Próximas rotas" ao lado -- pedido do Victor 03/09/2026 ("coloque
+          ao lado desse", junto do print desse filtro; revisado no mesmo
+          pedido: 7 dias em vez de 5, e o próprio botão mostra a data
+          escolhida por dentro -- "quando selecionar a data ele precisa
+          ficar aparecendo a data dentro desse quadrado", ver selectDay
+          acima). */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start flex-wrap">
+          {(Object.keys(STATUS_TAB_LABELS) as DeliveryStatusTab[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                tab === t ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              }`}
+              style={tab === t ? { background: `color-mix(in srgb, ${STATUS_TAB_COLORS[t]} 78%, black)` } : undefined}
+            >
+              {STATUS_TAB_LABELS[t]}
+              {t !== "todos" ? (
+                <span className={`ml-1 text-xs font-mono ${tab === t ? "text-white/80" : "text-gray-400 dark:text-gray-500"}`}>({counts[t]})</span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+
         <div className="relative">
           <button
             type="button"
             onClick={() => setDayPickerOpen((v) => !v)}
-            className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors"
+            className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors whitespace-nowrap"
             style={
-              dayPickerOpen
+              dayPickerOpen || viewDate
                 ? { background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }
                 : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
             }
           >
-            🗓 Próximas rotas {dayPickerOpen ? "▲" : "▼"}
+            {viewDate
+              ? `📅 ${WEEKDAY_SHORT[new Date(`${viewDate}T00:00:00Z`).getUTCDay()]} ${shortDateLabel(viewDate)}`
+              : "🗓 Próximas rotas"}{" "}
+            {dayPickerOpen ? "▲" : "▼"}
           </button>
           {dayPickerOpen ? (
             <div
-              className="absolute z-20 top-full mt-1.5 left-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1 min-w-[180px]"
+              className="absolute z-20 top-full mt-1.5 right-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1 min-w-[180px]"
               style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
             >
+              {viewDate ? (
+                <button
+                  type="button"
+                  onClick={() => selectDay(viewDate)}
+                  className="text-left text-sm rounded-md px-3 py-2 transition-colors"
+                  style={{ color: "var(--status-critical)" }}
+                >
+                  ✕ voltar pra hoje
+                </button>
+              ) : null}
               {upcomingDates.map((date) => (
                 <button
                   key={date}
@@ -501,53 +561,6 @@ export function EntregasKanbanHoje({
             </div>
           ) : null}
         </div>
-        {viewDate ? (
-          <button
-            type="button"
-            onClick={() => selectDay(viewDate)}
-            className="text-xs underline"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            ✕ voltar pra hoje
-          </button>
-        ) : null}
-      </div>
-
-      {/* Resumo horizontal por rota -- grid de 4 colunas em telas largas,
-          empilha em telas menores. Só contagem + motorista, sem lista de
-          chamado nenhuma dentro (essa mudou pra tabela única abaixo). */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {columns.map((column) => (
-          <RouteSummaryCard
-            key={column.key}
-            column={column}
-            selected={selectedRotaKey === column.key}
-            onToggle={() => setSelectedRotaKey((prev) => (prev === column.key ? null : column.key))}
-          />
-        ))}
-      </div>
-
-      {/* Filtro único Todos/Programado/Concluído/Cancelado/Não concluído --
-          substitui as subabas por coluna de antes (pedido do Victor
-          29/08/2026), agora um lugar só pra tabela achatada inteira. Os
-          números respeitam o filtro de rota escolhido acima (ver rotaRows). */}
-      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start flex-wrap">
-        {(Object.keys(STATUS_TAB_LABELS) as DeliveryStatusTab[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-              tab === t ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}
-            style={tab === t ? { background: `color-mix(in srgb, ${STATUS_TAB_COLORS[t]} 78%, black)` } : undefined}
-          >
-            {STATUS_TAB_LABELS[t]}
-            {t !== "todos" ? (
-              <span className={`ml-1 text-xs font-mono ${tab === t ? "text-white/80" : "text-gray-400 dark:text-gray-500"}`}>({counts[t]})</span>
-            ) : null}
-          </button>
-        ))}
       </div>
 
       {/* Tabela Grid Horizontal Limpa -- Guia de Componentes Maia (Design
