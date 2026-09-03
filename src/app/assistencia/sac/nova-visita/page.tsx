@@ -16,7 +16,10 @@ export default async function SacNovaVisitaPage() {
   const stores = await listStores();
 
   return (
-    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
+    // Centralizada, como toda tela de formulário -- mesmo ajuste/motivo de
+    // sac/nova/page.tsx (pedido do Victor 03/09/2026), mesmo par de telas
+    // "Nova ___" do SAC.
+    <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="Nova visita" subtitle="Montagem ou desmontagem — só o intake, a assistência atribui o montador depois.">
         <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150">
           ← Voltar

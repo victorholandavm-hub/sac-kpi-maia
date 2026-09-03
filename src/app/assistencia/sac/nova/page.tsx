@@ -25,7 +25,16 @@ export default async function SacNovaSolicitacaoPage() {
   }));
 
   return (
-    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
+    // Centralizada, como toda tela de formulário -- pedido do Victor
+    // 03/09/2026 ("essa tela precisa estar centralizada, como combinamos,
+    // assim como todas as telas de formulário"). Mesmo teto/padrão já usado
+    // em encomendas/solicitar/page.tsx (max-w-xl mx-auto) -- bate exatamente
+    // com o max-w-xl que o próprio <form> de SacCreateRequestForm.tsx já
+    // assume pra si (só que sem mx-auto, ficava desalinhado à esquerda numa
+    // página w-full). Essa tela fica fora do grupo (app) -- SAC não tem
+    // sessão Supabase Auth, ver requireEncomendaActor -- por isso nunca
+    // pegou o teto de largura de lá.
+    <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
       <AssistenciaHeader title="Nova entrega" subtitle="Troca/entrega de produto, envio de peça ou notificação externa.">
         <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150">
           ← Voltar
