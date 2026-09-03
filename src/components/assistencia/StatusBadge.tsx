@@ -68,15 +68,27 @@ export function StatusBadge({
           branco, bem abaixo do mínimo de leitura); misturar preto garante
           contraste em qualquer cor de status, sem precisar de exceção por
           status. O fundo continua com a cor crua (só 14%, sutil).
-          Revisado 03/09/2026 (modo noturno, "cor forte... dolorido aos
-          olhos"): mistura com var(--foreground) em vez de preto cru --
-          escurece no tema claro (foreground quase-preto) e clareia sozinho
-          no escuro (foreground quase-branco), mesmo raciocínio de
-          FilterPill.tsx. Preto fixo dava texto escuro em cima de fundo
-          escuro no modo noturno, sem contraste nenhum. */}
+          Revisado DE NOVO 03/09/2026 (aba Visitas, print em anexo: "Aberta"
+          quase branco, "Concluída" um verde-limão bem mais vívido que o
+          resto da tela, já muito mais discreta desde a revisão anterior de
+          hoje) -- a mistura com var(--foreground) (70%!) fazia sentido
+          quando --status-* ainda eram cores cruas nos dois temas, mas
+          globals.css já muda esses tokens pra uma versão BEM mais discreta
+          no escuro (color-mix 30% com --text-secondary, ver bloco html.dark)
+          -- misturar de novo 70% rumo a --foreground (quase branco no
+          escuro) clareava esse tom já discreto quase até sumir a cor,
+          voltando a destacar (mais claro = mais "gritante" ao olho, mesmo
+          sem ficar mais saturado). light-dark(): tema claro continua
+          escurecendo com preto (formato de sempre, sem mudança nenhuma
+          nesse tema); tema escuro usa a cor do token direto, sem mistura
+          extra nenhuma -- ela já foi calibrada pra funcionar como texto em
+          cima de fundo escuro. */}
       <span
         className={`inline-flex items-center ${sizeClasses} rounded-full whitespace-nowrap font-semibold`}
-        style={{ color: `color-mix(in srgb, ${color} 70%, var(--foreground))`, background: `color-mix(in srgb, ${color} 14%, var(--surface-1))` }}
+        style={{
+          color: `light-dark(color-mix(in srgb, ${color} 70%, black), ${color})`,
+          background: `color-mix(in srgb, ${color} 14%, var(--surface-1))`,
+        }}
       >
         {STATUS_LABELS[status] ?? status}
       </span>
