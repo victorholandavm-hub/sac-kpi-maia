@@ -295,6 +295,23 @@ export const DELIVERY_REQUEST_TYPES = [
   "envio_recolhimento_peca",
 ] as const;
 
+// "produto" vs "peça" -- pedido do Victor 03/09/2026: "todas as
+// notificações de assistência deve poder colocar que deu errado e que vai
+// fazer a segunda troca... hoje só pode se for troca de produto. envio de
+// peça também acontece isso". Generalizado "nova troca" (antes só
+// troca_produto) pra todo DELIVERY_REQUEST_TYPES acima -- ver
+// createExchangeChild (actions.ts) e DeliveryRequestActions.tsx. Esse mapa
+// só resolve qual substantivo usar nas perguntas genéricas da 2ª rodada
+// ("mesmo X ou outro X?", "o que aconteceu com o X?").
+export const DELIVERY_ITEM_NOUN: Record<string, string> = {
+  troca_produto: "produto",
+  entrega_produto: "produto",
+  recolhimento_produto: "produto",
+  envio_peca: "peça",
+  recolhimento: "peça",
+  envio_recolhimento_peca: "peça",
+};
+
 // O outro lado do corte acima -- montagem/desmontagem/vistoria/troca de
 // peça, a "visita de montador" de verdade, sem rota nem motorista (aba
 // "Visitas" de fila/page.tsx). Centralizado aqui em vez de recalculado onde

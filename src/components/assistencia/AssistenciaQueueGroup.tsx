@@ -203,7 +203,10 @@ function EntregaCardRow({
           }}
         >
           {REQUEST_TYPE_LABELS[r.type] ?? r.type}
-          {r.type === "troca_produto" && r.exchangeRound > 1 ? ` · ${r.exchangeRound}ª` : ""}
+          {/* Generalizado 03/09/2026 -- "nova troca" não é mais só de
+              troca_produto (ver createExchangeChild, actions.ts), então o
+              selo de rodada também não trava mais nesse tipo. */}
+          {r.exchangeRound > 1 ? ` · ${r.exchangeRound}ª` : ""}
         </span>
         <div className="mt-1">
           <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
