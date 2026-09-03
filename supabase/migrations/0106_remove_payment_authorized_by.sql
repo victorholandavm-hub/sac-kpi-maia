@@ -1,0 +1,11 @@
+-- Pedido do Victor 03/09/2026: campo "Autorizado por (gerente)" (por item,
+-- na tela de Pagamentos) tinha o VALOR digitado no lugar do NOME do gerente
+-- em vários itens (ex.: "20,00" em vez de um nome) -- achado revisando os
+-- itens montados por LUCIANO216 na Maia Campina Grande. Não era um erro
+-- isolado (achado o mesmo padrão em chamados #5131 e #5091, mais antigos),
+-- e o Victor confirmou que não precisa mais desse campo -- removido da UI
+-- (RequestItemsTable.tsx, PaymentItemEditor.tsx) e da action que gravava
+-- nele (setItemPaymentAuthorizedBy, pagamentos-actions.ts). Esta migration
+-- é a limpeza do lado do banco -- sem ela a coluna continua existindo,
+-- só que órfã (nada mais lê/escreve nela).
+alter table service_request_items drop column if exists payment_authorized_by;
