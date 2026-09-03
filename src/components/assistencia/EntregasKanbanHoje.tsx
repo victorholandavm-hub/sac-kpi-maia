@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
@@ -265,7 +266,7 @@ type FlatRow = { r: ServiceRequestSummary; rotaLabel: string; driverName: string
 // que antes eram tags à parte (urgente, "novo desde") viram indicadores
 // compactos dentro da própria coluna Situação -- a informação continua
 // ali, só sem virar uma sétima coluna.
-function TodayRow({ row }: { row: FlatRow }) {
+function TodayRow({ row, selected, onToggleSelected }: { row: FlatRow; selected: boolean; onToggleSelected: () => void }) {
   const { r } = row;
   const router = useRouter();
   // Linha inteira clicável -- pedido do Victor 01/09/2026: "ao clicar na
@@ -274,7 +275,9 @@ function TodayRow({ row }: { row: FlatRow }) {
   // <table>, o navegador expulsa a <a> pra fora e quebra o layout) --
   // onClick no próprio <tr> + cursor-pointer é o equivalente aqui.
   // ProductsModalButton já para propagação no próprio clique (stopPropagation),
-  // então continua abrindo só o modal, sem navegar.
+  // então continua abrindo só o modal, sem navegar. Checkbox de seleção em
+  // bloco (ver printable/toggleSelected abaixo) também para propagação, pelo
+  // mesmo motivo -- marcar pra imprimir não deve navegar pro chamado.
   // Concluída fica levemente apagada -- pedido do Victor 02/09/2026:
   // "as que estiverem como concluída devem ficar levemente apagadas em
   // relação as outras" -- só concluída, cancelada/programado continuam
@@ -284,6 +287,15 @@ function TodayRow({ row }: { row: FlatRow }) {
       onClick={() => router.push(`/assistencia/${r.id}`)}
       className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer ${r.status === "concluida" ? "opacity-60" : ""}`}
     >
+      <td className="pl-4 pr-2 py-3 align-top" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelected}
+          className="rounded"
+          aria-label={`Selecionar #${r.ticketNumber}`}
+        />
+      </td>
       <td className="px-4 py-3 align-top whitespace-nowrap">
         <div className="font-mono text-xs text-gray-400 dark:text-gray-500">#{r.ticketNumber}</div>
         <span
@@ -418,6 +430,12 @@ export function EntregasKanbanHoje({
     setDayPickerOpen(false);
   }
 
+  // Imprimir em bloco -- ver toggleSelected/allSelected/toggleAll mais
+  // abaixo (dependem de visibleRows, calculado depois do early-return logo
+  // abaixo) -- só o useState em si precisa ficar antes dele, incondicional
+  // (regra dos hooks).
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
   if (groups.length === 0) return null;
 
   const activeOverview = viewDate ? (upcomingOverview?.find((d) => d.date === viewDate) ?? null) : todayOverview;
@@ -437,6 +455,27 @@ export function EntregasKanbanHoje({
     tab === "todos"
       ? [...rotaRows].sort((a, b) => (a.r.status === "concluida" ? 1 : 0) - (b.r.status === "concluida" ? 1 : 0))
       : rotaRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
+
+  // Imprimir em bloco -- pedido do Victor 03/09/2026: "quando eu escolho a
+  // data da próxima rota, e ele me traz a lista, tem que ter a opção de
+  // imprimir em bloco". Mesmo padrão já usado em AssistenciaQueueGroup.tsx
+  // (checkbox por linha + "selecionar todas" + barra flutuante com link pra
+  // despacho-lote) -- vale tanto pra "Hoje" quanto pra qualquer dia de
+  // "Próximas rotas" escolhido, é a mesma tabela pros dois. Seleção
+  // referencia só o que está visível agora (visibleRows) -- "selecionar
+  // todas" não deve marcar linha escondida por outro filtro de status/rota.
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  const allSelected = visibleRows.length > 0 && visibleRows.every((row) => selected.has(row.r.id));
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(visibleRows.map((row) => row.r.id)));
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -581,6 +620,13 @@ export function EntregasKanbanHoje({
         </div>
       </div>
 
+      {visibleRows.length > 0 ? (
+        <label className="flex items-center gap-1.5 text-xs self-start text-gray-600 dark:text-gray-300">
+          <input type="checkbox" checked={allSelected} onChange={toggleAll} className="rounded" />
+          Selecionar todas
+        </label>
+      ) : null}
+
       {/* Tabela Grid Horizontal Limpa -- Guia de Componentes Maia (Design
           System, 01/09/2026): fim das caixas de texto espremidas do
           Kanban antigo. */}
@@ -588,6 +634,7 @@ export function EntregasKanbanHoje({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
+              <th className="pl-4 pr-2 py-2.5"></th>
               {["ID / Tipo", "Cliente", "Produto", "Rota / Motorista", "Situação", ""].map((h) => (
                 <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 whitespace-nowrap">
                   {h}
@@ -598,16 +645,47 @@ export function EntregasKanbanHoje({
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {visibleRows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">
                   Nada em &quot;{STATUS_TAB_LABELS[tab]}&quot; aqui.
                 </td>
               </tr>
             ) : (
-              visibleRows.map((row) => <TodayRow key={row.r.id} row={row} />)
+              visibleRows.map((row) => (
+                <TodayRow key={row.r.id} row={row} selected={selected.has(row.r.id)} onToggleSelected={() => toggleSelected(row.r.id)} />
+              ))
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Barra flutuante -- mesmo padrão de AssistenciaQueueGroup.tsx
+          (bottom-20 no mobile por causa da barra de navegação inferior,
+          bottom-4 no desktop). */}
+      {selected.size > 0 ? (
+        <div
+          className="fixed bottom-20 sm:bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:left-auto z-40 flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg flex-wrap"
+          style={{ background: "var(--surface-1)", borderColor: "var(--brand-green)" }}
+        >
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            {selected.size} selecionada{selected.size === 1 ? "" : "s"}
+          </span>
+          <Link
+            href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
+            target="_blank"
+            className="text-sm rounded-full px-3 py-1.5 font-medium border"
+            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+          >
+            🖨️ Imprimir selecionados
+          </Link>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+          >
+            cancelar
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
