@@ -392,7 +392,7 @@ export default async function SacNotificacoesPage({
                 groups={todayGroups}
                 todayOverview={todayOverview}
                 today={today}
-                upcomingOverview={rotaOverview.filter((d) => d.date > today).slice(0, 5)}
+                upcomingOverview={rotaOverview.filter((d) => d.date > today).slice(0, 7)}
                 motoristaAction={
                   <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly />
                 }
