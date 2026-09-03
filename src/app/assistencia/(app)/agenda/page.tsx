@@ -246,6 +246,11 @@ export default async function AgendaPage({
         </Link>
       ) : null}
 
+      {/* Todos os filtros agrupados num retângulo só -- mesmo pedido/motivo
+          de fila/page.tsx (03/09/2026, ver lá): "agrupe esses filtros e
+          coloque só uma linha como margem no retângulo". Última tela que
+          faltava receber esse tratamento. */}
+      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 dark:border-gray-600 p-4">
       {/* Linha 1 do guia de padronização: filtros rápidos por período,
           mesmo componente FilterPill das outras 2 telas (ver
           FilterPill.tsx). */}
@@ -339,6 +344,8 @@ export default async function AgendaPage({
           </Link>
         ) : null}
       </form>
+      </div>
+      {/* fecha o retângulo de filtros aberto acima */}
 
       {/* Kanban por montador só faz sentido com mouse/teclado pra arrastar
           -- desktop only, mesmo padrão de MobileActionSheet/AgendaDayGroups
