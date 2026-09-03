@@ -87,7 +87,12 @@ export default async function EncomendasCaixaPage({
   return (
     // Largura total -- pedido do Victor 31/08/2026, mesmo tratamento
     // das outras telas fora do grupo (app).
-    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
+    // Revisado 03/09/2026 -- achado do Victor: "na aba encomendas ainda
+    // está muito largo... revise as telas e deixe como na aba de
+    // solicitações". Mesmo teto do (app)/layout.tsx (max-w-[1600px]
+    // mx-auto, revisão de 02/09/2026) -- essa tela ficou de fora por
+    // estar fora do grupo (app), ver mesma nota em encomendas/fila/page.tsx.
+    <div className="w-full max-w-[1600px] mx-auto p-6 flex flex-col gap-6 min-w-0">
       <RealtimeQueueRefresher table="pedidos_encomenda" eventsTable="pedido_encomenda_events" />
       <AssistenciaHeader
         title={`Encomendas — ${storeLabel}`}

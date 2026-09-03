@@ -155,8 +155,16 @@ export default async function EncomendasQueuePage({
         sessão Supabase Auth -- ver comentário em requireEncomendaActor
         acima -- por isso não pegou a mudança de (app)/layout.tsx).
         Mesmo AssistenciaHeader de sempre, só o container que deixou de
-        limitar em max-w-4xl. */}
-    <div className="w-full p-6 flex flex-col gap-4 min-w-0">
+        limitar em max-w-4xl.
+        Revisado 03/09/2026 -- achado do Victor: "na aba encomendas ainda
+        está muito largo... revise as telas e deixe como na aba de
+        solicitações". Essa tela nunca pegou a revisão de 02/09/2026 do
+        (app)/layout.tsx (mesma nota acima: "preencher a largura inteira
+        da tela é ruim... um pouco menos do que é agora"), que trocou
+        largura total por max-w-[1600px] mx-auto -- por estar fora do
+        grupo (app), ficou parada na largura total de antes. Mesmo teto,
+        mesma margem da aba Solicitações agora. */}
+    <div className="w-full max-w-[1600px] mx-auto p-6 flex flex-col gap-4 min-w-0">
       <RealtimeQueueRefresher
         table="pedidos_encomenda"
         eventsTable="pedido_encomenda_events"
