@@ -498,7 +498,27 @@ function RotaDayCell({
   // clarinho como esse. --brand-green-soft + --text-primary é o par
   // certo pra fundo claro (mesmo usado em DriverRouteGroup.tsx,
   // MobileNav.tsx etc.).
-  const actionButtonStyle = { background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" };
+  //
+  // Achado do Victor 03/09/2026 (print em anexo, modo escuro): esse
+  // cartão inteiro nunca tinha passado pelo retrofit de modo noturno --
+  // fundo do dia (linha 511 abaixo) ficava #ffffff FIXO mesmo no escuro, e
+  // o texto por cima (var(--text-primary), quase branco no escuro) virava
+  // texto branco em cima de fundo branco -- literalmente ilegível ("não é
+  // pra estar branco, assim não da pra ler nada"). Mesma causa pro selo de
+  // rota (rotaBadgeClass abaixo): fundo vem de ROTA_COLORS, que no escuro
+  // já é var(--series-X) = var(--text-secondary) (cinza claro, monocromático
+  // desde a revisão de hoje mais cedo) -- texto branco fixo em cima de um
+  // cinza CLARO também perde contraste.
+  //
+  // "esse verde está muito forte... nesse modo dark, pra uma cor menos
+  // forte": var(--brand-green) continua vívido de propósito em botão
+  // sólido/CTA (ver nota em globals.css), mas aqui é usado como CONTORNO
+  // (borda do cartão de hoje, borda destes botões) -- nesse uso, vívido
+  // demais no escuro. mutedBrandGreen aplica a MESMA mistura já usada pros
+  // tokens --status-* (30% da cor crua + var(--text-secondary)) só no
+  // tema escuro; tema claro fica idêntico (light-dark(), zero mudança lá).
+  const mutedBrandGreen = "light-dark(var(--brand-green), color-mix(in srgb, var(--brand-green) 30%, var(--text-secondary)))";
+  const actionButtonStyle = { background: "var(--brand-green-soft)", borderColor: mutedBrandGreen, color: "var(--text-primary)" };
   const neutralButtonStyle = { background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text-secondary)" };
 
   return (
@@ -508,8 +528,8 @@ function RotaDayCell({
         // "Hoje" precisa se destacar de verdade no calendário -- pedido do
         // Victor 19/08/2026 ("cor um pouco mais forte na rota do dia"),
         // var(--surface-2) sozinho era sutil demais pra bater o olho.
-        border: isToday ? "2px solid var(--brand-green)" : "1px solid #E5E7EB",
-        background: isToday ? "color-mix(in srgb, var(--brand-green) 8%, var(--surface-1))" : "#ffffff",
+        border: isToday ? `2px solid ${mutedBrandGreen}` : "1px solid var(--border)",
+        background: isToday ? `color-mix(in srgb, ${mutedBrandGreen} 8%, var(--surface-1))` : "var(--surface-1)",
         opacity: isPast ? 0.3 : 1,
       }}
     >
@@ -587,7 +607,18 @@ function RotaDayCell({
             <>
               <span
                 className={rotaBadgeClass}
-                style={{ background: rotaValue ? ROTA_COLORS[rotaValue] : "var(--surface-2)", color: rotaValue ? "#fff" : "var(--text-muted)" }}
+                style={{
+                  background: rotaValue ? ROTA_COLORS[rotaValue] : "var(--surface-2)",
+                  // Texto branco fixo -- pensado pra ROTA_COLORS vívida (modo
+                  // claro). No escuro, ROTA_COLORS já é var(--series-X) =
+                  // var(--text-secondary) (cinza claro, monocromático desde
+                  // hoje mais cedo) -- branco em cima de cinza claro perde
+                  // contraste (mesmo selo "Praia" quase ilegível do print).
+                  // light-dark(): claro continua branco (sem mudança), escuro
+                  // usa var(--background) (quase preto), que lê bem em cima
+                  // de um cinza claro.
+                  color: rotaValue ? "light-dark(#fff, var(--background))" : "var(--text-muted)",
+                }}
               >
                 {rotaValue ? ROTA_LABELS[rotaValue] : "Sem rota"}
               </span>
