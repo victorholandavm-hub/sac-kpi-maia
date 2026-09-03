@@ -66,8 +66,25 @@
    (loja/encomendas/estoque/admin/relatórios). Cores de marca/status/série
    ficam quase iguais nos dois temas (já têm contraste bom em fundo claro
    OU escuro) -- só os poucos casos claramente baixo-contraste em fundo
-   escuro (ex.: amarelo, violeta) ganham um leve ajuste. */
-.dark {
+   escuro (ex.: amarelo, violeta) ganham um leve ajuste.
+
+   Bug real achado 03/09/2026 (print do Victor: "ta misturado", metade da
+   tela clara e metade escura): o build do Tailwind estava DESCARTANDO
+   esse bloco inteiro do CSS final -- conferido direto no bundle publicado
+   (document.styleSheets), só sobravam as classes `dark:xxx` geradas pelo
+   Tailwind (bg-gray-800, text-gray-100 etc.), nenhuma regra `.dark { ... }`
+   com as variáveis. A classe `.dark` na <html> aparecia certinho (o
+   ThemeToggle funciona), mas virava letra morta pra esse bloco -- daí
+   telas que usam var(--surface-1)/var(--text-primary) direto (a maioria
+   do sistema, feita antes do Tier 2) continuavam presas no claro, só as
+   convertidas pro Tier 2 (dark:bg-gray-800 etc.) mudavam -- exatamente o
+   "misturado" do print. Causa provável: `@custom-variant dark (&:where(.dark,
+   .dark *))` faz o Tailwind tratar QUALQUER seletor `.dark` no arquivo como
+   parte da própria geração de variante, podando um bloco de propriedades
+   soltas como esse. Seletor mais específico (`html.dark` em vez de
+   `.dark` puro) evita a colisão de string sem mudar nada de como a classe
+   é aplicada (o ThemeToggle sempre marca a <html> mesmo). */
+html.dark {
   color-scheme: dark;
   /* Revisado 03/09/2026 -- pedido do Victor: "a cor de fundo que ficou
      forte" (a 1ª versão, #101210, era perto demais do preto puro, alto
