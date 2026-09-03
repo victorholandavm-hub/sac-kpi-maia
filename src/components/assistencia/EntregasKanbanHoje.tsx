@@ -485,19 +485,37 @@ export function EntregasKanbanHoje({
           acima). */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start flex-wrap">
+          {/* Selecionado só "levemente diferente" dos outros da mesma
+              fileira -- pedido do Victor 03/09/2026: "o que estiver
+              selecionado... estejam numa cor levemente diferente das
+              outras que estão agrupadas abaixo". Preenchimento sólido
+              cor-mix 78% preto (praticamente preto puro com texto branco)
+              destoava forte demais do resto da fileira, cinza clarinho.
+              Troca pro mesmo espírito de "pílula clara sobre trilho" de
+              segmented control (bg-white/dark:bg-gray-600, uma leitura só
+              um tom mais clara que o trilho bg-gray-100/dark:bg-gray-700
+              ao redor) + texto na cor semântica do status em vez de
+              branco -- diferença perceptível, sem virar bloco preto. */}
           {(Object.keys(STATUS_TAB_LABELS) as DeliveryStatusTab[]).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-                tab === t ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                tab === t
+                  ? "bg-white dark:bg-gray-600 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               }`}
-              style={tab === t ? { background: `color-mix(in srgb, ${STATUS_TAB_COLORS[t]} 78%, black)` } : undefined}
+              style={tab === t ? { color: STATUS_TAB_COLORS[t] } : undefined}
             >
               {STATUS_TAB_LABELS[t]}
               {t !== "todos" ? (
-                <span className={`ml-1 text-xs font-mono ${tab === t ? "text-white/80" : "text-gray-400 dark:text-gray-500"}`}>({counts[t]})</span>
+                <span
+                  className={`ml-1 text-xs font-mono ${tab === t ? "" : "text-gray-400 dark:text-gray-500"}`}
+                  style={tab === t ? { color: `color-mix(in srgb, ${STATUS_TAB_COLORS[t]} 65%, var(--text-muted))` } : undefined}
+                >
+                  ({counts[t]})
+                </span>
               ) : null}
             </button>
           ))}
