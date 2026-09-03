@@ -41,7 +41,7 @@ import { verifyPin } from "@/lib/pinAuth";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, listDayLoad, listRequestsScheduledOn, type DayLoadItem } from "@/lib/serviceRequests";
-import { groupByRota, pinSemRotaFirst, type QueueGroup } from "@/lib/entregaQueueGrouping";
+import { groupByRota, pinSemRotaFirst, ENTREGA_TYPES, type QueueGroup } from "@/lib/entregaQueueGrouping";
 
 const REQUEST_TYPES = [
   "montagem",
@@ -1624,15 +1624,27 @@ export async function getAvailableRotasForDateAction(date: string): Promise<Avai
 // 5 dias na carga inicial da página -- mesmo raciocínio de
 // getAvailableRotasForDateAction acima, um dia por vez. Mesmo agrupamento
 // de todayGroups em fila/page.tsx (groupByRota + pinSemRotaFirst), sem os
-// filtros de loja/tipo/origem da fila (é uma prévia geral do dia, não uma
-// visão filtrada) -- overview de motorista de cada dia já vem de
+// filtros de loja/origem da fila (é uma prévia geral do dia, não uma visão
+// filtrada) -- overview de motorista de cada dia já vem de
 // getRotaWeekOverview (rotaOverview, 14 dias a partir de hoje), passado
 // como prop pro client component, sem precisar de busca própria aqui.
+//
+// Bug real achado pelo Victor 03/09/2026 (print em anexo): "está aparecendo
+// demandas da aba de visitas quando eu filtro por entregas futuras na aba
+// de entregas" -- "Vistoria"/"Troca de peça" (VISITA_TYPES, chamado de
+// montador) apareciam no board de Hoje/Próximas rotas, que é só de
+// entregas. Causa: essa função (ao contrário de listRequestsScheduledOn
+// pra HOJE em fila/page.tsx, que sempre passa `types`) buscava TODO tipo de
+// chamado agendado pro dia, sem filtro nenhum -- "sem os filtros de tipo"
+// no comentário acima não era "opcional", era o próprio corte entre
+// Entregas e Visitas. EntregasKanbanHoje (e "Próximas rotas" dentro dele)
+// só existe na aba Entregas -- por isso ENTREGA_TYPES aqui é fixo, não
+// precisa vir por parâmetro (nunca chamado da aba Visitas).
 export async function getDayRouteGroupsAction(date: string): Promise<QueueGroup[]> {
   const profile = await getProfile();
   requireRole(profile, "assistencia", "admin", "sac");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
-  const requests = await listRequestsScheduledOn(date);
+  const requests = await listRequestsScheduledOn(date, { types: ENTREGA_TYPES });
   return pinSemRotaFirst(groupByRota(requests));
 }
 
