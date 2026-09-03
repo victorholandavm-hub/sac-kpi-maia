@@ -94,18 +94,27 @@ function weekdayLabel(dateStr: string): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
-// Entregas/envios que já passaram da data agendada e continuam em
-// aberto -- pedido do Victor 25/08/2026: "preciso que haja algo bem
-// visivel para as notificações de assistencia que nao foram feitas no
-// dia e estao em atraso... para que fique mais facil deles verem e
-// remarcarem e nao ficar nada atrasado e para tras". Só quem ainda está
-// "aberta" -- concluído/cancelado não precisa remarcar mais nada, mesmo
-// com data agendada no passado. Usado tanto pro número do banner ("N
-// atrasadas") quanto pra filtrar a lista quando o banner "Remarcar
-// urgente" é clicado -- um cálculo só, compartilhado entre fila/page.tsx
-// (aba Entregas) e sac/notificacoes/page.tsx.
+// Entregas/envios que precisam ser remarcados -- pedido do Victor
+// 25/08/2026: "preciso que haja algo bem visivel para as notificações de
+// assistencia que nao foram feitas no dia e estao em atraso... para que
+// fique mais facil deles verem e remarcarem e nao ficar nada atrasado e
+// para tras". Dois casos DIFERENTES, mas os dois precisam de remarcação
+// (revisão do Victor 03/09/2026: "atrasado e nao concluido nao sao
+// coisas diferentes, mas os dois precisam de remarcação, então precisam
+// entrar no grupo para remarcar"):
+// 1) "aberta" com data agendada já passada -- nunca nem foi tentado.
+// 2) status "remarcar" -- já foi tentado (motorista reportou que não
+//    conseguiu concluir, ver driverReportIssue/driver-actions.ts), então
+//    já sabe que precisa de nova data, independente de já estar atrasado
+//    ou não (pode ser de hoje mesmo). Concluído/cancelado nunca entra
+//    aqui -- não precisa remarcar mais nada. Usado tanto pro número do
+//    banner ("N pra remarcar") quanto pra filtrar a lista quando ele é
+//    clicado -- um cálculo só, compartilhado entre fila/page.tsx (aba
+//    Entregas) e sac/notificacoes/page.tsx.
 export function filterOverdueOpen(requests: ServiceRequestSummary[]): ServiceRequestSummary[] {
-  return requests.filter((r) => r.status === "aberta" && bucketByScheduledDate(r.scheduledDate) === "atrasado");
+  return requests.filter(
+    (r) => (r.status === "aberta" && bucketByScheduledDate(r.scheduledDate) === "atrasado") || r.status === "remarcar"
+  );
 }
 
 // Entregas/envios ainda sem rota atribuída -- pedido do Victor 25/08/2026
