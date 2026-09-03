@@ -78,6 +78,29 @@ const DELIVERY_ENCERRADO_LABELS = [...DELIVERY_RESOLVIDO_LABELS, "Cancelada"];
 const STALE_PRIORITY_LIMIT = 15;
 const STALE_PRIORITY_TIME_BUDGET_MS = 60_000;
 
+// Bug real, achado 03/09/2026 (relato do Victor: carga 004440 com 4 clientes
+// aqui, 5 no Protheus -- pedido 059973/filial 212 nunca tinha uma linha
+// sequer em totvs_deliveries). Causa: syncStaleDeliveries só re-sincroniza
+// pedido JÁ EXISTENTE aqui; quem descobre pedido novo é só o scan sequencial
+// (syncDeliveries), que pagina o `/rest/ai/deliveries` SEM filtro nenhum --
+// e esse endpoint, sem filtro, tem 240 páginas (~24 mil pedidos) no
+// Protheus real (conferido 03/09/2026). Com licença única disputada
+// (comentário acima) e várias páginas não completando dentro do orçamento
+// de tempo, uma volta inteira do cursor pode levar dias -- pedido criado
+// DEPOIS que o cursor já passou da posição onde ele cairia só é visto na
+// PRÓXIMA volta inteira. Confirmado ao vivo: `?document=<cpf da Moniele>`
+// devolve o pedido 059973 na hora (a API tem o dado), só o crawl sequencial
+// que ainda não tinha chegado nele.
+//
+// Fix: pra carga ABERTA (status_carga_codigo <> Encerrada = "6") que já
+// conhecemos (porque algum outro pedido dela já sincronizou uma vez), o
+// endpoint aceita filtrar por `load=<código da carga>` -- reconsulta a carga
+// inteira e descobre pedido novo que tenha entrado nela depois da 1ª vez,
+// sem depender do cursor global. Carga aberta em produção (03/09/2026):
+// ~91 distintas -- cabe reconsultar todas em poucas execuções.
+const OPEN_CARGA_PRIORITY_LIMIT = 15;
+const OPEN_CARGA_TIME_BUDGET_MS = 45_000;
+
 // URL e paginação (page/size minúsculo) confirmados contra a API real em
 // 2026-07-30 -- api-totvs.yaml também errava os nomes de alguns campos do
 // payload (ver TotvsDeliveryOrder/TotvsDeliveryCarga abaixo: "order"/"branch"
@@ -1003,6 +1026,58 @@ async function syncStaleDeliveries(supabase: SupabaseAdmin): Promise<SyncResult>
   return { checked, upserted, errors };
 }
 
+type OpenCargaCandidate = { carga: string };
+
+async function syncOpenCargas(supabase: SupabaseAdmin): Promise<SyncResult> {
+  const started = Date.now();
+  const errors: string[] = [];
+  let checked = 0;
+  let upserted = 0;
+
+  // Uma carga pode ter várias linhas (uma por pedido já sincronizado nela) --
+  // agrupa por carga e usa o updated_at mais antigo do grupo como proxy de
+  // "há quanto tempo não reconsultamos essa carga inteira", pra rodar as
+  // mais desatualizadas primeiro em vez de sempre bater nas mesmas.
+  const { data: rows, error: fetchError } = await supabase
+    .from("totvs_delivery_cargas")
+    .select("carga, updated_at")
+    .neq("status_carga_codigo", "6")
+    .order("updated_at", { ascending: true })
+    .limit(OPEN_CARGA_PRIORITY_LIMIT * 8);
+  if (fetchError) {
+    errors.push(`open cargas: ${fetchError.message}`);
+    return { checked, upserted, errors };
+  }
+
+  const seen = new Set<string>();
+  const cargas: OpenCargaCandidate[] = [];
+  for (const r of (rows ?? []) as { carga: string; updated_at: string }[]) {
+    if (seen.has(r.carga)) continue;
+    seen.add(r.carga);
+    cargas.push({ carga: r.carga });
+    if (cargas.length >= OPEN_CARGA_PRIORITY_LIMIT) break;
+  }
+
+  for (const { carga } of cargas) {
+    if (Date.now() - started > OPEN_CARGA_TIME_BUDGET_MS) break;
+    checked++;
+    let json: TotvsDeliveryListResponse;
+    try {
+      json = await fetchTotvs<TotvsDeliveryListResponse>(
+        `${BASE_URL}/rest/ai/deliveries?load=${encodeURIComponent(carga)}&page=1&size=100`
+      );
+    } catch (err) {
+      errors.push(`open carga ${carga}: ${(err as Error).message}`);
+      continue;
+    }
+    for (const d of json.data ?? []) {
+      if (await upsertDelivery(supabase, d, errors)) upserted++;
+    }
+  }
+
+  return { checked, upserted, errors };
+}
+
 async function syncDeliveries(supabase: SupabaseAdmin): Promise<SyncResult> {
   const started = Date.now();
   let page = Number(await getSyncState(supabase, "totvs_deliveries_next_page")) || 1;
@@ -1047,6 +1122,7 @@ export type TotvsSyncSummary = {
   clients: { checked: number; upserted: number };
   orders: { checked: number; upserted: number };
   deliveriesStale: { checked: number; upserted: number };
+  deliveriesOpenCargas: { checked: number; upserted: number };
   deliveries: { checked: number; upserted: number };
   clientsBackfill: { checked: number; upserted: number };
   stock: { checked: number; upserted: number };
@@ -1063,6 +1139,11 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
   // Antes do scan sequencial: refresca com prioridade os pedidos não
   // resolvidos mais desatualizados (ver comentário em syncStaleDeliveries).
   const deliveriesStale = await syncStaleDeliveries(supabase);
+  // Antes do scan sequencial também: reconsulta carga aberta já conhecida
+  // pelo código dela (ver comentário em OPEN_CARGA_PRIORITY_LIMIT) -- pega
+  // pedido novo que entrou numa carga que o crawl sequencial ainda não deu
+  // a volta pra ver de novo.
+  const deliveriesOpenCargas = await syncOpenCargas(supabase);
   const deliveries = await syncDeliveries(supabase);
   const clientsBackfill = await backfillMissingClients(supabase);
   const stock = await syncStock(supabase);
@@ -1072,16 +1153,26 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
       clients.errors.length === 0 &&
       orders.errors.length === 0 &&
       deliveriesStale.errors.length === 0 &&
+      deliveriesOpenCargas.errors.length === 0 &&
       deliveries.errors.length === 0 &&
       clientsBackfill.errors.length === 0 &&
       stock.errors.length === 0,
     clients: { checked: clients.checked, upserted: clients.upserted },
     orders: { checked: orders.checked, upserted: orders.upserted },
     deliveriesStale: { checked: deliveriesStale.checked, upserted: deliveriesStale.upserted },
+    deliveriesOpenCargas: { checked: deliveriesOpenCargas.checked, upserted: deliveriesOpenCargas.upserted },
     deliveries: { checked: deliveries.checked, upserted: deliveries.upserted },
     clientsBackfill: { checked: clientsBackfill.checked, upserted: clientsBackfill.upserted },
     stock: { checked: stock.checked, upserted: stock.upserted },
-    errors: [...clients.errors, ...orders.errors, ...deliveriesStale.errors, ...deliveries.errors, ...clientsBackfill.errors, ...stock.errors],
+    errors: [
+      ...clients.errors,
+      ...orders.errors,
+      ...deliveriesStale.errors,
+      ...deliveriesOpenCargas.errors,
+      ...deliveries.errors,
+      ...clientsBackfill.errors,
+      ...stock.errors,
+    ],
   };
 
   await recordSyncRun(
@@ -1091,6 +1182,7 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
       clients: summary.clients,
       orders: summary.orders,
       deliveriesStale: summary.deliveriesStale,
+      deliveriesOpenCargas: summary.deliveriesOpenCargas,
       deliveries: summary.deliveries,
       clientsBackfill: summary.clientsBackfill,
       stock: summary.stock,
