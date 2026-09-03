@@ -39,7 +39,8 @@ import {
 import { verifyPin } from "@/lib/pinAuth";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
-import { ADDRESS_NUMBER_REQUIRED_TYPES, listDayLoad, type DayLoadItem } from "@/lib/serviceRequests";
+import { ADDRESS_NUMBER_REQUIRED_TYPES, listDayLoad, listRequestsScheduledOn, type DayLoadItem } from "@/lib/serviceRequests";
+import { groupByRota, pinSemRotaFirst, type QueueGroup } from "@/lib/entregaQueueGrouping";
 
 const REQUEST_TYPES = [
   "montagem",
@@ -1599,6 +1600,27 @@ export async function getAvailableRotasForDateAction(date: string): Promise<Avai
   requireRole(profile, "assistencia", "admin", "sac");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
   return getAvailableRotasForDate(date);
+}
+
+// "Próximas rotas" no board de Hoje (EntregasKanbanHoje.tsx) -- pedido do
+// Victor 03/09/2026: "um botão... quando eu clicar ele aparece as rotas
+// dos próximos 5 dias e se eu clicar em algum desses dias, ele já filtra
+// e aparece os clientes daquela rota, do mesmo jeito que acontece quando
+// clico" num card de rota de hoje. Busca sob demanda (só quando a
+// assistência realmente abre um dia futuro) em vez de já vir pronta pros
+// 5 dias na carga inicial da página -- mesmo raciocínio de
+// getAvailableRotasForDateAction acima, um dia por vez. Mesmo agrupamento
+// de todayGroups em fila/page.tsx (groupByRota + pinSemRotaFirst), sem os
+// filtros de loja/tipo/origem da fila (é uma prévia geral do dia, não uma
+// visão filtrada) -- overview de motorista de cada dia já vem de
+// getRotaWeekOverview (rotaOverview, 14 dias a partir de hoje), passado
+// como prop pro client component, sem precisar de busca própria aqui.
+export async function getDayRouteGroupsAction(date: string): Promise<QueueGroup[]> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin", "sac");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+  const requests = await listRequestsScheduledOn(date);
+  return pinSemRotaFirst(groupByRota(requests));
 }
 
 export async function setSchedule(

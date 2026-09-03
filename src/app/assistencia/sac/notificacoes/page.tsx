@@ -391,6 +391,8 @@ export default async function SacNotificacoesPage({
               <EntregasKanbanHoje
                 groups={todayGroups}
                 todayOverview={todayOverview}
+                today={today}
+                upcomingOverview={rotaOverview.filter((d) => d.date > today).slice(0, 5)}
                 motoristaAction={
                   <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly />
                 }

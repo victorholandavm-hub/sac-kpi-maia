@@ -7,9 +7,23 @@ import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
 import { DELIVERY_TYPE_COLORS } from "./AssistenciaQueueGroup";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
-import { driverNameForRota, JP_EXTRA_ROTA, type Rota, type RotaDayOverview } from "@/lib/rotas";
+import { getDayRouteGroupsAction } from "@/app/assistencia/actions";
+import { driverNameForRota, JP_EXTRA_ROTA, WEEKDAY_LABELS, type Rota, type RotaDayOverview } from "@/lib/rotas";
 import type { QueueGroup } from "@/lib/entregaQueueGrouping";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
+
+const WEEKDAY_SHORT = WEEKDAY_LABELS.map((w) => w.slice(0, 3));
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function shortDateLabel(dateStr: string): string {
+  const [, m, day] = dateStr.split("-");
+  return `${day}/${m}`;
+}
 
 // Quadro do dia de HOJE -- pedido do Victor 25/08/2026: "Para a operação
 // de Hoje, um quadro estilo Kanban funciona muito bem: Coluna Sem Rota,
@@ -98,6 +112,15 @@ function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | nul
       },
     ];
   });
+}
+
+// Mesma regra que já pré-selecionava a rota do dia em "Hoje" (ver
+// defaultRota/defaultColumnKey em EntregasKanbanHoje) -- extraída pra
+// reaproveitar também quando um dos "Próximos 5 dias" é escolhido (ver
+// selectDay), pra abrir cada dia já com a rota esperada dele em foco.
+function defaultColumnKeyFor(columns: KanbanColumn[], overview: RotaDayOverview | null): string | null {
+  const rota = overview ? (overview.assignments.primary?.rota ?? overview.expectedRota) : null;
+  return columns.find((c) => c.rotaKey === rota)?.key ?? null;
 }
 
 type DeliveryStatusTab = "todos" | "programado" | "concluido" | "cancelado" | "nao_concluido";
@@ -316,10 +339,20 @@ function TodayRow({ row }: { row: FlatRow }) {
 export function EntregasKanbanHoje({
   groups,
   todayOverview,
+  today,
+  upcomingOverview,
   motoristaAction,
 }: {
   groups: QueueGroup[];
   todayOverview: RotaDayOverview | null;
+  // Data de hoje (YYYY-MM-DD) -- só pra calcular os próximos 5 dias do
+  // botão "Próximas rotas" abaixo (ver upcomingDates). Overview (motorista
+  // esperado de cada um desses dias) já vem pronto de getRotaWeekOverview
+  // (rotaOverview, 14 dias a partir de hoje, ver fila/page.tsx) -- só os
+  // CHAMADOS de cada dia futuro são buscados sob demanda (getDayRouteGroupsAction),
+  // só quando a assistência realmente abre aquele dia.
+  today: string;
+  upcomingOverview?: RotaDayOverview[];
   // Botão "Gestão de Motoristas & Escala" (RotaMotoristaDoDia, modo
   // buttonOnly) -- pedido do Victor 02/09/2026: "deve ficar ao lado de
   // 'hoje' e só o botão". Renderizado como slot em vez de importado
@@ -328,20 +361,66 @@ export function EntregasKanbanHoje({
   // que também busca `groups`/`todayOverview`).
   motoristaAction?: React.ReactNode;
 }) {
-  const columns = buildColumns(groups, todayOverview);
+  const hojeColumns = buildColumns(groups, todayOverview);
   // Rota padrão do dia -- pedido do Victor 02/09/2026: "a rota padrão do
   // dia já deve vir selecionada como padrão". A atribuição de fato pra hoje
   // (assignments.primary) tem prioridade sobre o padrão da semana
   // (expectedRota) quando alguém já trocou a rota do dia por exceção --
   // mesma prioridade que driverNameForRota já usa acima.
-  const defaultRota = todayOverview ? (todayOverview.assignments.primary?.rota ?? todayOverview.expectedRota) : null;
-  const defaultColumnKey = columns.find((c) => c.rotaKey === defaultRota)?.key ?? null;
+  const defaultColumnKey = defaultColumnKeyFor(hojeColumns, todayOverview);
   const [tab, setTab] = useState<DeliveryStatusTab>("todos");
   // Clicar de novo na rota já selecionada limpa o filtro (volta a mostrar
   // todas) -- clicar numa rota diferente troca pra ela.
   const [selectedRotaKey, setSelectedRotaKey] = useState<string | null>(defaultColumnKey);
+
+  // "Próximas rotas" -- pedido do Victor 03/09/2026: "um botão... quando
+  // eu clicar ele aparece as rotas dos próximos 5 dias e se eu clicar em
+  // algum desses dias, ele já filtra e aparece os clientes daquela rota,
+  // do mesmo jeito que acontece quando clico" num card de rota de hoje.
+  // viewDate null = vendo "Hoje" (groups/todayOverview, já vêm prontos da
+  // página); viewDate = uma data = vendo aquele dia (busca sob demanda,
+  // ver selectDay -- cache em dayGroupsCache pra não rebuscar ao clicar
+  // no mesmo dia de novo na mesma sessão).
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  const [viewDate, setViewDate] = useState<string | null>(null);
+  const [dayGroupsCache, setDayGroupsCache] = useState<Record<string, QueueGroup[]>>({});
+  const [loadingDate, setLoadingDate] = useState<string | null>(null);
+  const upcomingDates = Array.from({ length: 5 }, (_, i) => addDays(today, i + 1));
+
+  async function selectDay(date: string) {
+    if (viewDate === date) {
+      // Clicar nele de novo -- mesmo padrão de "clicar de novo desmarca"
+      // já usado pra rota (ver onToggle do RouteSummaryCard abaixo):
+      // volta pra "Hoje".
+      setViewDate(null);
+      setSelectedRotaKey(defaultColumnKey);
+      setTab("todos");
+      return;
+    }
+    let dayGroups = dayGroupsCache[date];
+    if (!dayGroups) {
+      // Dropdown fica aberto durante a busca (mostra "carregando…" no
+      // próprio dia clicado) -- fecha só quando o dia já está pronto pra
+      // ver, não antes.
+      setLoadingDate(date);
+      try {
+        dayGroups = await getDayRouteGroupsAction(date);
+        setDayGroupsCache((prev) => ({ ...prev, [date]: dayGroups! }));
+      } finally {
+        setLoadingDate(null);
+      }
+    }
+    const dayOverview = upcomingOverview?.find((d) => d.date === date) ?? null;
+    setSelectedRotaKey(defaultColumnKeyFor(buildColumns(dayGroups, dayOverview), dayOverview));
+    setTab("todos");
+    setViewDate(date);
+    setDayPickerOpen(false);
+  }
+
   if (groups.length === 0) return null;
 
+  const activeOverview = viewDate ? (upcomingOverview?.find((d) => d.date === viewDate) ?? null) : todayOverview;
+  const columns = viewDate ? buildColumns(dayGroupsCache[viewDate] ?? [], activeOverview) : hojeColumns;
   const allRows: FlatRow[] = columns.flatMap((column) =>
     column.items.map((r) => ({ r, rotaLabel: column.rotaLabel, driverName: column.driverName, columnKey: column.key }))
   );
@@ -364,15 +443,74 @@ export function EntregasKanbanHoje({
           mesmo tratamento do indicador ativo do segmented control
           Visitas/Entregas/Agenda e do mês aberto (MonthAccordion.tsx).
           "Gestão de Motoristas & Escala" ao lado -- pedido do Victor
-          02/09/2026: "deve ficar ao lado de 'hoje' e só o botão". */}
+          02/09/2026: "deve ficar ao lado de 'hoje' e só o botão".
+          "Próximas rotas" ao lado -- pedido do Victor 03/09/2026 (ver
+          selectDay acima). Selo muda pra mostrar qual dia está em foco --
+          sem isso, olhando só os cards de rota abaixo não dava pra saber
+          se ainda é "Hoje" ou já é um dos próximos dias escolhido. */}
       <div className="flex items-center gap-3 flex-wrap">
         <span
           className="text-xs font-semibold uppercase tracking-wider text-white rounded-md shadow-sm px-2.5 py-1"
-          style={{ background: "#1B5E3C" }}
+          style={{ background: viewDate ? "var(--brand-orange)" : "#1B5E3C" }}
         >
-          📌 Hoje
+          {viewDate ? `📅 ${WEEKDAY_SHORT[new Date(`${viewDate}T00:00:00Z`).getUTCDay()]} ${shortDateLabel(viewDate)}` : "📌 Hoje"}
         </span>
         {motoristaAction}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setDayPickerOpen((v) => !v)}
+            className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors"
+            style={
+              dayPickerOpen
+                ? { background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }
+                : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
+            }
+          >
+            🗓 Próximas rotas {dayPickerOpen ? "▲" : "▼"}
+          </button>
+          {dayPickerOpen ? (
+            <div
+              className="absolute z-20 top-full mt-1.5 left-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1 min-w-[180px]"
+              style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+            >
+              {upcomingDates.map((date) => (
+                <button
+                  key={date}
+                  type="button"
+                  disabled={loadingDate === date}
+                  onClick={() => selectDay(date)}
+                  className="text-left text-sm rounded-md px-3 py-2 transition-colors disabled:opacity-60"
+                  style={
+                    viewDate === date
+                      ? { background: "var(--brand-green-soft)", color: "var(--text-primary)", fontWeight: 600 }
+                      : { color: "var(--text-primary)" }
+                  }
+                  onMouseEnter={(e) => {
+                    if (viewDate !== date) e.currentTarget.style.background = "var(--surface-2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (viewDate !== date) e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  {WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]} {shortDateLabel(date)}
+                  {loadingDate === date ? " · carregando…" : ""}
+                  {viewDate === date ? " ✓" : ""}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        {viewDate ? (
+          <button
+            type="button"
+            onClick={() => selectDay(viewDate)}
+            className="text-xs underline"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            ✕ voltar pra hoje
+          </button>
+        ) : null}
       </div>
 
       {/* Resumo horizontal por rota -- grid de 4 colunas em telas largas,
