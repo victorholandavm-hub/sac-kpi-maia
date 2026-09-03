@@ -29,7 +29,7 @@ export function WithdrawStockMovementButton({ movementId }: { movementId: string
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="text-xs rounded-lg border border-gray-200 px-2 py-1.5 text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+          className="text-xs rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1.5 text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
           autoFocus
         />
         {/* Primário -- Guia de Componentes Maia (Design System,
@@ -46,7 +46,7 @@ export function WithdrawStockMovementButton({ movementId }: { movementId: string
         <button
           type="button"
           onClick={() => setPicking(false)}
-          className="text-xs font-medium rounded-md px-2 py-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors duration-150"
+          className="text-xs font-medium rounded-md px-2 py-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150"
         >
           cancelar
         </button>

@@ -80,7 +80,7 @@ function WarningTag({ icon, text, color }: { icon?: string; text: string; color:
     <span
       title={text}
       className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap truncate max-w-[9rem] cursor-help"
-      style={{ color, background: `color-mix(in srgb, ${color} 14%, white)` }}
+      style={{ color, background: `color-mix(in srgb, ${color} 14%, var(--surface-1))` }}
     >
       {icon ? `${icon} ` : ""}
       {text}
@@ -143,7 +143,7 @@ function EntregaCardRow({
     <tr
       ref={nodeRef}
       onClick={() => router.push(`/assistencia/${r.id}`)}
-      className="hover:bg-gray-50 transition-colors duration-150 cursor-pointer"
+      className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer"
       style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
     >
       {hasLeftColumn ? (
@@ -164,7 +164,7 @@ function EntregaCardRow({
                   onClick={onMoveUp}
                   disabled={i === 0 || saving}
                   aria-label="Mover pra cima"
-                  className="text-xs leading-none px-1 disabled:opacity-25 text-gray-400 hover:text-gray-600"
+                  className="text-xs leading-none px-1 disabled:opacity-25 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   ▲
                 </button>
@@ -172,7 +172,7 @@ function EntregaCardRow({
                   onClick={onMoveDown}
                   disabled={i === orderLength - 1 || saving}
                   aria-label="Mover pra baixo"
-                  className="text-xs leading-none px-1 disabled:opacity-25 text-gray-400 hover:text-gray-600"
+                  className="text-xs leading-none px-1 disabled:opacity-25 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   ▼
                 </button>
@@ -185,14 +185,14 @@ function EntregaCardRow({
       {/* Coluna 1: ID / Tipo */}
       <td className={`${hasLeftColumn ? "pl-2" : "pl-4"} pr-3 py-3 align-top whitespace-nowrap`}>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-mono text-gray-400">#{r.ticketNumber}</span>
+          <span className="text-xs font-mono text-gray-400 dark:text-gray-500">#{r.ticketNumber}</span>
           <NewSinceBadge createdAt={r.createdAt} storageKey="fila-montagem-last-seen" />
         </div>
         <span
           className="inline-flex mt-1 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
           style={{
-            color: `color-mix(in srgb, ${DELIVERY_TYPE_COLORS[r.type] ?? "#6B7280"} 70%, black)`,
-            background: `color-mix(in srgb, ${DELIVERY_TYPE_COLORS[r.type] ?? "#6B7280"} 14%, white)`,
+            color: `color-mix(in srgb, ${DELIVERY_TYPE_COLORS[r.type] ?? "#6B7280"} 70%, var(--foreground))`,
+            background: `color-mix(in srgb, ${DELIVERY_TYPE_COLORS[r.type] ?? "#6B7280"} 14%, var(--surface-1))`,
           }}
         >
           {REQUEST_TYPE_LABELS[r.type] ?? r.type}
@@ -208,19 +208,19 @@ function EntregaCardRow({
           alerta, nunca decoração). */}
       <td className="px-3 py-3 align-top whitespace-nowrap">
         {effectiveDate ? (
-          <span className="text-sm font-semibold text-gray-800">
+          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
             {formatDateOnly(effectiveDate)}
             {effectiveDate === r.scheduledDate && r.scheduledTime ? ` · ${r.scheduledTime.slice(0, 5)}` : ""}
             {effectiveDate === r.scheduledDate && r.shift ? ` · ${SHIFT_LABELS[r.shift]}` : ""}
           </span>
         ) : (
-          <span className="text-sm text-gray-400">Sem data</span>
+          <span className="text-sm text-gray-400 dark:text-gray-500">Sem data</span>
         )}
         {r.urgent ? (
           <div className="mt-1">
             <span
               className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
-              style={{ color: "color-mix(in srgb, var(--brand-orange) 70%, black)", background: "color-mix(in srgb, var(--brand-orange) 16%, white)" }}
+              style={{ color: "color-mix(in srgb, var(--brand-orange) 70%, var(--foreground))", background: "color-mix(in srgb, var(--brand-orange) 16%, var(--surface-1))" }}
             >
               URGENTE
             </span>
@@ -233,8 +233,8 @@ function EntregaCardRow({
           telefone/bairro/CPF cada um na própria linha, pedido do
           Victor). */}
       <td className="px-3 py-3 align-top max-w-[220px]">
-        <div className="text-sm font-bold uppercase truncate text-gray-800">{r.clientName ?? "Sem nome de cliente"}</div>
-        <div className="text-xs text-gray-400 truncate">
+        <div className="text-sm font-bold uppercase truncate text-gray-800 dark:text-gray-100">{r.clientName ?? "Sem nome de cliente"}</div>
+        <div className="text-xs text-gray-400 dark:text-gray-500 truncate">
           {r.clientCpf ?? "CPF não informado"}
           {r.clientNeighborhood ? ` · ${r.clientNeighborhood}` : ""}
         </div>
@@ -249,7 +249,7 @@ function EntregaCardRow({
 
       {/* Coluna 4: Produto / Especificação -- texto corrido, uma linha só,
           truncado com tooltip pro texto inteiro. */}
-      <td className="px-3 py-3 align-top text-gray-600 max-w-[280px] truncate" title={productSummary}>
+      <td className="px-3 py-3 align-top text-gray-600 dark:text-gray-300 max-w-[280px] truncate" title={productSummary}>
         {productSummary}
       </td>
 
@@ -257,7 +257,7 @@ function EntregaCardRow({
           motorista. "Responsável" -- pedido do Victor 02/09/2026: "que
           apareça quem é o responsável por aquela demanda já na lista, sem
           precisar entrar na demanda". */}
-      <td className="px-3 py-3 align-top text-xs text-gray-400 whitespace-nowrap">
+      <td className="px-3 py-3 align-top text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
         <div className="truncate">{r.storeName}</div>
         <div className="truncate">Atendente: {r.requestedByName ?? "—"}</div>
         <div className="truncate">Responsável: {r.assignedToName ?? "—"}</div>
@@ -371,7 +371,7 @@ function VisitaCardRow({
             {r.comboMontagemDesmontagem ? (
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                style={{ color: "#8a4c0d", background: "color-mix(in srgb, var(--brand-orange) 14%, white)" }}
+                style={{ color: "#8a4c0d", background: "color-mix(in srgb, var(--brand-orange) 14%, var(--surface-1))" }}
               >
                 {r.type === "montagem" ? "+ desmontagem" : "+ montagem"}
               </span>
@@ -379,7 +379,7 @@ function VisitaCardRow({
             {isPartialCompletion ? (
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                style={{ color: "#8a4c0d", background: "color-mix(in srgb, var(--brand-orange) 14%, white)" }}
+                style={{ color: "#8a4c0d", background: "color-mix(in srgb, var(--brand-orange) 14%, var(--surface-1))" }}
               >
                 ◐ Parcial
               </span>
@@ -491,7 +491,7 @@ function VisitaCardRow({
                   title={r.montadorInstruction}
                   onClick={() => setInstructionOpen((v) => !v)}
                   className="text-xs font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap cursor-pointer"
-                  style={{ color: "#8a5a00", background: "color-mix(in srgb, var(--status-warning) 14%, white)" }}
+                  style={{ color: "#8a5a00", background: "color-mix(in srgb, var(--status-warning) 14%, var(--surface-1))" }}
                 >
                   📋 Instrução
                 </button>
@@ -670,16 +670,16 @@ export function AssistenciaQueueGroup({
       {printable && selected.size > 0 ? (
         <div
           className="fixed bottom-20 sm:bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:left-auto z-40 flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg flex-wrap"
-          style={{ background: "#ffffff", borderColor: "var(--brand-green)" }}
+          style={{ background: "var(--surface-1)", borderColor: "var(--brand-green)" }}
         >
-          <span className="text-sm font-medium" style={{ color: "#1F2937" }}>
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
             {selected.size} selecionada{selected.size === 1 ? "" : "s"}
           </span>
           <Link
             href={`/assistencia/despacho-lote?ids=${[...selected].join(",")}`}
             target="_blank"
             className="text-sm rounded-full px-3 py-1.5 font-medium border"
-            style={{ borderColor: "#E5E7EB", color: "#4B5563" }}
+            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
           >
             🖨️ Imprimir selecionados
           </Link>
@@ -709,20 +709,20 @@ export function AssistenciaQueueGroup({
         // por grupo (cada grupo já é um dia+rota, ver EntregasGroupsList),
         // mesmo padrão de cabeçalho repetido por instância que
         // DeliveryItemsTable.tsx já usa.
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden overflow-x-auto">
           <table className="w-full border-collapse text-sm" style={{ minWidth: "980px" }}>
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
+              <tr className="bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
                 {(printable || reorderable ? [""] : ([] as string[]))
                   .concat(["ID / Tipo", "Data / Período", "Cliente", "Produto", "Logística", ""])
                   .map((h, idx) => (
-                    <th key={idx} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">
+                    <th key={idx} className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 whitespace-nowrap">
                       {h}
                     </th>
                   ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {order.map((r, i) => {
                 const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
                 // Só scheduledDate (ScheduleField) ou approvedDeadline
@@ -759,7 +759,7 @@ export function AssistenciaQueueGroup({
           </table>
         </div>
       ) : (
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-gray-100 dark:divide-gray-700">
           {order.map((r, i) => {
             const needsAttention = r.deadlineStatus === "pendente" || r.escalationRisk;
             const effectiveDate = r.scheduledDate ?? r.approvedDeadline;
@@ -784,7 +784,7 @@ export function AssistenciaQueueGroup({
                   if (el) nodeRefs.current.set(r.id, el);
                   else nodeRefs.current.delete(r.id);
                 }}
-                className="flex flex-col gap-2 p-4 hover:bg-gray-50 transition-colors duration-150"
+                className="flex flex-col gap-2 p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
                 style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
               >
                 {/* Aba Visitas -- tabela de colunas fixas (ver

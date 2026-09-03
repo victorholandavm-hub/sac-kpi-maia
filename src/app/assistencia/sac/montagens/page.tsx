@@ -45,7 +45,7 @@ export default async function SacMontagensPage({
 
       <SacTabs active="montagens" />
 
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-gray-500 dark:text-gray-400">
         Visão só de acompanhamento — quem gerencia montagem, desmontagem, recolhimento, troca de peça e vistoria continua sendo a
         assistência técnica.
       </p>
@@ -56,26 +56,26 @@ export default async function SacMontagensPage({
       </div>
 
       {requests.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">{showCompleted ? "Nenhuma concluída ainda." : "Nenhuma em aberto no momento."}</p>
+        <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">{showCompleted ? "Nenhuma concluída ainda." : "Nenhuma em aberto no momento."}</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-          <div className="divide-y divide-gray-100">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {requests.map((r) => (
               <Link
                 key={r.id}
                 href={`/assistencia/${r.id}`}
-                className="flex items-center justify-between gap-3 p-4 flex-wrap hover:bg-gray-50 transition-colors duration-150"
+                className="flex items-center justify-between gap-3 p-4 flex-wrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
               >
                 <div className="flex flex-col gap-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono text-gray-400">#{r.ticketNumber}</span>
+                    <span className="text-xs font-mono text-gray-400 dark:text-gray-500">#{r.ticketNumber}</span>
                     <StatusBadge status={r.status} />
-                    <span className="text-sm font-medium text-gray-800">{REQUEST_TYPE_LABELS[r.type] ?? r.type}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{REQUEST_TYPE_LABELS[r.type] ?? r.type}</span>
                   </div>
-                  <p className="text-base font-bold truncate text-gray-800">{r.clientName ?? "Sem nome de cliente"}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-base font-bold truncate text-gray-800 dark:text-gray-100">{r.clientName ?? "Sem nome de cliente"}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
                     {r.storeName}
                     {r.assemblerName ? ` · Montador: ${r.assemblerName}` : ""}
                   </p>
@@ -86,7 +86,7 @@ export default async function SacMontagensPage({
         </div>
       )}
 
-      <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 self-center">
+      <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 self-center">
         ← Voltar
       </Link>
     </div>

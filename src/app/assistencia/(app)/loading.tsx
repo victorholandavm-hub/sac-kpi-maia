@@ -11,7 +11,7 @@
 export default function Loading() {
   return (
     <div className="flex items-center justify-center py-24">
-      <div className="h-8 w-8 rounded-full border-2 border-gray-200 animate-spin" style={{ borderTopColor: "#1B5E3C" }} aria-label="Carregando…" />
+      <div className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-600 animate-spin" style={{ borderTopColor: "#1B5E3C" }} aria-label="Carregando…" />
     </div>
   );
 }

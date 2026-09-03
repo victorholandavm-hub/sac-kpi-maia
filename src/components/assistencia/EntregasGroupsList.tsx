@@ -36,12 +36,12 @@ export function EntregasGroupsList({ groups, now }: { groups: QueueGroup[]; now:
           // significado semântico que importa.
           <details key={group.key} className={`group flex flex-col gap-2 ${group.dateBucket === "atrasado" ? "opacity-60" : ""}`}>
             <summary className="flex items-center gap-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-              <span className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400" aria-hidden="true">
+              <span className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400 dark:text-gray-500" aria-hidden="true">
                 ▶
               </span>
-              <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 whitespace-nowrap">{group.label}</span>
+              <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 whitespace-nowrap">{group.label}</span>
               {group.isSemRota ? (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide bg-gray-100 text-gray-500">Sem rota</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">Sem rota</span>
               ) : group.dateBucket &&
                 DATE_BUCKET_TAG[group.dateBucket] &&
                 // "Atrasada" só faz sentido enquanto sobra algo pra
@@ -60,11 +60,11 @@ export function EntregasGroupsList({ groups, now }: { groups: QueueGroup[]; now:
                   {DATE_BUCKET_TAG[group.dateBucket]!.label}
                 </span>
               ) : null}
-              <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
+              <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
                 {group.items.length}
               </span>
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="flex items-center gap-2 text-[11px] font-medium text-gray-400 whitespace-nowrap">
+              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
+              <span className="flex items-center gap-2 text-[11px] font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap">
                 <span>
                   {statusCounts.programado} Programado{statusCounts.programado === 1 ? "" : "s"}
                 </span>

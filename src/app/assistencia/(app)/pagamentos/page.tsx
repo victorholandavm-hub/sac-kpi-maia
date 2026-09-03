@@ -89,26 +89,26 @@ export default async function PagamentosPage({
           <form action="/assistencia/pagamentos" method="GET" className="flex items-center gap-2 flex-wrap">
             {pendentes ? <input type="hidden" name="pendentes" value={pendentes} /> : null}
             {assembler ? <input type="hidden" name="assembler" value={assembler} /> : null}
-            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap text-gray-500">
+            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap text-gray-500 dark:text-gray-400">
               De
-              <input type="date" name="from" defaultValue={from ?? ""} className="rounded-lg border border-gray-200 px-2 py-1 text-xs" />
+              <input type="date" name="from" defaultValue={from ?? ""} className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-xs" />
             </label>
-            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap text-gray-500">
+            <label className="flex items-center gap-1.5 text-xs whitespace-nowrap text-gray-500 dark:text-gray-400">
               Até
-              <input type="date" name="to" defaultValue={to ?? ""} className="rounded-lg border border-gray-200 px-2 py-1 text-xs" />
+              <input type="date" name="to" defaultValue={to ?? ""} className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-xs" />
             </label>
-            <button type="submit" className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 font-medium whitespace-nowrap text-gray-800">
+            <button type="submit" className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 font-medium whitespace-nowrap text-gray-800 dark:text-gray-100">
               Aplicar
             </button>
             {from || to ? (
-              <Link href={buildHref({ pendentes, assembler })} className="text-xs underline text-gray-500 hover:text-gray-700">
+              <Link href={buildHref({ pendentes, assembler })} className="text-xs underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
                 Limpar data
               </Link>
             ) : null}
           </form>
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
             Total: <strong>{formatBRL(grandTotal)}</strong> · Pago:{" "}
             <strong style={{ color: "var(--status-good)" }}>{formatBRL(paidTotal)}</strong> · Pendente:{" "}
             <strong style={{ color: "var(--status-warning)" }}>{formatBRL(pendingTotal)}</strong>
@@ -125,8 +125,8 @@ export default async function PagamentosPage({
       </div>
 
       {groups.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">
             {assembler
               ? "Nenhuma montagem desse montador encontrada."
               : pendentes

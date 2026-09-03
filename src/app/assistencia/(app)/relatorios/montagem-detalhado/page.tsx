@@ -83,12 +83,12 @@ function groupByAssembler(items: PaymentItem[]) {
 function StatCard({ label, value, caption, barColor }: { label: string; value: string; caption?: string; barColor: string }) {
   return (
     <div
-      className="flex-1 min-w-0 rounded-xl py-3 pl-4 pr-4 flex flex-col gap-1 bg-white shadow-sm"
+      className="flex-1 min-w-0 rounded-xl py-3 pl-4 pr-4 flex flex-col gap-1 bg-white dark:bg-gray-800 shadow-sm"
       style={{ borderLeft: `4px solid ${barColor}` }}
     >
-      <span className="text-sm truncate text-gray-500">{label}</span>
-      <span className="text-2xl font-bold truncate text-gray-800">{value}</span>
-      {caption ? <span className="text-xs truncate text-gray-400">{caption}</span> : null}
+      <span className="text-sm truncate text-gray-500 dark:text-gray-400">{label}</span>
+      <span className="text-2xl font-bold truncate text-gray-800 dark:text-gray-100">{value}</span>
+      {caption ? <span className="text-xs truncate text-gray-400 dark:text-gray-500">{caption}</span> : null}
     </div>
   );
 }
@@ -102,20 +102,20 @@ function StatCard({ label, value, caption, barColor }: { label: string; value: s
 function AssemblerDetailTable({ assemblerName, items }: { assemblerName: string; items: PaymentItem[] }) {
   const total = items.reduce((sum, i) => sum + itemTotal(i), 0);
   return (
-    <div className="rounded-xl overflow-hidden bg-white shadow-sm">
-      <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap border-b border-gray-100">
-        <span className="text-sm font-bold text-gray-800">
+    <div className="rounded-xl overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
+      <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap border-b border-gray-100 dark:border-gray-700">
+        <span className="text-sm font-bold text-gray-800 dark:text-gray-100">
           {assemblerName}{" "}
-          <span className="text-xs font-normal text-gray-400">
+          <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
             ({items.length} {items.length === 1 ? "produto" : "produtos"})
           </span>
         </span>
-        <span className="text-sm font-bold text-gray-800">{formatBRL(total)}</span>
+        <span className="text-sm font-bold text-gray-800 dark:text-gray-100">{formatBRL(total)}</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs" style={{ minWidth: 720 }}>
           <thead>
-            <tr className="bg-gray-50 text-gray-500">
+            <tr className="bg-gray-50 dark:bg-gray-700/40 text-gray-500 dark:text-gray-400">
               <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Chamado</th>
               <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Data</th>
               <th className="text-left px-3 py-2 font-semibold">Loja</th>
@@ -127,27 +127,27 @@ function AssemblerDetailTable({ assemblerName, items }: { assemblerName: string;
               <th className="text-left px-3 py-2 font-semibold whitespace-nowrap">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {items.map((item) => {
               const status = STATUS_LABEL[paymentStage(item.requestStatus, item.paymentReleased)];
               return (
                 <tr key={item.itemId}>
-                  <td className="px-3 py-2 whitespace-nowrap text-gray-800">
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-800 dark:text-gray-100">
                     <Link href={`/assistencia/${item.requestId}`} className="underline">
                       #{item.ticketNumber}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-gray-500">{formatDateBr(item.createdAt)}</td>
-                  <td className="px-3 py-2 text-gray-500">{item.storeName || "—"}</td>
-                  <td className="px-3 py-2 truncate max-w-[160px] text-gray-500" title={item.clientName ?? undefined}>
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">{formatDateBr(item.createdAt)}</td>
+                  <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{item.storeName || "—"}</td>
+                  <td className="px-3 py-2 truncate max-w-[160px] text-gray-500 dark:text-gray-400" title={item.clientName ?? undefined}>
                     {item.clientName ?? "—"}
                   </td>
-                  <td className="px-3 py-2 text-gray-800">{item.product}</td>
-                  <td className="px-3 py-2 text-right text-gray-500">{item.quantity}</td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap text-gray-500">
+                  <td className="px-3 py-2 text-gray-800 dark:text-gray-100">{item.product}</td>
+                  <td className="px-3 py-2 text-right text-gray-500 dark:text-gray-400">{item.quantity}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap text-gray-500 dark:text-gray-400">
                     {item.unitValue !== null ? formatBRL(item.unitValue) : "—"}
                   </td>
-                  <td className="px-3 py-2 text-right font-medium whitespace-nowrap text-gray-800">
+                  <td className="px-3 py-2 text-right font-medium whitespace-nowrap text-gray-800 dark:text-gray-100">
                     {item.unitValue !== null ? formatBRL(itemTotal(item)) : "—"}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap font-medium" style={{ color: status.color }}>
@@ -226,27 +226,27 @@ export default async function RelatorioMontagemDetalhadoPage({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Relatório de montagem detalhado</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">Relatório de montagem detalhado</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Todo produto de toda montagem/desmontagem no período, um por um -- pra conferir o valor certinho. Manoel (equipe interna) fica separado embaixo.
           </p>
         </div>
-        <Link href={buildRelatoriosHref({ from: dateFrom, to: dateTo, alvo: filterAlvo })} className="text-sm underline whitespace-nowrap text-gray-500 hover:text-gray-700">
+        <Link href={buildRelatoriosHref({ from: dateFrom, to: dateTo, alvo: filterAlvo })} className="text-sm underline whitespace-nowrap text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
           ← Voltar pros Relatórios
         </Link>
       </div>
 
       <form action="/assistencia/relatorios/montagem-detalhado" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterAlvo ? <input type="hidden" name="alvo" value={filterAlvo} /> : null}
-        <label className="flex items-center gap-2 text-sm text-gray-500">
+        <label className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           De
-          <input type="date" name="from" defaultValue={dateFrom} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input type="date" name="from" defaultValue={dateFrom} className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm" />
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-500">
+        <label className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           Até
-          <input type="date" name="to" defaultValue={dateTo} className="rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+          <input type="date" name="to" defaultValue={dateTo} className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm" />
         </label>
-        <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-800">
+        <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100">
           Aplicar
         </button>
       </form>
@@ -284,38 +284,38 @@ export default async function RelatorioMontagemDetalhadoPage({
           MENOS chamado sem produto nenhum registrado (normalmente
           cancelado antes de chegar a ter item) = o total daqui. */}
       {reconciliation.totalRequests !== distinctRequests ? (
-        <div className="rounded-xl p-4 flex flex-col gap-2 bg-white shadow-sm">
-          <h3 className="text-sm font-bold text-gray-800">
+        <div className="rounded-xl p-4 flex flex-col gap-2 bg-white dark:bg-gray-800 shadow-sm">
+          <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">
             Por que esse número é diferente do &quot;Solicitações no período&quot; do relatório principal?
           </h3>
-          <div className="flex flex-col gap-1 text-sm text-gray-500">
+          <div className="flex flex-col gap-1 text-sm text-gray-500 dark:text-gray-400">
             <div className="flex justify-between gap-4">
               <span>Solicitações no relatório principal (qualquer montador, com ou sem produto)</span>
-              <span className="font-medium text-gray-800">{reconciliation.totalRequests}</span>
+              <span className="font-medium text-gray-800 dark:text-gray-100">{reconciliation.totalRequests}</span>
             </div>
             {reconciliation.manoelRequests > 0 ? (
               <div className="flex justify-between gap-4">
                 <span>(−) Manoel (equipe interna, não entra aqui)</span>
-                <span className="font-medium text-gray-800">{reconciliation.manoelRequests}</span>
+                <span className="font-medium text-gray-800 dark:text-gray-100">{reconciliation.manoelRequests}</span>
               </div>
             ) : null}
             {reconciliation.emptyRequests.length > 0 ? (
               <div className="flex justify-between gap-4">
                 <span>(−) Sem produto nenhum registrado (nada pra listar aqui)</span>
-                <span className="font-medium text-gray-800">{reconciliation.emptyRequests.length}</span>
+                <span className="font-medium text-gray-800 dark:text-gray-100">{reconciliation.emptyRequests.length}</span>
               </div>
             ) : null}
-            <div className="flex justify-between gap-4 pt-1 border-t border-gray-100">
+            <div className="flex justify-between gap-4 pt-1 border-t border-gray-100 dark:border-gray-700">
               <span>(=) Solicitações neste relatório</span>
-              <span className="font-bold text-gray-800">{distinctRequests}</span>
+              <span className="font-bold text-gray-800 dark:text-gray-100">{distinctRequests}</span>
             </div>
           </div>
           {reconciliation.emptyRequests.length > 0 ? (
-            <div className="flex flex-col gap-1 pt-2 mt-1 border-t border-dashed border-gray-200">
-              <span className="text-xs font-medium text-gray-400">Chamados sem produto registrado:</span>
+            <div className="flex flex-col gap-1 pt-2 mt-1 border-t border-dashed border-gray-200 dark:border-gray-600">
+              <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Chamados sem produto registrado:</span>
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                 {reconciliation.emptyRequests.map((r) => (
-                  <Link key={r.id} href={`/assistencia/${r.id}`} className="underline text-gray-500 hover:text-gray-700">
+                  <Link key={r.id} href={`/assistencia/${r.id}`} className="underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
                     #{r.ticketNumber} · {r.storeName} · {STATUS_LABELS[r.status] ?? r.status}
                   </Link>
                 ))}
@@ -326,18 +326,18 @@ export default async function RelatorioMontagemDetalhadoPage({
       ) : null}
 
       {groups.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">Nenhuma montagem/desmontagem de terceirizado nesse período.</p>
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">Nenhuma montagem/desmontagem de terceirizado nesse período.</p>
         </div>
       ) : (
         groups.map((group) => <AssemblerDetailTable key={group.assemblerName} assemblerName={group.assemblerName} items={group.items} />)
       )}
 
       {manoelItems.length > 0 ? (
-        <div className="flex flex-col gap-3 pt-2 border-t-2 border-dashed border-gray-200">
+        <div className="flex flex-col gap-3 pt-2 border-t-2 border-dashed border-gray-200 dark:border-gray-600">
           <div>
-            <h2 className="text-base font-bold text-gray-800">Manoel (equipe interna)</h2>
-            <p className="text-xs text-gray-400">
+            <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">Manoel (equipe interna)</h2>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
               Funcionário da casa, não terceirizado -- não entra em nenhum dos números acima, só listado aqui por registro.
             </p>
           </div>

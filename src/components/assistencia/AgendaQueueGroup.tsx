@@ -71,7 +71,7 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
   }
 
   return (
-    <div className="divide-y divide-gray-100">
+    <div className="divide-y divide-gray-100 dark:divide-gray-700">
       {order.map((r, i) => {
         const rowOverdue = isOverdue && r.status !== "concluida" && r.status !== "cancelada";
         return (
@@ -81,7 +81,7 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
               if (el) nodeRefs.current.set(r.id, el);
               else nodeRefs.current.delete(r.id);
             }}
-            className="flex items-center gap-2 p-4 flex-wrap hover:bg-gray-50 transition-colors duration-150"
+            className="flex items-center gap-2 p-4 flex-wrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
             style={rowOverdue ? { borderLeft: "4px solid var(--status-critical)" } : undefined}
           >
             <div className="flex flex-col items-center gap-0.5 shrink-0">
@@ -89,7 +89,7 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                 onClick={() => move(i, -1)}
                 disabled={i === 0 || saving}
                 aria-label="Mover pra cima"
-                className="text-sm leading-none px-1 disabled:opacity-25 text-gray-500"
+                className="text-sm leading-none px-1 disabled:opacity-25 text-gray-500 dark:text-gray-400"
               >
                 ▲
               </button>
@@ -97,7 +97,7 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                 onClick={() => move(i, 1)}
                 disabled={i === order.length - 1 || saving}
                 aria-label="Mover pra baixo"
-                className="text-sm leading-none px-1 disabled:opacity-25 text-gray-500"
+                className="text-sm leading-none px-1 disabled:opacity-25 text-gray-500 dark:text-gray-400"
               >
                 ▼
               </button>
@@ -109,7 +109,7 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
             >
               <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono text-gray-400">#{r.ticketNumber}</span>
+                  <span className="text-xs font-mono text-gray-400 dark:text-gray-500">#{r.ticketNumber}</span>
                   <StatusBadge status={r.status} />
                   {rowOverdue ? (
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{ background: "var(--status-critical)" }}>
@@ -117,12 +117,12 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                     </span>
                   ) : null}
                   {r.scheduledTime ? (
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full border border-gray-200 text-gray-600">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300">
                       {r.scheduledTime.slice(0, 5)}
                     </span>
                   ) : null}
                   {r.shift ? (
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full border border-gray-200 text-gray-600">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300">
                       {SHIFT_LABELS[r.shift] ?? r.shift}
                     </span>
                   ) : null}
@@ -137,7 +137,7 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                   {r.rota && (DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type) ? (
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                      style={{ color: `color-mix(in srgb, ${ROTA_COLORS[r.rota]} 70%, black)`, background: `color-mix(in srgb, ${ROTA_COLORS[r.rota]} 14%, white)` }}
+                      style={{ color: `color-mix(in srgb, ${ROTA_COLORS[r.rota]} 70%, var(--foreground))`, background: `color-mix(in srgb, ${ROTA_COLORS[r.rota]} 14%, var(--surface-1))` }}
                     >
                       {ROTA_LABELS[r.rota]}
                       {r.rotaExceptionNote ? " ⚠" : ""}
@@ -146,13 +146,13 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                   <span
                     className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
                     style={{
-                      color: `color-mix(in srgb, ${REQUEST_TYPE_COLORS[r.type] ?? "#6B7280"} 70%, black)`,
-                      background: `color-mix(in srgb, ${REQUEST_TYPE_COLORS[r.type] ?? "#6B7280"} 14%, white)`,
+                      color: `color-mix(in srgb, ${REQUEST_TYPE_COLORS[r.type] ?? "#6B7280"} 70%, var(--foreground))`,
+                      background: `color-mix(in srgb, ${REQUEST_TYPE_COLORS[r.type] ?? "#6B7280"} 14%, var(--surface-1))`,
                     }}
                   >
                     {REQUEST_TYPE_LABELS[r.type] ?? r.type}
                   </span>
-                  <span className="text-xs text-gray-400">{r.storeName}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{r.storeName}</span>
                 </div>
                 <p className="text-sm truncate">
                   {/* Negrito + caixa alta -- pedido do Victor 25/08/2026
@@ -160,14 +160,14 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
                       caixa alta)", mesmo tratamento das outras 2 telas
                       (aqui era mais fraco -- text-secondary, sem negrito
                       -- alinhado agora). */}
-                  <span className="font-bold uppercase text-gray-800">{r.clientName ?? "Sem nome de cliente"}</span>
-                  <span className="text-gray-600">
+                  <span className="font-bold uppercase text-gray-800 dark:text-gray-100">{r.clientName ?? "Sem nome de cliente"}</span>
+                  <span className="text-gray-600 dark:text-gray-300">
                     {r.clientNeighborhood ? ` · 📍 ${r.clientNeighborhood}` : ""}
                     {r.reason ? ` · ${r.reason}` : ""}
                   </span>
                 </p>
               </div>
-              <div className="flex flex-col items-end gap-1 text-xs text-gray-400">
+              <div className="flex flex-col items-end gap-1 text-xs text-gray-400 dark:text-gray-500">
                 {/* Troca/entrega de produto e envio de peça saem de motorista,
                     o resto (montagem/vistoria/etc.) é montador -- mesma
                     distinção que separa DeliveryRequestDetailContent de

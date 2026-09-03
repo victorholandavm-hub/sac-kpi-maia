@@ -15,16 +15,16 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-gray-400">{label}</span>
-      <span className="text-sm text-gray-800">{value}</span>
+      <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
+      <span className="text-sm text-gray-800 dark:text-gray-100">{value}</span>
     </div>
   );
 }
 
 function Card({ title, children, className = "" }: { title?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-3 ${className}`}>
-      {title ? <h3 className="text-sm font-semibold text-gray-800">{title}</h3> : null}
+    <div className={`rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 flex flex-col gap-3 ${className}`}>
+      {title ? <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{title}</h3> : null}
       {children}
     </div>
   );
@@ -38,7 +38,7 @@ export default async function PedidoFornecedorDetailPage({ params }: { params: P
   if (!result) {
     return (
       <div className="max-w-3xl mx-auto p-6">
-        <p className="text-sm text-gray-400">Pedido não encontrado.</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">Pedido não encontrado.</p>
       </div>
     );
   }
@@ -50,20 +50,20 @@ export default async function PedidoFornecedorDetailPage({ params }: { params: P
       <div className="max-w-3xl mx-auto p-6 flex flex-col gap-4 w-full min-w-0">
         <RealtimeQueueRefresher requestId={pedido.id} table="pedidos_fornecedor" eventsTable="pedido_fornecedor_events" eventsIdColumn="pedido_id" />
 
-        <Link href="/assistencia/encomendas/fornecedores" className="text-sm underline self-start text-gray-500 hover:text-gray-700">
+        <Link href="/assistencia/encomendas/fornecedores" className="text-sm underline self-start text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
           ← Voltar
         </Link>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-sm font-mono text-gray-400">Pedido #{pedido.pedidoNumber}</span>
+          <span className="text-sm font-mono text-gray-400 dark:text-gray-500">Pedido #{pedido.pedidoNumber}</span>
           <PedidoFornecedorStatusBadge status={pedido.status} />
-          <h2 className="text-lg font-semibold text-gray-800">{pedido.fornecedor}</h2>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{pedido.fornecedor}</h2>
         </div>
 
         <Card title="Produtos">
           <ul className="flex flex-col gap-1">
             {pedido.items.map((item) => (
-              <li key={item.id} className="text-sm text-gray-800">
+              <li key={item.id} className="text-sm text-gray-800 dark:text-gray-100">
                 {item.quantidade}x {item.produtoDescricao}
               </li>
             ))}

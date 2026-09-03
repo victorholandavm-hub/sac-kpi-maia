@@ -131,7 +131,7 @@ export default async function EncomendasSacPage({
             + Nova encomenda
           </Link>
           <form action={signOut}>
-            <button type="submit" className="text-sm underline text-gray-500 hover:text-gray-700">
+            <button type="submit" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               Sair
             </button>
           </form>
@@ -147,7 +147,7 @@ export default async function EncomendasSacPage({
       </div>
 
       {showAll ? (
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-gray-400 dark:text-gray-500">
           Visão só de acompanhamento — quem gerencia cada pedido continua sendo a loja, o CD e a fábrica.
         </p>
       ) : null}
@@ -162,8 +162,8 @@ export default async function EncomendasSacPage({
       ) : null}
 
       {pedidos.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">
             {showAll ? "Nenhuma encomenda lançada ainda." : showCompleted ? "Nenhum pedido entregue/cancelado ainda." : "Nenhum pedido em aberto no momento."}
           </p>
         </div>
@@ -176,9 +176,9 @@ export default async function EncomendasSacPage({
               // precisam aparecer recolhidas".
               <details key={group.dateKey} className="group flex flex-col gap-1.5">
                 <summary className="flex items-center gap-2 px-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                  <span className="inline-block transition-transform group-open:rotate-90 text-gray-400">▶</span>
-                  <span className="text-sm font-semibold text-gray-800">{group.label}</span>
-                  <span className="text-xs text-gray-400">({group.pedidos.length})</span>
+                  <span className="inline-block transition-transform group-open:rotate-90 text-gray-400 dark:text-gray-500">▶</span>
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{group.label}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">({group.pedidos.length})</span>
                 </summary>
                 <PedidosDetailGroup
                   pedidos={group.pedidos}
@@ -202,7 +202,7 @@ export default async function EncomendasSacPage({
         </div>
       )}
 
-      <Link href="/assistencia/sac" className="text-sm underline self-center text-gray-500 hover:text-gray-700">
+      <Link href="/assistencia/sac" className="text-sm underline self-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
         ← Voltar
       </Link>
     </div>
@@ -223,8 +223,8 @@ function PedidosDetailGroup({
   photosByPedido: Awaited<ReturnType<typeof listEncomendaPhotosForPedidos>>;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <div className="divide-y divide-gray-100">
+    <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+      <div className="divide-y divide-gray-100 dark:divide-gray-700">
         {pedidos.map((p: PedidoEncomendaSummary) => (
           <details key={p.id} className="p-4">
             <summary className="flex items-start gap-2 cursor-pointer list-none">
@@ -242,14 +242,14 @@ function PedidosDetailGroup({
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-1 min-w-0">
                 <div className="flex flex-col gap-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono font-semibold text-gray-500">#{p.pedidoNumber}</span>
+                    <span className="text-xs font-mono font-semibold text-gray-500 dark:text-gray-400">#{p.pedidoNumber}</span>
                     <PedidoEncomendaStatusBadge status={p.status} />
-                    <span className="text-xs font-medium text-gray-500">{p.storeName}</span>
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{p.storeName}</span>
                   </div>
-                  <p className="text-sm text-gray-800">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
+                  <p className="text-sm text-gray-800 dark:text-gray-100">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
                 </div>
                 <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
-                  <span className="text-xs font-bold whitespace-nowrap text-gray-500">
+                  <span className="text-xs font-bold whitespace-nowrap text-gray-500 dark:text-gray-400">
                     {new Date(p.createdAt).toLocaleDateString("pt-BR")}
                   </span>
                   {p.prazoCdLoja ? (
@@ -257,15 +257,15 @@ function PedidosDetailGroup({
                       Na loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
                     </span>
                   ) : p.prazoFabricaCd ? (
-                    <span className="text-xs font-medium whitespace-nowrap text-gray-500">
+                    <span className="text-xs font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                       No CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
                     </span>
                   ) : null}
                 </div>
               </div>
             </summary>
-            <div className="mt-3 pt-3 flex flex-col gap-2 border-t border-gray-100">
-              <p className="text-xs text-gray-500">
+            <div className="mt-3 pt-3 flex flex-col gap-2 border-t border-gray-100 dark:border-gray-700">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Fornecedor: {p.fornecedorTipo === "fabrica_externa" ? `Externo: ${p.fornecedorExterno}` : p.fabricaNome}
               </p>
               {canEditPedido(requester, p) ? (
@@ -277,16 +277,16 @@ function PedidosDetailGroup({
                   Editar pedido
                 </Link>
               ) : null}
-              {p.vendedorName ? <p className="text-xs text-gray-500">Vendedor: {p.vendedorName}</p> : null}
-              {p.clienteCodigo ? <p className="text-xs text-gray-500">Código do cliente: {p.clienteCodigo}</p> : null}
-              {p.carga ? <p className="text-xs text-gray-500">Carga: {p.carga}</p> : null}
-              {p.nfE ? <p className="text-xs text-gray-500">NF-e: {p.nfE}</p> : null}
+              {p.vendedorName ? <p className="text-xs text-gray-500 dark:text-gray-400">Vendedor: {p.vendedorName}</p> : null}
+              {p.clienteCodigo ? <p className="text-xs text-gray-500 dark:text-gray-400">Código do cliente: {p.clienteCodigo}</p> : null}
+              {p.carga ? <p className="text-xs text-gray-500 dark:text-gray-400">Carga: {p.carga}</p> : null}
+              {p.nfE ? <p className="text-xs text-gray-500 dark:text-gray-400">NF-e: {p.nfE}</p> : null}
               {(photosByPedido.get(p.id) ?? []).length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {(photosByPedido.get(p.id) ?? []).map((photo) => (
                     <a key={photo.id} href={photo.url} target="_blank" rel="noopener noreferrer">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={photo.url} alt="Cupom fiscal" className="h-20 w-20 object-cover rounded-lg border border-gray-200" />
+                      <img src={photo.url} alt="Cupom fiscal" className="h-20 w-20 object-cover rounded-lg border border-gray-200 dark:border-gray-600" />
                     </a>
                   ))}
                 </div>

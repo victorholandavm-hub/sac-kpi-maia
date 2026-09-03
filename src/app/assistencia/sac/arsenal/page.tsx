@@ -49,9 +49,9 @@ export default async function ArsenalSacPage({
     <div className="w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Arsenal do SAC" subtitle="Base de conhecimento — contatos, garantias e CDC" />
 
-      <form action="/assistencia/sac/arsenal" method="GET" className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2">
+      <form action="/assistencia/sac/arsenal" method="GET" className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-2">
         {filterCategory ? <input type="hidden" name="category" value={filterCategory} /> : null}
-        <span className="pl-2 text-lg text-gray-400" aria-hidden>
+        <span className="pl-2 text-lg text-gray-400 dark:text-gray-500" aria-hidden>
           🔍
         </span>
         <input
@@ -59,7 +59,7 @@ export default async function ArsenalSacPage({
           name="q"
           defaultValue={q ?? ""}
           placeholder="Buscar por assunto, contato, produto, artigo do CDC…"
-          className="text-base flex-1 min-w-[200px] bg-transparent outline-none py-1.5 text-gray-800 placeholder:text-gray-400"
+          className="text-base flex-1 min-w-[200px] bg-transparent outline-none py-1.5 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
         />
         <button
           type="submit"
@@ -74,7 +74,7 @@ export default async function ArsenalSacPage({
         <Link
           href={buildHref({ q })}
           className={`text-xs px-3.5 py-1.5 rounded-full font-medium transition-colors duration-150 ${
-            !filterCategory ? "text-white" : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"
+            !filterCategory ? "text-white" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
           }`}
           style={!filterCategory ? { background: "var(--brand-green)" } : undefined}
         >
@@ -91,7 +91,7 @@ export default async function ArsenalSacPage({
               style={
                 active
                   ? { color: "#fff", background: `color-mix(in srgb, ${color} 78%, black)`, border: "1px solid transparent" }
-                  : { color: `color-mix(in srgb, ${color} 70%, black)`, background: "#fff", border: `1px solid ${color}` }
+                  : { color: `color-mix(in srgb, ${color} 70%, var(--foreground))`, background: "var(--surface-1)", border: `1px solid ${color}` }
               }
             >
               {ARSENAL_CATEGORY_LABELS[c]}
@@ -101,7 +101,7 @@ export default async function ArsenalSacPage({
         {profile.role === "admin" && !trimmedQ ? (
           <Link
             href={showInactive ? "/assistencia/sac/arsenal" : "/assistencia/sac/arsenal?inactive=1"}
-            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 ml-auto"
+            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 ml-auto"
           >
             {showInactive ? "ocultar inativas" : "mostrar inativas"}
           </Link>
@@ -111,8 +111,8 @@ export default async function ArsenalSacPage({
       {profile.role === "admin" ? <ArsenalEntryForm /> : null}
 
       {grouped.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">{trimmedQ ? "Nada encontrado pra esse termo." : "Nenhuma entrada cadastrada ainda."}</p>
+        <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">{trimmedQ ? "Nada encontrado pra esse termo." : "Nenhuma entrada cadastrada ainda."}</p>
         </div>
       ) : (
         grouped.map((g) => (
@@ -130,7 +130,7 @@ export default async function ArsenalSacPage({
         ))
       )}
 
-      <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 self-center">
+      <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 self-center">
         ← Voltar
       </Link>
     </div>

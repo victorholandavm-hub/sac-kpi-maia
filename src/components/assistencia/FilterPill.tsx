@@ -40,8 +40,33 @@ export function FilterPill({
   // garante contraste em qualquer cor, sem precisar de exceção por
   // status; usada tanto no texto (não selecionado) quanto no
   // preenchimento sólido (selecionado, com texto branco em cima).
-  const darkColor = color ? `color-mix(in srgb, ${color} 70%, black)` : undefined;
-  const solidFill = color ? `color-mix(in srgb, ${color} 78%, black)` : undefined;
+  //
+  // Revisado 03/09/2026 -- pedido do Victor: "ainda tem bastante cor forte
+  // dos filtros e status... deixar menos dolorido aos olhos, já que é a
+  // versão dark", confirmado com print da fileira Todas/Programado/Não
+  // programado/Concluídas/Canceladas ("to falando dessa cores muito fortes
+  // no dark"). Três correções: (1) fundo/borda/texto do pill NÃO
+  // selecionado eram hex cru (#fff/#E5E7EB/#4B5566), sempre claros
+  // independente do tema -- viravam um retângulo branco chapado boiando
+  // no fundo escuro. Trocados pelos tokens (var(--surface-1)/var(--border)/
+  // var(--text-secondary)), que já têm par escuro definido. (2) o texto do
+  // pill colorido não selecionado misturava sempre com "black" (preto) --
+  // certo no claro, errado no escuro (texto escuro em cima de fundo escuro
+  // = sem contraste). Mistura agora com var(--foreground), que já inverte
+  // sozinho por tema. (3) o preenchimento SÓLIDO do selecionado (pill
+  // ativo) era sempre um bloco saturado + texto branco -- correto e
+  // "chamativo de propósito" no claro, mas vira excesso de brilho/cor
+  // crua boiando no fundo escuro suave que a gente acabou de ajustar.
+  // `light-dark()` deixa o navegador escolher sozinho conforme o
+  // `color-scheme` ativo (:root/.dark em globals.css): no claro continua
+  // o bloco sólido de sempre; no escuro vira um tingido suave sobre o
+  // card (mesma família visual do StatusBadge.tsx), preenchimento sólido
+  // só reservado pro claro onde já funcionava bem.
+  const darkColor = color ? `color-mix(in srgb, ${color} 70%, var(--foreground))` : undefined;
+  const solidFill = color
+    ? `light-dark(color-mix(in srgb, ${color} 78%, black), color-mix(in srgb, ${color} 24%, var(--surface-1)))`
+    : undefined;
+  const solidText = color ? `light-dark(#fff, color-mix(in srgb, ${color} 85%, var(--foreground)))` : undefined;
   return (
     <Link
       href={href}
@@ -49,14 +74,14 @@ export function FilterPill({
       style={
         color
           ? {
-              color: selected ? "#fff" : darkColor,
-              background: selected ? solidFill : "#fff",
+              color: selected ? solidText : darkColor,
+              background: selected ? solidFill : "var(--surface-1)",
               border: `1px solid ${selected ? "transparent" : color}`,
             }
           : {
-              color: selected ? "#fff" : "#4B5566",
-              background: selected ? "#1B5E3C" : "#fff",
-              border: `1px solid ${selected ? "transparent" : "#E5E7EB"}`,
+              color: selected ? "light-dark(#fff, var(--text-primary))" : "var(--text-secondary)",
+              background: selected ? "light-dark(#1B5E3C, color-mix(in srgb, #1B5E3C 26%, var(--surface-1)))" : "var(--surface-1)",
+              border: `1px solid ${selected ? "transparent" : "var(--border)"}`,
             }
       }
     >

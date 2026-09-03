@@ -17,12 +17,12 @@ export type SacTabKey = (typeof TABS)[number]["key"];
 
 // Abas por sublinhado (não segmented control) -- Guia de Componentes
 // Maia (Design System, 01/09/2026): com 6 abas, um trilho de pílulas
-// (bg-gray-100 p-1, ver fila/agenda) ficaria apertado demais; sublinhado
+// (bg-gray-100 dark:bg-gray-700 p-1, ver fila/agenda) ficaria apertado demais; sublinhado
 // é o padrão certo pra um conjunto largo assim, só com as cores/
 // tipografia atualizadas.
 export function SacTabs({ active }: { active: SacTabKey }) {
   return (
-    <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto">
+    <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-600 overflow-x-auto">
       {TABS.map((tab) => {
         const isActive = tab.key === active;
         return (
@@ -30,7 +30,7 @@ export function SacTabs({ active }: { active: SacTabKey }) {
             key={tab.key}
             href={tab.href}
             className={`text-sm px-4 py-2.5 font-medium whitespace-nowrap border-b-2 -mb-px transition-colors duration-150 ${
-              isActive ? "text-gray-800" : "text-gray-500 border-transparent hover:text-gray-700"
+              isActive ? "text-gray-800 dark:text-gray-100" : "text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-200"
             }`}
             style={isActive ? { borderColor: "#1B5E3C" } : undefined}
           >

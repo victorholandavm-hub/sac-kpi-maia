@@ -59,10 +59,10 @@ export function EntregasWeekGroups({ groups, now }: { groups: QueueGroup[]; now:
         return (
           <details key={week.weekKey} className="group/week flex flex-col gap-2">
             <summary className="flex items-center gap-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-              <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/week:rotate-90 text-gray-400" aria-hidden="true">
+              <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/week:rotate-90 text-gray-400 dark:text-gray-500" aria-hidden="true">
                 ▶
               </span>
-              <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 whitespace-nowrap">{week.label}</span>
+              <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 whitespace-nowrap">{week.label}</span>
               {hasAtrasado ? (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide" style={{ background: "var(--status-critical)", color: "#fff" }}>
                   Atrasada
@@ -73,10 +73,10 @@ export function EntregasWeekGroups({ groups, now }: { groups: QueueGroup[]; now:
                   Futura
                 </span>
               ) : null}
-              <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
+              <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
                 {weekTotal}
               </span>
-              <div className="flex-1 h-px bg-gray-200" />
+              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
             </summary>
             <div className="flex flex-col gap-3 pl-4">
               <EntregasGroupsList groups={week.days} now={now} />

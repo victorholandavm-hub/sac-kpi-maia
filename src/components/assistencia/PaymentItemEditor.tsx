@@ -96,7 +96,7 @@ export function PaymentItemEditor({
               aria-label={`Selecionar ${item.product}`}
             />
           ) : null}
-          <Link href={`/assistencia/${item.requestId}`} className="text-sm min-w-0 hover:underline text-gray-800">
+          <Link href={`/assistencia/${item.requestId}`} className="text-sm min-w-0 hover:underline text-gray-800 dark:text-gray-100">
             {item.quantity > 1 ? `${item.quantity}x ` : ""}
             {item.product}
           </Link>
@@ -108,7 +108,7 @@ export function PaymentItemEditor({
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="Valor unit."
-                className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                className="w-24 rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-sm"
                 autoFocus
               />
               <button
@@ -121,11 +121,11 @@ export function PaymentItemEditor({
               </button>
             </>
           ) : canEdit && !isAwaitingApproval ? (
-            <button onClick={() => setEditing(true)} className="text-sm underline text-gray-500 hover:text-gray-700">
+            <button onClick={() => setEditing(true)} className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               {total !== null ? formatBRL(total) : "definir valor"}
             </button>
           ) : (
-            <span className="text-sm text-gray-500">{total !== null ? formatBRL(total) : "Sem valor definido"}</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">{total !== null ? formatBRL(total) : "Sem valor definido"}</span>
           )}
           {isConcluded ? (
             canEdit ? (
@@ -162,18 +162,18 @@ export function PaymentItemEditor({
             </span>
           ) : (
             <span
-              className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-400 whitespace-nowrap"
+              className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 whitespace-nowrap"
               title="Só é possível liberar o pagamento depois que a montagem for concluída."
             >
               A montar
             </span>
           )}
           {item.paymentReleased && item.paymentReleasedAt ? (
-            <span className="text-xs whitespace-nowrap text-gray-400">pago em {formatDate(item.paymentReleasedAt)}</span>
+            <span className="text-xs whitespace-nowrap text-gray-400 dark:text-gray-500">pago em {formatDate(item.paymentReleasedAt)}</span>
           ) : null}
         </div>
       </div>
-      <div className="flex items-center gap-2 flex-wrap text-xs text-gray-400">
+      <div className="flex items-center gap-2 flex-wrap text-xs text-gray-400 dark:text-gray-500">
         <span>
           {item.clientName ?? "Sem cliente"} · {item.storeName}
         </span>
@@ -184,7 +184,7 @@ export function PaymentItemEditor({
             <input
               value={authValue}
               onChange={(e) => setAuthValue(e.target.value)}
-              className="w-40 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+              className="w-40 rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-xs"
               autoFocus
             />
             <button
@@ -200,7 +200,7 @@ export function PaymentItemEditor({
             </button>
           </>
         ) : canEdit ? (
-          <button onClick={() => setEditingAuth(true)} className="underline text-gray-500 hover:text-gray-700">
+          <button onClick={() => setEditingAuth(true)} className="underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             {item.paymentAuthorizedBy ?? "definir"}
           </button>
         ) : (

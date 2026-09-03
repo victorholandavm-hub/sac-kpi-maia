@@ -47,13 +47,13 @@ function DeadlineTag({ dateStr, sub }: { dateStr: string; sub: string }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span
-        className="inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap w-fit text-gray-800"
-        style={{ background: `color-mix(in srgb, ${color} 35%, white)` }}
+        className="inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap w-fit text-gray-800 dark:text-gray-100"
+        style={{ background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
       >
         <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
         {formatDateOnly(dateStr)}
       </span>
-      <span className="text-[10px] uppercase tracking-wide text-gray-400">{sub}</span>
+      <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">{sub}</span>
     </div>
   );
 }
@@ -67,10 +67,10 @@ function DeadlineCell({ p, chegadaCd }: { p: PedidoEncomendaSummary; chegadaCd?:
   if (CD_JA_CONFIRMOU.includes(p.status) && chegadaCd) {
     return (
       <div className="flex flex-col gap-0.5">
-        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap w-fit bg-gray-100 text-gray-600">
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap w-fit bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
           📦 {new Date(chegadaCd).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
         </span>
-        <span className="text-[10px] uppercase tracking-wide text-gray-400">chegou no cd</span>
+        <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">chegou no cd</span>
       </div>
     );
   }
@@ -98,7 +98,7 @@ function ItemsCell({ items }: { items: PedidoEncomendaItem[] }) {
           >
             {item.quantidade}x
           </span>
-          <span className="text-sm font-bold truncate uppercase text-gray-800">{item.produtoDescricao}</span>
+          <span className="text-sm font-bold truncate uppercase text-gray-800 dark:text-gray-100">{item.produtoDescricao}</span>
         </div>
       ))}
     </div>
@@ -169,8 +169,8 @@ function PedidoRow({
         </div>
 
         <div className="w-full sm:w-[20%] shrink-0 flex flex-col gap-0.5 min-w-0 sm:pr-3 py-2 justify-center">
-          <span className="text-sm font-bold truncate text-gray-800">{p.storeName}</span>
-          <span className="text-xs truncate text-gray-400">
+          <span className="text-sm font-bold truncate text-gray-800 dark:text-gray-100">{p.storeName}</span>
+          <span className="text-xs truncate text-gray-400 dark:text-gray-500">
             Ped: #{p.pedidoNumber}
             {fornecedorLabel ? ` · ${fornecedorLabel}` : ""}
           </span>
@@ -203,7 +203,7 @@ function PedidoRow({
             Avançar →
           </button>
         ) : null}
-        <Link href={`/assistencia/encomendas/fila/${p.id}`} className="text-xs underline whitespace-nowrap text-gray-500 hover:text-gray-700">
+        <Link href={`/assistencia/encomendas/fila/${p.id}`} className="text-xs underline whitespace-nowrap text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
           Ver detalhes
         </Link>
       </div>
@@ -301,7 +301,7 @@ export function PedidoEncomendaFilaList({
                 ({semPrazo.length})
               </span>
             </div>
-            <div className="divide-y bg-white" style={{ borderColor: "var(--status-warning)" }}>
+            <div className="divide-y bg-white dark:bg-gray-800" style={{ borderColor: "var(--status-warning)" }}>
               {semPrazo.map(renderRow)}
             </div>
           </div>
@@ -310,15 +310,15 @@ export function PedidoEncomendaFilaList({
         {/* Lista única, cronológica, sem agrupar por dia -- pedido do
             Victor 25/08/2026 (ver comentário no topo do arquivo). */}
         {comPrazo.length > 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div className="divide-y divide-gray-100">{comPrazo.map(renderRow)}</div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">{comPrazo.map(renderRow)}</div>
           </div>
         ) : null}
       </div>
 
       {selected.size > 0 ? (
-        <div className="fixed bottom-20 sm:bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:left-auto z-40 flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-lg flex-wrap">
-          <span className="text-sm font-medium text-gray-800">
+        <div className="fixed bottom-20 sm:bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:left-auto z-40 flex items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 shadow-lg flex-wrap">
+          <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
             {selected.size} selecionado{selected.size > 1 ? "s" : ""}
           </span>
           <button
@@ -329,7 +329,7 @@ export function PedidoEncomendaFilaList({
           >
             Marcar como enviado para o CD
           </button>
-          <button onClick={() => setSelected(new Set())} className="text-sm underline text-gray-500 hover:text-gray-700">
+          <button onClick={() => setSelected(new Set())} className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             Limpar seleção
           </button>
         </div>

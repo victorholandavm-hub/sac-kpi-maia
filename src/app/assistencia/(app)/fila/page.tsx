@@ -15,13 +15,14 @@ import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES } from "@/
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
-import { EntregasWeekGroups } from "@/components/assistencia/EntregasWeekGroups";
+import { EntregasFlatList } from "@/components/assistencia/EntregasFlatList";
 import { EntregasKanbanHoje } from "@/components/assistencia/EntregasKanbanHoje";
 import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcut";
 import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
+import { DateRangeQuickFilter } from "@/components/assistencia/DateRangeQuickFilter";
 import { groupIntoMonths, isCurrentMonth, paginateMonths } from "@/lib/weekGrouping";
 import { MonthAccordion } from "@/components/assistencia/MonthAccordion";
 import {
@@ -246,6 +247,10 @@ export default async function AssistenciaQueuePage({
       requestedByNames: filterRequestedByNames,
       dateFrom,
       dateTo,
+      // Entregas filtra De/Até por data AGENDADA, não de criação -- pedido
+      // do Victor 03/09/2026 (ver dateField, serviceRequests.ts). Visitas
+      // continua em created_at, sem mudança.
+      dateField: showPecas ? "scheduled_date" : undefined,
       excludeOwnAssemblerStoreIds,
       allPages: true,
     }),
@@ -369,26 +374,46 @@ export default async function AssistenciaQueuePage({
   // fatiados por mês, são visões estreitas de propósito).
   const visitasPaged = !showPecas && !postFiltered ? paginateMonths(visitasMonths, page) : { pageMonths: visitasMonths, totalPages: 1 };
   const visitasPageMonths = visitasPaged.pageMonths;
-  // Entregas: `restGroups` (sem "hoje", ver acima) já tem `dateKey` cru
-  // de cada grupo (data, sem a rota grudada -- diferente de `key`, ver
-  // CUIDADO acima). "Sem data definida" (`dateKey` null, caso raro) fica
-  // de fora do agrupamento por mês -- sempre volta pra página 1, mesmo
-  // tratamento que EntregasWeekGroups.tsx já dá pra ele.
-  const entregasDated = showPecas ? restGroups.filter((g): g is QueueGroup & { dateKey: string } => !!g.dateKey) : [];
-  const entregasUndated = showPecas ? restGroups.filter((g) => !g.dateKey) : [];
-  const entregasMonths = showPecas ? groupIntoMonths(entregasDated, (g) => g.dateKey) : [];
-  const entregasPaged = showPecas && !postFiltered ? paginateMonths(entregasMonths, page) : { pageMonths: entregasMonths, totalPages: 1 };
-  const totalPages = showPecas ? entregasPaged.totalPages : visitasPaged.totalPages;
+  // Entregas: lista única, sem paginar por mês -- pedido do Victor
+  // 03/09/2026: "queria testar as listas de agenda, visitas e entregas
+  // para que ficassem em uma lista e nao mais agrupadas por semana/mês".
+  // `restGroups` (sem "hoje", ver acima) só serve pra achatar de volta pro
+  // array de chamados -- sem MonthAccordion, sem paginateMonths, sem
+  // "currentPage" (ver EntregasFlatList.tsx, que ordena por data agendada
+  // sozinho). Visitas continua com o agrupamento por mês de sempre por
+  // enquanto -- só Entregas mudou nessa rodada.
+  const restItems = showPecas ? restGroups.flatMap((g) => g.items) : [];
+  const totalPages = showPecas ? 1 : visitasPaged.totalPages;
   const currentPage = Math.min(Math.max(1, page), totalPages);
-  // Reconstrói `restGroups` só com os meses da página atual (achata
-  // MonthGroup->WeekGroup->dias de volta pra QueueGroup[], mesma ordem de
-  // sempre -- groupIntoMonths preserva a ordem de encontro). EntregasWeekGroups
-  // segue reagrupando por mês por conta própria em cima disso (só que
-  // agora só recebe os meses que cabem nesta página), então continua sem
-  // precisar mudar nada lá.
-  const entregasPageGroups = showPecas
-    ? [...entregasPaged.pageMonths.flatMap((m) => m.weeks.flatMap((w) => w.days)), ...(currentPage === 1 ? entregasUndated : [])]
-    : [];
+  // "Filtro de verdade ativo" na aba Entregas -- pedido do Victor
+  // 03/09/2026: "quero que quando filtre, ele apareça só o que foi
+  // pedido no filtro, nao precisa aparecer a rota de hoje". Com qualquer
+  // filtro ligado, o board "Hoje" (Kanban de rota) some e sobra só a
+  // lista achatada com o resultado do filtro (que já inclui os chamados
+  // de hoje, só que sem destaque especial) -- sem filtro nenhum, "Hoje"
+  // continua aparecendo por cima, do jeito que sempre foi.
+  const hasActiveEntregaFilter =
+    showPecas && !!(filterStatus || filterOrigem || filterSched !== undefined || filterCity || filterUrgente || filterSemRota || q || store || dateFrom || dateTo);
+  // Exceção: o atalho de período "Hoje" (ver DateRangeQuickFilter) sozinho
+  // -- pedido do Victor 03/09/2026 (revisão do pedido acima): "quando eu
+  // clicar em 'hoje', tambem precisa aparecer essas rotas e esses filtros
+  // de baixo" -- ele quer o board "Hoje" completo (cards de rota + abas
+  // Todos/Programado/Concluído/Cancelado/Não concluído) igual ao padrão,
+  // só que sem a lista achatada do resto embaixo (já que o filtro pediu
+  // só hoje mesmo). Só conta como "só Hoje" quando NENHUM outro filtro
+  // está junto (senão cai no caso geral acima, lista achatada pura).
+  const isHojePresetOnly =
+    showPecas &&
+    dateFrom === today &&
+    dateTo === today &&
+    !filterStatus &&
+    !filterOrigem &&
+    filterSched === undefined &&
+    !filterCity &&
+    !filterUrgente &&
+    !filterSemRota &&
+    !q &&
+    !store;
 
   return (
     <div className="flex flex-col gap-4">
@@ -440,11 +465,11 @@ export default async function AssistenciaQueuePage({
           aba estiver selecionada, ela precisa ficar com o quadrado em
           verde e as letras brancas ou cinzas" -- inverte a primeira
           tentativa, que era quadrado branco + letra verde). */}
-      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 p-1 self-start">
+      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start">
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
           className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
-            !showPecas ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-700"
+            !showPecas ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           }`}
           style={!showPecas ? { background: "#1B5E3C" } : undefined}
         >
@@ -453,7 +478,7 @@ export default async function AssistenciaQueuePage({
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, sched: schedParam, city: filterCity })}
           className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
-            showPecas ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-700"
+            showPecas ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           }`}
           style={showPecas ? { background: "#1B5E3C" } : undefined}
         >
@@ -468,11 +493,17 @@ export default async function AssistenciaQueuePage({
             mesma ideia de agenda/page.tsx repassar essa mesma fileira de
             volta pra Visitas/Entregas. Nunca "ativa" aqui (essa página
             nunca É a Agenda) -- fica sempre no estado neutro do trilho. */}
-        <Link href="/assistencia/agenda" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors duration-200">
+        <Link href="/assistencia/agenda" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
           Agenda
         </Link>
       </div>
 
+      {/* Todos os filtros agrupados num retângulo só -- pedido do Victor
+          03/09/2026: "agrupe esses filtros e coloque só uma linha como
+          margem no retângulo" (antes eram blocos soltos, um embaixo do
+          outro, sem nenhuma moldura em comum). Só borda fina (sem fundo
+          nem sombra extra) -- é margem, não mais um card cheio. */}
+      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 dark:border-gray-600 p-4">
       {/* Linha 1 do guia de padronização: filtros rápidos por status, com
           contador -- pedido do Victor 25/08/2026 ("guia de padronização"):
           "Botões estilo Pill/Badge para filtro rápido com contadores
@@ -493,8 +524,16 @@ export default async function AssistenciaQueuePage({
                   status: f.value.status ?? undefined,
                   q,
                   store,
-                  from: dateFrom,
-                  to: dateTo,
+                  // "Todas" é hierarquicamente superior ao período -- pedido
+                  // do Victor 03/09/2026: "se eu clicar em todas ele aparece
+                  // hoje e a lista com todas as outras" -- limpa from/to (ao
+                  // clicar em "Todas" some qualquer atalho de período ativo,
+                  // volta pro combinado padrão: board Hoje + lista achatada
+                  // do resto). Os outros pills de status preservam o período
+                  // escolhido normalmente (dá pra combinar "Programado" com
+                  // "últimos 30 dias", por exemplo).
+                  from: f.label === "Todas" ? undefined : dateFrom,
+                  to: f.label === "Todas" ? undefined : dateTo,
                   tab: "pecas",
                   origem: filterOrigem,
                   sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
@@ -543,8 +582,17 @@ export default async function AssistenciaQueuePage({
                 ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
                 : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, urgente: "1" })
             }
-            className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold text-white transition-colors duration-150 ${filterUrgente ? "" : "animate-pulse"}`}
-            style={{ background: "var(--status-critical)", border: `2px solid ${filterUrgente ? "#1F2937" : "var(--status-critical)"}` }}
+            className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold transition-colors duration-150 ${filterUrgente ? "" : "animate-pulse"}`}
+            style={{
+              // light-dark() -- pedido do Victor 03/09/2026: "cores muito
+              // fortes no dark", ver mesmo raciocínio em FilterPill.tsx.
+              // Continua "bem vermelho" no claro (era o pedido original,
+              // 25/08/2026); no escuro vira um vermelho tingido sobre o
+              // card em vez de bloco sólido brilhando no fundo escuro.
+              color: "light-dark(#fff, color-mix(in srgb, var(--status-critical) 88%, var(--foreground)))",
+              background: "light-dark(var(--status-critical), color-mix(in srgb, var(--status-critical) 26%, var(--surface-1)))",
+              border: `2px solid ${filterUrgente ? "var(--foreground)" : "light-dark(var(--status-critical), color-mix(in srgb, var(--status-critical) 26%, var(--surface-1)))"}`,
+            }}
           >
             ⚠ {overdueCount} pra remarcar
           </Link>
@@ -561,8 +609,12 @@ export default async function AssistenciaQueuePage({
                 ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
                 : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, semrota: "1" })
             }
-            className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold text-white transition-colors duration-150"
-            style={{ background: "var(--status-warning)", border: `2px solid ${filterSemRota ? "#1F2937" : "var(--status-warning)"}` }}
+            className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold transition-colors duration-150"
+            style={{
+              color: "light-dark(#fff, color-mix(in srgb, var(--status-warning) 88%, var(--foreground)))",
+              background: "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))",
+              border: `2px solid ${filterSemRota ? "var(--foreground)" : "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))"}`,
+            }}
           >
             🧭 {semRotaCount} sem rota
           </Link>
@@ -576,7 +628,7 @@ export default async function AssistenciaQueuePage({
           ao cliente final". */}
       {!showPecas ? (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-400">Tipo de solicitação:</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">Tipo de solicitação:</span>
           {ALVO_FILTERS.map((f) => {
             const selected = (f.value ?? undefined) === filterAlvo;
             return (
@@ -584,7 +636,7 @@ export default async function AssistenciaQueuePage({
                 key={f.label}
                 href={buildHref({ status: filterStatus, q, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: f.value ?? undefined })}
                 className={`text-sm font-medium px-3.5 py-1.5 rounded-full whitespace-nowrap transition-colors duration-150 ${
-                  selected ? "text-white" : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"
+                  selected ? "text-white" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
                 }`}
                 style={selected ? { background: "var(--brand-green)" } : undefined}
               >
@@ -595,7 +647,7 @@ export default async function AssistenciaQueuePage({
         </div>
       ) : null}
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-400 dark:text-gray-500">
         {total} solicitaç{total === 1 ? "ão" : "ões"} encontrada{total === 1 ? "" : "s"}
         {totalPages > 1 ? ` · página ${currentPage} de ${totalPages}` : ""}
       </p>
@@ -628,6 +680,32 @@ export default async function AssistenciaQueuePage({
         {showPecas ? null : <FilterSelect name="assembler" placeholder="Todos os montadores" options={assemblers} />}
       </div>
 
+      {/* Atalhos de período -- pedido do Victor 03/09/2026 (print de
+          referência: Hoje/7 dias/30 dias/3 meses/1 ano/Este ano). Preserva
+          todos os outros filtros já ativos (ver buildHref), só troca
+          from/to. */}
+      <DateRangeQuickFilter
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        buildHref={(range) =>
+          buildHref({
+            status: filterStatus,
+            q,
+            store,
+            assembler: effectiveAssembler,
+            tab: showPecas ? "pecas" : undefined,
+            origem: filterOrigem,
+            sched: schedParam,
+            alvo: filterAlvo,
+            city: filterCity,
+            urgente: filterUrgente ? "1" : undefined,
+            semrota: filterSemRota ? "1" : undefined,
+            from: range.from,
+            to: range.to,
+          })
+        }
+      />
+
       <form action="/assistencia/fila" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
         {store ? <input type="hidden" name="store" value={store} /> : null}
@@ -644,7 +722,7 @@ export default async function AssistenciaQueuePage({
             lupa". `pointer-events-none` no ícone -- sem isso o clique nele
             não cai no input logo atrás. */}
         <div className="relative flex-1 min-w-[240px]">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400" aria-hidden="true">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500" aria-hidden="true">
             🔍
           </span>
           <input
@@ -652,25 +730,25 @@ export default async function AssistenciaQueuePage({
             name="q"
             defaultValue={q ?? ""}
             placeholder="Buscar por nº do chamado, cliente, produto, CPF ou telefone…"
-            className="rounded-lg border border-gray-200 pl-8 pr-3 py-2 text-sm w-full text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 pl-8 pr-3 py-2 text-sm w-full text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
           />
         </div>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
           De
           <input
             type="date"
             name="from"
             defaultValue={dateFrom ?? ""}
-            className="rounded-lg border border-gray-200 px-2 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
           />
         </label>
-        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
           Até
           <input
             type="date"
             name="to"
             defaultValue={dateTo ?? ""}
-            className="rounded-lg border border-gray-200 px-2 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
           />
         </label>
         {/* Secundário (outline) -- Guia de Componentes Maia (Design
@@ -678,7 +756,7 @@ export default async function AssistenciaQueuePage({
             primário. */}
         <button
           type="submit"
-          className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+          className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
         >
           Buscar
         </button>
@@ -696,43 +774,49 @@ export default async function AssistenciaQueuePage({
               urgente: filterUrgente ? "1" : undefined,
               semrota: filterSemRota ? "1" : undefined,
             })}
-            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150"
+            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
           >
             Limpar busca/data
           </Link>
         ) : null}
       </form>
+      </div>
+      {/* fecha o retângulo de filtros aberto acima */}
 
       {requests.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">Nenhuma solicitação encontrada.</p>
+        <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">Nenhuma solicitação encontrada.</p>
         </div>
       ) : showPecas ? (
-        // Compartilhado com a tela de notificações do SAC -- ver
-        // EntregasKanbanHoje.tsx/EntregasWeekGroups.tsx. Hoje fica no
-        // Kanban (todayGroups); o resto (futuro + atrasado + sem rota)
-        // agrupado por mês > semana -- pedido do Victor 26/08/2026: "divida
-        // os agrupamentos igual é na tela de visitas, agrupados por
-        // semana". Kanban de "Hoje" só na página 1 -- é sempre o mês
-        // corrente, não faz sentido repetir em toda página de meses mais
-        // antigos (ver entregasPageGroups/currentPage acima).
+        // Lista única -- pedido do Victor 03/09/2026 (ver hasActiveEntregaFilter/
+        // restItems acima). Sem filtro nenhum: board "Hoje" (Kanban de
+        // rota) continua em cima, resto achatado embaixo (sem semana/mês).
+        // Com filtro ativo: "Hoje" some, sobra só a lista achatada com o
+        // resultado do filtro inteiro (`requests`, já inclui hoje junto,
+        // sem destaque especial).
         <div className="flex flex-col gap-4">
-          {/* motoristaAction -- pedido do Victor 26/08/2026: Junior como
-              motorista padrão de João Pessoa quando o dia ainda não tem
-              atribuição (defaultDriver em RotaMotoristaDoDia.tsx). Botão
-              (não a barra inteira, ver buttonOnly) ao lado de "📌 Hoje" --
-              pedido do Victor 02/09/2026: "deve ficar ao lado de 'hoje' e
-              só o botão". */}
-          {currentPage === 1 ? (
-            <EntregasKanbanHoje
-              groups={todayGroups}
-              todayOverview={todayOverview}
-              motoristaAction={
-                <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly />
-              }
-            />
-          ) : null}
-          {entregasPageGroups.length > 0 ? <EntregasWeekGroups groups={entregasPageGroups} now={now} /> : null}
+          {!hasActiveEntregaFilter || isHojePresetOnly ? (
+            <>
+              {/* motoristaAction -- pedido do Victor 26/08/2026: Junior como
+                  motorista padrão de João Pessoa quando o dia ainda não tem
+                  atribuição (defaultDriver em RotaMotoristaDoDia.tsx). Botão
+                  (não a barra inteira, ver buttonOnly) ao lado de "📌 Hoje" --
+                  pedido do Victor 02/09/2026: "deve ficar ao lado de 'hoje' e
+                  só o botão". */}
+              <EntregasKanbanHoje
+                groups={todayGroups}
+                todayOverview={todayOverview}
+                motoristaAction={
+                  <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly />
+                }
+              />
+              {/* Isolando "Hoje" (isHojePresetOnly) não mostra o resto --
+                  pedido só pediu hoje mesmo, ver comentário acima. */}
+              {!hasActiveEntregaFilter ? <EntregasFlatList items={restItems} /> : null}
+            </>
+          ) : (
+            <EntregasFlatList items={requests} />
+          )}
         </div>
       ) : (
         // Agrupado por mês > semana (do mês) > dia -- pedido do Victor
@@ -764,14 +848,14 @@ export default async function AssistenciaQueuePage({
                 // um bloco cheio (cinza pra semana, verde sólido pro dia).
                 <details key={week.weekKey} className="group/week flex flex-col gap-2">
                   <summary className="flex items-center gap-3 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                    <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/week:rotate-90 text-gray-400" aria-hidden="true">
+                    <span className="text-[10px] shrink-0 transition-transform duration-150 group-open/week:rotate-90 text-gray-400 dark:text-gray-500" aria-hidden="true">
                       ▶
                     </span>
-                    <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 whitespace-nowrap">{week.label}</span>
-                    <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
+                    <span className="text-sm font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 whitespace-nowrap">{week.label}</span>
+                    <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
                       {weekTotal}
                     </span>
-                    <div className="flex-1 h-px bg-gray-200" />
+                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
                   </summary>
                   <div className="flex flex-col gap-2 pl-4">
                     {week.days.map((group) => (
@@ -783,20 +867,20 @@ export default async function AssistenciaQueuePage({
                       // eu entrar em qualquer tela, as demandas agrupadas
                       // precisam aparecer recolhidas". <details> nativo, sem
                       // JS extra; sem `open` já nasce fechado.
-                      <details key={group.key} className="group rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                        <summary className="px-4 py-2.5 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-gray-50 transition-colors duration-150">
+                      <details key={group.key} className="group rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+                        <summary className="px-4 py-2.5 flex items-center gap-2 flex-wrap cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
                           <span
-                            className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400"
+                            className="text-[10px] shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400 dark:text-gray-500"
                             aria-hidden="true"
                           >
                             ▶
                           </span>
-                          <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">{group.label}</span>
-                          <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
+                          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">{group.label}</span>
+                          <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
                             {group.items.length}
                           </span>
                         </summary>
-                        <div className="border-t border-gray-100">
+                        <div className="border-t border-gray-100 dark:border-gray-700">
                           <AssistenciaQueueGroup items={group.items} reorderable now={now} showCreatedDate={false} printable={false} showStaleBadge />
                         </div>
                       </details>
@@ -823,18 +907,18 @@ export default async function AssistenciaQueuePage({
           {currentPage > 1 ? (
             <Link
               href={buildHref({ status: filterStatus, q, page: currentPage - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
-              className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+              className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
             >
               ← Mês mais recente
             </Link>
           ) : null}
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-gray-400 dark:text-gray-500">
             Página {currentPage} de {totalPages}
           </span>
           {currentPage < totalPages ? (
             <Link
               href={buildHref({ status: filterStatus, q, page: currentPage + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
-              className="text-sm px-4 py-2 rounded-lg border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+              className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
             >
               Mês mais antigo →
             </Link>

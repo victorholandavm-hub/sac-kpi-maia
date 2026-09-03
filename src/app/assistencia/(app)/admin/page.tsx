@@ -47,17 +47,17 @@ function timeAgo(iso: string): string {
 
 function AdminSection({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
-    <details className="group rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm">
-      <summary className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        <span className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400" aria-hidden="true">
+    <details className="group rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm">
+      <summary className="px-4 py-3 bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <span className="text-xs shrink-0 transition-transform duration-150 group-open:rotate-90 text-gray-400 dark:text-gray-500" aria-hidden="true">
           ▶
         </span>
-        <span className="text-sm font-semibold text-gray-800">
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
           {title}
           {count !== undefined ? ` (${count})` : ""}
         </span>
       </summary>
-      <div className="flex flex-col gap-2 p-4 bg-white">{children}</div>
+      <div className="flex flex-col gap-2 p-4 bg-white dark:bg-gray-800">{children}</div>
     </details>
   );
 }
@@ -66,7 +66,7 @@ export default async function AdminPage() {
   const profile = await getProfile();
 
   if (profile.role !== "admin") {
-    return <p className="text-sm text-gray-400">Acesso restrito ao admin.</p>;
+    return <p className="text-sm text-gray-400 dark:text-gray-500">Acesso restrito ao admin.</p>;
   }
 
   const [
@@ -102,10 +102,10 @@ export default async function AdminPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-bold text-gray-800">Administração</h2>
+      <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Administração</h2>
 
       <AdminSection title="Sincronizações" count={syncRuns.length}>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-gray-400 dark:text-gray-500">
           Última rodada de cada job agendado. Se algum ficar muito tempo sem atualizar ou aparecer em
           vermelho, é sinal de que parou de rodar.
         </p>
@@ -115,7 +115,7 @@ export default async function AdminPage() {
             const color = !run ? "var(--text-muted)" : run.ok ? "var(--status-good)" : "var(--status-critical)";
             return (
               <li key={job} className="flex items-center justify-between gap-2 text-sm flex-wrap">
-                <span className="text-gray-800">{SYNC_JOB_LABELS[job]}</span>
+                <span className="text-gray-800 dark:text-gray-100">{SYNC_JOB_LABELS[job]}</span>
                 {run ? (
                   <span style={{ color }} title={run.errors.join(" · ") || undefined}>
                     {run.ok ? "ok" : "erro"} · {timeAgo(run.ranAt)}
@@ -135,7 +135,7 @@ export default async function AdminPage() {
 
       <div className="grid sm:grid-cols-2 gap-4">
         <AdminSection title="Montadores" count={assemblers.length}>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Defina um PIN de {PIN_LENGTH} números pra cada um acessar a própria área em{" "}
             <span className="font-mono">/assistencia/montador</span>.
           </p>
@@ -150,7 +150,7 @@ export default async function AdminPage() {
         </AdminSection>
 
         <AdminSection title="Motoristas" count={drivers.length}>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Defina um PIN de {PIN_LENGTH} números pra cada um acessar a própria área em{" "}
             <span className="font-mono">/assistencia/motorista</span>.
           </p>
@@ -165,7 +165,7 @@ export default async function AdminPage() {
         </AdminSection>
 
         <AdminSection title="Equipe técnica" count={tecnicos.length}>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Defina um PIN de {PIN_LENGTH} números pra cada um acessar a própria área em{" "}
             <span className="font-mono">/assistencia/tecnico</span> -- quem recebe o motorista na volta da rota e
             dá destino ao produto (fábrica, estoque, conserto ou sem condições).
@@ -183,7 +183,7 @@ export default async function AdminPage() {
         <AdminSection title="Fornecedores" count={suppliers.length}>
           <ul className="flex flex-col gap-1 max-h-48 overflow-y-auto">
             {suppliers.map((s) => (
-              <li key={s} className="text-sm text-gray-500">
+              <li key={s} className="text-sm text-gray-500 dark:text-gray-400">
                 {s}
               </li>
             ))}
@@ -193,7 +193,7 @@ export default async function AdminPage() {
       </div>
 
       <AdminSection title="Gerentes de loja" count={gerentes.length}>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-gray-400 dark:text-gray-500">
           Cada gerente entra com o próprio nome + PIN de {PIN_LENGTH} números em <span className="font-mono">/assistencia/loja</span>{" "}
           e só consegue solicitar/negociar prazo para as lojas vinculadas abaixo (pode ser mais de uma).
           Pra mudar as lojas de um gerente já cadastrado, adicione ele de novo marcando o novo conjunto de lojas.
@@ -209,14 +209,14 @@ export default async function AdminPage() {
       </AdminSection>
 
       <AdminSection title="Catálogo de produtos — Encomendas" count={produtosEncomenda.length}>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-gray-400 dark:text-gray-500">
           Produtos disponíveis pra caixa escolher em <span className="font-mono">/assistencia/encomendas/solicitar</span>.
         </p>
         <ProdutoEncomendaAdmin produtos={produtosEncomenda} />
       </AdminSection>
 
       <AdminSection title="Caixas — Encomendas" count={caixas.length}>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-gray-400 dark:text-gray-500">
           Cada caixa tem seu próprio PIN e uma loja fixa, e entra com nome + PIN em{" "}
           <span className="font-mono">/assistencia/encomendas/caixa/login</span>.
         </p>
@@ -232,7 +232,7 @@ export default async function AdminPage() {
 
       <div className="grid sm:grid-cols-2 gap-4">
         <AdminSection title="Operadores CD — Encomendas" count={cdOperadores.length}>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Defina um PIN de {PIN_LENGTH} números pra cada um acessar{" "}
             <span className="font-mono">/assistencia/encomendas/cd/login</span>.
           </p>
@@ -247,7 +247,7 @@ export default async function AdminPage() {
         </AdminSection>
 
         <AdminSection title="Operadores Fábrica — Encomendas" count={fabricaOperadores.length}>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Defina um PIN de {PIN_LENGTH} números pra cada um acessar{" "}
             <span className="font-mono">/assistencia/encomendas/fabrica/login</span>.
           </p>
@@ -267,7 +267,7 @@ export default async function AdminPage() {
       </div>
 
       <AdminSection title="Equipe SAC — PIN" count={sacProfiles.length}>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-gray-400 dark:text-gray-500">
           Defina um PIN de {PIN_LENGTH} números pra cada um acessar{" "}
           <span className="font-mono">/assistencia/sac/login</span> direto pelo nome (pessoa nova entra
           primeiro pelo cadastro de usuário acima, com papel &ldquo;SAC&rdquo;, e o PIN é definido aqui depois).
@@ -282,7 +282,7 @@ export default async function AdminPage() {
       </AdminSection>
 
       <AdminSection title="Rotas de entrega">
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-gray-400 dark:text-gray-500">
           Rota fixa por dia da semana (padrão: Praia seg/qui, Sul ter/sex, Centro qua/sáb) — usada
           na agenda pra sugerir as datas certas de cada rota. Domingo não tem rota.
         </p>

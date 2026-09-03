@@ -55,11 +55,11 @@ export default async function LojaTrocasPage({
       <AssistenciaHeader title="Gerente de loja" subtitle="Trocas, entregas e notificações do SAC — só da sua loja">
         <div className="flex items-center gap-3 flex-wrap">
           <NotificationBell fetchAction={listLojaNotificationsAction} storageKey="loja" />
-          <Link href="/assistencia/loja/equipe" className="text-sm underline whitespace-nowrap text-gray-500 hover:text-gray-700">
+          <Link href="/assistencia/loja/equipe" className="text-sm underline whitespace-nowrap text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             Equipe da loja
           </Link>
           <form action={lojaGerenteSignOut}>
-            <button type="submit" className="text-sm underline text-gray-500 hover:text-gray-700">
+            <button type="submit" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               Sair
             </button>
           </form>
@@ -83,41 +83,41 @@ export default async function LojaTrocasPage({
       ) : null}
 
       {requests.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">
             {showCompleted ? "Nenhuma troca concluída ainda." : "Nenhuma troca do SAC em aberto no momento."}
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-5">
           {groupRequestsByDate(requests, showCompleted).map(([dateLabel, group]) => (
-            <div key={dateLabel} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <div key={dateLabel} className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+              <div className="px-4 py-2.5 bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
+                <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {showCompleted ? `Concluídas em ${dateLabel}` : `Solicitado em ${dateLabel}`}
                 </span>
               </div>
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {group.map((r) => {
                   return (
                     <div key={r.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4">
                       <div className="flex flex-col gap-1.5 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-mono font-semibold text-gray-500">#{r.ticketNumber}</span>
+                          <span className="text-xs font-mono font-semibold text-gray-500 dark:text-gray-400">#{r.ticketNumber}</span>
                           <StatusBadge status={r.status} showInfo size="sm" />
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold text-gray-800">{REQUEST_TYPE_LABELS[r.type] ?? r.type}</span>
-                          <span className="text-xs font-medium text-gray-500">· {r.storeName}</span>
+                          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{REQUEST_TYPE_LABELS[r.type] ?? r.type}</span>
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">· {r.storeName}</span>
                         </div>
-                        <p className="text-sm font-medium break-words text-gray-800">
+                        <p className="text-sm font-medium break-words text-gray-800 dark:text-gray-100">
                           {r.clientName ?? "Sem nome de cliente"}
                           {r.productSummary ? ` · ${r.productSummary}` : ""}
                         </p>
-                        {r.driverName ? <p className="text-xs font-medium text-gray-500">Motorista: {r.driverName}</p> : null}
+                        {r.driverName ? <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Motorista: {r.driverName}</p> : null}
                       </div>
                       {!showCompleted ? (
-                        <div className="shrink-0 pt-3 mt-1 border-t border-gray-100 sm:pt-0 sm:mt-0 sm:border-t-0 w-full sm:w-auto">
+                        <div className="shrink-0 pt-3 mt-1 border-t border-gray-100 dark:border-gray-700 sm:pt-0 sm:mt-0 sm:border-t-0 w-full sm:w-auto">
                           <LojaDeadlineControl
                             requestId={r.id}
                             requestedDeadline={r.requestedDeadline}
@@ -136,7 +136,7 @@ export default async function LojaTrocasPage({
         </div>
       )}
 
-      <Link href="/assistencia/loja" className="text-sm underline self-center text-gray-500 hover:text-gray-700">
+      <Link href="/assistencia/loja" className="text-sm underline self-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
         ← Voltar
       </Link>
     </div>

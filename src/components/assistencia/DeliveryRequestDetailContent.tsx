@@ -34,8 +34,8 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-gray-400">{label}</span>
-      <span className="text-sm text-gray-800">{value}</span>
+      <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
+      <span className="text-sm text-gray-800 dark:text-gray-100">{value}</span>
     </div>
   );
 }
@@ -47,8 +47,8 @@ function Row({ label, value }: { label: string; value: string | null | undefined
 // tela inteira.
 function Card({ title, children, className = "" }: { title?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-3 ${className}`}>
-      {title ? <h3 className="text-sm font-semibold text-gray-800">{title}</h3> : null}
+    <div className={`rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 flex flex-col gap-3 ${className}`}>
+      {title ? <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">{title}</h3> : null}
       {children}
     </div>
   );
@@ -58,7 +58,7 @@ function Card({ title, children, className = "" }: { title?: string; children: R
 // cores ficam reservadas pra status e alerta (Guia de Componentes Maia).
 function NeutralBadge({ children, icon }: { children: React.ReactNode; icon?: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-gray-700 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap">
       {icon ? <span aria-hidden="true">{icon}</span> : null}
       {children}
     </span>
@@ -175,7 +175,7 @@ export function DeliveryRequestDetailContent({
           outline, pra não competir em cor com ele. */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2.5 flex-wrap">
-          <h1 className="text-xl font-semibold text-gray-800 whitespace-nowrap">Chamado #{request.ticketNumber}</h1>
+          <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">Chamado #{request.ticketNumber}</h1>
           <DeliveryStatusBadge status={request.status} scheduledDate={request.scheduledDate} rota={request.rota} />
           <NeutralBadge>{REQUEST_TYPE_LABELS[request.type] ?? request.type}</NeutralBadge>
           <NeutralBadge icon="🏬">{request.storeName}</NeutralBadge>
@@ -184,8 +184,8 @@ export function DeliveryRequestDetailContent({
               className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
               style={
                 request.exchangeRound > 1
-                  ? { background: "#F3F4F6", color: "#8a5a00" }
-                  : { background: "#F3F4F6", color: "#4B5563" }
+                  ? { background: "color-mix(in srgb, var(--status-warning) 16%, var(--surface-1))", color: "color-mix(in srgb, var(--status-warning) 70%, var(--foreground))" }
+                  : { background: "var(--surface-2)", color: "var(--text-secondary)" }
               }
             >
               {request.exchangeRound}ª troca
@@ -203,13 +203,13 @@ export function DeliveryRequestDetailContent({
             </Link>
             <Link
               href={novaNotificacaoHref}
-              className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+              className="text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
             >
               + Criar nova notificação
             </Link>
             <Link
               href={`/assistencia/${request.id}/despacho`}
-              className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150"
+              className="text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
             >
               Imprimir despacho
             </Link>
@@ -218,7 +218,7 @@ export function DeliveryRequestDetailContent({
       </div>
 
       {request.parentExchange || request.childExchange ? (
-        <div className="flex items-center gap-3 flex-wrap text-sm text-gray-600">
+        <div className="flex items-center gap-3 flex-wrap text-sm text-gray-600 dark:text-gray-300">
           {request.parentExchange ? (
             <Link href={`/assistencia/${request.parentExchange.id}`} className="font-medium hover:underline" style={{ color: "#1B5E3C" }}>
               ↩ Troca anterior: #{request.parentExchange.ticketNumber} ({STATUS_LABELS[request.parentExchange.status] ?? request.parentExchange.status})
@@ -263,7 +263,7 @@ export function DeliveryRequestDetailContent({
             {/* Bloco 1: Dados do cliente -- nome em destaque, separado do
                 resto dos campos de leitura rápida. */}
             <Card title="Dados do cliente">
-              <span className="text-base font-semibold text-gray-800">{request.clientName ?? "Sem nome de cliente"}</span>
+              <span className="text-base font-semibold text-gray-800 dark:text-gray-100">{request.clientName ?? "Sem nome de cliente"}</span>
               <div className="flex flex-col gap-3">
                 <Row label="CPF" value={request.clientCpf} />
                 <Row label="Telefone" value={request.clientPhone} />
@@ -307,10 +307,10 @@ export function DeliveryRequestDetailContent({
               />
             ) : (
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-gray-400">Visita agendada</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">Visita agendada</span>
                 <div className="flex items-center gap-2 flex-wrap">
                   <RotaBadge rota={request.rota} />
-                  <span className="text-sm text-gray-800">
+                  <span className="text-sm text-gray-800 dark:text-gray-100">
                     {request.scheduledDate
                       ? `${request.scheduledDate.split("-").reverse().join("/")}${request.scheduledTime ? ` às ${request.scheduledTime.slice(0, 5)}` : ""}`
                       : "Não agendada"}
@@ -319,10 +319,10 @@ export function DeliveryRequestDetailContent({
               </div>
             )}
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-gray-400">Motorista</span>
-              <span className="text-sm text-gray-800">{request.driverName ?? "Nenhum motorista escolhido ainda"}</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">Motorista</span>
+              <span className="text-sm text-gray-800 dark:text-gray-100">{request.driverName ?? "Nenhum motorista escolhido ainda"}</span>
               {canManage ? (
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-400 dark:text-gray-500">
                   Vem da rota do dia -- pra trocar, use o painel{" "}
                   <Link href={motoristaDoDiaHref} className="underline">
                     Motorista do dia
@@ -347,10 +347,10 @@ export function DeliveryRequestDetailContent({
               <Row label="Motivo / problema" value={request.reason} />
               {request.causaRaiz ? (
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs text-gray-400">Quem errou</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">Quem errou</span>
                   <span
                     className="inline-flex self-start items-center rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap"
-                    style={{ background: "#F3F4F6", color: "#4B5563" }}
+                    style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}
                   >
                     {CAUSA_RAIZ_LABELS[request.causaRaiz] ?? request.causaRaiz}
                   </span>
@@ -375,10 +375,10 @@ export function DeliveryRequestDetailContent({
               {request.completedAt ? <Row label="Encerrada em" value={formatDateTimeBr(request.completedAt)} /> : null}
             </div>
 
-            <div className="flex flex-col gap-3 pt-3 border-t border-gray-100">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Fotos</h4>
+            <div className="flex flex-col gap-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Fotos</h4>
               <PhotoGallery photos={photos} deleteMode={canManage ? "staff" : undefined} />
-              {photos.length === 0 ? <p className="text-sm text-gray-400">Nenhuma foto anexada ainda.</p> : null}
+              {photos.length === 0 ? <p className="text-sm text-gray-400 dark:text-gray-500">Nenhuma foto anexada ainda.</p> : null}
               {canManage ? <RequestPhotoUpload requestId={request.id} /> : null}
             </div>
           </Card>

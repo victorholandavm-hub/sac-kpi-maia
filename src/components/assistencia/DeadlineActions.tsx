@@ -28,18 +28,18 @@ export function DeadlineActions({
   const isAprovado = deadlineStatus === "aprovado";
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
-      <h3 className="text-sm font-semibold text-gray-800">
+    <div className="flex flex-col gap-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4">
+      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
         {isRecusado ? "Nova data proposta pela assistência" : isAprovado ? "Prazo aprovado — dá pra mudar a qualquer momento" : "Prazo pendente de aprovação"}
       </h3>
 
-      <p className="text-sm text-gray-500">
-        Prazo pedido pelo gerente: <strong className="text-gray-800">{formatDateOnly(requestedDeadline) ?? "—"}</strong>
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        Prazo pedido pelo gerente: <strong className="text-gray-800 dark:text-gray-100">{formatDateOnly(requestedDeadline) ?? "—"}</strong>
       </p>
       {!isPendente ? (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           {isRecusado ? "Data proposta atualmente:" : "Data aprovada atualmente:"}{" "}
-          <strong className="text-gray-800">{formatDateOnly(approvedDeadline) ?? "—"}</strong>
+          <strong className="text-gray-800 dark:text-gray-100">{formatDateOnly(approvedDeadline) ?? "—"}</strong>
         </p>
       ) : null}
 
@@ -53,19 +53,19 @@ export function DeadlineActions({
       </button>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-gray-500 dark:text-gray-400">
           {isRecusado ? "Alterar a data proposta:" : isAprovado ? "Ou mudar pra outra data:" : "Ou propor outra data:"}
         </span>
         <input
           type="date"
           value={proposedDate}
           onChange={(e) => setProposedDate(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm"
         />
         <button
           disabled={pending || !proposedDate}
           onClick={() => run(() => rejectDeadline(requestId, proposedDate), "Data alterada.")}
-          className="text-sm font-medium rounded-lg border border-gray-200 px-3.5 py-2 text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 disabled:opacity-60"
+          className="text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150 disabled:opacity-60"
         >
           {isRecusado ? "Atualizar data proposta" : isAprovado ? "Mudar data" : "Recusar e propor"}
         </button>

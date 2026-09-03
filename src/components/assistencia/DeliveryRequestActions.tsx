@@ -111,7 +111,7 @@ export function DeliveryRequestActions({
 
   return (
     <>
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-3">
+    <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 flex flex-col gap-3">
       {/* Ações rápidas -- Guia de Componentes Maia (Design System,
           01/09/2026): "grupo vertical de botões bem definidos" no lugar
           da fileira de botões cinzas/coloridos soltos, cada um outline
@@ -121,7 +121,7 @@ export function DeliveryRequestActions({
           fica vinculada a quem a criou no sistema" (diferente de visita
           de montagem, ver RequestActions.tsx, que continua com claim --
           lá faz sentido, um montador pode pegar um chamado de outro). */}
-      <h3 className="text-sm font-semibold text-gray-800">Ações rápidas</h3>
+      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Ações rápidas</h3>
 
       <div className="flex flex-col gap-2">
         {!isFinal ? (
@@ -157,7 +157,7 @@ export function DeliveryRequestActions({
           <button
             disabled={pending}
             onClick={() => run(() => updateStatus(requestId, "aberta"), "Status revertido para aberta.")}
-            className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors duration-150 self-start disabled:opacity-60"
+            className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150 self-start disabled:opacity-60"
           >
             ↩ Reverter pra Aberta (marquei errado)
           </button>
@@ -174,7 +174,7 @@ export function DeliveryRequestActions({
             onChange={(e) => setRemarcarReason(e.target.value)}
             rows={2}
             placeholder="Ex: cliente ausente, endereço errado, precisa de nova data…"
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
             style={{ borderColor: "#E5E7EB" }}
             autoFocus
           />
@@ -192,7 +192,7 @@ export function DeliveryRequestActions({
                 setAskingRemarcarReason(false);
                 setRemarcarReason("");
               }}
-              className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150"
+              className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150"
             >
               cancelar
             </button>
@@ -231,7 +231,7 @@ export function DeliveryRequestActions({
             >
               Outro produto
             </button>
-            <button onClick={resetNovaTroca} className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150">
+            <button onClick={resetNovaTroca} className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150">
               cancelar
             </button>
           </div>
@@ -248,14 +248,14 @@ export function DeliveryRequestActions({
             onChange={(e) => setNovaTrocaReason(e.target.value)}
             rows={2}
             placeholder="Ex: veio com a mesma avaria, cliente decidiu trocar de modelo…"
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
             style={{ borderColor: "#E5E7EB" }}
             autoFocus
           />
           <select
             value={novaTrocaCausaRaiz}
             onChange={(e) => setNovaTrocaCausaRaiz(e.target.value)}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
             style={{ borderColor: "#E5E7EB" }}
           >
             <option value="" disabled>
@@ -273,14 +273,14 @@ export function DeliveryRequestActions({
                 value={novaTrocaCarga}
                 onChange={(e) => setNovaTrocaCarga(e.target.value)}
                 placeholder="Carga *"
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
                 style={{ borderColor: "#E5E7EB" }}
               />
               <input
                 value={novaTrocaConferente}
                 onChange={(e) => setNovaTrocaConferente(e.target.value)}
                 placeholder="Conferente *"
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
                 style={{ borderColor: "#E5E7EB" }}
               />
             </div>
@@ -291,14 +291,14 @@ export function DeliveryRequestActions({
                 value={novaTrocaCarga}
                 onChange={(e) => setNovaTrocaCarga(e.target.value)}
                 placeholder="Carga *"
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
                 style={{ borderColor: "#E5E7EB" }}
               />
               <input
                 value={novaTrocaDriverName}
                 onChange={(e) => setNovaTrocaDriverName(e.target.value)}
                 placeholder="Motorista que entregou (erro) *"
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
                 style={{ borderColor: "#E5E7EB" }}
               />
             </div>
@@ -309,7 +309,7 @@ export function DeliveryRequestActions({
               onChange={(e) => setNovaTrocaCausaRaizDetalhe(e.target.value)}
               rows={2}
               placeholder="O que houve, exatamente? *"
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+              className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
               style={{ borderColor: "#E5E7EB" }}
             />
           ) : null}
@@ -327,7 +327,7 @@ export function DeliveryRequestActions({
             >
               Confirmar nova troca
             </button>
-            <button onClick={resetNovaTroca} className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors duration-150">
+            <button onClick={resetNovaTroca} className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150">
               cancelar
             </button>
           </div>
@@ -339,14 +339,14 @@ export function DeliveryRequestActions({
     {/* Notas rápidas -- bloco próprio, separado das ações de status (Guia
         de Componentes Maia): "campo de texto compacto para adicionar
         observações". */}
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 flex flex-col gap-2">
-      <h3 className="text-sm font-semibold text-gray-800">Notas rápidas</h3>
+    <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 flex flex-col gap-2">
+      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Notas rápidas</h3>
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
         rows={2}
         placeholder="Adicionar observação…"
-        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 hover:border-gray-300 focus:border-gray-300 focus:outline-none transition-colors duration-150"
+        className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
       />
       <button
         disabled={pending || !note.trim()}
@@ -356,7 +356,7 @@ export function DeliveryRequestActions({
             setNote("");
           }, "Nota adicionada.")
         }
-        className="text-sm rounded-lg px-3.5 py-2 self-start border border-gray-200 font-medium text-gray-600 hover:border-gray-300 hover:text-gray-800 transition-colors duration-150 disabled:opacity-60"
+        className="text-sm rounded-lg px-3.5 py-2 self-start border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150 disabled:opacity-60"
       >
         Adicionar nota
       </button>

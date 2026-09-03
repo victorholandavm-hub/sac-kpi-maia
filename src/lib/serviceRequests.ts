@@ -407,9 +407,20 @@ export async function listRequests(
     // às vezes). Ver ASSISTENCIA_ORIGEM_REQUESTERS, entregaQueueGrouping.ts.
     requestedByNames?: string[];
     // YYYY-MM-DD, valida antes de interpolar (mesmo padrão de listDayLoad) --
-    // filtra por created_at, sempre no fuso de João Pessoa (ver formatDateTime.ts).
+    // filtra por created_at (ou scheduled_date, ver dateField), sempre no
+    // fuso de João Pessoa (ver formatDateTime.ts).
     dateFrom?: string;
     dateTo?: string;
+    // "created_at" (padrão, sempre foi assim) ou "scheduled_date" -- pedido
+    // do Victor 03/09/2026, testando os atalhos de período novos (Hoje/7
+    // dias/...) na aba Entregas: "quando filtrei pra hoje, ele só deveria
+    // mostrar as de hoje" -- filtrando por created_at, "hoje" virava "criado
+    // hoje" (quase nunca é a mesma coisa que "agendado pra hoje", já que a
+    // entrega costuma ser criada dias antes da data de rota). Só a aba
+    // Entregas passa "scheduled_date" (ver fila/page.tsx/sac/notificacoes);
+    // o resto do sistema (De/Até manual, Visitas) continua em created_at,
+    // sem mudança de comportamento.
+    dateField?: "created_at" | "scheduled_date";
     // Ver applyOwnAssemblerStoreExclusion acima.
     excludeOwnAssemblerStoreIds?: string[];
     // Busca TODAS as linhas que baterem com os filtros de uma vez (até
@@ -458,11 +469,22 @@ export async function listRequests(
   if (opts.types && opts.types.length > 0) {
     query = query.in("type", opts.types);
   }
-  if (opts.dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(opts.dateFrom)) {
-    query = query.gte("created_at", `${opts.dateFrom}T00:00:00-03:00`);
-  }
-  if (opts.dateTo && /^\d{4}-\d{2}-\d{2}$/.test(opts.dateTo)) {
-    query = query.lte("created_at", `${opts.dateTo}T23:59:59-03:00`);
+  if (opts.dateField === "scheduled_date") {
+    // Coluna DATE pura (sem hora/fuso pra interpolar, diferente de
+    // created_at) -- comparação direta de string YYYY-MM-DD já basta.
+    if (opts.dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(opts.dateFrom)) {
+      query = query.gte("scheduled_date", opts.dateFrom);
+    }
+    if (opts.dateTo && /^\d{4}-\d{2}-\d{2}$/.test(opts.dateTo)) {
+      query = query.lte("scheduled_date", opts.dateTo);
+    }
+  } else {
+    if (opts.dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(opts.dateFrom)) {
+      query = query.gte("created_at", `${opts.dateFrom}T00:00:00-03:00`);
+    }
+    if (opts.dateTo && /^\d{4}-\d{2}-\d{2}$/.test(opts.dateTo)) {
+      query = query.lte("created_at", `${opts.dateTo}T23:59:59-03:00`);
+    }
   }
   query = applyOwnAssemblerStoreExclusion(query, opts.excludeOwnAssemblerStoreIds);
 
@@ -1381,10 +1403,23 @@ export async function listScheduledRequests(
   // a ordenação usam agendaEffectiveDate (o mesmo "qual data vale" da fila),
   // calculado em JS porque não dá pra expressar um coalesce de 2 colunas no
   // builder do Supabase sem SQL bruto.
+  //
+  // Bug real, achado 03/09/2026 (print do Victor: "troca de peça [de
+  // produto] está aparecendo em agenda... em agenda é apenas a agenda dos
+  // montadores" + "apareceu tambem em agenda uma notificação de
+  // assistencia minha"): esse `.or()` nunca teve filtro de `type` nenhum
+  // -- qualquer chamado com scheduled_date/approved_deadline preenchido
+  // entrava, inclusive entrega/troca de produto e notificação externa
+  // (que também ganham data agendada/prazo, só que não são visita de
+  // montador nenhuma). `.in("type", VISITA_REQUEST_TYPES)` restringe pro
+  // mesmo conjunto que a aba "Visitas" da fila já usa (montagem/
+  // desmontagem/recolhimento/troca_peca/vistoria) -- Agenda é só a agenda
+  // dos montadores, tipo de entrega/notificação não tem nada a ver aqui.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const query: any = admin
     .from("service_requests")
     .select(SUMMARY_COLUMNS)
+    .in("type", [...VISITA_REQUEST_TYPES])
     .or("scheduled_date.not.is.null,approved_deadline.not.is.null");
 
   const { data, error } = (await query) as { data: SummaryRow[] | null; error: { message: string } | null };

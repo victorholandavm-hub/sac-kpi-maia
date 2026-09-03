@@ -51,16 +51,20 @@ export default async function AssistenciaAppLayout({
           (print:hidden), mas o espaço reservado (pt-6/pb-24, pensado pra
           rolagem na tela) continuava sendo impresso vazio -- empurrava o
           despacho pra baixo o bastante pra vazar pra segunda folha.
-          Largura total (sem max-w-5xl/mx-auto) -- pedido do Victor
-          31/08/2026: "trocar o layout compartilhado inteiro" pra largura
-          total, aplicado aqui de propósito (não em AssistenciaHeader.tsx,
+          Largura quase total (max-w-[1600px], sem mx-auto/max-w-5xl) --
+          pedido do Victor 31/08/2026: "trocar o layout compartilhado
+          inteiro" pra largura total, revisado 02/09/2026: "preencher a
+          largura inteira da tela é ruim... um pouco menos do que é
+          agora" -- não volta pro limite antigo (max-w-5xl/1024px, virava
+          estreito demais em monitor grande), só corta o exagero em telas
+          ultrawide. Aplicado aqui de propósito (não em AssistenciaHeader.tsx,
           que também é usado por ~25 telas fora desse layout -- motorista,
           montador, loja, SAC, encomendas -- que não fazem parte do
           pedido). Páginas que já tinham seu próprio max-w interno
           (despacho-lote, [id]/despacho -- documentos pensados pra
           impressão) continuam do jeito que estavam, isso é escolha
           deliberada delas, não uma sobra do limite antigo daqui. */}
-      <div className="w-full px-6 pt-6 pb-24 sm:pb-6 print:p-0 flex flex-col gap-6 min-w-0">
+      <div className="w-full max-w-[1600px] mx-auto px-6 pt-6 pb-24 sm:pb-6 print:p-0 flex flex-col gap-6 min-w-0">
         <div className="flex flex-col gap-3 print:hidden">
           <AssistenciaHeader
             title="Assistência — Lojas Maia"

@@ -21,8 +21,8 @@ export function ComboMontagemDesmontagemField({
   const complemento = type === "montagem" ? "desmontagem do móvel antigo" : "montagem do móvel novo";
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white shadow-sm p-4">
-      <span className="text-sm text-gray-800">
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4">
+      <span className="text-sm text-gray-800 dark:text-gray-100">
         Também precisa de {complemento} nessa visita: <span className="font-semibold">{value ? "Sim" : "Não"}</span>
       </span>
       <button
@@ -33,7 +33,7 @@ export function ComboMontagemDesmontagemField({
             value ? "Removido." : "Adicionado."
           )
         }
-        className="text-xs underline shrink-0 text-gray-500 hover:text-gray-700 disabled:opacity-60"
+        className="text-xs underline shrink-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-60"
       >
         {value ? "remover" : "adicionar"}
       </button>

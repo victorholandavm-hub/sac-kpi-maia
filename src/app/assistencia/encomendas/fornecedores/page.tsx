@@ -56,7 +56,7 @@ export default async function PedidosFornecedorPage({
           >
             + Novo pedido
           </Link>
-          <Link href="/assistencia/encomendas/fila" className="text-sm underline text-gray-500 hover:text-gray-700">
+          <Link href="/assistencia/encomendas/fila" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             ← Fila de encomendas
           </Link>
         </div>
@@ -67,7 +67,7 @@ export default async function PedidosFornecedorPage({
           className="rounded-lg p-4"
           style={{ background: "color-mix(in srgb, var(--status-good) 20%, var(--surface-1))", border: "2px solid var(--status-good)" }}
         >
-          <p className="text-sm font-medium text-gray-800">Pedido enviado com sucesso!{pedido ? ` Pedido #${pedido}.` : ""}</p>
+          <p className="text-sm font-medium text-gray-800 dark:text-gray-100">Pedido enviado com sucesso!{pedido ? ` Pedido #${pedido}.` : ""}</p>
         </div>
       ) : null}
 
@@ -87,23 +87,23 @@ export default async function PedidosFornecedorPage({
       </div>
 
       {pedidos.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">Nenhum pedido encontrado.</p>
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">Nenhum pedido encontrado.</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-          <div className="divide-y divide-gray-100">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {pedidos.map((p) => {
               const atrasado = p.status === "pedido_feito" && !!p.expectedAt && p.expectedAt < today;
               return (
                 <Link
                   key={p.id}
                   href={`/assistencia/encomendas/fornecedores/${p.id}`}
-                  className="flex items-center justify-between gap-4 p-4 flex-wrap hover:bg-gray-50 transition-colors duration-150"
+                  className="flex items-center justify-between gap-4 p-4 flex-wrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
                 >
                   <div className="flex flex-col gap-1 min-w-0 w-0 grow">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono text-gray-400">#{p.pedidoNumber}</span>
+                      <span className="text-xs font-mono text-gray-400 dark:text-gray-500">#{p.pedidoNumber}</span>
                       <PedidoFornecedorStatusBadge status={p.status} />
                       {atrasado ? (
                         <span
@@ -113,11 +113,11 @@ export default async function PedidosFornecedorPage({
                           Atrasado
                         </span>
                       ) : null}
-                      <span className="text-sm font-medium text-gray-800">{p.fornecedor}</span>
+                      <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{p.fornecedor}</span>
                     </div>
-                    <p className="text-sm truncate text-gray-500">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
+                    <p className="text-sm truncate text-gray-500 dark:text-gray-400">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1 text-xs text-gray-400">
+                  <div className="flex flex-col items-end gap-1 text-xs text-gray-400 dark:text-gray-500">
                     <span>{formatDateTimeBr(p.createdAt)}</span>
                     <span>Pedido por {p.requestedByName}</span>
                     {p.expectedAt ? (
@@ -139,7 +139,7 @@ export default async function PedidosFornecedorPage({
         </div>
       )}
 
-      <p className="text-xs text-center text-gray-400">
+      <p className="text-xs text-center text-gray-400 dark:text-gray-500">
         {actor.name} · {actor.role === "cd" ? "CD" : actor.role === "admin" ? "Administrador" : "Assistência"}
       </p>
     </div>

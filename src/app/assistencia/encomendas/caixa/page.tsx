@@ -103,7 +103,7 @@ export default async function EncomendasCaixaPage({
             + Novo pedido
           </Link>
           <form action={signOutAction}>
-            <button type="submit" className="text-sm underline text-gray-500 hover:text-gray-700">
+            <button type="submit" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               Sair
             </button>
           </form>
@@ -127,14 +127,14 @@ export default async function EncomendasCaixaPage({
       ) : null}
 
       {pedidos.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center">
-          <p className="text-sm text-gray-400">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
+          <p className="text-sm text-gray-400 dark:text-gray-500">
             {showCompleted ? "Nenhum pedido entregue/cancelado ainda." : "Nenhum pedido em aberto no momento."}
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-          <div className="divide-y divide-gray-100">
+        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {pedidos.map((p: PedidoEncomendaSummary) => (
               <details key={p.id} className="p-4">
                 <summary className="flex items-start gap-2 cursor-pointer list-none">
@@ -154,13 +154,13 @@ export default async function EncomendasCaixaPage({
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-1 min-w-0">
                   <div className="flex flex-col gap-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono font-semibold text-gray-500">#{p.pedidoNumber}</span>
+                      <span className="text-xs font-mono font-semibold text-gray-500 dark:text-gray-400">#{p.pedidoNumber}</span>
                       <PedidoEncomendaStatusBadge status={p.status} />
                     </div>
-                    <p className="text-sm text-gray-800">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
+                    <p className="text-sm text-gray-800 dark:text-gray-100">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
                   </div>
                   <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
-                    <span className="text-xs font-bold whitespace-nowrap text-gray-500">
+                    <span className="text-xs font-bold whitespace-nowrap text-gray-500 dark:text-gray-400">
                       {new Date(p.createdAt).toLocaleDateString("pt-BR")}
                     </span>
                     {p.prazoCdLoja ? (
@@ -168,18 +168,18 @@ export default async function EncomendasCaixaPage({
                         Na loja: {new Date(`${p.prazoCdLoja}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : p.prazoFabricaCd ? (
-                      <span className="text-xs font-medium whitespace-nowrap text-gray-500">
+                      <span className="text-xs font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                         No CD: {new Date(`${p.prazoFabricaCd}T00:00:00`).toLocaleDateString("pt-BR")}
                       </span>
                     ) : null}
                   </div>
                   </div>
                 </summary>
-                <div className="mt-3 pt-3 flex flex-col gap-2 border-t border-gray-100">
-                  <p className="text-xs text-gray-500">
+                <div className="mt-3 pt-3 flex flex-col gap-2 border-t border-gray-100 dark:border-gray-700">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     Fornecedor: {p.fornecedorTipo === "fabrica_externa" ? `Externo: ${p.fornecedorExterno}` : p.fabricaNome}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     Solicitado por: {p.requestedByName}
                     {storeIds.length > 1 ? ` (${p.storeName})` : ""}
                   </p>
@@ -192,16 +192,16 @@ export default async function EncomendasCaixaPage({
                       Editar pedido
                     </Link>
                   ) : null}
-                  {p.vendedorName ? <p className="text-xs text-gray-500">Vendedor: {p.vendedorName}</p> : null}
-                  {p.clienteCodigo ? <p className="text-xs text-gray-500">Código do cliente: {p.clienteCodigo}</p> : null}
-                  {p.carga ? <p className="text-xs text-gray-500">Carga: {p.carga}</p> : null}
-                  {p.nfE ? <p className="text-xs text-gray-500">NF-e: {p.nfE}</p> : null}
+                  {p.vendedorName ? <p className="text-xs text-gray-500 dark:text-gray-400">Vendedor: {p.vendedorName}</p> : null}
+                  {p.clienteCodigo ? <p className="text-xs text-gray-500 dark:text-gray-400">Código do cliente: {p.clienteCodigo}</p> : null}
+                  {p.carga ? <p className="text-xs text-gray-500 dark:text-gray-400">Carga: {p.carga}</p> : null}
+                  {p.nfE ? <p className="text-xs text-gray-500 dark:text-gray-400">NF-e: {p.nfE}</p> : null}
                   {(photosByPedido.get(p.id) ?? []).length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {(photosByPedido.get(p.id) ?? []).map((photo) => (
                         <a key={photo.id} href={photo.url} target="_blank" rel="noopener noreferrer">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={photo.url} alt="Cupom fiscal" className="h-20 w-20 object-cover rounded-lg border border-gray-200" />
+                          <img src={photo.url} alt="Cupom fiscal" className="h-20 w-20 object-cover rounded-lg border border-gray-200 dark:border-gray-600" />
                         </a>
                       ))}
                     </div>
@@ -216,7 +216,7 @@ export default async function EncomendasCaixaPage({
 
       <Link
         href={requester.kind === "gerente" ? "/assistencia/loja" : "/assistencia/encomendas"}
-        className="text-sm underline self-center text-gray-500 hover:text-gray-700"
+        className="text-sm underline self-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
       >
         ← Voltar
       </Link>
