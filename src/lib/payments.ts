@@ -193,7 +193,6 @@ export type PaymentItem = {
   unitValue: number | null;
   paymentReleased: boolean;
   paymentReleasedAt: string | null;
-  paymentAuthorizedBy: string | null;
   assemblerName: string | null;
   clientName: string | null;
   // Só pra aplicar o filtro mostruário x cliente (ver isMostruarioRequest)
@@ -212,7 +211,6 @@ type PaymentItemRow = {
   unit_value: number | null;
   payment_released: boolean;
   payment_released_at: string | null;
-  payment_authorized_by: string | null;
   request: {
     id: string;
     ticket_number: number;
@@ -243,7 +241,7 @@ export async function listPaymentItems(
   let query = admin
     .from("service_request_items")
     .select(
-      "id, product, quantity, unit_value, payment_released, payment_released_at, payment_authorized_by, request:service_requests(id, ticket_number, type, status, assembler_name, client_name, order_code, created_at, stores(name))"
+      "id, product, quantity, unit_value, payment_released, payment_released_at, request:service_requests(id, ticket_number, type, status, assembler_name, client_name, order_code, created_at, stores(name))"
     )
     .order("created_at", { ascending: false });
   // Visão geral (sem montador escolhido) só mostra quem já tem valor --
@@ -272,7 +270,6 @@ export async function listPaymentItems(
       unitValue: row.unit_value,
       paymentReleased: row.payment_released,
       paymentReleasedAt: row.payment_released_at,
-      paymentAuthorizedBy: row.payment_authorized_by,
       assemblerName: row.request!.assembler_name,
       clientName: row.request!.client_name,
       orderCode: row.request!.order_code,

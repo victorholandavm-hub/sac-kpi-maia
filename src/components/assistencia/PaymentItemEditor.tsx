@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { setItemUnitValue, setItemPaymentReleased, setItemPaymentAuthorizedBy } from "@/app/assistencia/pagamentos-actions";
+import { setItemUnitValue, setItemPaymentReleased } from "@/app/assistencia/pagamentos-actions";
 import { useQuickAction } from "./useQuickAction";
 import type { PaymentItem } from "@/lib/payments";
 
@@ -42,8 +42,6 @@ export function PaymentItemEditor({
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(item.unitValue !== null ? String(item.unitValue) : "");
-  const [editingAuth, setEditingAuth] = useState(false);
-  const [authValue, setAuthValue] = useState(item.paymentAuthorizedBy ?? "");
 
   const isConcluded = item.requestStatus === "concluida";
   // Montador já marcou como feito, mas o gerente da loja ainda não aprovou
@@ -70,17 +68,6 @@ export function PaymentItemEditor({
       () => setItemPaymentReleased(item.itemId, item.requestId, !item.paymentReleased),
       item.paymentReleased ? "Pagamento revertido para pendente." : "Pagamento marcado como pago."
     );
-  }
-
-  function saveAuth() {
-    if (!authValue.trim()) {
-      showToast("Informe o nome do gerente.", "error");
-      return;
-    }
-    run(async () => {
-      await setItemPaymentAuthorizedBy(item.itemId, item.requestId, authValue);
-      setEditingAuth(false);
-    }, "Autorização registrada.");
   }
 
   return (
@@ -177,35 +164,6 @@ export function PaymentItemEditor({
         <span>
           {item.clientName ?? "Sem cliente"} · {item.storeName}
         </span>
-        <span>·</span>
-        <span>Autorizado por (gerente):</span>
-        {editingAuth ? (
-          <>
-            <input
-              value={authValue}
-              onChange={(e) => setAuthValue(e.target.value)}
-              className="w-40 rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-1 text-xs"
-              autoFocus
-            />
-            <button
-              disabled={pending}
-              onClick={saveAuth}
-              className="rounded px-2 py-1 disabled:opacity-60"
-              style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
-            >
-              Salvar
-            </button>
-            <button onClick={() => setEditingAuth(false)} className="underline">
-              cancelar
-            </button>
-          </>
-        ) : canEdit ? (
-          <button onClick={() => setEditingAuth(true)} className="underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-            {item.paymentAuthorizedBy ?? "definir"}
-          </button>
-        ) : (
-          <span>{item.paymentAuthorizedBy ?? "não definido"}</span>
-        )}
       </div>
     </div>
   );
