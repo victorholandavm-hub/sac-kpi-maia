@@ -187,7 +187,17 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
     };
   }
 
-  await notifyTelegramNewEncomenda({ pedidoNumber, storeName: store.name });
+  const fornecedorLabel =
+    fornecedorTipo === "fabrica_externa"
+      ? (fornecedorExterno ?? "Fornecedor externo")
+      : (INTERNAL_FABRICAS.find((f) => f.id === fabricaId)?.nome ?? "Fábrica própria");
+  await notifyTelegramNewEncomenda({
+    pedidoNumber,
+    storeName: store.name,
+    requestedByName,
+    fornecedorLabel,
+    products: items.map((i) => i.produtoDescricao),
+  });
 
   revalidatePath("/assistencia/encomendas/caixa");
   revalidatePath("/assistencia/encomendas/fila");
