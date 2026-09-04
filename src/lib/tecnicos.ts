@@ -159,7 +159,7 @@ export type TecnicoRequestView = {
 
 const TECNICO_VIEW_LIMIT = 200;
 const TECNICO_VIEW_COLUMNS =
-  "id, ticket_number, type, store_id, client_name, client_cpf, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, client_time_restriction, driver_name, completed_at, requested_by_name, requester:profiles!requested_by(full_name), stores(name), items:service_request_items(id, product, part_code, quantity, destino, destino_definido_por, destino_definido_em, destino_loja_id, destino_loja:stores!destino_loja_id(name), destino_observacao)";
+  "id, ticket_number, type, store_id, client_name, client_cpf, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, client_time_restriction, driver_name, completed_at, requested_by_name, requester:profiles!requested_by(full_name), stores(name), items:service_request_items(id, product, part_code, quantity, destino, destino_definido_por, destino_definido_em, destino_loja_id, destino_loja:stores!destino_loja_id(name), destino_observacao, is_pickup)";
 
 type TecnicoViewRow = {
   id: string;
@@ -194,8 +194,26 @@ type TecnicoViewRow = {
     destino_loja_id: string | null;
     destino_loja: { name: string } | null;
     destino_observacao: string | null;
+    is_pickup: boolean;
   }[] | null;
 };
+
+// Troca com recolhimento (troca_produto/envio_recolhimento_peca) grava os
+// dois lados no mesmo chamado -- o produto ENTREGUE (is_pickup false) e o
+// RECOLHIDO (is_pickup true), ver createSacRequest/createQuickRequest em
+// actions.ts. Pedido do Victor 04/09/2026: "quando for uma troca com
+// recolhimento, para a equipe tecnica só precisa aparecer o produto que
+// foi recolhido, não precisa aparecer o que foi entregue" -- o entregue já
+// foi parar na casa do cliente, nunca passa pela mão da equipe técnica,
+// então não tem destino nenhum pra dar (mostrar ali só confundia/deixava
+// selecionável por engano). Só filtra quando o chamado TEM os dois lados
+// (algum item com is_pickup true) -- chamados só de recolhimento
+// (recolhimento_produto) não passam por esse split no banco (todo item
+// vem is_pickup false mesmo sendo 100% recolhido), então continuam
+// aparecendo inteiros, sem risco de sumir por engano.
+function tecnicoItemsForView<T extends { is_pickup: boolean }>(items: T[]): T[] {
+  return items.some((i) => i.is_pickup) ? items.filter((i) => i.is_pickup) : items;
+}
 
 function toTecnicoView(row: TecnicoViewRow): TecnicoRequestView {
   return {
@@ -219,7 +237,7 @@ function toTecnicoView(row: TecnicoViewRow): TecnicoRequestView {
     driverName: row.driver_name,
     completedAt: row.completed_at,
     requestedByName: row.requester?.full_name ?? row.requested_by_name ?? null,
-    items: (row.items ?? []).map((i) => ({
+    items: tecnicoItemsForView(row.items ?? []).map((i) => ({
       id: i.id,
       product: i.product,
       partCode: i.part_code,

@@ -16,6 +16,7 @@ import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRe
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { TecnicoItemDestino } from "@/components/assistencia/TecnicoItemDestino";
 import { TecnicoNotificationModalButton } from "@/components/assistencia/TecnicoNotificationModalButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -196,7 +197,7 @@ export default async function TecnicoHomePage({
           100% da largura da tela". Sem max-w/mx-auto nenhum -- só
           padding interno (px-6), que não é limitação de largura, é
           respiro em relação à borda da janela. */}
-      <div className="w-full flex flex-col min-w-0 bg-[#F9FAFB] min-h-screen">
+      <div className="w-full flex flex-col min-w-0 bg-[var(--background)] min-h-screen">
         {/* Barra de marca -- verde institucional, cheia, só nesta tela
             (não é o AssistenciaHeader compartilhado com o resto do
             sistema de assistência -- trocar aquele componente mudaria
@@ -224,6 +225,13 @@ export default async function TecnicoHomePage({
                 (Design System, 01/09/2026): barra de navegação com
                 "estado ativo em vidro fosco sutil (bg-white dark:bg-gray-800/15)". */}
             <div className="flex items-center gap-1 text-sm shrink-0">
+              {/* Pedido do Victor 04/09/2026: "preciso de duas coisas na
+                  tela da equipe tecnica: modo dark". O toggle em si já
+                  existe (ThemeToggle.tsx, mesmo componente do resto do
+                  sistema) -- só nunca tinha entrado aqui, porque esta
+                  tela usa seu próprio cabeçalho verde, não o
+                  AssistenciaHeader compartilhado (ver nota acima). */}
+              <ThemeToggle />
               {/* Pedido do Victor 28/08/2026: "preciso que a equipe
                   tecnica tambem tenha acesso" à tela de estoque (dar
                   baixa em retirada registrada pela assistência). */}
