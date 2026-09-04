@@ -13,6 +13,7 @@ import {
   MANOEL_ONLY_ASSEMBLER,
 } from "@/lib/assistenciaLabels";
 import { CausaRaizDonutChart } from "@/components/CausaRaizDonutChart";
+import { PagamentoPorMontadorExportButton } from "@/components/assistencia/PagamentoPorMontadorExportButton";
 
 // Seletor de Tipo da seção Indicadores -- pedido do Victor 28/08/2026:
 // "no filtros nao precisa ter recolhimento de peça e envio de peça e
@@ -706,8 +707,17 @@ export default async function RelatoriosPage({
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         <div className="flex flex-col gap-4">
           <details className={`${CARD_CLASS} overflow-hidden`}>
-            <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
-              Pagamento por montador ({assemblerRows.length})
+            <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between gap-3 flex-wrap">
+              <span>Pagamento por montador ({assemblerRows.length})</span>
+              {/* stopPropagation -- clicar no botão não pode fechar/abrir o
+                  <details> junto (o <summary> inteiro é a área de toggle
+                  por padrão). Pedido do Victor 03/09/2026: "exportar para
+                  excel tanto o relatorio quanto o relatorio detalhado". */}
+              {assemblerRows.length > 0 ? (
+                <span onClick={(e) => e.stopPropagation()}>
+                  <PagamentoPorMontadorExportButton rows={assemblerRows as [string, { total: number; pendente: number; pago: number; itens: number }][]} />
+                </span>
+              ) : null}
             </summary>
             {assemblerRows.length === 0 ? (
               <p className="text-sm p-4 text-gray-400 dark:text-gray-500">
