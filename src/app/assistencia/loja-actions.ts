@@ -8,6 +8,7 @@ import { getOptionalProfile } from "@/lib/dal";
 import { isMostruarioRequest } from "@/lib/serviceRequests";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { notifyAssistencia } from "@/lib/notifications";
+import { notifyTelegramStatusChange } from "@/lib/telegram";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
@@ -175,7 +176,7 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("status, store_id, ticket_number")
+    .select("status, store_id, ticket_number, type")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request) throw new Error("Solicitação não encontrada.");
@@ -215,6 +216,8 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
       to_status: "concluida",
       note: `${actorLabel} aprovou a conclusão.${trimmedNote ? ` Observação: ${trimmedNote}` : ""}`,
     });
+
+    await notifyTelegramStatusChange({ ticketNumber: request.ticket_number, type: request.type, newStatus: "concluida" });
 
     revalidatePath("/assistencia/loja");
     revalidatePath("/assistencia/fila");
@@ -265,6 +268,7 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
     message: `Chamado #${request.ticket_number} — ${eventNote}`,
     link,
   });
+  await notifyTelegramStatusChange({ ticketNumber: request.ticket_number, type: request.type, newStatus: "remarcar" });
 
   revalidatePath("/assistencia/loja");
   revalidatePath("/assistencia/fila");

@@ -20,6 +20,7 @@ import {
   type NewPedidoEncomendaItem,
 } from "@/lib/pedidosEncomenda";
 import { saveEncomendaPhoto } from "@/lib/pedidoEncomendaPhotos";
+import { notifyTelegramNewEncomenda } from "@/lib/telegram";
 import {
   searchTotvsOrdersByInvoice,
   findTotvsClientByCode,
@@ -185,6 +186,8 @@ export async function createPedidoEncomendaAction(_state: FormState, formData: F
       error: `Pedido #${pedidoNumber} criado, mas a foto não pôde ser salva: ${err instanceof Error ? err.message : "erro desconhecido"}`,
     };
   }
+
+  await notifyTelegramNewEncomenda({ pedidoNumber, storeName: store.name });
 
   revalidatePath("/assistencia/encomendas/caixa");
   revalidatePath("/assistencia/encomendas/fila");

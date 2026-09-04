@@ -21,6 +21,7 @@ import {
   CAUSA_RAIZ_OPTIONS,
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
+import { notifyTelegramNewRequest, notifyTelegramStatusChange } from "@/lib/telegram";
 import { resolveDriverName, listOwnStoreAssemblers } from "@/lib/payments";
 import { getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
 import { randomUUID } from "crypto";
@@ -534,6 +535,8 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     });
   }
 
+  await notifyTelegramNewRequest({ ticketNumber: data.ticket_number, type, clientName, storeName: store.name });
+
   redirect(`/assistencia/solicitar?enviado=1&chamado=${data.ticket_number}`);
 }
 
@@ -748,7 +751,7 @@ export async function cancelServiceRequestByGerente(requestId: string, note: str
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("status, store_id")
+    .select("status, store_id, type, ticket_number")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
@@ -784,6 +787,8 @@ export async function cancelServiceRequestByGerente(requestId: string, note: str
     message: note.trim(),
     link: `/assistencia/${requestId}`,
   });
+
+  await notifyTelegramStatusChange({ ticketNumber: current.ticket_number, type: current.type, newStatus: "cancelada" });
 
   revalidatePath("/assistencia/loja");
 }
@@ -934,7 +939,7 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("status, type, assembler_name, driver_name, store_id, deadline_status")
+    .select("status, type, assembler_name, driver_name, store_id, deadline_status, ticket_number")
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
@@ -993,6 +998,8 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
     message: note?.trim() || null,
     link: `/assistencia/${requestId}`,
   });
+
+  await notifyTelegramStatusChange({ ticketNumber: current.ticket_number, type: current.type, newStatus });
 
   revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
@@ -1187,6 +1194,8 @@ export async function createExchangeChild(
     message: reasonTrimmed,
     link: `/assistencia/${childId}`,
   });
+
+  await notifyTelegramNewRequest({ ticketNumber: child.ticket_number, type: parent.type, clientName: parent.client_name });
 
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/sac");
@@ -2306,7 +2315,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       // sempre mostrar "prazo pendente de aprovação" sem sentido.
       deadline_status: "aprovado",
     })
-    .select("id")
+    .select("id, ticket_number")
     .single();
 
   if (error || !data) {
@@ -2336,6 +2345,8 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     event_type: "created",
     to_status: "aberta",
   });
+
+  await notifyTelegramNewRequest({ ticketNumber: data.ticket_number, type, clientName });
 
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/agenda");
@@ -2676,6 +2687,8 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     event_type: "created",
     to_status: "aberta",
   });
+
+  await notifyTelegramNewRequest({ ticketNumber: data.ticket_number, type, clientName });
 
   revalidatePath("/assistencia/sac");
   redirect(`/assistencia/${data.id}`);

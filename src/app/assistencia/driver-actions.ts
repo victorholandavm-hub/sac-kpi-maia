@@ -9,6 +9,7 @@ import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import { notifyLoja, notifySac, notifyAssistencia } from "@/lib/notifications";
+import { notifyTelegramStatusChange } from "@/lib/telegram";
 import { SAC_MANAGED_TYPES, DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
 import type { RequestType } from "@/lib/serviceRequests";
 import { resolveDriverName } from "@/lib/payments";
@@ -197,7 +198,7 @@ export async function driverCompleteRequest(requestId: string): Promise<void> {
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("driver_name, status, store_id")
+    .select("driver_name, status, store_id, type, ticket_number")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.driver_name !== driverName) {
@@ -240,6 +241,8 @@ export async function driverCompleteRequest(requestId: string): Promise<void> {
     message: `Concluído pelo motorista ${driverName}.`,
     link: `/assistencia/${requestId}`,
   });
+
+  await notifyTelegramStatusChange({ ticketNumber: request.ticket_number, type: request.type, newStatus: "concluida" });
 
   revalidatePath("/assistencia/motorista");
   revalidatePath("/assistencia/fila");
@@ -290,6 +293,7 @@ export async function driverReportIssue(requestId: string, reason: string): Prom
   const link = `/assistencia/${requestId}`;
   await notifyLoja(request.store_id, { type: "status_changed", title: "Solicitação: Remarcar", message: note, link });
   await notifyRemarcarOwner(request.type, { type: "status_changed", title: "Precisa remarcar", message: `Chamado #${request.ticket_number} — ${note}`, link });
+  await notifyTelegramStatusChange({ ticketNumber: request.ticket_number, type: request.type, newStatus: "remarcar" });
 
   revalidatePath("/assistencia/motorista");
   revalidatePath("/assistencia/fila");
