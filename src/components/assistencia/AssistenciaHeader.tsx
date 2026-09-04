@@ -28,7 +28,16 @@ export function AssistenciaHeader({
           ) : null}
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      {/* flex-wrap -- pedido do Victor 04/09/2026 ("ajustar a
+          responsividade... o Antonio quer acessar via celular"): o
+          cabeçalho inteiro (linha 15 acima) já quebrava linha entre
+          logo/título e essa direita, mas essa direita em si não quebrava
+          -- páginas que passam vários botões/links em `children` (ex.:
+          Pagamentos: total/pago/pendente + exportar + nova) estouravam a
+          largura da tela em celular. Compartilhado por ~25 telas (ver
+          nota em (app)/layout.tsx) -- corrigir aqui vale pra todas de
+          uma vez, sem risco: só muda alguma coisa quando não cabe. */}
+      <div className="flex items-center gap-3 flex-wrap">
         <ThemeToggle />
         {children}
       </div>
