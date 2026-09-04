@@ -40,11 +40,17 @@ export function PagamentoPorMontadorExportButton({
   }
 
   return (
-    <button
-      onClick={handleExport}
-      className="text-sm px-3 py-2 rounded-lg font-medium whitespace-nowrap border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100"
-    >
-      Exportar CSV
-    </button>
+    // stopPropagation -- essa seção fica dentro de um <summary> (o card é
+    // um <details>, ver relatorios/page.tsx), que é a área de toggle
+    // inteira por padrão -- sem isso, clicar em "Exportar CSV" também
+    // abria/fechava o card junto.
+    <span onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={handleExport}
+        className="text-sm px-3 py-2 rounded-lg font-medium whitespace-nowrap border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100"
+      >
+        Exportar CSV
+      </button>
+    </span>
   );
 }
