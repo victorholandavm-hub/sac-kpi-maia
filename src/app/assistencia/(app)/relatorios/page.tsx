@@ -13,7 +13,7 @@ import {
   MANOEL_ONLY_ASSEMBLER,
 } from "@/lib/assistenciaLabels";
 import { CausaRaizDonutChart } from "@/components/CausaRaizDonutChart";
-import { PagamentoPorMontadorExportButton } from "@/components/assistencia/PagamentoPorMontadorExportButton";
+import { RelatorioExportButton } from "@/components/assistencia/RelatorioExportButton";
 
 // Seletor de Tipo da seção Indicadores -- pedido do Victor 28/08/2026:
 // "no filtros nao precisa ter recolhimento de peça e envio de peça e
@@ -573,13 +573,30 @@ export default async function RelatoriosPage({
           na aba de relatorio chamado relatorio de montagem detalhado".
           Carrega o mesmo período/alvo que já tá filtrado aqui, pra não
           o Antônio ter que reaplicar o filtro do outro lado. */}
-      <Link
-        href={`/assistencia/relatorios/montagem-detalhado?${new URLSearchParams({ from: dateFrom, to: dateTo, ...(filterAlvo ? { alvo: filterAlvo } : {}) }).toString()}`}
-        className="self-start text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
-        style={{ background: "#1B5E3C" }}
-      >
-        📋 Relatório de montagem detalhado
-      </Link>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Link
+          href={`/assistencia/relatorios/montagem-detalhado?${new URLSearchParams({ from: dateFrom, to: dateTo, ...(filterAlvo ? { alvo: filterAlvo } : {}) }).toString()}`}
+          className="self-start text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
+          style={{ background: "#1B5E3C" }}
+        >
+          📋 Relatório de montagem detalhado
+        </Link>
+        {/* Exportar CSV -- pedido do Victor 03/09/2026: primeiro só
+            "Pagamento por montador" (#300), revisado no mesmo pedido:
+            "não só o pagamento do montador mas junto com visão mensal,
+            desempenho do montador, analise por loja e solicitações por
+            loja". Botão subiu pra cá (era só dentro do card de Pagamento)
+            -- representa o relatório inteiro agora, e evita ficar preso
+            dentro de um <summary> de novo (ver hotfix #301: bug real em
+            produção por causa de um onClick preso ali dentro). */}
+        <RelatorioExportButton
+          monthRows={indicators.byMonth}
+          assemblerIndicatorRows={indicatorsByAssembler}
+          storeIndicatorRows={indicators.byStore}
+          storeReportRows={report.byStore}
+          paymentRows={assemblerRows as [string, { total: number; pendente: number; pago: number; itens: number }][]}
+        />
+      </div>
 
       {/* Indicadores -- redesign pedido do Victor 28/08/2026: sem borda
           externa colorida (card branco com sombra, ver CARD_CLASS), 3
@@ -707,20 +724,14 @@ export default async function RelatoriosPage({
       <div className="grid lg:grid-cols-2 gap-4 items-start">
         <div className="flex flex-col gap-4">
           <details className={`${CARD_CLASS} overflow-hidden`}>
-            <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between gap-3 flex-wrap">
-              <span>Pagamento por montador ({assemblerRows.length})</span>
-              {/* Pedido do Victor 03/09/2026: "exportar para excel tanto o
-                  relatorio quanto o relatorio detalhado". stopPropagation
-                  (clicar no botão não pode fechar/abrir o <details> junto,
-                  o <summary> inteiro é a área de toggle por padrão) mora
-                  DENTRO do componente client (PagamentoPorMontadorExportButton)
-                  -- Server Component não pode ter onClick direto no JSX
-                  (bug real em produção: "a tela de relatorios caiu... this
-                  page couldn't load" -- "Event handlers cannot be passed
-                  to Client Component props"). */}
-              {assemblerRows.length > 0 ? (
-                <PagamentoPorMontadorExportButton rows={assemblerRows as [string, { total: number; pendente: number; pago: number; itens: number }][]} />
-              ) : null}
+            {/* Exportar CSV daqui subiu pro topo da página (ver
+                RelatorioExportButton, junto de "Relatório de montagem
+                detalhado") -- agora exporta o relatório inteiro, não só
+                esse card. Evita também o problema real de produção de ter
+                um botão client component preso dentro de <summary> (ver
+                hotfix #301). */}
+            <summary className="text-base font-bold cursor-pointer px-4 py-3 text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
+              Pagamento por montador ({assemblerRows.length})
             </summary>
             {assemblerRows.length === 0 ? (
               <p className="text-sm p-4 text-gray-400 dark:text-gray-500">
