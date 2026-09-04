@@ -1076,6 +1076,14 @@ export async function createExchangeChild(
     causaRaizDetalhe = (opts.causaRaizDetalhe ?? "").trim();
     if (!causaRaizDetalhe) throw new Error("Descreva a causa raiz (obrigatório quando é \"Outro\").");
   }
+  // Erro do vendedor (pedido do Victor 04/09/2026) reaproveita o
+  // seller_name do chamado pai em vez de pedir de novo -- é o mesmo
+  // vendedor que fez a venda original, não muda a cada rodada de troca
+  // (diferente de carga/conferente/motorista, que podem ser outros a cada
+  // rodada).
+  if (opts.causaRaiz === "erro_vendedor" && !parent.seller_name) {
+    throw new Error("Esse chamado não tem vendedor(a) registrado -- edite o chamado original pra informar antes de continuar.");
+  }
 
   const nextRound = (parent.exchange_round ?? 1) + 1;
   const childId = randomUUID();
@@ -1990,6 +1998,13 @@ export async function updateRequestDetails(
     causaRaizDetalhe = String(formData.get("causa_raiz_detalhe") ?? "").trim();
     if (!causaRaizDetalhe) return { error: "Descreva a causa raiz (obrigatório quando é \"Outro\")." };
   }
+  // Erro do vendedor (pedido do Victor 04/09/2026: "obigatorio colocar o
+  // nome do vendedor") -- reaproveita o campo Vendedor(a) geral já
+  // gravado abaixo (seller_name, sempre editável), só exige que ele venha
+  // preenchido quando essa é a causa escolhida.
+  if (causaRaiz === "erro_vendedor" && !String(formData.get("seller_name") ?? "").trim()) {
+    return { error: "Informe o vendedor(a) (erro do vendedor precisa registrar quem foi)." };
+  }
 
   const { error } = await admin
     .from("service_requests")
@@ -2114,6 +2129,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   let causaConferente: string | null = null;
   let driverNameForError: string | null = null;
   let causaRaizDetalhe: string | null = null;
+  let sellerNameForError: string | null = null;
   if (isDelivery) {
     causaRaiz = String(formData.get("causa_raiz") ?? "").trim();
     if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
@@ -2131,6 +2147,15 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       if (!causaCarga) return { error: "Informe a carga (erro do motorista precisa registrar qual foi)." };
       if (!typedDriverName) return { error: "Informe o motorista (erro do motorista precisa registrar quem entregou)." };
       driverNameForError = await resolveDriverName(typedDriverName);
+    }
+    // Erro do vendedor (pedido do Victor 04/09/2026: "obigatorio colocar o
+    // nome do vendedor"), mesmo padrão de erro_conferencia/erro_motorista
+    // acima -- esse formulário (Nova entrega da assistência) não tem um
+    // campo geral de Vendedor(a) como o SAC, então precisa de um campo
+    // próprio (ver NovaEntregaAssistenciaForm.tsx).
+    if (causaRaiz === "erro_vendedor") {
+      sellerNameForError = String(formData.get("seller_name") ?? "").trim();
+      if (!sellerNameForError) return { error: "Informe o vendedor(a) (erro do vendedor precisa registrar quem foi)." };
     }
     // "Outro" precisa dizer exatamente o que houve (pedido do Victor
     // 21/08/2026), mesmo padrão de erro_conferencia/erro_motorista acima.
@@ -2264,6 +2289,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       causa_carga: causaCarga,
       causa_conferente: causaConferente,
       causa_raiz_detalhe: causaRaizDetalhe,
+      seller_name: sellerNameForError,
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
       // Restrição de horário/turno do cliente pra receber (pedido do Victor
       // 19/08/2026) -- só faz sentido pra tipo de entrega, mas não custa
@@ -2410,6 +2436,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   let causaCarga: string | null = null;
   let causaConferente: string | null = null;
   let causaRaizDetalhe: string | null = null;
+  let sellerNameForError: string | null = null;
   if (isDeliveryTypeCreate) {
     causaRaiz = String(formData.get("causa_raiz") ?? "").trim();
     if (!(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
@@ -2425,6 +2452,14 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       causaCarga = String(formData.get("causa_carga") ?? "").trim();
       if (!causaCarga) return { error: "Informe a carga (erro do motorista precisa registrar qual foi)." };
       if (!driverNameInput) return { error: "Informe o motorista (erro do motorista precisa registrar quem entregou)." };
+    }
+    // Erro do vendedor (pedido do Victor 04/09/2026: "obigatorio colocar o
+    // nome do vendedor"), mesmo padrão de erro_conferencia/erro_motorista
+    // acima -- campo próprio (ver SacCreateRequestForm.tsx), já que o SAC
+    // não pede um "Vendedor(a)" geral em nenhum outro lugar do formulário.
+    if (causaRaiz === "erro_vendedor") {
+      sellerNameForError = String(formData.get("seller_name") ?? "").trim();
+      if (!sellerNameForError) return { error: "Informe o vendedor(a) (erro do vendedor precisa registrar quem foi)." };
     }
     // "Outro" precisa dizer exatamente o que houve (pedido do Victor
     // 21/08/2026: "quando... selecionar 'outro' ele precisar digitar o
@@ -2591,6 +2626,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       causa_carga: causaCarga,
       causa_conferente: causaConferente,
       causa_raiz_detalhe: causaRaizDetalhe,
+      seller_name: sellerNameForError,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
       // Criado direto pelo SAC, não pela loja — não há prazo pra aprovar.
       deadline_status: "aprovado",

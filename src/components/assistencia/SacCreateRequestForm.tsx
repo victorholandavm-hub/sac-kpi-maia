@@ -779,6 +779,20 @@ export function SacCreateRequestForm({
           </div>
         ) : null}
 
+        {/* Pedido do Victor 04/09/2026: "quando for erro do vendedor,
+            obrigatorio colocar o nome do vendedor" -- mesmo padrão visual
+            de erro_conferencia/erro_motorista acima. */}
+        {causaRaiz === "erro_vendedor" ? (
+          <div className="flex flex-col gap-3 rounded-lg border p-3" style={{ borderColor: "var(--status-critical)" }}>
+            <p className="text-xs font-medium" style={{ color: "var(--status-critical)" }}>
+              Erro do vendedor -- precisa registrar quem foi.
+            </p>
+            <Field label="Vendedor(a) *">
+              <input name="seller_name" required placeholder="Nome de quem vendeu" className="rounded border px-3 py-2" style={inputStyle} />
+            </Field>
+          </div>
+        ) : null}
+
         {/* "Outro" não tem campo próprio nenhum além do Motivo genérico lá
             em cima -- pedido do Victor 21/08/2026: "quando... selecionar
             'outro' ele precisar digitar o que houve exatamente". Mesmo
