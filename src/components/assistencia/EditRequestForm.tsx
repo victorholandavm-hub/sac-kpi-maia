@@ -95,9 +95,25 @@ export function EditRequestForm({
         </Field>
       </div>
 
-      <Field label="Vendedor(a)">
-        <input name="seller_name" defaultValue={request.sellerName ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
+      <Field label={causaRaiz === "erro_vendedor" ? "Vendedor(a) *" : "Vendedor(a)"}>
+        <input
+          name="seller_name"
+          defaultValue={request.sellerName ?? ""}
+          required={causaRaiz === "erro_vendedor"}
+          className="rounded border px-3 py-2"
+          style={causaRaiz === "erro_vendedor" ? { borderColor: "var(--status-critical)" } : inputStyle}
+        />
       </Field>
+      {/* Pedido do Victor 04/09/2026: "quando for erro do vendedor,
+          obrigatorio colocar o nome do vendedor" -- aqui reaproveita o
+          campo Vendedor(a) já existente lá em cima (geral, sempre visível)
+          em vez de duplicar um segundo campo, só destaca que ficou
+          obrigatório nesse caso. */}
+      {causaRaiz === "erro_vendedor" ? (
+        <p className="text-xs font-medium -mt-2" style={{ color: "var(--status-critical)" }}>
+          Erro do vendedor -- preencha o campo Vendedor(a) acima.
+        </p>
+      ) : null}
 
       <Field label="Nome do cliente *">
         <input name="client_name" defaultValue={request.clientName ?? ""} required className="rounded border px-3 py-2" style={inputStyle} />
