@@ -428,7 +428,21 @@ export default async function RelatoriosPage({
     // achado do Victor 24/08/2026: "quando filtrar, o numero de
     // solicitações, total a pagar a montadores, pago e penente de
     // liberação deve ser filtrado" (antes só filtrava a tabela de cima).
-    listPaymentItems({ dateFrom, dateTo, alvo: filterAlvo }),
+    // includeNoValue: true -- achado do Victor 03/09/2026: "LUCIANO216 está
+    // com 61 itens [na aba Pagamentos], mas no relatório ele aparece com 60
+    // itens". Sem esse filtro, listPaymentItems descarta todo item sem
+    // valor definido ainda ANTES de chegar aqui -- inclusive item de
+    // montagem já CONCLUÍDA, só que o Antônio ainda não definiu o preço
+    // (mesmo caso que a aba Pagamentos mostra de propósito, "precisa de
+    // atenção", ver allItems em pagamentos/page.tsx). O "itens" contado
+    // abaixo silenciosamente ficava menor que a realidade -- não só de
+    // LUCIANO216: conferido no banco, Luanderson (-19), JOAO 214 (-9),
+    // Gabriel (-4), Paulo (-3), Junior (-2) e outros tinham a mesma
+    // divergência. Busca tudo aqui, filtro equivalente ao de
+    // pagamentos/page.tsx logo abaixo (no loop de byAssembler) -- widget de
+    // $ continua correto (item sem valor soma 0), só o "itens" que estava
+    // errado.
+    listPaymentItems({ dateFrom, dateTo, alvo: filterAlvo, includeNoValue: true }),
     getSupplierReconciliation(),
     // Alvo (mostruário/cliente) também vale pra Indicadores -- pedido do
     // Victor 27/08/2026. Data agora é a mesma `dateFrom`/`dateTo` do
@@ -436,8 +450,15 @@ export default async function RelatoriosPage({
     getServiceTypeIndicators(indicatorTypes, { dateFrom, dateTo, alvo: filterAlvo }),
   ]);
 
+  // Mesmo critério de "precisa de atenção do Antônio" da aba Pagamentos
+  // (allItems em pagamentos/page.tsx) -- só isso deixa "itens" (e os cards
+  // de $ acima) baterem entre as duas telas. Esconde só quem tá em
+  // andamento/aberto e ainda sem valor nenhum (não é acionável ainda).
+  const reportablePaymentItems = paymentItems.filter(
+    (i) => i.unitValue !== null || i.requestStatus === "concluida" || i.requestStatus === "aguardando_aprovacao"
+  );
   const byAssembler = new Map<string, { total: number; pendente: number; pago: number; itens: number; items: PaymentItem[] }>();
-  for (const item of paymentItems) {
+  for (const item of reportablePaymentItems) {
     const name = item.assemblerName ?? "Sem montador definido";
     const entry = byAssembler.get(name) ?? { total: 0, pendente: 0, pago: 0, itens: 0, items: [] };
     const value = (item.unitValue ?? 0) * item.quantity;
