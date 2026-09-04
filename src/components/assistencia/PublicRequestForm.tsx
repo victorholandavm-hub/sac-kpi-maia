@@ -229,7 +229,7 @@ export function PublicRequestForm({
   const [addressNumber, setAddressNumber] = useState("");
   const [isApartment, setIsApartment] = useState(false);
   const [addressComplement, setAddressComplement] = useState("");
-  const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+  const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "found" | "found_partial" | "not_found">("idle");
 
   // Busca o cliente pelo código pra autopreencher nome/CPF/telefone (dado
   // confiável) e sugerir endereço (editável -- o cliente pode ter mudado).
@@ -257,7 +257,12 @@ export function PublicRequestForm({
             setAddressComplement(match.addressComplement);
           }
           if (match.addressNeighborhood) setClientNeighborhood(match.addressNeighborhood);
-          setLookupStatus("found");
+          // Achado do Victor 04/09/2026 -- mesmo comentário em
+          // SacCreateRequestForm.tsx/NovaEntregaAssistenciaForm.tsx: a
+          // maioria dos códigos só bate no fallback totvs_orders (sem
+          // telefone/endereço), e "Cliente encontrado" genérico escondia
+          // isso.
+          setLookupStatus(match.phone1 || match.addressStreet ? "found" : "found_partial");
         })
         .catch(() => setLookupStatus("not_found"));
     }, 400);
@@ -460,6 +465,10 @@ export function PublicRequestForm({
           ) : lookupStatus === "found" ? (
             <span className="text-xs" style={{ color: "var(--status-good)" }}>
               Cliente encontrado — confira os dados abaixo.
+            </span>
+          ) : lookupStatus === "found_partial" ? (
+            <span className="text-xs" style={{ color: "var(--status-warning)" }}>
+              Cliente encontrado, mas sem telefone/endereço no cadastro — preencha esses campos à mão.
             </span>
           ) : lookupStatus === "not_found" ? (
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>

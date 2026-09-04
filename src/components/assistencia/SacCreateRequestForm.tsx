@@ -205,7 +205,7 @@ export function SacCreateRequestForm({
   const [addressNumber, setAddressNumber] = useState("");
   const [isApartment, setIsApartment] = useState(false);
   const [addressComplement, setAddressComplement] = useState("");
-  const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+  const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "found_partial" | "not_found">("idle");
 
   // Rota/data já na criação -- pedido do Victor 17/08/2026: antes só dava
   // pra agendar depois, editando o chamado (ScheduleField). Mesma lógica de
@@ -302,7 +302,16 @@ export function SacCreateRequestForm({
           setAddressComplement(match.addressComplement);
         }
         if (match.addressNeighborhood) setClientNeighborhood(match.addressNeighborhood);
-        setClientLookupStatus("found");
+        // Achado do Victor 04/09/2026 ("ainda nao está puxando automatico
+        // os dados do cliente quando coloco o codigo dele"): pra maioria
+        // dos códigos (24.584 já compraram, só 3.760 têm cadastro completo
+        // sincronizado -- ver findTotvsClientByCode), o match só vem do
+        // fallback totvs_orders, que não tem telefone/endereço nenhum. A
+        // mensagem "Cliente encontrado" genérica escondia isso -- parecia
+        // sucesso mas telefone/endereço/bairro (todos obrigatórios)
+        // ficavam em branco sem explicação nenhuma. Agora avisa quando
+        // faltou algo pra completar à mão.
+        setClientLookupStatus(match.phone1 || match.addressStreet ? "found" : "found_partial");
       })
       .catch(() => setClientLookupStatus("not_found"));
   }
@@ -387,6 +396,10 @@ export function SacCreateRequestForm({
           ) : clientLookupStatus === "found" ? (
             <span className="text-xs" style={{ color: "var(--status-good)" }}>
               Cliente encontrado — confira os dados abaixo.
+            </span>
+          ) : clientLookupStatus === "found_partial" ? (
+            <span className="text-xs" style={{ color: "var(--status-warning)" }}>
+              Cliente encontrado, mas sem telefone/endereço no cadastro — preencha esses campos à mão.
             </span>
           ) : clientLookupStatus === "not_found" ? (
             <span className="text-xs flex items-center gap-1.5 flex-wrap" style={{ color: "var(--text-muted)" }}>
