@@ -3,6 +3,7 @@ import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/li
 import {
   listRequests,
   listRequestsScheduledOn,
+  listScheduledRequests,
   listStores,
   isRequestStatus,
   isMostruarioRequest,
@@ -11,7 +12,7 @@ import {
 } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
 import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
-import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES } from "@/lib/assistenciaLabels";
+import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
@@ -88,6 +89,7 @@ function buildHref(params: {
   urgente?: string;
   semrota?: string;
   semmontador?: string;
+  atrasado?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -103,6 +105,7 @@ function buildHref(params: {
   if (params.city) sp.set("city", params.city);
   if (params.semmontador) sp.set("semmontador", params.semmontador);
   if (params.urgente) sp.set("urgente", params.urgente);
+  if (params.atrasado) sp.set("atrasado", params.atrasado);
   if (params.semrota) sp.set("semrota", params.semrota);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
@@ -168,11 +171,13 @@ export default async function AssistenciaQueuePage({
     urgente?: string;
     semrota?: string;
     semmontador?: string;
+    atrasado?: string;
   }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo, city, urgente, semrota, semmontador } = await searchParams;
+  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo, city, urgente, semrota, semmontador, atrasado } =
+    await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
@@ -199,6 +204,17 @@ export default async function AssistenciaQueuePage({
   // de filterAlvo/filterCity: não é uma coluna/status real, filtro em
   // JS depois da busca (ver aplicação abaixo).
   const filterSemMontador = !showPecas && semmontador === "1";
+  // "Atrasado" -- pedido do Victor 04/09/2026: "na aba visitas, precisa que
+  // apareça do mesmo jeito que aparece na aba de agenda: 'você tem 12
+  // visitas pendentes atrasadas'". Mesmo conceito de atraso da Agenda
+  // (scheduled_date/approved_deadline no passado, ainda aberta -- ver
+  // listScheduledRequests), só que aqui é o inverso de quem aparece: todos
+  // os montadores MENOS o Manoel (a agenda dele já tem o alerta dela
+  // própria, ver agenda/page.tsx). Clicar no banner troca pra essa visão
+  // (ver substituição de `requests` abaixo); qualquer outro clique na tela
+  // (pill de status, filtro de loja etc.) sai dela normalmente, já que
+  // nenhum desses outros links carrega `atrasado` adiante.
+  const filterAtrasado = !showPecas && atrasado === "1";
   // Filtro por cidade (ver CITY_FILTERS) -- só existe dentro da aba
   // Entregas, mesmo padrão das outras. Visitas não usa esse filtro --
   // Campina Grande não tem rota de visita técnica (montador), só de
@@ -237,33 +253,41 @@ export default async function AssistenciaQueuePage({
   // esses tipos.
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const today = new Date().toISOString().slice(0, 10);
-  const [{ items: rawRequests, total: rawTotal }, stores, assemblers, drivers, rotaOverview, todayRequestsFull] = await Promise.all([
-    listRequests({
-      status: filterStatus,
-      q,
-      storeId: store,
-      assemblerName: effectiveAssembler,
-      types,
-      requestedByNames: filterRequestedByNames,
-      dateFrom,
-      dateTo,
-      // Entregas filtra De/Até por data AGENDADA, não de criação -- pedido
-      // do Victor 03/09/2026 (ver dateField, serviceRequests.ts). Visitas
-      // continua em created_at, sem mudança.
-      dateField: showPecas ? "scheduled_date" : undefined,
-      excludeOwnAssemblerStoreIds,
-      allPages: true,
-    }),
-    listStores(),
-    listAssemblers(),
-    showPecas ? listDrivers() : Promise.resolve([]),
-    showPecas ? getRotaWeekOverview(startOfRotaWeek(today), 14) : Promise.resolve([]),
-    // Board "Hoje" (EntregasKanbanHoje, ver todayGroups abaixo) busca à
-    // parte, sem paginação -- ver listRequestsScheduledOn.
-    showPecas
-      ? listRequestsScheduledOn(today, { storeId: store, types, status: filterStatus, requestedByNames: filterRequestedByNames })
-      : Promise.resolve([]),
-  ]);
+  const [{ items: rawRequests, total: rawTotal }, stores, assemblers, drivers, rotaOverview, todayRequestsFull, visitasAtrasadasRaw] =
+    await Promise.all([
+      listRequests({
+        status: filterStatus,
+        q,
+        storeId: store,
+        assemblerName: effectiveAssembler,
+        types,
+        requestedByNames: filterRequestedByNames,
+        dateFrom,
+        dateTo,
+        // Entregas filtra De/Até por data AGENDADA, não de criação -- pedido
+        // do Victor 03/09/2026 (ver dateField, serviceRequests.ts). Visitas
+        // continua em created_at, sem mudança.
+        dateField: showPecas ? "scheduled_date" : undefined,
+        excludeOwnAssemblerStoreIds,
+        allPages: true,
+      }),
+      listStores(),
+      listAssemblers(),
+      showPecas ? listDrivers() : Promise.resolve([]),
+      showPecas ? getRotaWeekOverview(startOfRotaWeek(today), 14) : Promise.resolve([]),
+      // Board "Hoje" (EntregasKanbanHoje, ver todayGroups abaixo) busca à
+      // parte, sem paginação -- ver listRequestsScheduledOn.
+      showPecas
+        ? listRequestsScheduledOn(today, { storeId: store, types, status: filterStatus, requestedByNames: filterRequestedByNames })
+        : Promise.resolve([]),
+      // Banner "você tem X visitas pendentes atrasadas" (ver filterAtrasado
+      // acima) -- mesma busca que a Agenda usa pro alerta dela
+      // (listScheduledRequests({range:"atrasado"}), já cobre
+      // VISITA_REQUEST_TYPES inteiro). Busca própria, sem limite de
+      // página/filtro de status escolhido -- sempre reflete o total de
+      // verdade, igual o overdueCount da Agenda.
+      !showPecas ? listScheduledRequests({ range: "atrasado" }) : Promise.resolve([]),
+    ]);
   // Programado/Não programado não são status de verdade no banco (ver
   // ENTREGA_FILTERS acima) -- `.eq("status", "aberta")` já rolou no
   // servidor, esse filtro extra em JS separa quem já tem data+rota de
@@ -280,6 +304,15 @@ export default async function AssistenciaQueuePage({
   // NÃO depende mais dessa paginação por created_at -- ver
   // listRequestsScheduledOn/todayRequestsFull acima.
   let requests = filterSched === undefined ? rawRequests : rawRequests.filter((r) => isDeliveryScheduled(r.scheduledDate, r.rota) === filterSched);
+  // Manoel saiu da aba Visitas -- pedido do Victor 04/09/2026: "todos os
+  // montadores dentro de visitas e só manoel em agenda". As visitas dele
+  // (vistoria/troca_peca, ver MANOEL_ONLY_TYPES) ficam exclusivas da
+  // Agenda agora (ver agenda/page.tsx) -- incondicional, não depende de
+  // nenhum filtro escolhido. Sem efeito na aba Entregas (Manoel nunca tem
+  // chamado de entrega/motorista).
+  if (!showPecas) {
+    requests = requests.filter((r) => r.assemblerName !== MANOEL_ONLY_ASSEMBLER);
+  }
   // Mesmo raciocínio do filterSched acima -- "mostruário" não é uma coluna
   // no banco, é uma heurística sobre order_code/client_name (ver
   // isMostruarioRequest), então também só dá pra aplicar em JS depois da
@@ -307,6 +340,17 @@ export default async function AssistenciaQueuePage({
   const overdueCount = showPecas ? filterOverdueOpen(rawRequests).length : 0;
   // Mesmo raciocínio do overdueCount acima, pro pill "sem rota".
   const semRotaCount = showPecas ? filterSemRotaOpen(rawRequests).length : 0;
+  // Banner "você tem X visitas pendentes atrasadas" (ver filterAtrasado) --
+  // exclui o Manoel do total, mesma exclusão de `requests` acima (a
+  // Agenda dele já conta as próprias). Respeita loja/montador já
+  // escolhidos (mesmo padrão do overdueCount da Agenda), pra não mostrar
+  // um número maior do que o que a tela já está filtrando.
+  const visitasAtrasadasCount = !showPecas
+    ? visitasAtrasadasRaw
+        .filter((r) => r.assemblerName !== MANOEL_ONLY_ASSEMBLER)
+        .filter((r) => !store || r.storeId === store)
+        .filter((r) => !effectiveAssembler || r.assemblerName === effectiveAssembler).length
+    : 0;
   // Clicar no pill força só as atrasadas (ou só as sem rota) em aberto --
   // ignora status/programado escolhidos antes (não fazem sentido juntos:
   // os dois já implicam "aberta"). Mutuamente exclusivos -- os próprios
@@ -315,8 +359,25 @@ export default async function AssistenciaQueuePage({
     requests = filterOverdueOpen(rawRequests);
   } else if (filterSemRota) {
     requests = filterSemRotaOpen(rawRequests);
+  } else if (filterAtrasado) {
+    // Substitui a lista inteira pelas atrasadas (mesmo critério da
+    // Agenda -- scheduled_date/approved_deadline no passado, ainda aberta),
+    // igual o clique no banner da Agenda faz com `range=atrasado` lá.
+    // Mesmos filtros de loja/montador de visitasAtrasadasCount acima.
+    requests = visitasAtrasadasRaw
+      .filter((r) => r.assemblerName !== MANOEL_ONLY_ASSEMBLER)
+      .filter((r) => !store || r.storeId === store)
+      .filter((r) => !effectiveAssembler || r.assemblerName === effectiveAssembler);
   }
-  const postFiltered = filterSched !== undefined || filterAlvo !== undefined || filterCity !== undefined || filterUrgente || filterSemRota || filterSemMontador;
+  const postFiltered =
+    filterSched !== undefined ||
+    filterAlvo !== undefined ||
+    filterCity !== undefined ||
+    filterUrgente ||
+    filterSemRota ||
+    filterSemMontador ||
+    filterAtrasado ||
+    !showPecas;
   const total = postFiltered ? requests.length : rawTotal;
 
   // "Sem rota" primeiro, não perdido no meio do feed por data -- ver
@@ -431,7 +492,7 @@ export default async function AssistenciaQueuePage({
         description={
           showPecas
             ? "Rotas de motorista -- troca, entrega e recolhimento de produto, envio e recolhimento de peça."
-            : "Chamados de montagem, desmontagem, vistoria e troca de peça -- triagem de clientes e mostruário."
+            : "Chamados de montagem, desmontagem, vistoria e troca de peça -- triagem de clientes e mostruário. Não inclui o Manoel -- as visitas dele ficam na Agenda."
         }
         cta={
           <div className="flex items-center gap-2">
@@ -497,6 +558,31 @@ export default async function AssistenciaQueuePage({
           Agenda
         </Link>
       </div>
+
+      {/* Alerta de atrasadas -- pedido do Victor 04/09/2026: "na aba
+          visistas, precisa que apareça do mesmo jeito que aparece na aba
+          de agenda: 'você tem 12 visitas pendentes atrasadas'". Mesmo
+          componente/estilo do alerta da Agenda (ver agenda/page.tsx), só
+          que aqui é o inverso de quem conta: todos os montadores MENOS o
+          Manoel (ver visitasAtrasadasCount acima). Some quando já está na
+          própria visão de atrasadas (mesmo padrão de filterRange !==
+          "atrasado" na Agenda). */}
+      {!showPecas && visitasAtrasadasCount > 0 && !filterAtrasado ? (
+        <Link
+          href={buildHref({ q, store, assembler: effectiveAssembler, alvo: filterAlvo, atrasado: "1" })}
+          className="flex items-center gap-2 rounded-xl border px-4 py-3 font-semibold text-sm text-gray-800 dark:text-gray-100 transition-colors duration-150 hover:bg-white dark:hover:bg-gray-700"
+          style={{ background: "color-mix(in srgb, var(--status-critical) 8%, var(--surface-1))", borderColor: "var(--status-critical)" }}
+        >
+          <span className="text-lg" aria-hidden="true">
+            ⚠️
+          </span>
+          Você tem {visitasAtrasadasCount} visita{visitasAtrasadasCount === 1 ? "" : "s"} pendente{visitasAtrasadasCount === 1 ? "" : "s"} atrasada
+          {visitasAtrasadasCount === 1 ? "" : "s"}.
+          <span className="font-semibold shrink-0 ml-auto" style={{ color: "var(--status-critical)" }}>
+            Clique para tratar →
+          </span>
+        </Link>
+      ) : null}
 
       {/* Todos os filtros agrupados num retângulo só -- pedido do Victor
           03/09/2026: "agrupe esses filtros e coloque só uma linha como
@@ -676,8 +762,16 @@ export default async function AssistenciaQueuePage({
         ) : null}
         {/* Filtro de montador não existe na aba de entrega de peça -- lá é
             motorista, não montador (ver Motorista/Montador em
-            AssistenciaQueueGroup.tsx). */}
-        {showPecas ? null : <FilterSelect name="assembler" placeholder="Todos os montadores" options={assemblers} />}
+            AssistenciaQueueGroup.tsx). Manoel saiu da lista 04/09/2026 --
+            a Visitas dele mora só na Agenda agora (ver filtro incondicional
+            de `requests` acima). */}
+        {showPecas ? null : (
+          <FilterSelect
+            name="assembler"
+            placeholder="Todos os montadores"
+            options={assemblers.filter((a) => a !== MANOEL_ONLY_ASSEMBLER)}
+          />
+        )}
       </div>
 
       {/* Atalhos de período -- pedido do Victor 03/09/2026 (print de
