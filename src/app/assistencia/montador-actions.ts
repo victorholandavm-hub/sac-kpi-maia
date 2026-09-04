@@ -150,7 +150,7 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, deadline_status, type, ticket_number")
+    .select("assembler_name, status, store_id, deadline_status, type, ticket_number, client_name, requested_by_name, requester:profiles!requested_by(full_name)")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -231,7 +231,14 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
     link: `/assistencia/${requestId}`,
   });
 
-  await notifyTelegramStatusChange({ ticketNumber: request.ticket_number, type: request.type, newStatus: nextStatus });
+  await notifyTelegramStatusChange({
+    ticketNumber: request.ticket_number,
+    type: request.type,
+    newStatus: nextStatus,
+    clientName: request.client_name,
+    requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
+    assemblerName,
+  });
 
   revalidatePath("/assistencia/montador");
   revalidatePath(`/assistencia/montador/${requestId}`);
@@ -252,7 +259,7 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, ticket_number, type")
+    .select("assembler_name, status, store_id, ticket_number, type, client_name, requested_by_name, requester:profiles!requested_by(full_name)")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -285,7 +292,14 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
   const link = `/assistencia/${requestId}`;
   await notifyLoja(request.store_id, { type: "status_changed", title: "Solicitação: Remarcar", message: note, link });
   await notifyAssistencia({ type: "status_changed", title: "Precisa remarcar", message: `Chamado #${request.ticket_number} — ${note}`, link });
-  await notifyTelegramStatusChange({ ticketNumber: request.ticket_number, type: request.type, newStatus: "remarcar" });
+  await notifyTelegramStatusChange({
+    ticketNumber: request.ticket_number,
+    type: request.type,
+    newStatus: "remarcar",
+    clientName: request.client_name,
+    requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
+    assemblerName,
+  });
 
   revalidatePath("/assistencia/montador");
   revalidatePath(`/assistencia/montador/${requestId}`);
@@ -320,7 +334,7 @@ export async function montadorCompletePartially(requestId: string, completedItem
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, ticket_number, type")
+    .select("assembler_name, status, store_id, ticket_number, type, client_name, requested_by_name, requester:profiles!requested_by(full_name)")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -395,7 +409,14 @@ export async function montadorCompletePartially(requestId: string, completedItem
   if (!needsApproval) {
     await notifyAssistencia({ type: "status_changed", title: "Precisa remarcar", message: `Chamado #${request.ticket_number} — ${eventNote}`, link });
   }
-  await notifyTelegramStatusChange({ ticketNumber: request.ticket_number, type: request.type, newStatus: nextStatus });
+  await notifyTelegramStatusChange({
+    ticketNumber: request.ticket_number,
+    type: request.type,
+    newStatus: nextStatus,
+    clientName: request.client_name,
+    requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
+    assemblerName,
+  });
 
   revalidatePath("/assistencia/montador");
   revalidatePath(`/assistencia/montador/${requestId}`);

@@ -176,7 +176,9 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("status, store_id, ticket_number, type")
+    .select(
+      "status, store_id, ticket_number, type, client_name, assembler_name, requested_by_name, requester:profiles!requested_by(full_name)"
+    )
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request) throw new Error("Solicitação não encontrada.");
@@ -217,7 +219,14 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
       note: `${actorLabel} aprovou a conclusão.${trimmedNote ? ` Observação: ${trimmedNote}` : ""}`,
     });
 
-    await notifyTelegramStatusChange({ ticketNumber: request.ticket_number, type: request.type, newStatus: "concluida" });
+    await notifyTelegramStatusChange({
+      ticketNumber: request.ticket_number,
+      type: request.type,
+      newStatus: "concluida",
+      clientName: request.client_name,
+      requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
+      assemblerName: request.assembler_name,
+    });
 
     revalidatePath("/assistencia/loja");
     revalidatePath("/assistencia/fila");
@@ -268,7 +277,14 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
     message: `Chamado #${request.ticket_number} — ${eventNote}`,
     link,
   });
-  await notifyTelegramStatusChange({ ticketNumber: request.ticket_number, type: request.type, newStatus: "remarcar" });
+  await notifyTelegramStatusChange({
+    ticketNumber: request.ticket_number,
+    type: request.type,
+    newStatus: "remarcar",
+    clientName: request.client_name,
+    requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
+    assemblerName: request.assembler_name,
+  });
 
   revalidatePath("/assistencia/loja");
   revalidatePath("/assistencia/fila");

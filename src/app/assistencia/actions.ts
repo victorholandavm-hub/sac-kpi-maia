@@ -535,7 +535,7 @@ export async function createPublicRequest(_state: FormState, formData: FormData)
     });
   }
 
-  await notifyTelegramNewRequest({ ticketNumber: data.ticket_number, type, clientName, storeName: store.name });
+  await notifyTelegramNewRequest({ ticketNumber: data.ticket_number, type, clientName, storeName: store.name, requestedByName, assemblerName });
 
   redirect(`/assistencia/solicitar?enviado=1&chamado=${data.ticket_number}`);
 }
@@ -751,7 +751,9 @@ export async function cancelServiceRequestByGerente(requestId: string, note: str
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("status, store_id, type, ticket_number")
+    .select(
+      "status, store_id, type, ticket_number, client_name, requested_by_name, assembler_name, driver_name, requester:profiles!requested_by(full_name)"
+    )
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
@@ -788,7 +790,15 @@ export async function cancelServiceRequestByGerente(requestId: string, note: str
     link: `/assistencia/${requestId}`,
   });
 
-  await notifyTelegramStatusChange({ ticketNumber: current.ticket_number, type: current.type, newStatus: "cancelada" });
+  await notifyTelegramStatusChange({
+    ticketNumber: current.ticket_number,
+    type: current.type,
+    newStatus: "cancelada",
+    clientName: current.client_name,
+    requestedByName: current.requester?.[0]?.full_name ?? current.requested_by_name,
+    assemblerName: current.assembler_name,
+    driverName: current.driver_name,
+  });
 
   revalidatePath("/assistencia/loja");
 }
@@ -939,7 +949,9 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
-    .select("status, type, assembler_name, driver_name, store_id, deadline_status, ticket_number")
+    .select(
+      "status, type, assembler_name, driver_name, store_id, deadline_status, ticket_number, client_name, requested_by_name, requester:profiles!requested_by(full_name)"
+    )
     .eq("id", requestId)
     .single();
   if (fetchError || !current) throw new Error("Solicitação não encontrada.");
@@ -999,7 +1011,15 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
     link: `/assistencia/${requestId}`,
   });
 
-  await notifyTelegramStatusChange({ ticketNumber: current.ticket_number, type: current.type, newStatus });
+  await notifyTelegramStatusChange({
+    ticketNumber: current.ticket_number,
+    type: current.type,
+    newStatus,
+    clientName: current.client_name,
+    requestedByName: current.requester?.[0]?.full_name ?? current.requested_by_name,
+    assemblerName: current.assembler_name,
+    driverName: current.driver_name,
+  });
 
   revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
@@ -1195,7 +1215,13 @@ export async function createExchangeChild(
     link: `/assistencia/${childId}`,
   });
 
-  await notifyTelegramNewRequest({ ticketNumber: child.ticket_number, type: parent.type, clientName: parent.client_name });
+  await notifyTelegramNewRequest({
+    ticketNumber: child.ticket_number,
+    type: parent.type,
+    clientName: parent.client_name,
+    requestedByName: profile.fullName,
+    driverName: parent.driver_name,
+  });
 
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/sac");
@@ -2346,7 +2372,14 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     to_status: "aberta",
   });
 
-  await notifyTelegramNewRequest({ ticketNumber: data.ticket_number, type, clientName });
+  await notifyTelegramNewRequest({
+    ticketNumber: data.ticket_number,
+    type,
+    clientName,
+    requestedByName: profile.fullName,
+    assemblerName,
+    driverName: driverNameForError ?? driverNameForRota,
+  });
 
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/agenda");
@@ -2688,7 +2721,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     to_status: "aberta",
   });
 
-  await notifyTelegramNewRequest({ ticketNumber: data.ticket_number, type, clientName });
+  await notifyTelegramNewRequest({ ticketNumber: data.ticket_number, type, clientName, requestedByName: profile.fullName, driverName });
 
   revalidatePath("/assistencia/sac");
   redirect(`/assistencia/${data.id}`);

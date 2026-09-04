@@ -30,6 +30,38 @@ async function sendTelegramMessage(text: string): Promise<void> {
   }
 }
 
+// Achado do Victor 04/09/2026, testando o primeiro aviso: "preciso receber
+// com o nome do solicitante e o nome do cliente, e quando for montagem e
+// entrega, nome do montador e do motorista". Cada campo só entra na
+// mensagem quando o chamado de fato tem esse dado (ex.: motorista raramente
+// já está definido na hora da CRIAÇÃO de uma entrega, só depois que a rota
+// é atribuída) -- omitido em silêncio em vez de aparecer como "—" ou vazio.
+type RequestNotifyParams = {
+  ticketNumber: number;
+  type: string;
+  clientName?: string | null;
+  storeName?: string | null;
+  requestedByName?: string | null;
+  assemblerName?: string | null;
+  driverName?: string | null;
+};
+
+function requestNotifyLines(params: RequestNotifyParams): string[] {
+  const lines: string[] = [];
+  if (params.storeName) lines.push(`Loja: ${params.storeName}`);
+  if (params.clientName) lines.push(`Cliente: ${params.clientName}`);
+  if (params.requestedByName) lines.push(`Solicitado por: ${params.requestedByName}`);
+  // Montador só faz sentido pra montagem/desmontagem; motorista pro resto
+  // (entrega/envio/recolhimento) -- mesmo corte de sempre (ver
+  // DELIVERY_REQUEST_TYPES), pra não mostrar "Motorista: —" numa montagem.
+  if (params.type === "montagem" || params.type === "desmontagem") {
+    if (params.assemblerName) lines.push(`Montador: ${params.assemblerName}`);
+  } else if (params.driverName) {
+    lines.push(`Motorista: ${params.driverName}`);
+  }
+  return lines;
+}
+
 // Os dois grupos que o Victor pediu aviso na CRIAÇÃO: montagem/desmontagem
 // (ASSISTENCIA_MANAGED_TYPES, sem vistoria/troca de peça -- não fizeram
 // parte do pedido) e "chamados de entrega/envio/recolhimento"
@@ -37,26 +69,32 @@ async function sendTelegramMessage(text: string): Promise<void> {
 // notificação de assistencia" no pedido original, esclarecido com o
 // Victor via pergunta. notificação_externa fica de fora (não é nem um nem
 // outro grupo).
-export function notifyTelegramNewRequest(params: {
-  ticketNumber: number;
-  type: string;
-  clientName?: string | null;
-  storeName?: string | null;
-}): Promise<void> {
+export function notifyTelegramNewRequest(params: RequestNotifyParams): Promise<void> {
   const isMontagemDesmontagem = params.type === "montagem" || params.type === "desmontagem";
   const isDelivery = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(params.type);
   if (!isMontagemDesmontagem && !isDelivery) return Promise.resolve();
 
   const emoji = isMontagemDesmontagem ? "🪑" : "🚚";
   const label = REQUEST_TYPE_LABELS[params.type] ?? params.type;
-  const parts = [`${emoji} Nova solicitação: ${label}`, `#${params.ticketNumber}`];
-  if (params.storeName) parts.push(params.storeName);
-  if (params.clientName) parts.push(params.clientName);
-  return sendTelegramMessage(parts.join(" — "));
+  const lines = [`${emoji} Nova solicitação: ${label}`, `#${params.ticketNumber}`, ...requestNotifyLines(params)];
+  return sendTelegramMessage(lines.join("\n"));
 }
 
-export function notifyTelegramNewEncomenda(params: { pedidoNumber: number; storeName: string }): Promise<void> {
-  return sendTelegramMessage(`📦 Novo pedido de encomenda #${params.pedidoNumber} — ${params.storeName}`);
+export function notifyTelegramNewEncomenda(params: {
+  pedidoNumber: number;
+  storeName: string;
+  requestedByName: string;
+  fornecedorLabel: string;
+  products: string[];
+}): Promise<void> {
+  const lines = [
+    `📦 Novo pedido de encomenda #${params.pedidoNumber}`,
+    `Loja: ${params.storeName}`,
+    `Solicitado por: ${params.requestedByName}`,
+    `Fábrica/fornecedor: ${params.fornecedorLabel}`,
+    `Produto${params.products.length > 1 ? "s" : ""}: ${params.products.join(", ")}`,
+  ];
+  return sendTelegramMessage(lines.join("\n"));
 }
 
 // "Só status-chave" (pedido do Victor 04/09/2026, pra não virar ruído):
@@ -65,10 +103,11 @@ export function notifyTelegramNewEncomenda(params: { pedidoNumber: number; store
 // nada.
 const TELEGRAM_KEY_STATUSES = new Set(["concluida", "cancelada", "remarcar", "aguardando_aprovacao"]);
 
-export function notifyTelegramStatusChange(params: { ticketNumber: number; type: string; newStatus: string }): Promise<void> {
+export function notifyTelegramStatusChange(params: RequestNotifyParams & { newStatus: string }): Promise<void> {
   if (!TELEGRAM_KEY_STATUSES.has(params.newStatus)) return Promise.resolve();
   const label = REQUEST_TYPE_LABELS[params.type] ?? params.type;
   const statusLabel = STATUS_LABELS[params.newStatus] ?? params.newStatus;
   const emoji = params.newStatus === "concluida" ? "✅" : params.newStatus === "cancelada" ? "❌" : params.newStatus === "remarcar" ? "🔁" : "⏳";
-  return sendTelegramMessage(`${emoji} #${params.ticketNumber} (${label}) → ${statusLabel}`);
+  const lines = [`${emoji} #${params.ticketNumber} (${label}) → ${statusLabel}`, ...requestNotifyLines(params)];
+  return sendTelegramMessage(lines.join("\n"));
 }
