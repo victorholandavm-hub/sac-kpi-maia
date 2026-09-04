@@ -7,6 +7,7 @@ import { listSuppliers } from "@/lib/partOrders";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { WithdrawStockMovementButton } from "@/components/assistencia/WithdrawStockMovementButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,7 @@ export default async function TecnicoEstoquePage({
           do Victor 31/08/2026) -- cabeçalho próprio desta tela, não o
           AssistenciaHeader compartilhado (evita mudar outras telas do
           sistema de assistência que não foram pedidas). */}
-      <div className="w-full flex flex-col min-w-0 bg-[#F9FAFB] min-h-screen">
+      <div className="w-full flex flex-col min-w-0 bg-[var(--background)] min-h-screen">
         <div className="w-full" style={{ background: "var(--brand-green)" }}>
           <div className="flex items-center justify-between gap-4 px-6 py-3 flex-wrap">
             <div className="flex items-center gap-3 min-w-0">
@@ -103,6 +104,10 @@ export default async function TecnicoEstoquePage({
             {/* Ações do cabeçalho como pílulas ghost (vidro fosco) --
                 Guia de Componentes Maia (Design System, 01/09/2026). */}
             <div className="flex items-center gap-1 text-sm shrink-0">
+              {/* Pedido do Victor 04/09/2026: "preciso de duas coisas na
+                  tela da equipe tecnica: modo dark" -- mesmo motivo/
+                  componente de tecnico/page.tsx, ver lá. */}
+              <ThemeToggle />
               <Link
                 href="/assistencia/tecnico"
                 className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white dark:hover:bg-gray-700/10 transition-colors duration-150"
