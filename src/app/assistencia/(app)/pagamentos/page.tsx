@@ -107,7 +107,7 @@ export default async function PagamentosPage({
             ) : null}
           </form>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="text-sm text-gray-500 dark:text-gray-400">
             Total: <strong>{formatBRL(grandTotal)}</strong> · Pago:{" "}
             <strong style={{ color: "var(--status-good)" }}>{formatBRL(paidTotal)}</strong> · Pendente:{" "}
