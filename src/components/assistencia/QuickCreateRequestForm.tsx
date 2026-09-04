@@ -174,7 +174,7 @@ export function QuickCreateRequestForm({
   const [addressNumber, setAddressNumber] = useState("");
   const [isApartment, setIsApartment] = useState(false);
   const [addressComplement, setAddressComplement] = useState("");
-  const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+  const [clientLookupStatus, setClientLookupStatus] = useState<"idle" | "loading" | "found" | "found_partial" | "not_found">("idle");
   // Só montagem/desmontagem envolve entrar num prédio de verdade -- ver
   // ADDRESS_NUMBER_REQUIRED_TYPES em serviceRequests.ts.
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
@@ -206,7 +206,12 @@ export function QuickCreateRequestForm({
           setIsApartment(true);
           setAddressComplement(match.addressComplement);
         }
-        setClientLookupStatus("found");
+        // Achado do Victor 04/09/2026 -- mesmo comentário em
+        // SacCreateRequestForm.tsx/NovaEntregaAssistenciaForm.tsx: a
+        // maioria dos códigos só bate no fallback totvs_orders (sem
+        // telefone/endereço), e "Cliente encontrado" genérico escondia
+        // isso.
+        setClientLookupStatus(match.phone1 || match.addressStreet ? "found" : "found_partial");
       })
       .catch(() => setClientLookupStatus("not_found"));
   }
@@ -364,6 +369,10 @@ export function QuickCreateRequestForm({
           ) : clientLookupStatus === "found" ? (
             <span className="text-xs" style={{ color: "var(--status-good)" }}>
               Cliente encontrado — confira os dados abaixo.
+            </span>
+          ) : clientLookupStatus === "found_partial" ? (
+            <span className="text-xs" style={{ color: "var(--status-warning)" }}>
+              Cliente encontrado, mas sem telefone/endereço no cadastro — preencha esses campos à mão.
             </span>
           ) : clientLookupStatus === "not_found" ? (
             <span className="text-xs flex items-center gap-1.5 flex-wrap" style={{ color: "var(--text-muted)" }}>
