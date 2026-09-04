@@ -3,6 +3,7 @@ import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPaymentItems, paymentStage, type PaymentItem } from "@/lib/payments";
 import { getMontagemReconciliation } from "@/lib/serviceRequests";
 import { MANOEL_ONLY_ASSEMBLER, STATUS_LABELS } from "@/lib/assistenciaLabels";
+import { MontagemDetalhadoExportButton } from "@/components/assistencia/MontagemDetalhadoExportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -231,9 +232,12 @@ export default async function RelatorioMontagemDetalhadoPage({
             Todo produto de toda montagem/desmontagem no período, um por um -- pra conferir o valor certinho. Manoel (equipe interna) fica separado embaixo.
           </p>
         </div>
-        <Link href={buildRelatoriosHref({ from: dateFrom, to: dateTo, alvo: filterAlvo })} className="text-sm underline whitespace-nowrap text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-          ← Voltar pros Relatórios
-        </Link>
+        <div className="flex items-center gap-3 flex-wrap">
+          <MontagemDetalhadoExportButton items={allItems} />
+          <Link href={buildRelatoriosHref({ from: dateFrom, to: dateTo, alvo: filterAlvo })} className="text-sm underline whitespace-nowrap text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+            ← Voltar pros Relatórios
+          </Link>
+        </div>
       </div>
 
       <form action="/assistencia/relatorios/montagem-detalhado" method="GET" className="flex items-center gap-2 flex-wrap">
