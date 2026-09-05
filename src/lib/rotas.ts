@@ -167,6 +167,48 @@ export async function setRotaWeekday(weekday: number, rota: Rota | null): Promis
   updateTag(ROTA_WEEKDAY_CONFIG_TAG);
 }
 
+// Feriados -- pedido do Victor 05/09/2026: "que eu tenha a opção de
+// colocar isso em qualquer dia, só eu, para um feriado". Diferente do
+// padrão semanal (rota_weekday_config, um valor por DIA DA SEMANA) --
+// aqui é uma DATA específica, independente de qual dia da semana ela
+// cai. Trava geral: quando a data está aqui, getAvailableRotasForDate
+// devolve vazio direto, ignorando o padrão da semana e qualquer
+// atribuição de motorista que já exista pra essa data (o feriado vale
+// mais que uma atribuição feita antes de virar feriado).
+export type RotaHoliday = { date: string; note: string | null };
+
+const ROTA_HOLIDAYS_TAG = "rota-holidays";
+
+export const listRotaHolidays = unstable_cache(
+  async (): Promise<RotaHoliday[]> => {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.from("rota_holidays").select("date, note").order("date");
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => ({ date: r.date as string, note: r.note as string | null }));
+  },
+  ["rota-holidays"],
+  { revalidate: 60, tags: [ROTA_HOLIDAYS_TAG] }
+);
+
+async function isRotaHoliday(dateStr: string): Promise<boolean> {
+  const holidays = await listRotaHolidays();
+  return holidays.some((h) => h.date === dateStr);
+}
+
+export async function addRotaHoliday(date: string, note: string | null): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("rota_holidays").upsert({ date, note: note?.trim() || null }, { onConflict: "date" });
+  if (error) throw new Error(error.message);
+  updateTag(ROTA_HOLIDAYS_TAG);
+}
+
+export async function removeRotaHoliday(date: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("rota_holidays").delete().eq("date", date);
+  if (error) throw new Error(error.message);
+  updateTag(ROTA_HOLIDAYS_TAG);
+}
+
 // Quem dirige cada rota numa data específica -- ver setRotaDriverAssignment
 // (actions.ts). Só existe UMA rota "principal" por dia (o carro de sempre,
 // pode trocar de região dia a dia) -- carro(s) a mais no mesmo dia entram
@@ -246,6 +288,10 @@ export type AvailableRota = { id: string; rota: Rota; driverName: string | null;
 // Victor 18/08/2026), então quem escolhe a rota já sabe/recebe o
 // motorista junto, sem digitar nada à parte.
 export async function getAvailableRotasForDate(dateStr: string): Promise<AvailableRota[]> {
+  // Feriado trava geral -- nem olha pro padrão da semana nem pra
+  // atribuição de motorista que já exista (ver addRotaHoliday acima).
+  if (await isRotaHoliday(dateStr)) return [];
+
   const [config, assignments] = await Promise.all([getRotaWeekdayConfig(), getRotaDriverAssignments(dateStr)]);
 
   const entries: AvailableRota[] = [];
@@ -295,13 +341,19 @@ export type RotaDayOverview = {
   // dia específico (exceção), sem mexer no padrão da semana toda.
   expectedRota: Rota | null;
   assignments: RotaDriverAssignments;
+  // Feriado marcado pelo admin (ver addRotaHoliday) -- quando true, o
+  // painel "Motorista do dia" mostra "Feriado" em vez de "Sem rota"
+  // genérico, e getAvailableRotasForDate já bloqueou agendamento nessa
+  // data (mesma fonte, ver lá).
+  isHoliday: boolean;
+  holidayNote: string | null;
 };
 
 // Visão de várias datas seguidas (painel "Motorista do dia") -- uma query só
 // pro intervalo inteiro em vez de uma por dia. `days` normalmente é 14 (semana
 // atual + semana seguinte).
 export async function getRotaWeekOverview(fromDate: string, days: number): Promise<RotaDayOverview[]> {
-  const config = await getRotaWeekdayConfig();
+  const [config, holidays] = await Promise.all([getRotaWeekdayConfig(), listRotaHolidays()]);
   const admin = getSupabaseAdmin();
 
   const dates: string[] = [];
@@ -328,9 +380,18 @@ export async function getRotaWeekOverview(fromDate: string, days: number): Promi
     if (row.is_extra) bucket.extras.push(entry);
     else bucket.primary = entry;
   }
+  const holidayByDate = new Map(holidays.map((h) => [h.date, h.note]));
 
   return dates.map((date) => {
     const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
-    return { date, weekday, expectedRota: config[weekday] ?? null, assignments: byDate.get(date)! };
+    const holidayNote = holidayByDate.get(date) ?? null;
+    return {
+      date,
+      weekday,
+      expectedRota: config[weekday] ?? null,
+      assignments: byDate.get(date)!,
+      isHoliday: holidayByDate.has(date),
+      holidayNote,
+    };
   });
 }
