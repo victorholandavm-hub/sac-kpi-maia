@@ -7,6 +7,13 @@ import {
   removeRotaExtra as assistenciaRemoveRotaExtra,
   getRotaDriverAssignmentsAction as assistenciaGetRotaDriverAssignments,
 } from "@/app/assistencia/actions";
+// Chamado direto (não via prop `actions`) porque só quem entra com
+// `isAdmin` chega a mostrar o botão que dispara isso -- o próprio server
+// action confere `requireRole(profile, "admin")` de novo por baixo dos
+// panos (ver admin-actions.ts), então não tem problema Everton/Samuel
+// (PIN, sem Supabase Auth) importarem esse módulo sem nunca conseguir
+// chamar de verdade.
+import { addRotaHoliday, removeRotaHoliday } from "@/app/assistencia/admin-actions";
 import { useQuickAction } from "./useQuickAction";
 import {
   CG_ROTAS,
@@ -95,6 +102,7 @@ export function RotaMotoristaDoDia({
   compact,
   defaultDriver,
   buttonOnly,
+  isAdmin,
 }: {
   today: string;
   initialOverview: RotaDayOverview[];
@@ -129,6 +137,12 @@ export function RotaMotoristaDoDia({
   // existe no modo não-compact (Everton/Samuel continuam com a barra
   // recolhível de sempre).
   buttonOnly?: boolean;
+  // Só admin (getProfile) vê a opção de marcar/liberar feriado direto do
+  // lápis de edição -- pedido do Victor 05/09/2026: "só para mim". Everton/
+  // Samuel (PIN, motorista/page.tsx) nunca passam essa prop, então ficam
+  // sempre com `undefined` aqui (falsy) -- nenhum código a mais precisou
+  // saber "quem é" além de passar true/false na hora de renderizar.
+  isAdmin?: boolean;
 }) {
   const [overview, setOverview] = useState<RotaDayOverview[]>(initialOverview);
   // Recolhido por padrão, só uma fileira de dias -- achado do Victor
@@ -176,7 +190,7 @@ export function RotaMotoristaDoDia({
     // justamente esse modo compact que precisa funcionar bem estreito.
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       {sortedOverview.map((day) => (
-        <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} defaultDriver={defaultDriver} compact />
+        <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} defaultDriver={defaultDriver} isAdmin={isAdmin} compact />
       ))}
     </div>
   ) : (
@@ -191,7 +205,7 @@ export function RotaMotoristaDoDia({
           sentido sincronizado a uma grade de 7 colunas fixa). */}
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))" }}>
         {visibleDays.map((day) => (
-          <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} defaultDriver={defaultDriver} />
+          <RotaDayCell key={day.date} day={day} today={today} drivers={drivers} onChange={updateDay} actions={actions} defaultDriver={defaultDriver} isAdmin={isAdmin} />
         ))}
       </div>
 
@@ -325,6 +339,7 @@ function RotaDayCell({
   actions,
   compact,
   defaultDriver,
+  isAdmin,
 }: {
   day: RotaDayOverview;
   today: string;
@@ -333,6 +348,7 @@ function RotaDayCell({
   actions: RotaActions;
   compact?: boolean;
   defaultDriver?: string;
+  isAdmin?: boolean;
 }) {
   const { pending, run, showToast } = useQuickAction();
   const savedRota = day.assignments.primary?.rota ?? day.expectedRota;
@@ -341,7 +357,12 @@ function RotaDayCell({
   const [rotaEditOpen, setRotaEditOpen] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
   const [rotaValue, setRotaValue] = useState<Rota | "">(savedRota ?? "");
-  const [driverValue, setDriverValue] = useState(savedDriver || defaultDriver || "");
+  // Motorista padrão (Junior) só faz sentido preencher quando EXISTE rota
+  // pra esse dia -- achado do Victor 05/09/2026 (print): domingo mostrava
+  // "Sem rota" no selo mas "Junior" no nome do motorista logo abaixo, como
+  // se tivesse alguém escalado. `savedRota` cobre tanto atribuição real
+  // quanto o padrão semanal (expectedRota) -- domingo tem os dois nulos.
+  const [driverValue, setDriverValue] = useState(savedDriver || (savedRota ? defaultDriver : "") || "");
   const [extraDriver, setExtraDriver] = useState("");
   // Motorista de uma das 2 rotas fixas de Campina Grande -- qual delas
   // está sendo editada agora (null = nenhuma). Pedido do Victor
@@ -395,6 +416,25 @@ function RotaDayCell({
         "success"
       );
     });
+  }
+
+  // Marcar/liberar feriado direto do lápis -- pedido do Victor 05/09/2026:
+  // "quando eu clicar no lápis para editar, eu tenha a opção de 'colocar
+  // dia como indisponivel'". Só admin vê o botão (isAdmin), mas o server
+  // action confere o papel de novo -- defesa em profundidade, não confia só
+  // na UI escondida. Sem nota (a nota só existe hoje no fluxo de
+  // /assistencia/admin, RotaHolidaysManager) -- aqui é um toggle rápido.
+  function toggleHoliday() {
+    const wasHoliday = day.isHoliday;
+    run(async () => {
+      if (wasHoliday) {
+        await removeRotaHoliday(day.date);
+      } else {
+        await addRotaHoliday(day.date, "");
+      }
+      onChange({ ...day, isHoliday: !wasHoliday, holidayNote: null });
+      setRotaEditOpen(false);
+    }, wasHoliday ? `${weekdayLabel} ${dateLabel} liberado pra rotas.` : `${weekdayLabel} ${dateLabel} marcado como indisponível.`);
   }
 
   // Rota extra genérica de João Pessoa -- pedido do Victor 24/08/2026:
@@ -529,8 +569,14 @@ function RotaDayCell({
         // Victor 19/08/2026 ("cor um pouco mais forte na rota do dia"),
         // var(--surface-2) sozinho era sutil demais pra bater o olho.
         border: isToday ? `2px solid ${mutedBrandGreen}` : "1px solid var(--border)",
-        background: isToday ? `color-mix(in srgb, ${mutedBrandGreen} 8%, var(--surface-1))` : "var(--surface-1)",
-        opacity: isPast ? 0.3 : 1,
+        // Feriado usa o cinza de --surface-2 (em vez do fundo normal) pra
+        // ficar visualmente "travado" mesmo em dias de hoje/futuro que
+        // não ficariam apagados por `isPast` -- pedido do Victor
+        // 05/09/2026: "o dia fica travado e mais apagado". `isPast`
+        // continua tendo prioridade visual (dia passado É passado,
+        // feriado ou não).
+        background: day.isHoliday && !isPast ? "var(--surface-2)" : isToday ? `color-mix(in srgb, ${mutedBrandGreen} 8%, var(--surface-1))` : "var(--surface-1)",
+        opacity: isPast ? 0.3 : day.isHoliday ? 0.6 : 1,
       }}
     >
       {/* Dia da semana sempre visível na própria célula -- antes só
@@ -549,7 +595,7 @@ function RotaDayCell({
           conseguiu agendar visita nesse dia. */}
       {day.isHoliday ? (
         <span className="text-xs font-semibold" style={{ color: "var(--status-warning)" }}>
-          🎉 Feriado{day.holidayNote ? ` — ${day.holidayNote}` : ""} (sem rota disponível pra agendar)
+          🔒 Feriado{day.holidayNote ? ` — ${day.holidayNote}` : ""} (dia indisponível pra novas rotas)
         </span>
       ) : null}
 
@@ -578,18 +624,37 @@ function RotaDayCell({
             <span className={cityLabelClass} style={{ color: "var(--text-secondary)" }}>
               João Pessoa
             </span>
+            {/* Não-admin não tem o que fazer no lápis de um dia já travado
+                -- só admin (isAdmin) pode liberar de volta (ver bloco
+                abaixo), então o botão nem abre pra mais ninguém. */}
             <button
               type="button"
               onClick={rotaEditOpen ? cancelRotaEdit : () => setRotaEditOpen(true)}
               aria-label={rotaEditOpen ? "Cancelar edição da rota" : "Editar rota do dia"}
               className={editButtonClass}
               style={neutralButtonStyle}
+              disabled={day.isHoliday && !isAdmin}
             >
               {rotaEditOpen ? "✕" : "✏️"}
             </button>
           </div>
 
-          {rotaEditOpen ? (
+          {rotaEditOpen && day.isHoliday ? (
+            // Dia travado -- pedido do Victor 05/09/2026: só a opção de
+            // liberar aparece aqui, editar rota/motorista de um dia
+            // indisponível não faz sentido (getAvailableRotasForDate já
+            // bloqueia o agendamento de verdade pra essa data).
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                Esse dia está marcado como indisponível{day.holidayNote ? ` (${day.holidayNote})` : ""}.
+              </p>
+              {isAdmin ? (
+                <button type="button" disabled={pending} onClick={toggleHoliday} className={saveButtonClass} style={neutralButtonStyle}>
+                  Liberar dia
+                </button>
+              ) : null}
+            </div>
+          ) : rotaEditOpen ? (
             <div className="flex flex-col gap-1">
               <select
                 value={rotaValue}
@@ -612,6 +677,15 @@ function RotaDayCell({
               {dirty ? (
                 <button type="button" disabled={pending} onClick={save} className={saveButtonClass} style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
                   Salvar
+                </button>
+              ) : null}
+              {/* Atalho pra marcar o dia como indisponível -- pedido do
+                  Victor 05/09/2026: "quando eu clicar no lápis para editar,
+                  eu tenha a opção de 'colocar dia como indisponivel'". Só
+                  admin (isAdmin). */}
+              {isAdmin ? (
+                <button type="button" disabled={pending} onClick={toggleHoliday} className="text-xs underline self-start mt-0.5" style={{ color: "var(--status-critical)" }}>
+                  Colocar dia como indisponível
                 </button>
               ) : null}
             </div>
@@ -688,6 +762,10 @@ function RotaDayCell({
                 </button>
               </div>
             </div>
+          ) : day.isHoliday ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Indisponível
+            </span>
           ) : (
             <button type="button" onClick={() => setExtraOpen(true)} className={addExtraButtonClass} style={actionButtonStyle}>
               + rota extra
@@ -755,6 +833,14 @@ function RotaDayCell({
                       ✕
                     </button>
                   </div>
+                ) : day.isHoliday ? (
+                  // Feriado bloqueia Campina Grande junto com João Pessoa
+                  // (mesma trava de getAvailableRotasForDate) -- pedido do
+                  // Victor 05/09/2026, print mostrando os botões de CG
+                  // ainda ativos num dia marcado como indisponível.
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    Indisponível
+                  </span>
                 ) : (
                   <button
                     type="button"
