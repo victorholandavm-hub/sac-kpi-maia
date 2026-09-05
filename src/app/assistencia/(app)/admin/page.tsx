@@ -24,7 +24,8 @@ import { CdOperadorPinField } from "@/components/assistencia/CdOperadorPinField"
 import { FabricaOperadorPinField } from "@/components/assistencia/FabricaOperadorPinField";
 import { SacPinField } from "@/components/assistencia/SacPinField";
 import { RotaWeekdaySelect } from "@/components/assistencia/RotaWeekdaySelect";
-import { getRotaWeekdayConfig } from "@/lib/rotas";
+import { RotaHolidaysManager } from "@/components/assistencia/RotaHolidaysManager";
+import { getRotaWeekdayConfig, listRotaHolidays } from "@/lib/rotas";
 import { listLatestSyncRuns, type SyncJob } from "@/lib/syncRuns";
 
 const SYNC_JOB_LABELS: Record<SyncJob, string> = {
@@ -82,6 +83,7 @@ export default async function AdminPage() {
     fabricaOperadores,
     sacProfiles,
     rotaConfig,
+    rotaHolidays,
     syncRuns,
   ] = await Promise.all([
     listStores(),
@@ -96,6 +98,7 @@ export default async function AdminPage() {
     listFabricaOperadoresWithPinStatus(),
     listSacProfilesWithPinStatus(),
     getRotaWeekdayConfig(),
+    listRotaHolidays(),
     listLatestSyncRuns(),
   ]);
   const syncByJob = new Map(syncRuns.map((r) => [r.job, r]));
@@ -293,6 +296,16 @@ export default async function AdminPage() {
             </li>
           ))}
         </ul>
+      </AdminSection>
+
+      <AdminSection title="Feriados (sem rota)" count={rotaHolidays.length}>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Marque uma data específica (qualquer dia da semana) como sem rota -- pra um feriado, por
+          exemplo. Vale só pra essa data, sem mexer no padrão semanal acima; agendar uma visita
+          nesse dia mostra &quot;nenhuma rota disponível&quot;, do mesmo jeito que já acontece aos
+          domingos.
+        </p>
+        <RotaHolidaysManager holidays={rotaHolidays} />
       </AdminSection>
     </div>
   );

@@ -541,6 +541,18 @@ function RotaDayCell({
         {isToday ? " · hoje" : ""}
       </span>
 
+      {/* Feriado marcado pelo admin (ver RotaHolidaysManager, admin/page.tsx)
+          -- pedido do Victor 05/09/2026: trava geral pra essa data, além do
+          padrão semanal. Só um aviso aqui (esse painel continua editável,
+          quem trava de verdade é getAvailableRotasForDate) -- pra quem tá
+          escalando motorista não ficar tentando entender por que ninguém
+          conseguiu agendar visita nesse dia. */}
+      {day.isHoliday ? (
+        <span className="text-xs font-semibold" style={{ color: "var(--status-warning)" }}>
+          🎉 Feriado{day.holidayNote ? ` — ${day.holidayNote}` : ""} (sem rota disponível pra agendar)
+        </span>
+      ) : null}
+
       {/* João Pessoa e Campina Grande lado a lado, mesma hierarquia visual
           -- achado do Victor 24/08/2026: "parece que a rota de joao
           pessoa ta acima em hierarquia... fique dentro da data, mas lado

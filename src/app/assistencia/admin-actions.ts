@@ -17,7 +17,13 @@ import {
   addFabricaOperador as addFabricaOperadorLib,
   setFabricaOperadorPin as setFabricaOperadorPinLib,
 } from "@/lib/encomendaAuth";
-import { setRotaWeekday as setRotaWeekdayLib, isRota, type Rota } from "@/lib/rotas";
+import {
+  setRotaWeekday as setRotaWeekdayLib,
+  addRotaHoliday as addRotaHolidayLib,
+  removeRotaHoliday as removeRotaHolidayLib,
+  isRota,
+  type Rota,
+} from "@/lib/rotas";
 import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 
 export type FormState = { error?: string; success?: boolean } | undefined;
@@ -365,5 +371,24 @@ export async function setRotaWeekday(weekday: number, rota: string): Promise<voi
   const value: Rota | null = rota === "" ? null : isRota(rota) ? rota : null;
   if (rota !== "" && !isRota(rota)) throw new Error("Rota inválida.");
   await setRotaWeekdayLib(weekday, value);
+  revalidatePath("/assistencia/admin");
+}
+
+// Feriados (dias sem rota, independente do dia da semana) -- pedido do
+// Victor 05/09/2026: "que eu tenha a opção de colocar isso em qualquer
+// dia, só eu, para um feriado". Só admin, mesmo padrão de setRotaWeekday
+// acima.
+export async function addRotaHoliday(date: string, note: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  if (!date) throw new Error("Informe a data do feriado.");
+  await addRotaHolidayLib(date, note || null);
+  revalidatePath("/assistencia/admin");
+}
+
+export async function removeRotaHoliday(date: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  await removeRotaHolidayLib(date);
   revalidatePath("/assistencia/admin");
 }
