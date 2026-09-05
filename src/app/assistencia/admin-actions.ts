@@ -378,12 +378,19 @@ export async function setRotaWeekday(weekday: number, rota: string): Promise<voi
 // Victor 05/09/2026: "que eu tenha a opção de colocar isso em qualquer
 // dia, só eu, para um feriado". Só admin, mesmo padrão de setRotaWeekday
 // acima.
+// Além de /admin (RotaHolidaysManager), o próprio painel "Motorista do dia"
+// (RotaMotoristaDoDia.tsx) ganhou 05/09/2026 um atalho pra marcar/liberar
+// feriado direto do lápis de edição -- revalida também as telas que
+// renderizam esse painel (fila/notificações), senão um reload nelas
+// mostraria o estado antigo até o admin passar pelo /admin.
 export async function addRotaHoliday(date: string, note: string): Promise<void> {
   const profile = await getProfile();
   requireRole(profile, "admin");
   if (!date) throw new Error("Informe a data do feriado.");
   await addRotaHolidayLib(date, note || null);
   revalidatePath("/assistencia/admin");
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/sac/notificacoes");
 }
 
 export async function removeRotaHoliday(date: string): Promise<void> {
@@ -391,4 +398,6 @@ export async function removeRotaHoliday(date: string): Promise<void> {
   requireRole(profile, "admin");
   await removeRotaHolidayLib(date);
   revalidatePath("/assistencia/admin");
+  revalidatePath("/assistencia/fila");
+  revalidatePath("/assistencia/sac/notificacoes");
 }

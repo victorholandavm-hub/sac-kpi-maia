@@ -394,7 +394,7 @@ export default async function SacNotificacoesPage({
                 today={today}
                 upcomingOverview={rotaOverview.filter((d) => d.date > today).slice(0, 7)}
                 motoristaAction={
-                  <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly />
+                  <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
                 }
               />
               {!hasActiveFilter ? <EntregasFlatList items={restGroups.flatMap((g) => g.items)} /> : null}
