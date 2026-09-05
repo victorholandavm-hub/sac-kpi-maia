@@ -1,33 +1,47 @@
 import { REQUEST_TYPE_LABELS, STATUS_LABELS, DELIVERY_REQUEST_TYPES } from "./assistenciaLabels";
 
-// Bot do Telegram pro Victor -- pedido 04/09/2026: "criar um bot para me
+// Bot do Telegram -- pedido do Victor 04/09/2026: "criar um bot para me
 // avisar quando houver uma nova solicitação de montagem/desmontagem, nova
 // notificação de assistencia [esclarecido: chamados de entrega/envio/
 // recolhimento], nova solicitação de encomenda e mudança de status de
-// todas as solicitações [esclarecido: só status-chave]". Token/chat id
-// vêm de variável de ambiente (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID no
+// todas as solicitações [esclarecido: só status-chave]". Token/chat ids
+// vêm de variável de ambiente (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_IDS no
 // .env do servidor) -- nunca comitados no código. Sem as duas, a função
 // não faz nada (silenciosamente) -- não trava build/deploy de quem não
 // configurou isso ainda.
+//
+// TELEGRAM_CHAT_IDS (plural, separado por vírgula) -- pedido do Victor
+// 05/09/2026: "outro membros da equipe estao com acesso ao bot" -- cada
+// pessoa manda uma mensagem qualquer pro bot (é assim que o Telegram
+// libera ele mandar de volta pra ela) e o chat_id dela entra na lista.
+// Disparo em paralelo (Promise.all) -- uma pessoa com bloqueio/erro no
+// Telegram não atrasa nem derruba o envio pras outras.
 async function sendTelegramMessage(text: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
+  const chatIds = (process.env.TELEGRAM_CHAT_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (!token || chatIds.length === 0) return;
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text }),
-    });
-    if (!res.ok) {
-      console.error("[telegram] sendMessage falhou:", res.status, await res.text().catch(() => ""));
-    }
-  } catch (err) {
-    // Nunca deixa um problema no Telegram (rede, API fora do ar) derrubar
-    // a ação de verdade (criar chamado, mudar status etc.) -- só loga.
-    console.error("[telegram] sendMessage falhou:", err);
-  }
+  await Promise.all(
+    chatIds.map(async (chatId) => {
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, text }),
+        });
+        if (!res.ok) {
+          console.error("[telegram] sendMessage falhou:", chatId, res.status, await res.text().catch(() => ""));
+        }
+      } catch (err) {
+        // Nunca deixa um problema no Telegram (rede, API fora do ar) derrubar
+        // a ação de verdade (criar chamado, mudar status etc.) -- só loga.
+        console.error("[telegram] sendMessage falhou:", chatId, err);
+      }
+    })
+  );
 }
 
 // Achado do Victor 04/09/2026, testando o primeiro aviso: "preciso receber
