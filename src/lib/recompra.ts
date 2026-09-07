@@ -73,14 +73,19 @@ type OrderItemRow = { description: string | null; totvs_orders: { client_id: str
 
 // Varre totvs_order_items inteiro (join com totvs_orders pra pegar
 // client_id/issue_date, mesmo padrão já usado em vendasProduto.ts) -- pra
-// cada cliente, guarda a compra MAIS RECENTE de cada categoria, depois
-// escolhe a categoria com MAIOR ratio (a mais "vencida") como sinal de
-// janela daquele cliente. ~54 mil dos ~81 mil itens batem nalguma
-// categoria cíclica (conferido 07/09/2026) -- não filtra por palavra-chave
-// na query (a lista de keywords muda too fácil pra depender de um OR gigante
-// no banco), filtra em memória depois de trazer tudo, igual
-// listClientesPorNivel já faz com o pedido inteiro.
-async function buildJanelaPorCliente(): Promise<Map<string, CategoriaSinal>> {
+// cada cliente, guarda a compra MAIS RECENTE de cada categoria. ~54 mil
+// dos ~81 mil itens batem nalguma categoria cíclica (conferido
+// 07/09/2026) -- não filtra por palavra-chave na query (a lista de
+// keywords muda fácil demais pra depender de um OR gigante no banco),
+// filtra em memória depois de trazer tudo, igual listClientesPorNivel já
+// faz com o pedido inteiro.
+//
+// Extraída como função própria (07/09/2026, Fase 3 -- afinidade de
+// produto) porque tanto buildJanelaPorCliente quanto
+// buildAfinidadeGlobal precisam do MESMO conjunto de categorias por
+// cliente -- separar evita escanear totvs_order_items (a parte cara,
+// ~54 mil linhas) duas vezes.
+async function buildCategoriasPorCliente(): Promise<Map<string, Map<string, string>>> {
   const admin = getSupabaseAdmin();
   const rows = await fetchAllPagesParallel<OrderItemRow>(
     (from, to) =>
@@ -106,10 +111,16 @@ async function buildJanelaPorCliente(): Promise<Map<string, CategoriaSinal>> {
     if (!atual || order.issue_date > atual) porCategoria.set(categoria.key, order.issue_date);
     ultimaPorCategoria.set(order.client_id, porCategoria);
   }
+  return ultimaPorCategoria;
+}
 
+// Reduz o mapa de categorias por cliente (acima) pra um sinal só por
+// cliente -- a categoria com MAIOR ratio (a mais "vencida") é o sinal de
+// janela daquele cliente.
+function buildJanelaPorCliente(categoriasPorCliente: Map<string, Map<string, string>>): Map<string, CategoriaSinal> {
   const hoje = new Date();
   const resultado = new Map<string, CategoriaSinal>();
-  for (const [clientId, porCategoria] of ultimaPorCategoria) {
+  for (const [clientId, porCategoria] of categoriasPorCliente) {
     let melhor: CategoriaSinal | null = null;
     for (const [key, dataCompra] of porCategoria) {
       const categoria = CATEGORIAS_CICLO.find((c) => c.key === key);
@@ -121,6 +132,68 @@ async function buildJanelaPorCliente(): Promise<Map<string, CategoriaSinal>> {
     if (melhor) resultado.set(clientId, melhor);
   }
   return resultado;
+}
+
+// -----------------------------------------------------------------------
+// Afinidade de produto (cross-sell) -- Fase 3 do desenho original, pedido
+// do Victor 07/09/2026: "só a afinidade de produto... não depende do
+// backfill terminar nem do tempo passar". Associação simples entre
+// categorias (não precisa de Apriori/biblioteca de verdade -- só 7
+// categorias cadastradas, ver CATEGORIAS_CICLO, então o par completo é
+// só 21 combinações, trivial de calcular na mão): pra cada categoria A,
+// entre quem já comprou A, qual OUTRA categoria B esse mesmo grupo mais
+// comprou também (P(B|A) = clientes com A e B ÷ clientes com A).
+// -----------------------------------------------------------------------
+
+type AfinidadeCategoria = { categoria: CategoriaCiclo; score: number };
+
+function buildAfinidadeGlobal(categoriasPorCliente: Map<string, Map<string, string>>): Map<string, AfinidadeCategoria[]> {
+  const countCategoria = new Map<string, number>();
+  const countPar = new Map<string, number>();
+
+  for (const categorias of categoriasPorCliente.values()) {
+    const keys = [...categorias.keys()];
+    for (const k of keys) countCategoria.set(k, (countCategoria.get(k) ?? 0) + 1);
+    for (let i = 0; i < keys.length; i++) {
+      for (let j = i + 1; j < keys.length; j++) {
+        const [a, b] = [keys[i], keys[j]].sort();
+        const pairKey = `${a}|${b}`;
+        countPar.set(pairKey, (countPar.get(pairKey) ?? 0) + 1);
+      }
+    }
+  }
+
+  const resultado = new Map<string, AfinidadeCategoria[]>();
+  for (const catA of CATEGORIAS_CICLO) {
+    const totalA = countCategoria.get(catA.key) ?? 0;
+    if (totalA === 0) continue;
+    const associadas: AfinidadeCategoria[] = [];
+    for (const catB of CATEGORIAS_CICLO) {
+      if (catB.key === catA.key) continue;
+      const [a, b] = [catA.key, catB.key].sort();
+      const countBoth = countPar.get(`${a}|${b}`) ?? 0;
+      if (countBoth === 0) continue;
+      associadas.push({ categoria: catB, score: countBoth / totalA });
+    }
+    associadas.sort((x, y) => y.score - x.score);
+    resultado.set(catA.key, associadas);
+  }
+  return resultado;
+}
+
+// Pra um cliente, olha as categorias que ele JÁ TEM e, pra cada uma,
+// pega a mais associada (buildAfinidadeGlobal, já ordenada por score)
+// que ele AINDA NÃO tem -- entre todas essas candidatas, devolve a de
+// maior score. null quando o cliente não tem nenhuma categoria cíclica
+// reconhecida ainda, ou quando já comprou de tudo que existe associação.
+export function sugerirCrossSell(categoriasCliente: Set<string>, afinidadeGlobal: Map<string, AfinidadeCategoria[]>): CategoriaCiclo | null {
+  let melhor: AfinidadeCategoria | null = null;
+  for (const catKey of categoriasCliente) {
+    const associadas = afinidadeGlobal.get(catKey) ?? [];
+    const candidata = associadas.find((a) => !categoriasCliente.has(a.categoria.key));
+    if (candidata && (!melhor || candidata.score > melhor.score)) melhor = candidata;
+  }
+  return melhor?.categoria ?? null;
 }
 
 // -----------------------------------------------------------------------
@@ -235,20 +308,29 @@ export type RecompraCandidato = {
   // último contato já teve resultado registrado e um novo ciclo ainda não
   // começou).
   ultimoContato: RecompraContato | null;
+  // Fase 3 -- ver buildAfinidadeGlobal/sugerirCrossSell acima. Categoria
+  // (rótulo) mais associada ao que esse cliente já comprou, entre o que
+  // ele ainda não tem -- null quando ele não tem categoria cíclica
+  // reconhecida nenhuma, ou já comprou todas as associadas.
+  sugestaoCrossSell: string | null;
 };
 
-// Junta RFM/nível (listClientesPorNivel, já existente) + os dois sinais
-// novos (janela por categoria, atrito) num candidato só por cliente. Fica
-// de fora quem nunca comprou (nivel "sem_compra") -- não tem o que
-// recomprar. Ordenado por prioridade de segmento e, dentro dele, por quem
-// está mais "vencido" (ratio maior primeiro).
+// Junta RFM/nível (listClientesPorNivel, já existente) + os sinais novos
+// (janela por categoria, atrito, afinidade de produto) num candidato só
+// por cliente. Fica de fora quem nunca comprou (nivel "sem_compra") --
+// não tem o que recomprar. Ordenado por prioridade de segmento e, dentro
+// dele, por quem está mais "vencido" (ratio maior primeiro).
 export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
-  const [niveis, janelaPorCliente, atritoPorCliente, contatoPorCliente] = await Promise.all([
+  const [niveis, categoriasPorCliente, atritoPorCliente, contatoPorCliente] = await Promise.all([
     listClientesPorNivel(),
-    buildJanelaPorCliente(),
+    buildCategoriasPorCliente(),
     buildAtritoPorCliente(),
     listUltimoContatoPorCliente(),
   ]);
+  // As duas próximas são reduções puras em cima de categoriasPorCliente
+  // (já em memória) -- não precisam de I/O, não entram no Promise.all.
+  const janelaPorCliente = buildJanelaPorCliente(categoriasPorCliente);
+  const afinidadeGlobal = buildAfinidadeGlobal(categoriasPorCliente);
 
   const resultado: RecompraCandidato[] = [];
   for (const c of niveis) {
@@ -257,6 +339,8 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
     const atritoScore = atritoPorCliente.get(c.clientId) ?? 0;
     const atritoAlto = atritoScore >= ATRITO_ALTO_LIMIAR;
     const naJanela = (janela?.ratio ?? 0) >= RATIO_NA_JANELA;
+    const categoriasCliente = new Set(categoriasPorCliente.get(c.clientId)?.keys() ?? []);
+    const sugestao = sugerirCrossSell(categoriasCliente, afinidadeGlobal);
 
     resultado.push({
       clientId: c.clientId,
@@ -274,6 +358,7 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
       atritoAlto,
       segmento: calcularSegmento(naJanela, atritoAlto),
       ultimoContato: contatoPorCliente.get(c.clientId) ?? null,
+      sugestaoCrossSell: sugestao?.label ?? null,
     });
   }
 
