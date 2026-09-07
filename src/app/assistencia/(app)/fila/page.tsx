@@ -911,7 +911,19 @@ export default async function AssistenciaQueuePage({
               {!hasActiveEntregaFilter ? <EntregasFlatList items={restItems} /> : null}
             </>
           ) : (
-            <EntregasFlatList items={requests} />
+            // Achado do Victor 07/09/2026: filtrar por "Amanhã" (ou qualquer
+            // outro filtro/período) mostrava certinho os chamados daquele
+            // dia, mas o botão "Gestão de Motoristas & Escala" -- que só
+            // aparece dentro de EntregasKanbanHoje, escondido junto com o
+            // resto no ramo `isHojePresetOnly` acima -- sumia junto. O
+            // painel não é specific a "hoje" (é sempre a mesma semana +
+            // seguinte, com "Mostrar mais dias"), então não depende de
+            // nenhum estado desse ramo -- só falta o botão continuar
+            // visível mesmo com outro filtro ativo.
+            <>
+              <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+              <EntregasFlatList items={requests} />
+            </>
           )}
         </div>
       ) : (
