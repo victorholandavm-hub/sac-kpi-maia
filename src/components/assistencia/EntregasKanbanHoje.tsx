@@ -436,7 +436,23 @@ export function EntregasKanbanHoje({
   // (regra dos hooks).
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  if (groups.length === 0) return null;
+  // Achado do Victor 07/09/2026: num feriado (rota_holidays) sem NENHUM
+  // chamado hoje, esse `return null` também escondia o botão "Gestão de
+  // Motoristas & Escala" (motoristaAction) -- exatamente o dia em que ele
+  // mais queria abrir esse painel (pra conferir/mexer no feriado ou ver
+  // amanhã). Kanban + tabela continuam escondidos sem chamado nenhum (isso
+  // é intencional, evita bloco vazio poluindo a tela), só o cabeçalho com o
+  // botão sobrevive.
+  if (groups.length === 0) {
+    return motoristaAction ? (
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-semibold uppercase tracking-wider text-white rounded-md shadow-sm px-2.5 py-1" style={{ background: "#1B5E3C" }}>
+          📌 Hoje
+        </span>
+        {motoristaAction}
+      </div>
+    ) : null;
+  }
 
   const activeOverview = viewDate ? (upcomingOverview?.find((d) => d.date === viewDate) ?? null) : todayOverview;
   const columns = viewDate ? buildColumns(dayGroupsCache[viewDate] ?? [], activeOverview) : hojeColumns;
