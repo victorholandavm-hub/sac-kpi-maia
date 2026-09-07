@@ -4,6 +4,7 @@ import {
   getClientesResumo,
   listClientes,
   listClientesPorNivel,
+  listCanalAquisicaoPorCliente,
   isClienteStatus,
   isClienteNivel,
   CLIENTE_STATUSES,
@@ -30,6 +31,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { ClienteHistoricoRow } from "@/components/ClienteHistoricoRow";
 import { RecompraContatoCell } from "@/components/RecompraContatoCell";
 import { RecompraNaoContatarManager } from "@/components/RecompraNaoContatarManager";
+import { CanalAquisicaoSelect } from "@/components/CanalAquisicaoSelect";
 
 export const dynamic = "force-dynamic";
 
@@ -135,9 +137,10 @@ export default async function ClientesPage({
 async function StatusView({ q, status, page }: { q?: string; status?: string; page: number }) {
   const filterStatus = isClienteStatus(status) ? status : undefined;
 
-  const [resumo, listResult] = await Promise.all([
+  const [resumo, listResult, canalPorCliente] = await Promise.all([
     getClientesResumo(),
     listClientes({ q, status: filterStatus, page }),
+    listCanalAquisicaoPorCliente(),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(listResult.total / listResult.pageSize));
@@ -235,6 +238,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Telefone</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cidade</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Canal de aquisição</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -243,7 +247,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                     key={c.protheusCode}
                     clientId={c.protheusCode}
                     name={c.name}
-                    colSpan={7}
+                    colSpan={8}
                     accentColor={CLIENTE_STATUS_COLORS[c.status]}
                   >
                     <td className="px-4 py-2 whitespace-nowrap">
@@ -271,6 +275,9 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                     </td>
                     <td className="px-4 py-2" style={{ color: "var(--text-secondary)" }}>
                       {c.stores.length > 0 ? c.stores.join(", ") : "—"}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <CanalAquisicaoSelect clientId={c.protheusCode} canal={canalPorCliente.get(c.protheusCode) ?? null} />
                     </td>
                   </ClienteHistoricoRow>
                 ))}
