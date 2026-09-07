@@ -707,6 +707,42 @@ async function upsertOrdersBatch(supabase: SupabaseAdmin, orders: TotvsOrder[], 
   return upsertedOrders.length;
 }
 
+// Decide o próximo dia/página do cursor de syncOrders depois de uma página
+// respondida -- extraído numa função pura pra testar sem precisar mockar
+// rede/Supabase (ver totvsSync.test.ts).
+//
+// Bug real, achado 07/09/2026 (Victor perguntou se Vendas estava atualizado
+// -- não estava: totvs_orders ficou quase 3 semanas sem pedido nenhum, 15/08
+// a 06/09). Causa: quando `day` chegava em HOJE e a 1ª checada do dia (de
+// manhã cedo, antes de qualquer venda) batia 0 resultados, o código avançava
+// o cursor pro dia seguinte -- que fica MAIOR que "hoje" (`todayIso`), então
+// o `while (day <= today)` de syncOrders passa a ser falso pro resto do dia
+// inteiro. As vendas de verdade que entram depois (tarde/noite) nunca mais
+// são vistas, porque o cursor já pulou pra frente e essa função não tem um
+// mecanismo de "revisitar dia antigo" (diferente de deliveries, que tem
+// syncStaleDeliveries/syncOpenCargas pra isso).
+//
+// HOJE nunca pode ser considerado "definitivamente pronto" enquanto ainda é
+// hoje -- só um dia estritamente ANTERIOR a hoje pode ser encerrado de vez
+// (nenhuma venda nova vai aparecer nele depois). Pra hoje, `stop: true` sinaliza
+// pro chamador sair do laço desta execução (sem isso, `day` continuaria igual
+// e `day <= today` continuaria verdadeiro, batendo a mesma página vazia pra
+// sempre dentro da MESMA chamada) -- mas o cursor (`day`) NÃO avança, só a
+// página reseta pra 1, pra reescanear hoje do zero na próxima execução e
+// pegar pedido novo.
+export function nextOrdersCursor(
+  day: string,
+  page: number,
+  rowsLength: number,
+  totalPages: number | undefined,
+  todayIso: string
+): { day: string; page: number; stop: boolean } {
+  const dayExhausted = rowsLength === 0 || page >= (totalPages ?? page);
+  if (!dayExhausted) return { day, page: page + 1, stop: false };
+  if (day === todayIso) return { day, page: 1, stop: true };
+  return { day: isoDate(new Date(new Date(day).getTime() + ORDERS_WINDOW_DAYS * DAY_MS)), page: 1, stop: false };
+}
+
 // Varre dia a dia (não um StartDate/EndDate largo -- ver nota acima sobre o
 // tempo de resposta escalar com o período) até acabar o orçamento de tempo ou
 // alcançar hoje. O cursor (dia + página) é salvo sempre, mesmo quando a
@@ -769,12 +805,10 @@ async function syncOrders(supabase: SupabaseAdmin): Promise<SyncResult> {
     checked += rows.length;
     upserted += await upsertOrdersBatch(supabase, rows, errors);
 
-    if (rows.length === 0 || page >= (json.totalPages ?? page)) {
-      day = isoDate(new Date(new Date(day).getTime() + ORDERS_WINDOW_DAYS * DAY_MS));
-      page = 1;
-    } else {
-      page += 1;
-    }
+    const next = nextOrdersCursor(day, page, rows.length, json.totalPages, isoDate(today));
+    day = next.day;
+    page = next.page;
+    if (next.stop) break;
   }
 
   await setSyncState(supabase, "totvs_orders_next_day", day);

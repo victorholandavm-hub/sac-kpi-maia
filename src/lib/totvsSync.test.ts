@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ddmmyyyyToIso, isoDate, totvsHeaders, detectDeliveryRiskTrigger } from "./totvsSync";
+import { ddmmyyyyToIso, isoDate, totvsHeaders, detectDeliveryRiskTrigger, nextOrdersCursor } from "./totvsSync";
 
 describe("ddmmyyyyToIso", () => {
   it("converte DD/MM/YYYY pra YYYY-MM-DD", () => {
@@ -22,6 +22,41 @@ describe("ddmmyyyyToIso", () => {
 describe("isoDate", () => {
   it("formata uma data como YYYY-MM-DD", () => {
     expect(isoDate(new Date("2026-07-29T15:30:00Z"))).toBe("2026-07-29");
+  });
+});
+
+describe("nextOrdersCursor", () => {
+  const TODAY = "2026-09-07";
+
+  it("página incompleta -- avança só a página, mesmo dia", () => {
+    expect(nextOrdersCursor("2026-09-05", 1, 100, 3, TODAY)).toEqual({ day: "2026-09-05", page: 2, stop: false });
+  });
+
+  it("dia PASSADO esgotado (0 pedidos) -- avança pro dia seguinte", () => {
+    expect(nextOrdersCursor("2026-09-05", 1, 0, undefined, TODAY)).toEqual({ day: "2026-09-06", page: 1, stop: false });
+  });
+
+  it("dia PASSADO esgotado (última página) -- avança pro dia seguinte", () => {
+    expect(nextOrdersCursor("2026-09-05", 3, 40, 3, TODAY)).toEqual({ day: "2026-09-06", page: 1, stop: false });
+  });
+
+  // Regressão do bug real de 07/09/2026: HOJE com 0 pedidos (checado de
+  // manhã cedo, antes de qualquer venda) NÃO pode avançar o cursor pra
+  // amanhã -- isso prendia o sync de pedidos pro resto do dia inteiro,
+  // perdendo toda venda que entrasse depois (ver comentário em
+  // nextOrdersCursor, totvsSync.ts). Cursor tem que continuar em HOJE,
+  // só a página reseta e `stop: true` sinaliza pra sair do laço desta
+  // execução.
+  it("HOJE esgotado (0 pedidos) -- NÃO avança o cursor, só sinaliza parar", () => {
+    expect(nextOrdersCursor(TODAY, 1, 0, undefined, TODAY)).toEqual({ day: TODAY, page: 1, stop: true });
+  });
+
+  it("HOJE esgotado (última página, com pedidos) -- NÃO avança o cursor, só sinaliza parar", () => {
+    expect(nextOrdersCursor(TODAY, 2, 30, 2, TODAY)).toEqual({ day: TODAY, page: 1, stop: true });
+  });
+
+  it("HOJE com mais páginas -- avança só a página, sem parar", () => {
+    expect(nextOrdersCursor(TODAY, 1, 100, 3, TODAY)).toEqual({ day: TODAY, page: 2, stop: false });
   });
 });
 
