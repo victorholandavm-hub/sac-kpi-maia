@@ -575,8 +575,17 @@ function RotaDayCell({
         // 05/09/2026: "o dia fica travado e mais apagado". `isPast`
         // continua tendo prioridade visual (dia passado É passado,
         // feriado ou não).
-        background: day.isHoliday && !isPast ? "var(--surface-2)" : isToday ? `color-mix(in srgb, ${mutedBrandGreen} 8%, var(--surface-1))` : "var(--surface-1)",
-        opacity: isPast ? 0.3 : day.isHoliday ? 0.6 : 1,
+        //
+        // Achado do Victor 07/09/2026: domingo (sem rota no padrão semanal,
+        // `expectedRota` null e sem atribuição -- ver `savedRota`) também
+        // devia ficar "travado e mais apagado" que nem feriado, mesmo sem
+        // ninguém ter marcado nada manualmente. Só o VISUAL (mesmo
+        // `isPast`, que não desabilita nada) -- Campina Grande continua
+        // ativa nesses dias (suas 2 rotas fixas rodam todo dia, ver
+        // getAvailableRotasForDate), então não reaproveita o bloqueio de
+        // botões que só existe pra feriado de verdade (`day.isHoliday`).
+        background: (day.isHoliday || !savedRota) && !isPast ? "var(--surface-2)" : isToday ? `color-mix(in srgb, ${mutedBrandGreen} 8%, var(--surface-1))` : "var(--surface-1)",
+        opacity: isPast ? 0.3 : day.isHoliday || !savedRota ? 0.6 : 1,
       }}
     >
       {/* Dia da semana sempre visível na própria célula -- antes só
