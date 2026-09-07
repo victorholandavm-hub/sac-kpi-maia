@@ -15,6 +15,16 @@ import {
   CLIENTE_NIVEL_CRITERIA,
   type ClienteNivelInfo,
 } from "@/lib/clientes";
+import {
+  listRecompraCandidatos,
+  isRecompraSegmento,
+  RECOMPRA_SEGMENTOS,
+  RECOMPRA_SEGMENTO_LABELS,
+  RECOMPRA_SEGMENTO_DESCRICOES,
+  RECOMPRA_SEGMENTO_COLORS,
+  type RecompraSegmento,
+  type RecompraCandidato,
+} from "@/lib/recompra";
 import { AppHeader } from "@/components/AppHeader";
 import { ClienteHistoricoRow } from "@/components/ClienteHistoricoRow";
 
@@ -32,12 +42,13 @@ function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function buildHref(params: { view?: string; q?: string; status?: string; nivel?: string; page?: number }): string {
+function buildHref(params: { view?: string; q?: string; status?: string; nivel?: string; segmento?: string; page?: number }): string {
   const sp = new URLSearchParams();
   if (params.view && params.view !== "nivel") sp.set("view", params.view);
   if (params.q) sp.set("q", params.q);
   if (params.status) sp.set("status", params.status);
   if (params.nivel) sp.set("nivel", params.nivel);
+  if (params.segmento) sp.set("segmento", params.segmento);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/clientes?${qs}` : "/clientes";
@@ -46,13 +57,13 @@ function buildHref(params: { view?: string; q?: string; status?: string; nivel?:
 export default async function ClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; q?: string; status?: string; nivel?: string; page?: string }>;
+  searchParams: Promise<{ view?: string; q?: string; status?: string; nivel?: string; segmento?: string; page?: string }>;
 }) {
   await requireDashboardAuth();
-  const { view: viewParam, q, status, nivel, page: pageParam } = await searchParams;
+  const { view: viewParam, q, status, nivel, segmento, page: pageParam } = await searchParams;
   // Nível de relacionamento é a aba de aterrissagem (pedido do Victor
   // 15/08/2026) -- "status" só aparece quando pedido explicitamente na URL.
-  const view = viewParam === "status" ? "status" : "nivel";
+  const view = viewParam === "status" ? "status" : viewParam === "recompra" ? "recompra" : "nivel";
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
   return (
@@ -93,10 +104,24 @@ export default async function ClientesPage({
         >
           Nível de relacionamento
         </Link>
+        <Link
+          href={buildHref({ view: "recompra" })}
+          className="text-sm px-3 py-1.5 rounded-full border transition-colors"
+          style={{
+            borderColor: view === "recompra" ? "var(--brand-orange)" : "var(--border)",
+            background: view === "recompra" ? "var(--brand-orange)" : "transparent",
+            color: view === "recompra" ? "#fff" : "var(--text-secondary)",
+            fontWeight: view === "recompra" ? 600 : 400,
+          }}
+        >
+          Propensão a recompra
+        </Link>
       </div>
 
       {view === "status" ? (
         <StatusView q={q} status={status} page={page} />
+      ) : view === "recompra" ? (
+        <RecompraView q={q} segmento={segmento} page={page} />
       ) : (
         <NivelView q={q} nivel={nivel} page={page} />
       )}
@@ -493,6 +518,207 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
           </Link>
           <Link
             href={buildHref({ view: "nivel", q, nivel: filterNivel, page: Math.min(totalPages, pageClamped + 1) })}
+            aria-disabled={pageClamped >= totalPages}
+            className="text-sm px-3 py-1.5 rounded border"
+            style={{
+              borderColor: "var(--border)",
+              color: pageClamped >= totalPages ? "var(--text-muted)" : "var(--text-primary)",
+              pointerEvents: pageClamped >= totalPages ? "none" : undefined,
+            }}
+          >
+            Próxima →
+          </Link>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+// Aba "Propensão a recompra" -- pedido do Victor 07/09/2026 (motor de
+// recompra, Fase 1): régua determinística cruzando ciclo de reposição por
+// categoria com índice de atrito pós-venda (ver src/lib/recompra.ts).
+// Mesmo padrão visual das outras duas abas (cartões de filtro + busca +
+// tabela expansível) -- só o cálculo por trás é novo.
+async function RecompraView({ q, segmento, page }: { q?: string; segmento?: string; page: number }) {
+  const filterSegmento = isRecompraSegmento(segmento) ? segmento : undefined;
+  const todos = await listRecompraCandidatos();
+
+  const porSegmento = new Map<RecompraSegmento, number>();
+  for (const c of todos) porSegmento.set(c.segmento, (porSegmento.get(c.segmento) ?? 0) + 1);
+
+  const qLower = q?.trim().toLowerCase();
+  let filtrados = todos;
+  if (filterSegmento) filtrados = filtrados.filter((c) => c.segmento === filterSegmento);
+  if (qLower) {
+    filtrados = filtrados.filter(
+      (c) => (c.nome ?? "").toLowerCase().includes(qLower) || (c.cpfCnpj ?? "").toLowerCase().includes(qLower)
+    );
+  }
+
+  const total = filtrados.length;
+  const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
+  const pageClamped = Math.min(page, totalPages);
+  const pageItems = filtrados.slice((pageClamped - 1) * LIST_PAGE_SIZE, pageClamped * LIST_PAGE_SIZE);
+
+  return (
+    <>
+      <p className="text-xs -mt-4 max-w-2xl" style={{ color: "var(--text-muted)" }}>
+        {todos.length} clientes com pelo menos 1 compra, cruzando ciclo de reposição por categoria
+        (dias desde a última compra da categoria ÷ vida útil típica dela) com o histórico de
+        troca/envio/recolhimento ligado a cada um. Regra fixa hoje, sem modelo estatístico -- ver o
+        desenho completo pra saber o que falta pra virar previsão de verdade.
+      </p>
+
+      <div className="grid sm:grid-cols-4 gap-4">
+        {RECOMPRA_SEGMENTOS.map((s) => (
+          <Link
+            key={s}
+            href={buildHref({ view: "recompra", q, segmento: filterSegmento === s ? undefined : s })}
+            className="rounded-xl border p-4 flex flex-col gap-1 transition-all hover:-translate-y-0.5 hover:shadow-md"
+            style={{
+              background: `color-mix(in srgb, ${RECOMPRA_SEGMENTO_COLORS[s]} ${filterSegmento === s ? 10 : 5}%, var(--surface-1))`,
+              borderColor: `color-mix(in srgb, ${RECOMPRA_SEGMENTO_COLORS[s]} ${filterSegmento === s ? 100 : 35}%, var(--border))`,
+              borderTopWidth: 3,
+              borderTopColor: RECOMPRA_SEGMENTO_COLORS[s],
+            }}
+          >
+            <span className="text-2xl font-bold" style={{ color: RECOMPRA_SEGMENTO_COLORS[s] }}>
+              {porSegmento.get(s) ?? 0}
+            </span>
+            <span className="text-sm font-medium flex items-center gap-1" style={{ color: "var(--text-primary)" }}>
+              {RECOMPRA_SEGMENTO_LABELS[s]}
+              <span
+                title={RECOMPRA_SEGMENTO_DESCRICOES[s]}
+                aria-label={RECOMPRA_SEGMENTO_DESCRICOES[s]}
+                className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
+                style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
+              >
+                i
+              </span>
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap">
+        <input type="hidden" name="view" value="recompra" />
+        {filterSegmento ? <input type="hidden" name="segmento" value={filterSegmento} /> : null}
+        <input
+          type="search"
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Buscar por nome ou CPF/CNPJ…"
+          className="text-sm flex-1 min-w-[220px] rounded border px-3 py-2"
+          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+        />
+        <button type="submit" className="text-sm px-4 py-2 rounded font-medium" style={{ background: "var(--brand-orange)", color: "#fff" }}>
+          Buscar
+        </button>
+        {q || filterSegmento ? (
+          <Link href={buildHref({ view: "recompra" })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            Limpar
+          </Link>
+        ) : null}
+      </form>
+
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        {total} cliente{total === 1 ? "" : "s"} encontrado{total === 1 ? "" : "s"}
+        {totalPages > 1 ? ` · página ${pageClamped} de ${totalPages}` : ""}
+      </p>
+
+      {pageItems.length === 0 ? (
+        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Nenhum cliente encontrado.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr
+                  className="text-xs"
+                  style={{ color: "var(--text-secondary)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                >
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Segmento</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Categoria em janela</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nível</th>
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Atrito</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Gasto acumulado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                {pageItems.map((c: RecompraCandidato) => (
+                  <ClienteHistoricoRow
+                    key={c.clientId}
+                    clientId={c.clientId}
+                    name={c.nome ?? c.clientId}
+                    colSpan={7}
+                    accentColor={RECOMPRA_SEGMENTO_COLORS[c.segmento]}
+                  >
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{
+                          color: RECOMPRA_SEGMENTO_COLORS[c.segmento],
+                          background: `color-mix(in srgb, ${RECOMPRA_SEGMENTO_COLORS[c.segmento]} 15%, transparent)`,
+                        }}
+                      >
+                        {RECOMPRA_SEGMENTO_LABELS[c.segmento]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {c.categoriaJanela ? `${c.categoriaJanela} · há ${c.diasDesdeCategoria} dias` : "—"}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {CLIENTE_NIVEL_LABELS[c.nivel]}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap">
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={
+                          c.atritoAlto
+                            ? { color: "var(--status-critical)", background: "color-mix(in srgb, var(--status-critical) 15%, transparent)" }
+                            : { color: "var(--text-muted)", background: "var(--surface-2)" }
+                        }
+                        title={`${c.atritoScore} ponto${c.atritoScore === 1 ? "" : "s"} de atrito acumulado`}
+                      >
+                        {c.atritoAlto ? "alto" : "baixo"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {formatDateOnly(c.ultimaCompra)}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--brand-green)" }}>
+                      {formatBRL(c.gastoAcumulado)}
+                    </td>
+                  </ClienteHistoricoRow>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {totalPages > 1 ? (
+        <div className="flex items-center gap-2">
+          <Link
+            href={buildHref({ view: "recompra", q, segmento: filterSegmento, page: Math.max(1, pageClamped - 1) })}
+            aria-disabled={pageClamped <= 1}
+            className="text-sm px-3 py-1.5 rounded border"
+            style={{
+              borderColor: "var(--border)",
+              color: pageClamped <= 1 ? "var(--text-muted)" : "var(--text-primary)",
+              pointerEvents: pageClamped <= 1 ? "none" : undefined,
+            }}
+          >
+            ← Anterior
+          </Link>
+          <Link
+            href={buildHref({ view: "recompra", q, segmento: filterSegmento, page: Math.min(totalPages, pageClamped + 1) })}
             aria-disabled={pageClamped >= totalPages}
             className="text-sm px-3 py-1.5 rounded border"
             style={{
