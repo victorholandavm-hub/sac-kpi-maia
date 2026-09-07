@@ -436,22 +436,90 @@ export function EntregasKanbanHoje({
   // (regra dos hooks).
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // "Próximas rotas" -- extraído numa variável pra reaproveitar tanto no
+  // corpo cheio (linha do filtro de status, mais abaixo) quanto no
+  // cabeçalho "vazio" (ver early-return logo abaixo): mesmo botão +
+  // dropdown, os dois lugares só mudam o que fica ao lado dele.
+  const nextRoutesPicker = (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setDayPickerOpen((v) => !v)}
+        className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors whitespace-nowrap"
+        style={
+          dayPickerOpen || viewDate
+            ? { background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }
+            : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
+        }
+      >
+        {viewDate ? `📅 ${WEEKDAY_SHORT[new Date(`${viewDate}T00:00:00Z`).getUTCDay()]} ${shortDateLabel(viewDate)}` : "🗓 Próximas rotas"}{" "}
+        {dayPickerOpen ? "▲" : "▼"}
+      </button>
+      {dayPickerOpen ? (
+        <div
+          className="absolute z-20 top-full mt-1.5 right-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1 min-w-[180px]"
+          style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+        >
+          {viewDate ? (
+            <button
+              type="button"
+              onClick={() => selectDay(viewDate)}
+              className="text-left text-sm rounded-md px-3 py-2 transition-colors"
+              style={{ color: "var(--status-critical)" }}
+            >
+              ✕ voltar pra hoje
+            </button>
+          ) : null}
+          {upcomingDates.map((date) => (
+            <button
+              key={date}
+              type="button"
+              disabled={loadingDate === date}
+              onClick={() => selectDay(date)}
+              className="text-left text-sm rounded-md px-3 py-2 transition-colors disabled:opacity-60"
+              style={
+                viewDate === date
+                  ? { background: "var(--brand-green-soft)", color: "var(--text-primary)", fontWeight: 600 }
+                  : { color: "var(--text-primary)" }
+              }
+              onMouseEnter={(e) => {
+                if (viewDate !== date) e.currentTarget.style.background = "var(--surface-2)";
+              }}
+              onMouseLeave={(e) => {
+                if (viewDate !== date) e.currentTarget.style.background = "transparent";
+              }}
+            >
+              {WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]} {shortDateLabel(date)}
+              {loadingDate === date ? " · carregando…" : ""}
+              {viewDate === date ? " ✓" : ""}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+
   // Achado do Victor 07/09/2026: num feriado (rota_holidays) sem NENHUM
-  // chamado hoje, esse `return null` também escondia o botão "Gestão de
-  // Motoristas & Escala" (motoristaAction) -- exatamente o dia em que ele
-  // mais queria abrir esse painel (pra conferir/mexer no feriado ou ver
-  // amanhã). Kanban + tabela continuam escondidos sem chamado nenhum (isso
-  // é intencional, evita bloco vazio poluindo a tela), só o cabeçalho com o
-  // botão sobrevive.
-  if (groups.length === 0) {
-    return motoristaAction ? (
+  // chamado hoje, esse `return` também escondia o botão "Gestão de
+  // Motoristas & Escala" (motoristaAction) E o "Próximas rotas" -- os dois
+  // únicos jeitos de chegar na visão completa (cartões de rota + abas com
+  // contagem + tabela) de um dia QUE TEM chamado, tipo amanhã. Continua
+  // bloqueando o Kanban+tabela de HOJE sem chamado nenhum (intencional,
+  // evita bloco vazio) -- mas só enquanto `viewDate` for null. Assim que o
+  // admin escolhe um dia em "Próximas rotas", `viewDate` deixa de ser null
+  // e o resto da função (columns/counts/etc, todos já preparados pra ler
+  // de `dayGroupsCache[viewDate]` em vez de `groups`) renderiza a visão
+  // completa normalmente pra aquele dia, com groups de hoje vazio ou não.
+  if (groups.length === 0 && !viewDate) {
+    return (
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xs font-semibold uppercase tracking-wider text-white rounded-md shadow-sm px-2.5 py-1" style={{ background: "#1B5E3C" }}>
           📌 Hoje
         </span>
         {motoristaAction}
+        {nextRoutesPicker}
       </div>
-    ) : null;
+    );
   }
 
   const activeOverview = viewDate ? (upcomingOverview?.find((d) => d.date === viewDate) ?? null) : todayOverview;
@@ -576,64 +644,7 @@ export function EntregasKanbanHoje({
           ))}
         </div>
 
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setDayPickerOpen((v) => !v)}
-            className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors whitespace-nowrap"
-            style={
-              dayPickerOpen || viewDate
-                ? { background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }
-                : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
-            }
-          >
-            {viewDate
-              ? `📅 ${WEEKDAY_SHORT[new Date(`${viewDate}T00:00:00Z`).getUTCDay()]} ${shortDateLabel(viewDate)}`
-              : "🗓 Próximas rotas"}{" "}
-            {dayPickerOpen ? "▲" : "▼"}
-          </button>
-          {dayPickerOpen ? (
-            <div
-              className="absolute z-20 top-full mt-1.5 right-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1 min-w-[180px]"
-              style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
-            >
-              {viewDate ? (
-                <button
-                  type="button"
-                  onClick={() => selectDay(viewDate)}
-                  className="text-left text-sm rounded-md px-3 py-2 transition-colors"
-                  style={{ color: "var(--status-critical)" }}
-                >
-                  ✕ voltar pra hoje
-                </button>
-              ) : null}
-              {upcomingDates.map((date) => (
-                <button
-                  key={date}
-                  type="button"
-                  disabled={loadingDate === date}
-                  onClick={() => selectDay(date)}
-                  className="text-left text-sm rounded-md px-3 py-2 transition-colors disabled:opacity-60"
-                  style={
-                    viewDate === date
-                      ? { background: "var(--brand-green-soft)", color: "var(--text-primary)", fontWeight: 600 }
-                      : { color: "var(--text-primary)" }
-                  }
-                  onMouseEnter={(e) => {
-                    if (viewDate !== date) e.currentTarget.style.background = "var(--surface-2)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (viewDate !== date) e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  {WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]} {shortDateLabel(date)}
-                  {loadingDate === date ? " · carregando…" : ""}
-                  {viewDate === date ? " ✓" : ""}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        {nextRoutesPicker}
       </div>
 
       {visibleRows.length > 0 ? (
