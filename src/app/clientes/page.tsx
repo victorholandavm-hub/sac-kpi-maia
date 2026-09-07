@@ -645,6 +645,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Segmento</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Categoria em janela</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Sugestão (cross-sell)</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nível</th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Atrito</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
@@ -658,7 +659,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     key={c.clientId}
                     clientId={c.clientId}
                     name={c.nome ?? c.clientId}
-                    colSpan={8}
+                    colSpan={9}
                     accentColor={RECOMPRA_SEGMENTO_COLORS[c.segmento]}
                   >
                     <td className="px-4 py-2 whitespace-nowrap">
@@ -674,6 +675,9 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.categoriaJanela ? `${c.categoriaJanela} · há ${c.diasDesdeCategoria} dias` : "—"}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: c.sugestaoCrossSell ? "var(--text-primary)" : "var(--text-muted)" }}>
+                      {c.sugestaoCrossSell ?? "—"}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {CLIENTE_NIVEL_LABELS[c.nivel]}
