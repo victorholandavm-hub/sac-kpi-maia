@@ -378,11 +378,12 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
   // buildCategoriasPorCliente (que a usa) -- as outras três continuam em
   // paralelo com ela.
   const deliveryDatePorInvoiceSerie = await buildDeliveryDatePorInvoiceSerie();
-  const [niveis, categoriasPorCliente, atritoPorCliente, contatoPorCliente] = await Promise.all([
+  const [niveis, categoriasPorCliente, atritoPorCliente, contatoPorCliente, naoContatar] = await Promise.all([
     listClientesPorNivel(),
     buildCategoriasPorCliente(deliveryDatePorInvoiceSerie),
     buildAtritoPorCliente(),
     listUltimoContatoPorCliente(),
+    listClientesNaoContatar(),
   ]);
   // As duas próximas são reduções puras em cima de categoriasPorCliente
   // (já em memória) -- não precisam de I/O, não entram no Promise.all.
@@ -392,6 +393,9 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
   const resultado: RecompraCandidato[] = [];
   for (const c of niveis) {
     if (c.nivel === "sem_compra") continue;
+    // Salvaguarda de LGPD (ver migration 0109) -- quem pediu pra não ser
+    // mais contatado nunca aparece aqui, ponto final.
+    if (naoContatar.has(c.clientId)) continue;
     const janela = janelaPorCliente.get(c.clientId) ?? null;
     const atritoScore = atritoPorCliente.get(c.clientId) ?? 0;
     const atritoAlto = atritoScore >= ATRITO_ALTO_LIMIAR;
@@ -521,5 +525,65 @@ export async function registrarResultadoContato(contatoId: string, resultado: Re
     .from("recompra_contatos")
     .update({ resultado, resultado_em: new Date().toISOString() })
     .eq("id", contatoId);
+  if (error) throw new Error(error.message);
+}
+
+// -----------------------------------------------------------------------
+// Salvaguarda de LGPD -- ver migration 0109_recompra_nao_contatar.sql e
+// comentário em listRecompraCandidatos acima. Base legal escolhida
+// (legítimo interesse, cliente que já comprou) exige um jeito de
+// opt-out -- essa é a peça que implementa isso: uma vez marcado, o
+// cliente nunca mais aparece como candidato a recompra, até ser
+// desmarcado de novo.
+// -----------------------------------------------------------------------
+
+export type RecompraNaoContatar = {
+  clientId: string;
+  motivo: string | null;
+  criadoPor: string | null;
+  criadoEm: string;
+};
+
+async function listClientesNaoContatar(): Promise<Set<string>> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("recompra_nao_contatar").select("client_id");
+  if (error) throw new Error(error.message);
+  return new Set((data ?? []).map((r) => r.client_id as string));
+}
+
+// Lista completa (com motivo/data) pra tela de gerenciamento -- diferente
+// de listClientesNaoContatar acima (só os ids, usado no filtro principal,
+// que roda a cada carregamento da aba e não precisa do resto do dado).
+export async function listRecompraNaoContatarCompleto(): Promise<RecompraNaoContatar[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("recompra_nao_contatar")
+    .select("client_id, motivo, criado_por, criado_em")
+    .order("criado_em", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    clientId: r.client_id as string,
+    motivo: r.motivo as string | null,
+    criadoPor: r.criado_por as string | null,
+    criadoEm: r.criado_em as string,
+  }));
+}
+
+export async function marcarNaoContatar(clientId: string, motivo: string, criadoPor: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("recompra_nao_contatar").upsert(
+    {
+      client_id: clientId,
+      motivo: motivo.trim() || null,
+      criado_por: criadoPor.trim() || null,
+    },
+    { onConflict: "client_id" }
+  );
+  if (error) throw new Error(error.message);
+}
+
+export async function desmarcarNaoContatar(clientId: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("recompra_nao_contatar").delete().eq("client_id", clientId);
   if (error) throw new Error(error.message);
 }
