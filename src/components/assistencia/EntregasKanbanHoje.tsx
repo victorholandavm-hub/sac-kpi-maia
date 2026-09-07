@@ -499,29 +499,18 @@ export function EntregasKanbanHoje({
     </div>
   );
 
-  // Achado do Victor 07/09/2026: num feriado (rota_holidays) sem NENHUM
-  // chamado hoje, esse `return` também escondia o botão "Gestão de
-  // Motoristas & Escala" (motoristaAction) E o "Próximas rotas" -- os dois
-  // únicos jeitos de chegar na visão completa (cartões de rota + abas com
-  // contagem + tabela) de um dia QUE TEM chamado, tipo amanhã. Continua
-  // bloqueando o Kanban+tabela de HOJE sem chamado nenhum (intencional,
-  // evita bloco vazio) -- mas só enquanto `viewDate` for null. Assim que o
-  // admin escolhe um dia em "Próximas rotas", `viewDate` deixa de ser null
-  // e o resto da função (columns/counts/etc, todos já preparados pra ler
-  // de `dayGroupsCache[viewDate]` em vez de `groups`) renderiza a visão
-  // completa normalmente pra aquele dia, com groups de hoje vazio ou não.
-  if (groups.length === 0 && !viewDate) {
-    return (
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-xs font-semibold uppercase tracking-wider text-white rounded-md shadow-sm px-2.5 py-1" style={{ background: "#1B5E3C" }}>
-          📌 Hoje
-        </span>
-        {motoristaAction}
-        {nextRoutesPicker}
-      </div>
-    );
-  }
-
+  // Achado do Victor 07/09/2026, em 3 rodadas: primeiro só o motoristaAction
+  // sumia num feriado sem chamado (PR #315); depois "Próximas rotas" também
+  // (PR #319); por fim, ele pediu de volta até as abas Todos/Programado/
+  // Concluído/Cancelado/Não concluído, zeradas mas visíveis ("obviamente vai
+  // aparecer tudo zerado, mas ainda assim tem que aparecer"). Concluindo:
+  // NENHUM `return` antecipado por `groups.length === 0` -- o corpo inteiro
+  // (cartões de rota, abas com contagem, tabela) sempre roda, com ou sem
+  // chamado hoje. `buildColumns([], ...)` já devolve `[]` de graça (fileira
+  // de cartões some sozinha, sem cartão nenhum pra desenhar) e a tabela já
+  // tinha o estado vazio ("Nada em ... aqui") pronto pra quando
+  // `visibleRows.length === 0` -- só faltava não interromper a função antes
+  // de chegar nelas.
   const activeOverview = viewDate ? (upcomingOverview?.find((d) => d.date === viewDate) ?? null) : todayOverview;
   const columns = viewDate ? buildColumns(dayGroupsCache[viewDate] ?? [], activeOverview) : hojeColumns;
   const allRows: FlatRow[] = columns.flatMap((column) =>
