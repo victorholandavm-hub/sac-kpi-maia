@@ -60,5 +60,11 @@ next-env.d.ts
 # dev local, quando a env var não está definida.
 /.local-storage
 
+# scripts/clv (Motor de Recompra, CLV preditivo -- Python à parte do resto
+# do projeto) -- venv e saída gerada não vão pro repo, só o código.
+scripts/clv/venv/
+scripts/clv/out/
+scripts/clv/__pycache__/
+
 .vercel
 .env*
