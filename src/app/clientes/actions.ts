@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
-import { listComprasDoCliente, type ClienteCompra } from "@/lib/clientes";
+import { listComprasDoCliente, setCanalAquisicao, isCanalAquisicao, type ClienteCompra } from "@/lib/clientes";
 import { registrarContato, registrarResultadoContato, marcarNaoContatar, desmarcarNaoContatar, type RecompraResultado } from "@/lib/recompra";
 
 // Busca sob demanda, só quando o nome é clicado -- pedido do Victor
@@ -49,5 +49,16 @@ export async function marcarNaoContatarAction(clientId: string, motivo: string, 
 export async function desmarcarNaoContatarAction(clientId: string): Promise<void> {
   await requireDashboardAuth();
   await desmarcarNaoContatar(clientId);
+  revalidatePath("/clientes");
+}
+
+// Canal de aquisição -- pedido do Victor 07/09/2026: "como esse cliente
+// chegou até a loja", preenchido manualmente aos poucos (ver
+// CanalAquisicaoSelect.tsx, aba Status). Sem "definido por" individual
+// (mesmo motivo de sempre -- login do painel é senha única do time).
+export async function setCanalAquisicaoAction(clientId: string, canal: string): Promise<void> {
+  await requireDashboardAuth();
+  if (!isCanalAquisicao(canal)) throw new Error("Canal inválido.");
+  await setCanalAquisicao(clientId, canal, "");
   revalidatePath("/clientes");
 }

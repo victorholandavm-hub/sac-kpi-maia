@@ -535,3 +535,64 @@ export async function listComprasDoCliente(
     })),
   };
 }
+
+// -----------------------------------------------------------------------
+// Canal de aquisição -- pedido do Victor 07/09/2026: "como esse cliente
+// chegou até a loja". Não existe em nenhum sistema hoje (nem Protheus, nem
+// os apps) -- preenchido manualmente aos poucos pelo próprio Victor,
+// direto na aba Status (ver CanalAquisicaoSelect.tsx). Um canal só por
+// cliente (decisão dele 07/09/2026: "só um por cliente").
+// -----------------------------------------------------------------------
+
+export const CANAL_AQUISICAO_OPTIONS = [
+  "passou_na_loja",
+  "indicacao",
+  "instagram",
+  "facebook",
+  "google",
+  "propaganda",
+  "cliente_antigo",
+  "outro",
+] as const;
+export type CanalAquisicao = (typeof CANAL_AQUISICAO_OPTIONS)[number];
+
+export function isCanalAquisicao(value: string | undefined | null): value is CanalAquisicao {
+  return !!value && (CANAL_AQUISICAO_OPTIONS as readonly string[]).includes(value);
+}
+
+export const CANAL_AQUISICAO_LABELS: Record<CanalAquisicao, string> = {
+  passou_na_loja: "Passou na loja",
+  indicacao: "Indicação",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  google: "Google",
+  propaganda: "Propaganda (rádio/TV)",
+  cliente_antigo: "Cliente antigo, voltou sozinho",
+  outro: "Outro",
+};
+
+export async function listCanalAquisicaoPorCliente(): Promise<Map<string, CanalAquisicao>> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("cliente_canal_aquisicao").select("client_id, canal");
+  if (error) throw new Error(error.message);
+
+  const resultado = new Map<string, CanalAquisicao>();
+  for (const r of (data ?? []) as { client_id: string; canal: string }[]) {
+    if (isCanalAquisicao(r.canal)) resultado.set(r.client_id, r.canal);
+  }
+  return resultado;
+}
+
+export async function setCanalAquisicao(clientId: string, canal: CanalAquisicao, definidoPor: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("cliente_canal_aquisicao").upsert(
+    {
+      client_id: clientId,
+      canal,
+      definido_por: definidoPor.trim() || null,
+      atualizado_em: new Date().toISOString(),
+    },
+    { onConflict: "client_id" }
+  );
+  if (error) throw new Error(error.message);
+}
