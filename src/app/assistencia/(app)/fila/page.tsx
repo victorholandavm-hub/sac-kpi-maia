@@ -475,6 +475,16 @@ export default async function AssistenciaQueuePage({
     !filterSemRota &&
     !q &&
     !store;
+  // Achado do Victor 07/09/2026: clicar em "Hoje" (isHojePresetOnly) num dia
+  // sem NENHUM chamado (feriado) caía no "Nenhuma solicitação encontrada."
+  // genérico logo abaixo (`requests.length === 0`), que vem ANTES do ternário
+  // que decide `showPecas` -- nunca chegava a renderizar EntregasKanbanHoje,
+  // e com ele o motoristaAction/"Próximas rotas" sumiam de novo, mesmo já
+  // corrigidos pra sobreviver a `groups.length === 0` (ver PR #315/#319). O
+  // board não depende de `requests.length` pra valer a pena mostrar (o botão
+  // e "Próximas rotas" continuam úteis com 0 chamados hoje) -- esse board
+  // precisa renderizar mesmo com `requests` vazio.
+  const showEntregaBoard = showPecas && (!hasActiveEntregaFilter || isHojePresetOnly);
 
   return (
     <div className="flex flex-col gap-4">
@@ -877,7 +887,7 @@ export default async function AssistenciaQueuePage({
       </div>
       {/* fecha o retângulo de filtros aberto acima */}
 
-      {requests.length === 0 ? (
+      {requests.length === 0 && !showEntregaBoard ? (
         <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
           <p className="text-sm text-gray-400 dark:text-gray-500">Nenhuma solicitação encontrada.</p>
         </div>
@@ -889,7 +899,7 @@ export default async function AssistenciaQueuePage({
         // resultado do filtro inteiro (`requests`, já inclui hoje junto,
         // sem destaque especial).
         <div className="flex flex-col gap-4">
-          {!hasActiveEntregaFilter || isHojePresetOnly ? (
+          {showEntregaBoard ? (
             <>
               {/* motoristaAction -- pedido do Victor 26/08/2026: Junior como
                   motorista padrão de João Pessoa quando o dia ainda não tem

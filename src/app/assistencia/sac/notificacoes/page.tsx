@@ -167,6 +167,13 @@ export default async function SacNotificacoesPage({
   // sem a lista achatada do resto embaixo.
   const isHojePresetOnly =
     dateFrom === today && dateTo === today && !filterStatus && !filterOrigem && filterSched === undefined && !filterCity && !filterUrgente && !filterSemRota && !q && !store;
+  // Achado do Victor 07/09/2026 (mesmo de fila/page.tsx, ver lá): clicar em
+  // "Hoje" num dia sem NENHUM chamado (feriado) caía no "Nenhuma solicitação
+  // encontrada." genérico logo abaixo (`requests.length === 0`), antes de
+  // chegar no board -- motoristaAction/"Próximas rotas" sumiam de novo,
+  // mesmo já corrigidos pra sobreviver a `groups.length === 0`. O board não
+  // depende de `requests.length` pra valer a pena mostrar.
+  const showEntregaBoard = !hasActiveFilter || isHojePresetOnly;
 
   return (
     <div className="w-full p-6 flex flex-col gap-4 min-w-0">
@@ -369,7 +376,7 @@ export default async function SacNotificacoesPage({
       </div>
       {/* fecha o retângulo de filtros aberto acima */}
 
-      {requests.length === 0 ? (
+      {requests.length === 0 && !showEntregaBoard ? (
         <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
           <p className="text-sm text-gray-400 dark:text-gray-500">Nenhuma solicitação encontrada.</p>
         </div>
@@ -380,7 +387,7 @@ export default async function SacNotificacoesPage({
         // semana/mês. Com filtro ativo, "Hoje" some e sobra só a lista
         // achatada com o resultado do filtro inteiro.
         <div className="flex flex-col gap-4">
-          {!hasActiveFilter || isHojePresetOnly ? (
+          {showEntregaBoard ? (
             <>
               {/* motoristaAction -- SAC não alcança a fila da assistência,
                   precisa desse atalho aqui também pra não depender de pedir
