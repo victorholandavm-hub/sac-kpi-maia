@@ -231,6 +231,10 @@ export type RecompraCandidato = {
   atritoScore: number;
   atritoAlto: boolean;
   segmento: RecompraSegmento;
+  // Fase 2 -- ver RecompraContato abaixo. null = nunca foi contatado (ou o
+  // último contato já teve resultado registrado e um novo ciclo ainda não
+  // começou).
+  ultimoContato: RecompraContato | null;
 };
 
 // Junta RFM/nível (listClientesPorNivel, já existente) + os dois sinais
@@ -239,10 +243,11 @@ export type RecompraCandidato = {
 // recomprar. Ordenado por prioridade de segmento e, dentro dele, por quem
 // está mais "vencido" (ratio maior primeiro).
 export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
-  const [niveis, janelaPorCliente, atritoPorCliente] = await Promise.all([
+  const [niveis, janelaPorCliente, atritoPorCliente, contatoPorCliente] = await Promise.all([
     listClientesPorNivel(),
     buildJanelaPorCliente(),
     buildAtritoPorCliente(),
+    listUltimoContatoPorCliente(),
   ]);
 
   const resultado: RecompraCandidato[] = [];
@@ -268,6 +273,7 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
       atritoScore,
       atritoAlto,
       segmento: calcularSegmento(naJanela, atritoAlto),
+      ultimoContato: contatoPorCliente.get(c.clientId) ?? null,
     });
   }
 
@@ -277,4 +283,100 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
     return (b.ratioJanela ?? 0) - (a.ratioJanela ?? 0);
   });
   return resultado;
+}
+
+// -----------------------------------------------------------------------
+// Fase 2 -- registro de contato/resultado (fecha o elo de feedback que o
+// desenho original apontou como a peça que falta, ver motor-de-recompra.
+// html: "hoje esse elo não existe -- sem ele, o modelo nunca aprende
+// sozinho se uma abordagem funcionou"). Ver migration 0108_recompra_
+// contatos.sql. "Quem contatou" é texto livre -- o login do painel de
+// KPIs é senha única compartilhada do time (dashboardSession.ts), sem
+// usuário individual, não tem como capturar isso sozinho.
+// -----------------------------------------------------------------------
+
+export const RECOMPRA_RESULTADOS = ["vendeu", "nao_vendeu"] as const;
+export type RecompraResultado = (typeof RECOMPRA_RESULTADOS)[number];
+
+export const RECOMPRA_RESULTADO_LABELS: Record<RecompraResultado, string> = {
+  vendeu: "Virou venda",
+  nao_vendeu: "Não virou",
+};
+
+export type RecompraContato = {
+  id: string;
+  clientId: string;
+  segmento: string;
+  contatadoPor: string | null;
+  contatadoEm: string;
+  resultado: RecompraResultado | null;
+  resultadoEm: string | null;
+  nota: string | null;
+};
+
+type RecompraContatoRow = {
+  id: string;
+  client_id: string;
+  segmento: string;
+  contatado_por: string | null;
+  contatado_em: string;
+  resultado: string | null;
+  resultado_em: string | null;
+  nota: string | null;
+};
+
+function rowToContato(r: RecompraContatoRow): RecompraContato {
+  return {
+    id: r.id,
+    clientId: r.client_id,
+    segmento: r.segmento,
+    contatadoPor: r.contatado_por,
+    contatadoEm: r.contatado_em,
+    resultado: r.resultado === "vendeu" || r.resultado === "nao_vendeu" ? r.resultado : null,
+    resultadoEm: r.resultado_em,
+    nota: r.nota,
+  };
+}
+
+// Último contato de cada cliente (o mais recente por contatado_em) --
+// clientes com vários ciclos de contato ao longo do tempo só mostram o
+// mais novo na lista principal (ver ClienteHistoricoRow-like uso na
+// tela, que já resolve "ver mais" clicando no nome pro histórico de
+// compra -- contato segue o mesmo espírito, sem precisar de tela própria
+// pra isso agora).
+async function listUltimoContatoPorCliente(): Promise<Map<string, RecompraContato>> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("recompra_contatos")
+    .select("id, client_id, segmento, contatado_por, contatado_em, resultado, resultado_em, nota")
+    .order("contatado_em", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  const porCliente = new Map<string, RecompraContato>();
+  for (const r of (data ?? []) as RecompraContatoRow[]) {
+    // Já ordenado por contatado_em desc -- a primeira linha vista por
+    // client_id já é a mais recente, ignora as seguintes.
+    if (porCliente.has(r.client_id)) continue;
+    porCliente.set(r.client_id, rowToContato(r));
+  }
+  return porCliente;
+}
+
+export async function registrarContato(clientId: string, segmento: string, contatadoPor: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("recompra_contatos").insert({
+    client_id: clientId,
+    segmento,
+    contatado_por: contatadoPor.trim() || null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function registrarResultadoContato(contatoId: string, resultado: RecompraResultado): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { error } = await admin
+    .from("recompra_contatos")
+    .update({ resultado, resultado_em: new Date().toISOString() })
+    .eq("id", contatoId);
+  if (error) throw new Error(error.message);
 }
