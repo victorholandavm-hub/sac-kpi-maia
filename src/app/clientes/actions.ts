@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { listComprasDoCliente, type ClienteCompra } from "@/lib/clientes";
-import { registrarContato, registrarResultadoContato, type RecompraResultado } from "@/lib/recompra";
+import { registrarContato, registrarResultadoContato, marcarNaoContatar, desmarcarNaoContatar, type RecompraResultado } from "@/lib/recompra";
 
 // Busca sob demanda, só quando o nome é clicado -- pedido do Victor
 // 20/08/2026: "não quero que ao clicar vá para outra tela, tem que expandir
@@ -32,5 +32,22 @@ export async function registrarContatoAction(clientId: string, segmento: string,
 export async function registrarResultadoContatoAction(contatoId: string, resultado: RecompraResultado): Promise<void> {
   await requireDashboardAuth();
   await registrarResultadoContato(contatoId, resultado);
+  revalidatePath("/clientes");
+}
+
+// Salvaguarda de LGPD -- pedido do Victor 07/09/2026 (ver migration
+// 0109_recompra_nao_contatar.sql): opt-out do contato comercial
+// proativo da aba "Propensão a recompra". "Quem marcou" é texto livre --
+// mesmo motivo de contatadoPor em registrarContatoAction (login do
+// painel de KPIs é senha única compartilhada do time).
+export async function marcarNaoContatarAction(clientId: string, motivo: string, criadoPor: string): Promise<void> {
+  await requireDashboardAuth();
+  await marcarNaoContatar(clientId, motivo, criadoPor);
+  revalidatePath("/clientes");
+}
+
+export async function desmarcarNaoContatarAction(clientId: string): Promise<void> {
+  await requireDashboardAuth();
+  await desmarcarNaoContatar(clientId);
   revalidatePath("/clientes");
 }

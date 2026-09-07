@@ -17,6 +17,7 @@ import {
 } from "@/lib/clientes";
 import {
   listRecompraCandidatos,
+  listRecompraNaoContatarCompleto,
   isRecompraSegmento,
   RECOMPRA_SEGMENTOS,
   RECOMPRA_SEGMENTO_LABELS,
@@ -28,6 +29,7 @@ import {
 import { AppHeader } from "@/components/AppHeader";
 import { ClienteHistoricoRow } from "@/components/ClienteHistoricoRow";
 import { RecompraContatoCell } from "@/components/RecompraContatoCell";
+import { RecompraNaoContatarManager } from "@/components/RecompraNaoContatarManager";
 
 export const dynamic = "force-dynamic";
 
@@ -542,7 +544,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
 // tabela expansível) -- só o cálculo por trás é novo.
 async function RecompraView({ q, segmento, page }: { q?: string; segmento?: string; page: number }) {
   const filterSegmento = isRecompraSegmento(segmento) ? segmento : undefined;
-  const todos = await listRecompraCandidatos();
+  const [todos, naoContatar] = await Promise.all([listRecompraCandidatos(), listRecompraNaoContatarCompleto()]);
 
   const porSegmento = new Map<RecompraSegmento, number>();
   for (const c of todos) porSegmento.set(c.segmento, (porSegmento.get(c.segmento) ?? 0) + 1);
@@ -752,6 +754,8 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
           </Link>
         </div>
       ) : null}
+
+      <RecompraNaoContatarManager items={naoContatar} />
     </>
   );
 }
