@@ -285,7 +285,10 @@ function mesesEntre(dataIso: string, hoje: Date): number {
   return (hoje.getFullYear() - d.getFullYear()) * 12 + (hoje.getMonth() - d.getMonth());
 }
 
-function diasEntre(dataIso: string, hoje: Date): number {
+// Exportada -- recompra.ts reaproveita pro ciclo de reposição por
+// categoria (dias desde a última compra daquela categoria), mesmo cálculo
+// que "dias sem comprar" já usa aqui.
+export function diasEntre(dataIso: string, hoje: Date): number {
   const d = new Date(`${dataIso}T00:00:00`);
   return Math.floor((hoje.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
 }
