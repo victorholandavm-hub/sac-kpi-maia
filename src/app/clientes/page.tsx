@@ -674,7 +674,19 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                       </span>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {c.categoriaJanela ? `${c.categoriaJanela} · há ${c.diasDesdeCategoria} dias` : "—"}
+                      {c.categoriaJanela ? (
+                        <span
+                          title={
+                            c.categoriaJanelaDataReal
+                              ? "Contado a partir da data de entrega confirmada, não do pedido."
+                              : "Sem entrega confirmada pra essa compra -- contado a partir da data do pedido (aproximado)."
+                          }
+                        >
+                          {c.categoriaJanela} · há {c.diasDesdeCategoria} dias{c.categoriaJanelaDataReal ? " 📦" : ""}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: c.sugestaoCrossSell ? "var(--text-primary)" : "var(--text-muted)" }}>
                       {c.sugestaoCrossSell ?? "—"}
