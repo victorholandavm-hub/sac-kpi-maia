@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
@@ -385,7 +386,7 @@ type ClientePedidoRow = {
 // fetchAllPagesParallel) -- achado 19/08/2026: era sequencial, até 200
 // páginas (38 mil pedidos reais), boa parte dos 15,8s que a tela de
 // Clientes chegou a demorar pra carregar.
-export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
+async function listClientesPorNivelUncached(): Promise<ClienteNivelInfo[]> {
   const admin = getSupabaseAdmin();
 
   const [rows, storeNameById] = await Promise.all([
@@ -476,6 +477,19 @@ export async function listClientesPorNivel(): Promise<ClienteNivelInfo[]> {
 
   return resultado;
 }
+
+// Cache -- pedido do Victor 07/09/2026: reduzir egress do Supabase (custo
+// mensal do plano Pro) sem migrar banco nenhum. Essa função varre
+// totvs_orders inteiro (43 mil+ linhas e crescendo, ver backfill
+// histórico) -- a mais pesada da tela de Clientes, e reexecutada do zero
+// toda vez que a aba Nível de relacionamento OU Propensão a recompra
+// carrega (as duas usam, ver recompra.ts), sem cache nenhum até agora. O
+// dado de origem (sync do TOTVS) só muda a cada ~30min de qualquer jeito
+// -- 15min de cache não perde nada de fresco na prática.
+export const listClientesPorNivel = unstable_cache(listClientesPorNivelUncached, ["clientes-por-nivel"], {
+  revalidate: 900,
+  tags: ["clientes-por-nivel"],
+});
 
 export type ClienteCompra = {
   id: string;

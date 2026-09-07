@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { listClientesPorNivel, diasEntre, type ClienteNivel } from "./clientes";
@@ -89,7 +90,22 @@ type OrderItemRow = { description: string | null; totvs_orders: { client_id: str
 // de dt_retorno mais recente (a tentativa que realmente deu certo).
 type CargaRow = { nota_fiscal: string | null; serie: string | null; status_entrega: string | null; dt_retorno: string | null };
 
-async function buildDeliveryDatePorInvoiceSerie(): Promise<Map<string, string>> {
+// Cache -- pedido do Victor 07/09/2026: reduzir tráfego de egress do
+// Supabase (tinha estourado a cota antes, virou custo mensal do plano Pro)
+// sem migrar banco nenhum. Essas duas funções varrem totvs_order_items
+// (~54 mil linhas) e totvs_delivery_cargas (~36 mil) inteiros -- as mais
+// pesadas do Motor de Recompra, e reexecutadas do zero TODA VEZ que
+// alguém abre a aba "Propensão a recompra", sem cache nenhum até agora.
+// O dado de origem (sync do TOTVS) só muda a cada ~30min de qualquer
+// jeito -- 15min de cache não perde nada de fresco na prática e corta
+// bastante egress repetido. unstable_cache só aceita retorno
+// serializável (JSON) -- por isso as funções cacheadas devolvem objeto
+// simples (Record), não Map, com um wrapper fino por fora convertendo
+// de volta pra Map (formato que o resto do arquivo já espera, sem
+// precisar mudar mais nada).
+const DELIVERY_DATE_TAG = "recompra-delivery-date";
+
+async function fetchDeliveryDatePorInvoiceSerie(): Promise<Record<string, string>> {
   const admin = getSupabaseAdmin();
   const rows = await fetchAllPagesParallel<CargaRow>(
     (from, to) =>
@@ -103,33 +119,41 @@ async function buildDeliveryDatePorInvoiceSerie(): Promise<Map<string, string>> 
     { pageSize: CARGA_PAGE_SIZE }
   );
 
-  const resultado = new Map<string, string>();
+  const resultado: Record<string, string> = {};
   for (const r of rows) {
     if (!r.nota_fiscal || !r.serie || !r.dt_retorno) continue;
     const key = `${r.nota_fiscal}|${r.serie}`;
-    const atual = resultado.get(key);
-    if (!atual || r.dt_retorno > atual) resultado.set(key, r.dt_retorno);
+    const atual = resultado[key];
+    if (!atual || r.dt_retorno > atual) resultado[key] = r.dt_retorno;
   }
   return resultado;
 }
+
+const cachedDeliveryDatePorInvoiceSerie = unstable_cache(fetchDeliveryDatePorInvoiceSerie, ["recompra-delivery-date"], {
+  revalidate: 900,
+  tags: [DELIVERY_DATE_TAG],
+});
 
 // Varre totvs_order_items inteiro (join com totvs_orders pra pegar
 // client_id/issue_date/invoice/serie, mesmo padrão já usado em
 // vendasProduto.ts) -- pra cada cliente, guarda a compra MAIS RECENTE de
 // cada categoria, usando a data de entrega real quando existe
-// (deliveryDatePorInvoiceSerie) ou a data do pedido como aproximação. ~54
-// mil dos ~81 mil itens batem nalguma categoria cíclica (conferido
-// 07/09/2026) -- não filtra por palavra-chave na query (a lista de
-// keywords muda fácil demais pra depender de um OR gigante no banco),
-// filtra em memória depois de trazer tudo, igual listClientesPorNivel já
-// faz com o pedido inteiro.
+// (fetchDeliveryDatePorInvoiceSerie, já cacheada, ver acima) ou a data do
+// pedido como aproximação. ~54 mil dos ~81 mil itens batem nalguma
+// categoria cíclica (conferido 07/09/2026) -- não filtra por
+// palavra-chave na query (a lista de keywords muda fácil demais pra
+// depender de um OR gigante no banco), filtra em memória depois de
+// trazer tudo, igual listClientesPorNivel já faz com o pedido inteiro.
 //
 // Extraída como função própria (07/09/2026, Fase 3 -- afinidade de
 // produto) porque tanto buildJanelaPorCliente quanto
 // buildAfinidadeGlobal precisam do MESMO conjunto de categorias por
 // cliente -- separar evita escanear totvs_order_items (a parte cara,
 // ~54 mil linhas) duas vezes.
-async function buildCategoriasPorCliente(deliveryDatePorInvoiceSerie: Map<string, string>): Promise<Map<string, Map<string, { data: string; dataReal: boolean }>>> {
+const CATEGORIAS_POR_CLIENTE_TAG = "recompra-categorias-por-cliente";
+
+async function fetchCategoriasPorCliente(): Promise<Record<string, Record<string, { data: string; dataReal: boolean }>>> {
+  const deliveryDatePorInvoiceSerie = await cachedDeliveryDatePorInvoiceSerie();
   const admin = getSupabaseAdmin();
   const rows = await fetchAllPagesParallel<OrderItemRow>(
     (from, to) =>
@@ -144,21 +168,35 @@ async function buildCategoriasPorCliente(deliveryDatePorInvoiceSerie: Map<string
 
   // client_id -> categoria key -> { data mais recente dessa categoria pra
   // esse cliente, se veio de entrega confirmada ou só do pedido }.
-  const ultimaPorCategoria = new Map<string, Map<string, { data: string; dataReal: boolean }>>();
+  const ultimaPorCategoria: Record<string, Record<string, { data: string; dataReal: boolean }>> = {};
   for (const r of rows) {
     const order = r.totvs_orders;
     if (!order?.client_id) continue;
     const categoria = inferCategoriaCiclo(r.description);
     if (!categoria) continue;
-    const dataEntrega = order.invoice && order.serie ? deliveryDatePorInvoiceSerie.get(`${order.invoice}|${order.serie}`) : undefined;
+    const dataEntrega = order.invoice && order.serie ? deliveryDatePorInvoiceSerie[`${order.invoice}|${order.serie}`] : undefined;
     const data = dataEntrega ?? order.issue_date;
     const dataReal = dataEntrega !== undefined;
-    const porCategoria = ultimaPorCategoria.get(order.client_id) ?? new Map<string, { data: string; dataReal: boolean }>();
-    const atual = porCategoria.get(categoria.key);
-    if (!atual || data > atual.data) porCategoria.set(categoria.key, { data, dataReal });
-    ultimaPorCategoria.set(order.client_id, porCategoria);
+    const porCategoria = ultimaPorCategoria[order.client_id] ?? {};
+    const atual = porCategoria[categoria.key];
+    if (!atual || data > atual.data) porCategoria[categoria.key] = { data, dataReal };
+    ultimaPorCategoria[order.client_id] = porCategoria;
   }
   return ultimaPorCategoria;
+}
+
+const cachedCategoriasPorCliente = unstable_cache(fetchCategoriasPorCliente, ["recompra-categorias-por-cliente"], {
+  revalidate: 900,
+  tags: [CATEGORIAS_POR_CLIENTE_TAG],
+});
+
+async function buildCategoriasPorCliente(): Promise<Map<string, Map<string, { data: string; dataReal: boolean }>>> {
+  const obj = await cachedCategoriasPorCliente();
+  const resultado = new Map<string, Map<string, { data: string; dataReal: boolean }>>();
+  for (const [clientId, porCategoria] of Object.entries(obj)) {
+    resultado.set(clientId, new Map(Object.entries(porCategoria)));
+  }
+  return resultado;
 }
 
 // Reduz o mapa de categorias por cliente (acima) pra um sinal só por
@@ -374,13 +412,9 @@ export type RecompraCandidato = {
 // não tem o que recomprar. Ordenado por prioridade de segmento e, dentro
 // dele, por quem está mais "vencido" (ratio maior primeiro).
 export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
-  // deliveryDatePorInvoiceSerie precisa terminar ANTES de
-  // buildCategoriasPorCliente (que a usa) -- as outras três continuam em
-  // paralelo com ela.
-  const deliveryDatePorInvoiceSerie = await buildDeliveryDatePorInvoiceSerie();
   const [niveis, categoriasPorCliente, atritoPorCliente, contatoPorCliente, naoContatar] = await Promise.all([
     listClientesPorNivel(),
-    buildCategoriasPorCliente(deliveryDatePorInvoiceSerie),
+    buildCategoriasPorCliente(),
     buildAtritoPorCliente(),
     listUltimoContatoPorCliente(),
     listClientesNaoContatar(),
