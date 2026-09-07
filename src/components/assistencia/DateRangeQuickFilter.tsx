@@ -6,10 +6,17 @@ import { FilterPill } from "./FilterPill";
 // (não substitui -- ainda dá pra digitar uma data manual pra fora de
 // qualquer um desses atalhos), então mora ao lado deles na mesma barra de
 // filtros.
-export type DatePreset = "hoje" | "7d" | "30d" | "3m" | "1a" | "este_ano";
+export type DatePreset = "hoje" | "amanha" | "7d" | "30d" | "3m" | "1a" | "este_ano";
 
 const PRESETS: { key: DatePreset; label: string }[] = [
   { key: "hoje", label: "Hoje" },
+  // Pedido do Victor 07/09/2026: hoje é feriado (ver rota_holidays) e o
+  // painel "Motorista do dia" não mostra a semana toda por padrão -- na
+  // aba Entregas ele queria ver amanhã sem precisar digitar a data nos
+  // campos De/Até manualmente. Único atalho aqui que é um dia só (from ===
+  // to), não uma janela desde X dias atrás -- resto do componente já lida
+  // com isso de graça (computePresetRange só devolve {from, to}).
+  { key: "amanha", label: "Amanhã" },
   { key: "7d", label: "7 dias" },
   { key: "30d", label: "30 dias" },
   { key: "3m", label: "3 meses" },
@@ -31,6 +38,12 @@ function toYmd(d: Date): string {
 export function computePresetRange(preset: DatePreset, today: Date = new Date()): { from: string; to: string } {
   const to = toYmd(today);
   if (preset === "hoje") return { from: to, to };
+  if (preset === "amanha") {
+    const d = new Date(today);
+    d.setDate(d.getDate() + 1);
+    const tomorrow = toYmd(d);
+    return { from: tomorrow, to: tomorrow };
+  }
   if (preset === "7d") {
     const d = new Date(today);
     d.setDate(d.getDate() - 7);
