@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { listClientesPorNivel, diasEntre, type ClienteNivel } from "./clientes";
 import { DELIVERY_REQUEST_TYPES, CAUSA_RAIZ_ERRO_INTERNO } from "./assistenciaLabels";
+import { RESOLVIDO_LABELS } from "./entregasRisco";
 
 // Motor de Recompra, Fase 1 -- pedido do Victor 07/09/2026 ("desenho
 // completo" + "siga para a fase 1"): régua determinística (sem modelo
@@ -65,16 +66,59 @@ export function inferCategoriaCiclo(description: string | null): CategoriaCiclo 
 // contatar antes do concorrente.
 const RATIO_NA_JANELA = 0.7;
 
-type CategoriaSinal = { categoria: CategoriaCiclo; dataCompra: string; diasDesde: number; ratio: number };
+type CategoriaSinal = { categoria: CategoriaCiclo; dataCompra: string; diasDesde: number; ratio: number; dataReal: boolean };
 
 const ITEM_PAGE_SIZE = 1000;
+const CARGA_PAGE_SIZE = 1000;
 
-type OrderItemRow = { description: string | null; totvs_orders: { client_id: string | null; issue_date: string } | null };
+type OrderItemRow = { description: string | null; totvs_orders: { client_id: string | null; issue_date: string; invoice: string | null; serie: string | null } | null };
+
+// Data que o produto de fato chegou na casa do cliente, não a data do
+// pedido/nota fiscal -- pedido do Victor 07/09/2026: "implemente" depois
+// de achar que totvs_delivery_cargas.nota_fiscal/serie casa com
+// totvs_orders.invoice/serie (a chave que motor-de-recompra.html tinha
+// marcado como "não achei" -- FILIAL não bate entre as duas tabelas
+// (faturamento x venda, achado 07/09/2026), mas invoice+serie sozinho já
+// cobre 57% das entregas). Onde não tem entrega confirmada (a maioria,
+// ainda), cai pra issue_date do pedido -- ver dataReal em CategoriaSinal,
+// que marca qual dos dois foi usado.
+//
+// Várias tentativas de carga podem existir pro mesmo documento (ver
+// `tentativa` em totvs_delivery_cargas) -- só as com status_entrega
+// resolvido (RESOLVIDO_LABELS, entregasRisco.ts) contam, e entre elas a
+// de dt_retorno mais recente (a tentativa que realmente deu certo).
+type CargaRow = { nota_fiscal: string | null; serie: string | null; status_entrega: string | null; dt_retorno: string | null };
+
+async function buildDeliveryDatePorInvoiceSerie(): Promise<Map<string, string>> {
+  const admin = getSupabaseAdmin();
+  const rows = await fetchAllPagesParallel<CargaRow>(
+    (from, to) =>
+      admin
+        .from("totvs_delivery_cargas")
+        .select("nota_fiscal, serie, status_entrega, dt_retorno", { count: "exact" })
+        .not("nota_fiscal", "is", null)
+        .not("dt_retorno", "is", null)
+        .in("status_entrega", RESOLVIDO_LABELS)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<CargaRow>>,
+    { pageSize: CARGA_PAGE_SIZE }
+  );
+
+  const resultado = new Map<string, string>();
+  for (const r of rows) {
+    if (!r.nota_fiscal || !r.serie || !r.dt_retorno) continue;
+    const key = `${r.nota_fiscal}|${r.serie}`;
+    const atual = resultado.get(key);
+    if (!atual || r.dt_retorno > atual) resultado.set(key, r.dt_retorno);
+  }
+  return resultado;
+}
 
 // Varre totvs_order_items inteiro (join com totvs_orders pra pegar
-// client_id/issue_date, mesmo padrão já usado em vendasProduto.ts) -- pra
-// cada cliente, guarda a compra MAIS RECENTE de cada categoria. ~54 mil
-// dos ~81 mil itens batem nalguma categoria cíclica (conferido
+// client_id/issue_date/invoice/serie, mesmo padrão já usado em
+// vendasProduto.ts) -- pra cada cliente, guarda a compra MAIS RECENTE de
+// cada categoria, usando a data de entrega real quando existe
+// (deliveryDatePorInvoiceSerie) ou a data do pedido como aproximação. ~54
+// mil dos ~81 mil itens batem nalguma categoria cíclica (conferido
 // 07/09/2026) -- não filtra por palavra-chave na query (a lista de
 // keywords muda fácil demais pra depender de um OR gigante no banco),
 // filtra em memória depois de trazer tudo, igual listClientesPorNivel já
@@ -85,30 +129,33 @@ type OrderItemRow = { description: string | null; totvs_orders: { client_id: str
 // buildAfinidadeGlobal precisam do MESMO conjunto de categorias por
 // cliente -- separar evita escanear totvs_order_items (a parte cara,
 // ~54 mil linhas) duas vezes.
-async function buildCategoriasPorCliente(): Promise<Map<string, Map<string, string>>> {
+async function buildCategoriasPorCliente(deliveryDatePorInvoiceSerie: Map<string, string>): Promise<Map<string, Map<string, { data: string; dataReal: boolean }>>> {
   const admin = getSupabaseAdmin();
   const rows = await fetchAllPagesParallel<OrderItemRow>(
     (from, to) =>
       admin
         .from("totvs_order_items")
-        .select("description, totvs_orders!inner(client_id, issue_date, type)", { count: "exact" })
+        .select("description, totvs_orders!inner(client_id, issue_date, type, invoice, serie)", { count: "exact" })
         .eq("totvs_orders.type", "Venda")
         .not("totvs_orders.client_id", "is", null)
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<OrderItemRow>>,
     { pageSize: ITEM_PAGE_SIZE }
   );
 
-  // client_id -> categoria key -> data (YYYY-MM-DD) da compra mais recente
-  // dessa categoria pra esse cliente.
-  const ultimaPorCategoria = new Map<string, Map<string, string>>();
+  // client_id -> categoria key -> { data mais recente dessa categoria pra
+  // esse cliente, se veio de entrega confirmada ou só do pedido }.
+  const ultimaPorCategoria = new Map<string, Map<string, { data: string; dataReal: boolean }>>();
   for (const r of rows) {
     const order = r.totvs_orders;
     if (!order?.client_id) continue;
     const categoria = inferCategoriaCiclo(r.description);
     if (!categoria) continue;
-    const porCategoria = ultimaPorCategoria.get(order.client_id) ?? new Map<string, string>();
+    const dataEntrega = order.invoice && order.serie ? deliveryDatePorInvoiceSerie.get(`${order.invoice}|${order.serie}`) : undefined;
+    const data = dataEntrega ?? order.issue_date;
+    const dataReal = dataEntrega !== undefined;
+    const porCategoria = ultimaPorCategoria.get(order.client_id) ?? new Map<string, { data: string; dataReal: boolean }>();
     const atual = porCategoria.get(categoria.key);
-    if (!atual || order.issue_date > atual) porCategoria.set(categoria.key, order.issue_date);
+    if (!atual || data > atual.data) porCategoria.set(categoria.key, { data, dataReal });
     ultimaPorCategoria.set(order.client_id, porCategoria);
   }
   return ultimaPorCategoria;
@@ -117,17 +164,17 @@ async function buildCategoriasPorCliente(): Promise<Map<string, Map<string, stri
 // Reduz o mapa de categorias por cliente (acima) pra um sinal só por
 // cliente -- a categoria com MAIOR ratio (a mais "vencida") é o sinal de
 // janela daquele cliente.
-function buildJanelaPorCliente(categoriasPorCliente: Map<string, Map<string, string>>): Map<string, CategoriaSinal> {
+function buildJanelaPorCliente(categoriasPorCliente: Map<string, Map<string, { data: string; dataReal: boolean }>>): Map<string, CategoriaSinal> {
   const hoje = new Date();
   const resultado = new Map<string, CategoriaSinal>();
   for (const [clientId, porCategoria] of categoriasPorCliente) {
     let melhor: CategoriaSinal | null = null;
-    for (const [key, dataCompra] of porCategoria) {
+    for (const [key, { data: dataCompra, dataReal }] of porCategoria) {
       const categoria = CATEGORIAS_CICLO.find((c) => c.key === key);
       if (!categoria) continue;
       const diasDesde = diasEntre(dataCompra, hoje);
       const ratio = diasDesde / (categoria.cicloMeses * 30);
-      if (!melhor || ratio > melhor.ratio) melhor = { categoria, dataCompra, diasDesde, ratio };
+      if (!melhor || ratio > melhor.ratio) melhor = { categoria, dataCompra, diasDesde, ratio, dataReal };
     }
     if (melhor) resultado.set(clientId, melhor);
   }
@@ -147,7 +194,7 @@ function buildJanelaPorCliente(categoriasPorCliente: Map<string, Map<string, str
 
 type AfinidadeCategoria = { categoria: CategoriaCiclo; score: number };
 
-function buildAfinidadeGlobal(categoriasPorCliente: Map<string, Map<string, string>>): Map<string, AfinidadeCategoria[]> {
+function buildAfinidadeGlobal(categoriasPorCliente: Map<string, Map<string, { data: string; dataReal: boolean }>>): Map<string, AfinidadeCategoria[]> {
   const countCategoria = new Map<string, number>();
   const countPar = new Map<string, number>();
 
@@ -301,6 +348,12 @@ export type RecompraCandidato = {
   categoriaJanela: string | null;
   diasDesdeCategoria: number | null;
   ratioJanela: number | null;
+  // true = diasDesdeCategoria conta a partir da entrega de verdade
+  // (totvs_delivery_cargas), não do pedido -- ver buildDeliveryDatePorInvoiceSerie.
+  // Hoje só ~57% dos pedidos casam com uma entrega confirmada; o resto
+  // continua caindo pra data do pedido (dataReal false), aproximação de
+  // sempre.
+  categoriaJanelaDataReal: boolean;
   atritoScore: number;
   atritoAlto: boolean;
   segmento: RecompraSegmento;
@@ -321,9 +374,13 @@ export type RecompraCandidato = {
 // não tem o que recomprar. Ordenado por prioridade de segmento e, dentro
 // dele, por quem está mais "vencido" (ratio maior primeiro).
 export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
+  // deliveryDatePorInvoiceSerie precisa terminar ANTES de
+  // buildCategoriasPorCliente (que a usa) -- as outras três continuam em
+  // paralelo com ela.
+  const deliveryDatePorInvoiceSerie = await buildDeliveryDatePorInvoiceSerie();
   const [niveis, categoriasPorCliente, atritoPorCliente, contatoPorCliente] = await Promise.all([
     listClientesPorNivel(),
-    buildCategoriasPorCliente(),
+    buildCategoriasPorCliente(deliveryDatePorInvoiceSerie),
     buildAtritoPorCliente(),
     listUltimoContatoPorCliente(),
   ]);
@@ -354,6 +411,7 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
       categoriaJanela: janela?.categoria.label ?? null,
       diasDesdeCategoria: janela?.diasDesde ?? null,
       ratioJanela: janela?.ratio ?? null,
+      categoriaJanelaDataReal: janela?.dataReal ?? false,
       atritoScore,
       atritoAlto,
       segmento: calcularSegmento(naJanela, atritoAlto),
