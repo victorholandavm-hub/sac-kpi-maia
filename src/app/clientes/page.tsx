@@ -27,6 +27,7 @@ import {
 } from "@/lib/recompra";
 import { AppHeader } from "@/components/AppHeader";
 import { ClienteHistoricoRow } from "@/components/ClienteHistoricoRow";
+import { RecompraContatoCell } from "@/components/RecompraContatoCell";
 
 export const dynamic = "force-dynamic";
 
@@ -648,6 +649,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Atrito</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Gasto acumulado</th>
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Contato</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -656,7 +658,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     key={c.clientId}
                     clientId={c.clientId}
                     name={c.nome ?? c.clientId}
-                    colSpan={7}
+                    colSpan={8}
                     accentColor={RECOMPRA_SEGMENTO_COLORS[c.segmento]}
                   >
                     <td className="px-4 py-2 whitespace-nowrap">
@@ -694,6 +696,9 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     </td>
                     <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--brand-green)" }}>
                       {formatBRL(c.gastoAcumulado)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <RecompraContatoCell clientId={c.clientId} segmento={c.segmento} contato={c.ultimoContato} />
                     </td>
                   </ClienteHistoricoRow>
                 ))}
