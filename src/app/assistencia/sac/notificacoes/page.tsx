@@ -400,7 +400,16 @@ export default async function SacNotificacoesPage({
               {!hasActiveFilter ? <EntregasFlatList items={restGroups.flatMap((g) => g.items)} /> : null}
             </>
           ) : (
-            <EntregasFlatList items={requests} />
+            // Achado do Victor 07/09/2026: mesmo raciocínio de fila/page.tsx
+            // -- filtrar por "Amanhã" (ou qualquer outro filtro/período)
+            // escondia o botão "Gestão de Motoristas & Escala" junto com o
+            // resto do ramo `isHojePresetOnly` acima. O painel não depende
+            // de nenhum estado desse ramo (é sempre a semana + seguinte,
+            // com "Mostrar mais dias"), só falta continuar visível.
+            <>
+              <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+              <EntregasFlatList items={requests} />
+            </>
           )}
         </div>
       )}
