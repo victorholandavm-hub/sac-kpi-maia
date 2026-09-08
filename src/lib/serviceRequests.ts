@@ -938,32 +938,32 @@ export type DayLoadItem = {
 // listDayLoad logo abaixo.
 const VISITA_TYPES_FOR_DAY_LOAD = ASSISTENCIA_MANAGED_TYPES.filter((t) => !(DELIVERY_REQUEST_TYPES as readonly string[]).includes(t));
 
-// Visitas já agendadas pra um dia específico -- usado no momento de criar
-// uma solicitação nova (QuickCreateRequestForm) pra mostrar, assim que a
-// assistência escolhe a data, quantas e quais demandas já existem naquele
-// dia, sem precisar sair do formulário e ir checar a agenda à parte. Mesma
-// prioridade de data de agendaEffectiveDate (scheduled_date primeiro,
-// approved_deadline só quando não tem scheduled_date), expressa direto na
-// query porque aqui não dá pra trazer tudo e filtrar em JS como a agenda faz
-// (essa consulta roda a cada data digitada, precisa ser enxuta).
-//
-// Só tipo de VISITA (montagem/desmontagem/troca_peça/vistoria) -- achado
-// 20/08/2026 (pedido do Victor: "é so para aparecer as montagens ne"): sem
-// filtro de tipo, entrega/troca de produto (rota de motorista, sem nenhuma
-// relação com a agenda do montador) também aparecia aqui, misturado com as
-// visitas de verdade. QuickCreateRequestForm (único chamador) só cria
-// tipo de visita mesmo, então o filtro não tira nada que devesse aparecer.
+// Os 3 tipos que NovaEntregaAssistenciaForm.tsx (aba "Nova entrega" da
+// assistência) de fato cria (ver ENTREGA_TYPES nesse arquivo) -- troca/
+// entrega/recolhimento de PRODUTO são domínio do SAC (ver comentário em
+// nova-entrega/page.tsx), não entram aqui.
+const ENTREGA_TYPES_FOR_DAY_LOAD = ["recolhimento", "envio_peca", "envio_recolhimento_peca"] as const;
+
+// Consulta compartilhada por listDayLoad (visita, montador) e
+// listEntregaDayLoad (entrega, motorista) -- mesma ideia dos dois: assim
+// que a assistência escolhe a data no formulário de "nova solicitação",
+// mostra o que já existe agendado pra aquele dia, sem sair da tela pra
+// checar a agenda à parte. Mesma prioridade de data de agendaEffectiveDate
+// (scheduled_date primeiro, approved_deadline só quando não tem
+// scheduled_date), expressa direto na query porque aqui não dá pra trazer
+// tudo e filtrar em JS como a agenda faz (roda a cada data digitada,
+// precisa ser enxuta).
 //
 // Só o que a própria equipe assistência abriu -- pedido do Victor
 // 08/09/2026: "deve aparecer todas as notificações de assistência, apenas
-// deles, não do sac". O SAC também abre visita do mesmo tipo (ver
-// assistencia/sac/nova-visita), então o filtro de tipo acima sozinho não
-// bastava -- precisa saber QUEM abriu. `requested_by` aponta pro profile
-// de quem criou (só sac/assistencia/admin usam esses formulários -- ver
-// requested_by: profile.id em actions.ts); sem profile vinculado (não
-// deveria acontecer aqui, mas por garantia) conta como "não é do SAC" em
-// vez de sumir da lista à toa.
-export async function listDayLoad(date: string): Promise<DayLoadItem[]> {
+// deles, não do sac". O SAC também abre os mesmos tipos (ver
+// assistencia/sac/nova-visita e assistencia/sac/nova), então o filtro de
+// tipo sozinho não bastava -- precisa saber QUEM abriu. `requested_by`
+// aponta pro profile de quem criou (só sac/assistencia/admin usam esses
+// formulários -- ver requested_by: profile.id em actions.ts); sem profile
+// vinculado (não deveria acontecer aqui, mas por garantia) conta como "não
+// é do SAC" em vez de sumir da lista à toa.
+async function queryDayLoad(date: string, types: readonly RequestType[]): Promise<DayLoadItem[]> {
   // Validação estrita antes de interpolar na string do filtro -- `date` vem
   // de input do usuário (mesmo que o <input type="date"> do navegador já
   // restrinja o formato, a action pode ser chamada direto) e injeção aqui
@@ -974,7 +974,7 @@ export async function listDayLoad(date: string): Promise<DayLoadItem[]> {
   const { data, error } = await admin
     .from("service_requests")
     .select("id, ticket_number, type, client_name, client_neighborhood, shift, scheduled_time, stores(name), requester:profiles!requested_by(role)")
-    .in("type", [...VISITA_TYPES_FOR_DAY_LOAD])
+    .in("type", [...types])
     .or(`scheduled_date.eq.${date},and(scheduled_date.is.null,approved_deadline.eq.${date})`)
     .not("status", "eq", "cancelada")
     .order("scheduled_time", { ascending: true, nullsFirst: false });
@@ -1006,6 +1006,21 @@ export async function listDayLoad(date: string): Promise<DayLoadItem[]> {
       shift: r.shift,
       scheduledTime: r.scheduled_time,
     }));
+}
+
+// Achado 20/08/2026 (pedido do Victor: "é so para aparecer as montagens
+// ne"): sem filtro de tipo, entrega/troca de produto (rota de motorista,
+// sem nenhuma relação com a agenda do montador) também aparecia aqui,
+// misturado com as visitas de verdade.
+export async function listDayLoad(date: string): Promise<DayLoadItem[]> {
+  return queryDayLoad(date, VISITA_TYPES_FOR_DAY_LOAD);
+}
+
+// Mesma ideia de listDayLoad acima, só que pro lado de entrega (motorista)
+// -- pedido do Victor 08/09/2026, corrigindo o alvo: "não era nova visita
+// não, era da aba de entrega".
+export async function listEntregaDayLoad(date: string): Promise<DayLoadItem[]> {
+  return queryDayLoad(date, ENTREGA_TYPES_FOR_DAY_LOAD);
 }
 
 export type AssemblerRequestItem = { id: string; product: string; quantity: number; action: ItemAction | null; completed: boolean };
