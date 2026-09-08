@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
+import { registrarStatusDetrator, isNpsDetratorStatus, type NpsDetratorOrigem } from "@/lib/npsDetratores";
 
 // Avaliações do Google -- puxadas manualmente uma vez por semana (ver
 // src/lib/googleReviews.ts). O painel de KPIs do SAC usa login próprio
@@ -54,5 +55,15 @@ export async function saveGoogleReviewSnapshot(
     );
   if (error) throw new Error(error.message);
 
+  revalidatePath("/avaliacoes");
+}
+
+// Aba "Detratores" -- pedido do Victor 08/09/2026. Mesmo login (senha
+// única do painel de KPIs) das duas ações acima.
+export async function setNpsDetratorStatusAction(origem: NpsDetratorOrigem, origemId: string, status: string, motivo: string): Promise<void> {
+  await requireDashboardAuth();
+  if (!isNpsDetratorStatus(status)) throw new Error("Status inválido.");
+
+  await registrarStatusDetrator(origem, origemId, { status, motivo: motivo.trim() || null });
   revalidatePath("/avaliacoes");
 }

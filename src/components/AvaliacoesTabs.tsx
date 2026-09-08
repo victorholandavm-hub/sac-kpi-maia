@@ -5,18 +5,29 @@ import type { DateRange } from "@/lib/dateRange";
 import type { NpsSummary, NpsDetractor } from "@/lib/kpi";
 import type { StoreGoogleReviews } from "@/lib/googleReviews";
 import type { NpsWeekPoint } from "@/lib/npsTrend";
+import type { NpsDetrator } from "@/lib/npsDetratores";
 import { RangePicker } from "./RangePicker";
 import { NpsCard, NPS_SCORE_LABELS } from "./NpsCard";
 import { BarRanking } from "./BarRanking";
 import { NpsTrendChart } from "./NpsTrendChart";
 import { GoogleReviewsSection } from "./GoogleReviewsSection";
+import { NpsDetratoresTable } from "./NpsDetratoresTable";
 
 // Cada fonte de avaliação tem sua própria aba, sem misturar (pedido do
 // Victor 19/08/2026) -- quando entrar uma fonte nova de NPS (fora do GHL,
 // ainda sem data definida), é só somar uma entrada aqui + um novo bloco de
 // conteúdo abaixo, igual às duas que já existem.
+//
+// "Detratores" é diferente das outras duas: não é uma fonte própria, é uma
+// lista de trabalho cruzando TODAS as fontes de NPS (pedido do Victor
+// 08/09/2026) -- por isso não segue o padrão "uma aba por fonte" acima. As
+// abas por fase (pós-entrega/montagem/assistência) + uma aba "geral" com só
+// as notas ficam pra quando essas fontes estiverem rodando de verdade
+// (ainda esperando aprovação de template no WhatsApp) -- combinado com o
+// Victor, essa aba de Detratores é a parte que já dá pra ligar agora.
 const TABS = [
   { id: "nps-sac", label: "NPS Atendimento (SAC)" },
+  { id: "detratores", label: "Detratores" },
   { id: "google", label: "Avaliações Google" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -27,12 +38,14 @@ export function AvaliacoesTabs({
   npsDetractors,
   npsTrend,
   googleReviews,
+  npsDetratores,
 }: {
   range: DateRange;
   npsSummary: NpsSummary;
   npsDetractors: NpsDetractor[];
   npsTrend: NpsWeekPoint[];
   googleReviews: StoreGoogleReviews[];
+  npsDetratores: NpsDetrator[];
 }) {
   const [activeTab, setActiveTab] = useState<TabId>("nps-sac");
 
@@ -78,6 +91,17 @@ export function AvaliacoesTabs({
             coverage={{ withValue: npsSummary.responseCount, total: npsSummary.eligibleCount, pct: npsSummary.responseRatePct ?? 0 }}
           />
           <NpsTrendChart data={npsTrend} />
+        </div>
+      ) : null}
+
+      {activeTab === "detratores" ? (
+        <div className="flex flex-col gap-4">
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Todo mundo que deu nota baixa em qualquer NPS (últimos 6 meses) -- atendimento (SAC) e, assim que
+            estiverem rodando, pós-montagem e pós-assistência técnica. Registre o motivo depois de ligar e marque
+            como recuperado, perdido, em contato ou sem resposta.
+          </p>
+          <NpsDetratoresTable items={npsDetratores} />
         </div>
       ) : null}
 
