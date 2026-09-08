@@ -176,7 +176,7 @@ export default async function SacNotificacoesPage({
   const showEntregaBoard = !hasActiveFilter || isHojePresetOnly;
 
   return (
-    <div className="w-full p-6 flex flex-col gap-4 min-w-0">
+    <div className="max-w-6xl mx-auto w-full p-6 flex flex-col gap-4 min-w-0">
       <RealtimeQueueRefresher notifyOnInsert="Nova solicitação recebida!" />
 
       <AssistenciaHeader title="Notificação de Assistência" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`} />

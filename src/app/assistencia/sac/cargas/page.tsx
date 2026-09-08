@@ -173,7 +173,7 @@ export default async function CargasPage({ searchParams }: { searchParams: Promi
   ]);
 
   return (
-    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
+    <div className="max-w-6xl mx-auto w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Cargas" subtitle="Clientes que compraram e ainda não entraram em carga, e a carga de trocas da logística." />
 
       <SacTabs active="cargas" />

@@ -46,7 +46,7 @@ export default async function ArsenalSacPage({
   })).filter((g) => g.entries.length > 0);
 
   return (
-    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
+    <div className="max-w-6xl mx-auto w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Arsenal do SAC" subtitle="Base de conhecimento — contatos, garantias e CDC" />
 
       <form action="/assistencia/sac/arsenal" method="GET" className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-2">
