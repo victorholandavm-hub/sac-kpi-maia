@@ -953,6 +953,16 @@ const VISITA_TYPES_FOR_DAY_LOAD = ASSISTENCIA_MANAGED_TYPES.filter((t) => !(DELI
 // relação com a agenda do montador) também aparecia aqui, misturado com as
 // visitas de verdade. QuickCreateRequestForm (único chamador) só cria
 // tipo de visita mesmo, então o filtro não tira nada que devesse aparecer.
+//
+// Só o que a própria equipe assistência abriu -- pedido do Victor
+// 08/09/2026: "deve aparecer todas as notificações de assistência, apenas
+// deles, não do sac". O SAC também abre visita do mesmo tipo (ver
+// assistencia/sac/nova-visita), então o filtro de tipo acima sozinho não
+// bastava -- precisa saber QUEM abriu. `requested_by` aponta pro profile
+// de quem criou (só sac/assistencia/admin usam esses formulários -- ver
+// requested_by: profile.id em actions.ts); sem profile vinculado (não
+// deveria acontecer aqui, mas por garantia) conta como "não é do SAC" em
+// vez de sumir da lista à toa.
 export async function listDayLoad(date: string): Promise<DayLoadItem[]> {
   // Validação estrita antes de interpolar na string do filtro -- `date` vem
   // de input do usuário (mesmo que o <input type="date"> do navegador já
@@ -963,7 +973,7 @@ export async function listDayLoad(date: string): Promise<DayLoadItem[]> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("service_requests")
-    .select("id, ticket_number, type, client_name, client_neighborhood, shift, scheduled_time, stores(name)")
+    .select("id, ticket_number, type, client_name, client_neighborhood, shift, scheduled_time, stores(name), requester:profiles!requested_by(role)")
     .in("type", [...VISITA_TYPES_FOR_DAY_LOAD])
     .or(`scheduled_date.eq.${date},and(scheduled_date.is.null,approved_deadline.eq.${date})`)
     .not("status", "eq", "cancelada")
@@ -979,17 +989,23 @@ export async function listDayLoad(date: string): Promise<DayLoadItem[]> {
     shift: Shift | null;
     scheduled_time: string | null;
     stores: { name: string } | null;
+    requester: { role: string } | { role: string }[] | null;
   };
-  return ((data ?? []) as unknown as Row[]).map((r) => ({
-    id: r.id,
-    ticketNumber: r.ticket_number,
-    type: r.type,
-    clientName: r.client_name,
-    clientNeighborhood: r.client_neighborhood,
-    storeName: r.stores?.name ?? "—",
-    shift: r.shift,
-    scheduledTime: r.scheduled_time,
-  }));
+  return ((data ?? []) as unknown as Row[])
+    .filter((r) => {
+      const requesterRole = Array.isArray(r.requester) ? r.requester[0]?.role : r.requester?.role;
+      return requesterRole !== "sac";
+    })
+    .map((r) => ({
+      id: r.id,
+      ticketNumber: r.ticket_number,
+      type: r.type,
+      clientName: r.client_name,
+      clientNeighborhood: r.client_neighborhood,
+      storeName: r.stores?.name ?? "—",
+      shift: r.shift,
+      scheduledTime: r.scheduled_time,
+    }));
 }
 
 export type AssemblerRequestItem = { id: string; product: string; quantity: number; action: ItemAction | null; completed: boolean };
