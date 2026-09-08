@@ -9,9 +9,12 @@ import { NpsDetratoresTable } from "./NpsDetratoresTable";
 // Resumo de todas as fases numa tela só -- pedido do Victor 08/09/2026: "a
 // primeira aba seja desse resumo de avaliações de todas as fases. Hoje só
 // temos do SAC, aí você coloca do sac e as outras fases você deixa com um
-// traço". Pós-entrega não tem card com número (nem fonte de dado ainda) --
-// só o rótulo "em breve", diferente das outras 3 que já calculam sozinhas
-// (e mostram "—" com 0 respostas, sem precisar de código novo quando
+// traço". "1 mês pós-recebimento" (nome corrigido pelo Victor -- é o
+// terceiro gatilho do desenho original do Motor de NPS, "1 mês após a
+// compra"/pós-recebimento do produto, ainda só desenhado, nunca
+// implementado) não tem card com número (nem fonte de dado ainda) -- só o
+// rótulo "em breve", diferente das outras 3 que já calculam sozinhas (e
+// mostram "—" com 0 respostas, sem precisar de código novo quando
 // começarem a responder de verdade).
 function FaseCard({ label, npsIndex, responseCount }: { label: string; npsIndex: number | null; responseCount: number }) {
   return (
@@ -50,7 +53,7 @@ export function AvaliacoesResumo({
           <FaseCard label="Atendimento (SAC)" npsIndex={npsSummary.npsIndex} responseCount={npsSummary.responseCount} />
           <div className="rounded-lg border border-dashed p-4 flex flex-col gap-1" style={{ borderColor: "var(--border)" }}>
             <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-              Pós-entrega
+              1 mês pós-recebimento
             </span>
             <span className="text-2xl font-semibold" style={{ color: "var(--text-muted)" }}>
               —
