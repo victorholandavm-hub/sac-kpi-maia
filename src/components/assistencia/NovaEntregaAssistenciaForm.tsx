@@ -6,11 +6,12 @@ import {
   lookupTotvsClientForTeam,
   lookupTotvsProductForTeam,
   getAvailableRotasForDateAction,
+  getEntregaDayLoadAction,
   type FormState,
 } from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
-import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store } from "@/lib/serviceRequests";
+import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
 import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
 
@@ -258,6 +259,28 @@ export function NovaEntregaAssistenciaForm({
   const effectiveAvailableRotas = (hasDateContext ? availableRotas : []).filter((r) => ROTA_CITY[r.rota] === selectedCity);
   const effectiveLoadingRotas = hasDateContext && loadingRotas;
   const previewDriverName = effectiveAvailableRotas.find((r) => r.id === selectedRotaId)?.driverName ?? null;
+
+  // Assim que escolhe a data, mostra quantas e quais entregas/recolhimentos
+  // já existem naquele dia -- pedido do Victor 08/09/2026 (mesma ideia do
+  // "dia carregado" que QuickCreateRequestForm.tsx já tem pra visita, só
+  // que aqui é o tipo certo: recolhimento/envio de peça, não montagem).
+  const [dayLoad, setDayLoad] = useState<DayLoadItem[] | null>(null);
+  const [dayLoadLoading, setDayLoadLoading] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!scheduledDate) {
+        setDayLoad(null);
+        return;
+      }
+      setDayLoadLoading(true);
+      getEntregaDayLoadAction(scheduledDate)
+        .then((items) => setDayLoad(items))
+        .catch(() => setDayLoad(null))
+        .finally(() => setDayLoadLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [scheduledDate]);
 
   const { items, lookupStatus: itemsLookupStatus, update, add, remove, lookup } = useItemsList();
   // Só usada quando type === "envio_recolhimento_peca" -- mas o hook
@@ -642,6 +665,36 @@ export function NovaEntregaAssistenciaForm({
             Urgente
           </label>
         </div>
+
+        {scheduledDate ? (
+          <div className="rounded-lg p-3 flex flex-col gap-1.5" style={{ background: "var(--gridline)" }}>
+            {dayLoadLoading ? (
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Verificando a agenda desse dia…
+              </span>
+            ) : dayLoad === null ? null : dayLoad.length === 0 ? (
+              <span className="text-xs font-medium" style={{ color: "var(--status-good)" }}>
+                Nenhuma entrega/recolhimento agendado ainda nesse dia.
+              </span>
+            ) : (
+              <>
+                <span className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {dayLoad.length} entrega{dayLoad.length > 1 ? "s" : ""} já {dayLoad.length > 1 ? "agendadas" : "agendada"} nesse dia:
+                </span>
+                <ul className="flex flex-col gap-0.5">
+                  {dayLoad.map((item) => (
+                    <li key={item.id} className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                      #{item.ticketNumber} · {REQUEST_TYPE_LABELS[item.type] ?? item.type} · {item.storeName}
+                      {item.clientName ? ` · ${item.clientName}` : ""}
+                      {item.clientNeighborhood ? ` · 📍 ${item.clientNeighborhood}` : ""}
+                      {item.scheduledTime ? ` · ${item.scheduledTime.slice(0, 5)}` : item.shift ? ` · ${SHIFT_LABELS[item.shift]}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        ) : null}
 
         {/* Cidade primeiro, rota depois -- pedido do Victor 24/08/2026. */}
         <Field label="Cidade">

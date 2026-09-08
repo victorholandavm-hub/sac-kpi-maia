@@ -41,7 +41,7 @@ import {
 import { verifyPin } from "@/lib/pinAuth";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
-import { ADDRESS_NUMBER_REQUIRED_TYPES, listDayLoad, listRequestsScheduledOn, type DayLoadItem } from "@/lib/serviceRequests";
+import { ADDRESS_NUMBER_REQUIRED_TYPES, listDayLoad, listEntregaDayLoad, listRequestsScheduledOn, type DayLoadItem } from "@/lib/serviceRequests";
 import { groupByRota, pinSemRotaFirst, ENTREGA_TYPES, type QueueGroup } from "@/lib/entregaQueueGrouping";
 
 const REQUEST_TYPES = [
@@ -290,6 +290,13 @@ export async function lookupTotvsProductForTeam(code: string): Promise<TotvsProd
 export async function getDayLoadAction(date: string): Promise<DayLoadItem[]> {
   await getProfile();
   return listDayLoad(date);
+}
+
+// Mesma ideia, só que pro formulário de "Nova entrega" (NovaEntregaAssistenciaForm)
+// -- ver listEntregaDayLoad em serviceRequests.ts.
+export async function getEntregaDayLoadAction(date: string): Promise<DayLoadItem[]> {
+  await getProfile();
+  return listEntregaDayLoad(date);
 }
 
 // Sem sessão do Supabase Auth (usa a sessão de gerente de loja por PIN — ver
