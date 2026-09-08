@@ -52,9 +52,10 @@ export async function upsertGhlContact(phone: string, name: string | null): Prom
 }
 
 // Matricular o contato num workflow é o próprio gatilho de envio -- o
-// workflow (configurado no GHL, fora daqui) tem "Contact added to workflow"
-// como trigger e a ação de mandar o template de WhatsApp logo em seguida.
-// Não confirma entrega nenhuma, só que a matrícula foi aceita.
+// workflow (configurado no GHL, fora daqui) tem "Contact tag added" como
+// trigger (numa tag exclusiva, nunca aplicada por mais nada) e a ação de
+// mandar o template de WhatsApp logo em seguida. Não confirma entrega
+// nenhuma, só que a matrícula foi aceita.
 export async function addContactToWorkflow(ghlContactId: string, workflowId: string): Promise<boolean> {
   const res = await fetch(`${BASE_URL}/contacts/${ghlContactId}/workflow/${workflowId}`, {
     method: "POST",
@@ -62,4 +63,16 @@ export async function addContactToWorkflow(ghlContactId: string, workflowId: str
     body: JSON.stringify({}),
   });
   return res.ok;
+}
+
+// Pra ler a resposta da pesquisa de NPS precisa saber em qual conversa ela
+// foi parar -- a matrícula no workflow não devolve isso, só o fetchGhlMessages
+// (que já existe) precisa de um conversationId. Pega a mais recente do
+// contato (é sempre a mesma conversa de WhatsApp que o SAC já usa).
+export async function findGhlConversationId(ghlContactId: string): Promise<string | null> {
+  const params = new URLSearchParams({ locationId: process.env.GHL_LOCATION_ID ?? "", contactId: ghlContactId, limit: "1" });
+  const res = await fetch(`${BASE_URL}/conversations/search?${params}`, { headers: ghlHeaders() });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.conversations?.[0]?.id ?? null;
 }
