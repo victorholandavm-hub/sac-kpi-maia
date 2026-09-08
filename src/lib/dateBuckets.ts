@@ -6,7 +6,12 @@
 
 export type DateBucketKey = "atrasado" | "hoje" | "amanha" | "depois" | "sem_data";
 
-export const DATE_BUCKET_ORDER: DateBucketKey[] = ["atrasado", "hoje", "amanha", "depois", "sem_data"];
+// "atrasado" por último de propósito -- pedido do Victor 08/09/2026: "para
+// o motorista ela tem que ir pro final e não ser a primeira que é
+// mostrada". Só afeta groupByDateBucket (usado só por motorista/page.tsx);
+// groupByDateDetailed (montador) tem a própria ordem fixa à parte, não usa
+// essa constante.
+export const DATE_BUCKET_ORDER: DateBucketKey[] = ["hoje", "amanha", "depois", "sem_data", "atrasado"];
 
 export const DATE_BUCKET_LABELS: Record<DateBucketKey, string> = {
   atrasado: "Atrasado",
