@@ -167,6 +167,59 @@ export async function setRotaWeekday(weekday: number, rota: Rota | null): Promis
   updateTag(ROTA_WEEKDAY_CONFIG_TAG);
 }
 
+// Mudança de padrão semanal COM data de início -- pedido do Victor
+// 08/09/2026: "aplique essa mudança mas só a partir do dia 14 de
+// setembro. As dessa semana estão mantidas". Diferente de setRotaWeekday
+// acima (que sobrescreve o padrão pra sempre, valendo já pra qualquer
+// data, passada ou futura) -- isso aqui empilha uma mudança que só passa
+// a valer a partir de `effectiveFrom`, sem reescrever como a semana
+// atual (ou qualquer coisa antes da virada) já rodou. Ver resolveRotaForDate
+// abaixo pra como as duas tabelas se combinam.
+export type RotaWeekdayScheduleEntry = { weekday: number; rota: Rota | null; effectiveFrom: string };
+
+const ROTA_WEEKDAY_SCHEDULE_TAG = "rota-weekday-schedule";
+
+export const listRotaWeekdaySchedule = unstable_cache(
+  async (): Promise<RotaWeekdayScheduleEntry[]> => {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.from("rota_weekday_schedule").select("weekday, rota, effective_from").order("effective_from");
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => ({
+      weekday: r.weekday as number,
+      rota: isRota(r.rota as string) ? (r.rota as Rota) : null,
+      effectiveFrom: r.effective_from as string,
+    }));
+  },
+  ["rota-weekday-schedule"],
+  { revalidate: 60, tags: [ROTA_WEEKDAY_SCHEDULE_TAG] }
+);
+
+export async function scheduleRotaWeekdayChange(weekday: number, rota: Rota | null, effectiveFrom: string): Promise<void> {
+  if (weekday < 0 || weekday > 6) throw new Error("Dia da semana inválido.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)) throw new Error("Data inválida.");
+  const admin = getSupabaseAdmin();
+  const { error } = await admin
+    .from("rota_weekday_schedule")
+    .upsert({ weekday, rota, effective_from: effectiveFrom }, { onConflict: "weekday,effective_from" });
+  if (error) throw new Error(error.message);
+  updateTag(ROTA_WEEKDAY_SCHEDULE_TAG);
+}
+
+// Resolve a rota esperada pra uma data combinando o padrão-base
+// (rota_weekday_config) com qualquer mudança já agendada que tenha
+// entrado em vigor até essa data (a de effective_from mais recente que
+// ainda seja <= dateStr) -- sem nenhuma, cai no padrão-base de sempre.
+// Substitui getRotaForDate acima nos dois lugares que precisam disso
+// (getAvailableRotasForDate e getRotaWeekOverview); getRotaForDate
+// continua existindo só porque é usado como peça desta função.
+export function resolveRotaForDate(dateStr: string, baseConfig: RotaWeekdayConfig, schedule: RotaWeekdayScheduleEntry[]): Rota | null {
+  const weekday = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
+  const applicable = schedule.filter((s) => s.weekday === weekday && s.effectiveFrom <= dateStr);
+  if (applicable.length === 0) return getRotaForDate(dateStr, baseConfig);
+  const latest = applicable.reduce((a, b) => (b.effectiveFrom > a.effectiveFrom ? b : a));
+  return latest.rota;
+}
+
 // Feriados -- pedido do Victor 05/09/2026: "que eu tenha a opção de
 // colocar isso em qualquer dia, só eu, para um feriado". Diferente do
 // padrão semanal (rota_weekday_config, um valor por DIA DA SEMANA) --
@@ -292,7 +345,7 @@ export async function getAvailableRotasForDate(dateStr: string): Promise<Availab
   // atribuição de motorista que já exista (ver addRotaHoliday acima).
   if (await isRotaHoliday(dateStr)) return [];
 
-  const [config, assignments] = await Promise.all([getRotaWeekdayConfig(), getRotaDriverAssignments(dateStr)]);
+  const [config, schedule, assignments] = await Promise.all([getRotaWeekdayConfig(), listRotaWeekdaySchedule(), getRotaDriverAssignments(dateStr)]);
 
   const entries: AvailableRota[] = [];
   if (assignments.primary) {
@@ -313,7 +366,7 @@ export async function getAvailableRotasForDate(dateStr: string): Promise<Availab
     // ver comentário lá) entra direto aqui, não mais null. Pedido do
     // Victor 27/08/2026: agendar sem ninguém ter "confirmado" antes não
     // pode mais deixar o chamado sem motorista.
-    const expected = getRotaForDate(dateStr, config);
+    const expected = resolveRotaForDate(dateStr, config, schedule);
     if (expected) entries.push({ id: `expected-${expected}`, rota: expected, driverName: JP_DEFAULT_DRIVER, isExtra: false });
   }
   for (const extra of assignments.extras) {
@@ -353,7 +406,7 @@ export type RotaDayOverview = {
 // pro intervalo inteiro em vez de uma por dia. `days` normalmente é 14 (semana
 // atual + semana seguinte).
 export async function getRotaWeekOverview(fromDate: string, days: number): Promise<RotaDayOverview[]> {
-  const [config, holidays] = await Promise.all([getRotaWeekdayConfig(), listRotaHolidays()]);
+  const [config, schedule, holidays] = await Promise.all([getRotaWeekdayConfig(), listRotaWeekdaySchedule(), listRotaHolidays()]);
   const admin = getSupabaseAdmin();
 
   const dates: string[] = [];
@@ -388,7 +441,7 @@ export async function getRotaWeekOverview(fromDate: string, days: number): Promi
     return {
       date,
       weekday,
-      expectedRota: config[weekday] ?? null,
+      expectedRota: resolveRotaForDate(date, config, schedule),
       assignments: byDate.get(date)!,
       isHoliday: holidayByDate.has(date),
       holidayNote,
