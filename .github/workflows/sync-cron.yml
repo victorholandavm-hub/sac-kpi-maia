@@ -25,15 +25,25 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      # continue-on-error em cada passo -- descoberto em 08/09/2026: /api/sync
+      # sozinho já passou a levar mais de 60s (o Nginx da VPS corta nesse
+      # tempo, sem proxy_read_timeout configurado -- ver ajuste em paralelo no
+      # servidor), e como os 3 passos rodavam em sequência SEM isso, o
+      # primeiro "falhar" (na visão do curl/Nginx, mesmo o /api/sync
+      # terminando certo por trás) impedia os outros dois de rodar --
+      # /api/sync-ai-classify ficou 13 dias sem executar por causa disso.
       - name: Chamar /api/sync
+        continue-on-error: true
         run: |
-          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          curl -sf --max-time 170 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://sac.lojasmaia.com.br/api/sync"
       - name: Chamar /api/sync-ai-classify
+        continue-on-error: true
         run: |
-          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          curl -sf --max-time 170 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://sac.lojasmaia.com.br/api/sync-ai-classify"
       - name: Chamar /api/backup
+        continue-on-error: true
         run: |
-          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          curl -sf --max-time 170 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://sac.lojasmaia.com.br/api/backup"
