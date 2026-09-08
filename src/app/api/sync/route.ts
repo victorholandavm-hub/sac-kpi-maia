@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { businessMinutesBetween } from "@/lib/businessHours";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
-import { fetchGhlMessages, type GhlMessage } from "@/lib/ghlClient";
+import { fetchGhlMessages, upsertGhlContact, addContactToWorkflow, findGhlConversationId, type GhlMessage } from "@/lib/ghlClient";
+import { isMostruarioRequest } from "@/lib/serviceRequests";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -122,6 +123,120 @@ async function detectNpsScore(ghlConversationId: string): Promise<{ score: numbe
   return { score, answeredAt: last.dateAdded };
 }
 
+// NPS pós-montagem/pós-assistência técnica (pedido do Victor 07/09/2026) --
+// diferente do NPS do SAC acima (que reage a uma conversa marcada como
+// resolvida no GHL), o gatilho aqui é o `service_requests.status` virar
+// 'concluida' -- não centralizado em nenhum hook específico (montador,
+// motorista, aprovação da loja levam pra 'concluida' por caminhos
+// diferentes), então varre por status em vez de depender de cada um deles
+// lembrar de avisar aqui.
+const MONTAGEM_NPS_TYPES = new Set(["montagem", "desmontagem"]);
+// notificacao_externa nunca envolve visita física (ver comentário em
+// ADDRESS_NUMBER_REQUIRED_TYPES em serviceRequests.ts) -- não faz sentido
+// perguntar NPS de uma visita que não existiu.
+const NPS_EXCLUDED_TYPES = new Set(["notificacao_externa"]);
+
+function classifyNpsTipo(type: string): "montagem" | "assistencia_tecnica" | null {
+  if (MONTAGEM_NPS_TYPES.has(type)) return "montagem";
+  if (NPS_EXCLUDED_TYPES.has(type)) return null;
+  return "assistencia_tecnica";
+}
+
+type NpsCandidate = {
+  id: string;
+  type: string;
+  order_code: string | null;
+  client_name: string | null;
+  client_phone: string | null;
+};
+
+// Só manda pra quem concluiu de verdade nas últimas 48h (mesma janela do
+// resto deste sync) -- `service_request_nps` sem linha pro request_id é o
+// critério de "ainda não mandei". Workflows ainda sem template aprovado
+// (GHL_WORKFLOW_ID_* vazio) -- função vira no-op até esses envs existirem,
+// pra nunca matricular ninguém com o placeholder por engano num deploy
+// futuro antes da hora.
+async function enrollPendingNps(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<{ enrolled: number; errors: string[] }> {
+  const montagemWorkflowId = process.env.GHL_WORKFLOW_ID_MONTAGEM;
+  const assistenciaWorkflowId = process.env.GHL_WORKFLOW_ID_ASSISTENCIA;
+  if (!montagemWorkflowId || !assistenciaWorkflowId) return { enrolled: 0, errors: [] };
+
+  const sinceIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data: candidates, error } = await supabase
+    .from("service_requests")
+    .select("id, type, order_code, client_name, client_phone")
+    .eq("status", "concluida")
+    .gte("completed_at", sinceIso)
+    .returns<NpsCandidate[]>();
+  if (error) return { enrolled: 0, errors: [`nps candidatos: ${error.message}`] };
+  if (!candidates || candidates.length === 0) return { enrolled: 0, errors: [] };
+
+  const { data: already } = await supabase
+    .from("service_request_nps")
+    .select("request_id")
+    .in("request_id", candidates.map((c) => c.id));
+  const alreadySent = new Set((already ?? []).map((r) => r.request_id as string));
+
+  const errors: string[] = [];
+  let enrolled = 0;
+  for (const candidate of candidates) {
+    if (alreadySent.has(candidate.id) || !candidate.client_phone) continue;
+    if (isMostruarioRequest(candidate.order_code, candidate.client_name)) continue;
+    const tipo = classifyNpsTipo(candidate.type);
+    if (!tipo) continue;
+
+    const workflowId = tipo === "montagem" ? montagemWorkflowId : assistenciaWorkflowId;
+    const contactId = await upsertGhlContact(candidate.client_phone, candidate.client_name);
+    if (!contactId) {
+      errors.push(`nps ${candidate.id}: não achou/criou contato no GHL`);
+      continue;
+    }
+    if (!(await addContactToWorkflow(contactId, workflowId))) {
+      errors.push(`nps ${candidate.id}: falha ao matricular no workflow`);
+      continue;
+    }
+    const { error: insertError } = await supabase.from("service_request_nps").insert({ request_id: candidate.id, tipo, ghl_contact_id: contactId });
+    if (insertError) errors.push(`nps ${candidate.id}: ${insertError.message}`);
+    else enrolled++;
+  }
+  return { enrolled, errors };
+}
+
+// Resposta é um número sozinho de 0 a 10 (a lista de opções do template
+// ecoa só o número escolhido, sem palavra junto -- diferente do padrão
+// "N - descrição" do NPS do SAC acima, de propósito, pra nunca colidir os
+// dois regex numa mesma conversa). Só considera mensagem inbound DEPOIS de
+// enviado_em -- diferente do detectNpsScore acima (que pega a última da
+// conversa inteira), aqui precisa disso porque a mesma conversa pode ter
+// mais de uma pesquisa (SAC + montagem + assistência) ao longo do tempo.
+const NPS_SCORE_PATTERN = /^\s*(10|[0-9])\s*$/;
+
+async function detectPendingNpsResponses(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<number> {
+  const { data: pending } = await supabase
+    .from("service_request_nps")
+    .select("request_id, ghl_contact_id, enviado_em")
+    .is("respondido_em", null)
+    .limit(100);
+  if (!pending || pending.length === 0) return 0;
+
+  let answered = 0;
+  for (const row of pending) {
+    const conversationId = await findGhlConversationId(row.ghl_contact_id);
+    if (!conversationId) continue;
+    const msgs = await fetchGhlMessages(conversationId);
+    if (!msgs) continue;
+    const sentAtMs = new Date(row.enviado_em).getTime();
+    const reply = msgs.find(
+      (m) => m.direction === "inbound" && new Date(m.dateAdded).getTime() > sentAtMs && NPS_SCORE_PATTERN.test((m.body ?? "").trim())
+    );
+    if (!reply) continue;
+    const score = Number(NPS_SCORE_PATTERN.exec(reply.body!.trim())![1]);
+    await supabase.from("service_request_nps").update({ score, respondido_em: reply.dateAdded }).eq("request_id", row.request_id);
+    answered++;
+  }
+  return answered;
+}
+
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
   // Comparação direta com `Bearer ${process.env.CRON_SECRET}` deixava a
@@ -232,8 +347,17 @@ async function runSync() {
     }
   }
 
+  const { enrolled: montagemAssistNpsEnrolled, errors: npsEnrollErrors } = await enrollPendingNps(supabase);
+  errors.push(...npsEnrollErrors);
+  const montagemAssistNpsAnswered = await detectPendingNpsResponses(supabase);
+
   const ok = errors.length === 0;
-  await recordSyncRun("ghl", ok, { conversationsChecked: conversations.length, conversationsUpserted, responsesComputed, npsComputed }, errors);
+  await recordSyncRun(
+    "ghl",
+    ok,
+    { conversationsChecked: conversations.length, conversationsUpserted, responsesComputed, npsComputed, montagemAssistNpsEnrolled, montagemAssistNpsAnswered },
+    errors
+  );
 
   return NextResponse.json({
     ok,
@@ -241,6 +365,8 @@ async function runSync() {
     conversationsUpserted,
     responsesComputed,
     npsComputed,
+    montagemAssistNpsEnrolled,
+    montagemAssistNpsAnswered,
     errors,
   });
 }
