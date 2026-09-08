@@ -89,9 +89,9 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
       ) : null}
 
       <section className="grid md:grid-cols-2 gap-4">
-        <BarRanking title="Conferente que mais errou" data={data.byConferente} onSelect={openDrilldown} />
+        <BarRanking title="Conferente que mais errou" data={data.byConferente} onSelect={openDrilldown} showCount />
         <div className="flex flex-col gap-2">
-          <BarRanking title="Motorista que mais errou" data={data.byMotoristaErro} onSelect={openDrilldown} />
+          <BarRanking title="Motorista que mais errou" data={data.byMotoristaErro} onSelect={openDrilldown} showCount />
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             Baseado no motorista atual do chamado — se a rota foi reatribuída depois da criação, pode não refletir mais quem entregou o item errado originalmente.
           </p>

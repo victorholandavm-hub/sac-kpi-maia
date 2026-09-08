@@ -22,6 +22,7 @@ export function BarRanking({
   coverage,
   onSelect,
   showPercent,
+  showCount,
 }: {
   title: string;
   data: Count[];
@@ -35,6 +36,11 @@ export function BarRanking({
   // rankings que usam esse mesmo componente, tipo produto/rota/loja) --
   // só o de causa raiz pediu isso.
   showPercent?: boolean;
+  // Mesma ideia, só que o número bruto (não percentual) -- pedido do
+  // Victor 08/09/2026 pros rankings de "quem mais errou" (conferente/
+  // motorista). Opt-in igual ao de cima, os dois nunca são usados juntos
+  // no mesmo gráfico.
+  showCount?: boolean;
 }) {
   const height = Math.max(160, data.length * 36 + 24);
   const total = data.reduce((sum, d) => sum + d.count, 0);
@@ -103,6 +109,9 @@ export function BarRanking({
                   }}
                   style={{ fill: "#fff", fontSize: 11, fontWeight: 600 }}
                 />
+              ) : null}
+              {showCount ? (
+                <LabelList dataKey="count" position="insideRight" style={{ fill: "#fff", fontSize: 11, fontWeight: 600 }} />
               ) : null}
             </Bar>
           </BarChart>
