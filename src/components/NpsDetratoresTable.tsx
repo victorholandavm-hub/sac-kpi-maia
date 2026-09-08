@@ -20,10 +20,14 @@ import { formatDateTimeBr } from "@/lib/formatDateTime";
 function DetratorRow({ item }: { item: NpsDetrator }) {
   const router = useRouter();
   const [status, setStatus] = useState<NpsDetratorStatus>(item.status);
-  const [motivo, setMotivo] = useState(item.motivo ?? "");
+  // Sem motivo registrado ainda, pré-preenche com o resumo automático da
+  // conversa do GHL (ver motivoSugerido em npsDetratores.ts) -- o time só
+  // confirma ou reescreve, não parte do zero.
+  const [motivo, setMotivo] = useState(item.motivo ?? item.motivoSugerido ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const dirty = status !== item.status || motivo !== (item.motivo ?? "");
+  const dirty = status !== item.status || motivo !== (item.motivo ?? item.motivoSugerido ?? "");
+  const isSuggested = !item.motivo && !!item.motivoSugerido && motivo === item.motivoSugerido;
 
   async function save() {
     setPending(true);
@@ -84,9 +88,14 @@ function DetratorRow({ item }: { item: NpsDetrator }) {
           className="text-xs rounded border px-2 py-1 w-full"
           style={{ borderColor: "var(--border)" }}
         />
+        {isSuggested ? (
+          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+            🤖 sugestão do resumo da conversa (GHL) -- confira e salve
+          </span>
+        ) : null}
       </td>
       <td className="px-3 py-2.5 whitespace-nowrap">
-        {dirty ? (
+        {dirty || isSuggested ? (
           <button
             type="button"
             onClick={save}
@@ -94,7 +103,7 @@ function DetratorRow({ item }: { item: NpsDetrator }) {
             className="text-xs font-semibold px-2.5 py-1 rounded disabled:opacity-60"
             style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
           >
-            {pending ? "Salvando…" : "Salvar"}
+            {pending ? "Salvando…" : isSuggested && !dirty ? "Confirmar" : "Salvar"}
           </button>
         ) : null}
         {error ? (
