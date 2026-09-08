@@ -9,13 +9,15 @@ import { NpsDetratoresTable } from "./NpsDetratoresTable";
 // Resumo de todas as fases numa tela só -- pedido do Victor 08/09/2026: "a
 // primeira aba seja desse resumo de avaliações de todas as fases. Hoje só
 // temos do SAC, aí você coloca do sac e as outras fases você deixa com um
-// traço". "1 mês pós-recebimento" (nome corrigido pelo Victor -- é o
-// terceiro gatilho do desenho original do Motor de NPS, "1 mês após a
-// compra"/pós-recebimento do produto, ainda só desenhado, nunca
-// implementado) não tem card com número (nem fonte de dado ainda) -- só o
-// rótulo "em breve", diferente das outras 3 que já calculam sozinhas (e
-// mostram "—" com 0 respostas, sem precisar de código novo quando
-// começarem a responder de verdade).
+// traço". São 5 fases no total (achado 08/09/2026 -- eu tinha confundido
+// "pós-entrega" com "1 mês pós-recebimento", achando que eram a mesma
+// coisa; o Victor corrigiu: "existem os dois"): SAC (dado real),
+// pós-entrega e 1 mês pós-recebimento (nenhum dos dois tem fonte de dado
+// ainda -- nem desenhados de verdade, só o card placeholder), pós-montagem
+// e pós-assistência técnica (essas duas já calculam sozinhas a partir de
+// service_request_nps -- ver getNpsResumoPorFaseAdicional -- e mostram "—"
+// com 0 respostas, sem precisar de código novo quando os templates do
+// WhatsApp forem aprovados e começarem a responder de verdade).
 function FaseCard({ label, npsIndex, responseCount }: { label: string; npsIndex: number | null; responseCount: number }) {
   return (
     <div className="rounded-lg border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
@@ -27,6 +29,22 @@ function FaseCard({ label, npsIndex, responseCount }: { label: string; npsIndex:
       </span>
       <span className="text-xs" style={{ color: "var(--text-muted)" }}>
         {responseCount > 0 ? `${responseCount} resposta${responseCount > 1 ? "s" : ""}` : "sem respostas ainda"}
+      </span>
+    </div>
+  );
+}
+
+function FaseCardEmBreve({ label }: { label: string }) {
+  return (
+    <div className="rounded-lg border border-dashed p-4 flex flex-col gap-1" style={{ borderColor: "var(--border)" }}>
+      <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+        {label}
+      </span>
+      <span className="text-2xl font-semibold" style={{ color: "var(--text-muted)" }}>
+        —
+      </span>
+      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+        em breve
       </span>
     </div>
   );
@@ -49,25 +67,16 @@ export function AvaliacoesResumo({
         <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
           NPS por fase
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <FaseCard label="Atendimento (SAC)" npsIndex={npsSummary.npsIndex} responseCount={npsSummary.responseCount} />
-          <div className="rounded-lg border border-dashed p-4 flex flex-col gap-1" style={{ borderColor: "var(--border)" }}>
-            <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-              1 mês pós-recebimento
-            </span>
-            <span className="text-2xl font-semibold" style={{ color: "var(--text-muted)" }}>
-              —
-            </span>
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              em breve
-            </span>
-          </div>
+          <FaseCardEmBreve label="Pós-entrega" />
           <FaseCard label="Pós-montagem" npsIndex={resumoFasesAdicionais.montagem.npsIndex} responseCount={resumoFasesAdicionais.montagem.responseCount} />
           <FaseCard
             label="Pós-assistência técnica"
             npsIndex={resumoFasesAdicionais.assistencia_tecnica.npsIndex}
             responseCount={resumoFasesAdicionais.assistencia_tecnica.responseCount}
           />
+          <FaseCardEmBreve label="1 mês pós-recebimento" />
         </div>
       </div>
 
