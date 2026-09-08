@@ -29,6 +29,13 @@ function ItemRow({
   canEditItems: boolean;
 }) {
   const isConcluded = requestStatus === "concluida";
+  // Montador já marcou como feito, mas o gerente da loja ainda não aprovou
+  // -- só a partir da aprovação (status vira "concluida") é que dá pra
+  // definir valor/liberar pagamento. Mesmo tratamento de PaymentItemEditor.tsx
+  // (achado 08/09/2026: essa tela tinha ficado sem a trava visual -- o
+  // servidor já bloqueava certo, só a experiência ficava ruim, digitando o
+  // valor pra só depois receber o erro).
+  const isAwaitingApproval = requestStatus === "aguardando_aprovacao";
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(item.unitValue !== null ? String(item.unitValue) : "");
@@ -114,7 +121,7 @@ function ItemRow({
               Salvar
             </button>
           </>
-        ) : canEditValues ? (
+        ) : canEditValues && !isAwaitingApproval ? (
           <button onClick={() => setEditing(true)} className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             {total !== null ? formatBRL(total) : "definir valor"}
           </button>
@@ -146,6 +153,14 @@ function ItemRow({
               {item.paymentReleased ? "✓ Pago" : "Pendente"}
             </span>
           )
+        ) : isAwaitingApproval ? (
+          <span
+            className="text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap"
+            style={{ color: "var(--series-3)", borderColor: "var(--series-3)" }}
+            title="O montador marcou como concluído, esperando o gerente da loja confirmar."
+          >
+            Aguardando aprovação do gerente
+          </span>
         ) : (
           <span
             className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 whitespace-nowrap"
