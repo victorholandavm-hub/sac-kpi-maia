@@ -57,6 +57,14 @@ export type NpsDetrator = {
   status: NpsDetratorStatus;
   motivo: string | null;
   atualizadoEm: string | null;
+  // Resumo automático da conversa do GHL (v_ticket_enriched.summary_ai) --
+  // pedido do Victor 08/09/2026: "você que tem que me trazer qual foi o
+  // motivo, pois tem dentro da conversa do GHL". Só existe pra origem "sac"
+  // (é a única com conversa de atendimento de verdade por trás -- montagem/
+  // assistência técnica respondem a pesquisa avulsa, sem esse resumo).
+  // Preenche o campo Motivo como sugestão editável, nunca sobrescreve um
+  // motivo que o time já registrou.
+  motivoSugerido: string | null;
 };
 
 type StatusRow = { origem: string; origem_id: string; status: string; motivo: string | null; atualizado_em: string };
@@ -105,6 +113,22 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
     for (const c of contactRows ?? []) contactsById.set(c.id, { name: c.name, phone: c.phone });
   }
 
+  // Resumo automático da conversa (ver comentário no tipo NpsDetrator acima)
+  // -- v_ticket_enriched não tem linha pra toda conversa (só quem já foi
+  // classificado, ver sync-ai-classify), então nem todo detrator do SAC vai
+  // ter sugestão; sem sugestão o campo fica em branco pro time preencher à
+  // mão mesmo, sem quebrar nada.
+  const sacConversationIds = (sacRows ?? []).map((r) => r.id as string);
+  const summaryByConversationId = new Map<string, string | null>();
+  if (sacConversationIds.length > 0) {
+    const { data: summaryRows, error: summaryError } = await admin
+      .from("v_ticket_enriched")
+      .select("conversation_id, summary_ai")
+      .in("conversation_id", sacConversationIds);
+    if (summaryError) throw new Error(summaryError.message);
+    for (const s of summaryRows ?? []) summaryByConversationId.set(s.conversation_id as string, s.summary_ai as string | null);
+  }
+
   const sac: NpsDetrator[] = (sacRows ?? [])
     .filter((r) => r.nps_answered_at)
     .map((r) => {
@@ -118,6 +142,7 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
         respondidoEm: r.nps_answered_at as string,
         clientName: contact?.name ?? null,
         clientPhone: contact?.phone ?? null,
+        motivoSugerido: summaryByConversationId.get(r.id as string) ?? null,
         ...resolved,
       };
     });
@@ -141,11 +166,38 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
       respondidoEm: r.respondido_em,
       clientName: sr?.client_name ?? null,
       clientPhone: sr?.client_phone ?? null,
+      motivoSugerido: null,
       ...resolved,
     };
   });
 
   return [...sac, ...req].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
+}
+
+export type NpsFaseResumo = { npsIndex: number | null; responseCount: number };
+
+// Resumo (NPS clássico: %promotores - %detratores) pras fases que ainda não
+// têm uma função de summary própria feito nem_summary.ts tem pro SAC --
+// pedido do Victor 08/09/2026: "a primeira aba [de /avaliacoes] seja
+// desse resumo de avaliações de todas as fases". Devolve responseCount:0 +
+// npsIndex:null quando não tem nenhuma resposta ainda (vira "—" na tela) --
+// não precisa de código novo quando montagem/assistência técnica
+// começarem a responder de verdade, já calcula sozinho.
+export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" | "assistencia_tecnica", NpsFaseResumo>> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("service_request_nps").select("tipo, score").not("score", "is", null);
+  if (error) throw new Error(error.message);
+
+  function resumoFor(tipo: "montagem" | "assistencia_tecnica"): NpsFaseResumo {
+    const scores = (data ?? []).filter((r) => r.tipo === tipo).map((r) => r.score as number);
+    if (scores.length === 0) return { npsIndex: null, responseCount: 0 };
+    const promoters = scores.filter((s) => s >= 9).length;
+    const detractors = scores.filter((s) => s <= 6).length;
+    const npsIndex = Math.round(((promoters - detractors) / scores.length) * 100);
+    return { npsIndex, responseCount: scores.length };
+  }
+
+  return { montagem: resumoFor("montagem"), assistencia_tecnica: resumoFor("assistencia_tecnica") };
 }
 
 export async function registrarStatusDetrator(

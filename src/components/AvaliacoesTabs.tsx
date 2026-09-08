@@ -5,29 +5,30 @@ import type { DateRange } from "@/lib/dateRange";
 import type { NpsSummary, NpsDetractor } from "@/lib/kpi";
 import type { StoreGoogleReviews } from "@/lib/googleReviews";
 import type { NpsWeekPoint } from "@/lib/npsTrend";
-import type { NpsDetrator } from "@/lib/npsDetratores";
+import type { NpsDetrator, NpsFaseResumo } from "@/lib/npsDetratores";
 import { RangePicker } from "./RangePicker";
 import { NpsCard, NPS_SCORE_LABELS } from "./NpsCard";
 import { BarRanking } from "./BarRanking";
 import { NpsTrendChart } from "./NpsTrendChart";
 import { GoogleReviewsSection } from "./GoogleReviewsSection";
-import { NpsDetratoresTable } from "./NpsDetratoresTable";
+import { AvaliacoesResumo } from "./AvaliacoesResumo";
 
-// Cada fonte de avaliação tem sua própria aba, sem misturar (pedido do
-// Victor 19/08/2026) -- quando entrar uma fonte nova de NPS (fora do GHL,
-// ainda sem data definida), é só somar uma entrada aqui + um novo bloco de
-// conteúdo abaixo, igual às duas que já existem.
+// Cada fonte de avaliação (além do Resumo) tem sua própria aba, sem
+// misturar (pedido do Victor 19/08/2026) -- quando entrar uma fonte nova de
+// NPS (fora do GHL, ainda sem data definida), é só somar uma entrada aqui +
+// um novo bloco de conteúdo abaixo, igual às que já existem.
 //
-// "Detratores" é diferente das outras duas: não é uma fonte própria, é uma
-// lista de trabalho cruzando TODAS as fontes de NPS (pedido do Victor
-// 08/09/2026) -- por isso não segue o padrão "uma aba por fonte" acima. As
-// abas por fase (pós-entrega/montagem/assistência) + uma aba "geral" com só
-// as notas ficam pra quando essas fontes estiverem rodando de verdade
-// (ainda esperando aprovação de template no WhatsApp) -- combinado com o
-// Victor, essa aba de Detratores é a parte que já dá pra ligar agora.
+// "Resumo" vem primeiro de propósito (pedido do Victor 08/09/2026: "a
+// primeira aba seja desse resumo de avaliações de todas as fases") -- é o
+// NPS de cada fase (SAC hoje, pós-entrega/montagem/assistência técnica
+// quando entrarem no ar) + o botão de Detratores (lista de trabalho
+// cruzando todas as fontes, não é uma fonte própria, por isso não segue o
+// padrão "uma aba por fonte" das outras). Abas por fase individuais (tipo
+// uma só de "Pós-montagem") ficam pra quando essas fontes estiverem
+// rodando de verdade (ainda esperando aprovação de template no WhatsApp).
 const TABS = [
+  { id: "resumo", label: "Resumo" },
   { id: "nps-sac", label: "NPS Atendimento (SAC)" },
-  { id: "detratores", label: "Detratores" },
   { id: "google", label: "Avaliações Google" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -39,6 +40,7 @@ export function AvaliacoesTabs({
   npsTrend,
   googleReviews,
   npsDetratores,
+  resumoFasesAdicionais,
 }: {
   range: DateRange;
   npsSummary: NpsSummary;
@@ -46,8 +48,9 @@ export function AvaliacoesTabs({
   npsTrend: NpsWeekPoint[];
   googleReviews: StoreGoogleReviews[];
   npsDetratores: NpsDetrator[];
+  resumoFasesAdicionais: Record<"montagem" | "assistencia_tecnica", NpsFaseResumo>;
 }) {
-  const [activeTab, setActiveTab] = useState<TabId>("nps-sac");
+  const [activeTab, setActiveTab] = useState<TabId>("resumo");
 
   // Ordem invertida (5 no topo) -- fica mais intuitivo no gráfico de barras
   // horizontal ver "muito satisfeito" em cima.
@@ -78,6 +81,10 @@ export function AvaliacoesTabs({
         })}
       </div>
 
+      {activeTab === "resumo" ? (
+        <AvaliacoesResumo npsSummary={npsSummary} resumoFasesAdicionais={resumoFasesAdicionais} npsDetratores={npsDetratores} />
+      ) : null}
+
       {activeTab === "nps-sac" ? (
         <div className="flex flex-col gap-6">
           {/* Filtro de período só se aplica ao NPS (é range-scoped, igual ao
@@ -91,17 +98,6 @@ export function AvaliacoesTabs({
             coverage={{ withValue: npsSummary.responseCount, total: npsSummary.eligibleCount, pct: npsSummary.responseRatePct ?? 0 }}
           />
           <NpsTrendChart data={npsTrend} />
-        </div>
-      ) : null}
-
-      {activeTab === "detratores" ? (
-        <div className="flex flex-col gap-4">
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Todo mundo que deu nota baixa em qualquer NPS (últimos 6 meses) -- atendimento (SAC) e, assim que
-            estiverem rodando, pós-montagem e pós-assistência técnica. Registre o motivo depois de ligar e marque
-            como recuperado, perdido, em contato ou sem resposta.
-          </p>
-          <NpsDetratoresTable items={npsDetratores} />
         </div>
       ) : null}
 
