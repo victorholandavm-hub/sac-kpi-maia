@@ -94,6 +94,12 @@ function titleCase(s: string): string {
 // precisar duplicar a lógica de agrupamento.
 const CONFERENTE_ALIASES: Record<string, string> = {
   "VINICIUS JP": "VINICIOS",
+  // Achado 08/09/2026 (pedido do Victor: "vinicius e vinicios são a mesma
+  // pessoa"): "Vinicius"/"VINICIUS" solo, sem o "JP" do alias acima,
+  // também aparecia como causa_conferente -- mesmo conferente, grafia
+  // diferente. Não mexe em "VINICIOS E FLÁVIO"/"VINICIOS/FLÁVIO" (combo
+  // com outra pessoa, responsabilidade conjunta, não é o mesmo caso).
+  VINICIUS: "VINICIOS",
 };
 
 function canonicalConferenteKey(raw: string): string {
