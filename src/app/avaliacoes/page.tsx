@@ -3,6 +3,7 @@ import { resolveRange } from "@/lib/dateRange";
 import { categoryLabel, storeLabel } from "@/lib/labels";
 import { listStoreGoogleReviews } from "@/lib/googleReviews";
 import { getNpsTrend } from "@/lib/npsTrend";
+import { listNpsDetratores } from "@/lib/npsDetratores";
 import { AppHeader } from "@/components/AppHeader";
 import { AvaliacoesTabs } from "@/components/AvaliacoesTabs";
 
@@ -26,10 +27,11 @@ export default async function AvaliacoesPage({
 }) {
   const params = await searchParams;
   const range = resolveRange(params);
-  const [data, googleReviews, npsTrend] = await Promise.all([
+  const [data, googleReviews, npsTrend, npsDetratores] = await Promise.all([
     getKpiData(range, { categoryLabel, storeLabel }),
     listStoreGoogleReviews(),
     getNpsTrend(NPS_TREND_WEEKS),
+    listNpsDetratores(),
   ]);
 
   return (
@@ -51,6 +53,7 @@ export default async function AvaliacoesPage({
         npsDetractors={data.npsDetractors}
         npsTrend={npsTrend}
         googleReviews={googleReviews}
+        npsDetratores={npsDetratores}
       />
     </div>
   );
