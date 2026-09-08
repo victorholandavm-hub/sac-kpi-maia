@@ -40,7 +40,7 @@ export default async function SacMontagensPage({
   const requests = showCompleted ? items : items.filter((r) => r.status !== "concluida" && r.status !== "cancelada");
 
   return (
-    <div className="w-full p-6 flex flex-col gap-6 min-w-0">
+    <div className="max-w-6xl mx-auto w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Montagens e serviços" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`} />
 
       <SacTabs active="montagens" />
