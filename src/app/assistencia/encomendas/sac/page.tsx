@@ -8,17 +8,22 @@ import {
   listEventsForPedidos,
   listOpenPedidoEncomendaQueueIds,
   OPEN_PEDIDO_ENCOMENDA_STATUSES,
+  PEDIDO_ENCOMENDA_STATUSES,
+  isPedidoEncomendaStatus,
   type PedidoEncomendaSummary,
 } from "@/lib/pedidosEncomenda";
 import { listEncomendaPhotosForPedidos } from "@/lib/pedidoEncomendaPhotos";
+import { listStores } from "@/lib/serviceRequests";
 import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
 import { StatTile } from "@/components/StatTile";
 import { FilterPill } from "@/components/assistencia/FilterPill";
+import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
+import { PEDIDO_ENCOMENDA_STATUS_LABELS } from "@/lib/assistenciaLabels";
 
 // Precisa refletir os pedidos em aberto em tempo real — nunca gerar estático.
 export const dynamic = "force-dynamic";
@@ -74,7 +79,7 @@ function groupByDeadline(pedidos: PedidoEncomendaSummary[]): DeadlineGroup[] {
 export default async function EncomendasSacPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; store?: string; status?: string; q?: string }>;
 }) {
   const requester = await resolveEncomendaRequester();
   if (!requester) {
@@ -87,14 +92,22 @@ export default async function EncomendasSacPage({
     redirect("/assistencia/encomendas");
   }
 
-  const { view } = await searchParams;
+  const { view, store, status, q } = await searchParams;
   const showCompleted = view === "concluidos";
   const showAll = view === "todas";
+  // Filtros só fazem sentido na aba "Todas" -- pedido do Victor 09/09/2026:
+  // "na tela de todas as encomendas do sac, tenha os filtros para eles
+  // conseguirem filtrar". "Minhas em aberto"/"Minhas entregues" já são
+  // recortes pequenos (só o que o próprio SAC lançou); "Todas" é quem
+  // cresce sem limite (todo mundo, toda loja), mesma fonte de filtro
+  // (listAllPedidos) que a fila interna de CD/fábrica já usa.
+  const filterStatus = isPedidoEncomendaStatus(status) ? status : undefined;
 
-  const [meusPedidos, todosPedidos, queueIds] = await Promise.all([
+  const [meusPedidos, todosPedidos, queueIds, stores] = await Promise.all([
     listPedidosByRequester(requester.name),
-    showAll ? listAllPedidos() : Promise.resolve([]),
+    showAll ? listAllPedidos({ storeId: store, status: filterStatus, q }) : Promise.resolve([]),
     showAll || showCompleted ? Promise.resolve([]) : listOpenPedidoEncomendaQueueIds(),
+    showAll ? listStores() : Promise.resolve([]),
   ]);
   const allPedidos = meusPedidos;
   const queuePosition = new Map(queueIds.map((id, i) => [id, i + 1]));
@@ -147,9 +160,42 @@ export default async function EncomendasSacPage({
       </div>
 
       {showAll ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">
-          Visão só de acompanhamento — quem gerencia cada pedido continua sendo a loja, o CD e a fábrica.
-        </p>
+        <>
+          <p className="text-sm text-gray-400 dark:text-gray-500">
+            Visão só de acompanhamento — quem gerencia cada pedido continua sendo a loja, o CD e a fábrica.
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+            <FilterSelect
+              name="status"
+              placeholder="Qualquer status"
+              options={PEDIDO_ENCOMENDA_STATUSES.map((s) => ({ value: s, label: PEDIDO_ENCOMENDA_STATUS_LABELS[s] }))}
+            />
+            <form action="/assistencia/encomendas/sac" method="GET" className="flex items-center gap-2 flex-1 min-w-[240px]">
+              <input type="hidden" name="view" value="todas" />
+              {store ? <input type="hidden" name="store" value={store} /> : null}
+              {status ? <input type="hidden" name="status" value={status} /> : null}
+              <input
+                type="search"
+                name="q"
+                defaultValue={q ?? ""}
+                placeholder="Buscar por nº do pedido, cliente ou produto…"
+                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm flex-1"
+              />
+              <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100">
+                Buscar
+              </button>
+              {q ? (
+                <Link
+                  href={`/assistencia/encomendas/sac?view=todas${store ? `&store=${store}` : ""}${status ? `&status=${status}` : ""}`}
+                  className="text-xs underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                >
+                  Limpar busca
+                </Link>
+              ) : null}
+            </form>
+          </div>
+        </>
       ) : null}
 
       {!showCompleted && !showAll ? (
