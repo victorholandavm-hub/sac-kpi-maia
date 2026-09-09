@@ -374,6 +374,24 @@ export function SacCreateRequestForm({
           <input type="checkbox" name="urgent" className="rounded" />
           Urgente
         </label>
+
+        {/* Nota fiscal obrigatória em toda notificação (pedido do Victor
+            09/09/2026: "preciso que adicionem a nota fiscal" -- obrigatório
+            pra todo tipo, sem exceção) -- sobe junto com o resto do
+            formulário (sem endpoint de upload separado, ver createSacRequest
+            em actions.ts) e sai impressa junto com a notificação no despacho
+            (DespachoCard.tsx), pra não misturar a nota errada com o cliente
+            errado ao imprimir várias de uma vez. */}
+        <Field label="Nota fiscal * (foto ou PDF)">
+          <input
+            name="invoice_file"
+            type="file"
+            required
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
+            className="rounded border px-3 py-2 text-sm"
+            style={inputStyle}
+          />
+        </Field>
       </FormSection>
 
       <FormSection

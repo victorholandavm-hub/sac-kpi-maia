@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail, type ServiceRequestDetail } from "@/lib/serviceRequests";
+import { getInvoicePhotos } from "@/lib/servicePhotos";
 import { PrintButton, type PrintTarget } from "@/components/assistencia/PrintButton";
 import { DespachoCard } from "@/components/assistencia/DespachoCard";
 
@@ -44,6 +45,7 @@ export default async function DespachoLotePage({
   const results = await Promise.all(ids.map((id) => getRequestDetail(id)));
   const found = results.filter((r) => r !== null);
   const requests: ServiceRequestDetail[] = found.map((r) => r.request);
+  const invoicePhotosById = await getInvoicePhotos(requests.map((r) => r.id));
 
   // Impedir reimpressão -- pedido do Victor 28/08/2026 (ver PrintButton.tsx
   // pro resto do racional). Admin sempre pode reimprimir ("só eu poderia
@@ -117,7 +119,7 @@ export default async function DespachoLotePage({
             .join(" ");
           return (
             <div key={request.id} className={className}>
-              <DespachoCard request={request} />
+              <DespachoCard request={request} invoicePhoto={invoicePhotosById.get(request.id) ?? null} />
             </div>
           );
         })}
