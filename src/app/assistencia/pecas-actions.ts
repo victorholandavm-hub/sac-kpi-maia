@@ -48,6 +48,8 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
       color: emptyToNull(formData.get("color")),
       supplier: supplier || null,
       representative: emptyToNull(formData.get("representative")),
+      representative_email: emptyToNull(formData.get("representative_email")),
+      representative_phone: emptyToNull(formData.get("representative_phone")),
       requested_by: profile.fullName,
       notes: emptyToNull(formData.get("notes")),
       expected_at: emptyToNull(formData.get("expected_at")) ?? defaultExpectedAt,
@@ -74,7 +76,9 @@ export async function updatePartOrderStatus(id: string, newStatus: string) {
   const patch: Record<string, string> = { status: newStatus };
   if (newStatus === "peca_recebida") patch.part_arrived_at = today;
   if (newStatus === "enviada_ao_cliente") patch.sent_to_client_at = today;
-  if (newStatus === "encerrado") patch.closed_at = today;
+  // Cancelada é terminal igual encerrado (pedido do Victor 09/09/2026) --
+  // mesmo carimbo de closed_at, só o status que difere.
+  if (newStatus === "encerrado" || newStatus === "cancelada") patch.closed_at = today;
 
   const { error } = await admin.from("part_orders").update(patch).eq("id", id);
   if (error) throw new Error(error.message);

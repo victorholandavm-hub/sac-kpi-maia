@@ -90,6 +90,18 @@ export function NewPartOrderForm({
         <input name="representative" className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
+      {/* Contato do REPRESENTANTE (fornecedor) -- distinto do e-mail/telefone
+          do cliente lá embaixo (pedido do Victor 09/09/2026, planilha
+          "Solicitação de peças"). */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label="E-mail do representante">
+          <input name="representative_email" type="email" className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+        <Field label="Telefone do representante">
+          <input name="representative_phone" className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+      </div>
+
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Produto do cliente">
           <input

@@ -1,13 +1,27 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 
-export type PartOrderStatus = "aguardando_peca" | "peca_recebida" | "enviada_ao_cliente" | "encerrado";
+// "aguardando_resposta" e "cancelada" (pedido do Victor 09/09/2026, planilha
+// "Solicitação de peças") -- "aguardando_resposta" é ANTES de
+// "aguardando_peca" no fluxo real: fornecedor ainda nem confirmou que vai
+// mandar a peça, diferente de "aguardando_peca" (já confirmou, só falta
+// chegar). Ver NEXT_STATUSES em PartOrderActions.tsx pra transição entre os
+// dois.
+export type PartOrderStatus =
+  | "aguardando_resposta"
+  | "aguardando_peca"
+  | "peca_recebida"
+  | "enviada_ao_cliente"
+  | "encerrado"
+  | "cancelada";
 
 export const PART_ORDER_STATUSES: PartOrderStatus[] = [
+  "aguardando_resposta",
   "aguardando_peca",
   "peca_recebida",
   "enviada_ao_cliente",
   "encerrado",
+  "cancelada",
 ];
 
 export function isPartOrderStatus(value: string | undefined | null): value is PartOrderStatus {
@@ -35,6 +49,11 @@ export type PartOrder = {
   color: string | null;
   supplier: string | null;
   representative: string | null;
+  // Contato do REPRESENTANTE (fornecedor) -- distinto de clientEmail/
+  // clientPhone acima, que são do cliente final. Nunca existia antes (pedido
+  // do Victor 09/09/2026, planilha "Solicitação de peças").
+  representativeEmail: string | null;
+  representativePhone: string | null;
   requestedBy: string | null;
   status: PartOrderStatus;
   partArrivedAt: string | null;
@@ -60,6 +79,8 @@ type PartOrderRow = {
   color: string | null;
   supplier: string | null;
   representative: string | null;
+  representative_email: string | null;
+  representative_phone: string | null;
   requested_by: string | null;
   status: PartOrderStatus;
   part_arrived_at: string | null;
@@ -72,7 +93,7 @@ type PartOrderRow = {
 };
 
 const PART_ORDER_COLUMNS =
-  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, created_at, updated_at";
+  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, created_at, updated_at";
 
 function toPartOrder(row: PartOrderRow): PartOrder {
   return {
@@ -89,6 +110,8 @@ function toPartOrder(row: PartOrderRow): PartOrder {
     color: row.color,
     supplier: row.supplier,
     representative: row.representative,
+    representativeEmail: row.representative_email,
+    representativePhone: row.representative_phone,
     requestedBy: row.requested_by,
     status: row.status,
     partArrivedAt: row.part_arrived_at,

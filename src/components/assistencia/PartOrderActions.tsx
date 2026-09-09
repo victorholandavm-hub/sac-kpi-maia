@@ -5,11 +5,18 @@ import { updatePartOrderStatus, addPartOrderNote } from "@/app/assistencia/pecas
 import { useQuickAction } from "./useQuickAction";
 import { PART_ORDER_STATUS_LABELS } from "@/lib/assistenciaLabels";
 
+// aguardando_resposta/cancelada (pedido do Victor 09/09/2026, planilha
+// "Solicitação de peças") -- dos dois "aguardando", dá pra ir de um pro
+// outro nos dois sentidos (fornecedor pode confirmar OU voltar a não
+// responder), e cancelar vale de qualquer estado ainda aberto. cancelada é
+// terminal igual encerrado -- nenhuma transição depois.
 const NEXT_STATUSES: Record<string, string[]> = {
-  aguardando_peca: ["peca_recebida"],
+  aguardando_resposta: ["aguardando_peca", "peca_recebida", "cancelada"],
+  aguardando_peca: ["aguardando_resposta", "peca_recebida", "cancelada"],
   peca_recebida: ["enviada_ao_cliente"],
   enviada_ao_cliente: ["encerrado"],
   encerrado: [],
+  cancelada: [],
 };
 
 export function PartOrderActions({ orderId, status }: { orderId: string; status: string }) {
@@ -45,7 +52,7 @@ export function PartOrderActions({ orderId, status }: { orderId: string; status:
         </div>
       ) : (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          Pedido encerrado.
+          {status === "cancelada" ? "Pedido cancelado." : "Pedido encerrado."}
         </p>
       )}
 

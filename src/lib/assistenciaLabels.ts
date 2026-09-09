@@ -106,17 +106,21 @@ export const DEADLINE_STATUS_LABELS: Record<string, string> = {
 };
 
 export const PART_ORDER_STATUS_LABELS: Record<string, string> = {
+  aguardando_resposta: "Aguardando resposta",
   aguardando_peca: "Aguardando peça",
   peca_recebida: "Peça recebida",
   enviada_ao_cliente: "Enviada ao cliente",
   encerrado: "Encerrado",
+  cancelada: "Cancelada",
 };
 
 export const PART_ORDER_STATUS_COLORS: Record<string, string> = {
+  aguardando_resposta: "var(--status-serious)",
   aguardando_peca: "var(--status-warning)",
   peca_recebida: "var(--series-5)",
   enviada_ao_cliente: "var(--brand-orange)",
   encerrado: "var(--status-good)",
+  cancelada: "var(--text-muted)",
 };
 
 export const MOVEMENT_TYPE_LABELS: Record<string, string> = {
