@@ -133,8 +133,17 @@ export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
               pro motorista), mas ficava diferente do que a própria tela
               da notificação mostra ("Envio de peça" vira "Recolhimento
               ou entrega de peça" na impressão) -- REQUEST_TYPE_LABELS
-              direto, mesmo texto em todo canto do sistema. */}
-          <span className="text-base font-bold italic whitespace-nowrap" style={{ color: "#000" }}>
+              direto, mesmo texto em todo canto do sistema. Retângulo com
+              pontas arredondadas em volta -- pedido do Victor 09/09/2026,
+              mesmo dia: "só coloque isso dentro de um retangulo com
+              pontas arredondadas". Só borda (sem fundo) de propósito --
+              já tem o URGENTE! preenchido logo acima brigando por
+              atenção; um segundo bloco preenchido do mesmo tamanho
+              competiria com ele em vez de complementar. */}
+          <span
+            className="text-base font-bold italic whitespace-nowrap px-2 py-0.5 rounded-lg border-2"
+            style={{ color: "#000", borderColor: "#000" }}
+          >
             {REQUEST_TYPE_LABELS[request.type] ?? request.type}
           </span>
         </div>
