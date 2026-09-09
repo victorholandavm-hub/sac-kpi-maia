@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { formatFullAddress, type ServiceRequestDetail } from "@/lib/serviceRequests";
 import { formatDateOnlyBr } from "@/lib/formatDateTime";
+import { REQUEST_TYPE_LABELS, DRIVER_TYPE_LABELS } from "@/lib/assistenciaLabels";
 
 // scheduledDate é "YYYY-MM-DD" puro (sem hora/fuso) -- new Date(iso) via
 // formatDateOnlyBr trataria como UTC meia-noite e, convertendo pro fuso de
@@ -122,6 +123,18 @@ export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
           ) : null}
           <span className="text-2xl font-black leading-none whitespace-nowrap" style={{ color: "#000" }}>
             {request.scheduledDate ? formatScheduledDateBr(request.scheduledDate) : formatDateOnlyBr(request.createdAt)}
+          </span>
+          {/* Tipo do chamado (envio de peça, troca de produto, troca com
+              recolhimento...) -- pedido do Victor 09/09/2026: "na
+              impressão... nao vai em nenhum lugar se é envio de peça...
+              preciso que fique dentro do primeiro retangulo, bem visivel
+              e logo abaixo da data e em italico". DRIVER_TYPE_LABELS
+              primeiro (é o texto mais claro pro motorista, ex.: "Troca
+              com recolhimento" pra troca_produto -- mesmo exemplo que o
+              Victor usou); tipos que só existem em REQUEST_TYPE_LABELS
+              (montagem, vistoria...) caem nesse fallback. */}
+          <span className="text-base font-bold italic whitespace-nowrap" style={{ color: "#000" }}>
+            {DRIVER_TYPE_LABELS[request.type] ?? REQUEST_TYPE_LABELS[request.type] ?? request.type}
           </span>
         </div>
       </div>
