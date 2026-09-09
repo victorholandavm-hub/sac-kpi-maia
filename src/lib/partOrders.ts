@@ -35,6 +35,29 @@ export async function listSuppliers(): Promise<string[]> {
   return (data ?? []).map((s) => s.name as string);
 }
 
+export type SupplierContact = { representative: string | null; representativeEmail: string | null; representativePhone: string | null };
+
+// Contato do representante por FORNECEDOR (não por pedido) -- pedido do
+// Victor 09/09/2026: preencher sozinho ao escolher o fornecedor num pedido
+// novo. Mapa em vez de lista pra o form (client component) já receber
+// pronto pra consultar por nome, sem round-trip nenhum ao selecionar (só
+// ~49 fornecedores, cabe fácil mandar tudo de uma vez).
+export async function listSupplierContacts(): Promise<Record<string, SupplierContact>> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("suppliers").select("name, representative, representative_email, representative_phone");
+  if (error) throw new Error(error.message);
+
+  const map: Record<string, SupplierContact> = {};
+  for (const row of data ?? []) {
+    map[row.name as string] = {
+      representative: row.representative as string | null,
+      representativeEmail: row.representative_email as string | null,
+      representativePhone: row.representative_phone as string | null,
+    };
+  }
+  return map;
+}
+
 export type PartOrder = {
   id: string;
   ticketNumber: number;

@@ -1,5 +1,5 @@
 import { getProfile, redirectIfSac } from "@/lib/dal";
-import { listSuppliers } from "@/lib/partOrders";
+import { listSuppliers, listSupplierContacts } from "@/lib/partOrders";
 import { getRequestDetail } from "@/lib/serviceRequests";
 import { NewPartOrderForm } from "@/components/assistencia/NewPartOrderForm";
 
@@ -10,7 +10,7 @@ export default async function NovoPedidoPecaPage({
 }) {
   redirectIfSac(await getProfile());
   const { service_request_id } = await searchParams;
-  const suppliers = await listSuppliers();
+  const [suppliers, supplierContacts] = await Promise.all([listSuppliers(), listSupplierContacts()]);
 
   let defaultValues: {
     serviceRequestId?: string;
@@ -38,7 +38,7 @@ export default async function NovoPedidoPecaPage({
       <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
         Novo pedido de peça
       </h2>
-      <NewPartOrderForm suppliers={suppliers} defaultValues={defaultValues} />
+      <NewPartOrderForm suppliers={suppliers} supplierContacts={supplierContacts} defaultValues={defaultValues} />
     </div>
   );
 }

@@ -25,11 +25,25 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
   const supplierChoice = String(formData.get("supplier") ?? "").trim();
   const supplierOther = String(formData.get("supplier_other") ?? "").trim();
   const supplier = supplierChoice === "__outro__" ? supplierOther : supplierChoice;
+  const representative = emptyToNull(formData.get("representative"));
+  const representativeEmail = emptyToNull(formData.get("representative_email"));
+  const representativePhone = emptyToNull(formData.get("representative_phone"));
 
   const admin = getSupabaseAdmin();
 
   if (supplier) {
-    await admin.from("suppliers").upsert({ name: supplier }, { onConflict: "name" });
+    // Mantém o contato do fornecedor sempre atualizado com o mais recente
+    // digitado -- pedido do Victor 09/09/2026: é isso que alimenta o
+    // autopreenchimento (listSupplierContacts, partOrders.ts) da próxima
+    // vez que alguém escolher esse fornecedor num pedido novo. Só
+    // sobrescreve quando o pedido atual trouxe algo preenchido -- não
+    // apaga um contato já salvo só porque esse pedido específico deixou
+    // o campo em branco.
+    const supplierPatch: Record<string, string> = { name: supplier };
+    if (representative) supplierPatch.representative = representative;
+    if (representativeEmail) supplierPatch.representative_email = representativeEmail;
+    if (representativePhone) supplierPatch.representative_phone = representativePhone;
+    await admin.from("suppliers").upsert(supplierPatch, { onConflict: "name" });
   }
 
   const defaultExpectedAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -58,9 +72,9 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
       part_code: emptyToNull(formData.get("part_code")),
       color: emptyToNull(formData.get("color")),
       supplier: supplier || null,
-      representative: emptyToNull(formData.get("representative")),
-      representative_email: emptyToNull(formData.get("representative_email")),
-      representative_phone: emptyToNull(formData.get("representative_phone")),
+      representative,
+      representative_email: representativeEmail,
+      representative_phone: representativePhone,
       requested_by: profile.fullName,
       notes: emptyToNull(formData.get("notes")),
       expected_at: emptyToNull(formData.get("expected_at")) ?? defaultExpectedAt,
