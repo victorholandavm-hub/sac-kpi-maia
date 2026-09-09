@@ -85,7 +85,7 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           por ser outro recorte da mesma causa raiz, não perto do ranking
           geral de produto. */}
       {data.byProductDefeitoFabricacao.length > 0 ? (
-        <BarRanking title="Produtos com mais defeito de fabricação" data={data.byProductDefeitoFabricacao} onSelect={openDrilldown} />
+        <BarRanking title="Produtos com mais defeito de fabricação" data={data.byProductDefeitoFabricacao} onSelect={openDrilldown} showPercent />
       ) : null}
 
       <section className="grid md:grid-cols-2 gap-4">
