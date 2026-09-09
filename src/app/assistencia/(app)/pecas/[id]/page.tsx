@@ -41,7 +41,9 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-sm font-mono text-gray-400 dark:text-gray-500">Chamado #{order.ticketNumber}</span>
+        {/* Número da planilha (CH0001..CH1641) quando o pedido veio de lá --
+            pedido do Victor 09/09/2026: mostrar esse número, não um novo. */}
+        <span className="text-sm font-mono text-gray-400 dark:text-gray-500">{order.externalReference ?? `Chamado #${order.ticketNumber}`}</span>
         <StatusBadge status={order.status} />
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{order.partName}</h2>
       </div>

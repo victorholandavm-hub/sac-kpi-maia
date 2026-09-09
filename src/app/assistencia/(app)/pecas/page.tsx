@@ -1,33 +1,9 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPartOrders, listSuppliers, isPartOrderStatus, type PartOrder } from "@/lib/partOrders";
-import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
-
-function StatusBadge({ status }: { status: string }) {
-  const color = PART_ORDER_STATUS_COLORS[status] ?? "var(--text-muted)";
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-      style={{ color: "var(--text-primary)", background: `color-mix(in srgb, ${color} 35%, var(--surface-1))` }}
-    >
-      <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-      {PART_ORDER_STATUS_LABELS[status] ?? status}
-    </span>
-  );
-}
-
-function daysSince(dateStr: string): number {
-  const ms = Date.now() - new Date(dateStr).getTime();
-  return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
-}
-
-function isOverdue(expectedAt: string | null): boolean {
-  if (!expectedAt) return false;
-  const today = new Date().toISOString().slice(0, 10);
-  return today > expectedAt;
-}
+import { PecasTable } from "@/components/assistencia/PecasTable";
 
 function buildHref(params: { status?: string; q?: string; supplier?: string }) {
   const sp = new URLSearchParams();
@@ -135,55 +111,9 @@ export default async function PecasQueuePage({
         ) : null}
       </form>
 
-      {orders.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
-          <p className="text-sm text-gray-400 dark:text-gray-500">Nenhum pedido de peça encontrado.</p>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
-          <div className="divide-y divide-gray-100 dark:divide-gray-700">
-            {orders.map((o) => (
-              <Link
-                key={o.id}
-                href={`/assistencia/pecas/${o.id}`}
-                className="flex items-center justify-between gap-4 p-4 flex-wrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
-              >
-                <div className="flex flex-col gap-1 min-w-0 w-0 grow">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono text-gray-400 dark:text-gray-500">#{o.ticketNumber}</span>
-                    <StatusBadge status={o.status} />
-                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{o.partName}</span>
-                    {o.supplier ? <span className="text-xs text-gray-400 dark:text-gray-500">{o.supplier}</span> : null}
-                  </div>
-                  <p className="text-sm truncate text-gray-500 dark:text-gray-400">
-                    {o.clientName ?? "Sem cliente"}
-                    {o.product ? ` · ${o.product}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1 text-xs text-gray-400 dark:text-gray-500">
-                  {/* Cancelada não tem "dias aguardando" -- já não tá mais
-                      esperando nada, mesma lógica de encerrado (pedido do
-                      Victor 09/09/2026). */}
-                  {o.status !== "encerrado" && o.status !== "cancelada" ? (
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-                      style={{
-                        color: "var(--text-primary)",
-                        background: `color-mix(in srgb, ${isOverdue(o.expectedAt) ? "var(--status-critical)" : "var(--status-warning)"} 35%, var(--surface-1))`,
-                      }}
-                    >
-                      {daysSince(o.createdAt)} dias aguardando{isOverdue(o.expectedAt) ? " · atrasado" : ""}
-                    </span>
-                  ) : (
-                    <span>{new Date(o.createdAt).toLocaleDateString("pt-BR")}</span>
-                  )}
-                  <span>{o.requestedBy ? `Pedido por ${o.requestedBy}` : ""}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Tabela Grid Horizontal -- mesmo padrão da aba Entregas (pedido do
+          Victor 09/09/2026), ver PecasTable.tsx. */}
+      <PecasTable orders={orders} />
     </div>
   );
 }

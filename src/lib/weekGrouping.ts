@@ -84,7 +84,7 @@ export function groupIntoWeeks<T>(days: T[], dateKeyOf: (day: T) => string): Wee
 // (ver isCurrentMonth abaixo pra saber qual mês nasce aberto).
 export type MonthGroup<T> = { monthKey: string; label: string; weeks: WeekGroup<T>[] };
 
-const MONTH_LABELS = [
+export const MONTH_LABELS = [
   "Janeiro",
   "Fevereiro",
   "Março",
@@ -99,7 +99,7 @@ const MONTH_LABELS = [
   "Dezembro",
 ];
 
-function formatMonthLabel(monthKey: string): string {
+export function formatMonthLabel(monthKey: string): string {
   const [y, m] = monthKey.split("-");
   return `${MONTH_LABELS[Number(m) - 1]} de ${y}`;
 }
