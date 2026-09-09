@@ -61,13 +61,18 @@ export type RequestPhoto = {
   // (uso de sempre: motorista, observação geral, chamado sem item). Ver
   // hasPhotoForEveryCompletedItem abaixo.
   itemId: string | null;
+  // Nota fiscal anexada na criação (pedido do Victor 09/09/2026) -- mesmo
+  // padrão booleano de isProof, só que pra distinguir a nota das fotos
+  // comuns (avaria, observação). Ver createSacRequest (actions.ts) e
+  // getInvoicePhotos abaixo.
+  isInvoice: boolean;
 };
 
 export async function listRequestPhotos(requestId: string): Promise<RequestPhoto[]> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("service_request_photos")
-    .select("id, storage_path, uploaded_by, caption, created_at, is_proof, item_id")
+    .select("id, storage_path, uploaded_by, caption, created_at, is_proof, item_id, is_invoice")
     .eq("request_id", requestId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
@@ -81,7 +86,42 @@ export async function listRequestPhotos(requestId: string): Promise<RequestPhoto
     createdAt: row.created_at as string,
     isProof: !!row.is_proof,
     itemId: row.item_id as string | null,
+    isInvoice: !!row.is_invoice,
   }));
+}
+
+// Uma consulta só pra várias solicitações de uma vez (despacho em lote,
+// despacho-lote/page.tsx) em vez de uma ida ao banco por chamado -- mesmo
+// motivo de outras consultas em lote já existentes no projeto (ex.:
+// listClientesNaoContatar). Só a nota mais recente por chamado (normalmente
+// só existe uma, anexada na criação -- ver createSacRequest); se por algum
+// motivo tiver mais de uma, a mais nova vence.
+export async function getInvoicePhotos(requestIds: string[]): Promise<Map<string, RequestPhoto>> {
+  if (requestIds.length === 0) return new Map();
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("service_request_photos")
+    .select("id, request_id, storage_path, uploaded_by, caption, created_at, is_proof, item_id, is_invoice")
+    .in("request_id", requestIds)
+    .eq("is_invoice", true)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const byRequest = new Map<string, RequestPhoto>();
+  for (const row of data ?? []) {
+    byRequest.set(row.request_id as string, {
+      id: row.id as string,
+      url: photoPublicUrl(row.storage_path as string),
+      isPdf: (row.storage_path as string).toLowerCase().endsWith(".pdf"),
+      uploadedBy: row.uploaded_by as string | null,
+      caption: row.caption as string | null,
+      createdAt: row.created_at as string,
+      isProof: !!row.is_proof,
+      itemId: row.item_id as string | null,
+      isInvoice: true,
+    });
+  }
+  return byRequest;
 }
 
 // Usado só por driverCompleteRequest pra checar a exigência sem precisar
@@ -146,6 +186,7 @@ async function insertPhotoMetadata(opts: {
   caption?: string | null;
   isProof?: boolean;
   itemId?: string | null;
+  isInvoice?: boolean;
 }): Promise<void> {
   const admin = getSupabaseAdmin();
   const caption = opts.caption?.trim() || null;
@@ -156,6 +197,7 @@ async function insertPhotoMetadata(opts: {
     caption,
     is_proof: !!opts.isProof,
     item_id: opts.itemId ?? null,
+    is_invoice: !!opts.isInvoice,
   });
   if (insertError) {
     console.error("insertPhotoMetadata failed:", insertError.message);
@@ -171,6 +213,7 @@ export async function saveRequestPhoto(opts: {
   caption?: string | null;
   isProof?: boolean;
   itemId?: string | null;
+  isInvoice?: boolean;
 }): Promise<void> {
   const path = await uploadPhotoBytes(opts.requestId, opts.file);
   await insertPhotoMetadata({
@@ -180,6 +223,7 @@ export async function saveRequestPhoto(opts: {
     caption: opts.caption,
     isProof: opts.isProof,
     itemId: opts.itemId,
+    isInvoice: opts.isInvoice,
   });
 }
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { getRequestDetail } from "@/lib/serviceRequests";
+import { getInvoicePhotos } from "@/lib/servicePhotos";
 import { PrintButton, type PrintTarget } from "@/components/assistencia/PrintButton";
 import { DespachoCard } from "@/components/assistencia/DespachoCard";
 
@@ -22,6 +23,7 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
   }
 
   const { request, events } = result;
+  const invoicePhoto = (await getInvoicePhotos([request.id])).get(request.id) ?? null;
   // Impedir reimpressão -- pedido do Victor 28/08/2026 (ver PrintButton.tsx
   // pro resto do racional). Admin sempre pode reimprimir ("só eu poderia
   // imprimir mais de uma vez").
@@ -76,7 +78,7 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
         }
       `}</style>
 
-      <DespachoCard request={request} />
+      <DespachoCard request={request} invoicePhoto={invoicePhoto} />
     </div>
   );
 }

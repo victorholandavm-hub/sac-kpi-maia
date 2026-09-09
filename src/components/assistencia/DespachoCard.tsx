@@ -2,6 +2,7 @@ import Image from "next/image";
 import { formatFullAddress, type ServiceRequestDetail } from "@/lib/serviceRequests";
 import { formatDateOnlyBr } from "@/lib/formatDateTime";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import type { RequestPhoto } from "@/lib/servicePhotos";
 
 // scheduledDate é "YYYY-MM-DD" puro (sem hora/fuso) -- new Date(iso) via
 // formatDateOnlyBr trataria como UTC meia-noite e, convertendo pro fuso de
@@ -77,6 +78,32 @@ function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
   );
 }
 
+// Nota fiscal anexada na criação (pedido do Victor 09/09/2026: "que na hora
+// de imprimir, cada notificação saia junto com sua respectiva nota") --
+// sempre em folha própria (break-before), depois do cartão principal, pra
+// não disputar espaço com o resto do despacho nem risco de cortar a
+// imagem/PDF no meio. PDF usa <embed> (o navegador que imprime já sabe
+// renderizar PDF inline) -- sem lib nenhuma nova, mesmo espírito de "só o
+// que já existe" do resto do projeto.
+function InvoicePage({ photo }: { photo: RequestPhoto }) {
+  return (
+    <div
+      className="rounded-lg border overflow-hidden flex flex-col text-sm mt-4"
+      style={{ background: "var(--surface-1)", borderColor: "var(--border)", breakBefore: "page", pageBreakBefore: "always" }}
+    >
+      <SectionTitle>Nota fiscal</SectionTitle>
+      <div className="px-4 py-3 flex justify-center">
+        {photo.isPdf ? (
+          <embed src={photo.url} type="application/pdf" style={{ width: "100%", height: "260mm" }} />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photo.url} alt="Nota fiscal" style={{ maxWidth: "100%", maxHeight: "260mm", objectFit: "contain" }} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Papel físico da notificação -- extraído de [id]/despacho/page.tsx (pedido
 // do Victor 19/08/2026: reaproveitar o mesmo cartão pra imprimir várias de
 // uma vez, ver despacho-lote/page.tsx) pra não duplicar esse bloco grande
@@ -84,11 +111,12 @@ function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
 // cliente, produto, descrição da solicitação, relatório logístico,
 // assinatura -- sem "quem errou" (causa raiz), que é controle interno,
 // não vai pro papel que cliente/motorista veem.
-export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
+export function DespachoCard({ request, invoicePhoto }: { request: ServiceRequestDetail; invoicePhoto?: RequestPhoto | null }) {
   const isUrgente = request.urgent;
   const enderecoCompleto = [formatFullAddress(request), request.clientNeighborhood].filter(Boolean).join(" — ");
 
   return (
+    <>
     <div className="rounded-lg border overflow-hidden flex flex-col text-sm" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
       <div className="flex items-start justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center gap-3">
@@ -206,5 +234,7 @@ export function DespachoCard({ request }: { request: ServiceRequestDetail }) {
         </div>
       </div>
     </div>
+    {invoicePhoto ? <InvoicePage photo={invoicePhoto} /> : null}
+    </>
   );
 }

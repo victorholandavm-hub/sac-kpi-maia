@@ -23,7 +23,7 @@ import {
 import { notifyLoja } from "@/lib/notifications";
 import { notifyTelegramNewRequest, notifyTelegramStatusChange } from "@/lib/telegram";
 import { resolveDriverName, listOwnStoreAssemblers } from "@/lib/payments";
-import { getPhotoForAuth, deleteRequestPhoto } from "@/lib/servicePhotos";
+import { getPhotoForAuth, deleteRequestPhoto, saveRequestPhoto } from "@/lib/servicePhotos";
 import { randomUUID } from "crypto";
 import { getLojaGerenteSession } from "@/app/assistencia/loja-actions";
 import { getGerenteStoreIds } from "@/lib/gerentes";
@@ -2429,6 +2429,16 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     return { error: "Tipo inválido." };
   }
 
+  // Nota fiscal obrigatória pra todo tipo (pedido do Victor 09/09/2026,
+  // confirmado "obrigatório pra todo tipo") -- mesma validação de
+  // cupom_fiscal em createPedidoEncomenda (encomendas-actions.ts). Só
+  // valida a presença do arquivo aqui; o upload de verdade só acontece
+  // depois que o chamado existe (ver mais abaixo), mesmo padrão de lá.
+  const invoiceFile = formData.get("invoice_file");
+  if (!(invoiceFile instanceof File) || invoiceFile.size === 0) {
+    return { error: "Anexe a nota fiscal (foto ou PDF)." };
+  }
+
   const clientName = String(formData.get("client_name") ?? "").trim();
   if (!clientName) return { error: "Informe o nome do cliente." };
 
@@ -2687,6 +2697,17 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
 
   if (error || !data) {
     return { error: `Não foi possível criar: ${error?.message ?? "erro desconhecido"}` };
+  }
+
+  // Upload só depois do chamado existir (mesmo padrão de createPedidoEncomenda
+  // em encomendas-actions.ts) -- falha aqui não desfaz o chamado, só avisa
+  // (evita perder toda a solicitação por causa só do anexo).
+  try {
+    await saveRequestPhoto({ requestId: data.id, file: invoiceFile, uploadedBy: profile.fullName, caption: "Nota fiscal", isInvoice: true });
+  } catch (err) {
+    return {
+      error: `Solicitação #${data.ticket_number} criada, mas a nota fiscal não pôde ser salva: ${err instanceof Error ? err.message : "erro desconhecido"}`,
+    };
   }
 
   const allItems = [
