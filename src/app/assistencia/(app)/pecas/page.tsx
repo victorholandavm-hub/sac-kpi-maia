@@ -40,10 +40,12 @@ function buildHref(params: { status?: string; q?: string; supplier?: string }) {
 
 const FILTERS: { label: string; value: string | null }[] = [
   { label: "Todos", value: null },
+  { label: "Aguardando resposta", value: "aguardando_resposta" },
   { label: "Aguardando peça", value: "aguardando_peca" },
   { label: "Peça recebida", value: "peca_recebida" },
   { label: "Enviada ao cliente", value: "enviada_ao_cliente" },
   { label: "Encerrados", value: "encerrado" },
+  { label: "Canceladas", value: "cancelada" },
 ];
 
 export default async function PecasQueuePage({
@@ -159,7 +161,10 @@ export default async function PecasQueuePage({
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 text-xs text-gray-400 dark:text-gray-500">
-                  {o.status !== "encerrado" ? (
+                  {/* Cancelada não tem "dias aguardando" -- já não tá mais
+                      esperando nada, mesma lógica de encerrado (pedido do
+                      Victor 09/09/2026). */}
+                  {o.status !== "encerrado" && o.status !== "cancelada" ? (
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
                       style={{

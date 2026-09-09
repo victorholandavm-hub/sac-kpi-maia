@@ -52,6 +52,8 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
         <Row label="Cor" value={order.color} />
         <Row label="Fornecedor" value={order.supplier} />
         <Row label="Representante" value={order.representative} />
+        <Row label="E-mail do representante" value={order.representativeEmail} />
+        <Row label="Telefone do representante" value={order.representativePhone} />
         <Row label="Produto do cliente" value={order.product} />
         <Row label="Cliente" value={order.clientName} />
         <Row label="CPF" value={order.clientCpf} />
