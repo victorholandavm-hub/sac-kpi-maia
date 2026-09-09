@@ -5,6 +5,7 @@ import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
 import { fetchGhlMessages, upsertGhlContact, addContactToWorkflow, findGhlConversationId, type GhlMessage } from "@/lib/ghlClient";
 import { isMostruarioRequest } from "@/lib/serviceRequests";
 import { DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
+import { enrollPendingCompraNps, detectPendingCompraNpsResponses } from "@/lib/nps2Meses";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -362,11 +363,29 @@ async function runSync() {
   errors.push(...npsEnrollErrors);
   const montagemAssistNpsAnswered = await detectPendingNpsResponses(supabase);
 
+  // NPS "2 meses pós-recebimento" -- pedido do Victor 09/09/2026. Fonte de
+  // dado (totvs_orders/totvs_delivery_cargas) e destinatário (client_id,
+  // não requestId) diferentes dos 3 tipos acima, por isso função própria
+  // em nps2Meses.ts em vez de mais um `if` aqui -- mesma proteção deles
+  // (no-op sem GHL_WORKFLOW_ID_COMPRA configurado).
+  const { enrolled: compraNpsEnrolled, errors: compraNpsErrors } = await enrollPendingCompraNps();
+  errors.push(...compraNpsErrors);
+  const compraNpsAnswered = await detectPendingCompraNpsResponses();
+
   const ok = errors.length === 0;
   await recordSyncRun(
     "ghl",
     ok,
-    { conversationsChecked: conversations.length, conversationsUpserted, responsesComputed, npsComputed, montagemAssistNpsEnrolled, montagemAssistNpsAnswered },
+    {
+      conversationsChecked: conversations.length,
+      conversationsUpserted,
+      responsesComputed,
+      npsComputed,
+      montagemAssistNpsEnrolled,
+      montagemAssistNpsAnswered,
+      compraNpsEnrolled,
+      compraNpsAnswered,
+    },
     errors
   );
 
@@ -378,6 +397,8 @@ async function runSync() {
     npsComputed,
     montagemAssistNpsEnrolled,
     montagemAssistNpsAnswered,
+    compraNpsEnrolled,
+    compraNpsAnswered,
     errors,
   });
 }

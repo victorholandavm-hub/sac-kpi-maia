@@ -578,7 +578,11 @@ export type RecompraNaoContatar = {
   criadoEm: string;
 };
 
-async function listClientesNaoContatar(): Promise<Set<string>> {
+// Exportada (09/09/2026) pro NPS de 2 meses pós-recebimento (nps2Meses.ts)
+// reaproveitar -- mesma lista de opt-out ("legítimo interesse" pede opção
+// de não ser mais contatado, ver migration do Motor de Recompra), não faz
+// sentido duplicar por fonte de contato proativo diferente.
+export async function listClientesNaoContatar(): Promise<Set<string>> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.from("recompra_nao_contatar").select("client_id");
   if (error) throw new Error(error.message);
