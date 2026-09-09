@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { createPartOrder, type PartOrderFormState } from "@/app/assistencia/pecas-actions";
+import type { SupplierContact } from "@/lib/partOrders";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -17,9 +18,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export function NewPartOrderForm({
   suppliers,
+  supplierContacts,
   defaultValues,
 }: {
   suppliers: string[];
+  // Contato do representante por fornecedor -- pedido do Victor 09/09/2026:
+  // "quando... selecionar o fornecedor, já deve puxar automaticamente o
+  // nome, contato e e-mail do representante". Preenche os 3 campos abaixo
+  // sozinho ao trocar o select; quem digitar por cima continua podendo
+  // (campos ficam controlados, não travados).
+  supplierContacts: Record<string, SupplierContact>;
   defaultValues?: {
     serviceRequestId?: string;
     clientName?: string;
@@ -30,6 +38,17 @@ export function NewPartOrderForm({
 }) {
   const [state, formAction, pending] = useActionState<PartOrderFormState, FormData>(createPartOrder, undefined);
   const [supplier, setSupplier] = useState("");
+  const [representative, setRepresentative] = useState("");
+  const [representativeEmail, setRepresentativeEmail] = useState("");
+  const [representativePhone, setRepresentativePhone] = useState("");
+
+  function handleSupplierChange(value: string) {
+    setSupplier(value);
+    const contact = supplierContacts[value];
+    setRepresentative(contact?.representative ?? "");
+    setRepresentativeEmail(contact?.representativeEmail ?? "");
+    setRepresentativePhone(contact?.representativePhone ?? "");
+  }
 
   if (state?.success) {
     return (
@@ -67,7 +86,7 @@ export function NewPartOrderForm({
         <select
           name="supplier"
           value={supplier}
-          onChange={(e) => setSupplier(e.target.value)}
+          onChange={(e) => handleSupplierChange(e.target.value)}
           className="rounded border px-3 py-2"
           style={inputStyle}
         >
@@ -87,18 +106,39 @@ export function NewPartOrderForm({
       ) : null}
 
       <Field label="Representante do fornecedor">
-        <input name="representative" className="rounded border px-3 py-2" style={inputStyle} />
+        <input
+          name="representative"
+          value={representative}
+          onChange={(e) => setRepresentative(e.target.value)}
+          className="rounded border px-3 py-2"
+          style={inputStyle}
+        />
       </Field>
 
       {/* Contato do REPRESENTANTE (fornecedor) -- distinto do e-mail/telefone
           do cliente lá embaixo (pedido do Victor 09/09/2026, planilha
-          "Solicitação de peças"). */}
+          "Solicitação de peças"). Preenchidos sozinhos ao escolher o
+          fornecedor (ver handleSupplierChange acima) -- continua editável
+          por cima, pra representante novo/trocado. */}
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="E-mail do representante">
-          <input name="representative_email" type="email" className="rounded border px-3 py-2" style={inputStyle} />
+          <input
+            name="representative_email"
+            type="email"
+            value={representativeEmail}
+            onChange={(e) => setRepresentativeEmail(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
         </Field>
         <Field label="Telefone do representante">
-          <input name="representative_phone" className="rounded border px-3 py-2" style={inputStyle} />
+          <input
+            name="representative_phone"
+            value={representativePhone}
+            onChange={(e) => setRepresentativePhone(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
         </Field>
       </div>
 
