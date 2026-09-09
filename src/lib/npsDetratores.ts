@@ -5,16 +5,17 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 // o sistema roda, não só o do SAC. Duas escalas diferentes coexistem de
 // propósito (não convertidas pra uma "nota única"): SAC usa 1-5 (detrator =
 // 1 ou 2, mesmo critério de NpsDetractor em kpi.ts) e montagem/assistência
-// técnica usam 0-10, o NPS de verdade (detrator = 0 a 6, padrão de
-// mercado). Pós-entrega entra aqui quando existir -- é só somar mais uma
-// origem no union abaixo.
-export const NPS_DETRATOR_ORIGENS = ["sac", "montagem", "assistencia_tecnica"] as const;
+// técnica/entrega usam 0-10, o NPS de verdade (detrator = 0 a 6, padrão de
+// mercado). "1 mês pós-recebimento" entra aqui quando existir -- é só somar
+// mais uma origem no union abaixo.
+export const NPS_DETRATOR_ORIGENS = ["sac", "montagem", "assistencia_tecnica", "entrega"] as const;
 export type NpsDetratorOrigem = (typeof NPS_DETRATOR_ORIGENS)[number];
 
 export const NPS_DETRATOR_ORIGEM_LABELS: Record<NpsDetratorOrigem, string> = {
   sac: "Atendimento (SAC)",
   montagem: "Pós-montagem",
   assistencia_tecnica: "Pós-assistência técnica",
+  entrega: "Pós-entrega",
 };
 
 // Taxonomia de recuperação de detrator -- padrão de "closed-loop feedback"
@@ -156,7 +157,7 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
   };
   const req: NpsDetrator[] = ((reqRows ?? []) as unknown as ReqRow[]).map((r) => {
     const sr = Array.isArray(r.service_requests) ? r.service_requests[0] : r.service_requests;
-    const origem = (r.tipo === "montagem" ? "montagem" : "assistencia_tecnica") as NpsDetratorOrigem;
+    const origem = (r.tipo === "montagem" || r.tipo === "entrega" ? r.tipo : "assistencia_tecnica") as NpsDetratorOrigem;
     const resolved = resolveStatus(origem, r.request_id);
     return {
       origem,
@@ -183,12 +184,12 @@ export type NpsFaseResumo = { npsIndex: number | null; responseCount: number };
 // npsIndex:null quando não tem nenhuma resposta ainda (vira "—" na tela) --
 // não precisa de código novo quando montagem/assistência técnica
 // começarem a responder de verdade, já calcula sozinho.
-export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" | "assistencia_tecnica", NpsFaseResumo>> {
+export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" | "assistencia_tecnica" | "entrega", NpsFaseResumo>> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.from("service_request_nps").select("tipo, score").not("score", "is", null);
   if (error) throw new Error(error.message);
 
-  function resumoFor(tipo: "montagem" | "assistencia_tecnica"): NpsFaseResumo {
+  function resumoFor(tipo: "montagem" | "assistencia_tecnica" | "entrega"): NpsFaseResumo {
     const scores = (data ?? []).filter((r) => r.tipo === tipo).map((r) => r.score as number);
     if (scores.length === 0) return { npsIndex: null, responseCount: 0 };
     const promoters = scores.filter((s) => s >= 9).length;
@@ -197,7 +198,7 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
     return { npsIndex, responseCount: scores.length };
   }
 
-  return { montagem: resumoFor("montagem"), assistencia_tecnica: resumoFor("assistencia_tecnica") };
+  return { montagem: resumoFor("montagem"), assistencia_tecnica: resumoFor("assistencia_tecnica"), entrega: resumoFor("entrega") };
 }
 
 export async function registrarStatusDetrator(
