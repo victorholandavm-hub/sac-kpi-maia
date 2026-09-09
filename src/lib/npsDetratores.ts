@@ -5,10 +5,9 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 // o sistema roda, não só o do SAC. Duas escalas diferentes coexistem de
 // propósito (não convertidas pra uma "nota única"): SAC usa 1-5 (detrator =
 // 1 ou 2, mesmo critério de NpsDetractor em kpi.ts) e montagem/assistência
-// técnica/entrega usam 0-10, o NPS de verdade (detrator = 0 a 6, padrão de
-// mercado). "1 mês pós-recebimento" entra aqui quando existir -- é só somar
-// mais uma origem no union abaixo.
-export const NPS_DETRATOR_ORIGENS = ["sac", "montagem", "assistencia_tecnica", "entrega"] as const;
+// técnica/entrega/compra usam 0-10, o NPS de verdade (detrator = 0 a 6,
+// padrão de mercado).
+export const NPS_DETRATOR_ORIGENS = ["sac", "montagem", "assistencia_tecnica", "entrega", "compra"] as const;
 export type NpsDetratorOrigem = (typeof NPS_DETRATOR_ORIGENS)[number];
 
 export const NPS_DETRATOR_ORIGEM_LABELS: Record<NpsDetratorOrigem, string> = {
@@ -16,6 +15,7 @@ export const NPS_DETRATOR_ORIGEM_LABELS: Record<NpsDetratorOrigem, string> = {
   montagem: "Pós-montagem",
   assistencia_tecnica: "Pós-assistência técnica",
   entrega: "Pós-entrega",
+  compra: "2 meses pós-recebimento",
 };
 
 // Taxonomia de recuperação de detrator -- padrão de "closed-loop feedback"
@@ -78,7 +78,12 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
   const admin = getSupabaseAdmin();
   const sinceIso = new Date(Date.now() - LOOKBACK_MS).toISOString();
 
-  const [{ data: sacRows, error: sacError }, { data: reqRows, error: reqError }, { data: statusRows, error: statusError }] = await Promise.all([
+  const [
+    { data: sacRows, error: sacError },
+    { data: reqRows, error: reqError },
+    { data: compraRows, error: compraError },
+    { data: statusRows, error: statusError },
+  ] = await Promise.all([
     admin
       .from("conversations")
       .select("id, nps_score, nps_answered_at, contact_id")
@@ -93,10 +98,18 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
       .lte("score", 6)
       .gte("respondido_em", sinceIso)
       .order("respondido_em", { ascending: false }),
+    admin
+      .from("compra_nps")
+      .select("order_id, client_id, score, respondido_em, totvs_orders(client_name)")
+      .not("score", "is", null)
+      .lte("score", 6)
+      .gte("respondido_em", sinceIso)
+      .order("respondido_em", { ascending: false }),
     admin.from("nps_detrator_status").select("origem, origem_id, status, motivo, atualizado_em"),
   ]);
   if (sacError) throw new Error(sacError.message);
   if (reqError) throw new Error(reqError.message);
+  if (compraError) throw new Error(compraError.message);
   if (statusError) throw new Error(statusError.message);
 
   const statusByKey = new Map((statusRows as StatusRow[] | null ?? []).map((r) => [`${r.origem}:${r.origem_id}`, r]));
@@ -172,7 +185,39 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
     };
   });
 
-  return [...sac, ...req].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
+  // Telefone dos detratores de "compra" -- totvs_orders não tem, só o
+  // cadastro (mesmo join client_id = protheus_code do resto do projeto).
+  type CompraRow = {
+    order_id: string;
+    client_id: string;
+    score: number;
+    respondido_em: string;
+    totvs_orders: { client_name: string | null } | { client_name: string | null }[] | null;
+  };
+  const compraClientIds = [...new Set(((compraRows ?? []) as CompraRow[]).map((r) => r.client_id))];
+  const phoneByClientId = new Map<string, string | null>();
+  if (compraClientIds.length > 0) {
+    const { data: clienteRows, error: clientesError } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", compraClientIds);
+    if (clientesError) throw new Error(clientesError.message);
+    for (const c of clienteRows ?? []) phoneByClientId.set(c.protheus_code as string, c.phone1 as string | null);
+  }
+  const compra: NpsDetrator[] = ((compraRows ?? []) as CompraRow[]).map((r) => {
+    const order = Array.isArray(r.totvs_orders) ? r.totvs_orders[0] : r.totvs_orders;
+    const resolved = resolveStatus("compra", r.order_id);
+    return {
+      origem: "compra" as const,
+      origemId: r.order_id,
+      score: r.score,
+      escala: "0-10" as const,
+      respondidoEm: r.respondido_em,
+      clientName: order?.client_name ?? null,
+      clientPhone: phoneByClientId.get(r.client_id) ?? null,
+      motivoSugerido: null,
+      ...resolved,
+    };
+  });
+
+  return [...sac, ...req, ...compra].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
 }
 
 export type NpsFaseResumo = { npsIndex: number | null; responseCount: number };

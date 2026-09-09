@@ -48,7 +48,7 @@ export function AvaliacoesTabs({
   npsTrend: NpsWeekPoint[];
   googleReviews: StoreGoogleReviews[];
   npsDetratores: NpsDetrator[];
-  resumoFasesAdicionais: Record<"montagem" | "assistencia_tecnica" | "entrega", NpsFaseResumo>;
+  resumoFasesAdicionais: Record<"montagem" | "assistencia_tecnica" | "entrega" | "compra", NpsFaseResumo>;
 }) {
   const [activeTab, setActiveTab] = useState<TabId>("resumo");
 

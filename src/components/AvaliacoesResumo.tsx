@@ -9,17 +9,15 @@ import { NpsDetratoresTable } from "./NpsDetratoresTable";
 // Resumo de todas as fases numa tela só -- pedido do Victor 08/09/2026: "a
 // primeira aba seja desse resumo de avaliações de todas as fases. Hoje só
 // temos do SAC, aí você coloca do sac e as outras fases você deixa com um
-// traço". São 5 fases no total (achado 08/09/2026 -- eu tinha confundido
-// "pós-entrega" com "1 mês pós-recebimento", achando que eram a mesma
-// coisa; o Victor corrigiu: "existem os dois"): SAC (dado real), 1 mês
-// pós-recebimento (sem fonte de dado ainda -- nem desenhado de verdade, só
-// o card placeholder), pós-montagem/pós-assistência técnica/pós-entrega
-// (essas três já calculam sozinhas a partir de service_request_nps -- ver
-// getNpsResumoPorFaseAdicional -- e mostram "—" com 0 respostas, sem
-// precisar de código novo quando os templates do WhatsApp forem aprovados
-// e começarem a responder de verdade). "Entrega" separada de "assistência
-// técnica" só a partir de 09/09/2026 -- antes as duas caíam no mesmo balde
-// no backend mesmo com cards diferentes aqui na tela.
+// traço". São 5 fases no total: SAC (dado real) + pós-entrega/pós-montagem/
+// pós-assistência técnica/2 meses pós-recebimento (as 4 já calculam
+// sozinhas -- ver getNpsResumoPorFaseAdicional em npsDetratores.ts pras 3
+// primeiras e getCompraNpsResumo em nps2Meses.ts pra última -- e mostram
+// "—" com 0 respostas, sem precisar de código novo quando os templates do
+// WhatsApp forem aprovados e começarem a responder de verdade). "2 meses
+// pós-recebimento" (não "1 mês" -- correção do Victor 09/09/2026) é a
+// última a ganhar fonte de dado real, feita adiantando os gatilhos que
+// faltavam antes da aprovação dos templates.
 function FaseCard({ label, npsIndex, responseCount }: { label: string; npsIndex: number | null; responseCount: number }) {
   return (
     <div className="rounded-lg border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
@@ -36,29 +34,13 @@ function FaseCard({ label, npsIndex, responseCount }: { label: string; npsIndex:
   );
 }
 
-function FaseCardEmBreve({ label }: { label: string }) {
-  return (
-    <div className="rounded-lg border border-dashed p-4 flex flex-col gap-1" style={{ borderColor: "var(--border)" }}>
-      <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-        {label}
-      </span>
-      <span className="text-2xl font-semibold" style={{ color: "var(--text-muted)" }}>
-        —
-      </span>
-      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-        em breve
-      </span>
-    </div>
-  );
-}
-
 export function AvaliacoesResumo({
   npsSummary,
   resumoFasesAdicionais,
   npsDetratores,
 }: {
   npsSummary: NpsSummary;
-  resumoFasesAdicionais: Record<"montagem" | "assistencia_tecnica" | "entrega", NpsFaseResumo>;
+  resumoFasesAdicionais: Record<"montagem" | "assistencia_tecnica" | "entrega" | "compra", NpsFaseResumo>;
   npsDetratores: NpsDetrator[];
 }) {
   const [showDetratores, setShowDetratores] = useState(false);
@@ -78,7 +60,7 @@ export function AvaliacoesResumo({
             npsIndex={resumoFasesAdicionais.assistencia_tecnica.npsIndex}
             responseCount={resumoFasesAdicionais.assistencia_tecnica.responseCount}
           />
-          <FaseCardEmBreve label="1 mês pós-recebimento" />
+          <FaseCard label="2 meses pós-recebimento" npsIndex={resumoFasesAdicionais.compra.npsIndex} responseCount={resumoFasesAdicionais.compra.responseCount} />
         </div>
       </div>
 

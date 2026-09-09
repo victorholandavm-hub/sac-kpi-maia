@@ -4,6 +4,7 @@ import { categoryLabel, storeLabel } from "@/lib/labels";
 import { listStoreGoogleReviews } from "@/lib/googleReviews";
 import { getNpsTrend } from "@/lib/npsTrend";
 import { listNpsDetratores, getNpsResumoPorFaseAdicional } from "@/lib/npsDetratores";
+import { getCompraNpsResumo } from "@/lib/nps2Meses";
 import { AppHeader } from "@/components/AppHeader";
 import { AvaliacoesTabs } from "@/components/AvaliacoesTabs";
 
@@ -27,13 +28,19 @@ export default async function AvaliacoesPage({
 }) {
   const params = await searchParams;
   const range = resolveRange(params);
-  const [data, googleReviews, npsTrend, npsDetratores, resumoFasesAdicionais] = await Promise.all([
+  const [data, googleReviews, npsTrend, npsDetratores, resumoFasesAdicionais, compraNpsResumo] = await Promise.all([
     getKpiData(range, { categoryLabel, storeLabel }),
     listStoreGoogleReviews(),
     getNpsTrend(NPS_TREND_WEEKS),
     listNpsDetratores(),
     getNpsResumoPorFaseAdicional(),
+    getCompraNpsResumo(),
   ]);
+  // Junta os dois resumos numa coisa só pro Resumo de /avaliacoes mostrar
+  // as 4 fases que já calculam sozinhas -- compra_nps é tabela separada
+  // (sem chamado de assistência por trás, ver nps2Meses.ts), por isso vem
+  // de uma função à parte em vez de dentro de getNpsResumoPorFaseAdicional.
+  const resumoFasesCompletas = { ...resumoFasesAdicionais, compra: compraNpsResumo };
 
   return (
     <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
@@ -55,7 +62,7 @@ export default async function AvaliacoesPage({
         npsTrend={npsTrend}
         googleReviews={googleReviews}
         npsDetratores={npsDetratores}
-        resumoFasesAdicionais={resumoFasesAdicionais}
+        resumoFasesAdicionais={resumoFasesCompletas}
       />
     </div>
   );
