@@ -54,6 +54,21 @@ export type PartOrder = {
   // do Victor 09/09/2026, planilha "Solicitação de peças").
   representativeEmail: string | null;
   representativePhone: string | null;
+  // Tipo do CHAMADO de assistência que originou esse pedido de peça (ex.:
+  // "envio_peca", "troca_produto") -- só existe quando serviceRequestId
+  // está preenchido (pedido criado a partir de um chamado, ver
+  // pecas/nova/page.tsx). Pedidos avulsos (sem chamado por trás, incluindo
+  // todo o histórico importado da planilha) ficam null -- pedido do Victor
+  // 09/09/2026: "tag colorida... indicando o tipo/status do fluxo (ex:
+  // Envio de peça em verde, Troca de produto em laranja)", mesma
+  // taxonomia/cor já usada em REQUEST_TYPE_LABELS/DELIVERY_TYPE_COLORS
+  // pras entregas, não um tipo novo inventado só pra peças.
+  serviceRequestType: string | null;
+  // Número original do chamado na planilha "Solicitação de peças"
+  // (CH0001..CH1641) -- só preenchido nos pedidos importados do histórico.
+  // Pedido do Victor 09/09/2026: mostrar ESSE número em vez do ticket_number
+  // novo pra esses casos (ver PecasTable.tsx).
+  externalReference: string | null;
   requestedBy: string | null;
   status: PartOrderStatus;
   partArrivedAt: string | null;
@@ -81,6 +96,8 @@ type PartOrderRow = {
   representative: string | null;
   representative_email: string | null;
   representative_phone: string | null;
+  service_requests: { type: string } | null;
+  external_reference: string | null;
   requested_by: string | null;
   status: PartOrderStatus;
   part_arrived_at: string | null;
@@ -93,7 +110,7 @@ type PartOrderRow = {
 };
 
 const PART_ORDER_COLUMNS =
-  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, created_at, updated_at";
+  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, created_at, updated_at";
 
 function toPartOrder(row: PartOrderRow): PartOrder {
   return {
@@ -112,6 +129,8 @@ function toPartOrder(row: PartOrderRow): PartOrder {
     representative: row.representative,
     representativeEmail: row.representative_email,
     representativePhone: row.representative_phone,
+    serviceRequestType: row.service_requests?.type ?? null,
+    externalReference: row.external_reference,
     requestedBy: row.requested_by,
     status: row.status,
     partArrivedAt: row.part_arrived_at,

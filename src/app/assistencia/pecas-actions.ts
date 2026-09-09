@@ -34,9 +34,20 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
 
   const defaultExpectedAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
+  // Todo pedido novo continua a numeração da planilha "Solicitação de
+  // peças" (CH0001..CH1643 no histórico importado) -- pedido do Victor
+  // 09/09/2026: "se o ultimo chamado é o CH1643, o proximo deve ser o
+  // CH1644". ch_number_seq (migration 0119) garante isso sem risco de
+  // corrida entre duas criações ao mesmo tempo.
+  const { data: chNumber, error: chError } = await admin.rpc("next_ch_number");
+  if (chError) {
+    return { error: `Não foi possível gerar o número do chamado: ${chError.message}` };
+  }
+
   const { data, error } = await admin
     .from("part_orders")
     .insert({
+      external_reference: chNumber,
       service_request_id: emptyToNull(formData.get("service_request_id")),
       client_name: emptyToNull(formData.get("client_name")),
       client_cpf: emptyToNull(formData.get("client_cpf")),
@@ -65,22 +76,83 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
   return { success: true };
 }
 
-export async function updatePartOrderStatus(id: string, newStatus: string) {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
-  if (!isPartOrderStatus(newStatus)) throw new Error("Status inválido.");
-
-  const admin = getSupabaseAdmin();
+// Extraído pra reaproveitar em updatePartOrderStatus (uma peça) e
+// bulkUpdatePartOrderStatus (várias de uma vez, pedido do Victor
+// 09/09/2026: "seleção em lote") -- mesmos carimbos de data nos dois casos,
+// sem duplicar a regra.
+function statusChangePatch(newStatus: string): Record<string, string> {
   const today = new Date().toISOString().slice(0, 10);
-
   const patch: Record<string, string> = { status: newStatus };
   if (newStatus === "peca_recebida") patch.part_arrived_at = today;
   if (newStatus === "enviada_ao_cliente") patch.sent_to_client_at = today;
   // Cancelada é terminal igual encerrado (pedido do Victor 09/09/2026) --
   // mesmo carimbo de closed_at, só o status que difere.
   if (newStatus === "encerrado" || newStatus === "cancelada") patch.closed_at = today;
+  return patch;
+}
 
-  const { error } = await admin.from("part_orders").update(patch).eq("id", id);
+export async function updatePartOrderStatus(id: string, newStatus: string) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  if (!isPartOrderStatus(newStatus)) throw new Error("Status inválido.");
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("part_orders").update(statusChangePatch(newStatus)).eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/assistencia/pecas");
+  revalidatePath(`/assistencia/pecas/${id}`);
+}
+
+// Seleção em lote (pedido do Victor 09/09/2026: "Adicionar um checkbox...
+// para permitir a seleção em lote dos itens") -- um só update com `.in(...)`
+// em vez de um round-trip por pedido selecionado.
+export async function bulkUpdatePartOrderStatus(ids: string[], newStatus: string) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+  if (!isPartOrderStatus(newStatus)) throw new Error("Status inválido.");
+  if (ids.length === 0) return;
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("part_orders").update(statusChangePatch(newStatus)).in("id", ids);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/assistencia/pecas");
+}
+
+// Depois que a peça chega, "enviada ao cliente" e "caso encerrado" viram
+// duas perguntas INDEPENDENTES em vez de um botão de cada vez em sequência
+// -- pedido do Victor 09/09/2026, mesmo jeito que a planilha original já
+// tratava esses dois campos (colunas separadas, não um status único
+// avançando). Status final é derivado da combinação: encerrado (se
+// marcado) vence enviada_ao_cliente, que vence peca_recebida -- mesma
+// prioridade usada na importação do histórico (ver migration 0117).
+// Recalcula as duas datas do zero a cada chamada (não só carimba na
+// primeira vez) -- é um formulário de "estado atual", não um log de
+// eventos: desmarcar deve conseguir limpar a data de novo.
+export async function updatePartOrderDelivery(id: string, delivered: boolean, closed: boolean) {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+
+  const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("part_orders")
+    .select("sent_to_client_at, closed_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (fetchError || !current) throw new Error("Pedido de peça não encontrado.");
+
+  const today = new Date().toISOString().slice(0, 10);
+  const status = closed ? "encerrado" : delivered ? "enviada_ao_cliente" : "peca_recebida";
+
+  const { error } = await admin
+    .from("part_orders")
+    .update({
+      status,
+      sent_to_client_at: delivered ? (current.sent_to_client_at ?? today) : null,
+      closed_at: closed ? (current.closed_at ?? today) : null,
+    })
+    .eq("id", id);
   if (error) throw new Error(error.message);
 
   revalidatePath("/assistencia/pecas");
