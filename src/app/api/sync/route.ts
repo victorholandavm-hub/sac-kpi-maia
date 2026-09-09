@@ -4,6 +4,7 @@ import { businessMinutesBetween } from "@/lib/businessHours";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
 import { fetchGhlMessages, upsertGhlContact, addContactToWorkflow, findGhlConversationId, type GhlMessage } from "@/lib/ghlClient";
 import { isMostruarioRequest } from "@/lib/serviceRequests";
+import { DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -135,10 +136,19 @@ const MONTAGEM_NPS_TYPES = new Set(["montagem", "desmontagem"]);
 // ADDRESS_NUMBER_REQUIRED_TYPES em serviceRequests.ts) -- não faz sentido
 // perguntar NPS de uma visita que não existiu.
 const NPS_EXCLUDED_TYPES = new Set(["notificacao_externa"]);
+// "Entrega" (motorista) separado de "assistência técnica" (montador) --
+// achado 09/09/2026: os dois caíam no mesmo balde ("assistencia_tecnica"),
+// desalinhado com o Resumo de /avaliacoes, que já mostra "Pós-entrega" e
+// "Pós-assistência técnica" como cards separados. DELIVERY_REQUEST_TYPES
+// (troca/entrega de produto, envio/recolhimento de peça) é exatamente o
+// que o motorista atende -- mesmo critério que ratingKind (clientRating.ts)
+// já usa pra separar a tela de avaliação do motorista da do montador.
+const ENTREGA_NPS_TYPES = new Set(DELIVERY_REQUEST_TYPES as readonly string[]);
 
-function classifyNpsTipo(type: string): "montagem" | "assistencia_tecnica" | null {
+function classifyNpsTipo(type: string): "montagem" | "assistencia_tecnica" | "entrega" | null {
   if (MONTAGEM_NPS_TYPES.has(type)) return "montagem";
   if (NPS_EXCLUDED_TYPES.has(type)) return null;
+  if (ENTREGA_NPS_TYPES.has(type)) return "entrega";
   return "assistencia_tecnica";
 }
 
@@ -159,7 +169,8 @@ type NpsCandidate = {
 async function enrollPendingNps(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<{ enrolled: number; errors: string[] }> {
   const montagemWorkflowId = process.env.GHL_WORKFLOW_ID_MONTAGEM;
   const assistenciaWorkflowId = process.env.GHL_WORKFLOW_ID_ASSISTENCIA;
-  if (!montagemWorkflowId || !assistenciaWorkflowId) return { enrolled: 0, errors: [] };
+  const entregaWorkflowId = process.env.GHL_WORKFLOW_ID_ENTREGA;
+  if (!montagemWorkflowId || !assistenciaWorkflowId || !entregaWorkflowId) return { enrolled: 0, errors: [] };
 
   const sinceIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const { data: candidates, error } = await supabase
@@ -185,7 +196,7 @@ async function enrollPendingNps(supabase: ReturnType<typeof getSupabaseAdmin>): 
     const tipo = classifyNpsTipo(candidate.type);
     if (!tipo) continue;
 
-    const workflowId = tipo === "montagem" ? montagemWorkflowId : assistenciaWorkflowId;
+    const workflowId = tipo === "montagem" ? montagemWorkflowId : tipo === "entrega" ? entregaWorkflowId : assistenciaWorkflowId;
     const contactId = await upsertGhlContact(candidate.client_phone, candidate.client_name);
     if (!contactId) {
       errors.push(`nps ${candidate.id}: não achou/criou contato no GHL`);

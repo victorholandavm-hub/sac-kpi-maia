@@ -11,13 +11,15 @@ import { NpsDetratoresTable } from "./NpsDetratoresTable";
 // temos do SAC, aí você coloca do sac e as outras fases você deixa com um
 // traço". São 5 fases no total (achado 08/09/2026 -- eu tinha confundido
 // "pós-entrega" com "1 mês pós-recebimento", achando que eram a mesma
-// coisa; o Victor corrigiu: "existem os dois"): SAC (dado real),
-// pós-entrega e 1 mês pós-recebimento (nenhum dos dois tem fonte de dado
-// ainda -- nem desenhados de verdade, só o card placeholder), pós-montagem
-// e pós-assistência técnica (essas duas já calculam sozinhas a partir de
-// service_request_nps -- ver getNpsResumoPorFaseAdicional -- e mostram "—"
-// com 0 respostas, sem precisar de código novo quando os templates do
-// WhatsApp forem aprovados e começarem a responder de verdade).
+// coisa; o Victor corrigiu: "existem os dois"): SAC (dado real), 1 mês
+// pós-recebimento (sem fonte de dado ainda -- nem desenhado de verdade, só
+// o card placeholder), pós-montagem/pós-assistência técnica/pós-entrega
+// (essas três já calculam sozinhas a partir de service_request_nps -- ver
+// getNpsResumoPorFaseAdicional -- e mostram "—" com 0 respostas, sem
+// precisar de código novo quando os templates do WhatsApp forem aprovados
+// e começarem a responder de verdade). "Entrega" separada de "assistência
+// técnica" só a partir de 09/09/2026 -- antes as duas caíam no mesmo balde
+// no backend mesmo com cards diferentes aqui na tela.
 function FaseCard({ label, npsIndex, responseCount }: { label: string; npsIndex: number | null; responseCount: number }) {
   return (
     <div className="rounded-lg border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
@@ -56,7 +58,7 @@ export function AvaliacoesResumo({
   npsDetratores,
 }: {
   npsSummary: NpsSummary;
-  resumoFasesAdicionais: Record<"montagem" | "assistencia_tecnica", NpsFaseResumo>;
+  resumoFasesAdicionais: Record<"montagem" | "assistencia_tecnica" | "entrega", NpsFaseResumo>;
   npsDetratores: NpsDetrator[];
 }) {
   const [showDetratores, setShowDetratores] = useState(false);
@@ -69,7 +71,7 @@ export function AvaliacoesResumo({
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <FaseCard label="Atendimento (SAC)" npsIndex={npsSummary.npsIndex} responseCount={npsSummary.responseCount} />
-          <FaseCardEmBreve label="Pós-entrega" />
+          <FaseCard label="Pós-entrega" npsIndex={resumoFasesAdicionais.entrega.npsIndex} responseCount={resumoFasesAdicionais.entrega.responseCount} />
           <FaseCard label="Pós-montagem" npsIndex={resumoFasesAdicionais.montagem.npsIndex} responseCount={resumoFasesAdicionais.montagem.responseCount} />
           <FaseCard
             label="Pós-assistência técnica"
