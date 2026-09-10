@@ -206,6 +206,69 @@ export async function getPartOrder(id: string): Promise<PartOrder | null> {
   return toPartOrder(data as unknown as PartOrderRow);
 }
 
+export type PartOrderLinkMatch = {
+  id: string;
+  externalReference: string | null;
+  ticketNumber: number;
+  clientName: string | null;
+  clientCpf: string | null;
+  clientPhone: string | null;
+  product: string | null;
+  partName: string;
+  partCode: string | null;
+  color: string | null;
+  supplier: string | null;
+  status: PartOrderStatus;
+};
+
+// Vincular um pedido de peça já chegado numa notificação de assistência
+// nova -- pedido do Victor 10/09/2026: "quando essa peça chegar... vou
+// precisar fazer uma notificação de assistência... teria como... já dar a
+// opção de selecionar as informações que estão lá na aba de peças". Busca
+// por CPF, código da peça, número CH ou nome do cliente (o pedido citou os
+// 4, sem escolher um só -- essa função aceita todos ao mesmo tempo, `q` é
+// livre). Só pedidos já CHEGADOS (peca_recebida/enviada_ao_cliente) --
+// vincular um que ainda nem chegou não faz sentido nesse fluxo.
+export async function searchPartOrdersForLink(q: string): Promise<PartOrderLinkMatch[]> {
+  const trimmed = q.trim();
+  if (trimmed.length < 2) return [];
+
+  const admin = getSupabaseAdmin();
+  const qSafe = sanitizeOrFilterValue(trimmed);
+  const { data, error } = await admin
+    .from("part_orders")
+    .select(
+      "id, external_reference, ticket_number, client_name, client_cpf, client_phone, product, part_name, part_code, color, supplier, status"
+    )
+    .in("status", ["peca_recebida", "enviada_ao_cliente"])
+    .or(
+      [
+        `client_cpf.ilike.%${qSafe}%`,
+        `client_name.ilike.%${qSafe}%`,
+        `part_code.ilike.%${qSafe}%`,
+        `external_reference.ilike.%${qSafe}%`,
+      ].join(",")
+    )
+    .order("created_at", { ascending: false })
+    .limit(8);
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    externalReference: row.external_reference as string | null,
+    ticketNumber: row.ticket_number as number,
+    clientName: row.client_name as string | null,
+    clientCpf: row.client_cpf as string | null,
+    clientPhone: row.client_phone as string | null,
+    product: row.product as string | null,
+    partName: row.part_name as string,
+    partCode: row.part_code as string | null,
+    color: row.color as string | null,
+    supplier: row.supplier as string | null,
+    status: row.status as PartOrderStatus,
+  }));
+}
+
 export async function countPartOrdersOverview(): Promise<{ awaiting: number; readyToSend: number }> {
   const admin = getSupabaseAdmin();
   const [awaitingRes, readyRes] = await Promise.all([

@@ -31,7 +31,8 @@ import { getClientIp, checkAndRecordPublicSubmission } from "@/lib/rateLimit";
 import { checkIpRateLimit, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isRota, getRotaDriverAssignments, getAvailableRotasForDate, ROTA_LABELS, type AvailableRota } from "@/lib/rotas";
 import { sanitizeOrFilterValue } from "@/lib/searchFilter";
-import { findTotvsClientByCode, findTotvsProductByCode, type TotvsClientMatch, type TotvsProductMatch } from "@/lib/totvsLookup";
+import { findTotvsClientByCode, findTotvsClientByCpf, findTotvsProductByCode, type TotvsClientMatch, type TotvsProductMatch } from "@/lib/totvsLookup";
+import { searchPartOrdersForLink, type PartOrderLinkMatch } from "@/lib/partOrders";
 import {
   ASSISTENCIA_TEAM_COOKIE_NAME,
   ASSISTENCIA_TEAM_PENDING_MAX_AGE,
@@ -282,6 +283,22 @@ export async function lookupTotvsClientForTeam(code: string): Promise<TotvsClien
 export async function lookupTotvsProductForTeam(code: string): Promise<TotvsProductMatch | null> {
   await getProfile();
   return findTotvsProductByCode(code);
+}
+
+// Vincular pedido de peça numa notificação nova -- pedido do Victor
+// 10/09/2026 (ver searchPartOrdersForLink, partOrders.ts, pra racional
+// completo). lookupTotvsClientByCpfForTeam é o passo seguinte, depois de
+// escolher o pedido: acha o código do Protheus a partir do CPF do pedido,
+// reaproveitando a mesma busca por código que o formulário já faz sozinha
+// (telefone/endereço vêm de graça, sem duplicar lógica).
+export async function searchPartOrdersForLinkAction(q: string): Promise<PartOrderLinkMatch[]> {
+  await getProfile();
+  return searchPartOrdersForLink(q);
+}
+
+export async function lookupTotvsClientByCpfForTeam(cpf: string): Promise<TotvsClientMatch | null> {
+  await getProfile();
+  return findTotvsClientByCpf(cpf);
 }
 
 // Usado no formulário de criação (QuickCreateRequestForm) pra mostrar a
@@ -2355,6 +2372,17 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     return { error: `Não foi possível criar: ${error?.message ?? "erro desconhecido"}` };
   }
 
+  // Fecha o ciclo com o pedido de peça vinculado (ver
+  // QuickCreateRequestForm.tsx, selectPartOrder) -- pedido do Victor
+  // 10/09/2026: o chamado novo aparece como "Solicitação vinculada" na
+  // tela do pedido de peça, mesmo campo (service_request_id) que já
+  // existia no sentido contrário (pedido de peça criado a partir de um
+  // chamado, ver createPartOrder em pecas-actions.ts).
+  const partOrderId = emptyToNull(formData.get("part_order_id"));
+  if (partOrderId) {
+    await admin.from("part_orders").update({ service_request_id: data.id }).eq("id", partOrderId);
+  }
+
   if (items.length > 0) {
     const { error: itemsError } = await admin.from("service_request_items").insert(
       items.map((item) => ({
@@ -2429,13 +2457,24 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     return { error: "Tipo inválido." };
   }
 
-  // Nota fiscal obrigatória pra todo tipo (pedido do Victor 09/09/2026,
-  // confirmado "obrigatório pra todo tipo") -- mesma validação de
-  // cupom_fiscal em createPedidoEncomenda (encomendas-actions.ts). Só
-  // valida a presença do arquivo aqui; o upload de verdade só acontece
-  // depois que o chamado existe (ver mais abaixo), mesmo padrão de lá.
-  const invoiceFile = formData.get("invoice_file");
-  if (!(invoiceFile instanceof File) || invoiceFile.size === 0) {
+  // Nota fiscal obrigatória só pra Entregas (troca/entrega de produto,
+  // envio de peça, recolhimento...) -- correção do Victor 10/09/2026: "na
+  // solicitação de montagem está pedindo nota fiscal também, mas nao
+  // precisa, as unicas abas que precisam são as solicitações feitas pelo
+  // sac na aba de entregas e as solicitações de encomenda" (encomenda já
+  // tinha sua própria exigência, cupom_fiscal em createPedidoEncomenda,
+  // intocada por esse PR). Montagem/desmontagem e notificação externa
+  // (não são "entrega") ficam sem essa exigência -- SacNovaVisitaForm.tsx
+  // (montagem/desmontagem) nunca teve esse campo no formulário, então
+  // pedir "obrigatório pra todo tipo" travava toda criação vinda de lá.
+  // isDeliveryTypeCreate adiantado pra cá (era declarado só mais abaixo)
+  // -- só valida a presença aqui; o upload de verdade só acontece depois
+  // que o chamado existe (ver mais abaixo), mesmo padrão de
+  // createPedidoEncomenda.
+  const isDeliveryTypeCreate = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
+  const invoiceFileEntry = formData.get("invoice_file");
+  const invoiceFile = invoiceFileEntry instanceof File && invoiceFileEntry.size > 0 ? invoiceFileEntry : null;
+  if (isDeliveryTypeCreate && !invoiceFile) {
     return { error: "Anexe a nota fiscal (foto ou PDF)." };
   }
 
@@ -2468,7 +2507,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   // preenchendo o formulário (pedido do Victor 18/08/2026: antes o
   // despacho impresso mostrava o nome de quem criou o chamado no sistema
   // como se fosse quem autorizou, o que quase nunca é a mesma pessoa).
-  const isDeliveryTypeCreate = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
+  // isDeliveryTypeCreate já foi calculado mais acima (ver nota fiscal).
   const authorizedBy = String(formData.get("authorized_by") ?? "").trim();
   if (isDeliveryTypeCreate && !authorizedBy) return { error: "Informe quem autorizou." };
 
@@ -2701,9 +2740,14 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
 
   // Upload só depois do chamado existir (mesmo padrão de createPedidoEncomenda
   // em encomendas-actions.ts) -- falha aqui não desfaz o chamado, só avisa
-  // (evita perder toda a solicitação por causa só do anexo).
+  // (evita perder toda a solicitação por causa só do anexo). Só roda quando
+  // veio arquivo -- montagem/desmontagem/notificação externa não exigem
+  // mais (ver isDeliveryTypeCreate acima), então invoiceFile pode ser null
+  // aqui.
   try {
-    await saveRequestPhoto({ requestId: data.id, file: invoiceFile, uploadedBy: profile.fullName, caption: "Nota fiscal", isInvoice: true });
+    if (invoiceFile) {
+      await saveRequestPhoto({ requestId: data.id, file: invoiceFile, uploadedBy: profile.fullName, caption: "Nota fiscal", isInvoice: true });
+    }
   } catch (err) {
     return {
       error: `Solicitação #${data.ticket_number} criada, mas a nota fiscal não pôde ser salva: ${err instanceof Error ? err.message : "erro desconhecido"}`,

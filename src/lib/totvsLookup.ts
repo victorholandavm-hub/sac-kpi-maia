@@ -109,6 +109,42 @@ export async function findTotvsClientByCode(code: string): Promise<TotvsClientMa
   };
 }
 
+// Busca por CPF (não por código) -- pedido do Victor 10/09/2026: ao
+// vincular um pedido de peça numa notificação nova (ver
+// searchPartOrdersForLink, partOrders.ts), só temos o CPF do cliente, não
+// o código do Protheus. cpf_cnpj em totvs_clientes é gravado só com
+// dígitos, sem pontuação (confirmado em produção) -- por isso o
+// replace(/\D/g) dos dois lados antes de comparar, tolerante ao CPF do
+// pedido de peça ter vindo digitado com ou sem pontuação.
+export async function findTotvsClientByCpf(cpf: string): Promise<TotvsClientMatch | null> {
+  const digits = cpf.replace(/\D/g, "");
+  if (digits.length < 8) return null;
+
+  const admin = getSupabaseAdmin();
+  const { data } = await admin
+    .from("totvs_clientes")
+    .select(
+      "protheus_code, name, cpf_cnpj, phone1, address_street, address_number, address_complement, address_neighborhood, address_city, address_state"
+    )
+    .ilike("cpf_cnpj", `%${digits}%`)
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+
+  return {
+    protheusCode: data.protheus_code,
+    name: data.name,
+    cpfCnpj: data.cpf_cnpj,
+    phone1: data.phone1,
+    addressStreet: data.address_street,
+    addressNumber: data.address_number,
+    addressComplement: data.address_complement,
+    addressNeighborhood: data.address_neighborhood,
+    addressCity: data.address_city,
+    addressState: data.address_state,
+  };
+}
+
 export type TotvsProductMatch = {
   productCode: string;
   description: string | null;

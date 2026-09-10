@@ -375,23 +375,30 @@ export function SacCreateRequestForm({
           Urgente
         </label>
 
-        {/* Nota fiscal obrigatória em toda notificação (pedido do Victor
-            09/09/2026: "preciso que adicionem a nota fiscal" -- obrigatório
-            pra todo tipo, sem exceção) -- sobe junto com o resto do
-            formulário (sem endpoint de upload separado, ver createSacRequest
-            em actions.ts) e sai impressa junto com a notificação no despacho
-            (DespachoCard.tsx), pra não misturar a nota errada com o cliente
-            errado ao imprimir várias de uma vez. */}
-        <Field label="Nota fiscal * (foto ou PDF)">
-          <input
-            name="invoice_file"
-            type="file"
-            required
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
-            className="rounded border px-3 py-2 text-sm"
-            style={inputStyle}
-          />
-        </Field>
+        {/* Nota fiscal obrigatória só pra Entregas -- correção do Victor
+            10/09/2026: "as unicas abas que precisam são as solicitações
+            feitas pelo sac na aba de entregas e as solicitações de
+            encomenda... montagem/desmontagem nao precisa" (revisão do
+            pedido original de 09/09/2026, que era "todo tipo" -- montagem
+            nem passa por este formulário, mas notificação externa passa e
+            também não é "entrega", então também sai da exigência). Sobe
+            junto com o resto do formulário (sem endpoint de upload
+            separado, ver createSacRequest em actions.ts) e sai impressa
+            junto com a notificação no despacho (DespachoCard.tsx), pra não
+            misturar a nota errada com o cliente errado ao imprimir várias
+            de uma vez. */}
+        {isDelivery ? (
+          <Field label="Nota fiscal * (foto ou PDF)">
+            <input
+              name="invoice_file"
+              type="file"
+              required
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
+              className="rounded border px-3 py-2 text-sm"
+              style={inputStyle}
+            />
+          </Field>
+        ) : null}
       </FormSection>
 
       <FormSection
