@@ -53,11 +53,17 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
   // peças" (CH0001..CH1643 no histórico importado) -- pedido do Victor
   // 09/09/2026: "se o ultimo chamado é o CH1643, o proximo deve ser o
   // CH1644". ch_number_seq (migration 0119) garante isso sem risco de
-  // corrida entre duas criações ao mesmo tempo.
-  const { data: chNumber, error: chError } = await admin.rpc("next_ch_number");
+  // corrida entre duas criações ao mesmo tempo. Formatação ("CH" + zero à
+  // esquerda) sai do banco e vem pra cá (migration 0122) -- lpad truncou
+  // em vez de só preencher (0121 corrigiu isso e AINDA ASSIM aconteceu de
+  // novo, achado do Victor 10/09/2026 -- sem confirmar a causa exata,
+  // tirar a formatação de string do banco de vez é a saída mais segura).
+  // padStart do JS nunca trunca, só preenche quando é menor.
+  const { data: chSeq, error: chError } = await admin.rpc("next_ch_seq");
   if (chError) {
     return { error: `Não foi possível gerar o número do chamado: ${chError.message}` };
   }
+  const chNumber = `CH${String(chSeq).padStart(3, "0")}`;
 
   const { data, error } = await admin
     .from("part_orders")
