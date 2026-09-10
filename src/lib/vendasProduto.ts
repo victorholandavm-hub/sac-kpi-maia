@@ -325,20 +325,58 @@ type ItemRankingRow = {
 // arbitrário "por segurança".
 const RANKING_PAGE_SIZE = 1000;
 
-async function fetchItensDoPeriodo(range: DateRange): Promise<ItemRankingRow[]> {
+// Exportada 10/09/2026 -- reaproveitada por getVendaQuantidadePorCodigoNoPeriodo
+// abaixo.
+//
+// BUG DE PERFORMANCE achado em produção 10/09/2026 (Taxa de Quebra do
+// Relatório de Assistência voltando tudo "sem venda no período" --
+// investigado a partir do "por que não dados?" do Victor): a versão
+// original buscava DE totvs_order_items com `totvs_orders!inner(issue_date)`
+// embutido e filtrava a data no lado embutido -- o PostgREST traduz esse
+// filtro (coluna de uma tabela EMBUTIDA, não a que está no FROM) de um
+// jeito que o Postgres não consegue casar com o índice de
+// totvs_orders.issue_date direito: uma única página (1000 linhas) chegou
+// a levar 5,5s sozinha, e 3-4 páginas em paralelo (fetchAllPagesParallel)
+// estouravam o `statement timeout` (confirmado rodando as duas versões
+// direto). A MESMA busca invertida -- DE totvs_orders (filtra issue_date
+// na própria tabela, usa o índice de verdade) EMBUTINDO
+// totvs_order_items como filhos -- roda o mês inteiro em ~1s, confirmado
+// também via EXPLAIN ANALYZE (nested loop com os dois índices, ~400ms).
+// Achatamento pro formato de sempre (ItemRankingRow, 1 linha por item)
+// logo abaixo -- nenhum chamador precisou mudar.
+type OrderWithItemsRow = {
+  issue_date: string;
+  items: { product: string | null; description: string | null; quantity: number; total: number }[];
+};
+
+export async function fetchItensDoPeriodo(range: DateRange): Promise<ItemRankingRow[]> {
   const admin = getSupabaseAdmin();
 
-  return fetchAllPagesParallel<ItemRankingRow>(
+  const orders = await fetchAllPagesParallel<OrderWithItemsRow>(
     (from, to) =>
       admin
-        .from("totvs_order_items")
-        .select("product, description, quantity, total, totvs_orders!inner(issue_date)", { count: "exact" })
-        .gte("totvs_orders.issue_date", range.from)
-        .lte("totvs_orders.issue_date", range.to)
-        .not("product", "is", null)
-        .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemRankingRow>>,
+        .from("totvs_orders")
+        .select("issue_date, items:totvs_order_items(product, description, quantity, total)", { count: "exact" })
+        .gte("issue_date", range.from)
+        .lte("issue_date", range.to)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<OrderWithItemsRow>>,
     { pageSize: RANKING_PAGE_SIZE }
   );
+
+  const result: ItemRankingRow[] = [];
+  for (const order of orders) {
+    for (const item of order.items) {
+      if (!item.product) continue;
+      result.push({
+        product: item.product,
+        description: item.description,
+        quantity: item.quantity,
+        total: item.total,
+        totvs_orders: { issue_date: order.issue_date },
+      });
+    }
+  }
+  return result;
 }
 
 // categoria opcional -- quando informada, filtra o ranking só pra produtos
@@ -371,29 +409,31 @@ export async function listRankingProdutos(range: DateRange, limit: number, categ
 // 10/09/2026: Taxa de Quebra do Relatório de Assistência
 // (kpiAssistencia.ts) precisa cruzar "quantos chamados" com "quantas
 // vendas" DENTRO DO MESMO período escolhido na tela, não numa janela
-// fixa. Mesma query/paginação de listSaldoEstoqueProdutos (linhas
-// abaixo), só generalizada pro `range` recebido em vez de
-// RUNWAY_DIAS_JANELA_VENDA. Códigos sem nenhuma venda no período
-// simplesmente não aparecem no Map (chamador trata como 0).
+// fixa. Códigos sem nenhuma venda no período simplesmente não aparecem
+// no Map (chamador trata como 0).
+//
+// BUG achado em produção 10/09/2026 (Victor: "por que não dados?", Taxa
+// de Quebra mostrando tudo achatado perto de 0%): a primeira versão
+// filtrava direto no banco com `.in("product", codes)` (até ~100 códigos
+// distintos num mês) -- combinado com o join em totvs_orders, isso
+// estourava o `statement timeout` do Postgres (confirmado rodando a
+// query direto: COM o .in() dá timeout, SEM ele a mesma query com só o
+// filtro de período roda em ~5s pro mês inteiro). Erro ficava mudo (só
+// o catch abaixo, sem re-lançar) -- a Taxa de Quebra silenciosamente
+// virava tudo "sem venda no período" (Map vazio), sem nenhum aviso na
+// tela. Corrigido reaproveitando fetchItensDoPeriodo (mesma função que
+// a tela de Vendas usa, já comprovada rápida pra qualquer período,
+// inclusive "Tudo") -- busca só por data, sem filtro de produto no
+// banco, e filtra pelos códigos em memória aqui.
 export async function getVendaQuantidadePorCodigoNoPeriodo(codes: string[], range: DateRange): Promise<Map<string, number>> {
   const resultado = new Map<string, number>();
   if (codes.length === 0) return resultado;
 
   try {
-    const admin = getSupabaseAdmin();
-    const rows = await fetchAllPagesParallel<{ product: string | null; quantity: number }>(
-      (from, to) =>
-        admin
-          .from("totvs_order_items")
-          .select("product, quantity, totvs_orders!inner(issue_date)", { count: "exact" })
-          .in("product", codes)
-          .gte("totvs_orders.issue_date", range.from)
-          .lte("totvs_orders.issue_date", range.to)
-          .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ product: string | null; quantity: number }>>,
-      { pageSize: RANKING_PAGE_SIZE }
-    );
+    const codesSet = new Set(codes);
+    const rows = await fetchItensDoPeriodo(range);
     for (const row of rows) {
-      if (!row.product) continue;
+      if (!row.product || !codesSet.has(row.product)) continue;
       resultado.set(row.product, (resultado.get(row.product) ?? 0) + row.quantity);
     }
   } catch (err) {
