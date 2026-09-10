@@ -129,9 +129,19 @@ function PedidoRow({
   onAdvance: () => void;
 }) {
   const fornecedorLabel = p.fornecedorTipo === "fabrica_externa" ? `Externo: ${p.fornecedorExterno}` : p.fabricaNome;
+  // Cancelado fica levemente apagado -- mesmo tratamento de TodayRow
+  // (EntregasKanbanHoje.tsx), pedido do Victor 10/09/2026: "todas as
+  // solicitações que foram canceladas... deve aparecer mais apagado" --
+  // estendido aqui pra Encomendas também. "negado" fica de fora de
+  // propósito -- é uma recusa que ainda precisa de atenção (reenviar/
+  // ajustar), diferente de cancelado, que está mesmo encerrado.
+  const isCancelado = p.status === "cancelado";
 
   return (
-    <div className="flex items-stretch" style={needsAction ? { borderLeft: "4px solid var(--status-warning)" } : undefined}>
+    <div
+      className={`flex items-stretch ${isCancelado ? "opacity-60" : ""}`}
+      style={needsAction ? { borderLeft: "4px solid var(--status-warning)" } : undefined}
+    >
       {/* Checkbox de seleção em lote + posição na fila -- fora do <Link>
           abaixo, controles próprios (checkbox precisa ficar clicável sem
           navegar; posição é só leitura, mas fica no mesmo bloco fixo). */}

@@ -74,6 +74,11 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
     <div className="divide-y divide-gray-100 dark:divide-gray-700">
       {order.map((r, i) => {
         const rowOverdue = isOverdue && r.status !== "concluida" && r.status !== "cancelada";
+        // Concluída e cancelada ficam levemente apagadas -- mesmo tratamento
+        // de TodayRow (EntregasKanbanHoje.tsx), pedido do Victor 10/09/2026:
+        // "todas as solicitações que foram canceladas... deve aparecer mais
+        // apagado" -- estendido aqui pra Agenda também.
+        const isResolved = r.status === "concluida" || r.status === "cancelada";
         return (
           <div
             key={r.id}
@@ -81,7 +86,7 @@ export function AgendaQueueGroup({ items, isOverdue }: { items: ServiceRequestSu
               if (el) nodeRefs.current.set(r.id, el);
               else nodeRefs.current.delete(r.id);
             }}
-            className="flex items-center gap-2 p-4 flex-wrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
+            className={`flex items-center gap-2 p-4 flex-wrap hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 ${isResolved ? "opacity-60" : ""}`}
             style={rowOverdue ? { borderLeft: "4px solid var(--status-critical)" } : undefined}
           >
             <div className="flex flex-col items-center gap-0.5 shrink-0">

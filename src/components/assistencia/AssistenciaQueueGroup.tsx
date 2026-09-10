@@ -150,7 +150,11 @@ function EntregaCardRow({
     <tr
       ref={nodeRef}
       onClick={() => router.push(`/assistencia/${r.id}`)}
-      className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer"
+      // Concluída e cancelada ficam levemente apagadas -- mesmo tratamento
+      // de TodayRow (EntregasKanbanHoje.tsx), pedido do Victor 10/09/2026:
+      // "todas as solicitações que foram canceladas... deve aparecer mais
+      // apagado, como fica as solicitações concluidas de entregas hoje".
+      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer ${r.status === "concluida" || r.status === "cancelada" ? "opacity-60" : ""}`}
       style={needsAttention ? { borderLeft: `4px solid ${r.escalationRisk ? "var(--status-critical)" : "var(--status-warning)"}` } : undefined}
     >
       {hasLeftColumn ? (
@@ -334,8 +338,15 @@ function VisitaCardRow({
   const hasObservacoes =
     !!r.montadorInstruction || !!r.clientTimeRestriction || staleOpen || r.escalationRisk || r.deadlineStatus === "pendente" || !!paymentFlag;
 
+  // Concluída e cancelada ficam levemente apagadas -- mesmo tratamento de
+  // TodayRow (EntregasKanbanHoje.tsx), pedido do Victor 10/09/2026: "todas
+  // as solicitações que foram canceladas... deve aparecer mais apagado,
+  // como fica as solicitações concluidas de entregas hoje" -- estendido
+  // aqui pra aba Visitas também.
+  const isResolved = r.status === "concluida" || r.status === "cancelada";
+
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className={`flex flex-col gap-1.5 ${isResolved ? "opacity-60" : ""}`}>
       <div className="flex flex-col sm:flex-row sm:items-stretch gap-2 sm:gap-0">
         {/* Setas de ordenação (sem checkbox -- Visitas nunca é printable).
             `sm:justify-start`, não `sm:justify-center` -- achado do Victor
