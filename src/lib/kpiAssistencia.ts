@@ -152,12 +152,28 @@ export type AssistenciaKpiData = {
   // de byProduct (que ordena por volume de chamados): esse ordena por %
   // chamados/vendas. Mesmo corte de PRODUCT_RANKING_LIMIT.
   byProductBreakage: ProductBreakageStat[];
+  // Mesmo conjunto, ordenado por PREJUÍZO (R$) em vez de Taxa de Quebra
+  // (%) -- usado só no detalhamento do card de destaque
+  // (PrejuizoDetalheModal.tsx), não no gráfico principal. Ver comentário
+  // em byProductBreakageTopValor acima (getAssistenciaKpiData).
+  byProductBreakageTopValor: ProductBreakageStat[];
   // Prejuízo de estoque (produto) + custo operacional estático, somados
   // sobre TODO o conjunto (não só os 20 exibidos no gráfico) -- pedido do
   // Victor 10/09/2026: "refaça o cálculo... pra que ele seja a soma do
   // Prejuízo de Estoque + Custo Operacional Estático". Card de destaque
   // "Prejuízo Total Estimado em Estoque".
   prejuizoTotalEstimado: number;
+  // As duas parcelas de prejuizoTotalEstimado, separadas -- pedido do
+  // Victor 10/09/2026: "quando clicar nesse prejuízo, mostre os valores
+  // detalhados e como chegou a esse valor". PrejuizoDetalheModal.tsx usa
+  // isso pra montar "Estoque (RX) + Operacional (RY) = Total (RZ)" sem
+  // ter que resomar nada no cliente.
+  prejuizoEstoqueTotalEstimado: number;
+  custoOperacionalTotalEstimado: number;
+  // Breakdown do custo operacional POR TIPO (ver CUSTO_OPERACIONAL_POR_TIPO)
+  // -- mesma finalidade acima, "como chegou a esse valor" por tipo de
+  // chamado (ex.: "62 chamados de Troca de produto × R$120 = R$7.440").
+  custoOperacionalPorTipo: CustoOperacionalPorTipoRow[];
   // Transparência só da parte de ESTOQUE (produto): quantos chamados de
   // fato tinham part_code E custo conhecido, sobre o total -- vira badge
   // no StatTile. O custo operacional não precisa disso, é sempre um valor
@@ -250,6 +266,16 @@ const CUSTO_OPERACIONAL_POR_TIPO: Partial<Record<RequestType, number>> = {
   recolhimento: 60, // recolhimento de peça
   recolhimento_produto: 60, // recolhimento de produto
   envio_recolhimento_peca: 70,
+};
+
+// Linha do breakdown "custo operacional por tipo" -- ver
+// custoOperacionalPorTipo em AssistenciaKpiData/PrejuizoDetalheModal.tsx.
+export type CustoOperacionalPorTipoRow = {
+  type: RequestType;
+  label: string;
+  count: number;
+  valorUnitario: number;
+  subtotal: number;
 };
 
 // Código genérico pra item de chamado sem part_code (24% dos itens de
@@ -513,13 +539,25 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
       prejuizoEstimado: (prejuizoEstoque ?? 0) + entry.custoOperacionalEstimado,
     };
   });
-  // Custo operacional TOTAL do relatório -- calculado direto de `rows`
-  // (1 linha por chamado, sem depender de item/código nenhum), não da
-  // soma das linhas de byProductBreakageAll acima (que pode sobrepor
-  // quando um chamado tem vários códigos, ver comentário em
-  // ProductBreakageStat.custoOperacionalEstimado). Esse aqui é o valor
-  // certo pro card de destaque.
-  const custoOperacionalTotal = rows.reduce((soma, r) => soma + (CUSTO_OPERACIONAL_POR_TIPO[r.type] ?? 0), 0);
+  // Custo operacional TOTAL (e por tipo) -- calculado direto de `rows` (1
+  // linha por chamado, sem depender de item/código nenhum), não da soma
+  // das linhas de byProductBreakageAll acima (que pode sobrepor quando um
+  // chamado tem vários códigos, ver comentário em
+  // ProductBreakageStat.custoOperacionalEstimado). Esses aqui são os
+  // valores certos pro card de destaque e pro detalhamento ao clicar
+  // (PrejuizoDetalheModal.tsx, pedido do Victor 10/09/2026: "mostre os
+  // valores detalhados e como chegou a esse valor").
+  const chamadosPorTipoMap = new Map<RequestType, number>();
+  for (const r of rows) {
+    chamadosPorTipoMap.set(r.type, (chamadosPorTipoMap.get(r.type) ?? 0) + 1);
+  }
+  const custoOperacionalPorTipo: CustoOperacionalPorTipoRow[] = [...chamadosPorTipoMap.entries()]
+    .map(([type, count]) => {
+      const valorUnitario = CUSTO_OPERACIONAL_POR_TIPO[type] ?? 0;
+      return { type, label: REQUEST_TYPE_LABELS[type] ?? type, count, valorUnitario, subtotal: count * valorUnitario };
+    })
+    .sort((a, b) => b.subtotal - a.subtotal);
+  const custoOperacionalTotal = custoOperacionalPorTipo.reduce((soma, r) => soma + r.subtotal, 0);
   const prejuizoTotalEstimado = prejuizoEstoqueTotal + custoOperacionalTotal;
   // Ordena: taxa calculável primeiro (maior % primeiro), depois quem
   // ficou N/A por falta de venda/volume, "Não identificado" sempre por
@@ -534,6 +572,16 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     return b.count - a.count;
   });
   const byProductBreakage = byProductBreakageAll.slice(0, PRODUCT_RANKING_LIMIT);
+  // Top por PREJUÍZO (R$), não por taxa de quebra (%) -- pro detalhamento
+  // do card de destaque (PrejuizoDetalheModal.tsx, "como chegou a esse
+  // valor"). Calculado a partir de byProductBreakageAll (o conjunto
+  // INTEIRO, não o `byProductBreakage` já cortado em 20 por %) -- um
+  // produto caro mas com taxa de quebra baixa (poucos chamados sobre
+  // muita venda) pode nem entrar no top 20 por % e ainda assim ser um dos
+  // maiores prejuízos em R$; usar o ranking por % aqui esconderia ele.
+  const byProductBreakageTopValor = [...byProductBreakageAll]
+    .sort((a, b) => b.prejuizoEstimado - a.prejuizoEstimado)
+    .slice(0, PRODUCT_RANKING_LIMIT);
   // Cobertura do custo de PRODUTO só (prejuizoEstoque) -- o custo
   // OPERACIONAL não precisa de badge de cobertura, é sempre um valor
   // conhecido por construção (estimativa fixa por tipo, ver
@@ -551,7 +599,11 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     distinctProductCount: produtoCount.size,
     byProduct,
     byProductBreakage,
+    byProductBreakageTopValor,
     prejuizoTotalEstimado,
+    prejuizoEstoqueTotalEstimado: prejuizoEstoqueTotal,
+    custoOperacionalTotalEstimado: custoOperacionalTotal,
+    custoOperacionalPorTipo,
     prejuizoCobertura,
     byProductGroup,
     byProductDefeitoFabricacao,

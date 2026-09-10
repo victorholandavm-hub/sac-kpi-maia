@@ -7,6 +7,7 @@ import type { ReportRowItem } from "@/lib/serviceRequests";
 import { StatTile } from "./StatTile";
 import { BarRanking } from "./BarRanking";
 import { ProductBreakageRanking } from "./assistencia/ProductBreakageRanking";
+import { PrejuizoDetalheModal } from "./assistencia/PrejuizoDetalheModal";
 import { VolumeChart } from "./VolumeChart";
 import { CausaRaizDonutChart } from "./CausaRaizDonutChart";
 import { AssistenciaTicketsModal } from "./AssistenciaTicketsModal";
@@ -23,6 +24,11 @@ function formatBRL(value: number): string {
 // da interatividade (clique numa barra abre o drill-down de chamados).
 export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
   const [ticketsModal, setTicketsModal] = useState<{ title: string; totalCount: number; tickets: ReportRowItem[] } | null>(null);
+  // Detalhamento do Prejuízo Total -- pedido do Victor 10/09/2026, ver
+  // PrejuizoDetalheModal.tsx. Booleano só (não guarda dado nenhum, o
+  // modal já lê tudo direto de `data`) -- mais simples que replicar o
+  // padrão de ticketsModal acima, que precisa saber QUAL barra foi clicada.
+  const [showPrejuizoDetalhe, setShowPrejuizoDetalhe] = useState(false);
 
   function openDrilldown(item: Count) {
     const tag = item.tag ?? item.label;
@@ -57,10 +63,11 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           value={formatBRL(data.prejuizoTotalEstimado)}
           size="lg"
           accent="var(--status-critical)"
+          onClick={() => setShowPrejuizoDetalhe(true)}
           badge={{
             label: `${data.prejuizoCobertura.pct}% com custo de produto rastreado`,
             color: "var(--status-critical)",
-            title: `Soma custo de produto (unidades × custo de reposição do Protheus) com custo operacional estimado (frete/motoboy, valor fixo por tipo -- não vem do ERP). A parte de PRODUTO só está rastreada em ${data.prejuizoCobertura.withValue} de ${data.prejuizoCobertura.total} chamados (${data.prejuizoCobertura.pct}%) -- quem não tem código Protheus + custo sincronizado entra só com o custo operacional estimado.`,
+            title: `Soma custo de produto (unidades × custo de reposição do Protheus) com custo operacional estimado (frete/motoboy, valor fixo por tipo -- não vem do ERP). A parte de PRODUTO só está rastreada em ${data.prejuizoCobertura.withValue} de ${data.prejuizoCobertura.total} chamados (${data.prejuizoCobertura.pct}%) -- quem não tem código Protheus + custo sincronizado entra só com o custo operacional estimado. Clique no card pra ver o detalhamento.`,
           }}
         />
         <StatTile label="Produtos distintos com chamado" value={data.distinctProductCount} />
@@ -133,6 +140,18 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           totalCount={ticketsModal.totalCount}
           tickets={ticketsModal.tickets}
           onClose={() => setTicketsModal(null)}
+        />
+      ) : null}
+
+      {showPrejuizoDetalhe ? (
+        <PrejuizoDetalheModal
+          prejuizoTotalEstimado={data.prejuizoTotalEstimado}
+          prejuizoEstoqueTotalEstimado={data.prejuizoEstoqueTotalEstimado}
+          custoOperacionalTotalEstimado={data.custoOperacionalTotalEstimado}
+          custoOperacionalPorTipo={data.custoOperacionalPorTipo}
+          prejuizoCobertura={data.prejuizoCobertura}
+          byProductBreakageTopValor={data.byProductBreakageTopValor}
+          onClose={() => setShowPrejuizoDetalhe(false)}
         />
       ) : null}
     </div>

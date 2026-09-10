@@ -6,6 +6,7 @@ export function StatTile({
   size = "md",
   valueColor,
   badge,
+  onClick,
 }: {
   label: string;
   value: string | number;
@@ -19,10 +20,37 @@ export function StatTile({
   // mercado) -- `title` vira tooltip nativo do navegador com a explicação/
   // metodologia, pra não esconder a ressalva mas também não poluir a tela.
   badge?: { label: string; color: string; title?: string };
+  // Abre um detalhamento (ex.: modal explicando como o número foi
+  // calculado) -- pedido do Victor 10/09/2026 pro card de Prejuízo Total.
+  // Opcional: sem isso o card continua só leitura, mesmo comportamento de
+  // sempre.
+  onClick?: () => void;
 }) {
+  // "lg" é pensado pra números curtos ("130") -- valor longo (ex.: "R$
+  // 105.768,50") estourava a largura do card, cortado pela borda (achado
+  // do Victor 10/09/2026, print do card "Prejuízo total estimado em
+  // estoque"). Reduz a fonte quando o texto é longo, mantendo "lg" grande
+  // pra número curto continuar legível à distância.
+  const valueStr = String(value);
+  const lgSizeClass = valueStr.length > 8 ? "text-2xl sm:text-3xl font-bold" : "text-4xl sm:text-5xl font-bold";
+  const sizeClass = size === "lg" ? lgSizeClass : "text-3xl font-semibold";
+
   return (
     <div
-      className="rounded-lg border p-4 flex flex-col gap-1"
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      className={`rounded-lg border p-4 flex flex-col gap-1 min-w-0 ${onClick ? "cursor-pointer hover:shadow-md transition-shadow duration-150" : ""}`}
       style={{
         background: "var(--surface-1)",
         borderColor: "var(--border)",
@@ -31,11 +59,13 @@ export function StatTile({
     >
       <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
         {label}
+        {onClick ? (
+          <span className="ml-1" style={{ color: "var(--text-muted)" }} aria-hidden="true">
+            ⓘ
+          </span>
+        ) : null}
       </span>
-      <span
-        className={size === "lg" ? "text-4xl sm:text-5xl font-bold" : "text-3xl font-semibold"}
-        style={{ color: valueColor ?? "var(--text-primary)" }}
-      >
+      <span className={`${sizeClass} break-words`} style={{ color: valueColor ?? "var(--text-primary)", overflowWrap: "anywhere" }}>
         {value}
         {suffix ? (
           <span className="text-base font-normal ml-1" style={{ color: "var(--text-muted)" }}>
