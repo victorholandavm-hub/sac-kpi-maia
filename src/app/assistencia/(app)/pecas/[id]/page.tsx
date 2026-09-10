@@ -4,6 +4,7 @@ import { getPartOrder } from "@/lib/partOrders";
 import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PartOrderActions } from "@/components/assistencia/PartOrderActions";
 import { ExpectedAtField } from "@/components/assistencia/ExpectedAtField";
+import { PartOrderEmailButton } from "@/components/assistencia/PartOrderEmailButton";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 
 function StatusBadge({ status }: { status: string }) {
@@ -46,16 +47,18 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
         <span className="text-sm font-mono text-gray-400 dark:text-gray-500">{order.externalReference ?? `Chamado #${order.ticketNumber}`}</span>
         <StatusBadge status={order.status} />
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{order.partName}</h2>
-        {/* Editar dados do pedido -- pedido do Victor 10/09/2026: "preciso
-            que tenha a opção de editar cada demanda, para isso eu preciso
-            entrar na solicitação de peça". */}
-        <Link
-          href={`/assistencia/pecas/${order.id}/editar`}
-          className="text-sm underline ml-auto"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          Editar
-        </Link>
+        {/* Editar/E-mail/Imprimir -- pedido do Victor 10/09/2026 (mensagem
+            única: editar, e-mail padrão pro representante, impressão igual
+            ao despacho de chamados). */}
+        <div className="flex items-center gap-3 ml-auto">
+          <PartOrderEmailButton o={order} />
+          <Link href={`/assistencia/pecas/${order.id}/despacho`} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            Imprimir
+          </Link>
+          <Link href={`/assistencia/pecas/${order.id}/editar`} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            Editar
+          </Link>
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 grid sm:grid-cols-2 gap-4">
