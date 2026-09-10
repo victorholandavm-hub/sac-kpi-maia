@@ -46,12 +46,12 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
       <VolumeChart data={data.dailyVolume} title="Volume de chamados de assistência por dia" />
 
       <section className="grid md:grid-cols-2 gap-4">
-        <BarRanking title={`Chamados por produto (top 20 de ${data.distinctProductCount})`} data={data.byProduct} onSelect={openDrilldown} />
-        <BarRanking title="Chamados por grupo de produto" data={data.byProductGroup} onSelect={openDrilldown} />
-        <BarRanking title="Chamados por tipo de solicitação" data={data.byType} onSelect={openDrilldown} />
-        <BarRanking title="Chamados por rota" data={data.byRota} onSelect={openDrilldown} />
-        <BarRanking title="Chamados por loja" data={data.byStore} onSelect={openDrilldown} />
-        <BarRanking title="Chamados por atendente" data={data.byAgent} onSelect={openDrilldown} />
+        <BarRanking title={`Chamados por produto (top 20 de ${data.distinctProductCount})`} data={data.byProduct} onSelect={openDrilldown} showPercent />
+        <BarRanking title="Chamados por grupo de produto" data={data.byProductGroup} onSelect={openDrilldown} showPercent />
+        <BarRanking title="Chamados por tipo de solicitação" data={data.byType} onSelect={openDrilldown} showPercent />
+        <BarRanking title="Chamados por rota" data={data.byRota} onSelect={openDrilldown} showPercent />
+        <BarRanking title="Chamados por loja" data={data.byStore} onSelect={openDrilldown} showPercent />
+        <BarRanking title="Chamados por atendente" data={data.byAgent} onSelect={openDrilldown} showPercent />
       </section>
 
       <div className="rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>

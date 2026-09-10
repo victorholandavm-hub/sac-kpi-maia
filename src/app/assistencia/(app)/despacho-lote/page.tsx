@@ -49,9 +49,13 @@ export default async function DespachoLotePage({
 
   // Impedir reimpressão -- pedido do Victor 28/08/2026 (ver PrintButton.tsx
   // pro resto do racional). Admin sempre pode reimprimir ("só eu poderia
-  // imprimir mais de uma vez") -- sem checagem nenhuma pra ele.
+  // imprimir mais de uma vez") -- sem checagem nenhuma pra ele. Exceção pra
+  // "nova troca" (exchangeRound > 1) -- mesmo motivo/pedido do despacho
+  // individual (ver [id]/despacho/page.tsx).
   const isAdmin = profile.role === "admin";
-  const alreadyPrintedById = new Map(found.map((r) => [r.request.id, r.events.some((e) => e.eventType === "printed")]));
+  const alreadyPrintedById = new Map(
+    found.map((r) => [r.request.id, r.request.exchangeRound <= 1 && r.events.some((e) => e.eventType === "printed")])
+  );
   const targets: PrintTarget[] = requests.map((r) => ({
     id: r.id,
     ticketNumber: r.ticketNumber,
