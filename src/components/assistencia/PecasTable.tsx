@@ -8,6 +8,7 @@ import { PART_ORDER_STATUS_LABELS, REQUEST_TYPE_LABELS } from "@/lib/assistencia
 import { formatMonthLabel } from "@/lib/weekGrouping";
 import { DELIVERY_TYPE_COLORS } from "./AssistenciaQueueGroup";
 import { PartOrderQuickStatus } from "./PartOrderQuickStatus";
+import { PartOrderEmailButton } from "./PartOrderEmailButton";
 import { bulkUpdatePartOrderStatus } from "@/app/assistencia/pecas-actions";
 import { useQuickAction } from "./useQuickAction";
 
@@ -253,7 +254,10 @@ function PecaRow({ o, selected, onToggleSelected }: { o: PartOrder; selected: bo
         </div>
       </td>
       <td className="pl-3 pr-4 py-3 align-top text-right" onClick={(e) => e.stopPropagation()}>
-        <PartOrderSummaryButton o={o} />
+        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+          <PartOrderEmailButton o={o} />
+          <PartOrderSummaryButton o={o} />
+        </div>
       </td>
     </tr>
   );
