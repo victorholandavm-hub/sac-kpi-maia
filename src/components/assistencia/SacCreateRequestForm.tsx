@@ -103,6 +103,7 @@ function ItemsFields({
   onLookup,
   namePrefix,
   productLabel,
+  codeRequired,
 }: {
   items: Item[];
   lookupStatus: Record<number, ProductLookupStatus>;
@@ -112,6 +113,13 @@ function ItemsFields({
   onLookup: (index: number, code: string) => void;
   namePrefix: string;
   productLabel: string;
+  // Obrigatório só em troca_produto (ver uso abaixo) -- pedido do Victor
+  // 10/09/2026: sem código, a assistência não entra na Taxa de Quebra/
+  // Prejuízo do Relatório de Assistência (kpiAssistencia.ts cruza por
+  // part_code). Troca é o tipo que mais alimenta esse relatório, por
+  // isso é o único onde vira campo obrigatório de verdade -- nos outros
+  // tipos fica só o aviso abaixo (não trava o envio).
+  codeRequired?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -123,6 +131,7 @@ function ItemsFields({
               value={item.code}
               onChange={(e) => onUpdate(i, { code: e.target.value })}
               onBlur={(e) => onLookup(i, e.target.value)}
+              required={codeRequired}
               placeholder="Código"
               className="w-28 rounded border px-2 py-2"
               style={inputStyle}
@@ -167,6 +176,21 @@ function ItemsFields({
                 🔄 Tentar de novo
               </button>
             </span>
+          ) : null}
+          {/* Aviso de código em branco -- pedido do Victor 10/09/2026: sem
+              part_code, o item fica de fora da Taxa de Quebra/Prejuízo do
+              Relatório de Assistência (cruzamento por código, ver
+              kpiAssistencia.ts). Não aparece junto com "não encontrado"
+              acima (a busca já falhou, o aviso de campo vazio seria
+              redundante) nem enquanto ainda tá buscando. */}
+          {!item.code.trim() && lookupStatus[i] !== "loading" && lookupStatus[i] !== "not_found" ? (
+            <p
+              className="text-xs rounded px-2 py-1"
+              style={{ background: "color-mix(in srgb, var(--status-warning) 18%, var(--surface-1))", color: "var(--status-warning)" }}
+            >
+              ⚠ Atenção: Sem o código do produto, esta assistência não contabilizará na taxa de quebra e nos custos do
+              relatório.
+            </p>
           ) : null}
         </div>
       ))}
@@ -564,6 +588,7 @@ export function SacCreateRequestForm({
             onLookup={lookup}
             namePrefix="item"
             productLabel="Ex: Super Box Confort Mola Ensacada"
+            codeRequired={type === "troca_produto"}
           />
 
           {/* "Troca com recolhimento" é o único tipo que recolhe de
@@ -588,6 +613,7 @@ export function SacCreateRequestForm({
                 onLookup={lookupPickup}
                 namePrefix="pickup_item"
                 productLabel="Ex: Super Box Confort Mola Ensacada (avariada)"
+                codeRequired
               />
             </div>
           ) : null}

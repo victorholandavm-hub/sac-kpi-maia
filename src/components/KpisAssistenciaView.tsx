@@ -6,9 +6,14 @@ import type { AssistenciaKpiData } from "@/lib/kpiAssistencia";
 import type { ReportRowItem } from "@/lib/serviceRequests";
 import { StatTile } from "./StatTile";
 import { BarRanking } from "./BarRanking";
+import { ProductBreakageRanking } from "./assistencia/ProductBreakageRanking";
 import { VolumeChart } from "./VolumeChart";
 import { CausaRaizDonutChart } from "./CausaRaizDonutChart";
 import { AssistenciaTicketsModal } from "./AssistenciaTicketsModal";
+
+function formatBRL(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 // Conteúdo da página /kpis-assistencia -- extraído de dentro de
 // Dashboard.tsx (onde viveu como 4ª aba por um dia, 27/08/2026) pra
@@ -36,8 +41,28 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatTile label="Total de chamados de assistência" value={data.totalChamados} size="lg" />
+        {/* Prejuízo Total Estimado em Estoque -- pedido do Victor
+            10/09/2026: soma (1) prejuízo de PRODUTO (unidades trocadas/
+            enviadas × custo de reposição do Protheus, totvs_stock.unit_cost)
+            com (2) custo OPERACIONAL estático por tipo de chamado (frete/
+            motoboy, sem valor real no ERP -- estimativa fixa do Victor,
+            ver CUSTO_OPERACIONAL_POR_TIPO em kpiAssistencia.ts). O badge
+            só cobre a cobertura da parte (1) -- a (2) é sempre um valor
+            conhecido por construção (estimativa), não precisa de
+            cobertura. */}
+        <StatTile
+          label="Prejuízo total estimado em estoque"
+          value={formatBRL(data.prejuizoTotalEstimado)}
+          size="lg"
+          accent="var(--status-critical)"
+          badge={{
+            label: `${data.prejuizoCobertura.pct}% com custo de produto rastreado`,
+            color: "var(--status-critical)",
+            title: `Soma custo de produto (unidades × custo de reposição do Protheus) com custo operacional estimado (frete/motoboy, valor fixo por tipo -- não vem do ERP). A parte de PRODUTO só está rastreada em ${data.prejuizoCobertura.withValue} de ${data.prejuizoCobertura.total} chamados (${data.prejuizoCobertura.pct}%) -- quem não tem código Protheus + custo sincronizado entra só com o custo operacional estimado.`,
+          }}
+        />
         <StatTile label="Produtos distintos com chamado" value={data.distinctProductCount} />
         <StatTile label="Lojas com chamado no período" value={data.byStore.length} />
         <StatTile label="Rotas com chamado no período" value={data.byRota.length} />
@@ -46,7 +71,11 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
       <VolumeChart data={data.dailyVolume} title="Volume de chamados de assistência por dia" />
 
       <section className="grid md:grid-cols-2 gap-4">
-        <BarRanking title={`Chamados por produto (top 20 de ${data.distinctProductCount})`} data={data.byProduct} onSelect={openDrilldown} showPercent />
+        {/* Substitui o antigo ranking por volume bruto -- pedido do
+            Victor 10/09/2026: ordenar por Taxa de Quebra (chamados ÷
+            vendas do período), não por quantos chamados o produto teve.
+            Ver ProductBreakageRanking.tsx pro racional completo. */}
+        <ProductBreakageRanking data={data.byProductBreakage} onSelect={openDrilldown} />
         <BarRanking title="Chamados por grupo de produto" data={data.byProductGroup} onSelect={openDrilldown} showPercent />
         <BarRanking title="Chamados por tipo de solicitação" data={data.byType} onSelect={openDrilldown} showPercent />
         <BarRanking title="Chamados por rota" data={data.byRota} onSelect={openDrilldown} showPercent />

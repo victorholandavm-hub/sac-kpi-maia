@@ -150,6 +150,21 @@ function ItemsFields({
               Código não encontrado.
             </span>
           ) : null}
+          {/* Aviso de código em branco -- pedido do Victor 10/09/2026: sem
+              part_code, o item fica de fora da Taxa de Quebra/Prejuízo do
+              Relatório de Assistência (cruzamento por código, ver
+              kpiAssistencia.ts). Só aviso, não trava o envio -- essa tela
+              cria recolhimento/envio de peça, não "troca_produto" (único
+              tipo com código obrigatório de verdade, ver SacCreateRequestForm.tsx). */}
+          {!item.code.trim() && lookupStatus[i] !== "loading" && lookupStatus[i] !== "not_found" ? (
+            <p
+              className="text-xs rounded px-2 py-1"
+              style={{ background: "color-mix(in srgb, var(--status-warning) 18%, var(--surface-1))", color: "var(--status-warning)" }}
+            >
+              ⚠ Atenção: Sem o código do produto, esta assistência não contabilizará na taxa de quebra e nos custos do
+              relatório.
+            </p>
+          ) : null}
         </div>
       ))}
       <button type="button" onClick={onAdd} className="text-sm self-start underline" style={{ color: "var(--text-secondary)" }}>
