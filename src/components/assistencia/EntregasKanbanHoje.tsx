@@ -280,12 +280,15 @@ function TodayRow({ row, selected, onToggleSelected }: { row: FlatRow; selected:
   // mesmo motivo -- marcar pra imprimir não deve navegar pro chamado.
   // Concluída fica levemente apagada -- pedido do Victor 02/09/2026:
   // "as que estiverem como concluída devem ficar levemente apagadas em
-  // relação as outras" -- só concluída, cancelada/programado continuam
-  // no contraste normal.
+  // relação as outras". Cancelada entrou no mesmo tratamento (pedido do
+  // Victor 10/09/2026: "todas as solicitações que foram canceladas...
+  // deve aparecer mais apagado, como fica as solicitações concluidas de
+  // entregas hoje") -- as duas são estado final "resolvido", só programado
+  // continua no contraste normal.
   return (
     <tr
       onClick={() => router.push(`/assistencia/${r.id}`)}
-      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer ${r.status === "concluida" ? "opacity-60" : ""}`}
+      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer ${r.status === "concluida" || r.status === "cancelada" ? "opacity-60" : ""}`}
     >
       <td className="pl-4 pr-2 py-3 align-top" onClick={(e) => e.stopPropagation()}>
         <input

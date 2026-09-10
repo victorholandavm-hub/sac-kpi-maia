@@ -42,7 +42,10 @@ function EntregaFlatRow({ r, selected, onToggleSelected }: { r: ServiceRequestSu
   return (
     <tr
       onClick={() => router.push(`/assistencia/${r.id}`)}
-      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer ${r.status === "concluida" ? "opacity-60" : ""}`}
+      // Concluída e cancelada ficam levemente apagadas -- mesmo tratamento
+      // de TodayRow (EntregasKanbanHoje.tsx), pedido do Victor 10/09/2026
+      // estendido pra essa lista também.
+      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer ${r.status === "concluida" || r.status === "cancelada" ? "opacity-60" : ""}`}
     >
       {/* Checkbox de seleção em bloco (ver toggleSelected/EntregasFlatList
           abaixo) -- para propagação, senão marcar pra imprimir também
