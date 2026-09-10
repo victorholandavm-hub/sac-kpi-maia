@@ -4,13 +4,16 @@ import { useActionState, useEffect, useState } from "react";
 import {
   createQuickRequest,
   lookupTotvsClientForTeam,
+  lookupTotvsClientByCpfForTeam,
   lookupTotvsProductForTeam,
+  searchPartOrdersForLinkAction,
   getDayLoadAction,
   type FormState,
 } from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
+import type { PartOrderLinkMatch } from "@/lib/partOrders";
 import { FormSection } from "./FormSection";
 
 // "Nova visita" -- só os tipos de montador de verdade (pedido do Victor
@@ -290,8 +293,73 @@ export function QuickCreateRequestForm({
   const itemHandlers = makeItemHandlers(setItems, setItemsLookupStatus);
   const secondaryHandlers = makeItemHandlers(setSecondaryItems, setSecondaryLookupStatus);
 
+  // Vincular um pedido de peça já chegado -- pedido do Victor 10/09/2026:
+  // "quando essa peça chegar... vou precisar fazer uma notificação...
+  // teria como... já dar a opção de selecionar as informações que estão
+  // lá na aba de peças". Busca por CPF, código da peça, CH ou nome (livre,
+  // ver searchPartOrdersForLink em partOrders.ts) -- escolher um resultado
+  // preenche cliente + primeiro produto sozinho, e tenta achar o código do
+  // Protheus a partir do CPF (lookupTotvsClientByCpfForTeam) pra completar
+  // telefone/endereço também, reaproveitando o mesmo efeito de clientCode
+  // logo abaixo. part_orders não guarda endereço -- quando o CPF não bate
+  // em nenhum cadastro do Protheus, esses campos continuam em branco pra
+  // preencher à mão, igual já era antes desse recurso existir.
+  const [partOrderQuery, setPartOrderQuery] = useState("");
+  const [partOrderMatches, setPartOrderMatches] = useState<PartOrderLinkMatch[]>([]);
+  const [partOrderSearching, setPartOrderSearching] = useState(false);
+  const [linkedPartOrder, setLinkedPartOrder] = useState<PartOrderLinkMatch | null>(null);
+
+  useEffect(() => {
+    // setState só dentro do timer, nunca síncrono no corpo do efeito (regra
+    // do React Compiler) -- mesmo padrão de getDayLoadAction acima.
+    const timer = setTimeout(() => {
+      if (linkedPartOrder || partOrderQuery.trim().length < 2) {
+        setPartOrderMatches([]);
+        return;
+      }
+      setPartOrderSearching(true);
+      searchPartOrdersForLinkAction(partOrderQuery)
+        .then(setPartOrderMatches)
+        .catch(() => setPartOrderMatches([]))
+        .finally(() => setPartOrderSearching(false));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [partOrderQuery, linkedPartOrder]);
+
+  function selectPartOrder(m: PartOrderLinkMatch) {
+    setLinkedPartOrder(m);
+    setPartOrderMatches([]);
+    setPartOrderQuery(`${m.externalReference ?? `#${m.ticketNumber}`} — ${m.clientName ?? "sem nome"}`);
+    if (m.clientCpf) setClientCpf(m.clientCpf);
+    if (m.clientName) setClientName(m.clientName);
+    if (m.clientPhone) setClientPhone(m.clientPhone);
+    setType("troca_peca");
+    itemHandlers.update(0, { product: m.product ?? m.partName, code: m.partCode ?? "" });
+    if (m.clientCpf) {
+      lookupTotvsClientByCpfForTeam(m.clientCpf)
+        .then((match) => {
+          // setClientCode dispara o efeito de busca por código já existente
+          // logo abaixo (runClientLookup) -- reaproveita o preenchimento de
+          // telefone/endereço sem duplicar essa lógica aqui.
+          if (match) setClientCode(match.protheusCode);
+        })
+        .catch(() => {});
+    }
+  }
+
+  function clearLinkedPartOrder() {
+    setLinkedPartOrder(null);
+    setPartOrderQuery("");
+  }
+
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
+      {/* Fecha o ciclo -- pedido do Victor 10/09/2026: o chamado criado a
+          partir daqui vincula de volta no pedido de peça (service_request_id,
+          já existia pra pedido de peça -> chamado, agora funciona nos dois
+          sentidos), aparece como "Solicitação vinculada" na tela da peça. */}
+      {linkedPartOrder ? <input type="hidden" name="part_order_id" value={linkedPartOrder.id} /> : null}
+
       <FormSection title="Loja e tipo" number={1}>
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Loja *">
@@ -353,6 +421,64 @@ export function QuickCreateRequestForm({
         number={2}
         hint="Digite o código do cliente pra preencher o resto automaticamente (se souber) — é obrigatório."
       >
+        {/* Vincular pedido de peça já chegado -- pedido do Victor
+            10/09/2026, ver comentário em selectPartOrder acima. Fica antes
+            do código do cliente de propósito: é o atalho que evita digitar
+            os campos abaixo à mão. */}
+        <div className="relative">
+          <Field label="Vincular pedido de peça (opcional) — busque por CPF, código, CH ou nome">
+            <input
+              value={partOrderQuery}
+              onChange={(e) => setPartOrderQuery(e.target.value)}
+              placeholder="Ex: 047.938.864-42, 37366, CH1646, José Juarez…"
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            />
+          </Field>
+          {linkedPartOrder ? (
+            <p className="text-xs mt-1 flex items-center gap-1.5" style={{ color: "var(--status-good)" }}>
+              Vinculado a {linkedPartOrder.externalReference ?? `#${linkedPartOrder.ticketNumber}`} — dados preenchidos abaixo.
+              <button type="button" onClick={clearLinkedPartOrder} className="underline" style={{ color: "var(--text-secondary)" }}>
+                desvincular
+              </button>
+            </p>
+          ) : partOrderSearching ? (
+            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+              Buscando…
+            </p>
+          ) : null}
+          {partOrderMatches.length > 0 ? (
+            <div
+              className="absolute z-20 top-full mt-1 w-full rounded-lg border shadow-lg max-h-64 overflow-y-auto flex flex-col"
+              style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+            >
+              {partOrderMatches.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => selectPartOrder(m)}
+                  className="text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 border-b last:border-b-0"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                      {m.externalReference ?? `#${m.ticketNumber}`}
+                    </span>
+                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {m.clientName ?? "Sem nome"}
+                    </span>
+                  </div>
+                  <div className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+                    {m.partName}
+                    {m.partCode ? ` · cód. ${m.partCode}` : ""}
+                    {m.supplier ? ` · ${m.supplier}` : ""}
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
         <Field label="Código do cliente *">
           <input
             name="client_protheus_code"
