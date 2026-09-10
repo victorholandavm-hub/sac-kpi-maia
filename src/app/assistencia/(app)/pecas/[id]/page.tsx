@@ -46,6 +46,16 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
         <span className="text-sm font-mono text-gray-400 dark:text-gray-500">{order.externalReference ?? `Chamado #${order.ticketNumber}`}</span>
         <StatusBadge status={order.status} />
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{order.partName}</h2>
+        {/* Editar dados do pedido -- pedido do Victor 10/09/2026: "preciso
+            que tenha a opção de editar cada demanda, para isso eu preciso
+            entrar na solicitação de peça". */}
+        <Link
+          href={`/assistencia/pecas/${order.id}/editar`}
+          className="text-sm underline ml-auto"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          Editar
+        </Link>
       </div>
 
       <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-4 grid sm:grid-cols-2 gap-4">

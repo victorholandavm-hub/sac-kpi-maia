@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getProfile, requireRole } from "@/lib/dal";
 import { isPartOrderStatus } from "@/lib/partOrders";
@@ -88,6 +89,66 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
 
   revalidatePath("/assistencia/pecas");
   return { success: true };
+}
+
+// Corrigir os dados de um pedido já criado -- pedido do Victor 10/09/2026:
+// "preciso que tenha a opção de editar cada demanda". Mesmo padrão de
+// updateRequestDetails (actions.ts, chamados de assistência): campos
+// principais editáveis, redireciona pro detalhe ao salvar. `notes` FICA DE
+// FORA de propósito -- addPartOrderNote trata esse campo como log
+// (concatena "[data] texto" a cada nota), sobrescrever aqui apagaria o
+// histórico acumulado por engano.
+export async function updatePartOrder(id: string, _state: PartOrderFormState, formData: FormData): Promise<PartOrderFormState> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin");
+
+  const partName = String(formData.get("part_name") ?? "").trim();
+  if (!partName) {
+    return { error: "Informe a peça." };
+  }
+
+  const supplierChoice = String(formData.get("supplier") ?? "").trim();
+  const supplierOther = String(formData.get("supplier_other") ?? "").trim();
+  const supplier = supplierChoice === "__outro__" ? supplierOther : supplierChoice;
+  const representative = emptyToNull(formData.get("representative"));
+  const representativeEmail = emptyToNull(formData.get("representative_email"));
+  const representativePhone = emptyToNull(formData.get("representative_phone"));
+
+  const admin = getSupabaseAdmin();
+
+  if (supplier) {
+    const supplierPatch: Record<string, string> = { name: supplier };
+    if (representative) supplierPatch.representative = representative;
+    if (representativeEmail) supplierPatch.representative_email = representativeEmail;
+    if (representativePhone) supplierPatch.representative_phone = representativePhone;
+    await admin.from("suppliers").upsert(supplierPatch, { onConflict: "name" });
+  }
+
+  const { error } = await admin
+    .from("part_orders")
+    .update({
+      client_name: emptyToNull(formData.get("client_name")),
+      client_cpf: emptyToNull(formData.get("client_cpf")),
+      client_phone: emptyToNull(formData.get("client_phone")),
+      client_email: emptyToNull(formData.get("client_email")),
+      product: emptyToNull(formData.get("product")),
+      part_name: partName,
+      part_code: emptyToNull(formData.get("part_code")),
+      color: emptyToNull(formData.get("color")),
+      supplier: supplier || null,
+      representative,
+      representative_email: representativeEmail,
+      representative_phone: representativePhone,
+    })
+    .eq("id", id);
+
+  if (error) {
+    return { error: `Não foi possível salvar: ${error.message}` };
+  }
+
+  revalidatePath("/assistencia/pecas");
+  revalidatePath(`/assistencia/pecas/${id}`);
+  redirect(`/assistencia/pecas/${id}`);
 }
 
 // Extraído pra reaproveitar em updatePartOrderStatus (uma peça) e
