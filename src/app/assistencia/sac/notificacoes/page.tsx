@@ -117,7 +117,7 @@ export default async function SacNotificacoesPage({
   const [{ items: rawRequests }, stores, drivers, rotaOverview, todayRequestsFull] = await Promise.all([
     // Filtra De/Até por data AGENDADA, não de criação -- mesmo motivo/pedido
     // de fila/page.tsx (03/09/2026, ver dateField em serviceRequests.ts).
-    listRequests({ status: filterStatus, q, storeId: store, types, requestedByNames: filterRequestedByNames, dateFrom, dateTo, dateField: "scheduled_date" }),
+    listRequests({ status: filterStatus, q, storeId: store, types, requestedByNames: filterRequestedByNames, dateFrom, dateTo, dateField: "scheduled_date", allPages: true }),
     listStores(),
     listDrivers(),
     getRotaWeekOverview(startOfRotaWeek(today), 14),
