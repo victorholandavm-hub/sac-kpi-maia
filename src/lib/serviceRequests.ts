@@ -1717,6 +1717,16 @@ export type ReportRowItem = {
   // é o mesmo campo que já aparece como "Problema" na notificação
   // impressa (ver DespachoCard.tsx).
   reason: string | null;
+  // Produto(s) do chamado, já formatado ("2x Sofá Paris" -- vários itens
+  // juntos com ", ") -- pedido do Victor 10/09/2026: "preciso que
+  // apareça um pouco mais de detalhes quando eu clico, por exemplo qual
+  // é o produto daquela notificação" (drill-down de "Conferente que mais
+  // errou" no Relatório de Assistência). Opcional -- só
+  // getAssistenciaKpiData (kpiAssistencia.ts) preenche isso hoje, porque
+  // é o único lugar que já busca service_request_items junto; o
+  // relatório antigo (getRequestsReport, abaixo) não busca item nenhum,
+  // fica undefined lá (o modal simplesmente não mostra a linha).
+  productSummary?: string | null;
 };
 
 export type ReportRow = { key: string; total: number; concluida: number; cancelada: number; items: ReportRowItem[] };

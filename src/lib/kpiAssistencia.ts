@@ -56,7 +56,14 @@ type RequestRow = {
 
 const PAGE_SIZE = 1000;
 
-function toReportRowItem(r: RequestRow): ReportRowItem {
+// `productSummary` opcional -- pedido do Victor 10/09/2026: "preciso que
+// apareça... qual é o produto daquela notificação" no drill-down (ver
+// AssistenciaTicketsModal.tsx). Vem de `produtosPorChamado`
+// (getAssistenciaKpiData abaixo, montado a partir de service_request_items
+// já buscado); `aggregate()` e os pushes manuais no loop de produto
+// passam isso -- sem 3º argumento, fica `undefined` (mesmo efeito de
+// antes, o modal só não mostra a linha).
+function toReportRowItem(r: RequestRow, productSummary?: string | null): ReportRowItem {
   return {
     id: r.id,
     ticketNumber: r.ticket_number,
@@ -66,6 +73,7 @@ function toReportRowItem(r: RequestRow): ReportRowItem {
     storeName: r.stores?.name ?? r.store_id,
     createdAt: r.created_at,
     reason: r.reason,
+    productSummary,
   };
 }
 
@@ -121,7 +129,8 @@ function aggregate(
   keyFn: (r: RequestRow) => string | null,
   labelFn: (key: string) => string,
   ticketsByTag: Record<string, ReportRowItem[]>,
-  tagPrefix: string
+  tagPrefix: string,
+  produtosPorChamado: Map<string, string>
 ): Count[] {
   const counts = new Map<string, number>();
   for (const r of rows) {
@@ -129,7 +138,7 @@ function aggregate(
     if (!key) continue;
     counts.set(key, (counts.get(key) ?? 0) + 1);
     const tag = `${tagPrefix}:${key}`;
-    (ticketsByTag[tag] ??= []).push(toReportRowItem(r));
+    (ticketsByTag[tag] ??= []).push(toReportRowItem(r, produtosPorChamado.get(r.id)));
   }
   return [...counts.entries()]
     .map(([key, count]) => ({ label: labelFn(key), count, tag: `${tagPrefix}:${key}` }))
@@ -345,6 +354,27 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   const rowById = new Map(rows.map((r) => [r.id, r]));
   const ticketsByTag: Record<string, ReportRowItem[]> = {};
 
+  // Produto(s) por chamado, já formatado pro drill-down -- pedido do
+  // Victor 10/09/2026: "preciso que apareça... qual é o produto daquela
+  // notificação" ao clicar numa barra (ex.: "Conferente que mais
+  // errou"). Pré-passe separado (não dentro do loop principal mais
+  // abaixo, que também usa `items`) porque precisa do chamado INTEIRO
+  // (todos os itens juntos) pronto ANTES de qualquer toReportRowItem
+  // rodar -- inclusive dentro do próprio loop principal, que processa um
+  // item de cada vez.
+  const produtosPorChamado = new Map<string, string>();
+  {
+    const itensPorChamado = new Map<string, string[]>();
+    for (const item of items) {
+      if (!item.product) continue;
+      const label = item.quantity && item.quantity > 1 ? `${item.quantity}x ${item.product}` : item.product;
+      const lista = itensPorChamado.get(item.request_id) ?? [];
+      lista.push(label);
+      itensPorChamado.set(item.request_id, lista);
+    }
+    for (const [id, produtos] of itensPorChamado) produtosPorChamado.set(id, produtos.join(", "));
+  }
+
   // Volumetria por dia -- mesmo formato (DayCount) do resto do painel de
   // KPIs, pra reaproveitar VolumeChart direto.
   const porDia = new Map<string, number>();
@@ -356,15 +386,15 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, count]) => ({ date, count }));
 
-  const byRota = aggregate(rows, (r) => r.rota, (k) => ROTA_LABELS[k as Rota] ?? k, ticketsByTag, "rota");
-  const byStore = aggregate(rows, (r) => r.stores?.name ?? r.store_id, (k) => k, ticketsByTag, "loja");
-  const byType = aggregate(rows, (r) => r.type, (k) => REQUEST_TYPE_LABELS[k as RequestType] ?? k, ticketsByTag, "tipo");
-  const byCausaRaiz = aggregate(rows, (r) => r.causa_raiz, (k) => CAUSA_RAIZ_LABELS[k] ?? k, ticketsByTag, "causa");
+  const byRota = aggregate(rows, (r) => r.rota, (k) => ROTA_LABELS[k as Rota] ?? k, ticketsByTag, "rota", produtosPorChamado);
+  const byStore = aggregate(rows, (r) => r.stores?.name ?? r.store_id, (k) => k, ticketsByTag, "loja", produtosPorChamado);
+  const byType = aggregate(rows, (r) => r.type, (k) => REQUEST_TYPE_LABELS[k as RequestType] ?? k, ticketsByTag, "tipo", produtosPorChamado);
+  const byCausaRaiz = aggregate(rows, (r) => r.causa_raiz, (k) => CAUSA_RAIZ_LABELS[k] ?? k, ticketsByTag, "causa", produtosPorChamado);
   // Quem registrou o chamado (requested_by, ver toSummary em
   // serviceRequests.ts pro mesmo fallback join→texto) -- "atendente" no
   // sentido de quem atendeu/criou a notificação, não quem tá responsável
   // por ela agora (esse último muda de dono com claimRequest).
-  const byAgent = aggregate(rows, atendenteName, (k) => k, ticketsByTag, "atendente");
+  const byAgent = aggregate(rows, atendenteName, (k) => k, ticketsByTag, "atendente", produtosPorChamado);
   // Ver titleCase acima -- agrupa por nome em caixa alta (mesma pessoa,
   // caixa diferente, conta junto), exibe sempre em Title Case.
   const byConferente = aggregate(
@@ -372,7 +402,8 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     (r) => canonicalConferenteKey(r.causa_conferente!),
     titleCase,
     ticketsByTag,
-    "conferente"
+    "conferente",
+    produtosPorChamado
   );
   // Ressalva importante: `driver_name` também é sobrescrito toda vez que
   // a rota/data do chamado é reagendada (setSchedule, actions.ts) -- pra
@@ -386,7 +417,8 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     (r) => r.driver_name!.trim().toUpperCase(),
     titleCase,
     ticketsByTag,
-    "motorista"
+    "motorista",
+    produtosPorChamado
   );
 
   // Produto (e grupo de produto) -- de service_request_items, dedupe por
@@ -435,7 +467,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
       produtoPorChamado.add(dedupeKey);
       produtoCount.set(item.product, (produtoCount.get(item.product) ?? 0) + 1);
       const produtoTag = `produto:${item.product}`;
-      (ticketsByTag[produtoTag] ??= []).push(toReportRowItem(parentRow));
+      (ticketsByTag[produtoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
     }
 
     const codigo = item.part_code?.trim() || CODIGO_NAO_IDENTIFICADO;
@@ -459,7 +491,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
       // acima; o total do relatório não usa essa soma por linha).
       breakageEntry.custoOperacionalEstimado += CUSTO_OPERACIONAL_POR_TIPO[parentRow.type] ?? 0;
       const breakageTag = `produto_quebra:${codigo}`;
-      (ticketsByTag[breakageTag] ??= []).push(toReportRowItem(parentRow));
+      (ticketsByTag[breakageTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
     }
     breakagePorCodigo.set(codigo, breakageEntry);
 
@@ -467,7 +499,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
       produtoDefeitoPorChamado.add(dedupeKey);
       produtoDefeitoCount.set(item.product, (produtoDefeitoCount.get(item.product) ?? 0) + 1);
       const produtoDefeitoTag = `produto_defeito:${item.product}`;
-      (ticketsByTag[produtoDefeitoTag] ??= []).push(toReportRowItem(parentRow));
+      (ticketsByTag[produtoDefeitoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
     }
 
     const grupo = classificarProdutoAssistencia(item.product);
@@ -478,7 +510,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
       grupoEntry.count++;
       grupoCount.set(grupo.key, grupoEntry);
       const grupoTag = `grupo:${grupo.key}`;
-      (ticketsByTag[grupoTag] ??= []).push(toReportRowItem(parentRow));
+      (ticketsByTag[grupoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
     }
   }
   const byProduct: Count[] = [...produtoCount.entries()]

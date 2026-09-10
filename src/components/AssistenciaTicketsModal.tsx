@@ -70,6 +70,18 @@ export function AssistenciaTicketsModal({
               <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                 {REQUEST_TYPE_LABELS[t.type] ?? t.type} · {t.storeName}
               </span>
+              {/* Produto(s) do chamado -- pedido do Victor 10/09/2026:
+                  "preciso que apareça um pouco mais de detalhes quando eu
+                  clico, por exemplo qual é o produto daquela notificação".
+                  Só existe quando o drill-down vem de getAssistenciaKpiData
+                  (ver ReportRowItem.productSummary) -- undefined nos outros
+                  usos desse tipo (ex.: getRequestsReport), some sem deixar
+                  buraco. */}
+              {t.productSummary ? (
+                <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                  📦 {t.productSummary}
+                </span>
+              ) : null}
               {t.reason ? (
                 <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                   {t.reason}
