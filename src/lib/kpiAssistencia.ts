@@ -1,10 +1,15 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import type { DateRange } from "./dateRange";
-import type { Count, DayCount } from "./kpi";
+import type { Count, Coverage, DayCount } from "./kpi";
 import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES } from "./assistenciaLabels";
 import { ROTA_LABELS, type Rota } from "./rotas";
-import { classificarProdutoAssistencia } from "./vendasProduto";
+import {
+  classificarProdutoAssistencia,
+  getVendaQuantidadePorCodigoNoPeriodo,
+  getCustoUnitarioPorCodigo,
+  getEarliestSyncedOrderDate,
+} from "./vendasProduto";
 import type { RequestType, RequestStatus, ReportRowItem } from "./serviceRequests";
 
 // "KPIs da Assistência" (página própria, /kpis-assistencia) -- pedido do
@@ -143,6 +148,21 @@ export type AssistenciaKpiData = {
   // com chamado" -- o gráfico continua usando byProduct (cortado).
   distinctProductCount: number;
   byProduct: Count[];
+  // Ranking por Taxa de Quebra (ver ProductBreakageStat acima) -- diferente
+  // de byProduct (que ordena por volume de chamados): esse ordena por %
+  // chamados/vendas. Mesmo corte de PRODUCT_RANKING_LIMIT.
+  byProductBreakage: ProductBreakageStat[];
+  // Prejuízo de estoque (produto) + custo operacional estático, somados
+  // sobre TODO o conjunto (não só os 20 exibidos no gráfico) -- pedido do
+  // Victor 10/09/2026: "refaça o cálculo... pra que ele seja a soma do
+  // Prejuízo de Estoque + Custo Operacional Estático". Card de destaque
+  // "Prejuízo Total Estimado em Estoque".
+  prejuizoTotalEstimado: number;
+  // Transparência só da parte de ESTOQUE (produto): quantos chamados de
+  // fato tinham part_code E custo conhecido, sobre o total -- vira badge
+  // no StatTile. O custo operacional não precisa disso, é sempre um valor
+  // conhecido por construção (ver CUSTO_OPERACIONAL_POR_TIPO).
+  prejuizoCobertura: Coverage;
   byProductGroup: Count[];
   // Produtos com mais chamados por defeito de fabricação especificamente
   // (causa_raiz = 'defeito_fabricacao') -- subconjunto de byProduct acima,
@@ -159,6 +179,95 @@ export type AssistenciaKpiData = {
   // AssistenciaTicketsModal.tsx.
   ticketsByTag: Record<string, ReportRowItem[]>;
 };
+
+// Taxa de Quebra / Prejuízo de Estoque -- pedido do Victor 10/09/2026:
+// cruzar chamado com venda do mesmo produto no período (via
+// service_request_items.part_code ↔ totvs_order_items.product/
+// totvs_stock.product_code, ver getVendaQuantidadePorCodigoNoPeriodo/
+// getCustoUnitarioPorCodigo em vendasProduto.ts) pra saber "que fração
+// do que foi vendido desse produto virou chamado" e "quanto isso custou
+// em reposição". Superset de Count (label/count/tag) de propósito --
+// openDrilldown (KpisAssistenciaView.tsx) só lê esses 3 campos, então
+// continua funcionando sem mudar nada lá.
+export type ProductBreakageStat = Count & {
+  partCode: string;
+  // Unidades físicas trocadas/enviadas (soma de service_request_items.quantity,
+  // SEM dedupe) -- base do prejuízo. Diferente de `count` (chamados,
+  // deduplicado por request+produto) -- 2 chamados trocando 3 unidades
+  // cada contam 6 aqui, mas 2 em `count`.
+  itensQuantidade: number;
+  // Unidades vendidas desse código no MESMO período do relatório -- 0
+  // quando o código é real mas não vendeu nada no período (não confundir
+  // com taxaQuebraPct null, ver abaixo).
+  vendaQtd: number;
+  // null = não dá pra calcular uma taxa que faça sentido: bucket "Não
+  // identificado" (sem código), sem venda no período, ou venda abaixo de
+  // MIN_VENDA_PARA_TAXA (ruído estatístico de baixo volume) -- UI mostra
+  // "N/A" nesses casos, nunca 0% (0% sugeriria "nunca quebra", enganoso).
+  taxaQuebraPct: number | null;
+  custoUnitario: number | null;
+  // Prejuízo de ESTOQUE só (produto: unidades × custo de reposição) --
+  // null quando não sabemos o custo (produto sem custo sincronizado, ou
+  // bucket "Não identificado", sem código nenhum). Ver prejuizoCobertura
+  // em AssistenciaKpiData (mede quantos chamados têm esse valor de
+  // verdade) -- renomeado de `prejuizoEstimado` (10/09/2026) quando o
+  // custo operacional entrou, pra não confundir os dois.
+  prejuizoEstoque: number | null;
+  // Estimativa ESTÁTICA de frete/operação por tipo de chamado (valores
+  // fixos do Victor, ver CUSTO_OPERACIONAL_POR_TIPO abaixo) -- sempre um
+  // número, nunca null: o frete acontece mesmo quando não sabemos o custo
+  // do produto. Atribuído a este código toda vez que ele aparece pela
+  // primeira vez num chamado (mesmo gatilho de `count`) -- quando um
+  // MESMO chamado tem vários códigos diferentes (acontece, confirmado em
+  // produção), cada código da linha "ganha" o valor inteiro do chamado, o
+  // que pode SOMAR mais que o custo real se você somar todas as linhas à
+  // mão. O total do relatório (prejuizoTotalEstimado, AssistenciaKpiData)
+  // NÃO tem esse problema -- é calculado direto de `rows` (1 por
+  // chamado), sem depender dessa atribuição por linha.
+  custoOperacionalEstimado: number;
+  // Total da LINHA = (prejuizoEstoque ?? 0) + custoOperacionalEstimado --
+  // nunca null (custo operacional sempre existe). Pedido do Victor
+  // 10/09/2026: "some ao Prejuízo do Produto os valores operacionais".
+  prejuizoEstimado: number;
+};
+
+// Custo operacional ESTÁTICO por tipo de chamado -- pedido do Victor
+// 10/09/2026: sem custo real de frete/operação no ERP, estimativa fixa
+// por chamado, valores dados por ele (não calculados/sincronizados de
+// lugar nenhum). "Troca com recolhimento" (rótulo que troca_produto usa
+// na tela do motorista, DRIVER_TYPE_LABELS) e "Troca de produto" (rótulo
+// do mesmo tipo em REQUEST_TYPE_LABELS) são o MESMO `type` no banco --
+// confirmado com o Victor 10/09/2026 que o valor certo é R$120 (o R$150
+// que ele também citou pro mesmo tipo não se aplica a nada).
+// entrega_produto e envio_recolhimento_peca entraram em 10/09/2026 (ajuste
+// fino pós-teste do Victor, depois de ver o relatório com os dois
+// zerados) -- valores igualmente estáticos/estimados, mesmo racional dos
+// outros 4.
+const CUSTO_OPERACIONAL_POR_TIPO: Partial<Record<RequestType, number>> = {
+  troca_produto: 120, // "Troca com recolhimento" -- frete de recolhimento + reentrega
+  entrega_produto: 90,
+  envio_peca: 40, // frete/motoboy
+  recolhimento: 60, // recolhimento de peça
+  recolhimento_produto: 60, // recolhimento de produto
+  envio_recolhimento_peca: 70,
+};
+
+// Código genérico pra item de chamado sem part_code (24% dos itens de
+// entrega/envio no período típico, conferido em produção 10/09/2026) --
+// pedido explícito do Victor: mantém esses chamados contando no volume
+// geral (não desaparecem do dashboard), só ficam de fora do cálculo de
+// % e R$ por falta do dado que liga ao catálogo do Protheus. O custo
+// OPERACIONAL desse bucket continua contando normalmente (frete acontece
+// mesmo sem saber o código) -- só o prejuízo de ESTOQUE fica null.
+const CODIGO_NAO_IDENTIFICADO = "9999";
+const LABEL_NAO_IDENTIFICADO = "Produtos Não Identificados (Sem Código Protheus)";
+
+// Abaixo disso, "taxa de quebra" vira ruído -- 1 chamado sobre 1 venda
+// dá "100% de quebra" pra um produto que só apareceu uma vez, sem
+// significado nenhum pro ranking. Constante isolada e comentada de
+// propósito -- fácil de ajustar se o Victor achar o corte alto/baixo
+// demais depois de ver o relatório de verdade.
+const MIN_VENDA_PARA_TAXA = 5;
 
 const PRODUCT_RANKING_LIMIT = 20;
 
@@ -191,7 +300,9 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   );
 
   const ids = rows.map((r) => r.id);
-  type ItemRow = { request_id: string; product: string | null };
+  // part_code/quantity entraram 10/09/2026 -- base do cruzamento com
+  // vendas (Taxa de Quebra/Prejuízo, ver ProductBreakageStat acima).
+  type ItemRow = { request_id: string; product: string | null; part_code: string | null; quantity: number | null };
   const items =
     ids.length === 0
       ? []
@@ -199,7 +310,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
           (from, to) =>
             admin
               .from("service_request_items")
-              .select("request_id, product", { count: "exact" })
+              .select("request_id, product, part_code, quantity", { count: "exact" })
               .in("request_id", ids)
               .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemRow>>,
           { pageSize: PAGE_SIZE }
@@ -281,6 +392,13 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   // TODOS os motivos, não só defeito de fabricação).
   const produtoDefeitoPorChamado = new Set<string>();
   const produtoDefeitoCount = new Map<string, number>();
+  // Agregação por part_code (Taxa de Quebra/Prejuízo, 10/09/2026) -- Map
+  // própria, separada de produtoCount acima (que agrupa por DESCRIÇÃO
+  // livre, não por código): um mesmo código pode ter descrições digitadas
+  // diferentes de chamado pra chamado, e a descrição exibida aqui é só a
+  // PRIMEIRA vista (rótulo, não chave de agrupamento).
+  const codigoPorChamado = new Set<string>();
+  const breakagePorCodigo = new Map<string, { label: string; count: number; itensQuantidade: number; custoOperacionalEstimado: number }>();
   for (const item of items) {
     if (!item.product) continue;
     const parentRow = rowById.get(item.request_id);
@@ -293,6 +411,31 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
       const produtoTag = `produto:${item.product}`;
       (ticketsByTag[produtoTag] ??= []).push(toReportRowItem(parentRow));
     }
+
+    const codigo = item.part_code?.trim() || CODIGO_NAO_IDENTIFICADO;
+    const codigoDedupeKey = `${item.request_id}::${codigo}`;
+    const breakageEntry = breakagePorCodigo.get(codigo) ?? {
+      label: codigo === CODIGO_NAO_IDENTIFICADO ? LABEL_NAO_IDENTIFICADO : item.product,
+      count: 0,
+      itensQuantidade: 0,
+      custoOperacionalEstimado: 0,
+    };
+    // itensQuantidade soma toda linha (sem dedupe -- unidade física de
+    // verdade), `count` só cresce uma vez por chamado (mesmo dedupe de
+    // produtoCount acima, base da Taxa de Quebra).
+    breakageEntry.itensQuantidade += item.quantity ?? 1;
+    if (!codigoPorChamado.has(codigoDedupeKey)) {
+      codigoPorChamado.add(codigoDedupeKey);
+      breakageEntry.count += 1;
+      // Custo operacional do TIPO do chamado (ver CUSTO_OPERACIONAL_POR_TIPO)
+      // -- atribuído à linha desse código (ver nota de possível
+      // sobreposição em ProductBreakageStat.custoOperacionalEstimado
+      // acima; o total do relatório não usa essa soma por linha).
+      breakageEntry.custoOperacionalEstimado += CUSTO_OPERACIONAL_POR_TIPO[parentRow.type] ?? 0;
+      const breakageTag = `produto_quebra:${codigo}`;
+      (ticketsByTag[breakageTag] ??= []).push(toReportRowItem(parentRow));
+    }
+    breakagePorCodigo.set(codigo, breakageEntry);
 
     if (parentRow.causa_raiz === "defeito_fabricacao" && !produtoDefeitoPorChamado.has(dedupeKey)) {
       produtoDefeitoPorChamado.add(dedupeKey);
@@ -324,11 +467,92 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     .sort((a, b) => b.count - a.count)
     .slice(0, PRODUCT_RANKING_LIMIT);
 
+  // Taxa de Quebra / Prejuízo de Estoque (10/09/2026) -- cruza os códigos
+  // vistos acima com venda do MESMO período. Converte `range` (Date | null
+  // / Date, ver dateRange.ts) pro formato YYYY-MM-DD que
+  // vendasProduto.ts espera; `range.from === null` = "desde sempre", usa
+  // a data mais antiga já sincronizada como piso (getEarliestSyncedOrderDate,
+  // mesmo recurso que a tela de Vendas usa pra avisar período fora do que
+  // o sync cobre).
+  const codigosReais = [...breakagePorCodigo.keys()].filter((c) => c !== CODIGO_NAO_IDENTIFICADO);
+  const vendaRangeFrom = range.from
+    ? range.from.toISOString().slice(0, 10)
+    : ((await getEarliestSyncedOrderDate()) ?? range.to.toISOString().slice(0, 10));
+  const vendaRange = { from: vendaRangeFrom, to: range.to.toISOString().slice(0, 10) };
+  const [vendaQtdPorCodigo, custoPorCodigo] = await Promise.all([
+    getVendaQuantidadePorCodigoNoPeriodo(codigosReais, vendaRange),
+    getCustoUnitarioPorCodigo(codigosReais),
+  ]);
+
+  let prejuizoEstoqueTotal = 0;
+  let chamadosComCusto = 0;
+  const byProductBreakageAll: ProductBreakageStat[] = [...breakagePorCodigo.entries()].map(([codigo, entry]) => {
+    const isNaoIdentificado = codigo === CODIGO_NAO_IDENTIFICADO;
+    const vendaQtd = isNaoIdentificado ? 0 : (vendaQtdPorCodigo.get(codigo) ?? 0);
+    const custoUnitario = isNaoIdentificado ? null : (custoPorCodigo.get(codigo) ?? null);
+    // N/A (não 0%) quando: sem código, sem venda no período, ou venda
+    // abaixo de MIN_VENDA_PARA_TAXA (ruído de baixo volume) -- ver
+    // comentário em ProductBreakageStat/MIN_VENDA_PARA_TAXA acima.
+    const taxaQuebraPct = !isNaoIdentificado && vendaQtd >= MIN_VENDA_PARA_TAXA ? (entry.count / vendaQtd) * 100 : null;
+    const prejuizoEstoque = custoUnitario != null ? entry.itensQuantidade * custoUnitario : null;
+    if (prejuizoEstoque != null) {
+      prejuizoEstoqueTotal += prejuizoEstoque;
+      chamadosComCusto += entry.count;
+    }
+    return {
+      label: entry.label,
+      count: entry.count,
+      tag: `produto_quebra:${codigo}`,
+      partCode: codigo,
+      itensQuantidade: entry.itensQuantidade,
+      vendaQtd,
+      taxaQuebraPct,
+      custoUnitario,
+      prejuizoEstoque,
+      custoOperacionalEstimado: entry.custoOperacionalEstimado,
+      prejuizoEstimado: (prejuizoEstoque ?? 0) + entry.custoOperacionalEstimado,
+    };
+  });
+  // Custo operacional TOTAL do relatório -- calculado direto de `rows`
+  // (1 linha por chamado, sem depender de item/código nenhum), não da
+  // soma das linhas de byProductBreakageAll acima (que pode sobrepor
+  // quando um chamado tem vários códigos, ver comentário em
+  // ProductBreakageStat.custoOperacionalEstimado). Esse aqui é o valor
+  // certo pro card de destaque.
+  const custoOperacionalTotal = rows.reduce((soma, r) => soma + (CUSTO_OPERACIONAL_POR_TIPO[r.type] ?? 0), 0);
+  const prejuizoTotalEstimado = prejuizoEstoqueTotal + custoOperacionalTotal;
+  // Ordena: taxa calculável primeiro (maior % primeiro), depois quem
+  // ficou N/A por falta de venda/volume, "Não identificado" sempre por
+  // último de todos -- é o bucket menos útil pra essa métrica específica,
+  // mesmo aparecendo em volume de chamados normal em todo o resto da tela.
+  byProductBreakageAll.sort((a, b) => {
+    if (a.partCode === CODIGO_NAO_IDENTIFICADO) return b.partCode === CODIGO_NAO_IDENTIFICADO ? 0 : 1;
+    if (b.partCode === CODIGO_NAO_IDENTIFICADO) return -1;
+    if (a.taxaQuebraPct != null && b.taxaQuebraPct != null) return b.taxaQuebraPct - a.taxaQuebraPct;
+    if (a.taxaQuebraPct != null) return -1;
+    if (b.taxaQuebraPct != null) return 1;
+    return b.count - a.count;
+  });
+  const byProductBreakage = byProductBreakageAll.slice(0, PRODUCT_RANKING_LIMIT);
+  // Cobertura do custo de PRODUTO só (prejuizoEstoque) -- o custo
+  // OPERACIONAL não precisa de badge de cobertura, é sempre um valor
+  // conhecido por construção (estimativa fixa por tipo, ver
+  // CUSTO_OPERACIONAL_POR_TIPO), mesmo quando 0 pros tipos sem valor
+  // definido ainda.
+  const prejuizoCobertura: Coverage = {
+    withValue: chamadosComCusto,
+    total: rows.length,
+    pct: rows.length > 0 ? Math.round((chamadosComCusto / rows.length) * 100) : 0,
+  };
+
   return {
     totalChamados: rows.length,
     dailyVolume,
     distinctProductCount: produtoCount.size,
     byProduct,
+    byProductBreakage,
+    prejuizoTotalEstimado,
+    prejuizoCobertura,
     byProductGroup,
     byProductDefeitoFabricacao,
     byAgent,

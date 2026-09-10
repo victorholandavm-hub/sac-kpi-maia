@@ -133,6 +133,25 @@ function ItemsFields({
               </button>
             </span>
           ) : null}
+          {/* Aviso de código em branco -- pedido do Victor 10/09/2026: sem
+              part_code, o item fica de fora da Taxa de Quebra/Prejuízo do
+              Relatório de Assistência (cruzamento por código, ver
+              kpiAssistencia.ts). Aparece em qualquer tipo aqui, mas só
+              BLOQUEIA o envio (`codeRequired` acima) em montagem/
+              desmontagem e troca_peca -- vistoria continua opcional.
+              Vistoria à parte: troca_peca nem entra no relatório de
+              quebra (é visita de montador, fora de DELIVERY_REQUEST_TYPES
+              -- ver kpiAssistencia.ts), mas o Victor pediu o código
+              obrigatório mesmo assim (10/09/2026, ajuste fino). */}
+          {!item.code.trim() && lookupStatus[i] !== "loading" && lookupStatus[i] !== "not_found" ? (
+            <p
+              className="text-xs rounded px-2 py-1"
+              style={{ background: "color-mix(in srgb, var(--status-warning) 18%, var(--surface-1))", color: "var(--status-warning)" }}
+            >
+              ⚠ Atenção: Sem o código do produto, esta assistência não contabilizará na taxa de quebra e nos custos do
+              relatório.
+            </p>
+          ) : null}
         </div>
       ))}
       <button type="button" onClick={onAdd} className="text-sm self-start underline" style={{ color: "var(--text-secondary)" }}>
@@ -161,7 +180,13 @@ export function QuickCreateRequestForm({
   // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
   // pra montagem/desmontagem -- validado de novo no servidor (ver
   // createQuickRequest), isso aqui é só o feedback imediato no navegador.
-  const codeRequired = showCombo;
+  // Estendido 10/09/2026 pra troca_peca (ajuste fino pós-teste): também é
+  // uma "troca" de verdade, mesmo motivo de troca_produto em
+  // SacCreateRequestForm.tsx (código obrigatório pra entrar na Taxa de
+  // Quebra/Prejuízo, kpiAssistencia.ts). Independente de showCombo
+  // (combo é só a UI de "montar + desmontar juntos", não tem relação com
+  // troca_peca).
+  const codeRequired = showCombo || type === "troca_peca";
   // Mesmos tipos de EditRequestForm.tsx -- só quem passa por montador/técnico.
   const showMontadorInstruction = ASSISTENCIA_TYPES.includes(type as (typeof ASSISTENCIA_TYPES)[number]);
   // Montador da loja escolhida + globais/legado (store_id nulo) -- a loja só

@@ -2312,8 +2312,14 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
 
   // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
   // pra montagem/desmontagem -- antes era só uma sugestão pra autopreencher
-  // o nome (ver hint em QuickCreateRequestForm.tsx).
-  if (type === "montagem" || type === "desmontagem") {
+  // o nome (ver hint em QuickCreateRequestForm.tsx). Estendido 10/09/2026
+  // pra troca_peca (ajuste fino pós-teste) -- mesmo motivo de
+  // troca_produto em createSacRequest: sem código, o item não entra na
+  // Taxa de Quebra/Prejuízo (kpiAssistencia.ts), mesmo troca_peca não
+  // sendo um tipo que esse relatório conta hoje (é visita de montador,
+  // fora de DELIVERY_REQUEST_TYPES) -- o Victor pediu a trava assim
+  // mesmo.
+  if (type === "montagem" || type === "desmontagem" || type === "troca_peca") {
     const semCodigo = items.find((item) => !item.partCode);
     if (semCodigo) return { error: `Informe o código do produto "${semCodigo.product}".` };
   }
@@ -2670,6 +2676,16 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     if (pickupItems.length === 0) {
       return { error: "Informe pelo menos um produto a recolher (troca com recolhimento precisa dos dois lados)." };
     }
+    // Código do produto obrigatório em troca (pedido do Victor 10/09/2026)
+    // -- mesmo motivo/padrão do semCodigo de montagem/desmontagem acima
+    // (isVisitaType), defesa a mais além do `required` client-side
+    // (SacCreateRequestForm.tsx). Sem part_code o item fica de fora da
+    // Taxa de Quebra/Prejuízo do Relatório de Assistência (cruzamento por
+    // código, ver kpiAssistencia.ts) -- "troca" é o tipo que mais
+    // alimenta esse relatório, por isso é o único com essa trava de
+    // verdade (os outros tipos só mostram o aviso, não bloqueiam).
+    const semCodigoTroca = [...items, ...pickupItems].find((item) => !item.partCode);
+    if (semCodigoTroca) return { error: `Informe o código do produto "${semCodigoTroca.product}" (obrigatório em troca de produto).` };
   }
 
   const admin = getSupabaseAdmin();

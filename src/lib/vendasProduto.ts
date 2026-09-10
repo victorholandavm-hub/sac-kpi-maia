@@ -366,6 +366,66 @@ export async function listRankingProdutos(range: DateRange, limit: number, categ
   return aggregateRankingProdutos(rows, limit, categoria);
 }
 
+// Quantidade vendida por código, num período QUALQUER (não o runway fixo
+// de 30 dias que listSaldoEstoqueProdutos usa abaixo) -- pedido do Victor
+// 10/09/2026: Taxa de Quebra do Relatório de Assistência
+// (kpiAssistencia.ts) precisa cruzar "quantos chamados" com "quantas
+// vendas" DENTRO DO MESMO período escolhido na tela, não numa janela
+// fixa. Mesma query/paginação de listSaldoEstoqueProdutos (linhas
+// abaixo), só generalizada pro `range` recebido em vez de
+// RUNWAY_DIAS_JANELA_VENDA. Códigos sem nenhuma venda no período
+// simplesmente não aparecem no Map (chamador trata como 0).
+export async function getVendaQuantidadePorCodigoNoPeriodo(codes: string[], range: DateRange): Promise<Map<string, number>> {
+  const resultado = new Map<string, number>();
+  if (codes.length === 0) return resultado;
+
+  try {
+    const admin = getSupabaseAdmin();
+    const rows = await fetchAllPagesParallel<{ product: string | null; quantity: number }>(
+      (from, to) =>
+        admin
+          .from("totvs_order_items")
+          .select("product, quantity, totvs_orders!inner(issue_date)", { count: "exact" })
+          .in("product", codes)
+          .gte("totvs_orders.issue_date", range.from)
+          .lte("totvs_orders.issue_date", range.to)
+          .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ product: string | null; quantity: number }>>,
+      { pageSize: RANKING_PAGE_SIZE }
+    );
+    for (const row of rows) {
+      if (!row.product) continue;
+      resultado.set(row.product, (resultado.get(row.product) ?? 0) + row.quantity);
+    }
+  } catch (err) {
+    console.error("getVendaQuantidadePorCodigoNoPeriodo:", (err as Error).message);
+  }
+  return resultado;
+}
+
+// Custo de reposição (totvs_stock.unit_cost, sincronizado do
+// WSStock.unitCost via syncStock em totvsSync.ts) por código -- foto do
+// catálogo ATUAL, sem período (custo de reposição não é histórico aqui,
+// é "quanto custaria repor hoje"). Mesma ideia de
+// getVendaQuantidadePorCodigoNoPeriodo acima: pedido do Victor
+// 10/09/2026, Prejuízo Estimado de Estoque do Relatório de Assistência.
+export async function getCustoUnitarioPorCodigo(codes: string[]): Promise<Map<string, number>> {
+  const resultado = new Map<string, number>();
+  if (codes.length === 0) return resultado;
+
+  try {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.from("totvs_stock").select("product_code, unit_cost").in("product_code", codes);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      if (row.unit_cost == null) continue;
+      resultado.set(row.product_code, Number(row.unit_cost) || 0);
+    }
+  } catch (err) {
+    console.error("getCustoUnitarioPorCodigo:", (err as Error).message);
+  }
+  return resultado;
+}
+
 export type ProdutoSaldoEstoque = {
   // "o que tem em estoque" -- saldo físico no CD (current_balance),
   // independente de já estar comprometido com venda ou não.
