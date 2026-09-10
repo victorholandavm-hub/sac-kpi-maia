@@ -85,7 +85,17 @@ function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
 // imagem/PDF no meio. PDF usa <embed> (o navegador que imprime já sabe
 // renderizar PDF inline) -- sem lib nenhuma nova, mesmo espírito de "só o
 // que já existe" do resto do projeto.
+//
+// `#toolbar=0&navpanes=0&scrollbar=0` no fim da URL -- achado do Victor
+// 10/09/2026 (print anexo): sem isso, o visualizador de PDF nativo do
+// Chrome aparecia com a MOLDURA inteira (barra de zoom/página, painel de
+// miniatura lateral, fundo cinza-escuro de "página vazia") junto do
+// despacho, tanto na tela quanto impresso -- desperdiçando papel/espaço
+// com interface de visualizador em vez de só o conteúdo da nota. Esses
+// parâmetros são suportados pelo plugin de PDF do Chromium (não uma API
+// do Next/React) e escondem essa moldura, deixando só a página da nota.
 function InvoicePage({ photo }: { photo: RequestPhoto }) {
+  const pdfUrl = `${photo.url}#toolbar=0&navpanes=0&scrollbar=0`;
   return (
     <div
       className="rounded-lg border overflow-hidden flex flex-col text-sm mt-4"
@@ -94,7 +104,7 @@ function InvoicePage({ photo }: { photo: RequestPhoto }) {
       <SectionTitle>Nota fiscal</SectionTitle>
       <div className="px-4 py-3 flex justify-center">
         {photo.isPdf ? (
-          <embed src={photo.url} type="application/pdf" style={{ width: "100%", height: "260mm" }} />
+          <embed src={pdfUrl} type="application/pdf" style={{ width: "100%", height: "260mm" }} />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={photo.url} alt="Nota fiscal" style={{ maxWidth: "100%", maxHeight: "260mm", objectFit: "contain" }} />
