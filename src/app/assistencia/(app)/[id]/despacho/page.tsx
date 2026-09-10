@@ -27,8 +27,18 @@ export default async function DespachoPage({ params }: { params: Promise<{ id: s
   // Impedir reimpressão -- pedido do Victor 28/08/2026 (ver PrintButton.tsx
   // pro resto do racional). Admin sempre pode reimprimir ("só eu poderia
   // imprimir mais de uma vez").
+  //
+  // Exceção: uma "nova troca" (exchangeRound > 1, ver createExchangeChild
+  // em actions.ts) nunca é bloqueada -- achado do Victor 10/09/2026: "numa
+  // notificação que foi selecionada como segunda troca, não foi permitido
+  // imprimir... deve poder imprimir pois é uma nova troca". É um chamado
+  // novo, com id próprio (nunca herda os eventos do pai), então um
+  // `alreadyPrinted` verdadeiro aqui só pode ser um print de verdade desse
+  // MESMO chamado -- mas mesmo assim, sendo cada rodada uma remessa física
+  // nova (pode precisar reimprimir pro motorista/loja mais de uma vez ao
+  // longo do fluxo), a trava de reimpressão não se aplica.
   const isAdmin = profile.role === "admin";
-  const alreadyPrinted = events.some((e) => e.eventType === "printed");
+  const alreadyPrinted = request.exchangeRound <= 1 && events.some((e) => e.eventType === "printed");
   const target: PrintTarget = { id: request.id, ticketNumber: request.ticketNumber, clientName: request.clientName, alreadyPrinted };
 
   // Antes travava SAC em SAC_MANAGED_TYPES (só troca/entrega de produto e
