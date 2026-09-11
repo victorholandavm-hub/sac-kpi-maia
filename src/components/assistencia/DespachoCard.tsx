@@ -99,7 +99,18 @@ function InvoicePage({ photo }: { photo: RequestPhoto }) {
   return (
     <div
       className="rounded-lg border overflow-hidden flex flex-col text-sm mt-4"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)", breakBefore: "page", pageBreakBefore: "always" }}
+      // `break-before: page` (forçava página NOVA sempre) trocado por
+      // `break-inside: avoid` (11/09/2026, achado do Victor: "ainda está
+      // do mesmo jeito" mesmo depois de reduzir o espaço em branco do
+      // despacho) -- o forçado garantia uma folha só pra nota MESMO
+      // quando sobrava espaço de verdade na página anterior, sempre
+      // gastando 1 folha a mais. `break-inside: avoid` só evita cortar a
+      // imagem/PDF NO MEIO (o motivo original de existir essa regra) --
+      // se já não sobra espaço nenhum na página atual (o caso mais comum,
+      // a nota quase sempre ocupa quase a folha A4 inteira), o navegador
+      // ainda assim move pro início da próxima folha sozinho, sem
+      // precisar forçar nada.
+      style={{ background: "var(--surface-1)", borderColor: "var(--border)", breakInside: "avoid", pageBreakInside: "avoid" }}
     >
       <SectionTitle>Nota fiscal</SectionTitle>
       <div className="px-4 py-3 flex justify-center">
