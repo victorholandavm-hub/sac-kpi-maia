@@ -229,16 +229,22 @@ export function DespachoCard({ request, invoicePhoto }: { request: ServiceReques
       </div>
 
       <SectionTitle>Relatório logístico</SectionTitle>
-      <div className="px-4 py-3 flex flex-col gap-4">
+      <div className="px-4 py-2 flex flex-col gap-2">
         <Field label="Motorista / montador" value={request.driverName || request.assemblerName} />
-        <div className="flex flex-col gap-3 pt-1">
-          {Array.from({ length: 4 }).map((_, i) => (
+        {/* Linhas em branco pra anotação manual -- reduzidas de 4 pra 2
+            (achado do Victor 11/09/2026, print anexo: o despacho tava
+            saindo em 3 folhas -- página inteira quase vazia entre o fim
+            do conteúdo e a nota fiscal, que só forçava a 3ª folha porque
+            sobrava espaço demais aqui embaixo). 2 linhas ainda dá espaço
+            pra anotação rápida sem desperdiçar página inteira. */}
+        <div className="flex flex-col gap-2 pt-1">
+          {Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="border-b" style={{ borderColor: "var(--border)", height: "1rem" }} />
           ))}
         </div>
       </div>
 
-      <div className="flex justify-center pb-4 pt-2">
+      <div className="flex justify-center pb-2 pt-1">
         <div className="border-t w-56 text-center text-xs pt-1" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
           Assinatura do cliente
         </div>
