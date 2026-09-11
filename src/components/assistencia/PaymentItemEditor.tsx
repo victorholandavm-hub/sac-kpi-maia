@@ -119,18 +119,35 @@ export function PaymentItemEditor({
           )}
           {isConcluded ? (
             canEdit ? (
-              <button
-                onClick={toggleReleased}
-                disabled={pending}
-                title={item.paymentReleased ? "Clique pra reverter pra pendente" : undefined}
-                className="text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap shadow-sm"
-                style={{
-                  color: item.paymentReleased ? "#fff" : "var(--brand-green-ink)",
-                  background: item.paymentReleased ? "var(--status-good)" : "var(--brand-green)",
-                }}
-              >
-                {item.paymentReleased ? "✓ Pago" : "Marcar como pago"}
-              </button>
+              // Sem valor definido, não oferece o botão -- correção do
+              // Victor 11/09/2026: itens do Luanderson (#4901/#4907/#4983)
+              // tinham sido marcados como pagos SEM valor nenhum (contavam
+              // R$0 no total, mesmo aparecendo "pago") porque esse botão
+              // não conferia isso (a seleção em lote de
+              // AssemblerPaymentGroup.tsx já filtrava certo -- só faltava
+              // aqui). Reverter pra pendente continua liberado sempre
+              // (não depende de valor).
+              item.paymentReleased || total !== null ? (
+                <button
+                  onClick={toggleReleased}
+                  disabled={pending}
+                  title={item.paymentReleased ? "Clique pra reverter pra pendente" : undefined}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-60 whitespace-nowrap shadow-sm"
+                  style={{
+                    color: item.paymentReleased ? "#fff" : "var(--brand-green-ink)",
+                    background: item.paymentReleased ? "var(--status-good)" : "var(--brand-green)",
+                  }}
+                >
+                  {item.paymentReleased ? "✓ Pago" : "Marcar como pago"}
+                </button>
+              ) : (
+                <span
+                  className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 whitespace-nowrap"
+                  title="Defina o valor do item antes de marcar como pago."
+                >
+                  Sem valor
+                </span>
+              )
             ) : (
               <span
                 className="text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap"
