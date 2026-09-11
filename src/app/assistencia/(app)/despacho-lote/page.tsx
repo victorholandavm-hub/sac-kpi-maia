@@ -135,9 +135,28 @@ export default async function DespachoLotePage({
                   chamado a ocupar 2 páginas sempre, igual quem tem nota
                   -- o próximo chamado sempre nasce numa folha nova. Só
                   nos visíveis que não são o último (não tem próximo
-                  chamado pra proteger depois do último). */}
+                  chamado pra proteger depois do último).
+                  Essa folha É de propósito, mas SEM nenhum aviso ela
+                  parecia um bug -- achado do Victor 11/09/2026: "quando
+                  as notificações de assistência são feitas pela equipe
+                  assistência, não necessita de anexar nota fiscal, mas
+                  está ficando assim" (print de uma folha em branco). Uma
+                  nota curta e discreta deixa claro que é proposital em
+                  vez de sumir sem explicação -- só aparece na impressão
+                  (print:flex/hidden na tela), não interfere na prévia
+                  empilhada da tela. */}
               {!hidden && !invoicePhoto && !isLastVisible ? (
-                <div aria-hidden="true" style={{ breakBefore: "page", pageBreakBefore: "always" }} />
+                <div
+                  aria-hidden="true"
+                  className="hidden print:flex items-center justify-center text-center"
+                  style={{ breakBefore: "page", pageBreakBefore: "always", height: "260mm", color: "var(--text-muted)" }}
+                >
+                  <span className="text-xs">
+                    Chamado #{request.ticketNumber} não exige nota fiscal — folha em branco proposital
+                    <br />
+                    (garante que a próxima notificação comece numa folha nova na impressão frente e verso)
+                  </span>
+                </div>
               ) : null}
             </div>
           );
