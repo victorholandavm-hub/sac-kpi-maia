@@ -67,10 +67,22 @@ function StatusButton({ s, pending, onClick }: { s: string; pending: boolean; on
 // (encerrado > enviada_ao_cliente > peca_recebida, mesma prioridade da
 // importação do histórico). Estilo de cartão clicável em vez de checkbox
 // nu -- pedido do Victor 10/09/2026 (item 3, "produtividade").
-function DeliveryCheckboxes({ orderId, status }: { orderId: string; status: string }) {
+//
+// Continua aparecendo com status "encerrado" -- correção do Victor
+// 11/09/2026: "nas peças que estão com o status de encerrado, precisam
+// poder mudar de status pela equipe assistencia". Antes esses 2 checkboxes
+// só apareciam pra peca_recebida/enviada_ao_cliente -- assim que o caso
+// virava "encerrado" (a própria checkbox "Caso encerrado?" marcada), o card
+// inteiro sumia e sobrava só o texto estático "Pedido encerrado.", sem
+// nenhum controle pra desmarcar/reabrir (servidor já aceitava, ver
+// updatePartOrderDelivery em pecas-actions.ts -- o buraco era só aqui na
+// tela). `delivered` agora vem de fora (order.sentToClientAt, não mais
+// inferido só do status) -- com status "encerrado" não dava pra saber se
+// tinha sido entregue antes de fechar só olhando o status.
+function DeliveryCheckboxes({ orderId, status, delivered: initialDelivered }: { orderId: string; status: string; delivered: boolean }) {
   const { pending, run } = useQuickAction();
-  const [delivered, setDelivered] = useState(status === "enviada_ao_cliente");
-  const [closed, setClosed] = useState(false);
+  const [delivered, setDelivered] = useState(initialDelivered);
+  const [closed, setClosed] = useState(status === "encerrado");
 
   function toggleDelivered(checked: boolean) {
     setDelivered(checked);
@@ -139,19 +151,37 @@ function NotesHistory({ notes }: { notes: string }) {
   );
 }
 
-export function PartOrderActions({ orderId, status, notes }: { orderId: string; status: string; notes?: string | null }) {
+export function PartOrderActions({
+  orderId,
+  status,
+  notes,
+  delivered,
+}: {
+  orderId: string;
+  status: string;
+  notes?: string | null;
+  // Se já foi enviada ao cliente (order.sentToClientAt) -- só pra
+  // inicializar o checkbox certo quando status já chega como "encerrado"
+  // (ver DeliveryCheckboxes acima). Statuses anteriores (aguardando_*) não
+  // usam esse valor.
+  delivered: boolean;
+}) {
   const { pending, run } = useQuickAction();
   const [note, setNote] = useState("");
 
   const nextStatuses = NEXT_STATUSES[status] ?? [];
-  const showDeliveryCheckboxes = status === "peca_recebida" || status === "enviada_ao_cliente";
+  // "encerrado" entra aqui também -- pedido do Victor 11/09/2026 (ver
+  // comentário em DeliveryCheckboxes). "cancelada" continua fora: não tem
+  // par entregue/encerrado pra reabrir, é só terminal mesmo (pedido cancela
+  // e recria do zero, se precisar).
+  const showDeliveryCheckboxes = status === "peca_recebida" || status === "enviada_ao_cliente" || status === "encerrado";
 
   return (
     <div className="bg-white dark:bg-gray-800 border-2 rounded-xl p-6 shadow-sm flex flex-col gap-4" style={{ borderColor: "var(--brand-green)" }}>
       <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Ações</h3>
 
       {showDeliveryCheckboxes ? (
-        <DeliveryCheckboxes orderId={orderId} status={status} />
+        <DeliveryCheckboxes orderId={orderId} status={status} delivered={delivered} />
       ) : nextStatuses.length > 0 ? (
         <div className="flex items-center gap-2 flex-wrap">
           {nextStatuses.map((s) => (
@@ -164,7 +194,7 @@ export function PartOrderActions({ orderId, status, notes }: { orderId: string; 
           ))}
         </div>
       ) : (
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{status === "cancelada" ? "Pedido cancelado." : "Pedido encerrado."}</p>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pedido cancelado.</p>
       )}
 
       <div className="flex flex-col gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">

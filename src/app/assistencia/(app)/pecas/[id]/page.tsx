@@ -153,7 +153,7 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
         ) : null}
       </div>
 
-      <PartOrderActions orderId={order.id} status={order.status} notes={order.notes} />
+      <PartOrderActions orderId={order.id} status={order.status} notes={order.notes} delivered={!!order.sentToClientAt} />
     </div>
   );
 }

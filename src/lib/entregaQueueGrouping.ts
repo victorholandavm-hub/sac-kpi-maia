@@ -102,7 +102,18 @@ function weekdayLabel(dateStr: string): string {
 // (revisão do Victor 03/09/2026: "atrasado e nao concluido nao sao
 // coisas diferentes, mas os dois precisam de remarcação, então precisam
 // entrar no grupo para remarcar"):
-// 1) "aberta" com data agendada já passada -- nunca nem foi tentado.
+// 1) data agendada já passada, em qualquer status que não seja terminal
+//    (concluída/cancelada) -- pedido do Victor 11/09/2026: "todos os de
+//    datas anteriores ao dia de hoje, que nao estejam com status de
+//    concluido ou cancelado, sempre devem aparecer em pra remarcar". Uma
+//    tentativa anterior aqui checava só "aberta" (achando que entrega
+//    nunca chega em em_contato/em_andamento, vocabulário de visita de
+//    montagem, RequestActions.tsx) -- ERRADO na prática: `updateStatus`
+//    (actions.ts) é a mesma action genérica pra todo tipo, sem trava por
+//    tipo de chamado, e o chamado #4873 (troca_produto, scheduled_date
+//    10/09, real em produção) prova que dá pra uma entrega ficar presa em
+//    "em_andamento" -- só a TELA de entrega (DeliveryRequestActions.tsx)
+//    não oferece botão pra isso, mas não é a única forma do status mudar.
 // 2) status "remarcar" -- já foi tentado (motorista reportou que não
 //    conseguiu concluir, ver driverReportIssue/driver-actions.ts), então
 //    já sabe que precisa de nova data, independente de já estar atrasado
@@ -110,10 +121,13 @@ function weekdayLabel(dateStr: string): string {
 //    aqui -- não precisa remarcar mais nada. Usado tanto pro número do
 //    banner ("N pra remarcar") quanto pra filtrar a lista quando ele é
 //    clicado -- um cálculo só, compartilhado entre fila/page.tsx (aba
-//    Entregas) e sac/notificacoes/page.tsx.
+//    Entregas, admin E assistência -- ver redirectIfSac, fila/page.tsx)
+//    e sac/notificacoes/page.tsx (SAC/admin).
 export function filterOverdueOpen(requests: ServiceRequestSummary[]): ServiceRequestSummary[] {
   return requests.filter(
-    (r) => (r.status === "aberta" && bucketByScheduledDate(r.scheduledDate) === "atrasado") || r.status === "remarcar"
+    (r) =>
+      r.status === "remarcar" ||
+      (r.status !== "concluida" && r.status !== "cancelada" && bucketByScheduledDate(r.scheduledDate) === "atrasado")
   );
 }
 
