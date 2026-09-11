@@ -2481,7 +2481,18 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const invoiceFileEntry = formData.get("invoice_file");
   const invoiceFile = invoiceFileEntry instanceof File && invoiceFileEntry.size > 0 ? invoiceFileEntry : null;
   if (isDeliveryTypeCreate && !invoiceFile) {
-    return { error: "Anexe a nota fiscal (foto ou PDF)." };
+    return { error: "Anexe a nota fiscal (PDF)." };
+  }
+  // Só PDF pra nota fiscal -- pedido do Victor 11/09/2026: "para o sac,
+  // você so deve permitir que seja anexado pdf, imagem não pode" (foto
+  // tirada de tela/celular vinha ilegível ou cortada demais pra servir de
+  // comprovante fiscal de verdade -- ver caso #7049/#7054, nota errada por
+  // engano). Checagem de Content-Type aqui (rejeita cedo, mensagem clara);
+  // uploadPhotoBytes/matchesMagicBytes (servicePhotos.ts) ainda confere os
+  // bytes de verdade contra o tipo declarado, então um type "application/
+  // pdf" forjado num arquivo que não é PDF de verdade cai lá.
+  if (invoiceFile && invoiceFile.type !== "application/pdf") {
+    return { error: "A nota fiscal precisa ser um arquivo PDF (não é permitido anexar foto/imagem)." };
   }
 
   const clientName = String(formData.get("client_name") ?? "").trim();

@@ -19,16 +19,17 @@ export async function setItemUnitValue(itemId: string, requestId: string, unitVa
 
   const admin = getSupabaseAdmin();
 
-  // Montador concluiu mas o gerente da loja ainda não aprovou -- mesma trava
-  // de espírito do "só libera pagamento depois de concluída" abaixo em
-  // setItemPaymentReleased, só que aplicada mais cedo: nem o valor pode ser
-  // definido enquanto a aprovação estiver pendente (pedido do Victor
-  // 02/09/2026, confirmado testando o fluxo ao vivo). Pra qualquer status
-  // anterior a isso (aberta, em_andamento etc.) continua permitido definir
-  // valor adiantado, como já era -- a trava é só nessa janela específica.
+  // Valor só pode ser definido depois que a montagem for confirmada como
+  // concluída (status "concluida") -- correção do Victor 11/09/2026: antes
+  // o Antonio podia pré-definir o valor a qualquer momento (só travava
+  // durante "aguardando_aprovacao"), mas ele decidiu que o valor deve ficar
+  // preso à confirmação de conclusão (gerente da loja/admin/assistência via
+  // lojaApproveMontagemConclusion), não antes. Mesma trava em
+  // PaymentItemEditor.tsx/RequestItemsTable.tsx (UI) -- aqui é a garantia
+  // de verdade, os dois lados do form).
   const { data: request } = await admin.from("service_requests").select("status").eq("id", requestId).single();
-  if (request?.status === "aguardando_aprovacao") {
-    throw new Error("Essa montagem ainda está aguardando a aprovação do gerente da loja.");
+  if (request?.status !== "concluida") {
+    throw new Error("Só é possível definir o valor depois que a montagem for concluída (aprovada).");
   }
 
   const { data: item } = await admin.from("service_request_items").select("product").eq("id", itemId).single();

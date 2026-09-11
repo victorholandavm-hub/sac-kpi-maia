@@ -44,10 +44,13 @@ export function PaymentItemEditor({
   const [value, setValue] = useState(item.unitValue !== null ? String(item.unitValue) : "");
 
   const isConcluded = item.requestStatus === "concluida";
-  // Montador já marcou como feito, mas o gerente da loja ainda não aprovou
-  // -- só a partir da aprovação (status vira "concluida") é que o Antonio
-  // pode definir valor/liberar pagamento. Até lá, aparece na lista (pra não
-  // sumir sem explicação), só sem a opção de mexer em valor.
+  // Valor só editável depois de "concluida" (aprovada) -- correção do
+  // Victor 11/09/2026: antes o Antonio podia pré-definir o valor antes da
+  // montagem terminar (só travava durante aguardando_aprovacao); ele
+  // decidiu prender ao mesmo momento da aprovação. Item continua aparecendo
+  // na lista antes disso (pra não sumir sem explicação), só sem a opção de
+  // mexer em valor (ver setItemUnitValue, pagamentos-actions.ts, que
+  // reforça a mesma regra no servidor).
   const isAwaitingApproval = item.requestStatus === "aguardando_aprovacao";
   const total = item.unitValue !== null ? item.unitValue * item.quantity : null;
 
@@ -107,7 +110,7 @@ export function PaymentItemEditor({
                 Salvar
               </button>
             </>
-          ) : canEdit && !isAwaitingApproval ? (
+          ) : canEdit && isConcluded ? (
             <button onClick={() => setEditing(true)} className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               {total !== null ? formatBRL(total) : "definir valor"}
             </button>

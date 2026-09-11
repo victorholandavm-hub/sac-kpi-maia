@@ -29,12 +29,13 @@ function ItemRow({
   canEditItems: boolean;
 }) {
   const isConcluded = requestStatus === "concluida";
-  // Montador já marcou como feito, mas o gerente da loja ainda não aprovou
-  // -- só a partir da aprovação (status vira "concluida") é que dá pra
-  // definir valor/liberar pagamento. Mesmo tratamento de PaymentItemEditor.tsx
-  // (achado 08/09/2026: essa tela tinha ficado sem a trava visual -- o
-  // servidor já bloqueava certo, só a experiência ficava ruim, digitando o
-  // valor pra só depois receber o erro).
+  // Valor só editável depois de "concluida" (aprovada) -- mesma trava de
+  // PaymentItemEditor.tsx (correção do Victor 11/09/2026: antes dava pra
+  // pré-definir o valor antes da montagem terminar, só travava durante
+  // aguardando_aprovacao; ele decidiu prender ao mesmo momento da
+  // aprovação). Servidor (setItemUnitValue, pagamentos-actions.ts) reforça
+  // a mesma regra -- aqui é só pra não deixar digitar pra só depois receber
+  // o erro (achado 08/09/2026).
   const isAwaitingApproval = requestStatus === "aguardando_aprovacao";
   const { pending, run, showToast } = useQuickAction();
   const [editing, setEditing] = useState(false);
@@ -121,7 +122,7 @@ function ItemRow({
               Salvar
             </button>
           </>
-        ) : canEditValues && !isAwaitingApproval ? (
+        ) : canEditValues && isConcluded ? (
           <button onClick={() => setEditing(true)} className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             {total !== null ? formatBRL(total) : "definir valor"}
           </button>

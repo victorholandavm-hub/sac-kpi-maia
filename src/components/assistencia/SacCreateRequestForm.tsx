@@ -412,12 +412,19 @@ export function SacCreateRequestForm({
             misturar a nota errada com o cliente errado ao imprimir várias
             de uma vez. */}
         {isDelivery ? (
-          <Field label="Nota fiscal * (foto ou PDF)">
+          <Field label="Nota fiscal * (PDF)">
+            {/* Só PDF -- pedido do Victor 11/09/2026: "para o sac, você so
+                deve permitir que seja anexado pdf, imagem não pode" (foto
+                de tela/celular vinha ilegível demais pra servir de
+                comprovante fiscal de verdade). `accept` só filtra o que
+                aparece no seletor de arquivo do navegador (UX, contorna
+                fácil) -- a validação de verdade é no servidor
+                (createSacRequest, actions.ts). */}
             <input
               name="invoice_file"
               type="file"
               required
-              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
+              accept="application/pdf"
               className="rounded border px-3 py-2 text-sm"
               style={inputStyle}
             />
