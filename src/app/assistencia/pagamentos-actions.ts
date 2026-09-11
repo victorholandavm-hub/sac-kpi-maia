@@ -64,7 +64,20 @@ export async function setItemPaymentReleased(itemId: string, requestId: string, 
     }
   }
 
-  const { data: item } = await admin.from("service_request_items").select("product").eq("id", itemId).single();
+  const { data: item } = await admin.from("service_request_items").select("product, unit_value").eq("id", itemId).single();
+  // Nunca liberar pagamento sem valor definido -- inconsistência real achada
+  // 11/09/2026 (Victor: "seu antonio falou que ele gerou uma nota fiscal
+  // perto do 2200 reais e agora so aparece 1500 em pagos"): 8 itens do
+  // Luanderson (#4901/#4907/#4983) tinham sido marcados como pagos pelo
+  // botão INDIVIDUAL ("Marcar como pago" em PaymentItemEditor.tsx/
+  // RequestItemsTable.tsx) sem nunca ter um unit_value definido -- contavam
+  // R$0 no total, mesmo aparecendo como "pago". A seleção em LOTE
+  // (AssemblerPaymentGroup.tsx, `eligibleIds`) já filtrava certo (só deixa
+  // selecionar quem tem unit_value); faltava a mesma trava aqui e no botão
+  // individual (PaymentItemEditor.tsx/RequestItemsTable.tsx).
+  if (released && item?.unit_value === null) {
+    throw new Error("Defina o valor do item antes de marcar como pago.");
+  }
 
   const { error } = await admin
     .from("service_request_items")

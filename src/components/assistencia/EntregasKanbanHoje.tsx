@@ -10,7 +10,7 @@ import { DELIVERY_TYPE_COLORS } from "./AssistenciaQueueGroup";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { getDayRouteGroupsAction } from "@/app/assistencia/actions";
 import { driverNameForRota, JP_EXTRA_ROTA, WEEKDAY_LABELS, type Rota, type RotaDayOverview } from "@/lib/rotas";
-import type { QueueGroup } from "@/lib/entregaQueueGrouping";
+import { ENTREGA_TYPES_SAC, ENTREGA_TYPES_ASSISTENCIA, ASSISTENCIA_ORIGEM_REQUESTERS, type QueueGroup } from "@/lib/entregaQueueGrouping";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
 
 const WEEKDAY_SHORT = WEEKDAY_LABELS.map((w) => w.slice(0, 3));
@@ -143,6 +143,25 @@ function deliveryStatusTab(status: string): Exclude<DeliveryStatusTab, "todos"> 
   if (status === "cancelada") return "cancelado";
   if (status === "remarcar") return "nao_concluido";
   return "programado";
+}
+
+type OrigemFilter = "sac" | "assistencia";
+
+// Mesmo critério de origem já usado no filtro "SAC x Assistência" da aba
+// Entregas (fila/page.tsx/sac/notificacoes/page.tsx, ver ORIGEM_FILTERS em
+// entregaQueueGrouping.ts) -- pedido do Victor 11/09/2026: "ao lado de
+// proximas rotas, preciso de dois filtros, um sac e um assistencia...
+// para filtrar apenas o que é de cada setor". Lá o filtro roda na consulta
+// ao servidor (listRequests com `types`/`requestedByNames`); aqui os
+// chamados já vieram prontos do servidor (groups/dayGroupsCache), então é
+// o mesmo critério reaplicado em JS por cima do que já está na tela.
+function matchesOrigem(r: ServiceRequestSummary, origem: OrigemFilter): boolean {
+  if (origem === "sac") return (ENTREGA_TYPES_SAC as readonly string[]).includes(r.type);
+  return (
+    (ENTREGA_TYPES_ASSISTENCIA as readonly string[]).includes(r.type) &&
+    !!r.requestedByName &&
+    (ASSISTENCIA_ORIGEM_REQUESTERS as readonly string[]).includes(r.requestedByName)
+  );
 }
 
 const STATUS_TAB_LABELS: Record<DeliveryStatusTab, string> = {
@@ -387,6 +406,9 @@ export function EntregasKanbanHoje({
   // Clicar de novo na rota já selecionada limpa o filtro (volta a mostrar
   // todas) -- clicar numa rota diferente troca pra ela.
   const [selectedRotaKey, setSelectedRotaKey] = useState<string | null>(defaultColumnKey);
+  // SAC/Assistência -- mesmo padrão de clique de selectedRotaKey acima
+  // (clicar de novo no já selecionado desmarca, volta a mostrar todos).
+  const [selectedOrigem, setSelectedOrigem] = useState<OrigemFilter | null>(null);
 
   // "Próximas rotas" -- pedido do Victor 03/09/2026: "um botão... quando
   // eu clicar ele aparece as rotas dos próximos 5 dias e se eu clicar em
@@ -520,8 +542,9 @@ export function EntregasKanbanHoje({
     column.items.map((r) => ({ r, rotaLabel: column.rotaLabel, driverName: column.driverName, columnKey: column.key }))
   );
   const rotaRows = selectedRotaKey ? allRows.filter((row) => row.columnKey === selectedRotaKey) : allRows;
+  const origemRows = selectedOrigem ? rotaRows.filter((row) => matchesOrigem(row.r, selectedOrigem)) : rotaRows;
   const counts: HojeStatusCounts = { programado: 0, concluido: 0, cancelado: 0, nao_concluido: 0 };
-  for (const row of rotaRows) counts[deliveryStatusTab(row.r.status)]++;
+  for (const row of origemRows) counts[deliveryStatusTab(row.r.status)]++;
   // Aba "Todos" -- pedido do Victor 02/09/2026: "coloque para baixo os que
   // forem sendo concluidos e fique em cima os ainda programados". `.sort` é
   // estável (garantido desde ES2019), então só separa concluído do resto --
@@ -529,8 +552,8 @@ export function EntregasKanbanHoje({
   // de cada grupo, só empurra concluído pro fim da lista.
   const visibleRows =
     tab === "todos"
-      ? [...rotaRows].sort((a, b) => (a.r.status === "concluida" ? 1 : 0) - (b.r.status === "concluida" ? 1 : 0))
-      : rotaRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
+      ? [...origemRows].sort((a, b) => (a.r.status === "concluida" ? 1 : 0) - (b.r.status === "concluida" ? 1 : 0))
+      : origemRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
 
   // Imprimir em bloco -- pedido do Victor 03/09/2026: "quando eu escolho a
   // data da próxima rota, e ele me traz a lista, tem que ter a opção de
@@ -634,6 +657,41 @@ export function EntregasKanbanHoje({
               ) : null}
             </button>
           ))}
+        </div>
+
+        {/* SAC/Assistência -- pedido do Victor 11/09/2026: "ao lado de
+            proximas rotas, preciso de dois filtros, um sac e um
+            assistencia... para filtrar apenas o que é de cada setor e se
+            eu clicar de novo, ele volta a mostrar todos". Mesmo padrão de
+            clique de RouteSummaryCard (clicar no já selecionado
+            desmarca) -- só afeta a tabela abaixo, os cards de resumo por
+            rota continuam com a contagem cheia (mesmo comportamento que o
+            filtro de status Todos/Programado/... já tem hoje). */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setSelectedOrigem((prev) => (prev === "sac" ? null : "sac"))}
+            className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors whitespace-nowrap"
+            style={
+              selectedOrigem === "sac"
+                ? { background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }
+                : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
+            }
+          >
+            SAC
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedOrigem((prev) => (prev === "assistencia" ? null : "assistencia"))}
+            className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors whitespace-nowrap"
+            style={
+              selectedOrigem === "assistencia"
+                ? { background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }
+                : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
+            }
+          >
+            Assistência
+          </button>
         </div>
 
         {nextRoutesPicker}
