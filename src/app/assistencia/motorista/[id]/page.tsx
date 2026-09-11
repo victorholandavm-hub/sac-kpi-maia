@@ -55,7 +55,15 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
 
   const photos = await listRequestPhotos(request.id);
   const proofPhotos = photos.filter((p) => p.isProof);
-  const otherPhotos = photos.filter((p) => !p.isProof);
+  // Nota fiscal (anexada na criação, ver createSacRequest/actions.ts) sai
+  // da lista de "Fotos" comum -- pedido do Victor 11/09/2026: "preciso que
+  // para o motorista apareça a nota fiscal quando ele entrar na
+  // notificação, só um botão pra ele ver e baixar a nota". Já vinha
+  // dentro de `photos` (isInvoice), só nunca tinha ganhado destaque
+  // próprio aqui -- ficava misturada nas fotos comuns, sem nenhum botão
+  // claro de "ver"/"baixar".
+  const invoicePhoto = photos.find((p) => p.isInvoice) ?? null;
+  const otherPhotos = photos.filter((p) => !p.isProof && !p.isInvoice);
   const showCompleted = request.status === "concluida" || request.status === "cancelada";
   // Motorista não tem caso "mostruário" (sempre tem cliente de verdade na
   // outra ponta), diferente do montador -- QR aparece sempre que concluído
@@ -183,6 +191,41 @@ export default async function MotoristaRequestDetailPage({ params }: { params: P
             </a>
           ) : null}
         </div>
+
+        {/* Nota fiscal -- pedido do Victor 11/09/2026: um botão só pra ver
+            e baixar, sem misturar com a galeria de fotos comuns abaixo.
+            Card próprio, mesmo padrão visual de "Comprovante assinado"/
+            "Fotos" -- mas sem upload nenhum aqui (a nota é anexada na
+            CRIAÇÃO do chamado, pelo SAC/assistência, não pelo motorista). */}
+        {invoicePhoto ? (
+          <div
+            className="rounded-lg p-4 flex flex-col gap-3"
+            style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
+          >
+            <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              🧾 Nota fiscal
+            </h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <a
+                href={invoicePhoto.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium rounded-lg px-3 py-2.5"
+                style={{ background: "color-mix(in srgb, var(--brand-green) 12%, transparent)", color: "var(--brand-green)" }}
+              >
+                👁️ Ver nota fiscal
+              </a>
+              <a
+                href={invoicePhoto.url}
+                download
+                className="text-sm font-medium rounded-lg px-3 py-2.5 border"
+                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+              >
+                ⬇️ Baixar
+              </a>
+            </div>
+          </div>
+        ) : null}
 
         <div
           className="rounded-lg p-4 flex flex-col gap-3"
