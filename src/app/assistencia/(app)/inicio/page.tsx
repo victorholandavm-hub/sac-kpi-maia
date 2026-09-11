@@ -39,17 +39,22 @@ function Card({
   href: string;
   title: string;
   description: string;
-  // Faixa fina na borda esquerda -- única "cor" que sobra por card, só pra
-  // diferenciar visualmente sem colorir texto nenhum (ex.: KPIs do SAC,
-  // sistema/domínio separado). Omitido = card neutro igual aos outros.
-  accent?: string;
+  // Faixa fina colorida -- pedido do Victor 11/09/2026: "preciso que
+  // esteja com esse detalhe" (referência: KpiCardWhite em
+  // relatorios/page.tsx, que já usa essa mesma cor de série por card --
+  // ex.: "Total a pagar a montadores" com --series-4) "só que esse
+  // detalhe é lateral, eu queria que fosse na parte de cima dos cards".
+  // Em CIMA (borderTop) em vez de na esquerda (era borderLeft até
+  // 11/09/2026, só no card "KPIs do SAC") -- todo card agora recebe uma
+  // cor (ver chamadas abaixo), não só o de fora do domínio.
+  accent: string;
   children?: React.ReactNode;
 }) {
   return (
     <Link
       href={href}
       className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm p-5 flex flex-col gap-3 hover:border-gray-300 dark:hover:border-gray-500 transition-colors duration-150"
-      style={accent ? { borderLeft: `3px solid ${accent}` } : undefined}
+      style={{ borderTop: `4px solid ${accent}` }}
     >
       <div>
         <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">{title}</h3>
@@ -85,37 +90,41 @@ export default async function InicioPage() {
           sem esses breakpoints extras os cards ficariam com espaço vazio
           enorme dos dois lados numa tela de desktop. */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <Card href="/assistencia/fila" title="Solicitações" description="Montagem, desmontagem, recolhimento, troca de peça, vistoria e notificações.">
+        <Card href="/assistencia/fila" title="Solicitações" description="Montagem, desmontagem, recolhimento, troca de peça, vistoria e notificações." accent="var(--series-1)">
           <Stat label="Abertas sem contato" value={requests.openNoContact} warn />
           <Stat label="Aguardando aprovação de prazo" value={requests.pendingDeadline} />
           <Stat label="Concluídas hoje" value={requests.completedToday} />
         </Card>
 
-        <Card href="/assistencia/agenda" title="Agenda" description="Visitas técnicas agendadas na casa do cliente.">
+        <Card href="/assistencia/agenda" title="Agenda" description="Visitas técnicas agendadas na casa do cliente." accent="var(--series-5)">
           <Stat label="Agendadas para hoje" value={requests.scheduledToday} />
           <Stat label="Aguardando remarcação" value={requests.needsReschedule} warn />
         </Card>
 
-        <Card href="/assistencia/pecas" title="Peças" description="Pedidos de peça de reposição junto aos fornecedores.">
+        <Card href="/assistencia/pecas" title="Peças" description="Pedidos de peça de reposição junto aos fornecedores." accent="var(--series-3)">
           <Stat label="Aguardando chegar" value={parts.awaiting} />
           <Stat label="Prontas para enviar" value={parts.readyToSend} />
         </Card>
 
-        <Card href="/assistencia/fornecedores" title="Fornecedores" description="Remessas de peça defeituosa para conserto/reembolso.">
+        <Card href="/assistencia/fornecedores" title="Fornecedores" description="Remessas de peça defeituosa para conserto/reembolso." accent="var(--series-6)">
           <Stat label="Em aberto" value={supplierReturns.open} />
           <Stat label="Atrasadas" value={supplierReturns.overdue} warn />
         </Card>
 
-        <Card href="/assistencia/pagamentos" title="Pagamentos" description="Valor por item e liberação de pagamento do montador.">
+        {/* --series-4 (violeta) -- mesma cor do card "Total a pagar a
+            montadores" em relatorios/page.tsx (KpiCardWhite), pra manter
+            o mesmo domínio (pagamento de montador) reconhecível pela cor
+            em telas diferentes. */}
+        <Card href="/assistencia/pagamentos" title="Pagamentos" description="Valor por item e liberação de pagamento do montador." accent="var(--series-4)">
           <Stat label="Pendentes de liberação" value={pendingPayments} warn />
         </Card>
 
-        <Card href="/assistencia/estoque" title="Estoque" description="Registrar retiradas, devoluções e reparos no CD." />
+        <Card href="/assistencia/estoque" title="Estoque" description="Registrar retiradas, devoluções e reparos no CD." accent="var(--series-7)" />
 
-        <Card href="/assistencia/encomendas/fila" title="Encomendas" description="Pedido de produto: loja pede, fábrica produz, CD expede." />
+        <Card href="/assistencia/encomendas/fila" title="Encomendas" description="Pedido de produto: loja pede, fábrica produz, CD expede." accent="var(--series-2)" />
 
         {profile.role === "admin" ? (
-          <Card href="/assistencia/admin" title="Administração" description="Contas da equipe, montadores e fornecedores." />
+          <Card href="/assistencia/admin" title="Administração" description="Contas da equipe, montadores e fornecedores." accent="var(--series-8)" />
         ) : null}
 
         {profile.role === "admin" ? (
