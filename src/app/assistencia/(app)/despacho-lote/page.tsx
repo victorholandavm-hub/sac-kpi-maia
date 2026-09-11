@@ -118,12 +118,27 @@ export default async function DespachoLotePage({
       <div className="flex flex-col gap-6">
         {requests.map((request) => {
           const hidden = hideOnPrint(request.id);
-          const className = ["despacho-lote-item", hidden ? "hide-on-print" : "", !hidden && request.id !== lastVisibleId ? "break-after-page" : ""]
+          const invoicePhoto = invoicePhotosById.get(request.id) ?? null;
+          const isLastVisible = request.id === lastVisibleId;
+          const className = ["despacho-lote-item", hidden ? "hide-on-print" : "", !hidden && !isLastVisible ? "break-after-page" : ""]
             .filter(Boolean)
             .join(" ");
           return (
             <div key={request.id} className={className}>
-              <DespachoCard request={request} invoicePhoto={invoicePhotosById.get(request.id) ?? null} />
+              <DespachoCard request={request} invoicePhoto={invoicePhoto} />
+              {/* Sem nota fiscal, o chamado usa só 1 página -- achado do
+                  Victor 11/09/2026: numa impressora frente-e-verso
+                  (duplex), isso fazia o PRÓXIMO chamado começar no VERSO
+                  dessa mesma folha ("tá saindo frente e verso com duas
+                  notificações diferentes, quando era pra sair uma em
+                  cada folha sempre"). Folha extra em branco força esse
+                  chamado a ocupar 2 páginas sempre, igual quem tem nota
+                  -- o próximo chamado sempre nasce numa folha nova. Só
+                  nos visíveis que não são o último (não tem próximo
+                  chamado pra proteger depois do último). */}
+              {!hidden && !invoicePhoto && !isLastVisible ? (
+                <div aria-hidden="true" style={{ breakBefore: "page", pageBreakBefore: "always" }} />
+              ) : null}
             </div>
           );
         })}
