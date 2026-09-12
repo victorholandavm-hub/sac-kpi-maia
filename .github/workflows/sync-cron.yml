@@ -1,4 +1,4 @@
-name: Sync GHL (a cada 2h)
+name: Sync GHL + TOTVS (a cada 2h)
 
 on:
   schedule:
@@ -32,6 +32,24 @@ jobs:
       # primeiro "falhar" (na visão do curl/Nginx, mesmo o /api/sync
       # terminando certo por trás) impedia os outros dois de rodar --
       # /api/sync-ai-classify ficou 13 dias sem executar por causa disso.
+      #
+      # /api/totvs-sync entrou aqui em 12/09/2026: até então o backfill de
+      # pedidos do Protheus dependia só de um disparador externo (fora
+      # deste repositório, nunca identificado -- nem crontab nem systemd
+      # timer na VPS, GitHub Actions não chamava essa rota) que ficou 14h+
+      # sem rodar sem ninguém perceber. O comentário antigo em
+      # totvsSync.ts/totvs-sync/route.ts ("roda só num computador dentro da
+      # rede liberada, VPS/nuvem não alcança o Protheus") é da época do
+      # Vercel -- testado direto da VPS em 12/09/2026 e funcionou normal,
+      # sem timeout nenhum. Ter esse disparo aqui garante um mínimo
+      # visível/monitorável (a cada ~2-3h, ver agendamento no topo do
+      # arquivo) mesmo que o disparador externo (que continua podendo
+      # existir, rodando mais frequente) volte a falhar.
+      - name: Chamar /api/totvs-sync
+        continue-on-error: true
+        run: |
+          curl -sf --max-time 170 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://sac.lojasmaia.com.br/api/totvs-sync"
       - name: Chamar /api/sync
         continue-on-error: true
         run: |
