@@ -350,7 +350,14 @@ export function NovaEntregaAssistenciaForm({
     if (m.clientName) setClientName(m.clientName);
     if (m.clientPhone) setClientPhone(m.clientPhone);
     setType("envio_peca");
-    update(0, { product: m.product ?? m.partName, code: m.partCode ?? "" });
+    // Nome da PEÇA, não do produto inteiro (móvel) -- achado do Victor
+    // 12/09/2026: "no nome da peça tá indo o nome do produto... colocar
+    // para na parte do produto em caso de peça solicitada ir o nome da
+    // peça e não o do produto. pra na hora de carregarem não carregar o
+    // produto todo". `m.product` é o móvel inteiro (ex.: "GUARDA ROUPA 4P
+    // 4GAV DOMO..."), `m.partName` é a peça de reposição de verdade (ex.:
+    // "puxador", "dobradiça") -- estava invertido.
+    update(0, { product: m.partName || m.product || "", code: m.partCode ?? "" });
     if (m.clientCpf) {
       lookupTotvsClientByCpfForTeam(m.clientCpf)
         .then((match) => {
