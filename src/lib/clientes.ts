@@ -365,97 +365,63 @@ function isClienteInterno(nome: string | null, cpfCnpj: string | null): boolean 
   return false;
 }
 
-const ORDER_PAGE_SIZE = 1000;
+const CLIENTE_AGREGADO_PAGE_SIZE = 1000;
 
-type ClientePedidoRow = {
-  client_id: string | null;
-  type: string;
-  invoice_total: number;
-  issue_date: string;
-  client_name: string | null;
-  client_cpf_cnpj: string | null;
-  branch: string | null;
+type ClienteAgregadoRow = {
+  client_id: string;
+  nome: string | null;
+  cpf_cnpj: string | null;
+  compras: number;
+  gasto_acumulado: number;
+  primeira_compra: string | null;
+  ultima_compra: string | null;
+  branches: string[] | null;
 };
 
-// Busca o histórico de pedidos inteiro (paginado de verdade -- ver
-// convenção já usada em vendasProduto.ts/entregasRisco.ts) e agrega por
-// cliente. Gasto acumulado é líquido (Venda soma, Devolução subtrai,
-// mesma convenção de vendasProduto.ts pra quantidade vendida). Computa
-// tudo de uma vez -- cards e lista filtrável reaproveitam o mesmo array em
-// memória, sem repetir a varredura. Páginas em PARALELO (ver
-// fetchAllPagesParallel) -- achado 19/08/2026: era sequencial, até 200
-// páginas (38 mil pedidos reais), boa parte dos 15,8s que a tela de
-// Clientes chegou a demorar pra carregar.
+// Egress do Supabase -- pedido do Victor 12/09/2026 (custo mensal, decisão
+// Free vs Pro): essa função varria totvs_orders INTEIRO (178 mil+ linhas,
+// cresceu muito com o backfill completo do TOTVS) e agregava por cliente
+// em JS. Agora consulta v_clientes_agregado_nivel (migration 0123), que já
+// faz esse GROUP BY dentro do Postgres -- só ~24 mil linhas já agregadas
+// (1 por cliente) trafegam pela rede, não o histórico de pedidos inteiro.
+// A view replica exatamente a mesma lógica de antes (gasto líquido, soma
+// sempre sem inverter sinal por tipo -- ver histórico do bug em git blame
+// se precisar revisitar; compras/primeira/última só contam 'Venda').
 async function listClientesPorNivelUncached(): Promise<ClienteNivelInfo[]> {
   const admin = getSupabaseAdmin();
 
   const [rows, storeNameById] = await Promise.all([
-    fetchAllPagesParallel<ClientePedidoRow>(
+    fetchAllPagesParallel<ClienteAgregadoRow>(
       (from, to) =>
         admin
-          .from("totvs_orders")
-          .select("client_id, type, invoice_total, issue_date, client_name, client_cpf_cnpj, branch", { count: "exact" })
-          .not("client_id", "is", null)
-          .range(from, to) as unknown as PromiseLike<PagedQueryResult<ClientePedidoRow>>,
-      { pageSize: ORDER_PAGE_SIZE }
+          .from("v_clientes_agregado_nivel")
+          .select("client_id, nome, cpf_cnpj, compras, gasto_acumulado, primeira_compra, ultima_compra, branches", { count: "exact" })
+          .range(from, to) as unknown as PromiseLike<PagedQueryResult<ClienteAgregadoRow>>,
+      { pageSize: CLIENTE_AGREGADO_PAGE_SIZE }
     ),
     getStoreNameById(),
   ]);
 
-  type Acc = {
-    nome: string | null;
-    cpfCnpj: string | null;
-    compras: number;
-    gasto: number;
-    primeira: string | null;
-    ultima: string | null;
-    branches: Set<string>;
-  };
-  const porCliente = new Map<string, Acc>();
-  for (const r of rows) {
-    if (!r.client_id) continue;
-    if (isClienteInterno(r.client_name, r.client_cpf_cnpj)) continue;
-    const acc = porCliente.get(r.client_id) ?? { nome: null, cpfCnpj: null, compras: 0, gasto: 0, primeira: null, ultima: null, branches: new Set<string>() };
-    if (r.branch) acc.branches.add(r.branch);
-    // invoice_total já vem líquido/assinado direto do Protheus -- negativo
-    // pra Devolução, tanto no pedido quanto em cada item dele (conferido
-    // direto no banco 20/08/2026). Bug achado no mesmo dia: a versão
-    // anterior fazia `gasto -= invoice_total` pro caso de devolução, o que
-    // DOBRA o efeito -- subtrair um valor que já é negativo soma de novo,
-    // em vez de descontar (ex.: cliente CG3 Engenharia, venda de R$17.994
-    // devolvida por inteiro aparecia com gasto acumulado de R$53.982, não
-    // os R$17.994 líquidos corretos). Soma sempre, sem inverter sinal por
-    // tipo -- mesmo padrão (sem branch) de vendasProduto.ts pra quantidade.
-    acc.gasto += r.invoice_total;
-    if (r.type === "Venda") {
-      acc.compras += 1;
-      if (!acc.primeira || r.issue_date < acc.primeira) acc.primeira = r.issue_date;
-      if (!acc.ultima || r.issue_date > acc.ultima) acc.ultima = r.issue_date;
-    }
-    if (!acc.nome && r.client_name) acc.nome = r.client_name;
-    if (!acc.cpfCnpj && r.client_cpf_cnpj) acc.cpfCnpj = r.client_cpf_cnpj;
-    porCliente.set(r.client_id, acc);
-  }
-
   const hoje = new Date();
   const resultado: ClienteNivelInfo[] = [];
-  for (const [clientId, acc] of porCliente) {
-    const meses = acc.primeira ? mesesEntre(acc.primeira, hoje) : null;
-    const dias = acc.ultima ? diasEntre(acc.ultima, hoje) : null;
+  for (const r of rows) {
+    if (isClienteInterno(r.nome, r.cpf_cnpj)) continue;
+    const meses = r.primeira_compra ? mesesEntre(r.primeira_compra, hoje) : null;
+    const dias = r.ultima_compra ? diasEntre(r.ultima_compra, hoje) : null;
     resultado.push({
-      clientId,
-      nome: acc.nome,
-      cpfCnpj: acc.cpfCnpj,
-      compras: acc.compras,
-      gastoAcumulado: acc.gasto,
-      primeiraCompra: acc.primeira,
-      ultimaCompra: acc.ultima,
+      clientId: r.client_id,
+      nome: r.nome,
+      cpfCnpj: r.cpf_cnpj,
+      compras: r.compras,
+      gastoAcumulado: r.gasto_acumulado,
+      primeiraCompra: r.primeira_compra,
+      ultimaCompra: r.ultima_compra,
       mesesRelacionamento: meses,
-      nivel: calcularNivel(acc.compras, acc.gasto, meses),
+      nivel: calcularNivel(r.compras, r.gasto_acumulado, meses),
       posicaoNoNivel: 0, // preenchido abaixo, depois que todo o nível está montado
       diasSemComprar: dias,
       inativoRecente: dias !== null && dias >= DIAS_INATIVO_RECENTE,
-      stores: resolveStoreNames(acc.branches, storeNameById),
+      stores: resolveStoreNames(r.branches ?? [], storeNameById),
     });
   }
 
