@@ -1160,6 +1160,14 @@ export type TotvsSyncSummary = {
   deliveries: { checked: number; upserted: number };
   clientsBackfill: { checked: number; upserted: number };
   stock: { checked: number; upserted: number };
+  // Refresh das materialized views de Clientes/Motor de Recompra (ver
+  // migration 0124_views_materializadas_clientes_recompra.sql) -- pedido
+  // do Victor 12/09/2026 (egress/timeout do Supabase). Não é "checked/
+  // upserted" (não é um sync de dado do TOTVS em si), só um booleano de
+  // sucesso -- falha aqui não deve derrubar `ok` do resto do sync (as
+  // views só ficam mais desatualizadas, não é uma falha de sincronização
+  // de dado real), por isso fica FORA da conta de `summary.ok` abaixo.
+  agregacoesClientesRefreshed: boolean;
   errors: string[];
 };
 
@@ -1182,6 +1190,24 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
   const clientsBackfill = await backfillMissingClients(supabase);
   const stock = await syncStock(supabase);
 
+  // Refresh das materialized views de Clientes/Motor de Recompra (ver
+  // migration 0124) -- por último de propósito, depois que todo o resto
+  // já upsertou o dado mais novo do TOTVS nas tabelas cruas. ~3s + ~40s
+  // (testado via EXPLAIN ANALYZE), folga de sobra dentro do orçamento de
+  // tempo do sync inteiro. CONCURRENTLY (dentro da função SQL) não bloqueia
+  // leitura de quem estiver na tela de Clientes durante o refresh. Erro
+  // aqui não derruba `ok` do resto do sync -- as views só ficam mais
+  // desatualizadas, não é uma falha de sincronização de dado real.
+  let agregacoesClientesRefreshed = true;
+  const agregacoesErrors: string[] = [];
+  try {
+    const { error } = await supabase.rpc("refresh_clientes_recompra_views");
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    agregacoesClientesRefreshed = false;
+    agregacoesErrors.push(`refresh_clientes_recompra_views: ${(err as Error).message}`);
+  }
+
   const summary: TotvsSyncSummary = {
     ok:
       clients.errors.length === 0 &&
@@ -1198,6 +1224,7 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
     deliveries: { checked: deliveries.checked, upserted: deliveries.upserted },
     clientsBackfill: { checked: clientsBackfill.checked, upserted: clientsBackfill.upserted },
     stock: { checked: stock.checked, upserted: stock.upserted },
+    agregacoesClientesRefreshed,
     errors: [
       ...clients.errors,
       ...orders.errors,
@@ -1206,6 +1233,7 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
       ...deliveries.errors,
       ...clientsBackfill.errors,
       ...stock.errors,
+      ...agregacoesErrors,
     ],
   };
 
@@ -1220,6 +1248,7 @@ export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSu
       deliveries: summary.deliveries,
       clientsBackfill: summary.clientsBackfill,
       stock: summary.stock,
+      agregacoesClientesRefreshed: summary.agregacoesClientesRefreshed,
     },
     summary.errors
   );

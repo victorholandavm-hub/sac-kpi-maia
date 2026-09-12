@@ -1,9 +1,7 @@
-import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { listClientesPorNivel, diasEntre, type ClienteNivel } from "./clientes";
 import { DELIVERY_REQUEST_TYPES, CAUSA_RAIZ_ERRO_INTERNO } from "./assistenciaLabels";
-import { RESOLVIDO_LABELS } from "./entregasRisco";
 
 // Motor de Recompra, Fase 1 -- pedido do Victor 07/09/2026 ("desenho
 // completo" + "siga para a fase 1"): régua determinística (sem modelo
@@ -67,147 +65,66 @@ export function inferCategoriaCiclo(description: string | null): CategoriaCiclo 
 // contatar antes do concorrente.
 const RATIO_NA_JANELA = 0.7;
 
-type CategoriaSinal = { categoria: CategoriaCiclo; dataCompra: string; diasDesde: number; ratio: number; dataReal: boolean };
+type CategoriaSinal = { categoria: CategoriaCiclo; dataCompra: string; diasDesde: number; ratio: number };
 
-const ITEM_PAGE_SIZE = 1000;
-const CARGA_PAGE_SIZE = 1000;
+const CATEGORIA_AGREGADA_PAGE_SIZE = 1000;
 
-type OrderItemRow = {
-  description: string | null;
-  total: number | null;
-  totvs_orders: { client_id: string | null; issue_date: string; invoice: string | null; serie: string | null } | null;
+// `valorTotal`/`qtdCompras` entraram 12/09/2026 pro CLV preditivo (Fase 4).
+// `data` é a compra mais recente dessa categoria pra esse cliente.
+//
+// Egress + timeout do Supabase -- pedido do Victor 12/09/2026 (custo
+// mensal, decisão Free vs Pro): tentativa 1 (VIEW normal, migration 0123)
+// causou uma queda real em produção -- o código pagina em PARALELO, e
+// como a view recalculava do zero A CADA consulta (join com totvs_orders +
+// cross-referência com totvs_delivery_cargas pra achar a data de entrega
+// confirmada, ~2min+ pra recalcular, testado via EXPLAIN ANALYZE), várias
+// execuções concorrentes esgotaram o banco -- derrubando até o login
+// (mesmo Postgres pra tudo). Tentativa 2 (migration 0124, atual):
+// MATERIALIZED VIEW (computa uma vez, leitura da aplicação é instantânea)
+// + view SIMPLIFICADA -- tirou a cross-referência de entrega confirmada
+// (só um detalhe cosmético, o "📦" que existia antes) pra cortar o tempo
+// de recálculo de 2min+ pra 39s (aceitável pro refresh em segundo plano,
+// nunca pra uma leitura de usuário). Refresh chamado por runTotvsSync
+// (totvsSync.ts) a cada sync do TOTVS -- ver migration 0124 pro
+// `refresh_clientes_recompra_views()`.
+type CategoriaAcumulada = { data: string; valorTotal: number; qtdCompras: number };
+
+type CategoriaAgregadaRow = {
+  client_id: string;
+  categoria: string;
+  ultima_data: string;
+  valor_total: number;
+  qtd_compras: number;
 };
 
-// Data que o produto de fato chegou na casa do cliente, não a data do
-// pedido/nota fiscal -- pedido do Victor 07/09/2026: "implemente" depois
-// de achar que totvs_delivery_cargas.nota_fiscal/serie casa com
-// totvs_orders.invoice/serie (a chave que motor-de-recompra.html tinha
-// marcado como "não achei" -- FILIAL não bate entre as duas tabelas
-// (faturamento x venda, achado 07/09/2026), mas invoice+serie sozinho já
-// cobre 57% das entregas). Onde não tem entrega confirmada (a maioria,
-// ainda), cai pra issue_date do pedido -- ver dataReal em CategoriaSinal,
-// que marca qual dos dois foi usado.
-//
-// Várias tentativas de carga podem existir pro mesmo documento (ver
-// `tentativa` em totvs_delivery_cargas) -- só as com status_entrega
-// resolvido (RESOLVIDO_LABELS, entregasRisco.ts) contam, e entre elas a
-// de dt_retorno mais recente (a tentativa que realmente deu certo).
-type CargaRow = { nota_fiscal: string | null; serie: string | null; status_entrega: string | null; dt_retorno: string | null };
-
-// Cache -- pedido do Victor 07/09/2026: reduzir tráfego de egress do
-// Supabase (tinha estourado a cota antes, virou custo mensal do plano Pro)
-// sem migrar banco nenhum. Essas duas funções varrem totvs_order_items
-// (~54 mil linhas) e totvs_delivery_cargas (~36 mil) inteiros -- as mais
-// pesadas do Motor de Recompra, e reexecutadas do zero TODA VEZ que
-// alguém abre a aba "Propensão a recompra", sem cache nenhum até agora.
-// O dado de origem (sync do TOTVS) só muda a cada ~30min de qualquer
-// jeito -- 15min de cache não perde nada de fresco na prática e corta
-// bastante egress repetido. unstable_cache só aceita retorno
-// serializável (JSON) -- por isso as funções cacheadas devolvem objeto
-// simples (Record), não Map, com um wrapper fino por fora convertendo
-// de volta pra Map (formato que o resto do arquivo já espera, sem
-// precisar mudar mais nada).
-const DELIVERY_DATE_TAG = "recompra-delivery-date";
-
-async function fetchDeliveryDatePorInvoiceSerie(): Promise<Record<string, string>> {
-  const admin = getSupabaseAdmin();
-  const rows = await fetchAllPagesParallel<CargaRow>(
-    (from, to) =>
-      admin
-        .from("totvs_delivery_cargas")
-        .select("nota_fiscal, serie, status_entrega, dt_retorno", { count: "exact" })
-        .not("nota_fiscal", "is", null)
-        .not("dt_retorno", "is", null)
-        .in("status_entrega", RESOLVIDO_LABELS)
-        .range(from, to) as unknown as PromiseLike<PagedQueryResult<CargaRow>>,
-    { pageSize: CARGA_PAGE_SIZE }
-  );
-
-  const resultado: Record<string, string> = {};
-  for (const r of rows) {
-    if (!r.nota_fiscal || !r.serie || !r.dt_retorno) continue;
-    const key = `${r.nota_fiscal}|${r.serie}`;
-    const atual = resultado[key];
-    if (!atual || r.dt_retorno > atual) resultado[key] = r.dt_retorno;
-  }
-  return resultado;
-}
-
-const cachedDeliveryDatePorInvoiceSerie = unstable_cache(fetchDeliveryDatePorInvoiceSerie, ["recompra-delivery-date"], {
-  revalidate: 900,
-  tags: [DELIVERY_DATE_TAG],
-});
-
-// Varre totvs_order_items inteiro (join com totvs_orders pra pegar
-// client_id/issue_date/invoice/serie, mesmo padrão já usado em
-// vendasProduto.ts) -- pra cada cliente, guarda a compra MAIS RECENTE de
-// cada categoria, usando a data de entrega real quando existe
-// (fetchDeliveryDatePorInvoiceSerie, já cacheada, ver acima) ou a data do
-// pedido como aproximação. ~54 mil dos ~81 mil itens batem nalguma
-// categoria cíclica (conferido 07/09/2026) -- não filtra por
-// palavra-chave na query (a lista de keywords muda fácil demais pra
-// depender de um OR gigante no banco), filtra em memória depois de
-// trazer tudo, igual listClientesPorNivel já faz com o pedido inteiro.
-//
-// Extraída como função própria (07/09/2026, Fase 3 -- afinidade de
-// produto) porque tanto buildJanelaPorCliente quanto
-// buildAfinidadeGlobal precisam do MESMO conjunto de categorias por
-// cliente -- separar evita escanear totvs_order_items (a parte cara,
-// ~54 mil linhas) duas vezes.
-const CATEGORIAS_POR_CLIENTE_TAG = "recompra-categorias-por-cliente";
-
-// `valorTotal`/`qtdCompras` entraram 12/09/2026 pro CLV preditivo (Fase 4,
-// ver buildClvProjetadoPorCliente abaixo) -- acumulam TODA compra que bate
-// na categoria (não só a mais recente); `data`/`dataReal` continuam
-// rastreando só a última, como já era antes (janela de recompra não muda).
-type CategoriaAcumulada = { data: string; dataReal: boolean; valorTotal: number; qtdCompras: number };
-
 async function fetchCategoriasPorCliente(): Promise<Record<string, Record<string, CategoriaAcumulada>>> {
-  const deliveryDatePorInvoiceSerie = await cachedDeliveryDatePorInvoiceSerie();
   const admin = getSupabaseAdmin();
-  const rows = await fetchAllPagesParallel<OrderItemRow>(
+  const rows = await fetchAllPagesParallel<CategoriaAgregadaRow>(
     (from, to) =>
       admin
-        .from("totvs_order_items")
-        .select("description, total, totvs_orders!inner(client_id, issue_date, type, invoice, serie)", { count: "exact" })
-        .eq("totvs_orders.type", "Venda")
-        .not("totvs_orders.client_id", "is", null)
-        .range(from, to) as unknown as PromiseLike<PagedQueryResult<OrderItemRow>>,
-    { pageSize: ITEM_PAGE_SIZE }
+        .from("v_recompra_categorias_por_cliente")
+        .select("client_id, categoria, ultima_data, valor_total, qtd_compras", { count: "exact" })
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<CategoriaAgregadaRow>>,
+    { pageSize: CATEGORIA_AGREGADA_PAGE_SIZE }
   );
 
-  // client_id -> categoria key -> acumulado (data mais recente + valor/qtd
-  // total dessa categoria pra esse cliente).
   const acumuladoPorCategoria: Record<string, Record<string, CategoriaAcumulada>> = {};
   for (const r of rows) {
-    const order = r.totvs_orders;
-    if (!order?.client_id) continue;
-    const categoria = inferCategoriaCiclo(r.description);
-    if (!categoria) continue;
-    const dataEntrega = order.invoice && order.serie ? deliveryDatePorInvoiceSerie[`${order.invoice}|${order.serie}`] : undefined;
-    const data = dataEntrega ?? order.issue_date;
-    const dataReal = dataEntrega !== undefined;
-    const porCategoria = acumuladoPorCategoria[order.client_id] ?? {};
-    const atual = porCategoria[categoria.key] ?? { data, dataReal, valorTotal: 0, qtdCompras: 0 };
-    const usaComoUltima = data > atual.data;
-    porCategoria[categoria.key] = {
-      data: usaComoUltima ? data : atual.data,
-      dataReal: usaComoUltima ? dataReal : atual.dataReal,
-      valorTotal: atual.valorTotal + (r.total ?? 0),
-      qtdCompras: atual.qtdCompras + 1,
-    };
-    acumuladoPorCategoria[order.client_id] = porCategoria;
+    const porCategoria = acumuladoPorCategoria[r.client_id] ?? {};
+    porCategoria[r.categoria] = { data: r.ultima_data, valorTotal: r.valor_total, qtdCompras: r.qtd_compras };
+    acumuladoPorCategoria[r.client_id] = porCategoria;
   }
   return acumuladoPorCategoria;
 }
 
-const cachedCategoriasPorCliente = unstable_cache(fetchCategoriasPorCliente, ["recompra-categorias-por-cliente"], {
-  revalidate: 900,
-  tags: [CATEGORIAS_POR_CLIENTE_TAG],
-});
-
+// Sem unstable_cache aqui de propósito -- a materialized view JÁ É o cache
+// (atualizada a cada sync do TOTVS, ver comentário acima); um cache extra
+// em cima só reintroduziria o mesmo problema que derrubou o /clientes
+// antes (o objeto agregado inteiro passa de 30MB pra ~94-124 mil clientes/
+// categorias, e o limite do Next.js Data Cache é 2MB por item -- falhava
+// silenciosamente, sem cachear nada de verdade).
 async function buildCategoriasPorCliente(): Promise<Map<string, Map<string, CategoriaAcumulada>>> {
-  const obj = await cachedCategoriasPorCliente();
+  const obj = await fetchCategoriasPorCliente();
   const resultado = new Map<string, Map<string, CategoriaAcumulada>>();
   for (const [clientId, porCategoria] of Object.entries(obj)) {
     resultado.set(clientId, new Map(Object.entries(porCategoria)));
@@ -223,12 +140,12 @@ function buildJanelaPorCliente(categoriasPorCliente: Map<string, Map<string, Cat
   const resultado = new Map<string, CategoriaSinal>();
   for (const [clientId, porCategoria] of categoriasPorCliente) {
     let melhor: CategoriaSinal | null = null;
-    for (const [key, { data: dataCompra, dataReal }] of porCategoria) {
+    for (const [key, { data: dataCompra }] of porCategoria) {
       const categoria = CATEGORIAS_CICLO.find((c) => c.key === key);
       if (!categoria) continue;
       const diasDesde = diasEntre(dataCompra, hoje);
       const ratio = diasDesde / (categoria.cicloMeses * 30);
-      if (!melhor || ratio > melhor.ratio) melhor = { categoria, dataCompra, diasDesde, ratio, dataReal };
+      if (!melhor || ratio > melhor.ratio) melhor = { categoria, dataCompra, diasDesde, ratio };
     }
     if (melhor) resultado.set(clientId, melhor);
   }
@@ -470,12 +387,6 @@ export type RecompraCandidato = {
   categoriaJanela: string | null;
   diasDesdeCategoria: number | null;
   ratioJanela: number | null;
-  // true = diasDesdeCategoria conta a partir da entrega de verdade
-  // (totvs_delivery_cargas), não do pedido -- ver buildDeliveryDatePorInvoiceSerie.
-  // Hoje só ~57% dos pedidos casam com uma entrega confirmada; o resto
-  // continua caindo pra data do pedido (dataReal false), aproximação de
-  // sempre.
-  categoriaJanelaDataReal: boolean;
   atritoScore: number;
   atritoAlto: boolean;
   segmento: RecompraSegmento;
@@ -543,7 +454,6 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
       categoriaJanela: janela?.categoria.label ?? null,
       diasDesdeCategoria: janela?.diasDesde ?? null,
       ratioJanela: janela?.ratio ?? null,
-      categoriaJanelaDataReal: janela?.dataReal ?? false,
       atritoScore,
       atritoAlto,
       segmento: calcularSegmento(naJanela, atritoAlto),
