@@ -19,11 +19,13 @@ import {
 import {
   listRecompraCandidatos,
   listRecompraNaoContatarCompleto,
+  listClvProjetadoPorCliente,
   isRecompraSegmento,
   RECOMPRA_SEGMENTOS,
   RECOMPRA_SEGMENTO_LABELS,
   RECOMPRA_SEGMENTO_DESCRICOES,
   RECOMPRA_SEGMENTO_COLORS,
+  CLV_HORIZONTE_ANOS,
   type RecompraSegmento,
   type RecompraCandidato,
 } from "@/lib/recompra";
@@ -317,7 +319,12 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
 
 async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page: number }) {
   const filterNivel = isClienteNivel(nivel) ? nivel : undefined;
-  const todos = await listClientesPorNivel();
+  const [todos, clvPorCliente] = await Promise.all([listClientesPorNivel(), listClvProjetadoPorCliente()]);
+  // Potencial de receita projetado -- soma sobre TODOS os clientes (não só
+  // a página/filtro atual), mesmo espírito de "prejuízo total" na Taxa de
+  // Quebra (kpiAssistencia.ts): o card de total sempre reflete o conjunto
+  // inteiro, o corte é só pra exibição em lista.
+  const clvTotalProjetado = todos.reduce((sum, c) => sum + (clvPorCliente.get(c.clientId) ?? 0), 0);
 
   const porNivel = new Map<string, number>();
   const inativosPorNivel = new Map<string, number>();
@@ -347,6 +354,23 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
     <>
       <p className="text-xs -mt-4" style={{ color: "var(--text-muted)" }}>
         {todos.length} clientes com pelo menos um pedido no Protheus (compra, devolução ou ambos).
+      </p>
+      {/* CLV preditivo (Fase 4 do Motor de Recompra) -- pedido do Victor
+          07/09/2026, retomado 12/09/2026 depois do backfill do totvs_orders
+          terminar. Projeção por ciclo de reposição por categoria, não
+          "gasto ÷ anos" genérico -- ver comentário completo em
+          calcularClvProjetado/CLV preditivo em recompra.ts. */}
+      <p className="text-xs -mt-2 flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
+        Potencial de receita projetado (próximos {CLV_HORIZONTE_ANOS} anos):{" "}
+        <strong style={{ color: "var(--brand-green)" }}>{formatBRL(clvTotalProjetado)}</strong>
+        <span
+          title="Soma do CLV projetado de cada cliente: pra cada categoria que ele já comprou (colchão, roupeiro, travesseiro...), projeta quantos ciclos de reposição cabem nos próximos 5 anos × o valor médio que ele já gastou nessa categoria. Só ~2/3 dos itens vendidos batem numa categoria reconhecida -- cliente que só compra fora delas fica de fora dessa conta."
+          aria-label="Como o potencial de receita projetado é calculado"
+          className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
+          style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
+        >
+          i
+        </span>
       </p>
 
       <div className="grid sm:grid-cols-5 gap-4">
@@ -436,6 +460,22 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nível</th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Gasto acumulado</th>
+                  {/* CLV preditivo (Fase 4, ver comentário na página acima e
+                      em recompra.ts) -- ao lado do gasto JÁ FEITO, o valor
+                      FUTURO projetado. */}
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1">
+                      CLV projetado ({CLV_HORIZONTE_ANOS}a)
+                      <span
+                        title="Pra cada categoria que o cliente já comprou, projeta quantos ciclos de reposição cabem nos próximos 5 anos × o valor médio que ele já gastou nessa categoria. '—' = nenhuma compra numa categoria reconhecida ainda."
+                        aria-label="Como o CLV projetado é calculado"
+                        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
+                        style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
+                      >
+                        i
+                      </span>
+                    </span>
+                  </th>
                   {/* Pedido do Victor 01/09/2026: "aniversário de
                       relacionamento, ou seja, a data da primeira compra" --
                       mesmo dado que já era mostrado aqui (primeiraCompra,
@@ -453,7 +493,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                     key={c.clientId}
                     clientId={c.clientId}
                     name={c.nome ?? c.clientId}
-                    colSpan={9}
+                    colSpan={10}
                     accentColor={CLIENTE_NIVEL_COLORS[c.nivel]}
                     leadingCells={
                       <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
@@ -488,6 +528,9 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
                     </td>
                     <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--brand-green)" }}>
                       {formatBRL(c.gastoAcumulado)}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {clvPorCliente.has(c.clientId) ? formatBRL(clvPorCliente.get(c.clientId)!) : "—"}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {formatDateOnly(c.primeiraCompra)}
@@ -659,6 +702,23 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Atrito</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Gasto acumulado</th>
+                  {/* CLV preditivo (Fase 4) ajustado pelo índice de atrito
+                      desta mesma linha -- metade do CLV bruto quando
+                      "Atrito" (coluna acima) é alto, ver comentário completo
+                      em recompra.ts. */}
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1">
+                      CLV ajustado
+                      <span
+                        title={`CLV projetado (${CLV_HORIZONTE_ANOS} anos, mesmo cálculo da aba Nível de relacionamento) com 50% de desconto quando o atrito é alto -- cliente insatisfeito tende a não voltar no mesmo ritmo. '—' = sem categoria reconhecida pra projetar.`}
+                        aria-label="Como o CLV ajustado é calculado"
+                        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
+                        style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
+                      >
+                        i
+                      </span>
+                    </span>
+                  </th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Contato</th>
                 </tr>
               </thead>
@@ -668,7 +728,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     key={c.clientId}
                     clientId={c.clientId}
                     name={c.nome ?? c.clientId}
-                    colSpan={9}
+                    colSpan={10}
                     accentColor={RECOMPRA_SEGMENTO_COLORS[c.segmento]}
                   >
                     <td className="px-4 py-2 whitespace-nowrap">
@@ -721,6 +781,9 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     </td>
                     <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--brand-green)" }}>
                       {formatBRL(c.gastoAcumulado)}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {c.clvAjustado !== null ? formatBRL(c.clvAjustado) : "—"}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <RecompraContatoCell clientId={c.clientId} segmento={c.segmento} contato={c.ultimoContato} />
