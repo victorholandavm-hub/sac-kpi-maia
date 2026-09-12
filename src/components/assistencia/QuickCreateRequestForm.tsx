@@ -359,7 +359,11 @@ export function QuickCreateRequestForm({
     if (m.clientName) setClientName(m.clientName);
     if (m.clientPhone) setClientPhone(m.clientPhone);
     setType("troca_peca");
-    itemHandlers.update(0, { product: m.product ?? m.partName, code: m.partCode ?? "" });
+    // Nome da PEÇA, não do produto inteiro (móvel) -- mesmo achado/correção
+    // de NovaEntregaAssistenciaForm.tsx (Victor 12/09/2026): estava
+    // preenchendo com `m.product` (o móvel inteiro) em vez de `m.partName`
+    // (a peça de reposição de verdade).
+    itemHandlers.update(0, { product: m.partName || m.product || "", code: m.partCode ?? "" });
     if (m.clientCpf) {
       lookupTotvsClientByCpfForTeam(m.clientCpf)
         .then((match) => {
