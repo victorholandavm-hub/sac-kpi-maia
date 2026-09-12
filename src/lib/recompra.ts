@@ -72,7 +72,11 @@ type CategoriaSinal = { categoria: CategoriaCiclo; dataCompra: string; diasDesde
 const ITEM_PAGE_SIZE = 1000;
 const CARGA_PAGE_SIZE = 1000;
 
-type OrderItemRow = { description: string | null; totvs_orders: { client_id: string | null; issue_date: string; invoice: string | null; serie: string | null } | null };
+type OrderItemRow = {
+  description: string | null;
+  total: number | null;
+  totvs_orders: { client_id: string | null; issue_date: string; invoice: string | null; serie: string | null } | null;
+};
 
 // Data que o produto de fato chegou na casa do cliente, não a data do
 // pedido/nota fiscal -- pedido do Victor 07/09/2026: "implemente" depois
@@ -152,23 +156,29 @@ const cachedDeliveryDatePorInvoiceSerie = unstable_cache(fetchDeliveryDatePorInv
 // ~54 mil linhas) duas vezes.
 const CATEGORIAS_POR_CLIENTE_TAG = "recompra-categorias-por-cliente";
 
-async function fetchCategoriasPorCliente(): Promise<Record<string, Record<string, { data: string; dataReal: boolean }>>> {
+// `valorTotal`/`qtdCompras` entraram 12/09/2026 pro CLV preditivo (Fase 4,
+// ver buildClvProjetadoPorCliente abaixo) -- acumulam TODA compra que bate
+// na categoria (não só a mais recente); `data`/`dataReal` continuam
+// rastreando só a última, como já era antes (janela de recompra não muda).
+type CategoriaAcumulada = { data: string; dataReal: boolean; valorTotal: number; qtdCompras: number };
+
+async function fetchCategoriasPorCliente(): Promise<Record<string, Record<string, CategoriaAcumulada>>> {
   const deliveryDatePorInvoiceSerie = await cachedDeliveryDatePorInvoiceSerie();
   const admin = getSupabaseAdmin();
   const rows = await fetchAllPagesParallel<OrderItemRow>(
     (from, to) =>
       admin
         .from("totvs_order_items")
-        .select("description, totvs_orders!inner(client_id, issue_date, type, invoice, serie)", { count: "exact" })
+        .select("description, total, totvs_orders!inner(client_id, issue_date, type, invoice, serie)", { count: "exact" })
         .eq("totvs_orders.type", "Venda")
         .not("totvs_orders.client_id", "is", null)
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<OrderItemRow>>,
     { pageSize: ITEM_PAGE_SIZE }
   );
 
-  // client_id -> categoria key -> { data mais recente dessa categoria pra
-  // esse cliente, se veio de entrega confirmada ou só do pedido }.
-  const ultimaPorCategoria: Record<string, Record<string, { data: string; dataReal: boolean }>> = {};
+  // client_id -> categoria key -> acumulado (data mais recente + valor/qtd
+  // total dessa categoria pra esse cliente).
+  const acumuladoPorCategoria: Record<string, Record<string, CategoriaAcumulada>> = {};
   for (const r of rows) {
     const order = r.totvs_orders;
     if (!order?.client_id) continue;
@@ -177,12 +187,18 @@ async function fetchCategoriasPorCliente(): Promise<Record<string, Record<string
     const dataEntrega = order.invoice && order.serie ? deliveryDatePorInvoiceSerie[`${order.invoice}|${order.serie}`] : undefined;
     const data = dataEntrega ?? order.issue_date;
     const dataReal = dataEntrega !== undefined;
-    const porCategoria = ultimaPorCategoria[order.client_id] ?? {};
-    const atual = porCategoria[categoria.key];
-    if (!atual || data > atual.data) porCategoria[categoria.key] = { data, dataReal };
-    ultimaPorCategoria[order.client_id] = porCategoria;
+    const porCategoria = acumuladoPorCategoria[order.client_id] ?? {};
+    const atual = porCategoria[categoria.key] ?? { data, dataReal, valorTotal: 0, qtdCompras: 0 };
+    const usaComoUltima = data > atual.data;
+    porCategoria[categoria.key] = {
+      data: usaComoUltima ? data : atual.data,
+      dataReal: usaComoUltima ? dataReal : atual.dataReal,
+      valorTotal: atual.valorTotal + (r.total ?? 0),
+      qtdCompras: atual.qtdCompras + 1,
+    };
+    acumuladoPorCategoria[order.client_id] = porCategoria;
   }
-  return ultimaPorCategoria;
+  return acumuladoPorCategoria;
 }
 
 const cachedCategoriasPorCliente = unstable_cache(fetchCategoriasPorCliente, ["recompra-categorias-por-cliente"], {
@@ -190,9 +206,9 @@ const cachedCategoriasPorCliente = unstable_cache(fetchCategoriasPorCliente, ["r
   tags: [CATEGORIAS_POR_CLIENTE_TAG],
 });
 
-async function buildCategoriasPorCliente(): Promise<Map<string, Map<string, { data: string; dataReal: boolean }>>> {
+async function buildCategoriasPorCliente(): Promise<Map<string, Map<string, CategoriaAcumulada>>> {
   const obj = await cachedCategoriasPorCliente();
-  const resultado = new Map<string, Map<string, { data: string; dataReal: boolean }>>();
+  const resultado = new Map<string, Map<string, CategoriaAcumulada>>();
   for (const [clientId, porCategoria] of Object.entries(obj)) {
     resultado.set(clientId, new Map(Object.entries(porCategoria)));
   }
@@ -202,7 +218,7 @@ async function buildCategoriasPorCliente(): Promise<Map<string, Map<string, { da
 // Reduz o mapa de categorias por cliente (acima) pra um sinal só por
 // cliente -- a categoria com MAIOR ratio (a mais "vencida") é o sinal de
 // janela daquele cliente.
-function buildJanelaPorCliente(categoriasPorCliente: Map<string, Map<string, { data: string; dataReal: boolean }>>): Map<string, CategoriaSinal> {
+function buildJanelaPorCliente(categoriasPorCliente: Map<string, Map<string, CategoriaAcumulada>>): Map<string, CategoriaSinal> {
   const hoje = new Date();
   const resultado = new Map<string, CategoriaSinal>();
   for (const [clientId, porCategoria] of categoriasPorCliente) {
@@ -232,7 +248,7 @@ function buildJanelaPorCliente(categoriasPorCliente: Map<string, Map<string, { d
 
 type AfinidadeCategoria = { categoria: CategoriaCiclo; score: number };
 
-function buildAfinidadeGlobal(categoriasPorCliente: Map<string, Map<string, { data: string; dataReal: boolean }>>): Map<string, AfinidadeCategoria[]> {
+function buildAfinidadeGlobal(categoriasPorCliente: Map<string, Map<string, CategoriaAcumulada>>): Map<string, AfinidadeCategoria[]> {
   const countCategoria = new Map<string, number>();
   const countPar = new Map<string, number>();
 
@@ -282,6 +298,66 @@ export function sugerirCrossSell(categoriasCliente: Set<string>, afinidadeGlobal
 }
 
 // -----------------------------------------------------------------------
+// CLV preditivo -- Fase 4 do desenho original, pedido do Victor
+// 07/09/2026 ("desenho completo... quero implementar tudo que as grandes
+// redes fazem"), deliberadamente adiada na hora ("melhor esperar o
+// backfill avançar bastante antes de tentar" -- só 7 meses de histórico
+// dava um ritmo de gasto instável). Retomada 12/09/2026, backfill 100%
+// completo (2021-04 até hoje).
+//
+// NÃO é "gasto acumulado ÷ anos de relacionamento × horizonte" (o jeito
+// ingênuo de CLV) -- isso reintroduz o mesmo erro de RFM genérico que
+// esse motor inteiro existe pra evitar (ver "Ciclo de reposição, não
+// recência genérica" no topo do arquivo). Um cliente que gastou R$15.000
+// numa casa inteira há 3 anos e nada mais não vai gastar R$5.000/ano pra
+// sempre -- ele volta quando CADA categoria específica vencer o próprio
+// ciclo. Por isso o CLV aqui reaproveita o mesmo modelo de categoriasPorCliente
+// já usado pela janela de recompra e pela afinidade de produto acima:
+// pra cada categoria que o cliente já comprou, projeta quantos ciclos de
+// reposição CABEM no horizonte (ex.: travesseiro, ciclo de 18 meses, cabe
+// 60/18=3,3 vezes em 5 anos) × o valor médio que ELE MESMO já gastou
+// nessa categoria -- e soma entre todas as categorias que ele tem.
+//
+// Cliente com só 1 compra numa categoria ainda gera uma projeção válida
+// (não precisa de repetição pra ser defensável, ao contrário do jeito
+// ingênuo) -- não está extrapolando frequência de uma amostra pequena,
+// está aplicando o ciclo de mercado já usado no resto do sistema.
+// -----------------------------------------------------------------------
+
+// Horizonte de projeção -- "chutada" de mercado, mesmo espírito de
+// cicloMeses em CATEGORIAS_CICLO: isolada aqui de propósito, fácil de
+// recalibrar se a experiência real da loja pedir outro número.
+export const CLV_HORIZONTE_ANOS = 5;
+const CLV_HORIZONTE_MESES = CLV_HORIZONTE_ANOS * 12;
+
+function buildClvProjetadoPorCliente(categoriasPorCliente: Map<string, Map<string, CategoriaAcumulada>>): Map<string, number> {
+  const resultado = new Map<string, number>();
+  for (const [clientId, porCategoria] of categoriasPorCliente) {
+    let total = 0;
+    for (const [key, { valorTotal, qtdCompras }] of porCategoria) {
+      const categoria = CATEGORIAS_CICLO.find((c) => c.key === key);
+      if (!categoria || qtdCompras === 0) continue;
+      const valorMedio = valorTotal / qtdCompras;
+      const ciclosEsperados = CLV_HORIZONTE_MESES / categoria.cicloMeses;
+      total += valorMedio * ciclosEsperados;
+    }
+    if (total > 0) resultado.set(clientId, total);
+  }
+  return resultado;
+}
+
+// Exportada pra aba "Nível de relacionamento" (page.tsx), que hoje não
+// depende de mais nada deste arquivo -- reaproveita a mesma
+// categoriasPorCliente já cacheada (cachedCategoriasPorCliente, 15min),
+// sem I/O novo. listRecompraCandidatos abaixo (aba "Propensão a
+// recompra") já tem categoriasPorCliente em mãos e chama o reducer puro
+// direto, sem passar por essa função.
+export async function listClvProjetadoPorCliente(): Promise<Map<string, number>> {
+  const categoriasPorCliente = await buildCategoriasPorCliente();
+  return buildClvProjetadoPorCliente(categoriasPorCliente);
+}
+
+// -----------------------------------------------------------------------
 // Índice de atrito pós-venda
 // -----------------------------------------------------------------------
 
@@ -309,6 +385,14 @@ const ATRITO_WEIGHTS: Record<string, number> = {
 // leves -- limiar simples e ajustável (mesmo espírito do RATIO_NA_JANELA
 // acima).
 const ATRITO_ALTO_LIMIAR = 3;
+
+// Desconto do CLV projetado (ver CLV preditivo acima) quando o cliente tem
+// atrito alto -- cliente insatisfeito tende a não voltar, então o ritmo
+// histórico sozinho superestima o valor futuro real. Desconto fixo, sem
+// curva de retenção nem fluxo de caixa descontado -- over-engineering pra
+// um time sem analista de dados dedicado; mesmo espírito de regra fixa e
+// ajustável do resto do motor (ATRITO_ALTO_LIMIAR, RATIO_NA_JANELA).
+const CLV_FATOR_RETENCAO_ATRITO_ALTO = 0.5;
 
 async function buildAtritoPorCliente(): Promise<Map<string, number>> {
   const admin = getSupabaseAdmin();
@@ -404,6 +488,13 @@ export type RecompraCandidato = {
   // ele ainda não tem -- null quando ele não tem categoria cíclica
   // reconhecida nenhuma, ou já comprou todas as associadas.
   sugestaoCrossSell: string | null;
+  // Fase 4 -- ver buildClvProjetadoPorCliente acima. null = nenhuma compra
+  // numa categoria cíclica reconhecida (sem base pra projetar).
+  clvProjetado: number | null;
+  // clvProjetado com desconto de CLV_FATOR_RETENCAO_ATRITO_ALTO quando
+  // atritoAlto -- o número que de fato importa pra priorizar contato
+  // nesta aba (valor esperado, não só o "se tudo continuar igual").
+  clvAjustado: number | null;
 };
 
 // Junta RFM/nível (listClientesPorNivel, já existente) + os sinais novos
@@ -419,10 +510,11 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
     listUltimoContatoPorCliente(),
     listClientesNaoContatar(),
   ]);
-  // As duas próximas são reduções puras em cima de categoriasPorCliente
+  // As três próximas são reduções puras em cima de categoriasPorCliente
   // (já em memória) -- não precisam de I/O, não entram no Promise.all.
   const janelaPorCliente = buildJanelaPorCliente(categoriasPorCliente);
   const afinidadeGlobal = buildAfinidadeGlobal(categoriasPorCliente);
+  const clvPorCliente = buildClvProjetadoPorCliente(categoriasPorCliente);
 
   const resultado: RecompraCandidato[] = [];
   for (const c of niveis) {
@@ -436,6 +528,8 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
     const naJanela = (janela?.ratio ?? 0) >= RATIO_NA_JANELA;
     const categoriasCliente = new Set(categoriasPorCliente.get(c.clientId)?.keys() ?? []);
     const sugestao = sugerirCrossSell(categoriasCliente, afinidadeGlobal);
+    const clvProjetado = clvPorCliente.get(c.clientId) ?? null;
+    const clvAjustado = clvProjetado !== null ? clvProjetado * (atritoAlto ? CLV_FATOR_RETENCAO_ATRITO_ALTO : 1) : null;
 
     resultado.push({
       clientId: c.clientId,
@@ -455,6 +549,8 @@ export async function listRecompraCandidatos(): Promise<RecompraCandidato[]> {
       segmento: calcularSegmento(naJanela, atritoAlto),
       ultimoContato: contatoPorCliente.get(c.clientId) ?? null,
       sugestaoCrossSell: sugestao?.label ?? null,
+      clvProjetado,
+      clvAjustado,
     });
   }
 
