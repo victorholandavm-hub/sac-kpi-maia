@@ -743,16 +743,14 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                       </span>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {/* "📦 entrega confirmada" saiu 12/09/2026 -- a
+                          cross-referência com totvs_delivery_cargas que
+                          calculava isso era a maior parte do custo da
+                          view/materialized view (ver comentário em
+                          recompra.ts). Agora conta sempre a partir da data
+                          do pedido, direto. */}
                       {c.categoriaJanela ? (
-                        <span
-                          title={
-                            c.categoriaJanelaDataReal
-                              ? "Contado a partir da data de entrega confirmada, não do pedido."
-                              : "Sem entrega confirmada pra essa compra -- contado a partir da data do pedido (aproximado)."
-                          }
-                        >
-                          {c.categoriaJanela} · há {c.diasDesdeCategoria} dias{c.categoriaJanelaDataReal ? " 📦" : ""}
-                        </span>
+                        `${c.categoriaJanela} · há ${c.diasDesdeCategoria} dias`
                       ) : (
                         "—"
                       )}
