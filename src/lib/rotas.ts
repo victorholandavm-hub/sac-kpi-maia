@@ -386,6 +386,17 @@ export function startOfRotaWeek(dateStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+// `days` negativo anda pra trás -- usado tanto pro seletor "Rotas" de
+// EntregasKanbanHoje (7 dias antes/depois de hoje) quanto onde mais precisar
+// de aritmética de data em YYYY-MM-DD. Antes vivia duplicada dentro de
+// EntregasKanbanHoje.tsx (só pra frente); extraída pra cá quando ganhou uso
+// nos dois lados (client component e a página que busca os dados).
+export function addDays(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export type RotaDayOverview = {
   date: string;
   weekday: number;
