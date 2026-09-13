@@ -501,11 +501,24 @@ export function EntregasKanbanHoje({
           ) : null}
           {routeDates.map((date, i) => (
             <div key={date} className="contents">
-              {/* Linha separando os 7 dias passados dos 7 futuros -- pedido
-                  do Victor 13/09/2026. `date === today` nunca acontece aqui
-                  (hoje fica de fora da lista, ver routeDates), então o
-                  divisor cai exatamente entre os dois grupos de 7. */}
-              {i === 7 ? <hr className="my-1 border-t" style={{ borderColor: "var(--border)" }} /> : null}
+              {/* Rótulo "ANTERIORES"/"PRÓXIMAS" em vez de só uma linha --
+                  pedido do Victor 13/09/2026 (revisão do mesmo pedido, um dia
+                  depois): "algo pra identificar as rotas futuras e
+                  passadas... clean mas que eu consiga diferenciar
+                  visualmente". Mesmo estilo de mini-rótulo já usado em
+                  DespachoCard.tsx/PartOrderEmailButton.tsx (`text-[10px]
+                  uppercase tracking-wide`, cor muted). `date === today` nunca
+                  acontece aqui (hoje fica de fora da lista, ver routeDates),
+                  então i===0 e i===7 caem exatamente no início de cada
+                  grupo de 7. */}
+              {i === 0 || i === 7 ? (
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wide px-3 pt-1.5 pb-0.5"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {i === 0 ? "Anteriores" : "Próximas"}
+                </span>
+              ) : null}
               <button
                 type="button"
                 disabled={loadingDate === date}
