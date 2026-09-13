@@ -9,17 +9,11 @@ import { ProductsModalButton } from "./ProductsModalButton";
 import { DELIVERY_TYPE_COLORS } from "./AssistenciaQueueGroup";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { getDayRouteGroupsAction } from "@/app/assistencia/actions";
-import { driverNameForRota, JP_EXTRA_ROTA, WEEKDAY_LABELS, type Rota, type RotaDayOverview } from "@/lib/rotas";
+import { driverNameForRota, addDays, JP_EXTRA_ROTA, WEEKDAY_LABELS, type Rota, type RotaDayOverview } from "@/lib/rotas";
 import { ENTREGA_TYPES_SAC, ENTREGA_TYPES_ASSISTENCIA, ASSISTENCIA_ORIGEM_REQUESTERS, type QueueGroup } from "@/lib/entregaQueueGrouping";
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
 
 const WEEKDAY_SHORT = WEEKDAY_LABELS.map((w) => w.slice(0, 3));
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 function shortDateLabel(dateStr: string): string {
   const [, m, day] = dateStr.split("-");
@@ -117,8 +111,9 @@ function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | nul
 
 // Mesma regra que já pré-selecionava a rota do dia em "Hoje" (ver
 // defaultRota/defaultColumnKey em EntregasKanbanHoje) -- extraída pra
-// reaproveitar também quando um dos "Próximas rotas" (próximos 7 dias) é escolhido (ver
-// selectDay), pra abrir cada dia já com a rota esperada dele em foco.
+// reaproveitar também quando um dos dias do botão "Rotas" (7 antes/7 depois
+// de hoje) é escolhido (ver selectDay), pra abrir cada dia já com a rota
+// esperada dele em foco.
 function defaultColumnKeyFor(columns: KanbanColumn[], overview: RotaDayOverview | null): string | null {
   const rota = overview ? (overview.assignments.primary?.rota ?? overview.expectedRota) : null;
   return columns.find((c) => c.rotaKey === rota)?.key ?? null;
@@ -374,19 +369,20 @@ export function EntregasKanbanHoje({
   groups,
   todayOverview,
   today,
-  upcomingOverview,
+  routesOverview,
   motoristaAction,
 }: {
   groups: QueueGroup[];
   todayOverview: RotaDayOverview | null;
-  // Data de hoje (YYYY-MM-DD) -- só pra calcular os próximos 7 dias do
-  // botão "Próximas rotas" abaixo (ver upcomingDates). Overview (motorista
-  // esperado de cada um desses dias) já vem pronto de getRotaWeekOverview
-  // (rotaOverview, 14 dias a partir de hoje, ver fila/page.tsx) -- só os
-  // CHAMADOS de cada dia futuro são buscados sob demanda (getDayRouteGroupsAction),
+  // Data de hoje (YYYY-MM-DD) -- só pra calcular os 7 dias antes/depois do
+  // botão "Rotas" abaixo (ver routeDates). Overview (motorista esperado de
+  // cada um desses dias) já vem pronto de uma busca própria de
+  // getRotaWeekOverview cobrindo exatamente essa janela (ver
+  // entregasRoutesOverview, fila/page.tsx) -- só os CHAMADOS de cada dia
+  // (passado ou futuro) são buscados sob demanda (getDayRouteGroupsAction),
   // só quando a assistência realmente abre aquele dia.
   today: string;
-  upcomingOverview?: RotaDayOverview[];
+  routesOverview?: RotaDayOverview[];
   // Botão "Gestão de Motoristas & Escala" (RotaMotoristaDoDia, modo
   // buttonOnly) -- pedido do Victor 02/09/2026: "deve ficar ao lado de
   // 'hoje' e só o botão". Renderizado como slot em vez de importado
@@ -410,20 +406,28 @@ export function EntregasKanbanHoje({
   // (clicar de novo no já selecionado desmarca, volta a mostrar todos).
   const [selectedOrigem, setSelectedOrigem] = useState<OrigemFilter | null>(null);
 
-  // "Próximas rotas" -- pedido do Victor 03/09/2026: "um botão... quando
-  // eu clicar ele aparece as rotas dos próximos 5 dias e se eu clicar em
-  // algum desses dias, ele já filtra e aparece os clientes daquela rota,
-  // do mesmo jeito que acontece quando clico" num card de rota de hoje.
-  // viewDate null = vendo "Hoje" (groups/todayOverview, já vêm prontos da
-  // página); viewDate = uma data = vendo aquele dia (busca sob demanda,
-  // ver selectDay -- cache em dayGroupsCache pra não rebuscar ao clicar
-  // no mesmo dia de novo na mesma sessão).
+  // "Rotas" -- pedido do Victor 03/09/2026: "um botão... quando eu clicar
+  // ele aparece as rotas dos próximos 5 dias e se eu clicar em algum desses
+  // dias, ele já filtra e aparece os clientes daquela rota, do mesmo jeito
+  // que acontece quando clico" num card de rota de hoje. viewDate null =
+  // vendo "Hoje" (groups/todayOverview, já vêm prontos da página); viewDate
+  // = uma data = vendo aquele dia (busca sob demanda, ver selectDay -- cache
+  // em dayGroupsCache pra não rebuscar ao clicar no mesmo dia de novo na
+  // mesma sessão).
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
   const [viewDate, setViewDate] = useState<string | null>(null);
   const [dayGroupsCache, setDayGroupsCache] = useState<Record<string, QueueGroup[]>>({});
   const [loadingDate, setLoadingDate] = useState<string | null>(null);
-  // 7 dias -- pedido do Victor 03/09/2026 (revisão do pedido original de 5).
-  const upcomingDates = Array.from({ length: 7 }, (_, i) => addDays(today, i + 1));
+  // 7 dias pra cada lado -- pedido do Victor 13/09/2026: "não só as próximas
+  // rotas, mas também as anteriores" (o botão só oferecia os 7 dias
+  // seguintes até então, revisão do pedido original de 5 em 03/09/2026).
+  // Ordem cronológica (mais antigo primeiro) pra lista ficar fácil de ler de
+  // cima pra baixo; hoje não entra na lista (já é a visão padrão, com o "✕
+  // voltar pra hoje" cobrindo o caminho de volta).
+  const routeDates = [
+    ...Array.from({ length: 7 }, (_, i) => addDays(today, -7 + i)),
+    ...Array.from({ length: 7 }, (_, i) => addDays(today, i + 1)),
+  ];
 
   async function selectDay(date: string) {
     if (viewDate === date) {
@@ -448,7 +452,7 @@ export function EntregasKanbanHoje({
         setLoadingDate(null);
       }
     }
-    const dayOverview = upcomingOverview?.find((d) => d.date === date) ?? null;
+    const dayOverview = routesOverview?.find((d) => d.date === date) ?? null;
     setSelectedRotaKey(defaultColumnKeyFor(buildColumns(dayGroups, dayOverview), dayOverview));
     setTab("todos");
     setViewDate(date);
@@ -461,10 +465,10 @@ export function EntregasKanbanHoje({
   // (regra dos hooks).
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // "Próximas rotas" -- extraído numa variável pra reaproveitar tanto no
-  // corpo cheio (linha do filtro de status, mais abaixo) quanto no
-  // cabeçalho "vazio" (ver early-return logo abaixo): mesmo botão +
-  // dropdown, os dois lugares só mudam o que fica ao lado dele.
+  // "Rotas" -- extraído numa variável pra reaproveitar tanto no corpo cheio
+  // (linha do filtro de status, mais abaixo) quanto no cabeçalho "vazio"
+  // (ver early-return logo abaixo): mesmo botão + dropdown, os dois lugares
+  // só mudam o que fica ao lado dele.
   const nextRoutesPicker = (
     <div className="relative">
       <button
@@ -477,12 +481,12 @@ export function EntregasKanbanHoje({
             : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
         }
       >
-        {viewDate ? `📅 ${WEEKDAY_SHORT[new Date(`${viewDate}T00:00:00Z`).getUTCDay()]} ${shortDateLabel(viewDate)}` : "🗓 Próximas rotas"}{" "}
+        {viewDate ? `📅 ${WEEKDAY_SHORT[new Date(`${viewDate}T00:00:00Z`).getUTCDay()]} ${shortDateLabel(viewDate)}` : "🗓 Rotas"}{" "}
         {dayPickerOpen ? "▲" : "▼"}
       </button>
       {dayPickerOpen ? (
         <div
-          className="absolute z-20 top-full mt-1.5 right-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1 min-w-[180px]"
+          className="absolute z-20 top-full mt-1.5 right-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1 min-w-[180px] max-h-80 overflow-y-auto"
           style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
         >
           {viewDate ? (
@@ -495,29 +499,35 @@ export function EntregasKanbanHoje({
               ✕ voltar pra hoje
             </button>
           ) : null}
-          {upcomingDates.map((date) => (
-            <button
-              key={date}
-              type="button"
-              disabled={loadingDate === date}
-              onClick={() => selectDay(date)}
-              className="text-left text-sm rounded-md px-3 py-2 transition-colors disabled:opacity-60"
-              style={
-                viewDate === date
-                  ? { background: "var(--brand-green-soft)", color: "var(--text-primary)", fontWeight: 600 }
-                  : { color: "var(--text-primary)" }
-              }
-              onMouseEnter={(e) => {
-                if (viewDate !== date) e.currentTarget.style.background = "var(--surface-2)";
-              }}
-              onMouseLeave={(e) => {
-                if (viewDate !== date) e.currentTarget.style.background = "transparent";
-              }}
-            >
-              {WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]} {shortDateLabel(date)}
-              {loadingDate === date ? " · carregando…" : ""}
-              {viewDate === date ? " ✓" : ""}
-            </button>
+          {routeDates.map((date, i) => (
+            <div key={date} className="contents">
+              {/* Linha separando os 7 dias passados dos 7 futuros -- pedido
+                  do Victor 13/09/2026. `date === today` nunca acontece aqui
+                  (hoje fica de fora da lista, ver routeDates), então o
+                  divisor cai exatamente entre os dois grupos de 7. */}
+              {i === 7 ? <hr className="my-1 border-t" style={{ borderColor: "var(--border)" }} /> : null}
+              <button
+                type="button"
+                disabled={loadingDate === date}
+                onClick={() => selectDay(date)}
+                className="text-left text-sm rounded-md px-3 py-2 transition-colors disabled:opacity-60"
+                style={
+                  viewDate === date
+                    ? { background: "var(--brand-green-soft)", color: "var(--text-primary)", fontWeight: 600 }
+                    : { color: date < today ? "var(--text-secondary)" : "var(--text-primary)" }
+                }
+                onMouseEnter={(e) => {
+                  if (viewDate !== date) e.currentTarget.style.background = "var(--surface-2)";
+                }}
+                onMouseLeave={(e) => {
+                  if (viewDate !== date) e.currentTarget.style.background = "transparent";
+                }}
+              >
+                {WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]} {shortDateLabel(date)}
+                {loadingDate === date ? " · carregando…" : ""}
+                {viewDate === date ? " ✓" : ""}
+              </button>
+            </div>
           ))}
         </div>
       ) : null}
@@ -536,7 +546,7 @@ export function EntregasKanbanHoje({
   // tinha o estado vazio ("Nada em ... aqui") pronto pra quando
   // `visibleRows.length === 0` -- só faltava não interromper a função antes
   // de chegar nelas.
-  const activeOverview = viewDate ? (upcomingOverview?.find((d) => d.date === viewDate) ?? null) : todayOverview;
+  const activeOverview = viewDate ? (routesOverview?.find((d) => d.date === viewDate) ?? null) : todayOverview;
   const columns = viewDate ? buildColumns(dayGroupsCache[viewDate] ?? [], activeOverview) : hojeColumns;
   const allRows: FlatRow[] = columns.flatMap((column) =>
     column.items.map((r) => ({ r, rotaLabel: column.rotaLabel, driverName: column.driverName, columnKey: column.key }))
@@ -560,7 +570,7 @@ export function EntregasKanbanHoje({
   // imprimir em bloco". Mesmo padrão já usado em AssistenciaQueueGroup.tsx
   // (checkbox por linha + "selecionar todas" + barra flutuante com link pra
   // despacho-lote) -- vale tanto pra "Hoje" quanto pra qualquer dia de
-  // "Próximas rotas" escolhido, é a mesma tabela pros dois. Seleção
+  // "Rotas" escolhido, é a mesma tabela pros dois. Seleção
   // referencia só o que está visível agora (visibleRows) -- "selecionar
   // todas" não deve marcar linha escondida por outro filtro de status/rota.
   function toggleSelected(id: string) {
@@ -583,10 +593,10 @@ export function EntregasKanbanHoje({
           Visitas/Entregas/Agenda e do mês aberto (MonthAccordion.tsx).
           "Gestão de Motoristas & Escala" ao lado -- pedido do Victor
           02/09/2026: "deve ficar ao lado de 'hoje' e só o botão". Selo
-          muda pra mostrar qual dia está em foco (ver "Próximas rotas"
-          abaixo, junto do filtro de status) -- sem isso, olhando só os
-          cards de rota não dava pra saber se ainda é "Hoje" ou já é um
-          dos próximos dias escolhido. */}
+          muda pra mostrar qual dia está em foco (ver "Rotas" abaixo, junto
+          do filtro de status) -- sem isso, olhando só os cards de rota não
+          dava pra saber se ainda é "Hoje" ou já é um outro dia escolhido
+          (antes ou depois). */}
       <div className="flex items-center gap-3 flex-wrap">
         <span
           className="text-xs font-semibold uppercase tracking-wider text-white rounded-md shadow-sm px-2.5 py-1"
@@ -615,12 +625,14 @@ export function EntregasKanbanHoje({
           substitui as subabas por coluna de antes (pedido do Victor
           29/08/2026), agora um lugar só pra tabela achatada inteira. Os
           números respeitam o filtro de rota escolhido acima (ver rotaRows).
-          "Próximas rotas" ao lado -- pedido do Victor 03/09/2026 ("coloque
-          ao lado desse", junto do print desse filtro; revisado no mesmo
-          pedido: 7 dias em vez de 5, e o próprio botão mostra a data
-          escolhida por dentro -- "quando selecionar a data ele precisa
-          ficar aparecendo a data dentro desse quadrado", ver selectDay
-          acima). */}
+          "Rotas" ao lado -- pedido do Victor 03/09/2026 ("coloque ao lado
+          desse", junto do print desse filtro; revisado no mesmo pedido: 7
+          dias em vez de 5, e o próprio botão mostra a data escolhida por
+          dentro -- "quando selecionar a data ele precisa ficar aparecendo a
+          data dentro desse quadrado", ver selectDay acima). Renomeado de
+          "Próximas rotas" pra só "Rotas" em 13/09/2026, quando passou a
+          incluir os 7 dias ANTERIORES também, não só os seguintes (ver
+          routeDates acima). */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start flex-wrap">
           {/* Selecionado só "levemente diferente" dos outros da mesma

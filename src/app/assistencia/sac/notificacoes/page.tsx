@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { listRequests, listRequestsScheduledOn, listStores, isRequestStatus } from "@/lib/serviceRequests";
 import { listDrivers } from "@/lib/payments";
-import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
+import { getRotaWeekOverview, startOfRotaWeek, addDays, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
 import { ROLE_LABELS } from "@/lib/assistenciaLabels";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
@@ -114,13 +114,18 @@ export default async function SacNotificacoesPage({
   const filterRequestedByNames = filterOrigem === "assistencia" ? ASSISTENCIA_ORIGEM_REQUESTERS : undefined;
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ items: rawRequests }, stores, drivers, rotaOverview, todayRequestsFull] = await Promise.all([
+  const [{ items: rawRequests }, stores, drivers, rotaOverview, entregasRoutesOverview, todayRequestsFull] = await Promise.all([
     // Filtra De/Até por data AGENDADA, não de criação -- mesmo motivo/pedido
     // de fila/page.tsx (03/09/2026, ver dateField em serviceRequests.ts).
     listRequests({ status: filterStatus, q, storeId: store, types, requestedByNames: filterRequestedByNames, dateFrom, dateTo, dateField: "scheduled_date", allPages: true }),
     listStores(),
     listDrivers(),
     getRotaWeekOverview(startOfRotaWeek(today), 14),
+    // Overview do botão "Rotas" de EntregasKanbanHoje -- mesmo motivo de
+    // fila/page.tsx (13/09/2026): janela própria de exatamente 7 dias pra
+    // cada lado de hoje, já que `rotaOverview` acima (semana atual +
+    // seguinte a partir de segunda) não garante isso pro passado.
+    getRotaWeekOverview(addDays(today, -7), 15),
     // Board "Hoje" busca à parte, sem o limite de 100 linhas de
     // listRequests -- achado do Victor 27/08/2026: "a notificação de
     // Raemilly que está com everton para hoje, eu só consigo ver na
@@ -399,7 +404,7 @@ export default async function SacNotificacoesPage({
                 groups={todayGroups}
                 todayOverview={todayOverview}
                 today={today}
-                upcomingOverview={rotaOverview.filter((d) => d.date > today).slice(0, 7)}
+                routesOverview={entregasRoutesOverview}
                 motoristaAction={
                   <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
                 }

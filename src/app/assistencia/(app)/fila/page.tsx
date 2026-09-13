@@ -11,7 +11,7 @@ import {
   type RequestType,
 } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
-import { getRotaWeekOverview, startOfRotaWeek, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
+import { getRotaWeekOverview, startOfRotaWeek, addDays, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
 import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -253,8 +253,16 @@ export default async function AssistenciaQueuePage({
   // esses tipos.
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const today = new Date().toISOString().slice(0, 10);
-  const [{ items: rawRequests, total: rawTotal }, stores, assemblers, drivers, rotaOverview, todayRequestsFull, visitasAtrasadasRaw] =
-    await Promise.all([
+  const [
+    { items: rawRequests, total: rawTotal },
+    stores,
+    assemblers,
+    drivers,
+    rotaOverview,
+    entregasRoutesOverview,
+    todayRequestsFull,
+    visitasAtrasadasRaw,
+  ] = await Promise.all([
       listRequests({
         status: filterStatus,
         q,
@@ -275,6 +283,15 @@ export default async function AssistenciaQueuePage({
       listAssemblers(),
       showPecas ? listDrivers() : Promise.resolve([]),
       showPecas ? getRotaWeekOverview(startOfRotaWeek(today), 14) : Promise.resolve([]),
+      // Overview do botão "Rotas" de EntregasKanbanHoje -- pedido do Victor
+      // 13/09/2026: "não só as próximas rotas, mas também as anteriores,
+      // sete dias pra frente e sete dias para trás". Busca própria (não dá
+      // pra reaproveitar `rotaOverview` acima -- aquele é fixo semana atual +
+      // seguinte a partir de segunda-feira, então quantos dias PASSADOS ele
+      // cobre varia com o dia da semana de hoje, podendo ser só 1 ou até 0;
+      // aqui precisa ser sempre exatamente 7 pra cada lado, não importa que
+      // dia da semana é hoje).
+      showPecas ? getRotaWeekOverview(addDays(today, -7), 15) : Promise.resolve([]),
       // Board "Hoje" (EntregasKanbanHoje, ver todayGroups abaixo) busca à
       // parte, sem paginação -- ver listRequestsScheduledOn.
       showPecas
@@ -911,7 +928,7 @@ export default async function AssistenciaQueuePage({
                 groups={todayGroups}
                 todayOverview={todayOverview}
                 today={today}
-                upcomingOverview={rotaOverview.filter((d) => d.date > today).slice(0, 7)}
+                routesOverview={entregasRoutesOverview}
                 motoristaAction={
                   <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
                 }
