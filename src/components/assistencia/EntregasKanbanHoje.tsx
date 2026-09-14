@@ -537,8 +537,12 @@ export function EntregasKanbanHoje({
                 type="button"
                 onClick={() => setDateGroup(value)}
                 className={`flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 ${
-                  dateGroup === value ? "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  dateGroup === value ? "" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 }`}
+                // Preenchido de verde claro quando selecionado -- pedido do
+                // Victor 14/09/2026, corrigindo o cinza/branco genérico do
+                // segmented control padrão.
+                style={dateGroup === value ? { background: "var(--brand-green-soft)", color: "var(--text-primary)" } : undefined}
               >
                 {label}
               </button>
