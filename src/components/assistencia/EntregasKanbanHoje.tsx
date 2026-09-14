@@ -425,6 +425,15 @@ export function EntregasKanbanHoje({
   // em dayGroupsCache pra não rebuscar ao clicar no mesmo dia de novo na
   // mesma sessão).
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
+  // Correção do Victor 14/09/2026: "desse jeito nao, deve aparecer por
+  // padrao as próximas, e ai quando eu clicar em anteriores, mostrar
+  // apenas as anteriores, sem mostrar as duas ao mesmo tempo" -- a versão
+  // de duas colunas lado a lado (pedido dele mesmo, um dia antes) não era
+  // isso: ele queria alternar entre os dois grupos, um de cada vez, não
+  // ver os dois juntos. "Próximas" é o padrão (reabre sempre nele, não
+  // lembra a última escolha -- mesmo espírito de "Hoje" ser sempre a
+  // visão padrão do botão em si).
+  const [dateGroup, setDateGroup] = useState<"proximas" | "anteriores">("proximas");
   const [viewDate, setViewDate] = useState<string | null>(null);
   const [dayGroupsCache, setDayGroupsCache] = useState<Record<string, QueueGroup[]>>({});
   const [loadingDate, setLoadingDate] = useState<string | null>(null);
@@ -496,7 +505,7 @@ export function EntregasKanbanHoje({
       </button>
       {dayPickerOpen ? (
         <div
-          className="absolute z-20 top-full mt-1.5 right-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1.5 min-w-[320px]"
+          className="absolute z-20 top-full mt-1.5 right-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1.5 min-w-[220px]"
           style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
         >
           {viewDate ? (
@@ -509,62 +518,67 @@ export function EntregasKanbanHoje({
               ✕ voltar pra hoje
             </button>
           ) : null}
-          {/* Duas colunas lado a lado (Anteriores | Próximas) em vez de uma
-              lista só rolando -- pedido do Victor 14/09/2026: "prefiro que
-              apareça duas colunas". routeDates é sempre -7..-1 seguido de
-              +1..+7 (ver acima) -- corta certinho no meio, 7 em cada
-              coluna, cabem os 14 juntos sem precisar rolar. */}
-          <div className="grid grid-cols-2 gap-x-2">
-            {[
-              { label: "Anteriores", dates: routeDates.slice(0, 7) },
-              { label: "Próximas", dates: routeDates.slice(7) },
-            ].map((group) => (
-              <div key={group.label} className="flex flex-col gap-1">
-                {/* Mesmo estilo de mini-rótulo já usado em
-                    DespachoCard.tsx/PartOrderEmailButton.tsx (`text-[10px]
-                    uppercase tracking-wide`, cor muted) -- pedido do Victor
-                    13/09/2026: "algo pra identificar as rotas futuras e
-                    passadas... clean mas que eu consiga diferenciar
-                    visualmente". */}
-                <span className="text-[10px] font-bold uppercase tracking-wide px-3 pt-1.5 pb-0.5" style={{ color: "var(--text-muted)" }}>
-                  {group.label}
-                </span>
-                {group.dates.map((date) => (
-                  <button
-                    key={date}
-                    type="button"
-                    disabled={loadingDate === date}
-                    onClick={() => selectDay(date)}
-                    className="text-left text-sm rounded-md px-3 py-2 transition-colors disabled:opacity-60"
-                    style={
-                      viewDate === date
-                        ? { background: "var(--brand-green-soft)", color: "var(--text-primary)", fontWeight: 600 }
-                        : // Cor de fundo bem leve pra reforçar o rótulo acima --
-                          // pedido do Victor 13/09/2026: "coloque uma cor bem
-                          // leve para diferenciar". Neutro pro passado, verde
-                          // (mesma família do brand-green, só bem mais diluído
-                          // que --brand-green-soft usado no dia selecionado
-                          // acima -- não pode parecer selecionado) pro futuro.
-                          {
-                            background: date < today ? "color-mix(in srgb, var(--text-muted) 8%, transparent)" : "color-mix(in srgb, var(--brand-green) 8%, transparent)",
-                            color: date < today ? "var(--text-secondary)" : "var(--text-primary)",
-                          }
-                    }
-                    onMouseEnter={(e) => {
-                      if (viewDate !== date) e.currentTarget.style.background = "var(--surface-2)";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (viewDate !== date) {
-                        e.currentTarget.style.background = date < today ? "color-mix(in srgb, var(--text-muted) 8%, transparent)" : "color-mix(in srgb, var(--brand-green) 8%, transparent)";
+          {/* Correção do Victor 14/09/2026: não é pra ver Anteriores e
+              Próximas ao mesmo tempo (a versão de duas colunas lado a
+              lado) -- é pra alternar entre os dois, um grupo por vez,
+              Próximas por padrão. Segmented control, mesmo padrão já usado
+              em vários lugares do sistema (trilho cinza, pílula branca no
+              selecionado). routeDates é sempre -7..-1 seguido de +1..+7
+              (ver acima) -- corta certinho no meio, 7 em cada grupo. */}
+          <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-stretch">
+            {(
+              [
+                ["proximas", "Próximas"],
+                ["anteriores", "Anteriores"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setDateGroup(value)}
+                className={`flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 ${
+                  dateGroup === value ? "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-col gap-1">
+            {(dateGroup === "anteriores" ? routeDates.slice(0, 7) : routeDates.slice(7)).map((date) => (
+              <button
+                key={date}
+                type="button"
+                disabled={loadingDate === date}
+                onClick={() => selectDay(date)}
+                className="text-left text-sm rounded-md px-3 py-2 transition-colors disabled:opacity-60"
+                style={
+                  viewDate === date
+                    ? { background: "var(--brand-green-soft)", color: "var(--text-primary)", fontWeight: 600 }
+                    : // Cor de fundo bem leve -- pedido do Victor 13/09/2026:
+                      // "coloque uma cor bem leve para diferenciar". Neutro
+                      // pro passado, verde (mesma família do brand-green, só
+                      // bem mais diluído que --brand-green-soft usado no dia
+                      // selecionado acima -- não pode parecer selecionado)
+                      // pro futuro.
+                      {
+                        background: date < today ? "color-mix(in srgb, var(--text-muted) 8%, transparent)" : "color-mix(in srgb, var(--brand-green) 8%, transparent)",
+                        color: date < today ? "var(--text-secondary)" : "var(--text-primary)",
                       }
-                    }}
-                  >
-                    {WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]} {shortDateLabel(date)}
-                    {loadingDate === date ? " · carregando…" : ""}
-                    {viewDate === date ? " ✓" : ""}
-                  </button>
-                ))}
-              </div>
+                }
+                onMouseEnter={(e) => {
+                  if (viewDate !== date) e.currentTarget.style.background = "var(--surface-2)";
+                }}
+                onMouseLeave={(e) => {
+                  if (viewDate !== date) {
+                    e.currentTarget.style.background = date < today ? "color-mix(in srgb, var(--text-muted) 8%, transparent)" : "color-mix(in srgb, var(--brand-green) 8%, transparent)";
+                  }
+                }}
+              >
+                {WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]} {shortDateLabel(date)}
+                {loadingDate === date ? " · carregando…" : ""}
+                {viewDate === date ? " ✓" : ""}
+              </button>
             ))}
           </div>
         </div>
