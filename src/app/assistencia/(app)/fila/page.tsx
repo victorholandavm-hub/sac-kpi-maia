@@ -594,8 +594,13 @@ export default async function AssistenciaQueuePage({
       {/* Abas sublinhadas -- pedido do Victor 14/09/2026 (3ª rodada do
           mesmo pedido): "iguais a [Geral e Volumetria/...], a unica
           diferença é que o quadrado que estivesse selecionado, deveria
-          ficar verde com letras brancas". Ver UnderlineTab.tsx. */}
-      <div className="flex items-center gap-2 border-b self-start" style={{ borderColor: "var(--border)" }}>
+          ficar verde com letras brancas". Ver UnderlineTab.tsx.
+          SEM self-start (correção do Victor, mesmo dia: "ficou faltando
+          só uma linha na margem complementando a linha") -- a div herda
+          o stretch padrão do flex-col pai, mesmo comportamento do
+          Dashboard.tsx original: o border-b atravessa a largura toda,
+          não só o tanto que os 3 links ocupam. */}
+      <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
         <UnderlineTab
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
           label="Visitas"

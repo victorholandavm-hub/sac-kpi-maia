@@ -206,8 +206,11 @@ export default async function AgendaPage({
       />
 
       {/* Abas sublinhadas -- mesma fileira de fila/page.tsx (Visitas/
-          Entregas/Agenda), ver UnderlineTab.tsx pro racional completo. */}
-      <div className="flex items-center gap-2 border-b self-start" style={{ borderColor: "var(--border)" }}>
+          Entregas/Agenda), ver UnderlineTab.tsx pro racional completo.
+          SEM self-start (mesma correção de fila/page.tsx, pedido do
+          Victor 14/09/2026: "ficou faltando só uma linha na margem
+          complementando a linha") -- border-b estica a largura toda. */}
+      <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
         <UnderlineTab href="/assistencia/fila" label="Visitas" active={false} />
         <UnderlineTab href="/assistencia/fila?tab=pecas" label="Entregas" active={false} />
         <UnderlineTab href="/assistencia/agenda" label="Agenda" active />
