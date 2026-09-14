@@ -718,19 +718,26 @@ export function EntregasKanbanHoje({
             clique de RouteSummaryCard (clicar no já selecionado
             desmarca) -- só afeta a tabela abaixo, os cards de resumo por
             rota continuam com a contagem cheia (mesmo comportamento que o
-            filtro de status Todos/Programado/... já tem hoje). */}
-        <div className="flex items-center gap-1.5">
+            filtro de status Todos/Programado/... já tem hoje).
+            Estilo de abas sublinhadas 14/09/2026 (mesma revisão de
+            fila/page.tsx/agenda/page.tsx, "fiquem iguais a [Geral e
+            Volumetria/...]") -- só o tamanho (text-xs font-semibold
+            px-2.5 py-1.5) continua o mesmo de antes. `border-b` só na
+            largura desses 2 botões (não a fileira toda, que tem outros
+            controles ao lado, ver "Atendente"/nextRoutesPicker), lendo
+            como um mini-par de abas dentro do toolbar. */}
+        <div className="flex items-center gap-1.5 border-b" style={{ borderColor: "var(--border)" }}>
           <button
             type="button"
             onClick={() => {
               setSelectedOrigem((prev) => (prev === "sac" ? null : "sac"));
               setSelectedAtendente(null);
             }}
-            className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors whitespace-nowrap"
+            className="text-xs font-semibold px-2.5 py-1.5 -mb-px rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
             style={
               selectedOrigem === "sac"
-                ? { background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }
-                : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
+                ? { color: "var(--brand-green)", background: "var(--surface-1)", borderColor: "var(--border)" }
+                : { color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }
             }
           >
             SAC
@@ -741,15 +748,17 @@ export function EntregasKanbanHoje({
               setSelectedOrigem((prev) => (prev === "assistencia" ? null : "assistencia"));
               setSelectedAtendente(null);
             }}
-            className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors whitespace-nowrap"
+            className="text-xs font-semibold px-2.5 py-1.5 -mb-px rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
             style={
               selectedOrigem === "assistencia"
-                ? { background: "var(--brand-green-soft)", borderColor: "var(--brand-green)", color: "var(--text-primary)" }
-                : { background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-secondary)" }
+                ? { color: "var(--brand-green)", background: "var(--surface-1)", borderColor: "var(--border)" }
+                : { color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }
             }
           >
             Assistência
           </button>
+        </div>
+        <div className="flex items-center gap-1.5">
           {/* "Atendente" -- só aparece depois de escolher SAC/Assistência
               acima (ver atendenteOptions), mesmo padrão do filtro
               equivalente da aba Entregas (fila/page.tsx). Select nativo
