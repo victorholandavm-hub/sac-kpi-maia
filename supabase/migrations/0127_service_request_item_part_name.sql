@@ -1,0 +1,20 @@
+-- Diferenciar o PRODUTO (móvel do cliente) da PEÇA em si nos itens de
+-- envio/recolhimento de peça -- pedido do Victor 14/09/2026: "toda
+-- notificação de assistencia precisa estar ligada a no minimo um produto.
+-- Mesmo que seja o envio ou recolhimento de peça, tem que colocar o
+-- produto vinculado àquela peça". Esclarecido em seguida, sobre como
+-- imaginava o fluxo: "na hora que colocasse o codigo do produto,
+-- aparecesse um novo campo da peça que será enviado e/ou recolhida,
+-- vinculando aquela peça ao produto".
+--
+-- Antes disso, a coluna `product` de service_request_items já existia,
+-- mas pra envio_peca/recolhimento/envio_recolhimento_peca ela guardava o
+-- nome da PEÇA (ex.: "Puxador de roupeiro"), não do móvel a que ela
+-- pertence -- os dois formulários que criam esses tipos (Nova entrega da
+-- Assistência e SAC) rotulavam o campo único como se fosse a peça. Agora
+-- `product` passa a ser sempre o PRODUTO de verdade (móvel do cliente,
+-- igual já era pra troca_produto/entrega_produto/montagem/etc.), e
+-- `part_name` guarda a peça específica que vai ser enviada/recolhida
+-- daquele produto -- só usada (e obrigatória na aplicação) pros 3 tipos
+-- acima.
+alter table service_request_items add column part_name text;

@@ -141,6 +141,17 @@ export type RequestItem = {
   id: string;
   product: string;
   partCode: string | null;
+  // Só preenchida (e obrigatória na criação) pra envio_peca/recolhimento/
+  // envio_recolhimento_peca -- pedido do Victor 14/09/2026: "toda
+  // notificação de assistência precisa estar ligada a no mínimo um
+  // produto. Mesmo que seja o envio ou recolhimento de peça, tem que
+  // colocar o produto vinculado àquela peça". `product` acima passa a ser
+  // sempre o PRODUTO (móvel do cliente); esta é a peça específica dele
+  // que vai ser enviada/recolhida (ver migration
+  // 0127_service_request_item_part_name.sql). null pra qualquer outro
+  // tipo, que nunca teve essa distinção (product já é o produto de
+  // verdade neles).
+  partName: string | null;
   quantity: number;
   unitValue: number | null;
   paymentReleased: boolean;
@@ -160,6 +171,7 @@ type ItemRow = {
   id: string;
   product: string;
   part_code: string | null;
+  part_name: string | null;
   quantity: number;
   unit_value: number | null;
   payment_released: boolean;
@@ -289,13 +301,14 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
     id: row.id,
     product: row.product,
     partCode: row.part_code,
+    partName: row.part_name,
     quantity: row.quantity,
     unitValue: row.unit_value,
     paymentReleased: row.payment_released,
@@ -654,7 +667,7 @@ const DETAIL_COLUMNS =
   // ao dar suporte pra editar causa raiz depois de criado (ver
   // EditRequestForm.tsx): sem essa coluna, o texto de "Outro" digitado na
   // criação nunca aparecia de volta no formulário de correção.
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
 
 export async function getRequestDetail(
   id: string

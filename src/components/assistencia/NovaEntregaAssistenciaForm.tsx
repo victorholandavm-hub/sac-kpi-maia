@@ -37,9 +37,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-type Item = { product: string; quantity: number; code: string };
+// `partName` -- pedido do Victor 14/09/2026: "toda notificação de
+// assistencia precisa estar ligada a no minimo um produto. Mesmo que seja
+// o envio ou recolhimento de peça, tem que colocar o produto vinculado
+// àquela peça". `product`/`code` agora são sempre o PRODUTO de verdade
+// (móvel do cliente, com lookup TOTVS por código); `partName` é a peça
+// específica dele que vai ser enviada/recolhida -- campo novo, aparece
+// assim que o código é digitado (ver ItemsFields abaixo).
+type Item = { product: string; quantity: number; code: string; partName: string };
 type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
-const blankItem = (): Item => ({ product: "", quantity: 1, code: "" });
+const blankItem = (): Item => ({ product: "", quantity: 1, code: "", partName: "" });
 
 // Hook local -- peça a enviar e peça a recolher (combo envio_recolhimento_peca)
 // usam exatamente o mesmo estado e as mesmas 4 funções, só duas instâncias
@@ -88,6 +95,7 @@ function ItemsFields({
   onLookup,
   namePrefix,
   productLabel,
+  partLabel,
 }: {
   items: Item[];
   lookupStatus: Record<number, ProductLookupStatus>;
@@ -97,6 +105,9 @@ function ItemsFields({
   onLookup: (index: number, code: string) => void;
   namePrefix: string;
   productLabel: string;
+  // Placeholder do campo "Peça" -- pedido do Victor 14/09/2026, ver Item
+  // acima.
+  partLabel: string;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -108,8 +119,8 @@ function ItemsFields({
               value={item.code}
               onChange={(e) => onUpdate(i, { code: e.target.value })}
               onBlur={(e) => onLookup(i, e.target.value)}
-              placeholder="Código"
-              className="w-28 rounded border px-2 py-2"
+              placeholder="Código do produto"
+              className="w-32 rounded border px-2 py-2"
               style={inputStyle}
             />
             <input
@@ -141,6 +152,22 @@ function ItemsFields({
               remover
             </button>
           </div>
+          {/* Peça vinculada ao produto -- pedido do Victor 14/09/2026: "na
+              hora que colocasse o codigo do produto, aparecesse um novo
+              campo da peça que será enviado e/ou recolhida, vinculando
+              aquela peça ao produto". Aparece assim que o código é
+              digitado (não espera o lookup terminar -- reage na hora). */}
+          {item.code.trim() ? (
+            <input
+              name={`${namePrefix}_part_name`}
+              value={item.partName}
+              onChange={(e) => onUpdate(i, { partName: e.target.value })}
+              required
+              placeholder={partLabel}
+              className="rounded border px-2 py-2"
+              style={inputStyle}
+            />
+          ) : null}
           {lookupStatus[i] === "loading" ? (
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
               Buscando…
@@ -350,14 +377,15 @@ export function NovaEntregaAssistenciaForm({
     if (m.clientName) setClientName(m.clientName);
     if (m.clientPhone) setClientPhone(m.clientPhone);
     setType("envio_peca");
-    // Nome da PEÇA, não do produto inteiro (móvel) -- achado do Victor
-    // 12/09/2026: "no nome da peça tá indo o nome do produto... colocar
-    // para na parte do produto em caso de peça solicitada ir o nome da
-    // peça e não o do produto. pra na hora de carregarem não carregar o
-    // produto todo". `m.product` é o móvel inteiro (ex.: "GUARDA ROUPA 4P
-    // 4GAV DOMO..."), `m.partName` é a peça de reposição de verdade (ex.:
-    // "puxador", "dobradiça") -- estava invertido.
-    update(0, { product: m.partName || m.product || "", code: m.partCode ?? "" });
+    // `m.product` é o móvel inteiro (ex.: "GUARDA ROUPA 4P 4GAV DOMO..."),
+    // `m.partName` é a peça de reposição de verdade (ex.: "puxador",
+    // "dobradiça") -- achado do Victor 12/09/2026 ("no nome da peça tá
+    // indo o nome do produto") já tinha identificado essa troca, só que
+    // antes só existia UM campo aqui, então a correção foi jogar tudo pra
+    // peça. Agora que "produto" e "peça" são campos distintos (pedido do
+    // Victor 14/09/2026), cada um recebe o que já era certo desde o
+    // início: product = m.product, partName = m.partName.
+    update(0, { product: m.product || "", partName: m.partName || "", code: m.partCode ?? "" });
     if (m.clientCpf) {
       lookupTotvsClientByCpfForTeam(m.clientCpf)
         .then((match) => {
@@ -609,8 +637,8 @@ export function NovaEntregaAssistenciaForm({
         ) : null}
       </FormSection>
 
-      <FormSection title={type === "recolhimento" ? "Peça a recolher" : "Peça a enviar"} number={3}
-        hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
+      <FormSection title={type === "recolhimento" ? "Produto e peça a recolher" : "Produto e peça a enviar"} number={3}
+        hint="Digite o código do produto pra preencher o nome automaticamente (se souber) -- depois informe a peça específica dele."
       >
         <ItemsFields
           items={items}
@@ -620,7 +648,8 @@ export function NovaEntregaAssistenciaForm({
           onRemove={remove}
           onLookup={lookup}
           namePrefix="item"
-          productLabel="Ex: Puxador de roupeiro"
+          productLabel="Ex: Guarda-roupa 4 portas Domo"
+          partLabel="Ex: Puxador de roupeiro"
         />
 
         {/* Combo envio+recolhimento (pedido do Victor 02/09/2026) -- 2ª
@@ -630,7 +659,7 @@ export function NovaEntregaAssistenciaForm({
         {isEnvioRecolhimento ? (
           <div className="flex flex-col gap-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
             <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-              Peça a recolher *
+              Produto e peça a recolher *
             </span>
             <ItemsFields
               items={pickupItems}
@@ -640,7 +669,8 @@ export function NovaEntregaAssistenciaForm({
               onRemove={removePickup}
               onLookup={lookupPickup}
               namePrefix="pickup_item"
-              productLabel="Ex: Puxador de roupeiro (a recolher)"
+              productLabel="Ex: Guarda-roupa 4 portas Domo (a recolher)"
+              partLabel="Ex: Puxador de roupeiro (a recolher)"
             />
           </div>
         ) : null}
