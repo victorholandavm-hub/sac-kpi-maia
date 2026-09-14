@@ -49,9 +49,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-type Item = { product: string; quantity: number; code: string };
+// `partName` -- pedido do Victor 14/09/2026: "toda notificação de
+// assistencia precisa estar ligada a no minimo um produto. Mesmo que seja
+// o envio ou recolhimento de peça, tem que colocar o produto vinculado
+// àquela peça". Só usada de verdade quando type === "envio_peca" (ver
+// ItemsFields/showPart abaixo) -- nos outros tipos de entrega o "produto"
+// já é o produto de verdade, sem peça associada.
+type Item = { product: string; quantity: number; code: string; partName: string };
 type ProductLookupStatus = "idle" | "loading" | "found" | "not_found";
-const blankItem = (): Item => ({ product: "", quantity: 1, code: "" });
+const blankItem = (): Item => ({ product: "", quantity: 1, code: "", partName: "" });
 
 // Hook local -- entrega e recolhimento (troca_produto) usam exatamente o
 // mesmo estado e as mesmas 4 funções, só duas instâncias separadas (ver
@@ -104,6 +110,8 @@ function ItemsFields({
   namePrefix,
   productLabel,
   codeRequired,
+  showPart,
+  partLabel,
 }: {
   items: Item[];
   lookupStatus: Record<number, ProductLookupStatus>;
@@ -120,6 +128,10 @@ function ItemsFields({
   // isso é o único onde vira campo obrigatório de verdade -- nos outros
   // tipos fica só o aviso abaixo (não trava o envio).
   codeRequired?: boolean;
+  // Campo "Peça" -- só envio_peca usa (ver showProduct/type no formulário
+  // abaixo) -- pedido do Victor 14/09/2026.
+  showPart?: boolean;
+  partLabel?: string;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -165,6 +177,21 @@ function ItemsFields({
               remover
             </button>
           </div>
+          {/* Peça vinculada ao produto -- pedido do Victor 14/09/2026: "na
+              hora que colocasse o codigo do produto, aparecesse um novo
+              campo da peça que será enviado e/ou recolhida, vinculando
+              aquela peça ao produto". */}
+          {showPart && item.code.trim() ? (
+            <input
+              name={`${namePrefix}_part_name`}
+              value={item.partName}
+              onChange={(e) => onUpdate(i, { partName: e.target.value })}
+              required
+              placeholder={partLabel}
+              className="rounded border px-2 py-2"
+              style={inputStyle}
+            />
+          ) : null}
           {lookupStatus[i] === "loading" ? (
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
               Buscando…
@@ -581,10 +608,18 @@ export function SacCreateRequestForm({
                 // lugar).
                 type === "recolhimento_produto"
                 ? "Produto(s) a recolher"
-                : "Produto(s) e entrega"
+                : // envio_peca tem produto E peça agora -- pedido do Victor
+                  // 14/09/2026.
+                  type === "envio_peca"
+                  ? "Produto e peça a enviar"
+                  : "Produto(s) e entrega"
           }
           number={3}
-          hint="Digite o código do produto pra preencher o nome automaticamente (se souber)."
+          hint={
+            type === "envio_peca"
+              ? "Digite o código do produto pra preencher o nome automaticamente (se souber) -- depois informe a peça específica dele."
+              : "Digite o código do produto pra preencher o nome automaticamente (se souber)."
+          }
         >
           <ItemsFields
             items={items}
@@ -596,6 +631,8 @@ export function SacCreateRequestForm({
             namePrefix="item"
             productLabel="Ex: Super Box Confort Mola Ensacada"
             codeRequired={type === "troca_produto"}
+            showPart={type === "envio_peca"}
+            partLabel="Ex: Puxador de roupeiro"
           />
 
           {/* "Troca com recolhimento" é o único tipo que recolhe de

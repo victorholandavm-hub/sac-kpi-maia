@@ -144,7 +144,10 @@ function EntregaCardRow({
 }) {
   const router = useRouter();
   const hasLeftColumn = printable || reorderable;
-  const productSummary = r.items.map((item) => item.product).join(", ") || "—";
+  // Peça entre parênteses, quando tem (envio_peca/recolhimento/
+  // envio_recolhimento_peca) -- pedido do Victor 14/09/2026: dá pra ver
+  // qual peça está vinculada a cada produto sem precisar abrir o chamado.
+  const productSummary = r.items.map((item) => (item.partName ? `${item.product} (${item.partName})` : item.product)).join(", ") || "—";
 
   return (
     <tr

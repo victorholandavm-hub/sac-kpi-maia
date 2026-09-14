@@ -1144,8 +1144,10 @@ export async function createExchangeChild(
   // entrega/recolhimento, todo item copiado virava "a entregar" (default
   // da coluna), mesmo quando era "a recolher" no chamado original.
   const { data: items } = opts.sameProduct
-    ? await admin.from("service_request_items").select("product, part_code, quantity, item_action, is_pickup").eq("request_id", requestId)
-    : { data: [] as { product: string; part_code: string | null; quantity: number; item_action: string | null; is_pickup: boolean }[] };
+    ? await admin.from("service_request_items").select("product, part_code, part_name, quantity, item_action, is_pickup").eq("request_id", requestId)
+    : {
+        data: [] as { product: string; part_code: string | null; part_name: string | null; quantity: number; item_action: string | null; is_pickup: boolean }[],
+      };
 
   const { data: child, error } = await admin
     .from("service_requests")
@@ -1207,6 +1209,7 @@ export async function createExchangeChild(
         request_id: childId,
         product: item.product,
         part_code: item.part_code,
+        part_name: item.part_name,
         quantity: item.quantity,
         item_action: item.item_action,
         is_pickup: item.is_pickup,
@@ -1439,13 +1442,22 @@ export async function setAssistenciaOrderAction(items: { id: string; expectedOrd
 // mais um item, o montador avisa a assistência) só a assistência/admin
 // pode ajustar, em qualquer status -- daí essas duas actions à parte, sem
 // trava de status nenhuma.
+// Tipos de peça (envio_peca/recolhimento/envio_recolhimento_peca) exigem
+// item.partName vinculado ao produto -- mesma regra/pedido do Victor
+// 14/09/2026 de createQuickRequest/createSacRequest acima. Relevante aqui
+// principalmente pro caso de "nova troca com outro produto" (ver
+// createExchangeChild: sameProduct=false nasce sem item nenhum) -- é por
+// aqui, na tela do chamado (DeliveryItemsTable.tsx), que o produto+peça
+// entram depois.
+const PART_TYPES_REQUIRE_PART_NAME = ["envio_peca", "recolhimento", "envio_recolhimento_peca"];
+
 export async function addRequestItemByStaff(
   requestId: string,
   // isPickup -- pedido do Victor 26/08/2026 (troca_produto exige os dois
   // lados declarados): dá pra adicionar item já marcado como "a recolher"
   // depois que o chamado foi criado (ver DeliveryItemsTable.tsx). Sem valor
   // (outros tipos, que nunca usam isso) vira "a entregar", igual sempre foi.
-  input: { product: string; partCode?: string; quantity: number; action?: "montar" | "desmontar" | null; isPickup?: boolean }
+  input: { product: string; partCode?: string; partName?: string; quantity: number; action?: "montar" | "desmontar" | null; isPickup?: boolean }
 ): Promise<void> {
   const profile = await getProfile();
   // SAC também ajusta item dos próprios chamados de entrega desde
@@ -1460,11 +1472,16 @@ export async function addRequestItemByStaff(
   const product = input.product.trim();
   if (!product) throw new Error("Informe o produto.");
   const quantity = Math.max(1, input.quantity || 1);
+  const partName = input.partName?.trim() || null;
+  if (PART_TYPES_REQUIRE_PART_NAME.includes(current.type) && !partName) {
+    throw new Error("Informe a peça vinculada a esse produto.");
+  }
 
   const { error } = await admin.from("service_request_items").insert({
     request_id: requestId,
     product,
     part_code: input.partCode?.trim() || null,
+    part_name: partName,
     quantity,
     item_action: input.action ?? null,
     is_pickup: input.isPickup ?? false,
@@ -2250,13 +2267,20 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   // sem precisar abrir dois chamados separados pro mesmo cliente.
   const comboMontagemDesmontagem = (type === "montagem" || type === "desmontagem") && formData.get("combo_montagem_desmontagem") === "on";
 
-  function parseItems(prefix: string): { product: string; quantity: number; partCode: string | null; unitValue: number | null }[] | { error: string } {
+  function parseItems(
+    prefix: string
+  ): { product: string; quantity: number; partCode: string | null; partName: string | null; unitValue: number | null }[] | { error: string } {
     const products = formData.getAll(prefix + "_product").map((v) => String(v).trim());
     const quantities = formData.getAll(prefix + "_quantity").map((v) => {
       const n = parseInt(String(v), 10);
       return Number.isFinite(n) && n > 0 ? n : 1;
     });
     const codes = formData.getAll(prefix + "_code").map((v) => String(v).trim() || null);
+    // Peça vinculada ao produto -- pedido do Victor 14/09/2026 (ver
+    // PART_TYPES_REQUIRE_PART_NAME abaixo). Só preenchida de verdade pros
+    // 3 tipos de peça; nos outros o campo nem existe no formulário
+    // (getAll devolve [], partNames[i] vira undefined -> null).
+    const partNames = formData.getAll(prefix + "_part_name").map((v) => String(v).trim() || null);
     const unitValuesRaw = formData.getAll(prefix + "_unit_value").map((v) => String(v).trim());
     const unitValues: (number | null)[] = [];
     for (const raw of unitValuesRaw) {
@@ -2269,8 +2293,32 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       unitValues.push(parsed);
     }
     return products
-      .map((product, i) => ({ product, quantity: quantities[i] ?? 1, partCode: codes[i] ?? null, unitValue: unitValues[i] ?? null }))
+      .map((product, i) => ({
+        product,
+        quantity: quantities[i] ?? 1,
+        partCode: codes[i] ?? null,
+        partName: partNames[i] ?? null,
+        unitValue: unitValues[i] ?? null,
+      }))
       .filter((item) => item.product.length > 0);
+  }
+
+  // Envio/recolhimento de peça precisa do PRODUTO (item.product, o móvel do
+  // cliente) E da PEÇA vinculada a ele (item.partName) -- pedido do Victor
+  // 14/09/2026: "toda notificação de assistencia precisa estar ligada a no
+  // minimo um produto. Mesmo que seja o envio ou recolhimento de peça, tem
+  // que colocar o produto vinculado àquela peça". O formulário (ver
+  // NovaEntregaAssistenciaForm.tsx) já bloqueia os dois campos client-side
+  // -- essa checagem aqui é a defesa server-side que faltava (antes nem
+  // "pelo menos 1 item" era conferido de novo no servidor pra envio_peca/
+  // recolhimento sozinhos, só pro combo envio_recolhimento_peca).
+  const PART_TYPES_REQUIRE_PART_NAME = ["envio_peca", "recolhimento", "envio_recolhimento_peca"];
+  function validatePartItems(list: { product: string; partName: string | null }[], label: string): { error: string } | null {
+    if (!PART_TYPES_REQUIRE_PART_NAME.includes(type)) return null;
+    if (list.length === 0) return { error: `Informe pelo menos ${label}.` };
+    const semPeca = list.find((item) => !item.partName);
+    if (semPeca) return { error: `Informe a peça vinculada ao produto "${semPeca.product}".` };
+    return null;
   }
 
   // Sem combo, "item" é a lista única de sempre (a ação já é o type do
@@ -2283,6 +2331,13 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   const primaryItemsResult = parseItems("item");
   if ("error" in primaryItemsResult) return { error: primaryItemsResult.error };
   const primaryItems = primaryItemsResult.map((item) => ({ ...item, action: primaryAction, isPickup: false }));
+  // envio_peca/recolhimento (sozinhos, sem combo) usam só a lista primária
+  // -- valida aqui; envio_recolhimento_peca valida as duas listas mais
+  // abaixo, separadas.
+  if (type !== "envio_recolhimento_peca") {
+    const primaryError = validatePartItems(primaryItems, type === "recolhimento" ? "uma peça a recolher" : "uma peça a enviar");
+    if (primaryError) return primaryError;
+  }
 
   let secondaryItems: (typeof primaryItems)[number][] = [];
   if (comboMontagemDesmontagem) {
@@ -2302,11 +2357,13 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   // por esse campo.
   let pickupItems: (typeof primaryItems)[number][] = [];
   if (type === "envio_recolhimento_peca") {
-    if (primaryItems.length === 0) return { error: "Informe pelo menos uma peça a enviar." };
+    const primaryError = validatePartItems(primaryItems, "uma peça a enviar");
+    if (primaryError) return primaryError;
     const pickupItemsResult = parseItems("pickup_item");
     if ("error" in pickupItemsResult) return { error: pickupItemsResult.error };
     pickupItems = pickupItemsResult.map((item) => ({ ...item, action: null, isPickup: true }));
-    if (pickupItems.length === 0) return { error: "Informe pelo menos uma peça a recolher." };
+    const pickupError = validatePartItems(pickupItems, "uma peça a recolher");
+    if (pickupError) return pickupError;
   }
   const items = [...primaryItems, ...secondaryItems, ...pickupItems];
 
@@ -2395,6 +2452,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
         request_id: data.id,
         product: item.product,
         part_code: item.partCode,
+        part_name: item.partName,
         quantity: item.quantity,
         unit_value: item.unitValue,
         item_action: item.action,
@@ -2633,15 +2691,19 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const isVisitaType = type === "montagem" || type === "desmontagem";
   const comboMontagemDesmontagem = isVisitaType && formData.get("combo_montagem_desmontagem") === "on";
 
-  function parseItems(prefix: string): { product: string; quantity: number; partCode: string | null }[] {
+  function parseItems(prefix: string): { product: string; quantity: number; partCode: string | null; partName: string | null }[] {
     const products = formData.getAll(prefix + "_product").map((v) => String(v).trim());
     const quantities = formData.getAll(prefix + "_quantity").map((v) => {
       const n = parseInt(String(v), 10);
       return Number.isFinite(n) && n > 0 ? n : 1;
     });
     const codes = formData.getAll(prefix + "_code").map((v) => String(v).trim() || null);
+    // Peça vinculada ao produto -- pedido do Victor 14/09/2026, ver mesmo
+    // campo/comentário em createQuickRequest. Só preenchida de verdade pra
+    // envio_peca aqui (único tipo de peça que o SAC cria).
+    const partNames = formData.getAll(prefix + "_part_name").map((v) => String(v).trim() || null);
     return products
-      .map((product, i) => ({ product, quantity: quantities[i] ?? 1, partCode: codes[i] ?? null }))
+      .map((product, i) => ({ product, quantity: quantities[i] ?? 1, partCode: codes[i] ?? null, partName: partNames[i] ?? null }))
       .filter((item) => item.product.length > 0);
   }
 
@@ -2670,6 +2732,19 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   if (isVisitaType) {
     const semCodigo = items.find((item) => !item.partCode);
     if (semCodigo) return { error: `Informe o código do produto "${semCodigo.product}".` };
+  }
+
+  // Envio de peça precisa do PRODUTO (item.product, o móvel do cliente) E
+  // da PEÇA vinculada a ele (item.partName) -- pedido do Victor 14/09/2026:
+  // "toda notificação de assistencia precisa estar ligada a no minimo um
+  // produto. Mesmo que seja o envio ou recolhimento de peça, tem que
+  // colocar o produto vinculado àquela peça". Defesa server-side que
+  // faltava (antes nem "pelo menos 1 item" era conferido de novo aqui, só
+  // client-side em SacCreateRequestForm.tsx).
+  if (type === "envio_peca") {
+    if (items.length === 0) return { error: "Informe pelo menos uma peça a enviar." };
+    const semPeca = items.find((item) => !item.partName);
+    if (semPeca) return { error: `Informe a peça vinculada ao produto "${semPeca.product}".` };
   }
 
   // "Troca com recolhimento" (troca_produto, DRIVER_TYPE_LABELS) é o único
@@ -2794,6 +2869,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
         request_id: data.id,
         product: item.product,
         part_code: item.partCode,
+        part_name: item.partName,
         quantity: item.quantity,
         item_action: item.action,
         is_pickup: item.isPickup,

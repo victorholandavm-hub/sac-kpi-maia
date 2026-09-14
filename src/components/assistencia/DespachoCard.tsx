@@ -42,12 +42,19 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 // ver DespachoCard abaixo) sem duplicar a tabela inteira -- outros tipos
 // continuam com uma tabela só, chamado direto com todos os itens.
 function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
+  // Coluna "Peça" -- pedido do Victor 14/09/2026: envio/recolhimento de
+  // peça agora tem o produto (móvel do cliente) E a peça vinculada a ele
+  // (ver PartOrderDetailContent/DeliveryItemsTable.tsx). Só aparece
+  // quando algum item da lista tem peça -- outros tipos nunca preenchem
+  // isso, coluna ficaria vazia à toa.
+  const showPart = items.some((item) => item.partName);
   return (
     <table className="w-full text-sm border-collapse">
       <thead>
         <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
           <th className="px-3 py-1 text-left font-semibold w-24">Código</th>
           <th className="px-3 py-1 text-left font-semibold">Produto</th>
+          {showPart ? <th className="px-3 py-1 text-left font-semibold">Peça</th> : null}
           <th className="px-3 py-1 text-right font-semibold w-14">Qtd</th>
         </tr>
       </thead>
@@ -61,6 +68,11 @@ function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
               <td className="px-3 py-1" style={{ color: "var(--text-primary)" }}>
                 {item.product}
               </td>
+              {showPart ? (
+                <td className="px-3 py-1" style={{ color: "var(--text-primary)" }}>
+                  {item.partName || "—"}
+                </td>
+              ) : null}
               <td className="px-3 py-1 text-right" style={{ color: "var(--text-primary)" }}>
                 {item.quantity}
               </td>
@@ -68,7 +80,7 @@ function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
           ))
         ) : (
           <tr>
-            <td className="px-3 py-1" style={{ color: "var(--text-muted)" }} colSpan={3}>
+            <td className="px-3 py-1" style={{ color: "var(--text-muted)" }} colSpan={showPart ? 4 : 3}>
               —
             </td>
           </tr>
