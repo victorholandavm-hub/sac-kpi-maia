@@ -102,9 +102,9 @@ export function VendaVsAssistenciaTable({ data }: { data: VendaVsAssistenciaStat
         </div>
       </div>
       <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-        Vendas = pedidos de venda do Protheus no período. Assistência técnica = todos os chamados do sistema integrado no
-        mesmo período (entrega, troca, peça, montagem, desmontagem, vistoria etc.) — duas fontes diferentes, sem vínculo
-        pedido a pedido.
+        Vendas = pedidos de venda do Protheus no período. Assistência técnica = chamados do sistema integrado no mesmo
+        período (entrega, troca, peça, vistoria etc. — não conta montagem/desmontagem, serviço contratado à parte, não
+        sinal de problema) — duas fontes diferentes, sem vínculo pedido a pedido.
       </p>
       {data.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
