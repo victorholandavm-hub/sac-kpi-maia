@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { getProfile, requireRole } from "@/lib/dal";
 import { isPartOrderStatus } from "@/lib/partOrders";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
+import { requirePecasActor } from "@/lib/pecasAccess";
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const str = String(value ?? "").trim();
@@ -15,8 +15,7 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
 export type PartOrderFormState = { error?: string; success?: boolean } | undefined;
 
 export async function createPartOrder(_state: PartOrderFormState, formData: FormData): Promise<PartOrderFormState> {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  const actor = await requirePecasActor();
 
   const partName = String(formData.get("part_name") ?? "").trim();
   if (!partName) {
@@ -82,7 +81,7 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
       representative,
       representative_email: representativeEmail,
       representative_phone: representativePhone,
-      requested_by: profile.fullName,
+      requested_by: actor.name,
       notes: emptyToNull(formData.get("notes")),
       expected_at: emptyToNull(formData.get("expected_at")) ?? defaultExpectedAt,
     })
@@ -105,8 +104,7 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
 // (concatena "[data] texto" a cada nota), sobrescrever aqui apagaria o
 // histórico acumulado por engano.
 export async function updatePartOrder(id: string, _state: PartOrderFormState, formData: FormData): Promise<PartOrderFormState> {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  await requirePecasActor();
 
   const partName = String(formData.get("part_name") ?? "").trim();
   if (!partName) {
@@ -173,8 +171,7 @@ function statusChangePatch(newStatus: string): Record<string, string> {
 }
 
 export async function updatePartOrderStatus(id: string, newStatus: string) {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  await requirePecasActor();
   if (!isPartOrderStatus(newStatus)) throw new Error("Status inválido.");
 
   const admin = getSupabaseAdmin();
@@ -189,8 +186,7 @@ export async function updatePartOrderStatus(id: string, newStatus: string) {
 // para permitir a seleção em lote dos itens") -- um só update com `.in(...)`
 // em vez de um round-trip por pedido selecionado.
 export async function bulkUpdatePartOrderStatus(ids: string[], newStatus: string) {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  await requirePecasActor();
   if (!isPartOrderStatus(newStatus)) throw new Error("Status inválido.");
   if (ids.length === 0) return;
 
@@ -212,8 +208,7 @@ export async function bulkUpdatePartOrderStatus(ids: string[], newStatus: string
 // primeira vez) -- é um formulário de "estado atual", não um log de
 // eventos: desmarcar deve conseguir limpar a data de novo.
 export async function updatePartOrderDelivery(id: string, delivered: boolean, closed: boolean) {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  await requirePecasActor();
 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
@@ -241,8 +236,7 @@ export async function updatePartOrderDelivery(id: string, delivered: boolean, cl
 }
 
 export async function setExpectedAt(id: string, newDate: string) {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  await requirePecasActor();
   if (!newDate) throw new Error("Informe uma data.");
 
   const admin = getSupabaseAdmin();
@@ -253,9 +247,61 @@ export async function setExpectedAt(id: string, newDate: string) {
   revalidatePath(`/assistencia/pecas/${id}`);
 }
 
+// "Peça chegou em" / "Enviada ao cliente em" editáveis à mão -- pedido do
+// Victor 14/09/2026: "preciso que tanto assistencia quanto equipe técnica
+// possam editar a data de chegada da peça e data enviada para o
+// cliente... preciso que tenha historico em cada uma delas". Antes essas
+// duas datas só eram carimbadas de forma automática numa troca de status
+// (statusChangePatch/updatePartOrderDelivery acima) -- continuam sendo
+// (esse comportamento não mudou), só que agora também dá pra CORRIGIR à
+// mão direto, sem precisar desfazer/refazer o status inteiro só pra
+// ajustar uma data digitada errado. Independente de status de propósito
+// (só muda a data, igual setExpectedAt acima) -- mexer no status também
+// tem seu próprio fluxo já pronto (PartOrderQuickStatus/PartOrderActions),
+// essa aqui é só "essa data tá errada, corrige". Aceita `newDate` vazio
+// pra LIMPAR a data (desfazer um carimbo colocado por engano) -- diferente
+// de setExpectedAt (SLA sempre precisa de algum valor), aqui "não
+// aconteceu ainda" é um estado válido.
+async function updateDateFieldWithHistory(id: string, field: "part_arrived_at" | "sent_to_client_at", newDate: string) {
+  const actor = await requirePecasActor();
+  const admin = getSupabaseAdmin();
+
+  const { data: current, error: fetchError } = await admin.from("part_orders").select(field).eq("id", id).maybeSingle();
+  if (fetchError || !current) throw new Error("Pedido de peça não encontrado.");
+
+  const oldValue = (current as Record<string, string | null>)[field];
+  const newValue = newDate || null;
+  if (oldValue === newValue) return; // nada mudou -- sem linha de histórico à toa
+
+  const { error } = await admin
+    .from("part_orders")
+    .update({ [field]: newValue })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  await admin.from("part_order_field_history").insert({
+    part_order_id: id,
+    field,
+    old_value: oldValue,
+    new_value: newValue,
+    changed_by: actor.name,
+    changed_by_role: actor.role,
+  });
+
+  revalidatePath("/assistencia/pecas");
+  revalidatePath(`/assistencia/pecas/${id}`);
+}
+
+export async function updatePartArrivedAt(id: string, newDate: string) {
+  await updateDateFieldWithHistory(id, "part_arrived_at", newDate);
+}
+
+export async function updateSentToClientAt(id: string, newDate: string) {
+  await updateDateFieldWithHistory(id, "sent_to_client_at", newDate);
+}
+
 export async function addPartOrderNote(id: string, note: string) {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  await requirePecasActor();
   const trimmed = note.trim();
   if (!trimmed) throw new Error("Nota vazia.");
 

@@ -1,14 +1,14 @@
-import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listSuppliers, listSupplierContacts } from "@/lib/partOrders";
 import { getRequestDetail } from "@/lib/serviceRequests";
 import { NewPartOrderForm } from "@/components/assistencia/NewPartOrderForm";
 
+// Acesso (Profile assistência/admin OU equipe técnica) já garantido pelo
+// layout (pecas/layout.tsx, ver pecasAccess.ts) -- nada a checar aqui.
 export default async function NovoPedidoPecaPage({
   searchParams,
 }: {
   searchParams: Promise<{ service_request_id?: string }>;
 }) {
-  redirectIfSac(await getProfile());
   const { service_request_id } = await searchParams;
   const [suppliers, supplierContacts] = await Promise.all([listSuppliers(), listSupplierContacts()]);
 

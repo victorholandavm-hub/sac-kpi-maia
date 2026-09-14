@@ -138,6 +138,13 @@ export const ROLE_LABELS: Record<string, string> = {
   loja: "Loja",
   caixa: "Caixa",
   gerente: "Gerente",
+  // "tecnico" não é um Role de Profile de verdade (dal.ts) -- equipe
+  // técnica loga por PIN, sem usuário Supabase Auth por trás (ver
+  // tecnicoAuth.ts). Entra aqui só pra exibir o mesmo rótulo amigável de
+  // "quem fez isso" nos lugares que agora misturam os dois mundos (ex.:
+  // histórico de edição de pedido de peça, pedido do Victor 14/09/2026 --
+  // ver PartOrderDateField.tsx).
+  tecnico: "Equipe técnica",
 };
 
 export const PEDIDO_ENCOMENDA_STATUS_LABELS: Record<string, string> = {
