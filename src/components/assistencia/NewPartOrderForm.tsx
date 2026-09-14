@@ -185,7 +185,11 @@ export function NewPartOrderForm({
       </div>
 
       <Field label="E-mail de contato">
-        <input name="client_email" type="email" className="rounded border px-3 py-2" style={inputStyle} />
+        {/* Fixo com o e-mail da assistência por padrão -- pedido urgente
+            do Victor 14/09/2026 (o campo vinha em branco toda vez, sem
+            fallback nenhum). Continua editável por cima, se precisar
+            trocar pelo e-mail de verdade do cliente. */}
+        <input name="client_email" type="email" defaultValue="assistencia@moveisaiam.com.br" className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
       <Field label="Observações">
