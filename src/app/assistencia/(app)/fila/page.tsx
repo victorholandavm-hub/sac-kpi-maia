@@ -590,39 +590,25 @@ export default async function AssistenciaQueuePage({
         }
       />
 
-      {/* Abas sublinhadas -- pedido do Victor 14/09/2026: "preciso que
-          [Visitas/Entregas/Agenda] fiquem iguais a [Geral e Volumetria/
-          Performance da Equipe/Gargalos e Logística]... mantendo apenas o
-          tamanho original". Mesmo estilo de Dashboard.tsx (TABS, painel de
-          KPIs geral) -- ativa = texto verde + "flutua" sobre a linha
-          (fundo/borda combinando com o conteúdo abaixo, -mb-px cobre o
-          border-b do trilho); inativa = texto cinza, sem fundo/borda
-          nenhuma. Troca o antigo trilho cinza com quadrado sólido (achado
-          do Victor 02/09/2026, ver git blame) -- só o tamanho (px-4 py-1.5
-          text-sm font-semibold) continua o mesmo de antes. */}
-      <div className="flex items-center gap-2 border-b self-start" style={{ borderColor: "var(--border)" }}>
-        <Link
+      {/* Pills -- pedido do Victor 14/09/2026 (revisão do mesmo dia, depois
+          de ver a versão de aba sublinhada ao vivo): "deixe só o fundo
+          verde e a letra branco do que estiver selecionado". Reaproveita
+          FilterPill (mesmo componente da fileira Todas/Programado/...
+          logo abaixo) em vez de estilo escrito na mão de novo -- variante
+          neutra (sem `color`) já é exatamente isso: selecionado = fundo
+          verde sólido + letra branca, não selecionado = contorno fino
+          cinza. */}
+      <div className="flex items-center gap-2 self-start">
+        <FilterPill
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
-          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
-          style={{
-            color: !showPecas ? "var(--brand-green)" : "var(--text-secondary)",
-            background: !showPecas ? "var(--surface-1)" : "transparent",
-            borderColor: !showPecas ? "var(--border)" : "transparent",
-          }}
-        >
-          Visitas
-        </Link>
-        <Link
+          label="Visitas"
+          selected={!showPecas}
+        />
+        <FilterPill
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, atendente: filterAtendente, sched: schedParam, city: filterCity })}
-          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
-          style={{
-            color: showPecas ? "var(--brand-green)" : "var(--text-secondary)",
-            background: showPecas ? "var(--surface-1)" : "transparent",
-            borderColor: showPecas ? "var(--border)" : "transparent",
-          }}
-        >
-          Entregas
-        </Link>
+          label="Entregas"
+          selected={showPecas}
+        />
         {/* Agenda mora aqui do lado, dentro de "Solicitações" -- pedido do
             Victor 27/08/2026: "coloque agenda dentro de solicitações ao
             lado de visitas/entregas" (era aba própria no menu de cima,
@@ -632,13 +618,7 @@ export default async function AssistenciaQueuePage({
             mesma ideia de agenda/page.tsx repassar essa mesma fileira de
             volta pra Visitas/Entregas. Nunca "ativa" aqui (essa página
             nunca É a Agenda) -- fica sempre no estado neutro do trilho. */}
-        <Link
-          href="/assistencia/agenda"
-          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
-          style={{ color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }}
-        >
-          Agenda
-        </Link>
+        <FilterPill href="/assistencia/agenda" label="Agenda" selected={false} />
       </div>
 
       {/* Alerta de atrasadas -- pedido do Victor 04/09/2026: "na aba

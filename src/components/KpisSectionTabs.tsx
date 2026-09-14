@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { FilterPill } from "./assistencia/FilterPill";
 
 const TABS = [
   { key: "sac", label: "SAC", href: "/kpis" },
@@ -16,24 +16,17 @@ export type KpisSectionKey = (typeof TABS)[number]["key"];
 // diferentes, cada uma com seu próprio RangePicker) -- não dá pra usar
 // layout compartilhado (mesmo motivo de SacTabs.tsx/SolicitacoesTabs em
 // fila/page.tsx), cada página renderiza isso informando qual aba é a
-// sua. Cor laranja (brand-orange) -- mesma paleta do resto do painel de
-// KPIs (AppHeader.tsx), não o verde do sistema de assistência.
+// sua. Reaproveita FilterPill 14/09/2026 (pedido do Victor: "deixe só o
+// fundo verde e a letra branco do que estiver selecionado... mude nesse
+// tambem que é no painel de kpis") -- saiu do laranja próprio (ver git
+// blame) pro mesmo verde/branco de todo pill "selecionado" do resto do
+// app, consistência em vez de paleta à parte só pra essa fileira.
 export function KpisSectionTabs({ active }: { active: KpisSectionKey }) {
   return (
     <div className="flex items-center gap-2">
-      {TABS.map((tab) => {
-        const isActive = tab.key === active;
-        return (
-          <Link
-            key={tab.key}
-            href={tab.href}
-            className="text-base font-bold px-4 py-2 rounded-full"
-            style={isActive ? { background: "var(--brand-orange)", color: "#fff" } : { border: "2px solid var(--border)", color: "var(--text-secondary)" }}
-          >
-            {tab.label}
-          </Link>
-        );
-      })}
+      {TABS.map((tab) => (
+        <FilterPill key={tab.key} href={tab.href} label={tab.label} selected={tab.key === active} />
+      ))}
     </div>
   );
 }

@@ -204,35 +204,14 @@ export default async function AgendaPage({
         }
       />
 
-      {/* Abas sublinhadas -- mesma fileira de fila/page.tsx (Visitas/
-          Entregas/Agenda), estilo trocado 14/09/2026 pra bater com o
-          resto (ver comentário completo lá). Agenda é rota própria
-          (filtro/dado bem diferente -- mês corrente, por montador, não
-          por rota), então cada uma das 3 páginas renderiza sua própria
-          fileira em vez de layout compartilhado (mesma razão de
-          SacTabs.tsx) -- só o estilo precisa ficar igual nas 3. */}
-      <div className="flex items-center gap-2 border-b self-start" style={{ borderColor: "var(--border)" }}>
-        <Link
-          href="/assistencia/fila"
-          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
-          style={{ color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }}
-        >
-          Visitas
-        </Link>
-        <Link
-          href="/assistencia/fila?tab=pecas"
-          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
-          style={{ color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }}
-        >
-          Entregas
-        </Link>
-        <Link
-          href="/assistencia/agenda"
-          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
-          style={{ color: "var(--brand-green)", background: "var(--surface-1)", borderColor: "var(--border)" }}
-        >
-          Agenda
-        </Link>
+      {/* Pills -- mesma fileira de fila/page.tsx (Visitas/Entregas/Agenda),
+          estilo revisado 14/09/2026 (mesmo dia, "deixe só o fundo verde e
+          a letra branco do que estiver selecionado" -- ver comentário
+          completo lá). Reaproveita FilterPill (variante neutra). */}
+      <div className="flex items-center gap-2 self-start">
+        <FilterPill href="/assistencia/fila" label="Visitas" selected={false} />
+        <FilterPill href="/assistencia/fila?tab=pecas" label="Entregas" selected={false} />
+        <FilterPill href="/assistencia/agenda" label="Agenda" selected />
       </div>
 
       {/* Alerta de atrasadas -- pedido do Victor 25/08/2026: "Visitas
