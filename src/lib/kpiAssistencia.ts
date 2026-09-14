@@ -206,11 +206,14 @@ export type AssistenciaKpiData = {
   // quantidade de assistencia tecnica". Cruza DUAS fontes independentes
   // pro MESMO período: vendas vêm do Protheus (totvs_orders, sincronizado
   // via TOTVS Sync), chamados vêm do sistema integrado (service_requests,
-  // TODOS os tipos -- entrega/troca/peça/montagem/desmontagem/vistoria/
-  // etc., ver ALL_REQUEST_TYPES). Diferente de `byStore` acima -- aquele é
-  // só contagem de chamados (DELIVERY_REQUEST_TYPES, escopo mais estreito
-  // do resto desta tela, ver comentário no topo do arquivo); esse aqui é
-  // um cruzamento novo, com escopo de tipo próprio.
+  // ver VENDA_VS_ASSISTENCIA_TYPES abaixo -- quase todos os tipos, EXCETO
+  // montagem/desmontagem, pedido do Victor no mesmo dia: "montagem e
+  // desmontagem não devem entrar nesses números", são serviço contratado
+  // à parte, não um sinal de problema pós-venda como o resto). Diferente
+  // de `byStore` acima -- aquele é só contagem de chamados
+  // (DELIVERY_REQUEST_TYPES, escopo mais estreito do resto desta tela, ver
+  // comentário no topo do arquivo); esse aqui é um cruzamento novo, com
+  // escopo de tipo próprio.
   byStoreVendaVsAssistencia: VendaVsAssistenciaStat[];
   // Chave = `tag` de cada Count acima (ex.: "rota:praia") -- ver
   // AssistenciaTicketsModal.tsx.
@@ -347,6 +350,19 @@ const LABEL_NAO_IDENTIFICADO = "Produtos Não Identificados (Sem Código Protheu
 const MIN_VENDA_PARA_TAXA = 5;
 
 const PRODUCT_RANKING_LIMIT = 20;
+
+// Tipos que contam como "assistência técnica" no cruzamento Vendas x
+// Assistência (ver byStoreVendaVsAssistencia) -- ALL_REQUEST_TYPES sem
+// montagem/desmontagem. Pedido do Victor 14/09/2026, mesmo dia da
+// métrica: "montagem e desmontagem não devem entrar nesses números" --
+// são serviço de instalação contratado à parte (o cliente PEDE montagem,
+// não é um problema pós-venda como troca de peça/vistoria/troca de
+// produto), então contar eles infla o percentual sem significar "algo
+// deu errado". `.filter` em vez de reescrever a lista na mão -- se
+// ALL_REQUEST_TYPES ganhar um tipo novo um dia, ele já entra aqui
+// automaticamente (a exclusão fica só nos dois nomeados, não numa lista
+// positiva que alguém precisaria lembrar de atualizar).
+const VENDA_VS_ASSISTENCIA_TYPES = ALL_REQUEST_TYPES.filter((t) => t !== "montagem" && t !== "desmontagem");
 
 export async function getAssistenciaKpiData(range: DateRange): Promise<AssistenciaKpiData> {
   const admin = getSupabaseAdmin();
@@ -604,21 +620,21 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     // "Vendas x Assistência Técnica" (ver VendaVsAssistenciaStat acima) --
     // denominador, do Protheus.
     getVendasCountPorLoja(vendaRange),
-    // Numerador -- TODOS os tipos do sistema integrado (não só
-    // DELIVERY_REQUEST_TYPES de `rows`, ver comentário em
-    // byStoreVendaVsAssistencia), mesma janela de dias de `vendaRange`
-    // (ver chamadosFromIso/chamadosToIso acima -- não fromIso/toIso do
-    // `rows` principal, que usa uma borda ligeiramente diferente).
-    // Cancelada fica de fora, mesmo motivo/filtro de `rows` acima (nunca
-    // virou assistência de verdade). Linha inteira (não só store_id) --
-    // pedido do Victor 14/09/2026: clicar no percentual abre a lista
-    // desses chamados (ver VendaVsAssistenciaStat.tickets abaixo).
+    // Numerador -- VENDA_VS_ASSISTENCIA_TYPES (não DELIVERY_REQUEST_TYPES
+    // de `rows`, ver comentário em byStoreVendaVsAssistencia), mesma
+    // janela de dias de `vendaRange` (ver chamadosFromIso/chamadosToIso
+    // acima -- não fromIso/toIso do `rows` principal, que usa uma borda
+    // ligeiramente diferente). Cancelada fica de fora, mesmo motivo/filtro
+    // de `rows` acima (nunca virou assistência de verdade). Linha inteira
+    // (não só store_id) -- pedido do Victor 14/09/2026: clicar no
+    // percentual abre a lista desses chamados (ver
+    // VendaVsAssistenciaStat.tickets abaixo).
     fetchAllPagesParallel<ChamadoTodosTiposRow>(
       (from, to) =>
         admin
           .from("service_requests")
           .select("id, ticket_number, type, status, store_id, client_name, created_at, reason", { count: "exact" })
-          .in("type", ALL_REQUEST_TYPES)
+          .in("type", VENDA_VS_ASSISTENCIA_TYPES)
           .not("status", "eq", "cancelada")
           .gte("created_at", chamadosFromIso)
           .lte("created_at", chamadosToIso)
