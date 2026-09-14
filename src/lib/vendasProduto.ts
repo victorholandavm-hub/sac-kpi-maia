@@ -442,6 +442,35 @@ export async function getVendaQuantidadePorCodigoNoPeriodo(codes: string[], rang
   return resultado;
 }
 
+// Quantidade de VENDAS (pedidos type='Venda', não item) por loja no
+// período -- pedido do Victor 14/09/2026: "quero ver o percentual de
+// quantidade de vendas (entregas) x quantidade de assistencia tecnica...
+// os dados de vendas/entregas vem do protheus". Denominador do percentual
+// (ver byStoreVendaVsAssistencia, kpiAssistencia.ts) -- numerador é a
+// contagem de chamados do sistema integrado, fonte totalmente separada.
+// `branch` do Protheus é o mesmo id de `stores.id` (mesmo mapeamento já
+// usado em clientes.ts) -- sem join nenhum, a chave já bate direto.
+export async function getVendasCountPorLoja(range: DateRange): Promise<Map<string, number>> {
+  const admin = getSupabaseAdmin();
+  const rows = await fetchAllPagesParallel<{ branch: string | null }>(
+    (from, to) =>
+      admin
+        .from("totvs_orders")
+        .select("branch", { count: "exact" })
+        .eq("type", "Venda")
+        .gte("issue_date", range.from)
+        .lte("issue_date", range.to)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ branch: string | null }>>,
+    { pageSize: RANKING_PAGE_SIZE }
+  );
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.branch) continue;
+    counts.set(r.branch, (counts.get(r.branch) ?? 0) + 1);
+  }
+  return counts;
+}
+
 // Custo de reposição (totvs_stock.unit_cost, sincronizado do
 // WSStock.unitCost via syncStock em totvsSync.ts) por código -- foto do
 // catálogo ATUAL, sem período (custo de reposição não é histórico aqui,
