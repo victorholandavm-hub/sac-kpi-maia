@@ -1,8 +1,13 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
+import { getTecnicoSession } from "@/app/assistencia/tecnico-actions";
 import { listPartOrders, listSuppliers, isPartOrderStatus, type PartOrder } from "@/lib/partOrders";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { PecasTable } from "@/components/assistencia/PecasTable";
+import { TecnicoPecasFrame } from "@/components/assistencia/TecnicoPecasFrame";
+
+export const dynamic = "force-dynamic";
 
 function buildHref(params: { status?: string; q?: string; supplier?: string }) {
   const sp = new URLSearchParams();
@@ -10,7 +15,7 @@ function buildHref(params: { status?: string; q?: string; supplier?: string }) {
   if (params.q) sp.set("q", params.q);
   if (params.supplier) sp.set("supplier", params.supplier);
   const qs = sp.toString();
-  return qs ? `/assistencia/pecas?${qs}` : "/assistencia/pecas";
+  return qs ? `/assistencia/tecnico/pecas?${qs}` : "/assistencia/tecnico/pecas";
 }
 
 const FILTERS: { label: string; value: string | null }[] = [
@@ -24,14 +29,23 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Canceladas", value: "cancelada" },
 ];
 
-export default async function PecasQueuePage({
+// Rota própria da equipe técnica pra Peças -- pedido do Victor 14/09/2026,
+// depois de ver a versão anterior (compartilhada com assistência, só o
+// cabeçalho mudava): "fica ruim se for compartilhada com a equipe tecnica
+// a mesma tela da asisstencia". Mesmos dados/ações de sempre
+// (listPartOrders/PecasTable, pecas-actions.ts) -- só a apresentação muda
+// (cabeçalho verde + abas em vez do "Controle Assistência"/nav de
+// assistência, ver TecnicoPecasFrame.tsx).
+export default async function TecnicoPecasPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string; q?: string; supplier?: string }>;
 }) {
-  // O layout (pecas/layout.tsx) já garante acesso (Profile assistência/
-  // admin -- equipe técnica tem rota própria, /assistencia/tecnico/pecas,
-  // desde 14/09/2026) -- nada a checar aqui.
+  const tecnicoName = await getTecnicoSession();
+  if (!tecnicoName) {
+    redirect("/assistencia/tecnico/login");
+  }
+
   const { status, q, supplier } = await searchParams;
   const filterStatus = isPartOrderStatus(status) ? status : undefined;
   const [orders, suppliers]: [PartOrder[], string[]] = await Promise.all([
@@ -40,37 +54,10 @@ export default async function PecasQueuePage({
   ]);
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* "Controle Assistência" -- pedido do Victor 27/08/2026: "coloque
-          dessa mesma forma em outra aba peças/fornecedores/estoque e
-          nomeie essa aba como controle assistencia" (mesmo desenho da
-          fileira de pílulas Visitas/Entregas/Agenda em fila/page.tsx).
-          3 rotas próprias, dado/filtro cada uma o seu -- sem layout
-          compartilhado, cada página renderiza sua própria fileira. Rota
-          exclusiva de assistência/admin -- equipe técnica tem sua própria
-          desde 14/09/2026 (/assistencia/tecnico/pecas). */}
-      <div className="flex items-center gap-2">
-        <Link
-          href="/assistencia/pecas"
-          className="text-sm font-semibold px-4 py-2 rounded-full text-white shadow-sm"
-          style={{ background: "color-mix(in srgb, var(--brand-green) 78%, black)" }}
-        >
-          Peças
-        </Link>
-        <Link
-          href="/assistencia/fornecedores"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
-        >
-          Fornecedores
-        </Link>
-        <Link
-          href="/assistencia/estoque"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
-        >
-          Estoque
-        </Link>
-      </div>
-
+    <TecnicoPecasFrame
+      title="Peças"
+      subtitle={`Olá, ${tecnicoName} — pedidos de peça de fornecedor: acompanhe status, chegada e envio ao cliente.`}
+    >
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           {FILTERS.map((f) => (
@@ -83,7 +70,7 @@ export default async function PecasQueuePage({
           ))}
         </div>
         <Link
-          href="/assistencia/pecas/nova"
+          href="/assistencia/tecnico/pecas/nova"
           className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm whitespace-nowrap transition-all duration-200 hover:brightness-110"
           style={{ background: "#1B5E3C" }}
         >
@@ -95,7 +82,7 @@ export default async function PecasQueuePage({
         <FilterSelect name="supplier" placeholder="Todos os fornecedores" options={suppliers} />
       </div>
 
-      <form action="/assistencia/pecas" method="GET" className="flex items-center gap-2 flex-wrap">
+      <form action="/assistencia/tecnico/pecas" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
         {supplier ? <input type="hidden" name="supplier" value={supplier} /> : null}
         <input
@@ -109,15 +96,16 @@ export default async function PecasQueuePage({
           Buscar
         </button>
         {q ? (
-          <Link href={buildHref({ status: filterStatus, supplier })} className="text-xs underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+          <Link
+            href={buildHref({ status: filterStatus, supplier })}
+            className="text-xs underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+          >
             Limpar busca
           </Link>
         ) : null}
       </form>
 
-      {/* Tabela Grid Horizontal -- mesmo padrão da aba Entregas (pedido do
-          Victor 09/09/2026), ver PecasTable.tsx. */}
-      <PecasTable orders={orders} />
-    </div>
+      <PecasTable orders={orders} basePath="/assistencia/tecnico/pecas" />
+    </TecnicoPecasFrame>
   );
 }

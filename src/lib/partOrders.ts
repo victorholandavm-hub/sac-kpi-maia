@@ -7,11 +7,17 @@ import { sanitizeOrFilterValue } from "./searchFilter";
 // mandar a peça, diferente de "aguardando_peca" (já confirmou, só falta
 // chegar). Ver NEXT_STATUSES em PartOrderActions.tsx pra transição entre os
 // dois.
+// "devolvida_ao_estoque" (pedido do Victor 14/09/2026, migration 0126) --
+// desfecho da peça quando ela chega DEPOIS do caso do cliente já ter sido
+// resolvido por outro meio (ver resolvedWithoutPartAt abaixo): em vez de
+// "enviada_ao_cliente", volta pro estoque. Status terminal, igual
+// encerrado/cancelada.
 export type PartOrderStatus =
   | "aguardando_resposta"
   | "aguardando_peca"
   | "peca_recebida"
   | "enviada_ao_cliente"
+  | "devolvida_ao_estoque"
   | "encerrado"
   | "cancelada";
 
@@ -20,6 +26,7 @@ export const PART_ORDER_STATUSES: PartOrderStatus[] = [
   "aguardando_peca",
   "peca_recebida",
   "enviada_ao_cliente",
+  "devolvida_ao_estoque",
   "encerrado",
   "cancelada",
 ];
@@ -99,6 +106,13 @@ export type PartOrder = {
   closedAt: string | null;
   expectedAt: string | null;
   notes: string | null;
+  // Quando preenchido, o CASO do cliente já foi resolvido por outro meio,
+  // sem esperar esta peça -- pedido do Victor 14/09/2026, migration 0126
+  // (ver PartOrderActions.tsx). A peça em si continua seu fluxo normal até
+  // chegar de verdade; só o desfecho na chegada muda (devolvida_ao_estoque
+  // em vez de enviada_ao_cliente).
+  resolvedWithoutPartAt: string | null;
+  resolvedWithoutPartBy: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -128,12 +142,14 @@ type PartOrderRow = {
   closed_at: string | null;
   expected_at: string | null;
   notes: string | null;
+  resolved_without_part_at: string | null;
+  resolved_without_part_by: string | null;
   created_at: string;
   updated_at: string;
 };
 
 const PART_ORDER_COLUMNS =
-  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, created_at, updated_at";
+  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, resolved_without_part_at, resolved_without_part_by, created_at, updated_at";
 
 function toPartOrder(row: PartOrderRow): PartOrder {
   return {
@@ -161,6 +177,8 @@ function toPartOrder(row: PartOrderRow): PartOrder {
     closedAt: row.closed_at,
     expectedAt: row.expected_at,
     notes: row.notes,
+    resolvedWithoutPartAt: row.resolved_without_part_at,
+    resolvedWithoutPartBy: row.resolved_without_part_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

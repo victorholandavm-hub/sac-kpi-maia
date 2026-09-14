@@ -20,6 +20,7 @@ export function NewPartOrderForm({
   suppliers,
   supplierContacts,
   defaultValues,
+  basePath = "/assistencia/pecas",
 }: {
   suppliers: string[];
   // Contato do representante por fornecedor -- pedido do Victor 09/09/2026:
@@ -35,6 +36,9 @@ export function NewPartOrderForm({
     clientPhone?: string;
     product?: string;
   };
+  // Rota própria da equipe técnica desde 14/09/2026 -- ver
+  // TecnicoPecasFrame.tsx/pecas-actions.ts.
+  basePath?: string;
 }) {
   const [state, formAction, pending] = useActionState<PartOrderFormState, FormData>(createPartOrder, undefined);
   const [supplier, setSupplier] = useState("");
@@ -56,7 +60,7 @@ export function NewPartOrderForm({
         <p className="text-sm font-medium" style={{ color: "var(--status-good)" }}>
           Pedido de peça criado!
         </p>
-        <Link href="/assistencia/pecas" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+        <Link href={basePath} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
           Voltar para a lista
         </Link>
       </div>

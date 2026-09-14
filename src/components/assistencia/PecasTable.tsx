@@ -171,15 +171,29 @@ function PartOrderSummaryButton({ o }: { o: PartOrder }) {
 }
 
 // Linha inteira clicável (igual TodayRow) -- só as células com controle
-// próprio (checkbox, select de status) param propagação.
-function PecaRow({ o, selected, onToggleSelected }: { o: PartOrder; selected: boolean; onToggleSelected: () => void }) {
+// próprio (checkbox, select de status) param propagação. `basePath` --
+// pedido do Victor 14/09/2026: rota própria da equipe técnica
+// (/assistencia/tecnico/pecas), reaproveitando esta mesma tabela (já densa
+// igual fila/estoque) em vez de duplicá-la -- default é a rota de
+// assistência/admin de sempre.
+function PecaRow({
+  o,
+  selected,
+  onToggleSelected,
+  basePath,
+}: {
+  o: PartOrder;
+  selected: boolean;
+  onToggleSelected: () => void;
+  basePath: string;
+}) {
   const router = useRouter();
-  const open = o.status !== "encerrado" && o.status !== "cancelada";
+  const open = o.status !== "encerrado" && o.status !== "cancelada" && o.status !== "devolvida_ao_estoque";
   const typeColor = o.serviceRequestType ? (DELIVERY_TYPE_COLORS[o.serviceRequestType] ?? "#6B7280") : null;
 
   return (
     <tr
-      onClick={() => router.push(`/assistencia/pecas/${o.id}`)}
+      onClick={() => router.push(`${basePath}/${o.id}`)}
       className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer"
     >
       <td className="pl-4 pr-2 py-3 align-top" onClick={(e) => e.stopPropagation()}>
@@ -251,6 +265,19 @@ function PecaRow({ o, selected, onToggleSelected }: { o: PartOrder; selected: bo
               {daysSince(o.createdAt)}d{isOverdue(o.expectedAt) ? " · atrasado" : ""}
             </span>
           ) : null}
+          {/* Cliente já resolvido sem esta peça (pedido do Victor
+              14/09/2026) -- só faz sentido chamar atenção enquanto a peça
+              ainda não teve esse desfecho aplicado (senão o próprio status
+              "Devolvida ao estoque" já conta a história). */}
+          {o.resolvedWithoutPartAt && o.status !== "devolvida_ao_estoque" ? (
+            <span
+              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+              title="Cliente já resolvido sem esta peça -- devolver ao estoque quando chegar."
+              style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--brand-orange) 35%, var(--surface-1))" }}
+            >
+              ⚠ sem cliente
+            </span>
+          ) : null}
         </div>
       </td>
       <td className="pl-3 pr-4 py-3 align-top text-right" onClick={(e) => e.stopPropagation()}>
@@ -263,7 +290,17 @@ function PecaRow({ o, selected, onToggleSelected }: { o: PartOrder; selected: bo
   );
 }
 
-function PecasTableBody({ orders, selected, onToggle }: { orders: PartOrder[]; selected: Set<string>; onToggle: (id: string) => void }) {
+function PecasTableBody({
+  orders,
+  selected,
+  onToggle,
+  basePath,
+}: {
+  orders: PartOrder[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  basePath: string;
+}) {
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden overflow-x-auto">
       <table className="w-full border-collapse text-sm" style={{ minWidth: "960px" }}>
@@ -281,7 +318,7 @@ function PecasTableBody({ orders, selected, onToggle }: { orders: PartOrder[]; s
         </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
           {orders.map((o) => (
-            <PecaRow key={o.id} o={o} selected={selected.has(o.id)} onToggleSelected={() => onToggle(o.id)} />
+            <PecaRow key={o.id} o={o} selected={selected.has(o.id)} onToggleSelected={() => onToggle(o.id)} basePath={basePath} />
           ))}
         </tbody>
       </table>
@@ -289,7 +326,7 @@ function PecasTableBody({ orders, selected, onToggle }: { orders: PartOrder[]; s
   );
 }
 
-export function PecasTable({ orders }: { orders: PartOrder[] }) {
+export function PecasTable({ orders, basePath = "/assistencia/pecas" }: { orders: PartOrder[]; basePath?: string }) {
   const { pending, run } = useQuickAction();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<PartOrderStatus>("peca_recebida");
@@ -349,7 +386,7 @@ export function PecasTable({ orders }: { orders: PartOrder[] }) {
               <span className="text-xs font-semibold text-gray-400 dark:text-gray-500">({group.items.length})</span>
             </summary>
             <div className="p-3 bg-white dark:bg-gray-800">
-              <PecasTableBody orders={group.items} selected={selected} onToggle={toggleSelected} />
+              <PecasTableBody orders={group.items} selected={selected} onToggle={toggleSelected} basePath={basePath} />
             </div>
           </details>
         ))}
