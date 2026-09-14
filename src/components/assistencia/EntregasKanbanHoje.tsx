@@ -496,7 +496,7 @@ export function EntregasKanbanHoje({
       </button>
       {dayPickerOpen ? (
         <div
-          className="absolute z-20 top-full mt-1.5 right-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1 min-w-[180px] max-h-80 overflow-y-auto"
+          className="absolute z-20 top-full mt-1.5 right-0 rounded-lg border shadow-lg p-1.5 flex flex-col gap-1.5 min-w-[320px]"
           style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
         >
           {viewDate ? (
@@ -509,60 +509,64 @@ export function EntregasKanbanHoje({
               ✕ voltar pra hoje
             </button>
           ) : null}
-          {routeDates.map((date, i) => (
-            <div key={date} className="contents">
-              {/* Rótulo "ANTERIORES"/"PRÓXIMAS" em vez de só uma linha --
-                  pedido do Victor 13/09/2026 (revisão do mesmo pedido, um dia
-                  depois): "algo pra identificar as rotas futuras e
-                  passadas... clean mas que eu consiga diferenciar
-                  visualmente". Mesmo estilo de mini-rótulo já usado em
-                  DespachoCard.tsx/PartOrderEmailButton.tsx (`text-[10px]
-                  uppercase tracking-wide`, cor muted). `date === today` nunca
-                  acontece aqui (hoje fica de fora da lista, ver routeDates),
-                  então i===0 e i===7 caem exatamente no início de cada
-                  grupo de 7. */}
-              {i === 0 || i === 7 ? (
-                <span
-                  className="text-[10px] font-bold uppercase tracking-wide px-3 pt-1.5 pb-0.5"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  {i === 0 ? "Anteriores" : "Próximas"}
+          {/* Duas colunas lado a lado (Anteriores | Próximas) em vez de uma
+              lista só rolando -- pedido do Victor 14/09/2026: "prefiro que
+              apareça duas colunas". routeDates é sempre -7..-1 seguido de
+              +1..+7 (ver acima) -- corta certinho no meio, 7 em cada
+              coluna, cabem os 14 juntos sem precisar rolar. */}
+          <div className="grid grid-cols-2 gap-x-2">
+            {[
+              { label: "Anteriores", dates: routeDates.slice(0, 7) },
+              { label: "Próximas", dates: routeDates.slice(7) },
+            ].map((group) => (
+              <div key={group.label} className="flex flex-col gap-1">
+                {/* Mesmo estilo de mini-rótulo já usado em
+                    DespachoCard.tsx/PartOrderEmailButton.tsx (`text-[10px]
+                    uppercase tracking-wide`, cor muted) -- pedido do Victor
+                    13/09/2026: "algo pra identificar as rotas futuras e
+                    passadas... clean mas que eu consiga diferenciar
+                    visualmente". */}
+                <span className="text-[10px] font-bold uppercase tracking-wide px-3 pt-1.5 pb-0.5" style={{ color: "var(--text-muted)" }}>
+                  {group.label}
                 </span>
-              ) : null}
-              <button
-                type="button"
-                disabled={loadingDate === date}
-                onClick={() => selectDay(date)}
-                className="text-left text-sm rounded-md px-3 py-2 transition-colors disabled:opacity-60"
-                style={
-                  viewDate === date
-                    ? { background: "var(--brand-green-soft)", color: "var(--text-primary)", fontWeight: 600 }
-                    : // Cor de fundo bem leve pra reforçar o rótulo acima --
-                      // pedido do Victor 13/09/2026: "coloque uma cor bem
-                      // leve para diferenciar". Neutro pro passado, verde
-                      // (mesma família do brand-green, só bem mais diluído
-                      // que --brand-green-soft usado no dia selecionado
-                      // acima -- não pode parecer selecionado) pro futuro.
-                      {
-                        background: date < today ? "color-mix(in srgb, var(--text-muted) 8%, transparent)" : "color-mix(in srgb, var(--brand-green) 8%, transparent)",
-                        color: date < today ? "var(--text-secondary)" : "var(--text-primary)",
+                {group.dates.map((date) => (
+                  <button
+                    key={date}
+                    type="button"
+                    disabled={loadingDate === date}
+                    onClick={() => selectDay(date)}
+                    className="text-left text-sm rounded-md px-3 py-2 transition-colors disabled:opacity-60"
+                    style={
+                      viewDate === date
+                        ? { background: "var(--brand-green-soft)", color: "var(--text-primary)", fontWeight: 600 }
+                        : // Cor de fundo bem leve pra reforçar o rótulo acima --
+                          // pedido do Victor 13/09/2026: "coloque uma cor bem
+                          // leve para diferenciar". Neutro pro passado, verde
+                          // (mesma família do brand-green, só bem mais diluído
+                          // que --brand-green-soft usado no dia selecionado
+                          // acima -- não pode parecer selecionado) pro futuro.
+                          {
+                            background: date < today ? "color-mix(in srgb, var(--text-muted) 8%, transparent)" : "color-mix(in srgb, var(--brand-green) 8%, transparent)",
+                            color: date < today ? "var(--text-secondary)" : "var(--text-primary)",
+                          }
+                    }
+                    onMouseEnter={(e) => {
+                      if (viewDate !== date) e.currentTarget.style.background = "var(--surface-2)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (viewDate !== date) {
+                        e.currentTarget.style.background = date < today ? "color-mix(in srgb, var(--text-muted) 8%, transparent)" : "color-mix(in srgb, var(--brand-green) 8%, transparent)";
                       }
-                }
-                onMouseEnter={(e) => {
-                  if (viewDate !== date) e.currentTarget.style.background = "var(--surface-2)";
-                }}
-                onMouseLeave={(e) => {
-                  if (viewDate !== date) {
-                    e.currentTarget.style.background = date < today ? "color-mix(in srgb, var(--text-muted) 8%, transparent)" : "color-mix(in srgb, var(--brand-green) 8%, transparent)";
-                  }
-                }}
-              >
-                {WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]} {shortDateLabel(date)}
-                {loadingDate === date ? " · carregando…" : ""}
-                {viewDate === date ? " ✓" : ""}
-              </button>
-            </div>
-          ))}
+                    }}
+                  >
+                    {WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]} {shortDateLabel(date)}
+                    {loadingDate === date ? " · carregando…" : ""}
+                    {viewDate === date ? " ✓" : ""}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>
