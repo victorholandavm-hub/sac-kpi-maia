@@ -53,8 +53,14 @@ function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
       <thead>
         <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
           <th className="px-3 py-1 text-left font-semibold w-24">Código</th>
-          <th className="px-3 py-1 text-left font-semibold">Produto</th>
-          {showPart ? <th className="px-3 py-1 text-left font-semibold">Peça</th> : null}
+          <th className={`px-3 py-1 text-left font-semibold ${showPart ? "text-xs" : ""}`}>Produto</th>
+          {/* Peça em evidência (maior, negrito) -- pedido do Victor
+              14/09/2026: "preciso que... a PEÇA esteja maior e em
+              evidencia e o produto esteja menor, para nao confundir quem
+              vai carregar". Quem carrega o motorista pega é a PEÇA em si
+              (ex.: "puxador"), não o móvel inteiro -- Produto vira só
+              contexto/referência, menor. */}
+          {showPart ? <th className="px-3 py-1 text-left font-bold text-base">Peça</th> : null}
           <th className="px-3 py-1 text-right font-semibold w-14">Qtd</th>
         </tr>
       </thead>
@@ -65,11 +71,11 @@ function ProductTable({ items }: { items: ServiceRequestDetail["items"] }) {
               <td className="px-3 py-1" style={{ color: "var(--text-secondary)" }}>
                 {item.partCode || "—"}
               </td>
-              <td className="px-3 py-1" style={{ color: "var(--text-primary)" }}>
+              <td className={showPart ? "px-3 py-1 text-xs" : "px-3 py-1"} style={{ color: showPart ? "var(--text-muted)" : "var(--text-primary)" }}>
                 {item.product}
               </td>
               {showPart ? (
-                <td className="px-3 py-1" style={{ color: "var(--text-primary)" }}>
+                <td className="px-3 py-1 text-base font-bold" style={{ color: "var(--text-primary)" }}>
                   {item.partName || "—"}
                 </td>
               ) : null}

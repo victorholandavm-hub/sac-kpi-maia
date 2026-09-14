@@ -35,8 +35,12 @@ function ItemRow({ item, requestId, canEditItems, showPart }: { item: RequestIte
   return (
     <tr className="border-t border-gray-100 dark:border-gray-700">
       <td className="py-2 pr-3 text-xs font-mono text-gray-400 dark:text-gray-500 whitespace-nowrap">{item.partCode ?? "—"}</td>
-      <td className="py-2 pr-3 text-sm text-gray-800 dark:text-gray-100">{item.product}</td>
-      {showPart ? <td className="py-2 pr-3 text-sm text-gray-600 dark:text-gray-300">{item.partName ?? "—"}</td> : null}
+      {/* Peça em evidência (maior, negrito), produto reduzido a contexto --
+          pedido do Victor 14/09/2026: "preciso que... a PEÇA esteja maior
+          e em evidencia e o produto esteja menor, para nao confundir quem
+          vai carregar". */}
+      <td className={showPart ? "py-2 pr-3 text-xs text-gray-500 dark:text-gray-400" : "py-2 pr-3 text-sm text-gray-800 dark:text-gray-100"}>{item.product}</td>
+      {showPart ? <td className="py-2 pr-3 text-base font-bold text-gray-900 dark:text-gray-100">{item.partName ?? "—"}</td> : null}
       <td className="py-2 pr-3 text-sm text-gray-600 dark:text-gray-300 text-right whitespace-nowrap">{item.quantity}</td>
       <td className="py-2 text-right whitespace-nowrap">
         {canEditItems ? (
