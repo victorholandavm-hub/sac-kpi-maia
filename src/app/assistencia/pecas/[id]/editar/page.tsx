@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { getProfile, redirectIfSac } from "@/lib/dal";
 import { getPartOrder, listSuppliers, listSupplierContacts } from "@/lib/partOrders";
 import { EditPartOrderForm } from "@/components/assistencia/EditPartOrderForm";
 
+// Acesso (Profile assistência/admin OU equipe técnica) já garantido pelo
+// layout (pecas/layout.tsx, ver pecasAccess.ts) -- nada a checar aqui.
 export default async function EditPartOrderPage({ params }: { params: Promise<{ id: string }> }) {
-  redirectIfSac(await getProfile());
   const { id } = await params;
   const [order, suppliers, supplierContacts] = await Promise.all([getPartOrder(id), listSuppliers(), listSupplierContacts()]);
 

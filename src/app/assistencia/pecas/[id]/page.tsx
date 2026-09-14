@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { getProfile, redirectIfSac } from "@/lib/dal";
-import { getPartOrder } from "@/lib/partOrders";
+import { getPartOrder, listPartOrderFieldHistory } from "@/lib/partOrders";
+import { updatePartArrivedAt, updateSentToClientAt } from "@/app/assistencia/pecas-actions";
 import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PartOrderActions } from "@/components/assistencia/PartOrderActions";
 import { ExpectedAtField } from "@/components/assistencia/ExpectedAtField";
+import { PartOrderDateField } from "@/components/assistencia/PartOrderDateField";
 import { PartOrderEmailButton } from "@/components/assistencia/PartOrderEmailButton";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 
@@ -55,8 +56,9 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
+// Acesso (Profile assistência/admin OU equipe técnica) já garantido pelo
+// layout (pecas/layout.tsx, ver pecasAccess.ts) -- nada a checar aqui.
 export default async function PartOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  redirectIfSac(await getProfile());
   const { id } = await params;
   const order = await getPartOrder(id);
 
@@ -64,7 +66,15 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
     return <p className="text-sm text-gray-500 dark:text-gray-400">Pedido de peça não encontrado.</p>;
   }
 
-  const hasAndamento = order.partArrivedAt || order.sentToClientAt || order.closedAt || order.serviceRequestId;
+  // "Peça chegou em"/"Enviada ao cliente em" viraram editáveis com
+  // histórico 14/09/2026 (pedido do Victor) -- ver PartOrderDateField.tsx.
+  // Sempre existe o bloco "Andamento" agora que essas 2 datas têm um jeito
+  // de editar independente de já ter valor (antes só apareciam quando
+  // hasAndamento era true -- editar SEM ainda ter uma data também precisa
+  // de onde clicar).
+  const fieldHistory = await listPartOrderFieldHistory(id);
+  const partArrivedHistory = fieldHistory.filter((h) => h.field === "part_arrived_at");
+  const sentToClientHistory = fieldHistory.filter((h) => h.field === "sent_to_client_at");
 
   return (
     <div className="flex flex-col gap-4">
@@ -130,27 +140,34 @@ export default async function PartOrderDetailPage({ params }: { params: Promise<
           <ExpectedAtField orderId={order.id} expectedAt={order.expectedAt} />
         </Block>
 
-        {hasAndamento ? (
-          <Block title="Andamento">
-            <Field label="Peça chegou em" value={order.partArrivedAt ? new Date(order.partArrivedAt).toLocaleDateString("pt-BR") : null} />
-            <Field
-              label="Enviada ao cliente em"
-              value={order.sentToClientAt ? new Date(order.sentToClientAt).toLocaleDateString("pt-BR") : null}
-            />
-            <Field label="Encerrado em" value={order.closedAt ? new Date(order.closedAt).toLocaleDateString("pt-BR") : null} />
-            {order.serviceRequestId ? (
-              <div className="flex flex-col gap-0.5">
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Solicitação vinculada</span>
-                <Link
-                  href={`/assistencia/${order.serviceRequestId}`}
-                  className="text-sm font-medium underline text-gray-900 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  Ver solicitação
-                </Link>
-              </div>
-            ) : null}
-          </Block>
-        ) : null}
+        <Block title="Andamento">
+          <PartOrderDateField
+            orderId={order.id}
+            label="Peça chegou em"
+            value={order.partArrivedAt}
+            history={partArrivedHistory}
+            action={updatePartArrivedAt}
+          />
+          <PartOrderDateField
+            orderId={order.id}
+            label="Enviada ao cliente em"
+            value={order.sentToClientAt}
+            history={sentToClientHistory}
+            action={updateSentToClientAt}
+          />
+          <Field label="Encerrado em" value={order.closedAt ? new Date(order.closedAt).toLocaleDateString("pt-BR") : null} />
+          {order.serviceRequestId ? (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Solicitação vinculada</span>
+              <Link
+                href={`/assistencia/${order.serviceRequestId}`}
+                className="text-sm font-medium underline text-gray-900 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                Ver solicitação
+              </Link>
+            </div>
+          ) : null}
+        </Block>
       </div>
 
       <PartOrderActions orderId={order.id} status={order.status} notes={order.notes} delivered={!!order.sentToClientAt} />

@@ -269,6 +269,44 @@ export async function searchPartOrdersForLink(q: string): Promise<PartOrderLinkM
   }));
 }
 
+export type PartOrderDateField = "part_arrived_at" | "sent_to_client_at";
+
+// Histórico de edição manual de "Peça chegou em"/"Enviada ao cliente em"
+// -- pedido do Victor 14/09/2026 (ver updatePartArrivedAt/
+// updateSentToClientAt, pecas-actions.ts, e migration
+// 0125_part_order_field_history.sql). Mais recente primeiro -- é log, faz
+// sentido ler de trás pra frente (o que mudou por último é o que importa
+// primeiro).
+export type PartOrderFieldHistoryEntry = {
+  id: string;
+  field: PartOrderDateField;
+  oldValue: string | null;
+  newValue: string | null;
+  changedBy: string;
+  changedByRole: string;
+  changedAt: string;
+};
+
+export async function listPartOrderFieldHistory(partOrderId: string): Promise<PartOrderFieldHistoryEntry[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("part_order_field_history")
+    .select("id, field, old_value, new_value, changed_by, changed_by_role, changed_at")
+    .eq("part_order_id", partOrderId)
+    .order("changed_at", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    field: row.field as PartOrderDateField,
+    oldValue: row.old_value as string | null,
+    newValue: row.new_value as string | null,
+    changedBy: row.changed_by as string,
+    changedByRole: row.changed_by_role as string,
+    changedAt: row.changed_at as string,
+  }));
+}
+
 export async function countPartOrdersOverview(): Promise<{ awaiting: number; readyToSend: number }> {
   const admin = getSupabaseAdmin();
   const [awaitingRes, readyRes] = await Promise.all([

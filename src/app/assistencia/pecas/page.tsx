@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getProfile, redirectIfSac } from "@/lib/dal";
+import { requirePecasViewer } from "@/lib/pecasAccess";
 import { listPartOrders, listSuppliers, isPartOrderStatus, type PartOrder } from "@/lib/partOrders";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
@@ -29,7 +29,12 @@ export default async function PecasQueuePage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; supplier?: string }>;
 }) {
-  redirectIfSac(await getProfile());
+  // O layout (pecas/layout.tsx) já garante acesso (Profile assistência/
+  // admin OU sessão de equipe técnica) -- chamado de novo aqui só pra
+  // saber qual dos dois é, e decidir se mostra a fileira Fornecedores/
+  // Estoque abaixo (rotas que a equipe técnica não tem acesso -- ver
+  // pecasAccess.ts).
+  const { tecnicoName } = await requirePecasViewer();
   const { status, q, supplier } = await searchParams;
   const filterStatus = isPartOrderStatus(status) ? status : undefined;
   const [orders, suppliers]: [PartOrder[], string[]] = await Promise.all([
@@ -44,7 +49,13 @@ export default async function PecasQueuePage({
           nomeie essa aba como controle assistencia" (mesmo desenho da
           fileira de pílulas Visitas/Entregas/Agenda em fila/page.tsx).
           3 rotas próprias, dado/filtro cada uma o seu -- sem layout
-          compartilhado, cada página renderiza sua própria fileira. */}
+          compartilhado, cada página renderiza sua própria fileira.
+          Fornecedores/Estoque somem pra equipe técnica 14/09/2026 -- ela
+          só ganhou acesso à aba Peças (pedido do Victor foi específico:
+          "a aba peça"), essas 2 continuam rotas exclusivas de
+          assistência/admin (dentro do layout compartilhado, ver
+          pecasAccess.ts) -- mostrar o link só pra dar 404/redirecionar
+          pro login seria pior que não mostrar. */}
       <div className="flex items-center gap-2">
         <Link
           href="/assistencia/pecas"
@@ -53,18 +64,22 @@ export default async function PecasQueuePage({
         >
           Peças
         </Link>
-        <Link
-          href="/assistencia/fornecedores"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
-        >
-          Fornecedores
-        </Link>
-        <Link
-          href="/assistencia/estoque"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
-        >
-          Estoque
-        </Link>
+        {tecnicoName ? null : (
+          <>
+            <Link
+              href="/assistencia/fornecedores"
+              className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
+            >
+              Fornecedores
+            </Link>
+            <Link
+              href="/assistencia/estoque"
+              className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
+            >
+              Estoque
+            </Link>
+          </>
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-4 flex-wrap">

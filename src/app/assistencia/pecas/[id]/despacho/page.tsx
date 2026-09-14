@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { getProfile, redirectIfSac } from "@/lib/dal";
 import { getPartOrder } from "@/lib/partOrders";
 import { PartOrderDespachoCard } from "@/components/assistencia/PartOrderDespachoCard";
 import { SimplePrintButton } from "@/components/assistencia/SimplePrintButton";
@@ -8,9 +7,10 @@ import { SimplePrintButton } from "@/components/assistencia/SimplePrintButton";
 // cada solicitação dessa possa ser impressa igual o despacho das
 // notificações de assistencia". Mesmo esqueleto de [id]/despacho/page.tsx
 // (chamados), sem o controle de "já impressa" (não foi pedido aqui, nem
-// existe registro de evento pra pedido de peça).
+// existe registro de evento pra pedido de peça). Acesso (Profile
+// assistência/admin OU equipe técnica) já garantido pelo layout
+// (pecas/layout.tsx, ver pecasAccess.ts) -- nada a checar aqui.
 export default async function PartOrderDespachoPage({ params }: { params: Promise<{ id: string }> }) {
-  redirectIfSac(await getProfile());
   const { id } = await params;
   const order = await getPartOrder(id);
 

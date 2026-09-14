@@ -7,6 +7,7 @@ import { listSuppliers } from "@/lib/partOrders";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { WithdrawStockMovementButton } from "@/components/assistencia/WithdrawStockMovementButton";
+import { TecnicoTabs } from "@/components/assistencia/TecnicoTabs";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const dynamic = "force-dynamic";
@@ -108,12 +109,6 @@ export default async function TecnicoEstoquePage({
                   tela da equipe tecnica: modo dark" -- mesmo motivo/
                   componente de tecnico/page.tsx, ver lá. */}
               <ThemeToggle />
-              <Link
-                href="/assistencia/tecnico"
-                className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white dark:hover:bg-gray-700/10 transition-colors duration-150"
-              >
-                ← Fila de Classificação
-              </Link>
               <form action={tecnicoSignOut}>
                 <button
                   type="submit"
@@ -127,6 +122,10 @@ export default async function TecnicoEstoquePage({
         </div>
 
         <div className="flex flex-col gap-3 px-6 pt-4 pb-6">
+          {/* 3 abas -- pedido do Victor 14/09/2026, ver TecnicoTabs.tsx.
+              Substitui o link "← Fila de Classificação" solto que morava
+              no cabeçalho verde acima. */}
+          <TecnicoTabs active="estoque" />
           {/* Filtro de fábrica + busca -- mesma barra de tecnico/page.tsx. */}
           <div className="flex items-center gap-3 flex-wrap">
             <FilterSelect name="factory" placeholder="Todas as fábricas" options={suppliers} />

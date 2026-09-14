@@ -16,6 +16,7 @@ import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRe
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { TecnicoItemDestino } from "@/components/assistencia/TecnicoItemDestino";
 import { TecnicoNotificationModalButton } from "@/components/assistencia/TecnicoNotificationModalButton";
+import { TecnicoTabs } from "@/components/assistencia/TecnicoTabs";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const dynamic = "force-dynamic";
@@ -232,15 +233,6 @@ export default async function TecnicoHomePage({
                   tela usa seu próprio cabeçalho verde, não o
                   AssistenciaHeader compartilhado (ver nota acima). */}
               <ThemeToggle />
-              {/* Pedido do Victor 28/08/2026: "preciso que a equipe
-                  tecnica tambem tenha acesso" à tela de estoque (dar
-                  baixa em retirada registrada pela assistência). */}
-              <Link
-                href="/assistencia/tecnico/estoque"
-                className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white dark:hover:bg-gray-700/10 transition-colors duration-150"
-              >
-                Estoque
-              </Link>
               <Link
                 href="/assistencia"
                 className="px-3 py-1.5 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white dark:hover:bg-gray-700/10 transition-colors duration-150"
@@ -260,6 +252,13 @@ export default async function TecnicoHomePage({
         </div>
 
         <div className="flex flex-col gap-3 px-6 pt-4 pb-6">
+          {/* 3 abas (Fila de Classificação/Estoque/Peças) -- pedido do
+              Victor 14/09/2026, ver TecnicoTabs.tsx. Substitui o link
+              "Estoque" solto que morava no cabeçalho verde acima (ver git
+              blame) -- "Peças" é rota nova (ganhou acesso, "a aba peça...
+              tambem apareça para a equipe técnica"), as 3 precisam viver
+              juntas agora. */}
+          <TecnicoTabs active="fila" />
           {/* Barra de busca + filtro de loja -- ampla, integrada logo
               acima da tabela (pedido do Victor 31/08/2026). */}
           <div className="flex items-center gap-3 flex-wrap">
