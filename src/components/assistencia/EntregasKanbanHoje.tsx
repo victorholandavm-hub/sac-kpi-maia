@@ -760,8 +760,13 @@ export function EntregasKanbanHoje({
             }}
             className="text-xs font-semibold px-2.5 py-1.5 -mb-px rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
             style={
+              // borderColor var(--border) (não var(--brand-green)) --
+              // mesma correção de UnderlineTab.tsx: a borda cinza sobe e
+              // contorna o quadrado preenchido, se juntando ao border-b
+              // do trilho nas pontas, em vez de ficar invisível (mesma
+              // cor do fundo).
               selectedOrigem === "sac"
-                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--brand-green)" }
+                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--border)" }
                 : { color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }
             }
           >
@@ -776,7 +781,7 @@ export function EntregasKanbanHoje({
             className="text-xs font-semibold px-2.5 py-1.5 -mb-px rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
             style={
               selectedOrigem === "assistencia"
-                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--brand-green)" }
+                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--border)" }
                 : { color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }
             }
           >
