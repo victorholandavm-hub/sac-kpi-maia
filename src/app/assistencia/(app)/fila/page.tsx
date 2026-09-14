@@ -590,28 +590,36 @@ export default async function AssistenciaQueuePage({
         }
       />
 
-      {/* Segmented control -- trilho cinza continua, mesmo padrão de
-          Todos/Programado/Concluído/Cancelado ao lado. Ativo = quadrado
-          VERDE + letra branca (achado do Victor 02/09/2026: "quando uma
-          aba estiver selecionada, ela precisa ficar com o quadrado em
-          verde e as letras brancas ou cinzas" -- inverte a primeira
-          tentativa, que era quadrado branco + letra verde). */}
-      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start">
+      {/* Abas sublinhadas -- pedido do Victor 14/09/2026: "preciso que
+          [Visitas/Entregas/Agenda] fiquem iguais a [Geral e Volumetria/
+          Performance da Equipe/Gargalos e Logística]... mantendo apenas o
+          tamanho original". Mesmo estilo de Dashboard.tsx (TABS, painel de
+          KPIs geral) -- ativa = texto verde + "flutua" sobre a linha
+          (fundo/borda combinando com o conteúdo abaixo, -mb-px cobre o
+          border-b do trilho); inativa = texto cinza, sem fundo/borda
+          nenhuma. Troca o antigo trilho cinza com quadrado sólido (achado
+          do Victor 02/09/2026, ver git blame) -- só o tamanho (px-4 py-1.5
+          text-sm font-semibold) continua o mesmo de antes. */}
+      <div className="flex items-center gap-2 border-b self-start" style={{ borderColor: "var(--border)" }}>
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
-          className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
-            !showPecas ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-          }`}
-          style={!showPecas ? { background: "#1B5E3C" } : undefined}
+          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
+          style={{
+            color: !showPecas ? "var(--brand-green)" : "var(--text-secondary)",
+            background: !showPecas ? "var(--surface-1)" : "transparent",
+            borderColor: !showPecas ? "var(--border)" : "transparent",
+          }}
         >
           Visitas
         </Link>
         <Link
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, atendente: filterAtendente, sched: schedParam, city: filterCity })}
-          className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
-            showPecas ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-          }`}
-          style={showPecas ? { background: "#1B5E3C" } : undefined}
+          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
+          style={{
+            color: showPecas ? "var(--brand-green)" : "var(--text-secondary)",
+            background: showPecas ? "var(--surface-1)" : "transparent",
+            borderColor: showPecas ? "var(--border)" : "transparent",
+          }}
         >
           Entregas
         </Link>
@@ -624,7 +632,11 @@ export default async function AssistenciaQueuePage({
             mesma ideia de agenda/page.tsx repassar essa mesma fileira de
             volta pra Visitas/Entregas. Nunca "ativa" aqui (essa página
             nunca É a Agenda) -- fica sempre no estado neutro do trilho. */}
-        <Link href="/assistencia/agenda" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
+        <Link
+          href="/assistencia/agenda"
+          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
+          style={{ color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }}
+        >
           Agenda
         </Link>
       </div>

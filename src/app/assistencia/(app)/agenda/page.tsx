@@ -204,25 +204,32 @@ export default async function AgendaPage({
         }
       />
 
-      {/* Segmented control -- mesma fileira de fila/page.tsx (Visitas/
-          Entregas) -- pedido do Victor 27/08/2026: "coloque agenda
-          dentro de solicitações ao lado de visitas/entregas". Ativo =
-          quadrado VERDE + letra branca (achado do Victor 02/09/2026: ver
-          fila/page.tsx). Agenda é rota própria (filtro/dado bem
-          diferente -- mês corrente, por montador, não por rota), então
-          cada uma das 3 páginas renderiza sua própria fileira em vez de
-          layout compartilhado (mesma razão de SacTabs.tsx). */}
-      <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start">
-        <Link href="/assistencia/fila" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
+      {/* Abas sublinhadas -- mesma fileira de fila/page.tsx (Visitas/
+          Entregas/Agenda), estilo trocado 14/09/2026 pra bater com o
+          resto (ver comentário completo lá). Agenda é rota própria
+          (filtro/dado bem diferente -- mês corrente, por montador, não
+          por rota), então cada uma das 3 páginas renderiza sua própria
+          fileira em vez de layout compartilhado (mesma razão de
+          SacTabs.tsx) -- só o estilo precisa ficar igual nas 3. */}
+      <div className="flex items-center gap-2 border-b self-start" style={{ borderColor: "var(--border)" }}>
+        <Link
+          href="/assistencia/fila"
+          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
+          style={{ color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }}
+        >
           Visitas
         </Link>
-        <Link href="/assistencia/fila?tab=pecas" className="px-4 py-1.5 rounded-md text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200">
+        <Link
+          href="/assistencia/fila?tab=pecas"
+          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
+          style={{ color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }}
+        >
           Entregas
         </Link>
         <Link
           href="/assistencia/agenda"
-          className="px-4 py-1.5 rounded-md text-sm font-semibold text-white shadow-sm transition-all duration-200"
-          style={{ background: "#1B5E3C" }}
+          className="px-4 py-1.5 -mb-px rounded-t-lg border border-b-0 text-sm font-semibold transition-colors duration-200"
+          style={{ color: "var(--brand-green)", background: "var(--surface-1)", borderColor: "var(--border)" }}
         >
           Agenda
         </Link>
