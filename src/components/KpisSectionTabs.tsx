@@ -1,4 +1,4 @@
-import { FilterPill } from "./assistencia/FilterPill";
+import { UnderlineTab } from "./UnderlineTab";
 
 const TABS = [
   { key: "sac", label: "SAC", href: "/kpis" },
@@ -16,16 +16,15 @@ export type KpisSectionKey = (typeof TABS)[number]["key"];
 // diferentes, cada uma com seu próprio RangePicker) -- não dá pra usar
 // layout compartilhado (mesmo motivo de SacTabs.tsx/SolicitacoesTabs em
 // fila/page.tsx), cada página renderiza isso informando qual aba é a
-// sua. Reaproveita FilterPill 14/09/2026 (pedido do Victor: "deixe só o
-// fundo verde e a letra branco do que estiver selecionado... mude nesse
-// tambem que é no painel de kpis") -- saiu do laranja próprio (ver git
-// blame) pro mesmo verde/branco de todo pill "selecionado" do resto do
-// app, consistência em vez de paleta à parte só pra essa fileira.
+// sua. Estilo de aba sublinhada 14/09/2026 (3ª rodada do mesmo pedido,
+// ver UnderlineTab.tsx pro racional completo) -- saiu do laranja
+// próprio (ver git blame) pro mesmo verde/branco usado nas outras abas
+// desse estilo no resto do app.
 export function KpisSectionTabs({ active }: { active: KpisSectionKey }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
       {TABS.map((tab) => (
-        <FilterPill key={tab.key} href={tab.href} label={tab.label} selected={tab.key === active} />
+        <UnderlineTab key={tab.key} href={tab.href} label={tab.label} active={tab.key === active} />
       ))}
     </div>
   );
