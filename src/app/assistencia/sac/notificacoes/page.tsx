@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getProfile } from "@/lib/dal";
+import { getProfile, listAtendentesByRole } from "@/lib/dal";
 import { listRequests, listRequestsScheduledOn, listStores, isRequestStatus } from "@/lib/serviceRequests";
 import { listDrivers } from "@/lib/payments";
 import { getRotaWeekOverview, startOfRotaWeek, addDays, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
@@ -39,6 +39,7 @@ function buildHref(params: {
   from?: string;
   to?: string;
   origem?: string;
+  atendente?: string;
   sched?: string;
   city?: string;
   urgente?: string;
@@ -51,6 +52,7 @@ function buildHref(params: {
   if (params.from) sp.set("from", params.from);
   if (params.to) sp.set("to", params.to);
   if (params.origem) sp.set("origem", params.origem);
+  if (params.atendente) sp.set("atendente", params.atendente);
   if (params.sched) sp.set("sched", params.sched);
   if (params.city) sp.set("city", params.city);
   if (params.urgente) sp.set("urgente", params.urgente);
@@ -84,6 +86,7 @@ export default async function SacNotificacoesPage({
     from?: string;
     to?: string;
     origem?: string;
+    atendente?: string;
     sched?: string;
     city?: string;
     urgente?: string;
@@ -95,11 +98,18 @@ export default async function SacNotificacoesPage({
     redirect("/assistencia/inicio");
   }
 
-  const { status, q, store, from, to, origem, sched, city, urgente, semrota } = await searchParams;
+  const { status, q, store, from, to, origem, atendente, sched, city, urgente, semrota } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
   const dateTo = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : undefined;
   const filterOrigem = origem === "sac" || origem === "assistencia" ? origem : undefined;
+  // Filtro "Atendente" -- pedido do Victor 14/09/2026 (mesmo raciocínio de
+  // fila/page.tsx, ver lá): só existe depois de escolher a Origem, e a
+  // lista de nomes é buscada e validada ANTES do Promise.all principal por
+  // causa da mesma ordem de dependência (filterAtendente entra no filtro
+  // da query logo abaixo).
+  const atendentes = filterOrigem ? await listAtendentesByRole(filterOrigem) : [];
+  const filterAtendente = filterOrigem && atendente && atendentes.includes(atendente) ? atendente : undefined;
   const filterSched: boolean | undefined = filterStatus === "aberta" && (sched === "1" || sched === "0") ? sched === "1" : undefined;
   const schedParam = filterSched === true ? "1" : filterSched === false ? "0" : undefined;
   // Filtro por cidade (ver CITY_FILTERS) -- pedido do Victor 24/08/2026.
@@ -110,8 +120,11 @@ export default async function SacNotificacoesPage({
   // Pill "sem rota" -- mesmo padrão de fila/page.tsx (ver lá).
   const filterSemRota = semrota === "1";
   const types = filterOrigem === "sac" ? ENTREGA_TYPES_SAC : filterOrigem === "assistencia" ? ENTREGA_TYPES_ASSISTENCIA : ENTREGA_TYPES;
-  // Ver ASSISTENCIA_ORIGEM_REQUESTERS, entregaQueueGrouping.ts.
-  const filterRequestedByNames = filterOrigem === "assistencia" ? ASSISTENCIA_ORIGEM_REQUESTERS : undefined;
+  // Ver ASSISTENCIA_ORIGEM_REQUESTERS, entregaQueueGrouping.ts -- filtro
+  // "Atendente" (um nome só) tem prioridade sobre esse padrão de
+  // origem=assistência (lista toda de Iasmyn+Luis), mesmo raciocínio de
+  // fila/page.tsx.
+  const filterRequestedByNames = filterAtendente ? [filterAtendente] : filterOrigem === "assistencia" ? ASSISTENCIA_ORIGEM_REQUESTERS : undefined;
   const today = new Date().toISOString().slice(0, 10);
 
   const [{ items: rawRequests }, stores, drivers, rotaOverview, entregasRoutesOverview, todayRequestsFull] = await Promise.all([
@@ -166,7 +179,8 @@ export default async function SacNotificacoesPage({
   // Ver mesmo raciocínio/pedido em fila/page.tsx (03/09/2026): com
   // qualquer filtro ativo, "Hoje" some e sobra só a lista achatada com o
   // resultado do filtro inteiro.
-  const hasActiveFilter = !!(filterStatus || filterOrigem || filterSched !== undefined || filterCity || filterUrgente || filterSemRota || q || store || dateFrom || dateTo);
+  const hasActiveFilter =
+    !!(filterStatus || filterOrigem || filterAtendente || filterSched !== undefined || filterCity || filterUrgente || filterSemRota || q || store || dateFrom || dateTo);
   // Exceção "Hoje" sozinho -- mesmo raciocínio/pedido de fila/page.tsx
   // (03/09/2026, ver lá): mostra o board completo (cards de rota + abas),
   // sem a lista achatada do resto embaixo.
@@ -227,6 +241,7 @@ export default async function SacNotificacoesPage({
               from: f.label === "Todas" ? undefined : dateFrom,
               to: f.label === "Todas" ? undefined : dateTo,
               origem: filterOrigem,
+              atendente: filterAtendente,
               sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
               city: filterCity,
             })}
@@ -242,8 +257,8 @@ export default async function SacNotificacoesPage({
           <Link
             href={
               filterUrgente
-                ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
-                : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, urgente: "1" })
+                ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, atendente: filterAtendente, city: filterCity })
+                : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, atendente: filterAtendente, city: filterCity, urgente: "1" })
             }
             className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold transition-colors duration-150 ${filterUrgente ? "" : "animate-pulse"}`}
             style={{
@@ -263,8 +278,8 @@ export default async function SacNotificacoesPage({
           <Link
             href={
               filterSemRota
-                ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity })
-                : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, city: filterCity, semrota: "1" })
+                ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, atendente: filterAtendente, city: filterCity })
+                : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, atendente: filterAtendente, city: filterCity, semrota: "1" })
             }
             className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold transition-colors duration-150"
             style={{
@@ -296,6 +311,9 @@ export default async function SacNotificacoesPage({
           placeholder="Origem: todas"
           options={ORIGEM_FILTERS.filter((f) => f.value !== null).map((f) => ({ value: f.value as string, label: f.label }))}
         />
+        {/* "Atendente" -- pedido do Victor 14/09/2026, mesmo raciocínio de
+            fila/page.tsx (ver lá): só aparece depois de escolher a Origem. */}
+        {filterOrigem ? <FilterSelect name="atendente" placeholder="Atendente: todos" options={atendentes} /> : null}
         <FilterSelect
           name="city"
           placeholder="Cidade: todas"
@@ -314,6 +332,7 @@ export default async function SacNotificacoesPage({
             q,
             store,
             origem: filterOrigem,
+            atendente: filterAtendente,
             sched: schedParam,
             city: filterCity,
             urgente: filterUrgente ? "1" : undefined,
@@ -328,6 +347,7 @@ export default async function SacNotificacoesPage({
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
         {store ? <input type="hidden" name="store" value={store} /> : null}
         {filterOrigem ? <input type="hidden" name="origem" value={filterOrigem} /> : null}
+        {filterAtendente ? <input type="hidden" name="atendente" value={filterAtendente} /> : null}
         {schedParam ? <input type="hidden" name="sched" value={schedParam} /> : null}
         {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
         {filterUrgente ? <input type="hidden" name="urgente" value="1" /> : null}
@@ -371,7 +391,7 @@ export default async function SacNotificacoesPage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, origem: filterOrigem, sched: schedParam, city: filterCity, urgente: filterUrgente ? "1" : undefined, semrota: filterSemRota ? "1" : undefined })}
+            href={buildHref({ status: filterStatus, store, origem: filterOrigem, atendente: filterAtendente, sched: schedParam, city: filterCity, urgente: filterUrgente ? "1" : undefined, semrota: filterSemRota ? "1" : undefined })}
             className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
           >
             Limpar busca/data

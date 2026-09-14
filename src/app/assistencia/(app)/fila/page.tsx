@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/lib/dal";
+import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests, listAtendentesByRole } from "@/lib/dal";
 import {
   listRequests,
   listRequestsScheduledOn,
@@ -83,6 +83,7 @@ function buildHref(params: {
   to?: string;
   tab?: string;
   origem?: string;
+  atendente?: string;
   sched?: string;
   alvo?: string;
   city?: string;
@@ -100,6 +101,7 @@ function buildHref(params: {
   if (params.to) sp.set("to", params.to);
   if (params.tab) sp.set("tab", params.tab);
   if (params.origem) sp.set("origem", params.origem);
+  if (params.atendente) sp.set("atendente", params.atendente);
   if (params.sched) sp.set("sched", params.sched);
   if (params.alvo) sp.set("alvo", params.alvo);
   if (params.city) sp.set("city", params.city);
@@ -165,6 +167,7 @@ export default async function AssistenciaQueuePage({
     to?: string;
     tab?: string;
     origem?: string;
+    atendente?: string;
     sched?: string;
     alvo?: string;
     city?: string;
@@ -176,8 +179,25 @@ export default async function AssistenciaQueuePage({
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
-  const { status, q, page: pageParam, store, assembler, from, to, tab, origem, sched, alvo, city, urgente, semrota, semmontador, atrasado } =
-    await searchParams;
+  const {
+    status,
+    q,
+    page: pageParam,
+    store,
+    assembler,
+    from,
+    to,
+    tab,
+    origem,
+    atendente,
+    sched,
+    alvo,
+    city,
+    urgente,
+    semrota,
+    semmontador,
+    atrasado,
+  } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
@@ -190,6 +210,21 @@ export default async function AssistenciaQueuePage({
   // valor de "origem" que tenha sobrado na URL de antes de trocar pra
   // Visitas, mesmo padrão de effectiveAssembler logo abaixo.
   const filterOrigem = showPecas && (origem === "sac" || origem === "assistencia") ? origem : undefined;
+  // Filtro "Atendente" -- pedido do Victor 14/09/2026: "quando eu clicasse
+  // em SAC, me desse mais uma opção de filtro, para eu filtrar por
+  // atendente. e a mesma coisa para assistencia". Só existe DEPOIS de já
+  // ter escolhido uma origem (ver renderização do FilterSelect abaixo) --
+  // sem origem escolhida, "atendente" sozinho seria ambíguo (mistura nome
+  // de quem atende no SAC com quem atende na assistência). Busca própria
+  // (fora do Promise.all grande logo abaixo, de propósito) porque
+  // `filterAtendente` -- validado contra essa lista -- já entra como filtro
+  // DENTRO da query principal desse mesmo Promise.all; sem isso, trocar de
+  // Origem mantendo um `?atendente=` que só existe do outro lado (ex.: veio
+  // de SAC, tinha "Ana" selecionado, troca pra Assistência) filtraria por um
+  // nome que não existe nesse lado e devolveria 0 resultados sem
+  // explicação nenhuma, em vez de simplesmente ignorar o valor obsoleto.
+  const atendentes = showPecas && filterOrigem ? await listAtendentesByRole(filterOrigem) : [];
+  const filterAtendente = filterOrigem && atendente && atendentes.includes(atendente) ? atendente : undefined;
   // Programado/Não programado (ver ENTREGA_FILTERS acima) -- também só faz
   // sentido dentro da aba Entregas, mesmo padrão de filterOrigem.
   const filterSched: boolean | undefined = showPecas && filterStatus === "aberta" && (sched === "1" || sched === "0") ? sched === "1" : undefined;
@@ -239,8 +274,15 @@ export default async function AssistenciaQueuePage({
         ? ENTREGA_TYPES_ASSISTENCIA
         : ENTREGA_TYPES
     : VISITA_TYPES;
-  // Ver ASSISTENCIA_ORIGEM_REQUESTERS, entregaQueueGrouping.ts.
-  const filterRequestedByNames = showPecas && filterOrigem === "assistencia" ? ASSISTENCIA_ORIGEM_REQUESTERS : undefined;
+  // Ver ASSISTENCIA_ORIGEM_REQUESTERS, entregaQueueGrouping.ts -- filtro
+  // "Atendente" (filterAtendente, um nome só) tem prioridade sobre esse
+  // padrão de origem=assistência (a lista toda de Iasmyn+Luis) quando o
+  // Victor escolhe alguém específico no dropdown.
+  const filterRequestedByNames = filterAtendente
+    ? [filterAtendente]
+    : showPecas && filterOrigem === "assistencia"
+      ? ASSISTENCIA_ORIGEM_REQUESTERS
+      : undefined;
   // Entrega de peça não tem montador (é motorista) -- ignora um valor de
   // "assembler" que tenha sobrado na URL de antes de trocar de aba, senão
   // filtra por um campo que essas linhas nunca preenchem e a lista some
@@ -471,7 +513,8 @@ export default async function AssistenciaQueuePage({
   // de hoje, só que sem destaque especial) -- sem filtro nenhum, "Hoje"
   // continua aparecendo por cima, do jeito que sempre foi.
   const hasActiveEntregaFilter =
-    showPecas && !!(filterStatus || filterOrigem || filterSched !== undefined || filterCity || filterUrgente || filterSemRota || q || store || dateFrom || dateTo);
+    showPecas &&
+    !!(filterStatus || filterOrigem || filterAtendente || filterSched !== undefined || filterCity || filterUrgente || filterSemRota || q || store || dateFrom || dateTo);
   // Exceção: o atalho de período "Hoje" (ver DateRangeQuickFilter) sozinho
   // -- pedido do Victor 03/09/2026 (revisão do pedido acima): "quando eu
   // clicar em 'hoje', tambem precisa aparecer essas rotas e esses filtros
@@ -564,7 +607,7 @@ export default async function AssistenciaQueuePage({
           Visitas
         </Link>
         <Link
-          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, sched: schedParam, city: filterCity })}
+          href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, atendente: filterAtendente, sched: schedParam, city: filterCity })}
           className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
             showPecas ? "text-white shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           }`}
@@ -649,6 +692,7 @@ export default async function AssistenciaQueuePage({
                   to: f.label === "Todas" ? undefined : dateTo,
                   tab: "pecas",
                   origem: filterOrigem,
+                  atendente: filterAtendente,
                   sched: f.value.sched === true ? "1" : f.value.sched === false ? "0" : undefined,
                   city: filterCity,
                 })}
@@ -692,8 +736,8 @@ export default async function AssistenciaQueuePage({
           <Link
             href={
               filterUrgente
-                ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
-                : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, urgente: "1" })
+                ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, atendente: filterAtendente, city: filterCity })
+                : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, atendente: filterAtendente, city: filterCity, urgente: "1" })
             }
             className={`text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold transition-colors duration-150 ${filterUrgente ? "" : "animate-pulse"}`}
             style={{
@@ -719,8 +763,8 @@ export default async function AssistenciaQueuePage({
           <Link
             href={
               filterSemRota
-                ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity })
-                : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, city: filterCity, semrota: "1" })
+                ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, atendente: filterAtendente, city: filterCity })
+                : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, atendente: filterAtendente, city: filterCity, semrota: "1" })
             }
             className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold transition-colors duration-150"
             style={{
@@ -780,6 +824,14 @@ export default async function AssistenciaQueuePage({
             options={ORIGEM_FILTERS.filter((f) => f.value !== null).map((f) => ({ value: f.value as string, label: f.label }))}
           />
         ) : null}
+        {/* "Atendente" -- pedido do Victor 14/09/2026: "quando eu clicasse
+            em SAC, me desse mais uma opção de filtro, para eu filtrar por
+            atendente. e a mesma coisa para assistencia". Só aparece DEPOIS
+            de escolher a Origem (troca de lista junto: nomes de quem tem
+            login role=sac ou role=assistencia, ver listAtendentesByRole em
+            dal.ts) -- sem Origem escolhida não dá pra saber qual das duas
+            listas usar. */}
+        {showPecas && filterOrigem ? <FilterSelect name="atendente" placeholder="Atendente: todos" options={atendentes} /> : null}
         {showPecas ? (
           <FilterSelect
             name="city"
@@ -816,6 +868,7 @@ export default async function AssistenciaQueuePage({
             assembler: effectiveAssembler,
             tab: showPecas ? "pecas" : undefined,
             origem: filterOrigem,
+            atendente: filterAtendente,
             sched: schedParam,
             alvo: filterAlvo,
             city: filterCity,
@@ -833,6 +886,7 @@ export default async function AssistenciaQueuePage({
         {effectiveAssembler ? <input type="hidden" name="assembler" value={effectiveAssembler} /> : null}
         {showPecas ? <input type="hidden" name="tab" value="pecas" /> : null}
         {filterOrigem ? <input type="hidden" name="origem" value={filterOrigem} /> : null}
+        {filterAtendente ? <input type="hidden" name="atendente" value={filterAtendente} /> : null}
         {schedParam ? <input type="hidden" name="sched" value={schedParam} /> : null}
         {filterAlvo ? <input type="hidden" name="alvo" value={filterAlvo} /> : null}
         {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
@@ -889,6 +943,7 @@ export default async function AssistenciaQueuePage({
               assembler: effectiveAssembler,
               tab: showPecas ? "pecas" : undefined,
               origem: filterOrigem,
+              atendente: filterAtendente,
               sched: schedParam,
               alvo: filterAlvo,
               city: filterCity,
@@ -1041,7 +1096,7 @@ export default async function AssistenciaQueuePage({
         <div className="flex items-center justify-center gap-4 pt-2">
           {currentPage > 1 ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: currentPage - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
+              href={buildHref({ status: filterStatus, q, page: currentPage - 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, atendente: filterAtendente, sched: schedParam, alvo: filterAlvo, city: filterCity })}
               className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
             >
               ← Mês mais recente
@@ -1052,7 +1107,7 @@ export default async function AssistenciaQueuePage({
           </span>
           {currentPage < totalPages ? (
             <Link
-              href={buildHref({ status: filterStatus, q, page: currentPage + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, sched: schedParam, alvo: filterAlvo, city: filterCity })}
+              href={buildHref({ status: filterStatus, q, page: currentPage + 1, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: showPecas ? "pecas" : undefined, origem: filterOrigem, atendente: filterAtendente, sched: schedParam, alvo: filterAlvo, city: filterCity })}
               className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
             >
               Mês mais antigo →
