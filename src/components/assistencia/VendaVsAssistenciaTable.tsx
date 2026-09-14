@@ -1,4 +1,5 @@
 import type { VendaVsAssistenciaStat } from "@/lib/kpiAssistencia";
+import { VendaVsAssistenciaDrilldown } from "./VendaVsAssistenciaDrilldown";
 
 // "Vendas x Assistência técnica" por loja -- pedido do Victor 14/09/2026:
 // "quero ver o percentual de quantidade de vendas (entregas) x quantidade
@@ -21,6 +22,16 @@ function formatInt(value: number): string {
   return value.toLocaleString("pt-BR");
 }
 
+// Largura fixa pro badge/texto da célula de percentual -- pedido do
+// Victor 14/09/2026 ("retoque de UI"): sem isso, "4,4%" (3 dígitos) e
+// "21,3%" (4 dígitos) tinham badges de tamanho diferente (inline-block
+// abraça o conteúdo), quebrando o alinhamento vertical entre linhas.
+// `text-center` centraliza o conteúdo dentro dessa largura -- é o que
+// também resolve o hífen (sem venda) ficando "colado" na borda direita
+// da célula: com largura fixa + centralizado, ele fica no meio do
+// próprio badge, não da coluna inteira.
+const PERCENT_BADGE_CLASS = "inline-block w-20 text-center";
+
 function PercentualCell({ percentual }: { percentual: number | null }) {
   if (percentual == null) {
     // Sem venda no período -- "0,0%" seria enganoso (não é que a taxa é
@@ -30,7 +41,7 @@ function PercentualCell({ percentual }: { percentual: number | null }) {
     // quebrar o padrão numérico" mas continuar deixando claro que é
     // diferente de uma taxa de fato calculada.
     return (
-      <span style={{ color: "var(--text-muted)" }} title="Sem venda sincronizada no período -- não dá pra calcular percentual.">
+      <span className={PERCENT_BADGE_CLASS} style={{ color: "var(--text-muted)" }} title="Sem venda sincronizada no período -- não dá pra calcular percentual.">
         —
       </span>
     );
@@ -43,7 +54,7 @@ function PercentualCell({ percentual }: { percentual: number | null }) {
   if (percentual > CRITICO_PCT) {
     return (
       <span
-        className="inline-block rounded px-1.5 py-0.5 font-semibold"
+        className={`${PERCENT_BADGE_CLASS} rounded px-1.5 py-0.5 font-semibold`}
         style={{ color: "var(--status-critical)", background: "color-mix(in srgb, var(--status-critical) 14%, transparent)" }}
       >
         {percentual.toFixed(1).replace(".", ",")}%
@@ -53,14 +64,18 @@ function PercentualCell({ percentual }: { percentual: number | null }) {
   if (percentual >= ATENCAO_PCT) {
     return (
       <span
-        className="inline-block rounded px-1.5 py-0.5 font-semibold"
+        className={`${PERCENT_BADGE_CLASS} rounded px-1.5 py-0.5 font-semibold`}
         style={{ color: "var(--status-warning)", background: "color-mix(in srgb, var(--status-warning) 16%, transparent)" }}
       >
         {percentual.toFixed(1).replace(".", ",")}%
       </span>
     );
   }
-  return <span style={{ color: "var(--text-secondary)" }}>{percentual.toFixed(1).replace(".", ",")}%</span>;
+  return (
+    <span className={PERCENT_BADGE_CLASS} style={{ color: "var(--text-secondary)" }}>
+      {percentual.toFixed(1).replace(".", ",")}%
+    </span>
+  );
 }
 
 export function VendaVsAssistenciaTable({ data }: { data: VendaVsAssistenciaStat[] }) {
@@ -115,7 +130,15 @@ export function VendaVsAssistenciaTable({ data }: { data: VendaVsAssistenciaStat
                   <td className="py-2.5 pr-4 text-right">{formatInt(row.vendas)}</td>
                   <td className="py-2.5 pr-4 text-right">{formatInt(row.chamados)}</td>
                   <td className="py-2.5 pr-2 text-right">
-                    <PercentualCell percentual={row.percentual} />
+                    {/* Clicar no percentual abre a lista de chamados por
+                        trás dele, agrupada por tipo -- pedido do Victor
+                        14/09/2026 ("quando eu clicar no percentual...").
+                        Sem chamado no período (tickets vazio), o wrapper
+                        deixa de virar botão sozinho -- ver
+                        VendaVsAssistenciaDrilldown.tsx. */}
+                    <VendaVsAssistenciaDrilldown storeName={row.storeName} tickets={row.tickets}>
+                      <PercentualCell percentual={row.percentual} />
+                    </VendaVsAssistenciaDrilldown>
                   </td>
                 </tr>
               ))}
