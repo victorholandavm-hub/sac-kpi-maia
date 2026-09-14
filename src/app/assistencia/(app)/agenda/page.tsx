@@ -4,6 +4,7 @@ import { listScheduledRequests, listStores, agendaEffectiveDate, type ServiceReq
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
+import { UnderlineTab } from "@/components/UnderlineTab";
 import { AgendaDayGroups } from "@/components/assistencia/AgendaDayGroups";
 import { AgendaKanbanBoard } from "@/components/assistencia/AgendaKanbanBoard";
 import { JP_PRIMARY_ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
@@ -204,14 +205,12 @@ export default async function AgendaPage({
         }
       />
 
-      {/* Pills -- mesma fileira de fila/page.tsx (Visitas/Entregas/Agenda),
-          estilo revisado 14/09/2026 (mesmo dia, "deixe só o fundo verde e
-          a letra branco do que estiver selecionado" -- ver comentário
-          completo lá). Reaproveita FilterPill (variante neutra). */}
-      <div className="flex items-center gap-2 self-start">
-        <FilterPill href="/assistencia/fila" label="Visitas" selected={false} />
-        <FilterPill href="/assistencia/fila?tab=pecas" label="Entregas" selected={false} />
-        <FilterPill href="/assistencia/agenda" label="Agenda" selected />
+      {/* Abas sublinhadas -- mesma fileira de fila/page.tsx (Visitas/
+          Entregas/Agenda), ver UnderlineTab.tsx pro racional completo. */}
+      <div className="flex items-center gap-2 border-b self-start" style={{ borderColor: "var(--border)" }}>
+        <UnderlineTab href="/assistencia/fila" label="Visitas" active={false} />
+        <UnderlineTab href="/assistencia/fila?tab=pecas" label="Entregas" active={false} />
+        <UnderlineTab href="/assistencia/agenda" label="Agenda" active />
       </div>
 
       {/* Alerta de atrasadas -- pedido do Victor 25/08/2026: "Visitas

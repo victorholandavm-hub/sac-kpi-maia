@@ -23,6 +23,7 @@ import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia"
 import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcut";
 import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
+import { UnderlineTab } from "@/components/UnderlineTab";
 import { DateRangeQuickFilter } from "@/components/assistencia/DateRangeQuickFilter";
 import { groupIntoMonths, isCurrentMonth, paginateMonths } from "@/lib/weekGrouping";
 import { MonthAccordion } from "@/components/assistencia/MonthAccordion";
@@ -590,24 +591,20 @@ export default async function AssistenciaQueuePage({
         }
       />
 
-      {/* Pills -- pedido do Victor 14/09/2026 (revisão do mesmo dia, depois
-          de ver a versão de aba sublinhada ao vivo): "deixe só o fundo
-          verde e a letra branco do que estiver selecionado". Reaproveita
-          FilterPill (mesmo componente da fileira Todas/Programado/...
-          logo abaixo) em vez de estilo escrito na mão de novo -- variante
-          neutra (sem `color`) já é exatamente isso: selecionado = fundo
-          verde sólido + letra branca, não selecionado = contorno fino
-          cinza. */}
-      <div className="flex items-center gap-2 self-start">
-        <FilterPill
+      {/* Abas sublinhadas -- pedido do Victor 14/09/2026 (3ª rodada do
+          mesmo pedido): "iguais a [Geral e Volumetria/...], a unica
+          diferença é que o quadrado que estivesse selecionado, deveria
+          ficar verde com letras brancas". Ver UnderlineTab.tsx. */}
+      <div className="flex items-center gap-2 border-b self-start" style={{ borderColor: "var(--border)" }}>
+        <UnderlineTab
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, alvo: filterAlvo })}
           label="Visitas"
-          selected={!showPecas}
+          active={!showPecas}
         />
-        <FilterPill
+        <UnderlineTab
           href={buildHref({ status: filterStatus, store, assembler: effectiveAssembler, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, atendente: filterAtendente, sched: schedParam, city: filterCity })}
           label="Entregas"
-          selected={showPecas}
+          active={showPecas}
         />
         {/* Agenda mora aqui do lado, dentro de "Solicitações" -- pedido do
             Victor 27/08/2026: "coloque agenda dentro de solicitações ao
@@ -618,7 +615,7 @@ export default async function AssistenciaQueuePage({
             mesma ideia de agenda/page.tsx repassar essa mesma fileira de
             volta pra Visitas/Entregas. Nunca "ativa" aqui (essa página
             nunca É a Agenda) -- fica sempre no estado neutro do trilho. */}
-        <FilterPill href="/assistencia/agenda" label="Agenda" selected={false} />
+        <UnderlineTab href="/assistencia/agenda" label="Agenda" active={false} />
       </div>
 
       {/* Alerta de atrasadas -- pedido do Victor 04/09/2026: "na aba

@@ -719,13 +719,16 @@ export function EntregasKanbanHoje({
             desmarca) -- só afeta a tabela abaixo, os cards de resumo por
             rota continuam com a contagem cheia (mesmo comportamento que o
             filtro de status Todos/Programado/... já tem hoje).
-            Estilo de abas sublinhadas 14/09/2026 (mesma revisão de
-            fila/page.tsx/agenda/page.tsx, "fiquem iguais a [Geral e
-            Volumetria/...]") -- só o tamanho (text-xs font-semibold
-            px-2.5 py-1.5) continua o mesmo de antes. `border-b` só na
-            largura desses 2 botões (não a fileira toda, que tem outros
-            controles ao lado, ver "Atendente"/nextRoutesPicker), lendo
-            como um mini-par de abas dentro do toolbar. */}
+            Estilo de abas sublinhadas 14/09/2026 (3ª rodada do mesmo
+            pedido, ver UnderlineTab.tsx pro racional completo -- aqui
+            continua sendo `<button>`, não `<Link>`, porque é estado
+            local do board, não navegação, então não dá pra reaproveitar
+            aquele componente direto) -- só o tamanho (text-xs
+            font-semibold px-2.5 py-1.5) continua o mesmo de antes.
+            `border-b` só na largura desses 2 botões (não a fileira toda,
+            que tem outros controles ao lado, ver "Atendente"/
+            nextRoutesPicker), lendo como um mini-par de abas dentro do
+            toolbar. */}
         <div className="flex items-center gap-1.5 border-b" style={{ borderColor: "var(--border)" }}>
           <button
             type="button"
@@ -736,7 +739,7 @@ export function EntregasKanbanHoje({
             className="text-xs font-semibold px-2.5 py-1.5 -mb-px rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
             style={
               selectedOrigem === "sac"
-                ? { color: "var(--brand-green)", background: "var(--surface-1)", borderColor: "var(--border)" }
+                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--brand-green)" }
                 : { color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }
             }
           >
@@ -751,7 +754,7 @@ export function EntregasKanbanHoje({
             className="text-xs font-semibold px-2.5 py-1.5 -mb-px rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
             style={
               selectedOrigem === "assistencia"
-                ? { color: "var(--brand-green)", background: "var(--surface-1)", borderColor: "var(--border)" }
+                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--brand-green)" }
                 : { color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }
             }
           >
