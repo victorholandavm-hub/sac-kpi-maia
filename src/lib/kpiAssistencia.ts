@@ -225,6 +225,26 @@ export type VendaVsAssistenciaStat = {
   // null quando vendas = 0 no período -- sem denominador, não dá pra
   // calcular um percentual que signifique alguma coisa (não é "0%").
   percentual: number | null;
+  // Chamados por trás de `chamados` -- pedido do Victor 14/09/2026: clicar
+  // no percentual abre a lista deles, agrupada por tipo (ver
+  // VendaVsAssistenciaBoardModal.tsx). Mais recente primeiro. Vazio (não
+  // omitido) quando `chamados` é 0 -- sempre length === chamados.
+  tickets: ReportRowItem[];
+};
+
+// Linha crua da busca "todos os tipos, todas as lojas" que alimenta
+// byStoreVendaVsAssistencia acima (ver getAssistenciaKpiData) -- só os
+// campos que ReportRowItem precisa, sem os extras de RequestRow (causa
+// raiz, motorista etc., que essa métrica não usa).
+type ChamadoTodosTiposRow = {
+  id: string;
+  ticket_number: number;
+  type: RequestType;
+  status: RequestStatus;
+  store_id: string;
+  client_name: string | null;
+  created_at: string;
+  reason: string | null;
 };
 
 // Taxa de Quebra / Prejuízo de Estoque -- pedido do Victor 10/09/2026:
@@ -590,17 +610,19 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     // (ver chamadosFromIso/chamadosToIso acima -- não fromIso/toIso do
     // `rows` principal, que usa uma borda ligeiramente diferente).
     // Cancelada fica de fora, mesmo motivo/filtro de `rows` acima (nunca
-    // virou assistência de verdade).
-    fetchAllPagesParallel<{ store_id: string }>(
+    // virou assistência de verdade). Linha inteira (não só store_id) --
+    // pedido do Victor 14/09/2026: clicar no percentual abre a lista
+    // desses chamados (ver VendaVsAssistenciaStat.tickets abaixo).
+    fetchAllPagesParallel<ChamadoTodosTiposRow>(
       (from, to) =>
         admin
           .from("service_requests")
-          .select("store_id", { count: "exact" })
+          .select("id, ticket_number, type, status, store_id, client_name, created_at, reason", { count: "exact" })
           .in("type", ALL_REQUEST_TYPES)
           .not("status", "eq", "cancelada")
           .gte("created_at", chamadosFromIso)
           .lte("created_at", chamadosToIso)
-          .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ store_id: string }>>,
+          .range(from, to) as unknown as PromiseLike<PagedQueryResult<ChamadoTodosTiposRow>>,
       { pageSize: PAGE_SIZE }
     ),
     // Nomes de TODAS as lojas -- achado ao revisar esses números
@@ -612,11 +634,27 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     // TODAS as lojas, com ou sem chamado.
     listStores(),
   ]);
+  const storeNameById = new Map(allStores.map((s) => [s.id, s.name]));
   const chamadosPorLoja = new Map<string, number>();
+  const ticketsPorLoja = new Map<string, ReportRowItem[]>();
   for (const r of chamadosTodosTiposRows) {
     chamadosPorLoja.set(r.store_id, (chamadosPorLoja.get(r.store_id) ?? 0) + 1);
+    const lista = ticketsPorLoja.get(r.store_id) ?? [];
+    lista.push({
+      id: r.id,
+      ticketNumber: r.ticket_number,
+      type: r.type,
+      status: r.status,
+      clientName: r.client_name,
+      storeName: storeNameById.get(r.store_id) ?? r.store_id,
+      createdAt: r.created_at,
+      reason: r.reason,
+    });
+    ticketsPorLoja.set(r.store_id, lista);
   }
-  const storeNameById = new Map(allStores.map((s) => [s.id, s.name]));
+  // Mais recente primeiro -- pedido do Victor 14/09/2026, mesma ordem que
+  // faz sentido pra "lista de notificações" (ver VendaVsAssistenciaBoardModal.tsx).
+  for (const lista of ticketsPorLoja.values()) lista.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   // União das duas fontes -- uma loja pode ter vendas sem NENHUM chamado no
   // período (ótimo sinal, não motivo pra sumir da lista) ou, mais raro,
   // aparecer só no lado de chamados (loja sem venda sincronizada ainda).
@@ -631,6 +669,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
         vendas,
         chamados,
         percentual: vendas > 0 ? (chamados / vendas) * 100 : null,
+        tickets: ticketsPorLoja.get(storeId) ?? [],
       };
     })
     .sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1));
