@@ -39,48 +39,65 @@ export function TicketResumoModal({ ticket, onClose }: { ticket: ReportRowItem; 
             Fechar
           </button>
         </div>
-        <dl className="flex flex-col gap-2.5 text-sm">
-          <div>
-            <dt className="text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+        {/* Div simples em vez de dl/dt/dd -- achado do Victor 14/09/2026:
+            a margem padrão do navegador pra <dd> (margin-inline-start)
+            empurrava o valor pra longe do rótulo, parecendo alinhado à
+            direita em vez de embaixo do rótulo. text-left explícito nos
+            dois (rótulo e valor), sem margem nenhuma. */}
+        <div className="flex flex-col gap-2.5 text-sm text-left">
+          <div className="text-left">
+            <div className="text-[11px] uppercase tracking-wide text-left" style={{ color: "var(--text-muted)" }}>
               Tipo
-            </dt>
-            <dd style={{ color: "var(--text-primary)" }}>{REQUEST_TYPE_LABELS[ticket.type] ?? ticket.type}</dd>
+            </div>
+            <div className="text-left" style={{ color: "var(--text-primary)" }}>
+              {REQUEST_TYPE_LABELS[ticket.type] ?? ticket.type}
+            </div>
           </div>
-          <div>
-            <dt className="text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+          <div className="text-left">
+            <div className="text-[11px] uppercase tracking-wide text-left" style={{ color: "var(--text-muted)" }}>
               Cliente
-            </dt>
-            <dd style={{ color: "var(--text-primary)" }}>{ticket.clientName ?? "Sem nome"}</dd>
+            </div>
+            <div className="text-left" style={{ color: "var(--text-primary)" }}>
+              {ticket.clientName ?? "Sem nome"}
+            </div>
           </div>
-          <div>
-            <dt className="text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+          <div className="text-left">
+            <div className="text-[11px] uppercase tracking-wide text-left" style={{ color: "var(--text-muted)" }}>
               Loja
-            </dt>
-            <dd style={{ color: "var(--text-primary)" }}>{ticket.storeName}</dd>
+            </div>
+            <div className="text-left" style={{ color: "var(--text-primary)" }}>
+              {ticket.storeName}
+            </div>
           </div>
-          <div>
-            <dt className="text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+          <div className="text-left">
+            <div className="text-[11px] uppercase tracking-wide text-left" style={{ color: "var(--text-muted)" }}>
               Aberto em
-            </dt>
-            <dd style={{ color: "var(--text-primary)" }}>{formatDateTimeBr(ticket.createdAt)}</dd>
+            </div>
+            <div className="text-left" style={{ color: "var(--text-primary)" }}>
+              {formatDateTimeBr(ticket.createdAt)}
+            </div>
           </div>
           {ticket.productSummary ? (
-            <div>
-              <dt className="text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+            <div className="text-left">
+              <div className="text-[11px] uppercase tracking-wide text-left" style={{ color: "var(--text-muted)" }}>
                 Produto
-              </dt>
-              <dd style={{ color: "var(--text-primary)" }}>📦 {ticket.productSummary}</dd>
+              </div>
+              <div className="text-left" style={{ color: "var(--text-primary)" }}>
+                📦 {ticket.productSummary}
+              </div>
             </div>
           ) : null}
           {ticket.reason ? (
-            <div>
-              <dt className="text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+            <div className="text-left">
+              <div className="text-[11px] uppercase tracking-wide text-left" style={{ color: "var(--text-muted)" }}>
                 Problema
-              </dt>
-              <dd style={{ color: "var(--text-secondary)" }}>{ticket.reason}</dd>
+              </div>
+              <div className="text-left" style={{ color: "var(--text-secondary)" }}>
+                {ticket.reason}
+              </div>
             </div>
           ) : null}
-        </dl>
+        </div>
       </div>
     </>
   );

@@ -651,6 +651,38 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     listStores(),
   ]);
   const storeNameById = new Map(allStores.map((s) => [s.id, s.name]));
+  // Produto(s) desses chamados -- pedido do Victor 14/09/2026: "coloque o
+  // nome do produto também" no resumo (TicketResumoModal.tsx). Mesmo
+  // formato/fonte de `produtosPorChamado` acima (service_request_items),
+  // busca PRÓPRIA -- não dá pra reaproveitar aquele map, construído só
+  // pros ids de `rows` (escopo DELIVERY_REQUEST_TYPES, período com borda
+  // diferente, ver comentário em chamadosFromIso/chamadosToIso) --
+  // `chamadosTodosTiposRows` é um conjunto de chamados independente.
+  const chamadoVendaIds = chamadosTodosTiposRows.map((r) => r.id);
+  const chamadoVendaItems =
+    chamadoVendaIds.length === 0
+      ? []
+      : await fetchAllPagesParallel<{ request_id: string; product: string | null; quantity: number | null }>(
+          (from, to) =>
+            admin
+              .from("service_request_items")
+              .select("request_id, product, quantity", { count: "exact" })
+              .in("request_id", chamadoVendaIds)
+              .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ request_id: string; product: string | null; quantity: number | null }>>,
+          { pageSize: PAGE_SIZE }
+        );
+  const produtosPorChamadoVenda = new Map<string, string>();
+  {
+    const itensPorChamado = new Map<string, string[]>();
+    for (const item of chamadoVendaItems) {
+      if (!item.product) continue;
+      const label = item.quantity && item.quantity > 1 ? `${item.quantity}x ${item.product}` : item.product;
+      const lista = itensPorChamado.get(item.request_id) ?? [];
+      lista.push(label);
+      itensPorChamado.set(item.request_id, lista);
+    }
+    for (const [id, produtos] of itensPorChamado) produtosPorChamadoVenda.set(id, produtos.join(", "));
+  }
   const chamadosPorLoja = new Map<string, number>();
   const ticketsPorLoja = new Map<string, ReportRowItem[]>();
   for (const r of chamadosTodosTiposRows) {
@@ -665,6 +697,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
       storeName: storeNameById.get(r.store_id) ?? r.store_id,
       createdAt: r.created_at,
       reason: r.reason,
+      productSummary: produtosPorChamadoVenda.get(r.id),
     });
     ticketsPorLoja.set(r.store_id, lista);
   }
