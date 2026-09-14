@@ -7,6 +7,7 @@ import type { ReportRowItem } from "@/lib/serviceRequests";
 import { StatTile } from "./StatTile";
 import { BarRanking } from "./BarRanking";
 import { ProductBreakageRanking } from "./assistencia/ProductBreakageRanking";
+import { VendaVsAssistenciaTable } from "./assistencia/VendaVsAssistenciaTable";
 import { PrejuizoDetalheModal } from "./assistencia/PrejuizoDetalheModal";
 import { VolumeChart } from "./VolumeChart";
 import { CausaRaizDonutChart } from "./CausaRaizDonutChart";
@@ -89,6 +90,8 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
         <BarRanking title="Chamados por loja" data={data.byStore} onSelect={openDrilldown} showPercent />
         <BarRanking title="Chamados por atendente" data={data.byAgent} onSelect={openDrilldown} showPercent />
       </section>
+
+      <VendaVsAssistenciaTable data={data.byStoreVendaVsAssistencia} />
 
       <div className="rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
         <h3 className="text-sm font-medium mb-3" style={{ color: "var(--text-primary)" }}>

@@ -2,13 +2,14 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import type { DateRange } from "./dateRange";
 import type { Count, Coverage, DayCount } from "./kpi";
-import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES } from "./assistenciaLabels";
+import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES, ALL_REQUEST_TYPES } from "./assistenciaLabels";
 import { ROTA_LABELS, type Rota } from "./rotas";
 import {
   classificarProdutoAssistencia,
   getVendaQuantidadePorCodigoNoPeriodo,
   getCustoUnitarioPorCodigo,
   getEarliestSyncedOrderDate,
+  getVendasCountPorLoja,
 } from "./vendasProduto";
 import type { RequestType, RequestStatus, ReportRowItem } from "./serviceRequests";
 
@@ -200,9 +201,30 @@ export type AssistenciaKpiData = {
   byCausaRaiz: Count[];
   byConferente: Count[];
   byMotoristaErro: Count[];
+  // "Vendas x Assistência Técnica" por loja -- pedido do Victor 14/09/2026:
+  // "quero ver o percentual de quantidade de vendas (entregas) x
+  // quantidade de assistencia tecnica". Cruza DUAS fontes independentes
+  // pro MESMO período: vendas vêm do Protheus (totvs_orders, sincronizado
+  // via TOTVS Sync), chamados vêm do sistema integrado (service_requests,
+  // TODOS os tipos -- entrega/troca/peça/montagem/desmontagem/vistoria/
+  // etc., ver ALL_REQUEST_TYPES). Diferente de `byStore` acima -- aquele é
+  // só contagem de chamados (DELIVERY_REQUEST_TYPES, escopo mais estreito
+  // do resto desta tela, ver comentário no topo do arquivo); esse aqui é
+  // um cruzamento novo, com escopo de tipo próprio.
+  byStoreVendaVsAssistencia: VendaVsAssistenciaStat[];
   // Chave = `tag` de cada Count acima (ex.: "rota:praia") -- ver
   // AssistenciaTicketsModal.tsx.
   ticketsByTag: Record<string, ReportRowItem[]>;
+};
+
+export type VendaVsAssistenciaStat = {
+  storeId: string;
+  storeName: string;
+  vendas: number;
+  chamados: number;
+  // null quando vendas = 0 no período -- sem denominador, não dá pra
+  // calcular um percentual que signifique alguma coisa (não é "0%").
+  percentual: number | null;
 };
 
 // Taxa de Quebra / Prejuízo de Estoque -- pedido do Victor 10/09/2026:
@@ -537,10 +559,56 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     ? range.from.toISOString().slice(0, 10)
     : ((await getEarliestSyncedOrderDate()) ?? range.to.toISOString().slice(0, 10));
   const vendaRange = { from: vendaRangeFrom, to: range.to.toISOString().slice(0, 10) };
-  const [vendaQtdPorCodigo, custoPorCodigo] = await Promise.all([
+  const [vendaQtdPorCodigo, custoPorCodigo, vendasPorLoja, chamadosTodosTiposRows] = await Promise.all([
     getVendaQuantidadePorCodigoNoPeriodo(codigosReais, vendaRange),
     getCustoUnitarioPorCodigo(codigosReais),
+    // "Vendas x Assistência Técnica" (ver VendaVsAssistenciaStat acima) --
+    // denominador, do Protheus.
+    getVendasCountPorLoja(vendaRange),
+    // Numerador -- TODOS os tipos do sistema integrado (não só
+    // DELIVERY_REQUEST_TYPES de `rows`, ver comentário em
+    // byStoreVendaVsAssistencia), mesmo período de `rows` (created_at).
+    // Cancelada fica de fora, mesmo motivo/filtro de `rows` acima (nunca
+    // virou assistência de verdade).
+    fetchAllPagesParallel<{ store_id: string; stores: { name: string } | null }>(
+      (from, to) => {
+        let query = admin
+          .from("service_requests")
+          .select("store_id, stores(name)", { count: "exact" })
+          .in("type", ALL_REQUEST_TYPES)
+          .not("status", "eq", "cancelada")
+          .lte("created_at", toIso);
+        if (fromIso) query = query.gte("created_at", fromIso);
+        return query.range(from, to) as unknown as PromiseLike<PagedQueryResult<{ store_id: string; stores: { name: string } | null }>>;
+      },
+      { pageSize: PAGE_SIZE }
+    ),
   ]);
+  const chamadosPorLoja = new Map<string, number>();
+  const storeNameById = new Map<string, string>();
+  for (const r of chamadosTodosTiposRows) {
+    chamadosPorLoja.set(r.store_id, (chamadosPorLoja.get(r.store_id) ?? 0) + 1);
+    if (r.stores?.name && !storeNameById.has(r.store_id)) storeNameById.set(r.store_id, r.stores.name);
+  }
+  // União das duas fontes -- uma loja pode ter vendas sem NENHUM chamado no
+  // período (ótimo sinal, não motivo pra sumir da lista) ou, mais raro,
+  // aparecer só no lado de chamados (loja sem venda sincronizada ainda).
+  // Nome prefere o vindo de service_requests (já resolvido acima); cai pro
+  // próprio código de loja (branch) só se nenhum chamado trouxe o nome.
+  const lojaIds = new Set([...vendasPorLoja.keys(), ...chamadosPorLoja.keys()]);
+  const byStoreVendaVsAssistencia: VendaVsAssistenciaStat[] = [...lojaIds]
+    .map((storeId) => {
+      const vendas = vendasPorLoja.get(storeId) ?? 0;
+      const chamados = chamadosPorLoja.get(storeId) ?? 0;
+      return {
+        storeId,
+        storeName: storeNameById.get(storeId) ?? storeId,
+        vendas,
+        chamados,
+        percentual: vendas > 0 ? (chamados / vendas) * 100 : null,
+      };
+    })
+    .sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1));
 
   let prejuizoEstoqueTotal = 0;
   let chamadosComCusto = 0;
@@ -646,6 +714,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     byCausaRaiz,
     byConferente,
     byMotoristaErro,
+    byStoreVendaVsAssistencia,
     ticketsByTag,
   };
 }
