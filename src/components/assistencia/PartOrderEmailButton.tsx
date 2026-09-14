@@ -25,6 +25,9 @@ function buildSubject(): string {
 }
 
 function buildBody(o: PartOrder): string {
+  // Espaço (linha em branco) entre cada informação -- pedido do Victor
+  // 14/09/2026: "gentileza em dar espaços em acada informação". Antes era
+  // uma linha embaixo da outra sem respiro nenhum.
   return [
     `Nome do Cliente: ${o.clientName ?? ""}`,
     `N° Pedido de Venda: `,
@@ -40,7 +43,7 @@ function buildBody(o: PartOrder): string {
     `Código da Peça: ${o.partCode ?? ""}`,
     `Descrição: ${o.notes ?? ""}`,
     `FOTO/VÍDEO: `,
-  ].join("\n");
+  ].join("\n\n");
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
