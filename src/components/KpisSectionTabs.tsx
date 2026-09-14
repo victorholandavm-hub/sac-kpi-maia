@@ -16,15 +16,16 @@ export type KpisSectionKey = (typeof TABS)[number]["key"];
 // diferentes, cada uma com seu próprio RangePicker) -- não dá pra usar
 // layout compartilhado (mesmo motivo de SacTabs.tsx/SolicitacoesTabs em
 // fila/page.tsx), cada página renderiza isso informando qual aba é a
-// sua. Estilo de aba sublinhada 14/09/2026 (3ª rodada do mesmo pedido,
-// ver UnderlineTab.tsx pro racional completo) -- saiu do laranja
-// próprio (ver git blame) pro mesmo verde/branco usado nas outras abas
-// desse estilo no resto do app.
+// sua. Estilo de aba sublinhada 14/09/2026 (ver UnderlineTab.tsx pro
+// racional completo) -- estrutura igual ao resto do app agora, mas
+// `color="var(--brand-orange)"` mantém a identidade visual própria do
+// painel de KPIs (pedido do Victor no mesmo dia, revisão final: "esse,
+// dos kpis pode deixar a cor laranja mesmo, nao verde").
 export function KpisSectionTabs({ active }: { active: KpisSectionKey }) {
   return (
     <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
       {TABS.map((tab) => (
-        <UnderlineTab key={tab.key} href={tab.href} label={tab.label} active={tab.key === active} />
+        <UnderlineTab key={tab.key} href={tab.href} label={tab.label} active={tab.key === active} color="var(--brand-orange)" />
       ))}
     </div>
   );

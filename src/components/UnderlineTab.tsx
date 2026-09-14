@@ -15,15 +15,22 @@ import Link from "next/link";
 // KpisSectionTabs.tsx) com a MESMA receita -- reescrever à mão de novo
 // cada vez que o estilo mudar (já mudou duas vezes hoje) é receita
 // pra divergir.
-export function UnderlineTab({ href, label, active }: { href: string; label: string; active: boolean }) {
+//
+// `color` opcional (default verde) -- pedido do Victor 14/09/2026
+// (revisão no mesmo dia): "esse, dos kpis pode deixar a cor laranja
+// mesmo, nao verde" -- KpisSectionTabs.tsx já usava laranja antes de
+// virar essa aba sublinhada (paleta própria do painel de KPIs, ver
+// AppHeader.tsx), só a estrutura mudou, a cor da aba ativa continua
+// sendo a "identidade" de cada tela que usa esse componente.
+export function UnderlineTab({ href, label, active, color = "var(--brand-green)" }: { href: string; label: string; active: boolean; color?: string }) {
   return (
     <Link
       href={href}
       className="text-sm font-medium px-4 py-2 -mb-px rounded-t-lg border border-b-0 transition-colors duration-200"
       style={{
         color: active ? "#fff" : "var(--text-secondary)",
-        background: active ? "var(--brand-green)" : "transparent",
-        borderColor: active ? "var(--brand-green)" : "transparent",
+        background: active ? color : "transparent",
+        borderColor: active ? color : "transparent",
       }}
     >
       {label}
