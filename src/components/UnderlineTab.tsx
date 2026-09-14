@@ -22,6 +22,20 @@ import Link from "next/link";
 // virar essa aba sublinhada (paleta própria do painel de KPIs, ver
 // AppHeader.tsx), só a estrutura mudou, a cor da aba ativa continua
 // sendo a "identidade" de cada tela que usa esse componente.
+//
+// borderColor da aba ativa é var(--border) (a MESMA cor do trilho
+// embaixo), não `color` -- correção do Victor 14/09/2026 (3ª rodada):
+// "quero que a linha acompanhe a aba que está selecionada... a linha
+// que está vindo de baixo, suba a partir do retangulo, rodeando o
+// retangulo e desça novamente se juntando a linha de baixo". Com
+// border-b-0 + rounded-t-lg + -mb-px (que já existiam), essa borda
+// cinza sobe pelos dois lados e contorna o topo do quadrado preenchido,
+// juntando visualmente com o border-b do trilho nas duas pontas -- só
+// não passa embaixo da palavra (a própria borda de baixo foi removida),
+// que é exatamente o "não precisa sublinhar a palavra" pedido por ele.
+// Antes usava `color` (a cor de preenchimento), o que deixava a borda
+// invisível (mesma cor do fundo) -- por isso parecia só "sumir" atrás
+// do quadrado em vez de contornar.
 export function UnderlineTab({ href, label, active, color = "var(--brand-green)" }: { href: string; label: string; active: boolean; color?: string }) {
   return (
     <Link
@@ -30,7 +44,7 @@ export function UnderlineTab({ href, label, active, color = "var(--brand-green)"
       style={{
         color: active ? "#fff" : "var(--text-secondary)",
         background: active ? color : "transparent",
-        borderColor: active ? color : "transparent",
+        borderColor: active ? "var(--border)" : "transparent",
       }}
     >
       {label}
