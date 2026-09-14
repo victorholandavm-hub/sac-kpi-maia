@@ -405,6 +405,16 @@ export function EntregasKanbanHoje({
   // SAC/Assistência -- mesmo padrão de clique de selectedRotaKey acima
   // (clicar de novo no já selecionado desmarca, volta a mostrar todos).
   const [selectedOrigem, setSelectedOrigem] = useState<OrigemFilter | null>(null);
+  // "Atendente" -- pedido do Victor 14/09/2026: "quando eu clicasse em
+  // SAC, me desse mais uma opção de filtro, para eu filtrar por
+  // atendente" -- só existe aqui DEPOIS de escolher SAC/Assistência acima
+  // (mesmo padrão do filtro "Atendente" da aba Entregas propriamente dita,
+  // ver fila/page.tsx). Diferente de lá (que busca a lista de nomes do
+  // servidor via listAtendentesByRole, dal.ts) -- aqui os chamados já
+  // vieram prontos do servidor, então as opções vêm dos próprios
+  // `requestedByName` distintos já visíveis (ver atendenteOptions abaixo),
+  // sem ida nova ao banco.
+  const [selectedAtendente, setSelectedAtendente] = useState<string | null>(null);
 
   // "Rotas" -- pedido do Victor 03/09/2026: "um botão... quando eu clicar
   // ele aparece as rotas dos próximos 5 dias e se eu clicar em algum desses
@@ -577,8 +587,14 @@ export function EntregasKanbanHoje({
   );
   const rotaRows = selectedRotaKey ? allRows.filter((row) => row.columnKey === selectedRotaKey) : allRows;
   const origemRows = selectedOrigem ? rotaRows.filter((row) => matchesOrigem(row.r, selectedOrigem)) : rotaRows;
+  // Opções do dropdown "Atendente" -- nomes distintos que já aparecem em
+  // origemRows (pós SAC/Assistência, pré atendente), ordem alfabética.
+  const atendenteOptions = selectedOrigem
+    ? [...new Set(origemRows.map((row) => row.r.requestedByName).filter((n): n is string => !!n))].sort((a, b) => a.localeCompare(b, "pt-BR"))
+    : [];
+  const atendenteRows = selectedAtendente ? origemRows.filter((row) => row.r.requestedByName === selectedAtendente) : origemRows;
   const counts: HojeStatusCounts = { programado: 0, concluido: 0, cancelado: 0, nao_concluido: 0 };
-  for (const row of origemRows) counts[deliveryStatusTab(row.r.status)]++;
+  for (const row of atendenteRows) counts[deliveryStatusTab(row.r.status)]++;
   // Aba "Todos" -- pedido do Victor 02/09/2026: "coloque para baixo os que
   // forem sendo concluidos e fique em cima os ainda programados". `.sort` é
   // estável (garantido desde ES2019), então só separa concluído do resto --
@@ -586,8 +602,8 @@ export function EntregasKanbanHoje({
   // de cada grupo, só empurra concluído pro fim da lista.
   const visibleRows =
     tab === "todos"
-      ? [...origemRows].sort((a, b) => (a.r.status === "concluida" ? 1 : 0) - (b.r.status === "concluida" ? 1 : 0))
-      : origemRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
+      ? [...atendenteRows].sort((a, b) => (a.r.status === "concluida" ? 1 : 0) - (b.r.status === "concluida" ? 1 : 0))
+      : atendenteRows.filter((row) => deliveryStatusTab(row.r.status) === tab);
 
   // Imprimir em bloco -- pedido do Victor 03/09/2026: "quando eu escolho a
   // data da próxima rota, e ele me traz a lista, tem que ter a opção de
@@ -706,7 +722,10 @@ export function EntregasKanbanHoje({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setSelectedOrigem((prev) => (prev === "sac" ? null : "sac"))}
+            onClick={() => {
+              setSelectedOrigem((prev) => (prev === "sac" ? null : "sac"));
+              setSelectedAtendente(null);
+            }}
             className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors whitespace-nowrap"
             style={
               selectedOrigem === "sac"
@@ -718,7 +737,10 @@ export function EntregasKanbanHoje({
           </button>
           <button
             type="button"
-            onClick={() => setSelectedOrigem((prev) => (prev === "assistencia" ? null : "assistencia"))}
+            onClick={() => {
+              setSelectedOrigem((prev) => (prev === "assistencia" ? null : "assistencia"));
+              setSelectedAtendente(null);
+            }}
             className="text-xs font-semibold rounded-md shadow-sm px-2.5 py-1.5 border transition-colors whitespace-nowrap"
             style={
               selectedOrigem === "assistencia"
@@ -728,6 +750,26 @@ export function EntregasKanbanHoje({
           >
             Assistência
           </button>
+          {/* "Atendente" -- só aparece depois de escolher SAC/Assistência
+              acima (ver atendenteOptions), mesmo padrão do filtro
+              equivalente da aba Entregas (fila/page.tsx). Select nativo
+              (não FilterSelect, que mexe na URL -- aqui é tudo estado local
+              do board "Hoje"/"Rotas", sem searchParams). */}
+          {selectedOrigem && atendenteOptions.length > 0 ? (
+            <select
+              value={selectedAtendente ?? ""}
+              onChange={(e) => setSelectedAtendente(e.target.value || null)}
+              className="rounded-md border px-2 py-1.5 text-xs"
+              style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: selectedAtendente ? "var(--text-primary)" : "var(--text-secondary)" }}
+            >
+              <option value="">Atendente: todos</option>
+              {atendenteOptions.map((nome) => (
+                <option key={nome} value={nome}>
+                  {nome}
+                </option>
+              ))}
+            </select>
+          ) : null}
         </div>
 
         {nextRoutesPicker}
