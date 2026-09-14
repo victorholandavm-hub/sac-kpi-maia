@@ -50,6 +50,20 @@ export const getProfile = cache(async (): Promise<Profile> => {
   };
 });
 
+// Nomes de quem tem login com esse papel -- usado no filtro "Atendente" da
+// aba Entregas (fila/page.tsx e sac/notificacoes/page.tsx), pedido do
+// Victor 14/09/2026: "quando eu clicasse em SAC, me desse mais uma opção
+// de filtro, para eu filtrar por atendente. e a mesma coisa para
+// assistencia". Sem requireRole -- é só uma lista de nomes, a mesma
+// informação que já aparece em cada chamado individual dessas telas
+// (requestedByName, ver serviceRequests.ts).
+export async function listAtendentesByRole(role: "sac" | "assistencia"): Promise<string[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("profiles").select("full_name").eq("role", role).order("full_name");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((p) => p.full_name as string);
+}
+
 // Mesma consulta de getProfile, sem redirecionar -- pra código que precisa
 // checar "essa ação também vale pra admin/assistência" como fallback opcional
 // dentro de um fluxo cuja sessão principal é outra (ex.: gerente de loja por
