@@ -527,13 +527,24 @@ export function EntregasKanbanHoje({
                 style={
                   viewDate === date
                     ? { background: "var(--brand-green-soft)", color: "var(--text-primary)", fontWeight: 600 }
-                    : { color: date < today ? "var(--text-secondary)" : "var(--text-primary)" }
+                    : // Cor de fundo bem leve pra reforçar o rótulo acima --
+                      // pedido do Victor 13/09/2026: "coloque uma cor bem
+                      // leve para diferenciar". Neutro pro passado, verde
+                      // (mesma família do brand-green, só bem mais diluído
+                      // que --brand-green-soft usado no dia selecionado
+                      // acima -- não pode parecer selecionado) pro futuro.
+                      {
+                        background: date < today ? "color-mix(in srgb, var(--text-muted) 8%, transparent)" : "color-mix(in srgb, var(--brand-green) 8%, transparent)",
+                        color: date < today ? "var(--text-secondary)" : "var(--text-primary)",
+                      }
                 }
                 onMouseEnter={(e) => {
                   if (viewDate !== date) e.currentTarget.style.background = "var(--surface-2)";
                 }}
                 onMouseLeave={(e) => {
-                  if (viewDate !== date) e.currentTarget.style.background = "transparent";
+                  if (viewDate !== date) {
+                    e.currentTarget.style.background = date < today ? "color-mix(in srgb, var(--text-muted) 8%, transparent)" : "color-mix(in srgb, var(--brand-green) 8%, transparent)";
+                  }
                 }}
               >
                 {WEEKDAY_SHORT[new Date(`${date}T00:00:00Z`).getUTCDay()]} {shortDateLabel(date)}
