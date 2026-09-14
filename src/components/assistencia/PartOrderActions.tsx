@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { updatePartOrderStatus, updatePartOrderDelivery, addPartOrderNote } from "@/app/assistencia/pecas-actions";
+import {
+  updatePartOrderStatus,
+  updatePartOrderDelivery,
+  addPartOrderNote,
+  markResolvedWithoutPart,
+  unmarkResolvedWithoutPart,
+  type PartOrderDeliveryOutcome,
+} from "@/app/assistencia/pecas-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PART_ORDER_STATUS_LABELS } from "@/lib/assistenciaLabels";
 
@@ -13,12 +20,13 @@ import { PART_ORDER_STATUS_LABELS } from "@/lib/assistenciaLabels";
 // enviada_ao_cliente SAÍRAM daqui (pedido do Victor 09/09/2026: "depois que
 // marca como recebida... colocar se foi entregue ao cliente e se o caso foi
 // encerrado" como duas perguntas independentes, não um botão de cada vez em
-// sequência) -- ver DeliveryCheckboxes abaixo.
+// sequência) -- ver DeliveryOutcomeCard abaixo.
 const NEXT_STATUSES: Record<string, string[]> = {
   aguardando_resposta: ["peca_recebida", "aguardando_peca", "cancelada"],
   aguardando_peca: ["peca_recebida", "aguardando_resposta", "cancelada"],
   encerrado: [],
   cancelada: [],
+  devolvida_ao_estoque: [],
 };
 
 // "peca_recebida" é sempre a ação primária (avança o fluxo de verdade);
@@ -59,56 +67,148 @@ function StatusButton({ s, pending, onClick }: { s: string; pending: boolean; on
   );
 }
 
-// Depois que a peça chega, "enviada ao cliente" e "caso encerrado" são
-// fatos independentes (mesmo jeito que a planilha original tratava --
-// colunas separadas, não um status único avançando) -- pedido do Victor
-// 09/09/2026. Cada checkbox chama updatePartOrderDelivery com o par
-// completo (delivered, closed) -- o servidor deriva o status final sozinho
-// (encerrado > enviada_ao_cliente > peca_recebida, mesma prioridade da
-// importação do histórico). Estilo de cartão clicável em vez de checkbox
-// nu -- pedido do Victor 10/09/2026 (item 3, "produtividade").
-//
-// Continua aparecendo com status "encerrado" -- correção do Victor
-// 11/09/2026: "nas peças que estão com o status de encerrado, precisam
-// poder mudar de status pela equipe assistencia". Antes esses 2 checkboxes
-// só apareciam pra peca_recebida/enviada_ao_cliente -- assim que o caso
-// virava "encerrado" (a própria checkbox "Caso encerrado?" marcada), o card
-// inteiro sumia e sobrava só o texto estático "Pedido encerrado.", sem
-// nenhum controle pra desmarcar/reabrir (servidor já aceitava, ver
-// updatePartOrderDelivery em pecas-actions.ts -- o buraco era só aqui na
-// tela). `delivered` agora vem de fora (order.sentToClientAt, não mais
-// inferido só do status) -- com status "encerrado" não dava pra saber se
-// tinha sido entregue antes de fechar só olhando o status.
-function DeliveryCheckboxes({ orderId, status, delivered: initialDelivered }: { orderId: string; status: string; delivered: boolean }) {
-  const { pending, run } = useQuickAction();
-  const [delivered, setDelivered] = useState(initialDelivered);
-  const [closed, setClosed] = useState(status === "encerrado");
+function formatDateTimeShort(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
 
-  function toggleDelivered(checked: boolean) {
-    setDelivered(checked);
-    run(() => updatePartOrderDelivery(orderId, checked, closed), checked ? "Marcado como entregue ao cliente." : "Desmarcado.");
-  }
-  function toggleClosed(checked: boolean) {
-    setClosed(checked);
-    run(() => updatePartOrderDelivery(orderId, delivered, checked), checked ? "Caso encerrado." : "Reaberto.");
+// Diferenciação CASO x PEÇA -- pedido do Victor 14/09/2026: "às vezes
+// consegue a peça por outros meios... encerra o caso do cliente e só
+// depois a peça chega", esclarecido em seguida: "preciso que haja dentro
+// da solicitação a diferenciação entre a solicitação do cliente e a peça
+// ligada a ele. Pois o caso fica encerrado, mas nós ainda estamos
+// aguardando a peça". Essa marcação é INDEPENDENTE do status (o pedido
+// continua seu fluxo normal até a peça chegar de verdade) -- só avisa: a
+// partir de agora, não tem mais cliente esperando por ela (ver
+// DeliveryOutcomeCard abaixo, que passa a oferecer "devolvida ao estoque"
+// como desfecho).
+function ResolvedWithoutPartToggle({
+  orderId,
+  resolvedAt,
+  resolvedBy,
+}: {
+  orderId: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+}) {
+  const { pending, run } = useQuickAction();
+
+  if (resolvedAt) {
+    return (
+      <div
+        className="flex items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5 text-sm flex-wrap"
+        style={{ borderColor: "var(--brand-orange)", background: "color-mix(in srgb, var(--brand-orange) 10%, var(--surface-1))" }}
+      >
+        <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+          ⚠ Cliente já resolvido sem esta peça ({formatDateTimeShort(resolvedAt)}
+          {resolvedBy ? `, ${resolvedBy}` : ""}). Quando a peça chegar, devolva ao estoque.
+        </span>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => run(() => unmarkResolvedWithoutPart(orderId), "Desmarcado.")}
+          className="text-xs font-semibold underline shrink-0 disabled:opacity-60"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          desfazer
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="grid sm:grid-cols-2 gap-2">
-      <label
-        className="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-100 rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
-        style={delivered ? { borderColor: "var(--brand-green)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" } : undefined}
-      >
-        <input type="checkbox" checked={delivered} disabled={pending} onChange={(e) => toggleDelivered(e.target.checked)} className="rounded w-4 h-4" />
-        Entregue ao cliente?
-      </label>
-      <label
-        className="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-100 rounded-lg border border-gray-200 dark:border-gray-600 px-3.5 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
-        style={closed ? { borderColor: "var(--brand-green)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" } : undefined}
-      >
-        <input type="checkbox" checked={closed} disabled={pending} onChange={(e) => toggleClosed(e.target.checked)} className="rounded w-4 h-4" />
-        Caso encerrado?
-      </label>
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => run(() => markResolvedWithoutPart(orderId), "Marcado: cliente já resolvido sem esta peça.")}
+      className="text-sm font-medium text-left underline disabled:opacity-60 self-start"
+      style={{ color: "var(--text-secondary)" }}
+    >
+      Cliente já foi resolvido sem esta peça?
+    </button>
+  );
+}
+
+const DELIVERY_OUTCOMES: { value: PartOrderDeliveryOutcome; label: string }[] = [
+  { value: "pendente", label: "Aguardando decisão" },
+  { value: "entregue", label: "Entregue ao cliente" },
+  { value: "devolvida_estoque", label: "Devolvida ao estoque" },
+];
+
+function initialOutcome(status: string, delivered: boolean): PartOrderDeliveryOutcome {
+  if (status === "devolvida_ao_estoque") return "devolvida_estoque";
+  if (delivered) return "entregue";
+  return "pendente";
+}
+
+// Depois que a peça chega, o desfecho é uma escolha entre 3 caminhos
+// mutuamente exclusivos (mesmo espírito das 2 checkboxes independentes de
+// antes -- pedido do Victor 09/09/2026 -- ampliado 14/09/2026 pra incluir
+// "devolvida ao estoque"). "Caso encerrado?" continua uma pergunta à parte,
+// só relevante em cima de "entregue" (devolvida ao estoque já é terminal
+// sozinha). Estilo de cartão clicável -- pedido do Victor 10/09/2026 (item
+// 3, "produtividade").
+//
+// Continua aparecendo com status "encerrado"/"devolvida_ao_estoque" --
+// correção do Victor 11/09/2026: "nas peças que estão com o status de
+// encerrado, precisam poder mudar de status pela equipe assistencia" --
+// sem isso o card sumia e sobrava só texto estático, sem controle pra
+// desmarcar/reabrir.
+function DeliveryOutcomeCard({ orderId, status, delivered: initialDelivered }: { orderId: string; status: string; delivered: boolean }) {
+  const { pending, run } = useQuickAction();
+  const [outcome, setOutcome] = useState<PartOrderDeliveryOutcome>(initialOutcome(status, initialDelivered));
+  const [closed, setClosed] = useState(status === "encerrado");
+
+  function choose(next: PartOrderDeliveryOutcome) {
+    setOutcome(next);
+    run(
+      () => updatePartOrderDelivery(orderId, next, closed),
+      next === "devolvida_estoque" ? "Marcada como devolvida ao estoque." : next === "entregue" ? "Marcado como entregue ao cliente." : "Desmarcado."
+    );
+  }
+  function toggleClosed(checked: boolean) {
+    setClosed(checked);
+    run(() => updatePartOrderDelivery(orderId, outcome, checked), checked ? "Caso encerrado." : "Reaberto.");
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid sm:grid-cols-3 gap-2">
+        {DELIVERY_OUTCOMES.map((o) => (
+          <label
+            key={o.value}
+            className="flex items-center gap-2.5 text-sm font-medium rounded-lg border px-3.5 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
+            style={
+              outcome === o.value
+                ? { color: "var(--text-primary)", borderColor: "var(--brand-green)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }
+                : { color: "var(--text-primary)", borderColor: "var(--border)" }
+            }
+          >
+            <input
+              type="radio"
+              name={`outcome-${orderId}`}
+              checked={outcome === o.value}
+              disabled={pending}
+              onChange={() => choose(o.value)}
+              className="w-4 h-4"
+            />
+            {o.label}
+          </label>
+        ))}
+      </div>
+
+      {outcome === "entregue" ? (
+        <label
+          className="flex items-center gap-2.5 text-sm font-medium rounded-lg border px-3.5 py-2.5 cursor-pointer self-start hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
+          style={
+            closed
+              ? { color: "var(--text-primary)", borderColor: "var(--brand-green)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }
+              : { color: "var(--text-primary)", borderColor: "var(--border)" }
+          }
+        >
+          <input type="checkbox" checked={closed} disabled={pending} onChange={(e) => toggleClosed(e.target.checked)} className="rounded w-4 h-4" />
+          Caso encerrado?
+        </label>
+      ) : null}
     </div>
   );
 }
@@ -156,33 +256,46 @@ export function PartOrderActions({
   status,
   notes,
   delivered,
+  resolvedWithoutPartAt,
+  resolvedWithoutPartBy,
 }: {
   orderId: string;
   status: string;
   notes?: string | null;
   // Se já foi enviada ao cliente (order.sentToClientAt) -- só pra
-  // inicializar o checkbox certo quando status já chega como "encerrado"
-  // (ver DeliveryCheckboxes acima). Statuses anteriores (aguardando_*) não
+  // inicializar o card certo quando status já chega como "encerrado" (ver
+  // DeliveryOutcomeCard acima). Statuses anteriores (aguardando_*) não
   // usam esse valor.
   delivered: boolean;
+  // Ver ResolvedWithoutPartToggle acima -- pedido do Victor 14/09/2026.
+  resolvedWithoutPartAt: string | null;
+  resolvedWithoutPartBy: string | null;
 }) {
   const { pending, run } = useQuickAction();
   const [note, setNote] = useState("");
 
   const nextStatuses = NEXT_STATUSES[status] ?? [];
-  // "encerrado" entra aqui também -- pedido do Victor 11/09/2026 (ver
-  // comentário em DeliveryCheckboxes). "cancelada" continua fora: não tem
-  // par entregue/encerrado pra reabrir, é só terminal mesmo (pedido cancela
-  // e recria do zero, se precisar).
-  const showDeliveryCheckboxes = status === "peca_recebida" || status === "enviada_ao_cliente" || status === "encerrado";
+  // Devolvida_ao_estoque entra aqui também (14/09/2026), junto com
+  // encerrado (11/09/2026: "nas peças que estão com o status de encerrado,
+  // precisam poder mudar de status pela equipe assistencia") -- "cancelada"
+  // continua fora: não tem desfecho pra reabrir, é só terminal mesmo
+  // (pedido cancela e recria do zero, se precisar).
+  const showDeliveryOutcome = status === "peca_recebida" || status === "enviada_ao_cliente" || status === "encerrado" || status === "devolvida_ao_estoque";
+  const showNextStatusButtons = !showDeliveryOutcome && nextStatuses.length > 0;
+  // "Cliente já resolvido sem esta peça?" só faz sentido enquanto o pedido
+  // ainda não tem um desfecho -- ver BLOCKED_FOR_RESOLVED_WITHOUT_PART
+  // (pecas-actions.ts), mesma lista.
+  const canMarkResolvedWithoutPart = !["enviada_ao_cliente", "encerrado", "cancelada", "devolvida_ao_estoque"].includes(status);
 
   return (
     <div className="bg-white dark:bg-gray-800 border-2 rounded-xl p-6 shadow-sm flex flex-col gap-4" style={{ borderColor: "var(--brand-green)" }}>
       <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Ações</h3>
 
-      {showDeliveryCheckboxes ? (
-        <DeliveryCheckboxes orderId={orderId} status={status} delivered={delivered} />
-      ) : nextStatuses.length > 0 ? (
+      {canMarkResolvedWithoutPart ? (
+        <ResolvedWithoutPartToggle orderId={orderId} resolvedAt={resolvedWithoutPartAt} resolvedBy={resolvedWithoutPartBy} />
+      ) : null}
+
+      {showNextStatusButtons ? (
         <div className="flex items-center gap-2 flex-wrap">
           {nextStatuses.map((s) => (
             <StatusButton
@@ -193,9 +306,11 @@ export function PartOrderActions({
             />
           ))}
         </div>
-      ) : (
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pedido cancelado.</p>
-      )}
+      ) : null}
+
+      {showDeliveryOutcome ? <DeliveryOutcomeCard orderId={orderId} status={status} delivered={delivered} /> : null}
+
+      {status === "cancelada" ? <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pedido cancelado.</p> : null}
 
       <div className="flex flex-col gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
         <div className="flex items-center gap-2">

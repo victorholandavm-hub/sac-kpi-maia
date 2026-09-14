@@ -110,6 +110,10 @@ export const PART_ORDER_STATUS_LABELS: Record<string, string> = {
   aguardando_peca: "Aguardando peça",
   peca_recebida: "Peça recebida",
   enviada_ao_cliente: "Enviada ao cliente",
+  // Pedido do Victor 14/09/2026: peça que chega depois do caso do cliente
+  // já ter sido resolvido por outro meio -- ver resolvedWithoutPartAt em
+  // partOrders.ts.
+  devolvida_ao_estoque: "Devolvida ao estoque",
   encerrado: "Encerrado",
   cancelada: "Cancelada",
 };
@@ -119,6 +123,7 @@ export const PART_ORDER_STATUS_COLORS: Record<string, string> = {
   aguardando_peca: "var(--status-warning)",
   peca_recebida: "var(--series-5)",
   enviada_ao_cliente: "var(--brand-orange)",
+  devolvida_ao_estoque: "var(--series-8)",
   encerrado: "var(--status-good)",
   cancelada: "var(--text-muted)",
 };

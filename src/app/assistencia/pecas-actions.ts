@@ -12,6 +12,21 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
   return str.length > 0 ? str : null;
 }
 
+// A partir de 14/09/2026 a equipe técnica também gerencia pedidos de peça,
+// só que numa rota própria (/assistencia/tecnico/pecas, visual denso igual
+// fila/estoque -- "fica ruim se for compartilhada a mesma tela da
+// assistencia", achado do Victor) -- as ações abaixo continuam as mesmas
+// pras duas rotas (requirePecasActor já cobre os dois mundos), só a
+// revalidação/redirecionamento precisam saber dos dois caminhos.
+function revalidatePecasPaths(id?: string) {
+  revalidatePath("/assistencia/pecas");
+  revalidatePath("/assistencia/tecnico/pecas");
+  if (id) {
+    revalidatePath(`/assistencia/pecas/${id}`);
+    revalidatePath(`/assistencia/tecnico/pecas/${id}`);
+  }
+}
+
 export type PartOrderFormState = { error?: string; success?: boolean } | undefined;
 
 export async function createPartOrder(_state: PartOrderFormState, formData: FormData): Promise<PartOrderFormState> {
@@ -92,7 +107,7 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
     return { error: `Não foi possível criar o pedido de peça: ${error?.message ?? "erro desconhecido"}` };
   }
 
-  revalidatePath("/assistencia/pecas");
+  revalidatePecasPaths();
   return { success: true };
 }
 
@@ -104,7 +119,7 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
 // (concatena "[data] texto" a cada nota), sobrescrever aqui apagaria o
 // histórico acumulado por engano.
 export async function updatePartOrder(id: string, _state: PartOrderFormState, formData: FormData): Promise<PartOrderFormState> {
-  await requirePecasActor();
+  const actor = await requirePecasActor();
 
   const partName = String(formData.get("part_name") ?? "").trim();
   if (!partName) {
@@ -150,89 +165,119 @@ export async function updatePartOrder(id: string, _state: PartOrderFormState, fo
     return { error: `Não foi possível salvar: ${error.message}` };
   }
 
-  revalidatePath("/assistencia/pecas");
-  revalidatePath(`/assistencia/pecas/${id}`);
-  redirect(`/assistencia/pecas/${id}`);
+  revalidatePecasPaths(id);
+  // Volta pra rota de quem editou -- rota própria da equipe técnica desde
+  // 14/09/2026 (ver revalidatePecasPaths acima).
+  redirect(actor.role === "tecnico" ? `/assistencia/tecnico/pecas/${id}` : `/assistencia/pecas/${id}`);
 }
 
 // Extraído pra reaproveitar em updatePartOrderStatus (uma peça) e
 // bulkUpdatePartOrderStatus (várias de uma vez, pedido do Victor
 // 09/09/2026: "seleção em lote") -- mesmos carimbos de data nos dois casos,
-// sem duplicar a regra.
-function statusChangePatch(newStatus: string): Record<string, string> {
+// sem duplicar a regra. `actor` é opcional só pra não quebrar a assinatura
+// se algum dia chamado sem ator disponível -- os dois usos atuais sempre
+// passam.
+function statusChangePatch(newStatus: string, actor?: { name: string }): Record<string, string> {
   const today = new Date().toISOString().slice(0, 10);
   const patch: Record<string, string> = { status: newStatus };
-  if (newStatus === "peca_recebida") patch.part_arrived_at = today;
+  // "devolvida_ao_estoque" também carimba part_arrived_at -- pular direto
+  // pra esse status (ex.: via PartOrderQuickStatus, sem passar pelas 2
+  // perguntas de updatePartOrderDelivery) ainda significa que a peça
+  // chegou fisicamente (pedido do Victor 14/09/2026, migration 0126).
+  if (newStatus === "peca_recebida" || newStatus === "devolvida_ao_estoque") patch.part_arrived_at = today;
   if (newStatus === "enviada_ao_cliente") patch.sent_to_client_at = today;
-  // Cancelada é terminal igual encerrado (pedido do Victor 09/09/2026) --
-  // mesmo carimbo de closed_at, só o status que difere.
-  if (newStatus === "encerrado" || newStatus === "cancelada") patch.closed_at = today;
+  // Cancelada/devolvida_ao_estoque são terminais igual encerrado (pedido
+  // do Victor 09/09/2026 e 14/09/2026) -- mesmo carimbo de closed_at, só o
+  // status que difere.
+  if (newStatus === "encerrado" || newStatus === "cancelada" || newStatus === "devolvida_ao_estoque") patch.closed_at = today;
+  // Chegar em "devolvida_ao_estoque" por qualquer caminho já registra
+  // "caso resolvido sem esta peça" sozinho, se ainda não tivesse sido
+  // marcado antes (ver markResolvedWithoutPart abaixo) -- não faz sentido
+  // ter esse status sem essa marca.
+  if (newStatus === "devolvida_ao_estoque" && actor) {
+    patch.resolved_without_part_at = new Date().toISOString();
+    patch.resolved_without_part_by = actor.name;
+  }
   return patch;
 }
 
 export async function updatePartOrderStatus(id: string, newStatus: string) {
-  await requirePecasActor();
+  const actor = await requirePecasActor();
   if (!isPartOrderStatus(newStatus)) throw new Error("Status inválido.");
 
   const admin = getSupabaseAdmin();
-  const { error } = await admin.from("part_orders").update(statusChangePatch(newStatus)).eq("id", id);
+  const { error } = await admin.from("part_orders").update(statusChangePatch(newStatus, actor)).eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/assistencia/pecas");
-  revalidatePath(`/assistencia/pecas/${id}`);
+  revalidatePecasPaths(id);
 }
 
 // Seleção em lote (pedido do Victor 09/09/2026: "Adicionar um checkbox...
 // para permitir a seleção em lote dos itens") -- um só update com `.in(...)`
 // em vez de um round-trip por pedido selecionado.
 export async function bulkUpdatePartOrderStatus(ids: string[], newStatus: string) {
-  await requirePecasActor();
+  const actor = await requirePecasActor();
   if (!isPartOrderStatus(newStatus)) throw new Error("Status inválido.");
   if (ids.length === 0) return;
 
   const admin = getSupabaseAdmin();
-  const { error } = await admin.from("part_orders").update(statusChangePatch(newStatus)).in("id", ids);
+  const { error } = await admin.from("part_orders").update(statusChangePatch(newStatus, actor)).in("id", ids);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/assistencia/pecas");
+  revalidatePecasPaths();
 }
 
-// Depois que a peça chega, "enviada ao cliente" e "caso encerrado" viram
-// duas perguntas INDEPENDENTES em vez de um botão de cada vez em sequência
-// -- pedido do Victor 09/09/2026, mesmo jeito que a planilha original já
-// tratava esses dois campos (colunas separadas, não um status único
-// avançando). Status final é derivado da combinação: encerrado (se
-// marcado) vence enviada_ao_cliente, que vence peca_recebida -- mesma
-// prioridade usada na importação do histórico (ver migration 0117).
-// Recalcula as duas datas do zero a cada chamada (não só carimba na
+// Depois que a peça chega, o desfecho vira uma escolha de 3 caminhos --
+// pedido do Victor 09/09/2026 (originalmente "entregue ao cliente"/"caso
+// encerrado" como duas perguntas independentes, mesmo jeito que a planilha
+// original tratava esses dois campos) ampliado em 14/09/2026: "às vezes
+// consegue a peça por outros meios... e essa peça que chega em nome do
+// cliente, volta pro estoque". `outcome` escolhe entre pendente/entregue/
+// devolvida ao estoque (mutuamente exclusivos -- não dá pra estar nos dois
+// ao mesmo tempo); "Caso encerrado?" continua uma pergunta À PARTE, só faz
+// sentido em cima de "entregue" (devolvida ao estoque já é terminal
+// sozinha, pendente não tem o que encerrar). Status final: devolvida ao
+// estoque > encerrado (se marcado) > enviada_ao_cliente > peca_recebida --
+// mesma prioridade em espírito da importação do histórico (migration
+// 0117). Recalcula os campos do zero a cada chamada (não só carimba na
 // primeira vez) -- é um formulário de "estado atual", não um log de
-// eventos: desmarcar deve conseguir limpar a data de novo.
-export async function updatePartOrderDelivery(id: string, delivered: boolean, closed: boolean) {
-  await requirePecasActor();
+// eventos: trocar de outcome deve conseguir limpar o anterior.
+export type PartOrderDeliveryOutcome = "pendente" | "entregue" | "devolvida_estoque";
+
+export async function updatePartOrderDelivery(id: string, outcome: PartOrderDeliveryOutcome, closed: boolean) {
+  const actor = await requirePecasActor();
 
   const admin = getSupabaseAdmin();
   const { data: current, error: fetchError } = await admin
     .from("part_orders")
-    .select("sent_to_client_at, closed_at")
+    .select("sent_to_client_at, closed_at, resolved_without_part_at")
     .eq("id", id)
     .maybeSingle();
   if (fetchError || !current) throw new Error("Pedido de peça não encontrado.");
 
   const today = new Date().toISOString().slice(0, 10);
-  const status = closed ? "encerrado" : delivered ? "enviada_ao_cliente" : "peca_recebida";
+  const isReturned = outcome === "devolvida_estoque";
+  const isDelivered = outcome === "entregue";
+  const status = isReturned ? "devolvida_ao_estoque" : closed ? "encerrado" : isDelivered ? "enviada_ao_cliente" : "peca_recebida";
 
-  const { error } = await admin
-    .from("part_orders")
-    .update({
-      status,
-      sent_to_client_at: delivered ? (current.sent_to_client_at ?? today) : null,
-      closed_at: closed ? (current.closed_at ?? today) : null,
-    })
-    .eq("id", id);
+  const patch: Record<string, string | null> = {
+    status,
+    sent_to_client_at: isDelivered ? (current.sent_to_client_at ?? today) : null,
+    closed_at: isReturned || closed ? (current.closed_at ?? today) : null,
+  };
+  // Devolver ao estoque sem ter passado antes por "marcar resolvido sem
+  // esta peça" (ex.: só percebeu agora, na hora que a peça chegou) --
+  // registra a marca sozinho, pra não ficar devolvida_ao_estoque sem essa
+  // informação (ver markResolvedWithoutPart abaixo).
+  if (isReturned && !current.resolved_without_part_at) {
+    patch.resolved_without_part_at = new Date().toISOString();
+    patch.resolved_without_part_by = actor.name;
+  }
+
+  const { error } = await admin.from("part_orders").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/assistencia/pecas");
-  revalidatePath(`/assistencia/pecas/${id}`);
+  revalidatePecasPaths(id);
 }
 
 export async function setExpectedAt(id: string, newDate: string) {
@@ -243,8 +288,52 @@ export async function setExpectedAt(id: string, newDate: string) {
   const { error } = await admin.from("part_orders").update({ expected_at: newDate }).eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/assistencia/pecas");
-  revalidatePath(`/assistencia/pecas/${id}`);
+  revalidatePecasPaths(id);
+}
+
+// Diferenciação CASO x PEÇA -- pedido do Victor 14/09/2026: às vezes a
+// assistência resolve o cliente por outro meio antes da peça pedida à
+// fábrica chegar (e encerra o atendimento dele), mas o pedido de peça em
+// si continua até a peça chegar de verdade, só que agora sem cliente
+// esperando por ela. Ação independente de status -- só registra o fato
+// "esse caso já foi resolvido sem esta peça", sem mexer no fluxo normal de
+// chegada (aguardando_peca -> peca_recebida continua rolando igual). É
+// updatePartOrderDelivery (acima) quem, na hora que a peça chega de
+// verdade, passa a oferecer "devolvida ao estoque" como desfecho em vez de
+// "entregue ao cliente". Bloqueado depois que o pedido já tem um desfecho
+// (entregue/encerrado/cancelado/devolvido) -- nesse ponto não faz mais
+// sentido "resolver sem a peça" algo que já terminou.
+const BLOCKED_FOR_RESOLVED_WITHOUT_PART = ["enviada_ao_cliente", "encerrado", "cancelada", "devolvida_ao_estoque"];
+
+export async function markResolvedWithoutPart(id: string) {
+  const actor = await requirePecasActor();
+  const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin.from("part_orders").select("status").eq("id", id).maybeSingle();
+  if (fetchError || !current) throw new Error("Pedido de peça não encontrado.");
+  if (BLOCKED_FOR_RESOLVED_WITHOUT_PART.includes(current.status)) {
+    throw new Error("Esse pedido já tem um desfecho -- não faz sentido marcar agora.");
+  }
+
+  const { error } = await admin
+    .from("part_orders")
+    .update({ resolved_without_part_at: new Date().toISOString(), resolved_without_part_by: actor.name })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePecasPaths(id);
+}
+
+export async function unmarkResolvedWithoutPart(id: string) {
+  await requirePecasActor();
+  const admin = getSupabaseAdmin();
+
+  const { error } = await admin
+    .from("part_orders")
+    .update({ resolved_without_part_at: null, resolved_without_part_by: null })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePecasPaths(id);
 }
 
 // "Peça chegou em" / "Enviada ao cliente em" editáveis à mão -- pedido do
@@ -288,8 +377,7 @@ async function updateDateFieldWithHistory(id: string, field: "part_arrived_at" |
     changed_by_role: actor.role,
   });
 
-  revalidatePath("/assistencia/pecas");
-  revalidatePath(`/assistencia/pecas/${id}`);
+  revalidatePecasPaths(id);
 }
 
 export async function updatePartArrivedAt(id: string, newDate: string) {
@@ -315,5 +403,5 @@ export async function addPartOrderNote(id: string, note: string) {
   const { error } = await admin.from("part_orders").update({ notes: appended }).eq("id", id);
   if (error) throw new Error(error.message);
 
-  revalidatePath(`/assistencia/pecas/${id}`);
+  revalidatePecasPaths(id);
 }
