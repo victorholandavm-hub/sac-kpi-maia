@@ -11,7 +11,7 @@ import {
   getEarliestSyncedOrderDate,
   getVendasCountPorLoja,
 } from "./vendasProduto";
-import type { RequestType, RequestStatus, ReportRowItem } from "./serviceRequests";
+import { listStores, type RequestType, type RequestStatus, type ReportRowItem } from "./serviceRequests";
 
 // "KPIs da Assistência" (página própria, /kpis-assistencia) -- pedido do
 // Victor 27/08/2026: "preciso que você pegue todas as informações de
@@ -559,7 +559,26 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     ? range.from.toISOString().slice(0, 10)
     : ((await getEarliestSyncedOrderDate()) ?? range.to.toISOString().slice(0, 10));
   const vendaRange = { from: vendaRangeFrom, to: range.to.toISOString().slice(0, 10) };
-  const [vendaQtdPorCodigo, custoPorCodigo, vendasPorLoja, chamadosTodosTiposRows] = await Promise.all([
+  // Cuidado de fuso -- achado ao revisar esses números 14/09/2026: "to"
+  // customizado (RangePicker, De/Até) chega como "YYYY-MM-DD" puro, e
+  // `new Date("2026-09-14")` do JS interpreta isso como meia-noite EM UTC
+  // (não meia-noite no Brasil, UTC-3) -- então `toIso` (usado no `rows`
+  // principal acima, escopo DELIVERY_REQUEST_TYPES) corta às 21h do dia
+  // ANTERIOR no horário do Brasil, perdendo quase o dia inteiro de "Até"
+  // pra quem escolhe um período customizado. `vendaRange.to`, por outro
+  // lado, é comparado contra `issue_date` (coluna DATE, sem hora) -- não
+  // sofre esse corte, sempre inclui o dia inteiro. Comparar chamados
+  // (created_at, com hora) contra vendas (issue_date, sem hora) usando
+  // bordas DIFERENTES faria o numerador e o denominador cobrirem janelas
+  // de dias diferentes -- exatamente o tipo de inconsistência que
+  // invalidaria o percentual. Corrigido aqui recalculando bordas
+  // ALINHADAS ao mesmo dia-calendário de `vendaRange` (não reusa
+  // fromIso/toIso do `rows` acima, que continua como estava -- mudar o
+  // corte do resto da página é remexer em números que o Victor já
+  // conferiu noutros gráficos, fora do escopo desse cruzamento).
+  const chamadosFromIso = `${vendaRange.from}T00:00:00.000Z`;
+  const chamadosToIso = `${vendaRange.to}T23:59:59.999Z`;
+  const [vendaQtdPorCodigo, custoPorCodigo, vendasPorLoja, chamadosTodosTiposRows, allStores] = await Promise.all([
     getVendaQuantidadePorCodigoNoPeriodo(codigosReais, vendaRange),
     getCustoUnitarioPorCodigo(codigosReais),
     // "Vendas x Assistência Técnica" (ver VendaVsAssistenciaStat acima) --
@@ -567,34 +586,40 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     getVendasCountPorLoja(vendaRange),
     // Numerador -- TODOS os tipos do sistema integrado (não só
     // DELIVERY_REQUEST_TYPES de `rows`, ver comentário em
-    // byStoreVendaVsAssistencia), mesmo período de `rows` (created_at).
+    // byStoreVendaVsAssistencia), mesma janela de dias de `vendaRange`
+    // (ver chamadosFromIso/chamadosToIso acima -- não fromIso/toIso do
+    // `rows` principal, que usa uma borda ligeiramente diferente).
     // Cancelada fica de fora, mesmo motivo/filtro de `rows` acima (nunca
     // virou assistência de verdade).
-    fetchAllPagesParallel<{ store_id: string; stores: { name: string } | null }>(
-      (from, to) => {
-        let query = admin
+    fetchAllPagesParallel<{ store_id: string }>(
+      (from, to) =>
+        admin
           .from("service_requests")
-          .select("store_id, stores(name)", { count: "exact" })
+          .select("store_id", { count: "exact" })
           .in("type", ALL_REQUEST_TYPES)
           .not("status", "eq", "cancelada")
-          .lte("created_at", toIso);
-        if (fromIso) query = query.gte("created_at", fromIso);
-        return query.range(from, to) as unknown as PromiseLike<PagedQueryResult<{ store_id: string; stores: { name: string } | null }>>;
-      },
+          .gte("created_at", chamadosFromIso)
+          .lte("created_at", chamadosToIso)
+          .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ store_id: string }>>,
       { pageSize: PAGE_SIZE }
     ),
+    // Nomes de TODAS as lojas -- achado ao revisar esses números
+    // 14/09/2026: resolver o nome só a partir do join de `chamadosTodosTiposRows`
+    // (como a primeira versão fazia) deixa sem nome exatamente a loja que
+    // teve vendas mas ZERO chamados no período -- o melhor caso possível,
+    // mas ficava mostrando o código cru da filial (ex.: "213") em vez do
+    // nome. `listStores()` (serviceRequests.ts) já é cacheada 60s e cobre
+    // TODAS as lojas, com ou sem chamado.
+    listStores(),
   ]);
   const chamadosPorLoja = new Map<string, number>();
-  const storeNameById = new Map<string, string>();
   for (const r of chamadosTodosTiposRows) {
     chamadosPorLoja.set(r.store_id, (chamadosPorLoja.get(r.store_id) ?? 0) + 1);
-    if (r.stores?.name && !storeNameById.has(r.store_id)) storeNameById.set(r.store_id, r.stores.name);
   }
+  const storeNameById = new Map(allStores.map((s) => [s.id, s.name]));
   // União das duas fontes -- uma loja pode ter vendas sem NENHUM chamado no
   // período (ótimo sinal, não motivo pra sumir da lista) ou, mais raro,
   // aparecer só no lado de chamados (loja sem venda sincronizada ainda).
-  // Nome prefere o vindo de service_requests (já resolvido acima); cai pro
-  // próprio código de loja (branch) só se nenhum chamado trouxe o nome.
   const lojaIds = new Set([...vendasPorLoja.keys(), ...chamadosPorLoja.keys()]);
   const byStoreVendaVsAssistencia: VendaVsAssistenciaStat[] = [...lojaIds]
     .map((storeId) => {
