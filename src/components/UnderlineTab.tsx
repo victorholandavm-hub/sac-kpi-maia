@@ -23,19 +23,25 @@ import Link from "next/link";
 // AppHeader.tsx), só a estrutura mudou, a cor da aba ativa continua
 // sendo a "identidade" de cada tela que usa esse componente.
 //
-// borderColor da aba ativa é var(--border) (a MESMA cor do trilho
-// embaixo), não `color` -- correção do Victor 14/09/2026 (3ª rodada):
-// "quero que a linha acompanhe a aba que está selecionada... a linha
-// que está vindo de baixo, suba a partir do retangulo, rodeando o
-// retangulo e desça novamente se juntando a linha de baixo". Com
-// border-b-0 + rounded-t-lg + -mb-px (que já existiam), essa borda
-// cinza sobe pelos dois lados e contorna o topo do quadrado preenchido,
-// juntando visualmente com o border-b do trilho nas duas pontas -- só
-// não passa embaixo da palavra (a própria borda de baixo foi removida),
-// que é exatamente o "não precisa sublinhar a palavra" pedido por ele.
-// Antes usava `color` (a cor de preenchimento), o que deixava a borda
-// invisível (mesma cor do fundo) -- por isso parecia só "sumir" atrás
-// do quadrado em vez de contornar.
+// borderColor da aba ativa contorna o quadrado preenchido -- correção do
+// Victor 14/09/2026 (3ª rodada): "quero que a linha acompanhe a aba que
+// está selecionada... a linha que está vindo de baixo, suba a partir do
+// retangulo, rodeando o retangulo e desça novamente se juntando a linha
+// de baixo". Com border-b-0 + rounded-t-lg + -mb-px (que já existiam),
+// essa borda sobe pelos dois lados e contorna o topo do quadrado
+// preenchido, juntando visualmente com o border-b do trilho nas duas
+// pontas -- só não passa embaixo da palavra (a própria borda de baixo foi
+// removida), que é exatamente o "não precisa sublinhar a palavra" pedido
+// por ele.
+//
+// var(--text-muted), não var(--border) -- 2ª correção, mesmo dia
+// ("ainda nao tem a linha"): var(--border) é cinza a 10% de opacidade
+// (pensado pra divisória sutil sobre fundo neutro), contra o preenchimento
+// verde sólido isso é praticamente invisível numa tela normal -- por isso
+// a borda "sumia" de novo, mesmo já sendo uma cor diferente do
+// preenchimento. var(--text-muted) é opaco (cinza médio de verdade),
+// contrasta tanto contra o verde quanto contra o fundo claro/escuro da
+// página.
 export function UnderlineTab({ href, label, active, color = "var(--brand-green)" }: { href: string; label: string; active: boolean; color?: string }) {
   return (
     <Link
@@ -44,7 +50,7 @@ export function UnderlineTab({ href, label, active, color = "var(--brand-green)"
       style={{
         color: active ? "#fff" : "var(--text-secondary)",
         background: active ? color : "transparent",
-        borderColor: active ? "var(--border)" : "transparent",
+        borderColor: active ? "var(--text-muted)" : "transparent",
       }}
     >
       {label}
