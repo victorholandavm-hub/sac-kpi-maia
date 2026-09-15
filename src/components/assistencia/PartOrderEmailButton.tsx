@@ -7,11 +7,14 @@ import type { PartOrder } from "@/lib/partOrders";
 // pedido do Victor 10/09/2026, texto exato que ele já usa hoje (copiado
 // literalmente, inclusive o bloco fixo de dados da empresa). Só os campos
 // vazios do modelo original (Nome do Cliente, Fábrica, Produto, Cor, Peça,
-// Código da Peça) são preenchidos com o dado do pedido -- "N° Pedido de
-// Venda" e "Descrição" não têm campo correspondente em part_orders, ficam
-// em branco pro atendente completar à mão (Descrição cai pra Observação
-// quando o pedido já tem uma, só pra economizar digitação, não é o mesmo
-// campo).
+// Código da Peça) são preenchidos com o dado do pedido -- "Descrição" não
+// tem campo correspondente em part_orders, fica em branco pro atendente
+// completar à mão (cai pra Observação quando o pedido já tem uma, só pra
+// economizar digitação, não é o mesmo campo). "N° Pedido de Venda"
+// (linha do modelo original) SAIU daqui 15/09/2026 -- achado do Victor:
+// "Nota Fiscal e N° Pedido de Venda é a mesma coisa, pode deixar só uma"
+// -- Nota Fiscal (abaixo) já cobre o mesmo conceito, agora com campo de
+// verdade (invoiceNumber) por trás.
 const EMPRESA_BLOCO = {
   municipio: "João Pessoa",
   estado: "Paraíba",
@@ -34,7 +37,6 @@ function buildBody(o: PartOrder): string {
   // uma linha embaixo da outra sem respiro nenhum.
   return [
     `Nome do Cliente: ${o.clientName ?? ""}`,
-    `N° Pedido de Venda: `,
     `Município: ${EMPRESA_BLOCO.municipio}`,
     `Estado: ${EMPRESA_BLOCO.estado}`,
     `Razão Social: ${EMPRESA_BLOCO.razaoSocial}`,
