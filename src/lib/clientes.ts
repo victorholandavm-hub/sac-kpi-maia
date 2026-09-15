@@ -291,9 +291,19 @@ export const CLIENTE_NIVEL_CRITERIA: Record<ClienteNivel, string> = {
   sem_compra: "Nunca fez uma compra (não tem nenhum pedido do tipo Venda no histórico do Protheus).",
 };
 
+// Achado 15/09/2026 revisando a classificação de nível: a subtração de
+// ano/mês sozinha ignora o DIA -- um cliente cuja 1ª compra foi dia 20 já
+// contava como "24 meses" no dia 15 do mês do aniversário, 5 dias ANTES de
+// completar 24 meses de verdade (mesmo bug nos limites de 12 e 6 meses,
+// ouro/prata). Sempre superestimava (nunca subestimava), e sempre na
+// direção de promover o cliente de nível cedo demais -- corrigido
+// comparando o dia também: se hoje ainda não chegou no dia do aniversário
+// deste mês, o mês corrente ainda não conta inteiro.
 function mesesEntre(dataIso: string, hoje: Date): number {
   const d = new Date(`${dataIso}T00:00:00`);
-  return (hoje.getFullYear() - d.getFullYear()) * 12 + (hoje.getMonth() - d.getMonth());
+  let meses = (hoje.getFullYear() - d.getFullYear()) * 12 + (hoje.getMonth() - d.getMonth());
+  if (hoje.getDate() < d.getDate()) meses -= 1;
+  return meses;
 }
 
 // Exportada -- recompra.ts reaproveita pro ciclo de reposição por
