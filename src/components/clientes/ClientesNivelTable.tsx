@@ -162,17 +162,51 @@ export function ClientesNivelTable({
   const scrollElRef = useRef<HTMLDivElement | null>(null);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
+  // Barra de rolagem duplicada no topo -- pedido do Victor 15/09/2026:
+  // tabela comprida (muitas linhas), o scrollbar horizontal só aparece no
+  // fim dela, obrigando rolar a página toda pra baixo só pra rolar pro
+  // lado. topRef é uma barra falsa em cima da tabela, sincronizada nos
+  // dois sentidos com o scroll de verdade (mesmo elemento data-slot=
+  // table-container de cima); spacerRef só existe pra dar largura de
+  // rolagem igual à da tabela real.
+  const topRef = useRef<HTMLDivElement>(null);
+  const spacerRef = useRef<HTMLDivElement>(null);
+  const syncingRef = useRef<"top" | "bottom" | null>(null);
+
   useEffect(() => {
     const el = wrapperRef.current?.querySelector<HTMLDivElement>('[data-slot="table-container"]');
-    if (!el) return;
+    const top = topRef.current;
+    const spacer = spacerRef.current;
+    if (!el || !top || !spacer) return;
     scrollElRef.current = el;
-    const update = () => setCanScrollRight(el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
+
+    const update = () => {
+      setCanScrollRight(el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
+      spacer.style.width = `${el.scrollWidth}px`;
+    };
     update();
-    el.addEventListener("scroll", update);
+
+    const onBottomScroll = () => {
+      update();
+      if (syncingRef.current === "top") return;
+      syncingRef.current = "bottom";
+      top.scrollLeft = el.scrollLeft;
+      syncingRef.current = null;
+    };
+    const onTopScroll = () => {
+      if (syncingRef.current === "bottom") return;
+      syncingRef.current = "top";
+      el.scrollLeft = top.scrollLeft;
+      syncingRef.current = null;
+    };
+
+    el.addEventListener("scroll", onBottomScroll);
+    top.addEventListener("scroll", onTopScroll);
     const observer = new ResizeObserver(update);
     observer.observe(el);
     return () => {
-      el.removeEventListener("scroll", update);
+      el.removeEventListener("scroll", onBottomScroll);
+      top.removeEventListener("scroll", onTopScroll);
       observer.disconnect();
     };
   }, [items]);
@@ -327,6 +361,13 @@ export function ClientesNivelTable({
       ref={wrapperRef}
       className="relative min-w-0 rounded-lg overflow-hidden border-2 border-[var(--brand-green)] [&_[data-slot=table-container]]:min-w-0 [&_[data-slot=table-container]]:[scrollbar-color:var(--brand-green)_transparent] [&_[data-slot=table-container]]:[scrollbar-width:thin] [&_[data-slot=table-container]]:[&::-webkit-scrollbar]:h-2.5 [&_[data-slot=table-container]]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot=table-container]]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot=table-container]]:[&::-webkit-scrollbar-thumb]:bg-[var(--brand-green)]"
     >
+      <div
+        ref={topRef}
+        className="min-w-0 overflow-x-auto overflow-y-hidden border-b [scrollbar-color:var(--brand-green)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--brand-green)]"
+        style={{ height: 17, borderColor: "var(--border)" }}
+      >
+        <div ref={spacerRef} style={{ height: 1 }} />
+      </div>
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
