@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { ClientesNivelTable } from "@/components/clientes/ClientesNivelTable";
+import { UnderlineTab } from "@/components/UnderlineTab";
+import { DualScrollTable } from "@/components/DualScrollTable";
 import {
   getClientesResumo,
   listClientes,
@@ -86,43 +88,10 @@ export default async function ClientesPage({
         </p>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Link
-          href={buildHref({ view: "status" })}
-          className="text-sm px-3 py-1.5 rounded-full border transition-colors"
-          style={{
-            borderColor: view === "status" ? "var(--brand-orange)" : "var(--border)",
-            background: view === "status" ? "var(--brand-orange)" : "transparent",
-            color: view === "status" ? "#fff" : "var(--text-secondary)",
-            fontWeight: view === "status" ? 600 : 400,
-          }}
-        >
-          Status (Protheus)
-        </Link>
-        <Link
-          href={buildHref({ view: "nivel" })}
-          className="text-sm px-3 py-1.5 rounded-full border transition-colors"
-          style={{
-            borderColor: view === "nivel" ? "var(--brand-orange)" : "var(--border)",
-            background: view === "nivel" ? "var(--brand-orange)" : "transparent",
-            color: view === "nivel" ? "#fff" : "var(--text-secondary)",
-            fontWeight: view === "nivel" ? 600 : 400,
-          }}
-        >
-          Nível de relacionamento
-        </Link>
-        <Link
-          href={buildHref({ view: "recompra" })}
-          className="text-sm px-3 py-1.5 rounded-full border transition-colors"
-          style={{
-            borderColor: view === "recompra" ? "var(--brand-orange)" : "var(--border)",
-            background: view === "recompra" ? "var(--brand-orange)" : "transparent",
-            color: view === "recompra" ? "#fff" : "var(--text-secondary)",
-            fontWeight: view === "recompra" ? 600 : 400,
-          }}
-        >
-          Propensão a recompra
-        </Link>
+      <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+        <UnderlineTab href={buildHref({ view: "status" })} label="Status (Protheus)" active={view === "status"} color="var(--brand-orange)" />
+        <UnderlineTab href={buildHref({ view: "nivel" })} label="Nível de relacionamento" active={view === "nivel"} color="var(--brand-orange)" />
+        <UnderlineTab href={buildHref({ view: "recompra" })} label="Propensão a recompra" active={view === "recompra"} color="var(--brand-orange)" />
       </div>
 
       {view === "status" ? (
@@ -598,7 +567,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
         // (mesma causa raiz do bug corrigido em ClientesNivelTable.tsx
         // 15/09/2026).
         <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
-          <div className="min-w-0 overflow-x-auto">
+          <DualScrollTable>
             <table className="w-full text-sm">
               <thead>
                 <tr
@@ -701,7 +670,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                 ))}
               </tbody>
             </table>
-          </div>
+          </DualScrollTable>
         </div>
       )}
 
