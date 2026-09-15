@@ -59,10 +59,21 @@ export type ClientesResumo = {
 // (embora sem efeito prático hoje: nenhum desses dois registros existe em
 // totvs_clientes atualmente, só aparecem em totvs_orders, conferido no
 // banco). Corrigido pra nunca divergir se algum dia aparecer um.
+//
+// A.D. MAIA (29112864000187) e Pedro Maia Jacome (11672695430) entraram
+// 15/09/2026, mesmo pedido/motivo de NOMES_CLIENTE_INTERNO abaixo -- por
+// CPF/CNPJ aqui (não por nome) porque A.D. MAIA tem DUAS grafias de nome
+// diferentes no cadastro do Protheus pro mesmo CNPJ ("A.D. MAIA IND.DE
+// MOVEIS..." e "A.D. MAIA INDUSTRIA DE MOVEIS...") -- filtrar por nome
+// deixaria uma das duas passar.
 function excludeInternalClients<
   Q extends { not: (column: string, operator: string, value: string) => Q },
 >(query: Q): Q {
-  return query.not("cpf_cnpj", "like", `${COMPANY_CNPJ_ROOT}%`).not("name", "ilike", "CONSUMIDOR FINAL");
+  return query
+    .not("cpf_cnpj", "like", `${COMPANY_CNPJ_ROOT}%`)
+    .not("name", "ilike", "CONSUMIDOR FINAL")
+    .not("cpf_cnpj", "eq", "29112864000187")
+    .not("cpf_cnpj", "eq", "11672695430");
 }
 
 // Só contagens (head: true) -- 3.760 clientes hoje cabem numa página só,
@@ -356,10 +367,24 @@ export type ClienteNivelInfo = {
 // compram de verdade (ex.: "CG3 ENGENHARIA LTDA") têm raiz diferente e
 // continuam contando normalmente.
 const COMPANY_CNPJ_ROOT = "39537682";
-const NOMES_CLIENTE_INTERNO = new Set(["CONSUMIDOR FINAL"]);
+// "A.D. MAIA IND.DE MOVEIS E COLCHOES LTDA" (CNPJ 29112864000187) e "PEDRO
+// MAIA JACOME" (CPF 11672695430) -- pedido do Victor 15/09/2026: "pode
+// tirar da lista, pois é uma empresa do grupo e pedro é o dono da
+// empresa". CNPJ diferente da raiz 39537682 (por isso não caía na
+// exclusão acima) -- é outra empresa do mesmo grupo familiar, não a
+// LOJAS AIAM em si, mas do mesmo jeito não é um cliente de verdade.
+// Excluídos por CPF/CNPJ (não só por nome) -- achado ao conferir:
+// totvs_clientes tem DUAS grafias pro mesmo CNPJ da A.D. MAIA ("A.D. MAIA
+// IND.DE MOVEIS..." e "A.D. MAIA INDUSTRIA DE MOVEIS..."), então filtrar
+// só por nome deixaria uma das duas passar se algum dia aparecer aqui
+// também (hoje só a 1ª grafia aparece em totvs_orders, mas não custa ser
+// robusto do mesmo jeito que excludeInternalClients acima já ficou).
+const NOMES_CLIENTE_INTERNO = new Set(["CONSUMIDOR FINAL", "A.D. MAIA IND.DE MOVEIS E COLCHOES LTDA", "PEDRO MAIA JACOME"]);
+const CPF_CNPJ_CLIENTE_INTERNO = new Set(["29112864000187", "11672695430"]);
 
 function isClienteInterno(nome: string | null, cpfCnpj: string | null): boolean {
   if (cpfCnpj && cpfCnpj.startsWith(COMPANY_CNPJ_ROOT)) return true;
+  if (cpfCnpj && CPF_CNPJ_CLIENTE_INTERNO.has(cpfCnpj.replace(/\D/g, ""))) return true;
   if (nome && NOMES_CLIENTE_INTERNO.has(nome.trim().toUpperCase())) return true;
   return false;
 }
