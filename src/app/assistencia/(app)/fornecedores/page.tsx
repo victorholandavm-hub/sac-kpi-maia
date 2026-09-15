@@ -5,6 +5,7 @@ import { listSuppliers } from "@/lib/partOrders";
 import { SUPPLIER_RETURN_STATUS_LABELS, SUPPLIER_RETURN_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
+import { UnderlineTab } from "@/components/UnderlineTab";
 
 function formatBRL(value: number | null) {
   if (value === null) return "—";
@@ -69,26 +70,12 @@ export default async function FornecedoresPage({
     <div className="flex flex-col gap-4">
       {/* "Controle Assistência" -- pedido do Victor 27/08/2026, mesmo
           desenho de pecas/page.tsx (ver lá). */}
-      <div className="flex items-center gap-2">
-        <Link
-          href="/assistencia/pecas"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
-        >
-          Peças
-        </Link>
-        <Link
-          href="/assistencia/fornecedores"
-          className="text-sm font-semibold px-4 py-2 rounded-full text-white shadow-sm"
-          style={{ background: "color-mix(in srgb, var(--brand-green) 78%, black)" }}
-        >
-          Fornecedores
-        </Link>
-        <Link
-          href="/assistencia/estoque"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
-        >
-          Estoque
-        </Link>
+      {/* Estilo trocado pra aba sublinhada 15/09/2026 (mesmo pedido/
+          racional de pecas/page.tsx, ver lá). */}
+      <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+        <UnderlineTab href="/assistencia/pecas" label="Peças" active={false} />
+        <UnderlineTab href="/assistencia/fornecedores" label="Fornecedores" active />
+        <UnderlineTab href="/assistencia/estoque" label="Estoque" active={false} />
       </div>
 
       <div className="flex items-center justify-between gap-4 flex-wrap">

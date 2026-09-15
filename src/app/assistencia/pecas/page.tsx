@@ -3,6 +3,7 @@ import { listPartOrders, listSuppliers, isPartOrderStatus, type PartOrder } from
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { PecasTable } from "@/components/assistencia/PecasTable";
+import { UnderlineTab } from "@/components/UnderlineTab";
 
 function buildHref(params: { status?: string; q?: string; supplier?: string }) {
   const sp = new URLSearchParams();
@@ -43,32 +44,19 @@ export default async function PecasQueuePage({
     <div className="flex flex-col gap-4">
       {/* "Controle Assistência" -- pedido do Victor 27/08/2026: "coloque
           dessa mesma forma em outra aba peças/fornecedores/estoque e
-          nomeie essa aba como controle assistencia" (mesmo desenho da
-          fileira de pílulas Visitas/Entregas/Agenda em fila/page.tsx).
-          3 rotas próprias, dado/filtro cada uma o seu -- sem layout
-          compartilhado, cada página renderiza sua própria fileira. Rota
-          exclusiva de assistência/admin -- equipe técnica tem sua própria
-          desde 14/09/2026 (/assistencia/tecnico/pecas). */}
-      <div className="flex items-center gap-2">
-        <Link
-          href="/assistencia/pecas"
-          className="text-sm font-semibold px-4 py-2 rounded-full text-white shadow-sm"
-          style={{ background: "color-mix(in srgb, var(--brand-green) 78%, black)" }}
-        >
-          Peças
-        </Link>
-        <Link
-          href="/assistencia/fornecedores"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
-        >
-          Fornecedores
-        </Link>
-        <Link
-          href="/assistencia/estoque"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
-        >
-          Estoque
-        </Link>
+          nomeie essa aba como controle assistencia". Estilo trocado pra
+          aba sublinhada 15/09/2026 (pedido do Victor: "preciso que esse
+          fique igual a esse [Visitas/Entregas/Agenda]... com essa borda
+          em cinza rodeando a aba selecionada") -- mesmo UnderlineTab.tsx
+          já usado lá, em vez das pílulas arredondadas de antes. 3 rotas
+          próprias, dado/filtro cada uma o seu -- sem layout compartilhado,
+          cada página renderiza sua própria fileira. Rota exclusiva de
+          assistência/admin -- equipe técnica tem sua própria desde
+          14/09/2026 (/assistencia/tecnico/pecas). */}
+      <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+        <UnderlineTab href="/assistencia/pecas" label="Peças" active />
+        <UnderlineTab href="/assistencia/fornecedores" label="Fornecedores" active={false} />
+        <UnderlineTab href="/assistencia/estoque" label="Estoque" active={false} />
       </div>
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
