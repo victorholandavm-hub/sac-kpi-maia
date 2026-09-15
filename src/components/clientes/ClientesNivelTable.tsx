@@ -19,7 +19,7 @@
 // componentes shadcn/ui. Mandar TODOS os milhares de clientes pro cliente
 // de uma vez (pra paginação/ordenação 100% client-side) pesaria demais no
 // payload inicial -- por isso `manualPagination` aqui, não getPaginationRowModel.
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 // @tanstack/react-table v9 troca useReactTable/getCoreRowModel/
 // getExpandedRowModel/ColumnDef (API v8 clássica) por um modelo novo de
 // registro explícito de "features" (useTable + tableFeatures(...)) --
@@ -150,6 +150,30 @@ export function ClientesNivelTable({
   clvByClientId: Record<string, number>;
 }) {
   const [expanded, setExpanded] = useState<ExpandedState>({});
+
+  // Aviso visual de que dá pra rolar a tabela pro lado -- pedido do Victor
+  // 15/09/2026 depois de achar que as colunas da direita estavam sendo
+  // "cortadas" (na verdade só rolam, mas sem indicação nenhuma o scrollbar
+  // nativo do Windows some quando não tá em uso e ninguém descobre sozinho).
+  // Quem realmente rola é o container interno do <Table> (ui/table.tsx,
+  // data-slot="table-container") -- esse wrapper aqui só serve pra achar
+  // ele via querySelector, não tem overflow próprio.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  useEffect(() => {
+    const el = wrapperRef.current?.querySelector<HTMLDivElement>('[data-slot="table-container"]');
+    if (!el) return;
+    const update = () => setCanScrollRight(el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
+    update();
+    el.addEventListener("scroll", update);
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, [items]);
 
   const columns: ColumnDef<ClienteNivelInfo>[] = [
     {
@@ -286,42 +310,61 @@ export function ClientesNivelTable({
   });
 
   return (
-    <div className="rounded-lg overflow-hidden border-2 border-[var(--brand-green)]">
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="bg-[color-mix(in_srgb,var(--brand-green)_10%,var(--surface-1))]">
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="whitespace-nowrap">
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
+    // min-w-0 é o ponto chave: este componente é filho direto do wrapper
+    // "flex flex-col" da página (clientes/page.tsx) -- sem isso, o item flex
+    // nunca encolhe abaixo da largura natural da tabela (nowrap em toda
+    // coluna), então o overflow-x-auto do <Table> nunca chega a entrar em
+    // ação e as últimas colunas ficam cortadas em vez de roláveis.
+    <div
+      ref={wrapperRef}
+      className="relative min-w-0 rounded-lg overflow-hidden border-2 border-[var(--brand-green)] [&_[data-slot=table-container]]:min-w-0 [&_[data-slot=table-container]]:[scrollbar-color:var(--brand-green)_transparent] [&_[data-slot=table-container]]:[scrollbar-width:thin] [&_[data-slot=table-container]]:[&::-webkit-scrollbar]:h-2.5 [&_[data-slot=table-container]]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot=table-container]]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot=table-container]]:[&::-webkit-scrollbar-thumb]:bg-[var(--brand-green)]"
+    >
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="bg-[color-mix(in_srgb,var(--brand-green)_10%,var(--surface-1))]">
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id} className="whitespace-nowrap">
+                  {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => (
+            <Fragment key={row.id}>
+              <TableRow className="hover:bg-[var(--surface-2)]">
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className="whitespace-nowrap">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
                 ))}
               </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <Fragment key={row.id}>
-                <TableRow className="hover:bg-[var(--surface-2)]">
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="whitespace-nowrap">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
+              {row.getIsExpanded() ? (
+                <TableRow key={`${row.id}-expanded`} className="bg-[color-mix(in_srgb,var(--brand-green)_6%,var(--surface-2))] hover:bg-[color-mix(in_srgb,var(--brand-green)_6%,var(--surface-2))]">
+                  <TableCell colSpan={columns.length} className="p-0">
+                    <ComprasExpandidas clientId={row.original.clientId} />
+                  </TableCell>
                 </TableRow>
-                {row.getIsExpanded() ? (
-                  <TableRow key={`${row.id}-expanded`} className="bg-[color-mix(in_srgb,var(--brand-green)_6%,var(--surface-2))] hover:bg-[color-mix(in_srgb,var(--brand-green)_6%,var(--surface-2))]">
-                    <TableCell colSpan={columns.length} className="p-0">
-                      <ComprasExpandidas clientId={row.original.clientId} />
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-              </Fragment>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+              ) : null}
+            </Fragment>
+          ))}
+        </TableBody>
+      </Table>
+      {canScrollRight ? (
+        // Só cobre a altura do cabeçalho (h-10, igual TableHead) -- se
+        // cobrisse a tabela inteira (inset-y-0) o ícone ficaria centralizado
+        // no meio de uma lista de dezenas de linhas, fora da área visível
+        // ao carregar a página.
+        <div
+          aria-hidden
+          className="pointer-events-none absolute top-0 right-0 h-10 w-10 flex items-center justify-end pr-1"
+          style={{ background: "linear-gradient(to right, transparent, color-mix(in srgb, var(--brand-green) 10%, var(--surface-1)) 70%)" }}
+        >
+          <ChevronRight className="size-4 text-muted-foreground animate-pulse" />
+        </div>
+      ) : null}
     </div>
   );
 }
