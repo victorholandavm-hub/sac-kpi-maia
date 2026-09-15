@@ -37,6 +37,10 @@ function buildBody(o: PartOrder): string {
   // uma linha embaixo da outra sem respiro nenhum.
   return [
     `Nome do Cliente: ${o.clientName ?? ""}`,
+    // Nota fiscal logo abaixo do nome do cliente -- pedido do Victor
+    // 15/09/2026. Morava lá embaixo, perto de Código da Peça, desde que
+    // ganhou campo próprio (14/09/2026).
+    `Nota Fiscal: ${o.invoiceNumber ?? ""}`,
     `Município: ${EMPRESA_BLOCO.municipio}`,
     `Estado: ${EMPRESA_BLOCO.estado}`,
     `Razão Social: ${EMPRESA_BLOCO.razaoSocial}`,
@@ -47,9 +51,6 @@ function buildBody(o: PartOrder): string {
     `Cor: ${o.color ?? ""}`,
     `PEÇA: ${o.partName}`,
     `Código da Peça: ${o.partCode ?? ""}`,
-    // Nota fiscal -- pedido do Victor 15/09/2026: "no corpo do texto
-    // coloque o numero da nota fiscal".
-    `Nota Fiscal: ${o.invoiceNumber ?? ""}`,
     `Descrição: ${o.notes ?? ""}`,
     `FOTO/VÍDEO: `,
   ].join("\n\n");

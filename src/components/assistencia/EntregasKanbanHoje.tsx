@@ -760,13 +760,15 @@ export function EntregasKanbanHoje({
             }}
             className="text-xs font-semibold px-2.5 py-1.5 -mb-px rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
             style={
-              // borderColor var(--border) (não var(--brand-green)) --
-              // mesma correção de UnderlineTab.tsx: a borda cinza sobe e
-              // contorna o quadrado preenchido, se juntando ao border-b
-              // do trilho nas pontas, em vez de ficar invisível (mesma
-              // cor do fundo).
+              // borderColor var(--text-muted) (não var(--brand-green), nem
+              // var(--border)) -- mesma correção de UnderlineTab.tsx: a
+              // borda cinza sobe e contorna o quadrado preenchido, se
+              // juntando ao border-b do trilho nas pontas. var(--border)
+              // sozinho é cinza a 10% de opacidade, praticamente invisível
+              // contra o preenchimento verde sólido -- var(--text-muted)
+              // é opaco de verdade.
               selectedOrigem === "sac"
-                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--border)" }
+                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--text-muted)" }
                 : { color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }
             }
           >
@@ -781,7 +783,7 @@ export function EntregasKanbanHoje({
             className="text-xs font-semibold px-2.5 py-1.5 -mb-px rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
             style={
               selectedOrigem === "assistencia"
-                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--border)" }
+                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--text-muted)" }
                 : { color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }
             }
           >
