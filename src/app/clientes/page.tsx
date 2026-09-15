@@ -225,8 +225,13 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
           </p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
-          <div className="overflow-x-auto">
+        // min-w-0: este bloco é filho direto do "flex flex-col" da página
+        // -- sem isso, o item flex nunca encolhe abaixo da largura natural
+        // da tabela e o overflow-x-auto nunca chega a rolar de verdade
+        // (mesma causa raiz do bug corrigido em ClientesNivelTable.tsx
+        // 15/09/2026).
+        <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr
@@ -275,7 +280,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                     <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.city ? `${c.city}${c.state ? `/${c.state}` : ""}` : "—"}
                     </td>
-                    <td className="px-4 py-2" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                       {c.stores.length > 0 ? c.stores.join(", ") : "—"}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
@@ -587,8 +592,13 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
           </p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
-          <div className="overflow-x-auto">
+        // min-w-0: este bloco é filho direto do "flex flex-col" da página
+        // -- sem isso, o item flex nunca encolhe abaixo da largura natural
+        // da tabela e o overflow-x-auto nunca chega a rolar de verdade
+        // (mesma causa raiz do bug corrigido em ClientesNivelTable.tsx
+        // 15/09/2026).
+        <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+          <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr

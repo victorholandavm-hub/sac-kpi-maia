@@ -81,12 +81,17 @@ export function ClienteHistoricoRow({
       <tr className="transition-colors hover:bg-[var(--surface-2)]">
         {leadingCells}
         <td
-          className="px-4 py-2"
+          className="px-4 py-2 whitespace-nowrap"
           style={{
             color: "var(--text-primary)",
             boxShadow: accentColor ? `inset 3px 0 0 ${accentColor}` : undefined,
           }}
         >
+          {/* whitespace-nowrap -- sem isso, essa é a única célula da linha
+              sem nowrap, então é a única que quebra: com o resto da linha
+              "empurrando" as colunas, o nome (às vezes bem longo) acaba
+              espremido em várias linhas dentro de uma coluna estreita
+              (achado 15/09/2026, aba Propensão a recompra). */}
           <button onClick={toggle} className="flex items-center gap-1.5 text-left underline decoration-dotted">
             <span
               className="text-xs shrink-0 transition-transform duration-150"
