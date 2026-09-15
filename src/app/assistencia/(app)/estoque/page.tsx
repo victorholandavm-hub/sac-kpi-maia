@@ -13,6 +13,7 @@ import { FilterPill } from "@/components/assistencia/FilterPill";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { StockMovementCard } from "@/components/assistencia/StockMovementCard";
 import { groupIntoWeeks } from "@/lib/weekGrouping";
+import { UnderlineTab } from "@/components/UnderlineTab";
 
 function buildHref(params: { type?: string; q?: string; factory?: string; responsavel?: string; from?: string; to?: string }) {
   const sp = new URLSearchParams();
@@ -99,26 +100,12 @@ export default async function EstoquePage({
     <div className="flex flex-col gap-4">
       {/* "Controle Assistência" -- pedido do Victor 27/08/2026, mesmo
           desenho de pecas/page.tsx (ver lá). */}
-      <div className="flex items-center gap-2">
-        <Link
-          href="/assistencia/pecas"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
-        >
-          Peças
-        </Link>
-        <Link
-          href="/assistencia/fornecedores"
-          className="text-sm font-semibold px-4 py-2 rounded-full border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-150"
-        >
-          Fornecedores
-        </Link>
-        <Link
-          href="/assistencia/estoque"
-          className="text-sm font-semibold px-4 py-2 rounded-full text-white shadow-sm"
-          style={{ background: "color-mix(in srgb, var(--brand-green) 78%, black)" }}
-        >
-          Estoque
-        </Link>
+      {/* Estilo trocado pra aba sublinhada 15/09/2026 (mesmo pedido/
+          racional de pecas/page.tsx, ver lá). */}
+      <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+        <UnderlineTab href="/assistencia/pecas" label="Peças" active={false} />
+        <UnderlineTab href="/assistencia/fornecedores" label="Fornecedores" active={false} />
+        <UnderlineTab href="/assistencia/estoque" label="Estoque" active />
       </div>
 
       {/* Título + CTA -- pedido do Victor 28/08/2026 (redesign): "seguindo
