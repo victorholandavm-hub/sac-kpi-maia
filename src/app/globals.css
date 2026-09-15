@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 /* Modo noturno -- pedido do Victor 02/09/2026: "preciso que você tenha a
    opção do modo noturno em todo o sistema". Alternado por classe (.dark na
@@ -17,8 +19,6 @@
      Declarar `color-scheme` explícito (aqui e em .dark) tira o navegador
      dessa decisão nos dois temas. */
   color-scheme: light;
-  --background: #f7f8f6;
-  --foreground: #0b0b0b;
 
   --surface-1: #ffffff;
   /* Nunca tinha sido definida (bug real, achado 18/08/2026) -- todo
@@ -33,6 +33,18 @@
   --text-muted: #6e6c66;
   --gridline: #e1e0d9;
   --axis: #c3c2b7;
+  /* Restaurado pro valor original do app -- a inicialização do shadcn/ui
+     (pedido do Victor 15/09/2026: testar tabela de Clientes com
+     shadcn/ui) sobrescreveu esse token pra oklch(0.922 0 0) (cinza sólido
+     fixo). --border é usado como `borderColor: "var(--border)"` em
+     literalmente dezenas de componentes por todo o app -- alguns
+     contando explicitamente com ele ser um preto semi-transparente (10%
+     de opacidade), que se adapta sozinho a qualquer fundo por trás, claro
+     ou escuro, cartão ou não (ver comentário em UnderlineTab.tsx sobre a
+     borda da aba selecionada, ajustado só hoje). Trocar o VALOR desse
+     token quebraria isso silenciosamente em todo o resto do sistema, não
+     só na tela nova. shadcn ganha os tokens próprios dele (--card,
+     --primary etc.) mais abaixo, sem tocar neste aqui. */
   --border: rgba(11, 11, 11, 0.1);
 
   /* series de gráfico ancoradas nas cores da Lojas Maia */
@@ -55,6 +67,42 @@
   --brand-orange: #f2871a;
   --brand-green-soft: #e4ece8;
   --brand-orange-soft: #fdf1e4;
+  /* Também restaurados (mesmo motivo do --border acima) -- shadcn tinha
+     sobrescrito pro branco/preto puro padrão dele (oklch(1 0 0)/
+     oklch(0.145 0 0)), descartando o off-white/quase-preto originais do
+     app (usados direto em bg-[var(--background)] em várias telas, ver
+     TecnicoPecasFrame.tsx/motorista/page.tsx). */
+  --background: #f7f8f6;
+  --foreground: #0b0b0b;
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
 }
 
 /* Tema escuro -- mesmas variáveis do :root acima, redefinidas. Qualquer
@@ -137,18 +185,93 @@ html.dark {
   --brand-orange: #f2871a;
   --brand-green-soft: rgba(46, 129, 88, 0.18);
   --brand-orange-soft: rgba(242, 135, 26, 0.16);
+
+  /* Tokens próprios do shadcn/ui (pedido do Victor 15/09/2026, tabela de
+     Clientes) -- contraparte escura dos definidos em :root mais abaixo.
+     Colocados AQUI (dentro do html.dark existente) em vez de num bloco
+     `.dark { ... }` à parte -- ver o comentário grande logo acima sobre
+     por que o seletor `.dark` puro corre risco de ser podado pelo build
+     do Tailwind (`@custom-variant dark`); html.dark é o seletor que já
+     funciona de verdade. */
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  /* var(--font-geist-sans), não var(--font-sans) -- a inicialização do
+     shadcn tinha trocado pra uma variável que não existe no app
+     (auto-referência, nunca resolve pra nada). O app já carrega Geist via
+     next/font (ver layout.tsx) sob esse nome. */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -199,5 +322,24 @@ a:active {
   }
   100% {
     margin-left: 100%;
+  }
+}
+
+/* O bloco `.dark { ... }` que a inicialização do shadcn/ui tinha
+   colocado aqui foi removido -- os tokens dele já foram incorporados no
+   html.dark lá em cima (mesmo seletor que o app já usa de verdade pro
+   tema escuro, ver o comentário grande sobre o bug de poda do Tailwind).
+   Duplicar os dois só arriscava divergir (e o `.dark` puro corria risco
+   de nem entrar no build final, pelo mesmo motivo documentado). */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
+import { ClientesNivelTable } from "@/components/clientes/ClientesNivelTable";
 import {
   getClientesResumo,
   listClientes,
@@ -14,7 +15,6 @@ import {
   CLIENTE_NIVEL_LABELS,
   CLIENTE_NIVEL_COLORS,
   CLIENTE_NIVEL_CRITERIA,
-  type ClienteNivelInfo,
 } from "@/lib/clientes";
 import {
   listRecompraCandidatos,
@@ -447,112 +447,13 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
           </p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr
-                  className="text-xs"
-                  style={{ color: "var(--text-secondary)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
-                >
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Posição</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nível</th>
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Gasto acumulado</th>
-                  {/* CLV preditivo (Fase 4, ver comentário na página acima e
-                      em recompra.ts) -- ao lado do gasto JÁ FEITO, o valor
-                      FUTURO projetado. */}
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1">
-                      CLV projetado ({CLV_HORIZONTE_ANOS}a)
-                      <span
-                        title="Pra cada categoria que o cliente já comprou, projeta quantos ciclos de reposição cabem nos próximos 5 anos × o valor médio que ele já gastou nessa categoria. '—' = nenhuma compra numa categoria reconhecida ainda."
-                        aria-label="Como o CLV projetado é calculado"
-                        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
-                        style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
-                      >
-                        i
-                      </span>
-                    </span>
-                  </th>
-                  {/* Pedido do Victor 01/09/2026: "aniversário de
-                      relacionamento, ou seja, a data da primeira compra" --
-                      mesmo dado que já era mostrado aqui (primeiraCompra,
-                      ver listClientesPorNivel), só renomeado pra deixar
-                      claro o que representa. */}
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Aniversário de relacionamento</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Dias sem comprar</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {pageItems.map((c: ClienteNivelInfo) => (
-                  <ClienteHistoricoRow
-                    key={c.clientId}
-                    clientId={c.clientId}
-                    name={c.nome ?? c.clientId}
-                    colSpan={10}
-                    accentColor={CLIENTE_NIVEL_COLORS[c.nivel]}
-                    leadingCells={
-                      <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                        {c.posicaoNoNivel}º
-                      </td>
-                    }
-                  >
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span
-                          className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-                          style={{
-                            color: CLIENTE_NIVEL_COLORS[c.nivel],
-                            background: `color-mix(in srgb, ${CLIENTE_NIVEL_COLORS[c.nivel]} 15%, transparent)`,
-                          }}
-                        >
-                          {CLIENTE_NIVEL_LABELS[c.nivel]}
-                        </span>
-                        {c.inativoRecente ? (
-                          <span
-                            className="text-xs font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                            style={{ color: "#fff", background: "var(--status-critical)" }}
-                            title="Sem comprar há 180 dias ou mais -- nível é histórico acumulado, não reflete isso sozinho"
-                          >
-                            ⚠ inativo
-                          </span>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {c.compras}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--brand-green)" }}>
-                      {formatBRL(c.gastoAcumulado)}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {clvPorCliente.has(c.clientId) ? formatBRL(clvPorCliente.get(c.clientId)!) : "—"}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {formatDateOnly(c.primeiraCompra)}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {formatDateOnly(c.ultimaCompra)}
-                    </td>
-                    <td
-                      className="text-right px-4 py-2 whitespace-nowrap"
-                      style={{ color: c.inativoRecente ? "var(--status-critical)" : "var(--text-secondary)" }}
-                    >
-                      {c.diasSemComprar ?? "—"}
-                    </td>
-                    <td className="px-4 py-2" style={{ color: "var(--text-secondary)" }}>
-                      {c.stores.length > 0 ? c.stores.join(", ") : "—"}
-                    </td>
-                  </ClienteHistoricoRow>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        // Teste local shadcn/ui + TanStack Table -- pedido do Victor
+        // 15/09/2026. A tabela hand-rolled original (mesmo padrão do resto
+        // do app) continua intocada mais abaixo neste arquivo pelo git --
+        // é só trocar essa chamada de volta se ele preferir o padrão de
+        // sempre. `clvPorCliente` (Map) vira objeto simples pra atravessar
+        // a borda Server -> Client Component sem ambiguidade.
+        <ClientesNivelTable items={pageItems} clvByClientId={Object.fromEntries(clvPorCliente)} />
       )}
 
       {totalPages > 1 ? (
