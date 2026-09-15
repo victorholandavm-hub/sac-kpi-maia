@@ -218,8 +218,8 @@ export function ClientesNivelTable({
     {
       id: "aniversario",
       accessorKey: "primeiraCompra",
-      header: "Aniversário de relacionamento",
-      cell: ({ getValue }) => <span className="text-muted-foreground whitespace-nowrap">{formatDateOnly(getValue<string | null>())}</span>,
+      header: () => <div className="text-right">Aniversário de rel.</div>,
+      cell: ({ getValue }) => <div className="text-right text-muted-foreground whitespace-nowrap">{formatDateOnly(getValue<string | null>())}</div>,
     },
     {
       id: "ultimaCompra",
@@ -275,6 +275,11 @@ export function ClientesNivelTable({
     getRowId: (row) => row.clientId,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
+    // Por padrão o v9 só deixa expandir linha que tenha subRows (uso normal
+    // seria dados hierárquicos) -- aqui a "expansão" é só um painel de
+    // detalhe por linha (histórico de compras), sem hierarquia nenhuma, daí
+    // precisa liberar explicitamente ou toggleExpanded() nunca faz nada.
+    getRowCanExpand: () => true,
     // Paginação/ordenação continuam a cargo do servidor (ver comentário no
     // topo do arquivo) -- só a apresentação da página atual é da tabela.
     manualPagination: true,
