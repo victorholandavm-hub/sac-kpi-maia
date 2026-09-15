@@ -42,15 +42,23 @@ import Link from "next/link";
 // preenchimento. var(--text-muted) é opaco (cinza médio de verdade),
 // contrasta tanto contra o verde quanto contra o fundo claro/escuro da
 // página.
+// Preview sem preenchimento sólido -- pedido do Victor 15/09/2026: "tire o
+// verde do botão e deixe so a borda pra eu ver como que fica", depois
+// conferido contra a referência original de Dashboard.tsx (painel de
+// KPIs, "Geral e Volumetria/..."): fundo var(--surface-1) (não totalmente
+// transparente -- um cartão clarinho flutuando, não texto solto) + borda
+// var(--border) + texto na cor de identidade (`color`). É literalmente a
+// MESMA receita de Dashboard.tsx (só parametrizada aqui por `color` em vez
+// de var(--brand-green) fixo).
 export function UnderlineTab({ href, label, active, color = "var(--brand-green)" }: { href: string; label: string; active: boolean; color?: string }) {
   return (
     <Link
       href={href}
       className="text-sm font-medium px-4 py-2 -mb-px rounded-t-lg border border-b-0 transition-colors duration-200"
       style={{
-        color: active ? "#fff" : "var(--text-secondary)",
-        background: active ? color : "transparent",
-        borderColor: active ? "var(--text-muted)" : "transparent",
+        color: active ? color : "var(--text-secondary)",
+        background: active ? "var(--surface-1)" : "transparent",
+        borderColor: active ? "var(--border)" : "transparent",
       }}
     >
       {label}
