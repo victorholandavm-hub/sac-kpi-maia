@@ -159,11 +159,13 @@ export function ClientesNivelTable({
   // data-slot="table-container") -- esse wrapper aqui só serve pra achar
   // ele via querySelector, não tem overflow próprio.
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const scrollElRef = useRef<HTMLDivElement | null>(null);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
   useEffect(() => {
     const el = wrapperRef.current?.querySelector<HTMLDivElement>('[data-slot="table-container"]');
     if (!el) return;
+    scrollElRef.current = el;
     const update = () => setCanScrollRight(el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
     update();
     el.addEventListener("scroll", update);
@@ -178,7 +180,13 @@ export function ClientesNivelTable({
   const columns: ColumnDef<ClienteNivelInfo>[] = [
     {
       id: "posicao",
-      header: () => <div className="text-right">Posição</div>,
+      // Abreviado (Posição -> Pos.) -- pedido do Victor 15/09/2026: sob
+      // alinhamento à direita, um título bem mais longo que o valor (ex.
+      // "Posição" vs "1º") deixa o título visivelmente "puxado" pra
+      // esquerda do dado, mesmo as duas bordas direitas coincidindo
+      // (confirmado por medição -- thead/tbody sempre têm a mesma largura
+      // de coluna numa <table> só). Abreviar encolhe essa folga.
+      header: () => <div className="text-right">Pos.</div>,
       cell: ({ row }) => <div className="text-right text-muted-foreground tabular-nums">{row.original.posicaoNoNivel}º</div>,
     },
     {
@@ -228,12 +236,12 @@ export function ClientesNivelTable({
       accessorKey: "gastoAcumulado",
       // Coluna de valores financeiros alinhada à direita + moeda pt-BR
       // (pedido explícito).
-      header: () => <div className="text-right">Gasto acumulado</div>,
+      header: () => <div className="text-right">Gasto acum.</div>,
       cell: ({ getValue }) => <div className="text-right font-semibold text-[var(--brand-green)] tabular-nums">{formatBRL(getValue<number>())}</div>,
     },
     {
       id: "clv",
-      header: () => <div className="text-right">CLV projetado ({CLV_HORIZONTE_ANOS}a)</div>,
+      header: () => <div className="text-right">CLV ({CLV_HORIZONTE_ANOS}a)</div>,
       cell: ({ row }) => {
         const clv = clvByClientId[row.original.clientId];
         return <div className="text-right text-muted-foreground tabular-nums">{clv !== undefined ? formatBRL(clv) : "—"}</div>;
@@ -353,17 +361,21 @@ export function ClientesNivelTable({
         </TableBody>
       </Table>
       {canScrollRight ? (
-        // Só cobre a altura do cabeçalho (h-10, igual TableHead) -- se
-        // cobrisse a tabela inteira (inset-y-0) o ícone ficaria centralizado
-        // no meio de uma lista de dezenas de linhas, fora da área visível
-        // ao carregar a página.
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-0 right-0 h-10 w-10 flex items-center justify-end pr-1"
+        // Botão de verdade (clicável, rola a tabela), não só um ícone
+        // decorativo -- pedido do Victor 15/09/2026: "a setinha de arrastar
+        // pro lado não está funcionando" (tentou clicar nela esperando que
+        // rolasse). Só cobre a altura do cabeçalho (h-10, igual TableHead)
+        // -- se cobrisse a tabela inteira o botão ficaria no meio de uma
+        // lista de dezenas de linhas, fora da área visível ao carregar.
+        <button
+          type="button"
+          onClick={() => scrollElRef.current?.scrollBy({ left: 240, behavior: "smooth" })}
+          aria-label="Rolar a tabela para o lado"
+          className="absolute top-0 right-0 h-10 w-10 flex items-center justify-end pr-1 cursor-pointer"
           style={{ background: "linear-gradient(to right, transparent, color-mix(in srgb, var(--brand-green) 10%, var(--surface-1)) 70%)" }}
         >
           <ChevronRight className="size-4 text-muted-foreground animate-pulse" />
-        </div>
+        </button>
       ) : null}
     </div>
   );
