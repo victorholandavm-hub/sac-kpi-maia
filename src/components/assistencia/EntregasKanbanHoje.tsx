@@ -760,15 +760,13 @@ export function EntregasKanbanHoje({
             }}
             className="text-xs font-semibold px-2.5 py-1.5 -mb-px rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
             style={
-              // borderColor var(--text-muted) (não var(--brand-green), nem
-              // var(--border)) -- mesma correção de UnderlineTab.tsx: a
-              // borda cinza sobe e contorna o quadrado preenchido, se
-              // juntando ao border-b do trilho nas pontas. var(--border)
-              // sozinho é cinza a 10% de opacidade, praticamente invisível
-              // contra o preenchimento verde sólido -- var(--text-muted)
-              // é opaco de verdade.
+              // Mesma receita de UnderlineTab.tsx/Dashboard.tsx -- pedido
+              // do Victor 15/09/2026, conferido contra a referência
+              // original (painel de KPIs): fundo var(--surface-1) + borda
+              // var(--border) + texto verde, em vez do preenchimento
+              // sólido de antes.
               selectedOrigem === "sac"
-                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--text-muted)" }
+                ? { color: "var(--brand-green)", background: "var(--surface-1)", borderColor: "var(--border)" }
                 : { color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }
             }
           >
@@ -783,7 +781,7 @@ export function EntregasKanbanHoje({
             className="text-xs font-semibold px-2.5 py-1.5 -mb-px rounded-t-lg border border-b-0 transition-colors whitespace-nowrap"
             style={
               selectedOrigem === "assistencia"
-                ? { color: "#fff", background: "var(--brand-green)", borderColor: "var(--text-muted)" }
+                ? { color: "var(--brand-green)", background: "var(--surface-1)", borderColor: "var(--border)" }
                 : { color: "var(--text-secondary)", background: "transparent", borderColor: "transparent" }
             }
           >
