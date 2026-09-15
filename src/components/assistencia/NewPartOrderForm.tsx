@@ -56,13 +56,26 @@ export function NewPartOrderForm({
 
   if (state?.success) {
     return (
-      <div className="rounded-lg border p-4" style={{ background: "var(--surface-1)", borderColor: "var(--status-good)" }}>
+      <div className="rounded-lg border p-4 flex flex-col gap-3" style={{ background: "var(--surface-1)", borderColor: "var(--status-good)" }}>
         <p className="text-sm font-medium" style={{ color: "var(--status-good)" }}>
           Pedido de peça criado!
         </p>
-        <Link href={basePath} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
-          Voltar para a lista
-        </Link>
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Pedido do Victor 15/09/2026: "preciso que tenha um botão de
+              fazer uma nova solicitação de peça assim que eu faço um
+              solicitação" -- quem tem várias peças pra pedir seguidas não
+              precisa voltar pra lista só pra clicar em "Novo" de novo. */}
+          <Link
+            href={`${basePath}/nova`}
+            className="text-sm font-semibold px-4 py-2 rounded-lg text-white shadow-sm transition-all duration-200 hover:brightness-110"
+            style={{ background: "var(--brand-green)" }}
+          >
+            + Novo pedido de peça
+          </Link>
+          <Link href={basePath} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            Voltar para a lista
+          </Link>
+        </div>
       </div>
     );
   }
