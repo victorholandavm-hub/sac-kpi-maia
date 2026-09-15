@@ -192,6 +192,14 @@ export function NewPartOrderForm({
         <input name="client_email" type="email" defaultValue="assistencia@moveisaiam.com.br" className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
+      <Field label="Número da nota fiscal">
+        {/* Pedido do Victor 15/09/2026: "no chamado para uma nova peça...
+            no corpo do texto coloque o numero da nota fiscal" -- vai no
+            e-mail pro representante do fornecedor (ver
+            PartOrderEmailButton.tsx). */}
+        <input name="invoice_number" className="rounded border px-3 py-2" style={inputStyle} />
+      </Field>
+
       <Field label="Observações">
         <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>

@@ -99,6 +99,7 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
       requested_by: actor.name,
       notes: emptyToNull(formData.get("notes")),
       expected_at: emptyToNull(formData.get("expected_at")) ?? defaultExpectedAt,
+      invoice_number: emptyToNull(formData.get("invoice_number")),
     })
     .select("id")
     .single();
@@ -158,6 +159,7 @@ export async function updatePartOrder(id: string, _state: PartOrderFormState, fo
       representative,
       representative_email: representativeEmail,
       representative_phone: representativePhone,
+      invoice_number: emptyToNull(formData.get("invoice_number")),
     })
     .eq("id", id);
 

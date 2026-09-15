@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   createQuickRequest,
   lookupTotvsClientForTeam,
@@ -17,6 +17,7 @@ import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } f
 import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import type { PartOrderLinkMatch } from "@/lib/partOrders";
 import { FormSection } from "./FormSection";
+import { useFormDraft } from "./useFormDraft";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -217,6 +218,7 @@ export function NovaEntregaAssistenciaForm({
   cargas: { carga: string; label: string }[];
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createQuickRequest, undefined);
+  const formRef = useRef<HTMLFormElement>(null);
   const [type, setType] = useState<EntregaType>("recolhimento");
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
 
@@ -403,8 +405,16 @@ export function NovaEntregaAssistenciaForm({
     setPartOrderQuery("");
   }
 
+  // Rascunho em localStorage -- pedido do Victor 15/09/2026: sair da aba
+  // Entregas no meio do preenchimento (ex.: pra ver uma solicitação) e
+  // voltar não pode zerar o formulário. `part_order_id` fora do rascunho
+  // -- é o hidden field do vínculo com o pedido de peça (ver
+  // selectPartOrder acima), não faz sentido "restaurar" um vínculo antigo
+  // por engano.
+  useFormDraft(formRef, "draft:nova-entrega-assistencia", ["part_order_id"]);
+
   return (
-    <form action={formAction} className="flex flex-col gap-4 max-w-xl">
+    <form ref={formRef} action={formAction} className="flex flex-col gap-4 max-w-xl">
       {/* Fecha o ciclo -- mesmo padrão de QuickCreateRequestForm.tsx: o
           chamado criado a partir daqui vincula de volta no pedido de peça
           (service_request_id). */}

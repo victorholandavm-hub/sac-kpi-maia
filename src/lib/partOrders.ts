@@ -106,6 +106,9 @@ export type PartOrder = {
   closedAt: string | null;
   expectedAt: string | null;
   notes: string | null;
+  // Número da nota fiscal -- pedido do Victor 15/09/2026: vai no corpo do
+  // e-mail pro representante do fornecedor (ver PartOrderEmailButton.tsx).
+  invoiceNumber: string | null;
   // Quando preenchido, o CASO do cliente já foi resolvido por outro meio,
   // sem esperar esta peça -- pedido do Victor 14/09/2026, migration 0126
   // (ver PartOrderActions.tsx). A peça em si continua seu fluxo normal até
@@ -142,6 +145,7 @@ type PartOrderRow = {
   closed_at: string | null;
   expected_at: string | null;
   notes: string | null;
+  invoice_number: string | null;
   resolved_without_part_at: string | null;
   resolved_without_part_by: string | null;
   created_at: string;
@@ -149,7 +153,7 @@ type PartOrderRow = {
 };
 
 const PART_ORDER_COLUMNS =
-  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, resolved_without_part_at, resolved_without_part_by, created_at, updated_at";
+  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, invoice_number, resolved_without_part_at, resolved_without_part_by, created_at, updated_at";
 
 function toPartOrder(row: PartOrderRow): PartOrder {
   return {
@@ -177,6 +181,7 @@ function toPartOrder(row: PartOrderRow): PartOrder {
     closedAt: row.closed_at,
     expectedAt: row.expected_at,
     notes: row.notes,
+    invoiceNumber: row.invoice_number,
     resolvedWithoutPartAt: row.resolved_without_part_at,
     resolvedWithoutPartBy: row.resolved_without_part_by,
     createdAt: row.created_at,

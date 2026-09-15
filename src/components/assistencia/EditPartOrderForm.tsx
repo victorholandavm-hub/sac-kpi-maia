@@ -146,6 +146,12 @@ export function EditPartOrderForm({
         <input name="client_email" type="email" defaultValue={order.clientEmail ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
+      <Field label="Número da nota fiscal">
+        {/* Pedido do Victor 15/09/2026 -- vai no e-mail pro representante
+            do fornecedor (ver PartOrderEmailButton.tsx). */}
+        <input name="invoice_number" defaultValue={order.invoiceNumber ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
+      </Field>
+
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>
           {state.error}
