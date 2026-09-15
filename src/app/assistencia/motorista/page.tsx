@@ -12,6 +12,7 @@ import { listRequestsForDriver, type DriverRequestView } from "@/lib/serviceRequ
 import { listDrivers } from "@/lib/payments";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { DriverRouteGroup } from "@/components/assistencia/DriverRouteGroup";
+import { NotifyRouteWhatsAppButton } from "@/components/assistencia/NotifyRouteWhatsAppButton";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, groupByDateBucket } from "@/lib/dateBuckets";
 import { ROTAS, ROTA_LABELS, getRotaWeekOverview, JP_DEFAULT_DRIVER, type Rota } from "@/lib/rotas";
@@ -154,8 +155,16 @@ export default async function MotoristaHomePage({
       ) : groups ? (
         groups.map((group) => (
           <details key={group.key} open={group.open}>
-            <summary className="text-base font-bold cursor-pointer py-1" style={{ color: "var(--text-primary)" }}>
-              {group.label} ({group.items.length})
+            <summary className="text-base font-bold cursor-pointer py-1 flex items-center gap-2 flex-wrap" style={{ color: "var(--text-primary)" }}>
+              <span>
+                {group.label} ({group.items.length})
+              </span>
+              {/* Pedido do Victor 15/09/2026: "ao sair do CD, poder mandar
+                  uma mensagem para todos os clientes da rota do dia via
+                  whatsapp" -- só no balde "Hoje" (group.key termina em
+                  "_hoje", ver groupByRotaAndBucket acima), que é a rota
+                  que o motorista está de fato saindo pra fazer agora. */}
+              {group.key.endsWith("_hoje") ? <NotifyRouteWhatsAppButton items={group.items} /> : null}
             </summary>
             <div className="mt-2">
               <DriverRouteGroup

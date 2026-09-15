@@ -20,8 +20,12 @@ const EMPRESA_BLOCO = {
   endereco: "RUA HORTENCIO RIBEIRO DE LUNA 355- DISTRITO INDUSTRIAL JOÃO PESSOA",
 };
 
-function buildSubject(): string {
-  return "Solicitação de Peças - LOJAS AIAM";
+// Número do chamado no assunto -- pedido do Victor 15/09/2026: "no
+// assunto você coloque o numero do chamado". externalReference (CH0001..)
+// pro histórico importado da planilha, senão #ticket_number -- mesmo
+// critério já usado em toda a tela (ver PecasTable.tsx).
+function buildSubject(o: PartOrder): string {
+  return `Solicitação de Peças - LOJAS AIAM - ${o.externalReference ?? `#${o.ticketNumber}`}`;
 }
 
 function buildBody(o: PartOrder): string {
@@ -41,6 +45,9 @@ function buildBody(o: PartOrder): string {
     `Cor: ${o.color ?? ""}`,
     `PEÇA: ${o.partName}`,
     `Código da Peça: ${o.partCode ?? ""}`,
+    // Nota fiscal -- pedido do Victor 15/09/2026: "no corpo do texto
+    // coloque o numero da nota fiscal".
+    `Nota Fiscal: ${o.invoiceNumber ?? ""}`,
     `Descrição: ${o.notes ?? ""}`,
     `FOTO/VÍDEO: `,
   ].join("\n\n");
@@ -72,7 +79,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 
 export function PartOrderEmailButton({ o }: { o: PartOrder }) {
   const [open, setOpen] = useState(false);
-  const subject = buildSubject();
+  const subject = buildSubject(o);
   const body = buildBody(o);
 
   return (

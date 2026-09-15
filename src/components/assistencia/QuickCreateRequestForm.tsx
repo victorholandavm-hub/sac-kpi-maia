@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   createQuickRequest,
   lookupTotvsClientForTeam,
@@ -15,6 +15,7 @@ import { REQUEST_TYPE_LABELS, SHIFT_LABELS, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEM
 import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
 import type { PartOrderLinkMatch } from "@/lib/partOrders";
 import { FormSection } from "./FormSection";
+import { useFormDraft } from "./useFormDraft";
 
 // "Nova visita" -- só os tipos de montador de verdade (pedido do Victor
 // 18/08/2026: "hoje temos uma aba de visitas e uma aba de entregas, tem que
@@ -172,6 +173,7 @@ export function QuickCreateRequestForm({
   includeSacTypes: boolean;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createQuickRequest, undefined);
+  const formRef = useRef<HTMLFormElement>(null);
   const TYPES = includeSacTypes ? [...ASSISTENCIA_TYPES, SAC_TYPE] : ASSISTENCIA_TYPES;
   const [type, setType] = useState<string>("vistoria");
   const [storeId, setStoreId] = useState("");
@@ -381,8 +383,12 @@ export function QuickCreateRequestForm({
     setPartOrderQuery("");
   }
 
+  // Rascunho em localStorage -- pedido do Victor 15/09/2026, mesmo
+  // racional de NovaEntregaAssistenciaForm.tsx (ver useFormDraft.ts).
+  useFormDraft(formRef, "draft:nova-visita", ["part_order_id"]);
+
   return (
-    <form action={formAction} className="flex flex-col gap-4 max-w-xl">
+    <form ref={formRef} action={formAction} className="flex flex-col gap-4 max-w-xl">
       {/* Fecha o ciclo -- pedido do Victor 10/09/2026: o chamado criado a
           partir daqui vincula de volta no pedido de peça (service_request_id,
           já existia pra pedido de peça -> chamado, agora funciona nos dois

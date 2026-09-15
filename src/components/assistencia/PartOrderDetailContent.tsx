@@ -119,6 +119,9 @@ export async function PartOrderDetailContent({ id, basePath }: { id: string; bas
           <Field label="Telefone do representante" value={order.representativePhone} />
           <Field label="Pedido por" value={order.requestedBy} />
           <Field label="Criado em" value={formatDateTimeBr(order.createdAt)} />
+          {/* Pedido do Victor 15/09/2026 -- vai no e-mail pro representante
+              do fornecedor (ver PartOrderEmailButton.tsx). */}
+          <Field label="Nota fiscal" value={order.invoiceNumber} />
           <ExpectedAtField orderId={order.id} expectedAt={order.expectedAt} />
         </Block>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useActionState } from "react";
 import {
   createSacRequest,
@@ -21,6 +21,7 @@ import {
 import { ADDRESS_NUMBER_REQUIRED_TYPES, SHIFTS, type Store } from "@/lib/serviceRequests";
 import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
 import { FormSection } from "./FormSection";
+import { useFormDraft } from "./useFormDraft";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -239,6 +240,7 @@ export function SacCreateRequestForm({
   cargas: { carga: string; label: string }[];
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
+  const formRef = useRef<HTMLFormElement>(null);
   const [type, setType] = useState<SacType>("troca_produto");
   const isDelivery = DELIVERY_TYPES.includes(type);
   const showProduct = isDelivery;
@@ -374,8 +376,14 @@ export function SacCreateRequestForm({
     return () => clearTimeout(timer);
   }, [clientCode]);
 
+  // Rascunho em localStorage -- pedido do Victor 15/09/2026, mesmo
+  // racional de NovaEntregaAssistenciaForm.tsx (ver useFormDraft.ts). Nota
+  // fiscal (invoice_file) nunca entra -- FormData não serializa arquivo
+  // pra string, o hook já ignora sozinho (ver saveDraft lá).
+  useFormDraft(formRef, "draft:sac-nova");
+
   return (
-    <form action={formAction} className="flex flex-col gap-4 max-w-xl">
+    <form ref={formRef} action={formAction} className="flex flex-col gap-4 max-w-xl">
       <FormSection title="Tipo e loja" number={1}>
         <Field label="Tipo">
           <select
