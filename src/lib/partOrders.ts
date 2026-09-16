@@ -116,15 +116,60 @@ export type PartOrder = {
   // em vez de enviada_ao_cliente).
   resolvedWithoutPartAt: string | null;
   resolvedWithoutPartBy: string | null;
-  // Amarra peças pedidas NA MESMA submissão do formulário -- pedido do
-  // Victor 16/09/2026: "adicione a opção de eu adicionar mais de uma peça
-  // na mesma solicitação, pois... a fábrica manda tudo junto". null =
-  // pedido avulso (comportamento de sempre). Ver listPartOrdersByGroupId
-  // abaixo.
+  // LEGADO (migration 0131, 16/09/2026) -- amarrava peças pedidas na mesma
+  // submissão em VÁRIOS part_orders (um chamado por peça). Achado do
+  // Victor testando de verdade: "por que ficou em três chamados
+  // diferentes? era pra ser tudo em um só" -- correto, não é assim que
+  // devia funcionar. Substituído por part_order_items (migration 0132,
+  // ver PartOrderItem/listPartOrderItems abaixo) -- um chamado só, várias
+  // peças DENTRO dele. groupId fica só pra continuar exibindo certo os
+  // pouquíssimos chamados já criados com o desenho antigo antes da
+  // correção; solicitação nova NUNCA mais grava isso.
   groupId: string | null;
+  // Quantas peças em part_order_items além da 1ª (que já mora em
+  // partName/partCode/color/product acima) -- 0 = chamado de sempre (1
+  // peça só, nenhuma linha em part_order_items, imensa maioria histórica).
+  // Ver PartOrderItem/listPartOrderItems abaixo.
+  extraItemsCount: number;
   createdAt: string;
   updatedAt: string;
 };
+
+// Peças ALÉM da 1ª de um chamado com várias peças (migration 0132,
+// 16/09/2026) -- a 1ª peça mora em part_orders.part_name/part_code/color/
+// product (ver comentário em PartOrder acima); estas são as extras,
+// criadas junto quando a solicitação tinha mais de uma peça (ver
+// createPartOrder, pecas-actions.ts).
+export type PartOrderItem = {
+  id: string;
+  partName: string;
+  partCode: string | null;
+  color: string | null;
+  product: string | null;
+};
+
+type PartOrderItemRow = {
+  id: string;
+  part_name: string;
+  part_code: string | null;
+  color: string | null;
+  product: string | null;
+};
+
+function toPartOrderItem(row: PartOrderItemRow): PartOrderItem {
+  return { id: row.id, partName: row.part_name, partCode: row.part_code, color: row.color, product: row.product };
+}
+
+export async function listPartOrderItems(partOrderId: string): Promise<PartOrderItem[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("part_order_items")
+    .select("id, part_name, part_code, color, product")
+    .eq("part_order_id", partOrderId)
+    .order("created_at");
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as PartOrderItemRow[]).map(toPartOrderItem);
+}
 
 type PartOrderRow = {
   id: string;
@@ -155,12 +200,17 @@ type PartOrderRow = {
   resolved_without_part_at: string | null;
   resolved_without_part_by: string | null;
   group_id: string | null;
+  // Embed de contagem (PostgREST "table(count)") -- vem como array de 1
+  // item, {count: N}, mesmo quando N é 0. Usado só pra saber se o chamado
+  // tem mais de 1 peça (ver extraItemsCount, PartOrder acima) sem precisar
+  // de uma consulta à parte pra cada linha da lista.
+  part_order_items: { count: number }[];
   created_at: string;
   updated_at: string;
 };
 
 const PART_ORDER_COLUMNS =
-  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, invoice_number, resolved_without_part_at, resolved_without_part_by, group_id, created_at, updated_at";
+  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, invoice_number, resolved_without_part_at, resolved_without_part_by, group_id, part_order_items(count), created_at, updated_at";
 
 function toPartOrder(row: PartOrderRow): PartOrder {
   return {
@@ -192,6 +242,7 @@ function toPartOrder(row: PartOrderRow): PartOrder {
     resolvedWithoutPartAt: row.resolved_without_part_at,
     resolvedWithoutPartBy: row.resolved_without_part_by,
     groupId: row.group_id,
+    extraItemsCount: row.part_order_items?.[0]?.count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

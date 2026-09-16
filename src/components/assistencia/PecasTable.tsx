@@ -218,16 +218,25 @@ function PecaRow({
             09/09/2026: "essa data deve aparecer logo abaixo do numero do
             chamado". */}
         <div className="text-[10px] text-gray-400 dark:text-gray-500">{formatDateOnly(o.createdAt)}</div>
-        {/* Faz parte de uma solicitação com mais peças -- pedido do Victor
-            16/09/2026: "quando solicitamos mais de uma peça junta, a
-            fábrica manda tudo junto". Só um sinal de "não é avulsa" (não
-            conta quantas -- a lista aqui pode estar paginada/filtrada e
-            cortar a solicitação em páginas diferentes; a contagem certa
-            está no detalhe/e-mail, que buscam o grupo completo). */}
-        {o.groupId ? (
+        {/* Chamado com mais de uma peça -- pedido do Victor 16/09/2026:
+            "quando solicitamos mais de uma peça junta, a fábrica manda
+            tudo junto". extraItemsCount é exato (part_order_items desse
+            chamado, migration 0132) -- mostra o total certo. groupId é
+            LEGADO (migration 0131, só os 3 chamados criados antes da
+            correção) -- não dá pra saber quantas sem buscar, fica um
+            aviso genérico. */}
+        {o.extraItemsCount > 0 ? (
           <span
             className="inline-flex mt-1 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap"
-            title="Faz parte de uma solicitação com mais peças"
+            title={`Chamado com ${o.extraItemsCount + 1} peças`}
+            style={{ color: "var(--text-secondary)", background: "var(--surface-2)" }}
+          >
+            🔗 +{o.extraItemsCount} peça{o.extraItemsCount > 1 ? "s" : ""}
+          </span>
+        ) : o.groupId ? (
+          <span
+            className="inline-flex mt-1 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap"
+            title="Faz parte de uma solicitação com mais peças (formato antigo)"
             style={{ color: "var(--text-secondary)", background: "var(--surface-2)" }}
           >
             🔗 +peças
@@ -297,7 +306,7 @@ function PecaRow({
       </td>
       <td className="pl-3 pr-4 py-3 align-top text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1.5 flex-wrap">
-          <PartOrderEmailButton o={o} groupId={o.groupId} />
+          <PartOrderEmailButton o={o} groupId={o.groupId} extraItemsCount={o.extraItemsCount} />
           <PartOrderSummaryButton o={o} />
         </div>
       </td>

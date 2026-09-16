@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getPartOrder, listPartOrderFieldHistory, listPartOrdersByGroupId } from "@/lib/partOrders";
+import { getPartOrder, listPartOrderFieldHistory, listPartOrdersByGroupId, listPartOrderItems, type PartOrderItem } from "@/lib/partOrders";
 import { updatePartArrivedAt, updateSentToClientAt } from "@/app/assistencia/pecas-actions";
 import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PartOrderActions } from "@/components/assistencia/PartOrderActions";
@@ -63,12 +63,20 @@ export async function PartOrderDetailContent({ id, basePath }: { id: string; bas
   const partArrivedHistory = fieldHistory.filter((h) => h.field === "part_arrived_at");
   const sentToClientHistory = fieldHistory.filter((h) => h.field === "sent_to_client_at");
 
-  // Peças-irmãs da mesma solicitação -- pedido do Victor 16/09/2026: "mais
-  // de uma peça na mesma solicitação, pois... a fábrica manda tudo
-  // junto". Só busca quando o pedido tem group_id (a esmagadora maioria,
-  // avulsa, não paga esse SELECT a mais).
+  // Peças-irmãs LEGADO (migration 0131, group_id) -- só os poucos
+  // chamados criados antes da correção de 16/09/2026 (ver migration 0132)
+  // ainda usam isso. Chamado novo nunca tem group_id.
   const groupSiblings = order.groupId ? await listPartOrdersByGroupId(order.groupId) : [];
   const otherGroupSiblings = groupSiblings.filter((s) => s.id !== order.id);
+
+  // Demais peças deste chamado -- pedido do Victor 16/09/2026: "adicione
+  // a opção de eu adicionar mais de uma peça na mesma solicitação, pois...
+  // a fábrica manda tudo junto", corrigido no mesmo dia pra UM chamado só
+  // (migration 0132) depois dele achar que 3 peças tinham virado 3
+  // chamados linkados. Só busca quando o chamado realmente tem mais de 1
+  // peça (extraItemsCount, ver PART_ORDER_COLUMNS/toPartOrder em
+  // partOrders.ts) -- a esmagadora maioria não paga esse SELECT a mais.
+  const extraItems = order.extraItemsCount > 0 ? await listPartOrderItems(order.id) : [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -84,7 +92,7 @@ export async function PartOrderDetailContent({ id, basePath }: { id: string; bas
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <PartOrderEmailButton o={order} groupId={order.groupId} />
+            <PartOrderEmailButton o={order} groupId={order.groupId} extraItemsCount={order.extraItemsCount} />
             <Link
               href={`${basePath}/${order.id}/despacho`}
               className="text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500 transition-colors duration-150"
@@ -125,13 +133,30 @@ export async function PartOrderDetailContent({ id, basePath }: { id: string; bas
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <Block title="Peça / Produto">
+        <Block title={extraItems.length > 0 ? `Peça / Produto (1ª de ${extraItems.length + 1})` : "Peça / Produto"}>
           <Field label="Código da peça" value={order.partCode} />
           <Field label="Cor" value={order.color} />
           <Field label="Fornecedor" value={order.supplier} />
           <div className="sm:col-span-2">
             <Field label="Produto do cliente" value={order.product} />
           </div>
+          {/* Demais peças do MESMO chamado -- pedido do Victor 16/09/2026,
+              corrigido no mesmo dia pra UM chamado só (migration 0132, ver
+              comentário em extraItems acima). */}
+          {extraItems.length > 0 ? (
+            <div className="sm:col-span-2 flex flex-col gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Demais peças deste chamado</span>
+              {extraItems.map((item: PartOrderItem, i: number) => (
+                <div key={item.id} className="rounded-lg border border-gray-100 dark:border-gray-700 p-3 grid sm:grid-cols-2 gap-2">
+                  <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 sm:col-span-2">Peça {i + 2}</span>
+                  <Field label="Produto do cliente" value={item.product} />
+                  <Field label="Peça" value={item.partName} />
+                  <Field label="Código da peça" value={item.partCode} />
+                  <Field label="Cor" value={item.color} />
+                </div>
+              ))}
+            </div>
+          ) : null}
         </Block>
 
         <Block title="Cliente">

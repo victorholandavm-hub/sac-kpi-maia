@@ -2,7 +2,19 @@
 
 import { useState } from "react";
 import type { PartOrder } from "@/lib/partOrders";
-import { getPartOrderGroup } from "@/app/assistencia/pecas-actions";
+import { getPartOrderGroup, getPartOrderItemsAction } from "@/app/assistencia/pecas-actions";
+
+// Uma peça (as 4 que variam por peça, ver migration 0132) -- forma comum
+// pra unificar os dois jeitos de um chamado ter mais de uma peça: o
+// LEGADO (migration 0131, 3 chamados linkados por group_id, cada um um
+// PartOrder inteiro) e o ATUAL (migration 0132, part_order_items dentro
+// de UM chamado só). buildBody/buildSubject abaixo trabalham só com essa
+// forma, não com PartOrder inteiro -- não importa de onde veio.
+type Piece = { partName: string; partCode: string | null; color: string | null; product: string | null };
+
+function toPiece(o: Pick<PartOrder, "partName" | "partCode" | "color" | "product">): Piece {
+  return { partName: o.partName, partCode: o.partCode, color: o.color, product: o.product };
+}
 
 // E-mail padrão que a assistência manda pro representante do fornecedor --
 // pedido do Victor 10/09/2026, texto exato que ele já usa hoje (copiado
@@ -31,29 +43,27 @@ const EMPRESA_BLOCO = {
 // na mesma solicitação (pedido do Victor 16/09/2026: "a fábrica manda
 // tudo junto") -- assunto cita a 1ª referência + quantas peças, corpo
 // (buildBody abaixo) lista cada uma.
-function buildSubject(orders: PartOrder[]): string {
-  const first = orders[0];
-  const ref = first.externalReference ?? `#${first.ticketNumber}`;
-  return orders.length > 1 ? `Solicitação de Peças - LOJAS AIAM - ${ref} (${orders.length} peças)` : `Solicitação de Peças - LOJAS AIAM - ${ref}`;
+function buildSubject(header: PartOrder, pieces: Piece[]): string {
+  const ref = header.externalReference ?? `#${header.ticketNumber}`;
+  return pieces.length > 1 ? `Solicitação de Peças - LOJAS AIAM - ${ref} (${pieces.length} peças)` : `Solicitação de Peças - LOJAS AIAM - ${ref}`;
 }
 
-function buildBody(orders: PartOrder[]): string {
-  const first = orders[0];
+function buildBody(header: PartOrder, pieces: Piece[]): string {
   // Espaço (linha em branco) entre cada informação -- pedido do Victor
   // 14/09/2026: "gentileza em dar espaços em acada informação". Antes era
   // uma linha embaixo da outra sem respiro nenhum.
-  const header = [
-    `Nome do Cliente: ${first.clientName ?? ""}`,
+  const headerLines = [
+    `Nome do Cliente: ${header.clientName ?? ""}`,
     // Nota fiscal logo abaixo do nome do cliente -- pedido do Victor
     // 15/09/2026. Morava lá embaixo, perto de Código da Peça, desde que
     // ganhou campo próprio (14/09/2026).
-    `Nota Fiscal: ${first.invoiceNumber ?? ""}`,
+    `Nota Fiscal: ${header.invoiceNumber ?? ""}`,
     `Município: ${EMPRESA_BLOCO.municipio}`,
     `Estado: ${EMPRESA_BLOCO.estado}`,
     `Razão Social: ${EMPRESA_BLOCO.razaoSocial}`,
     `CNPJ: ${EMPRESA_BLOCO.cnpj}`,
     `Endereço: ${EMPRESA_BLOCO.endereco}`,
-    `Fábrica: ${first.supplier ?? ""}`,
+    `Fábrica: ${header.supplier ?? ""}`,
   ];
 
   // Produto entrou no bloco de CADA peça (não mais no cabeçalho
@@ -65,17 +75,17 @@ function buildBody(orders: PartOrder[]): string {
   // 16/09/2026: "quando solicitamos mais de uma peça junta, a fábrica
   // manda tudo junto", um e-mail só em vez de um por peça.
   const pecaBlocks =
-    orders.length === 1
-      ? [`Produto: ${first.product ?? ""}`, `Cor: ${first.color ?? ""}`, `PEÇA: ${first.partName}`, `Código da Peça: ${first.partCode ?? ""}`]
-      : orders.flatMap((o, i) => [
+    pieces.length === 1
+      ? [`Produto: ${pieces[0].product ?? ""}`, `Cor: ${pieces[0].color ?? ""}`, `PEÇA: ${pieces[0].partName}`, `Código da Peça: ${pieces[0].partCode ?? ""}`]
+      : pieces.flatMap((p, i) => [
           `Peça ${i + 1}:`,
-          `Produto: ${o.product ?? ""}`,
-          `Cor: ${o.color ?? ""}`,
-          `PEÇA: ${o.partName}`,
-          `Código da Peça: ${o.partCode ?? ""}`,
+          `Produto: ${p.product ?? ""}`,
+          `Cor: ${p.color ?? ""}`,
+          `PEÇA: ${p.partName}`,
+          `Código da Peça: ${p.partCode ?? ""}`,
         ]);
 
-  return [...header, ...pecaBlocks, `Descrição: ${first.notes ?? ""}`, `FOTO/VÍDEO: `].join("\n\n");
+  return [...headerLines, ...pecaBlocks, `Descrição: ${header.notes ?? ""}`, `FOTO/VÍDEO: `].join("\n\n");
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -102,31 +112,52 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-export function PartOrderEmailButton({ o, groupId }: { o: PartOrder; groupId?: string | null }) {
+export function PartOrderEmailButton({
+  o,
+  groupId,
+  extraItemsCount = 0,
+}: {
+  o: PartOrder;
+  // LEGADO (migration 0131) -- só os 3 chamados criados antes da correção
+  // de 16/09/2026 ainda usam isso (ver comentário em PartOrder,
+  // partOrders.ts). Chamado novo nunca tem group_id.
+  groupId?: string | null;
+  // ATUAL (migration 0132) -- quantas peças em part_order_items além da
+  // 1ª (que já vem em `o`). Ver PartOrder.extraItemsCount.
+  extraItemsCount?: number;
+}) {
   const [open, setOpen] = useState(false);
-  // Mais de uma peça na mesma solicitação -- pedido do Victor 16/09/2026:
-  // "a fábrica manda tudo junto", então o e-mail precisa listar todas, não
-  // só a peça desta linha. Busca sob demanda (só ao abrir, não a cada
-  // render da tabela/lista) via getPartOrderGroup -- não depende de quem
-  // renderizou este botão já ter as peças-irmãs em mãos (a lista pode
-  // estar paginada/filtrada e cortar a mesma solicitação em páginas
-  // diferentes).
-  const [group, setGroup] = useState<PartOrder[] | null>(null);
-  const [loadingGroup, setLoadingGroup] = useState(false);
+  // Mais de uma peça no mesmo chamado -- pedido do Victor 16/09/2026: "a
+  // fábrica manda tudo junto", então o e-mail precisa listar todas, não só
+  // a 1ª. Busca sob demanda (só ao abrir, não a cada render da tabela/
+  // lista) -- não depende de quem renderizou este botão já ter as demais
+  // peças em mãos (a lista pode estar paginada/filtrada).
+  const [extraPieces, setExtraPieces] = useState<Piece[] | null>(null);
+  const [loadingExtra, setLoadingExtra] = useState(false);
 
-  const orders = group ?? [o];
-  const subject = buildSubject(orders);
-  const body = buildBody(orders);
+  const pieces = [toPiece(o), ...(extraPieces ?? [])];
+  const subject = buildSubject(o, pieces);
+  const body = buildBody(o, pieces);
 
   async function handleOpen() {
     setOpen(true);
-    if (groupId && !group) {
-      setLoadingGroup(true);
+    if (extraPieces) return;
+    if (extraItemsCount > 0) {
+      setLoadingExtra(true);
+      try {
+        const items = await getPartOrderItemsAction(o.id);
+        setExtraPieces(items.map((it) => ({ partName: it.partName, partCode: it.partCode, color: it.color, product: it.product })));
+      } finally {
+        setLoadingExtra(false);
+      }
+    } else if (groupId) {
+      // LEGADO -- ver comentário no tipo das props acima.
+      setLoadingExtra(true);
       try {
         const siblings = await getPartOrderGroup(groupId);
-        if (siblings.length > 1) setGroup(siblings);
+        setExtraPieces(siblings.filter((s) => s.id !== o.id).map(toPiece));
       } finally {
-        setLoadingGroup(false);
+        setLoadingExtra(false);
       }
     }
   }
@@ -168,13 +199,13 @@ export function PartOrderEmailButton({ o, groupId }: { o: PartOrder; groupId?: s
             <div className="flex items-center justify-between gap-4">
               <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
                 E-mail pro representante
-                {loadingGroup ? (
+                {loadingExtra ? (
                   <span className="ml-2 text-xs font-normal" style={{ color: "var(--text-muted)" }}>
-                    carregando peças da solicitação…
+                    carregando peças do chamado…
                   </span>
-                ) : orders.length > 1 ? (
+                ) : pieces.length > 1 ? (
                   <span className="ml-2 text-xs font-normal" style={{ color: "var(--text-muted)" }}>
-                    {orders.length} peças nesta solicitação
+                    {pieces.length} peças neste chamado
                   </span>
                 ) : null}
               </h3>
