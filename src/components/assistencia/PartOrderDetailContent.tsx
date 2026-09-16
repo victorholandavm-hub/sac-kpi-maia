@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getPartOrder, listPartOrderFieldHistory } from "@/lib/partOrders";
+import { getPartOrder, listPartOrderFieldHistory, listPartOrdersByGroupId } from "@/lib/partOrders";
 import { updatePartArrivedAt, updateSentToClientAt } from "@/app/assistencia/pecas-actions";
 import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PartOrderActions } from "@/components/assistencia/PartOrderActions";
@@ -63,6 +63,13 @@ export async function PartOrderDetailContent({ id, basePath }: { id: string; bas
   const partArrivedHistory = fieldHistory.filter((h) => h.field === "part_arrived_at");
   const sentToClientHistory = fieldHistory.filter((h) => h.field === "sent_to_client_at");
 
+  // Peças-irmãs da mesma solicitação -- pedido do Victor 16/09/2026: "mais
+  // de uma peça na mesma solicitação, pois... a fábrica manda tudo
+  // junto". Só busca quando o pedido tem group_id (a esmagadora maioria,
+  // avulsa, não paga esse SELECT a mais).
+  const groupSiblings = order.groupId ? await listPartOrdersByGroupId(order.groupId) : [];
+  const otherGroupSiblings = groupSiblings.filter((s) => s.id !== order.id);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl px-6 py-5 shadow-sm flex flex-col gap-3">
@@ -77,7 +84,7 @@ export async function PartOrderDetailContent({ id, basePath }: { id: string; bas
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <PartOrderEmailButton o={order} />
+            <PartOrderEmailButton o={order} groupId={order.groupId} />
             <Link
               href={`${basePath}/${order.id}/despacho`}
               className="text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500 transition-colors duration-150"
@@ -92,6 +99,29 @@ export async function PartOrderDetailContent({ id, basePath }: { id: string; bas
             </Link>
           </div>
         </div>
+        {/* Peças-irmãs da mesma solicitação -- pedido do Victor
+            16/09/2026: "quando solicitamos mais de uma peça junta, a
+            fábrica manda tudo junto". Cada peça continua sua própria
+            linha/status (ver comentário em migration 0131) -- isso aqui é
+            só pra não perder de vista que elas vieram juntas. */}
+        {otherGroupSiblings.length > 0 ? (
+          <div className="flex flex-col gap-1.5 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+              Outras peças desta mesma solicitação ({otherGroupSiblings.length})
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {otherGroupSiblings.map((s) => (
+                <Link
+                  key={s.id}
+                  href={`${basePath}/${s.id}`}
+                  className="text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
+                >
+                  {s.externalReference ?? `#${s.ticketNumber}`} · {s.partName}
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">

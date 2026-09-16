@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { PartOrder } from "@/lib/partOrders";
+import { getPartOrderGroup } from "@/app/assistencia/pecas-actions";
 
 // E-mail padrão que a assistência manda pro representante do fornecedor --
 // pedido do Victor 10/09/2026, texto exato que ele já usa hoje (copiado
@@ -26,34 +27,47 @@ const EMPRESA_BLOCO = {
 // Número do chamado no assunto -- pedido do Victor 15/09/2026: "no
 // assunto você coloque o numero do chamado". externalReference (CH0001..)
 // pro histórico importado da planilha, senão #ticket_number -- mesmo
-// critério já usado em toda a tela (ver PecasTable.tsx).
-function buildSubject(o: PartOrder): string {
-  return `Solicitação de Peças - LOJAS AIAM - ${o.externalReference ?? `#${o.ticketNumber}`}`;
+// critério já usado em toda a tela (ver PecasTable.tsx). Mais de uma peça
+// na mesma solicitação (pedido do Victor 16/09/2026: "a fábrica manda
+// tudo junto") -- assunto cita a 1ª referência + quantas peças, corpo
+// (buildBody abaixo) lista cada uma.
+function buildSubject(orders: PartOrder[]): string {
+  const first = orders[0];
+  const ref = first.externalReference ?? `#${first.ticketNumber}`;
+  return orders.length > 1 ? `Solicitação de Peças - LOJAS AIAM - ${ref} (${orders.length} peças)` : `Solicitação de Peças - LOJAS AIAM - ${ref}`;
 }
 
-function buildBody(o: PartOrder): string {
+function buildBody(orders: PartOrder[]): string {
+  const first = orders[0];
   // Espaço (linha em branco) entre cada informação -- pedido do Victor
   // 14/09/2026: "gentileza em dar espaços em acada informação". Antes era
   // uma linha embaixo da outra sem respiro nenhum.
-  return [
-    `Nome do Cliente: ${o.clientName ?? ""}`,
+  const header = [
+    `Nome do Cliente: ${first.clientName ?? ""}`,
     // Nota fiscal logo abaixo do nome do cliente -- pedido do Victor
     // 15/09/2026. Morava lá embaixo, perto de Código da Peça, desde que
     // ganhou campo próprio (14/09/2026).
-    `Nota Fiscal: ${o.invoiceNumber ?? ""}`,
+    `Nota Fiscal: ${first.invoiceNumber ?? ""}`,
     `Município: ${EMPRESA_BLOCO.municipio}`,
     `Estado: ${EMPRESA_BLOCO.estado}`,
     `Razão Social: ${EMPRESA_BLOCO.razaoSocial}`,
     `CNPJ: ${EMPRESA_BLOCO.cnpj}`,
     `Endereço: ${EMPRESA_BLOCO.endereco}`,
-    `Fábrica: ${o.supplier ?? ""}`,
-    `Produto: ${o.product ?? ""}`,
-    `Cor: ${o.color ?? ""}`,
-    `PEÇA: ${o.partName}`,
-    `Código da Peça: ${o.partCode ?? ""}`,
-    `Descrição: ${o.notes ?? ""}`,
-    `FOTO/VÍDEO: `,
-  ].join("\n\n");
+    `Fábrica: ${first.supplier ?? ""}`,
+    `Produto: ${first.product ?? ""}`,
+  ];
+
+  // Uma peça: formato de sempre, sem "Peça 1:" na frente (comportamento
+  // idêntico ao de antes do pedido de várias peças). Mais de uma: cada
+  // peça em bloco próprio, numerado -- pedido do Victor 16/09/2026:
+  // "quando solicitamos mais de uma peça junta, a fábrica manda tudo
+  // junto", um e-mail só em vez de um por peça.
+  const pecaBlocks =
+    orders.length === 1
+      ? [`Cor: ${first.color ?? ""}`, `PEÇA: ${first.partName}`, `Código da Peça: ${first.partCode ?? ""}`]
+      : orders.flatMap((o, i) => [`Peça ${i + 1}:`, `Cor: ${o.color ?? ""}`, `PEÇA: ${o.partName}`, `Código da Peça: ${o.partCode ?? ""}`]);
+
+  return [...header, ...pecaBlocks, `Descrição: ${first.notes ?? ""}`, `FOTO/VÍDEO: `].join("\n\n");
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -80,10 +94,34 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-export function PartOrderEmailButton({ o }: { o: PartOrder }) {
+export function PartOrderEmailButton({ o, groupId }: { o: PartOrder; groupId?: string | null }) {
   const [open, setOpen] = useState(false);
-  const subject = buildSubject(o);
-  const body = buildBody(o);
+  // Mais de uma peça na mesma solicitação -- pedido do Victor 16/09/2026:
+  // "a fábrica manda tudo junto", então o e-mail precisa listar todas, não
+  // só a peça desta linha. Busca sob demanda (só ao abrir, não a cada
+  // render da tabela/lista) via getPartOrderGroup -- não depende de quem
+  // renderizou este botão já ter as peças-irmãs em mãos (a lista pode
+  // estar paginada/filtrada e cortar a mesma solicitação em páginas
+  // diferentes).
+  const [group, setGroup] = useState<PartOrder[] | null>(null);
+  const [loadingGroup, setLoadingGroup] = useState(false);
+
+  const orders = group ?? [o];
+  const subject = buildSubject(orders);
+  const body = buildBody(orders);
+
+  async function handleOpen() {
+    setOpen(true);
+    if (groupId && !group) {
+      setLoadingGroup(true);
+      try {
+        const siblings = await getPartOrderGroup(groupId);
+        if (siblings.length > 1) setGroup(siblings);
+      } finally {
+        setLoadingGroup(false);
+      }
+    }
+  }
 
   return (
     <>
@@ -92,7 +130,7 @@ export function PartOrderEmailButton({ o }: { o: PartOrder }) {
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          setOpen(true);
+          handleOpen();
         }}
         className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap underline"
         style={{ color: "var(--text-primary)", background: "color-mix(in srgb, var(--text-secondary) 15%, var(--surface-1))" }}
@@ -122,6 +160,15 @@ export function PartOrderEmailButton({ o }: { o: PartOrder }) {
             <div className="flex items-center justify-between gap-4">
               <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
                 E-mail pro representante
+                {loadingGroup ? (
+                  <span className="ml-2 text-xs font-normal" style={{ color: "var(--text-muted)" }}>
+                    carregando peças da solicitação…
+                  </span>
+                ) : orders.length > 1 ? (
+                  <span className="ml-2 text-xs font-normal" style={{ color: "var(--text-muted)" }}>
+                    {orders.length} peças nesta solicitação
+                  </span>
+                ) : null}
               </h3>
               <button
                 aria-label="Fechar"
