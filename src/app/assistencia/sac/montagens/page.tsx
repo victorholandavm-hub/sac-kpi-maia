@@ -19,25 +19,32 @@ export const dynamic = "force-dynamic";
 export default async function SacMontagensPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; q?: string }>;
 }) {
   const profile = await getProfile();
   if (profile.role !== "sac" && profile.role !== "admin") {
     redirect("/assistencia/inicio");
   }
 
-  const { view } = await searchParams;
+  const { view, q } = await searchParams;
   const showCompleted = view === "concluidas";
 
   // Ver OWN_ASSEMBLER_STORE_IDS -- SAC também não enxerga montagem/
   // desmontagem/vistoria de Mamanguape/Campina Grande (exceto se for admin).
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
+  // Busca por cliente/CPF/telefone/produto/nº do chamado -- pedido do
+  // Victor 16/09/2026: "poderem consultar caso já tenha alguma solicitação
+  // em aberto do cliente específico". Sem `q`, a busca já cobre esses
+  // campos (ver listRequests, serviceRequests.ts) -- com o filtro
+  // preenchido, ignora o toggle Em aberto/Concluídas e mostra os dois (não
+  // faz sentido escolher escondido enquanto procura um cliente específico).
   const { items } = await listRequests({
     types: [...ASSISTENCIA_MANAGED_TYPES],
-    status: showCompleted ? "concluida" : undefined,
+    status: q ? undefined : showCompleted ? "concluida" : undefined,
+    q,
     excludeOwnAssemblerStoreIds,
   });
-  const requests = showCompleted ? items : items.filter((r) => r.status !== "concluida" && r.status !== "cancelada");
+  const requests = q ? items : showCompleted ? items : items.filter((r) => r.status !== "concluida" && r.status !== "cancelada");
 
   return (
     <div className="max-w-6xl mx-auto w-full p-6 flex flex-col gap-6 min-w-0">
@@ -50,14 +57,41 @@ export default async function SacMontagensPage({
         assistência técnica.
       </p>
 
-      <div className="flex items-center gap-2">
-        <FilterPill label="Em aberto" selected={!showCompleted} href="/assistencia/sac/montagens" />
-        <FilterPill label="Concluídas" selected={showCompleted} href="/assistencia/sac/montagens?view=concluidas" />
-      </div>
+      <form action="/assistencia/sac/montagens" method="GET" className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[240px]">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500" aria-hidden="true">
+            🔍
+          </span>
+          <input
+            type="search"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Buscar por cliente, CPF, telefone, produto ou nº do chamado…"
+            className="rounded-lg border border-gray-200 dark:border-gray-600 pl-8 pr-3 py-2 text-sm w-full text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 hover:border-gray-300 dark:hover:border-gray-500 focus:border-gray-300 dark:focus:border-gray-500 focus:outline-none transition-colors duration-150"
+          />
+        </div>
+        <button type="submit" className="text-sm px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-600 font-medium text-gray-800 dark:text-gray-100">
+          Buscar
+        </button>
+        {q ? (
+          <Link href="/assistencia/sac/montagens" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+            Limpar busca
+          </Link>
+        ) : null}
+      </form>
+
+      {!q ? (
+        <div className="flex items-center gap-2">
+          <FilterPill label="Em aberto" selected={!showCompleted} href="/assistencia/sac/montagens" />
+          <FilterPill label="Concluídas" selected={showCompleted} href="/assistencia/sac/montagens?view=concluidas" />
+        </div>
+      ) : null}
 
       {requests.length === 0 ? (
         <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
-          <p className="text-sm text-gray-400 dark:text-gray-500">{showCompleted ? "Nenhuma concluída ainda." : "Nenhuma em aberto no momento."}</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">
+            {q ? "Nenhum chamado encontrado." : showCompleted ? "Nenhuma concluída ainda." : "Nenhuma em aberto no momento."}
+          </p>
         </div>
       ) : (
         <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">

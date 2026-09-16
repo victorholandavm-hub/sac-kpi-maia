@@ -78,7 +78,12 @@ function buildBody(header: PartOrder, pieces: Piece[]): string {
     pieces.length === 1
       ? [`Produto: ${pieces[0].product ?? ""}`, `Cor: ${pieces[0].color ?? ""}`, `PEÇA: ${pieces[0].partName}`, `Código da Peça: ${pieces[0].partCode ?? ""}`]
       : pieces.flatMap((p, i) => [
-          `Peça ${i + 1}:`,
+          // "Produto N:" em vez de "Peça N:" -- pedido do Victor 16/09/2026:
+          // "colocar na parte da linha abaixo onde tem produto... esse
+          // negócio de peça 1 confunde" (a linha logo abaixo já é "Produto:
+          // X", ter os dois rótulos diferentes -- "Peça" no cabeçalho do
+          // bloco e "Produto" no campo -- confundia quem lia o e-mail).
+          `Produto ${i + 1}:`,
           `Produto: ${p.product ?? ""}`,
           `Cor: ${p.color ?? ""}`,
           `PEÇA: ${p.partName}`,
