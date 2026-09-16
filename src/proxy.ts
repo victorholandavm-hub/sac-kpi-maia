@@ -21,6 +21,14 @@ const PASSTHROUGH_PREFIXES = [
   // /assistencia, então cairia no gate de auth do painel de KPIs do SAC (ou
   // no redirect pra /assistencia) sem isso.
   "/api/staff/upload-photo",
+  // Log de impressão da notificação de assistência (ver PrintButton.tsx) --
+  // mesmo motivo dos três acima (POST comum em vez de Server Action):
+  // não começa com /assistencia, então caía nesse mesmo redirect pra
+  // /assistencia (achado 16/09/2026 verificando o deploy da correção do
+  // botão de imprimir -- o fetch falhava silenciosamente, `.catch(()=>{})`
+  // não deixava travar o `window.print()`, mas o evento "printed" nunca
+  // era gravado).
+  "/api/assistencia/log-print",
   // Serve foto do disco local (ver src/lib/localPhotoStorage.ts) -- não
   // começa com /assistencia, então sem isso caía no gate de auth do painel
   // de KPIs do SAC (ou no redirect pra /assistencia no projeto exclusivo da
