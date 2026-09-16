@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { hashPin } from "./montadorAuth";
 import { isMostruarioRequest, type RequestType } from "./serviceRequests";
 import { sanitizeOrFilterValue } from "./searchFilter";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
 // Cacheado 60s -- mesmo motivo/pedido de listStores (serviceRequests.ts):
 // lista de referência que quase nunca muda, mas era buscada do zero (com
@@ -238,26 +239,38 @@ export async function listPaymentItems(
   } = {}
 ): Promise<PaymentItem[]> {
   const admin = getSupabaseAdmin();
-  let query = admin
-    .from("service_request_items")
-    .select(
-      "id, product, quantity, unit_value, payment_released, payment_released_at, request:service_requests(id, ticket_number, type, status, assembler_name, client_name, order_code, created_at, stores(name))"
-    )
-    .order("created_at", { ascending: false });
-  // Visão geral (sem montador escolhido) só mostra quem já tem valor --
-  // senão a lista fica poluída com anos de item sem preço nenhum. Ao
-  // escolher um montador específico (ver pagamentos/page.tsx), o Antonio
-  // quer exatamente o contrário: ver tudo dessa pessoa, inclusive o que
-  // ainda não tem valor, pra já definir ali mesmo sem entrar em cada
-  // solicitação.
-  if (!opts.includeNoValue) {
-    query = query.not("unit_value", "is", null);
-  }
-  const { data, error } = await query;
+  // Busca paginada (fetchAllPagesParallel) -- achado 16/09/2026 (Victor:
+  // "tem 456 itens sem montador?"): essa consulta buscava tudo num
+  // `.select()` só, sem `.range()`/paginação nenhuma. Com
+  // service_request_items já passando de 1000 linhas, o limite padrão de
+  // resposta do PostgREST (1000 linhas) cortava silenciosamente as linhas
+  // mais ANTIGAS (ordenado por created_at desc) de QUALQUER consulta com
+  // includeNoValue:true (que é sempre, nas duas telas que chamam essa
+  // função -- Pagamentos e Relatórios) -- cada item novo no sistema empurra
+  // o corte pra frente, fazendo item antigo (com valor/pagamento já
+  // definido ou não) sumir dos totais sem nada nele ter mudado.
+  const rows = await fetchAllPagesParallel<PaymentItemRow>((from, to) => {
+    let query = admin
+      .from("service_request_items")
+      .select(
+        "id, product, quantity, unit_value, payment_released, payment_released_at, request:service_requests(id, ticket_number, type, status, assembler_name, client_name, order_code, created_at, stores(name))",
+        { count: "exact" }
+      )
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    // Visão geral (sem montador escolhido) só mostra quem já tem valor --
+    // senão a lista fica poluída com anos de item sem preço nenhum. Ao
+    // escolher um montador específico (ver pagamentos/page.tsx), o Antonio
+    // quer exatamente o contrário: ver tudo dessa pessoa, inclusive o que
+    // ainda não tem valor, pra já definir ali mesmo sem entrar em cada
+    // solicitação.
+    if (!opts.includeNoValue) {
+      query = query.not("unit_value", "is", null);
+    }
+    return query as unknown as PromiseLike<PagedQueryResult<PaymentItemRow>>;
+  });
 
-  if (error) throw new Error(error.message);
-
-  const items = ((data ?? []) as unknown as PaymentItemRow[])
+  const items = rows
     .filter((row) => row.request !== null)
     .map((row) => ({
       itemId: row.id,
