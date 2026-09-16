@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getPartOrder, listPartOrderFieldHistory, listPartOrdersByGroupId, listPartOrderItems, type PartOrderItem } from "@/lib/partOrders";
+import { getPartOrder, listPartOrderFieldHistory, listPartOrdersByGroupId, listPartOrderItems } from "@/lib/partOrders";
 import { updatePartArrivedAt, updateSentToClientAt } from "@/app/assistencia/pecas-actions";
 import { PART_ORDER_STATUS_LABELS, PART_ORDER_STATUS_COLORS } from "@/lib/assistenciaLabels";
 import { PartOrderActions } from "@/components/assistencia/PartOrderActions";
@@ -86,7 +86,23 @@ export async function PartOrderDetailContent({ id, basePath }: { id: string; bas
             <span className="text-xs font-mono font-medium text-gray-500 dark:text-gray-400">
               {order.externalReference ?? `Chamado #${order.ticketNumber}`}
             </span>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate">{order.partName}</h2>
+            {/* Todas as peças no título quando o chamado tem mais de uma --
+                pedido do Victor 16/09/2026: "preciso que todas as peças
+                apareçam aqui, no caso de mais de uma peça no chamado". Antes
+                só mostrava order.partName (a 1ª peça), as demais (extraItems)
+                ficavam escondidas até descer pro bloco "Peça / Produto". */}
+            {extraItems.length > 0 ? (
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex flex-col gap-0.5">
+                <span>1. {order.partName}</span>
+                {extraItems.map((item, i) => (
+                  <span key={item.id}>
+                    {i + 2}. {item.partName}
+                  </span>
+                ))}
+              </h2>
+            ) : (
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate">{order.partName}</h2>
+            )}
             <div>
               <StatusBadge status={order.status} />
             </div>
@@ -133,30 +149,29 @@ export async function PartOrderDetailContent({ id, basePath }: { id: string; bas
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <Block title={extraItems.length > 0 ? `Peça / Produto (1ª de ${extraItems.length + 1})` : "Peça / Produto"}>
-          <Field label="Código da peça" value={order.partCode} />
-          <Field label="Cor" value={order.color} />
+        {/* Sem hierarquia entre a 1ª peça e as demais -- pedido do Victor
+            16/09/2026: "aqui não tenha hierarquia de peça, apareça mais
+            organizado... produto 1: xyz e depois peça 1: xyz... todos tem
+            que ter produto e peça". Antes a 1ª peça vinha solta, com campos
+            fora de ordem e sem rótulo "Peça" (só aparecia no título lá em
+            cima) enquanto as demais ganhavam uma caixa à parte, mais
+            "escondida" -- agora as duas passam pelo mesmo bloco, no mesmo
+            formato, só numerado. */}
+        <Block title={extraItems.length > 0 ? `Peças / Produtos (${extraItems.length + 1})` : "Peça / Produto"}>
           <Field label="Fornecedor" value={order.supplier} />
-          <div className="sm:col-span-2">
-            <Field label="Produto do cliente" value={order.product} />
-          </div>
-          {/* Demais peças do MESMO chamado -- pedido do Victor 16/09/2026,
-              corrigido no mesmo dia pra UM chamado só (migration 0132, ver
-              comentário em extraItems acima). */}
-          {extraItems.length > 0 ? (
-            <div className="sm:col-span-2 flex flex-col gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Demais peças deste chamado</span>
-              {extraItems.map((item: PartOrderItem, i: number) => (
-                <div key={item.id} className="rounded-lg border border-gray-100 dark:border-gray-700 p-3 grid sm:grid-cols-2 gap-2">
-                  <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 sm:col-span-2">Peça {i + 2}</span>
-                  <Field label="Produto do cliente" value={item.product} />
-                  <Field label="Peça" value={item.partName} />
-                  <Field label="Código da peça" value={item.partCode} />
-                  <Field label="Cor" value={item.color} />
-                </div>
-              ))}
-            </div>
-          ) : null}
+          {[{ id: "main", product: order.product, partName: order.partName, partCode: order.partCode, color: order.color }, ...extraItems].map(
+            (piece: { id: string; product: string | null; partName: string; partCode: string | null; color: string | null }, i: number) => (
+              <div
+                key={piece.id}
+                className={`sm:col-span-2 grid sm:grid-cols-2 gap-4 ${i > 0 ? "pt-4 border-t border-gray-100 dark:border-gray-700" : ""}`}
+              >
+                <Field label={`Produto ${i + 1}`} value={piece.product} />
+                <Field label={`Peça ${i + 1}`} value={piece.partName} />
+                <Field label="Código da peça" value={piece.partCode} />
+                <Field label="Cor" value={piece.color} />
+              </div>
+            )
+          )}
         </Block>
 
         <Block title="Cliente">
