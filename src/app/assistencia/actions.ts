@@ -1283,31 +1283,13 @@ export async function addNote(requestId: string, note: string) {
   revalidatePath(`/assistencia/${requestId}`);
 }
 
-// Pedido do Victor 21/08/2026: "quando alguem mandar imprimir essas
-// notificações fique registrado em algum lugar quem imprimiu, data e
-// hora". Mesmo padrão de addNote acima (insere em service_request_events),
-// só que aceita vários ids de uma vez (impressão em lote, ver
-// PrintButton.tsx/despacho-lote/page.tsx) e não precisa de nota nenhuma --
-// actor_id + created_at já são o registro. Sem requireManageAccess de
-// propósito: quem pode VER o despacho (ver canView nas duas páginas de
-// despacho) pode imprimir -- editar é que é restrito por tipo, não
-// ver/imprimir.
-export async function logPrint(requestIds: string[]): Promise<void> {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin", "sac");
-  const ids = requestIds.map((id) => id.trim()).filter(Boolean);
-  if (ids.length === 0) return;
-
-  const admin = getSupabaseAdmin();
-  const { error } = await admin.from("service_request_events").insert(
-    ids.map((id) => ({
-      request_id: id,
-      actor_id: profile.id,
-      event_type: "printed",
-    }))
-  );
-  if (error) throw new Error(error.message);
-}
+// logPrint (pedido do Victor 21/08/2026: registrar quem/quando imprimiu)
+// saiu daqui 16/09/2026 -- virou POST comum em
+// /api/assistencia/log-print/route.ts. Mesmo motivo já corrigido em
+// upload-photo (26/08/2026, ver comentário lá): Server Action guarda um
+// ID de build que fica inválido depois de um deploy novo, e o clique de
+// "Imprimir" ficava morto ("Failed to find Server Action") pra quem já
+// estava com a tela de despacho aberta de antes.
 
 // Upload de foto pela equipe NÃO é mais aqui -- virou POST comum em
 // /api/staff/upload-photo/route.ts (RequestPhotoUpload.tsx chama aquela
