@@ -54,18 +54,26 @@ function buildBody(orders: PartOrder[]): string {
     `CNPJ: ${EMPRESA_BLOCO.cnpj}`,
     `Endereço: ${EMPRESA_BLOCO.endereco}`,
     `Fábrica: ${first.supplier ?? ""}`,
-    `Produto: ${first.product ?? ""}`,
   ];
 
-  // Uma peça: formato de sempre, sem "Peça 1:" na frente (comportamento
-  // idêntico ao de antes do pedido de várias peças). Mais de uma: cada
-  // peça em bloco próprio, numerado -- pedido do Victor 16/09/2026:
-  // "quando solicitamos mais de uma peça junta, a fábrica manda tudo
-  // junto", um e-mail só em vez de um por peça.
+  // Produto entrou no bloco de CADA peça (não mais no cabeçalho
+  // compartilhado) -- pedido do Victor 16/09/2026: "produto do cliente
+  // também precisa seguir a mesma lógica... já que uma peça está ligada a
+  // um produto". Uma peça: formato de sempre, sem "Peça 1:" na frente
+  // (comportamento idêntico ao de antes do pedido de várias peças). Mais
+  // de uma: cada peça em bloco próprio, numerado -- pedido do Victor
+  // 16/09/2026: "quando solicitamos mais de uma peça junta, a fábrica
+  // manda tudo junto", um e-mail só em vez de um por peça.
   const pecaBlocks =
     orders.length === 1
-      ? [`Cor: ${first.color ?? ""}`, `PEÇA: ${first.partName}`, `Código da Peça: ${first.partCode ?? ""}`]
-      : orders.flatMap((o, i) => [`Peça ${i + 1}:`, `Cor: ${o.color ?? ""}`, `PEÇA: ${o.partName}`, `Código da Peça: ${o.partCode ?? ""}`]);
+      ? [`Produto: ${first.product ?? ""}`, `Cor: ${first.color ?? ""}`, `PEÇA: ${first.partName}`, `Código da Peça: ${first.partCode ?? ""}`]
+      : orders.flatMap((o, i) => [
+          `Peça ${i + 1}:`,
+          `Produto: ${o.product ?? ""}`,
+          `Cor: ${o.color ?? ""}`,
+          `PEÇA: ${o.partName}`,
+          `Código da Peça: ${o.partCode ?? ""}`,
+        ]);
 
   return [...header, ...pecaBlocks, `Descrição: ${first.notes ?? ""}`, `FOTO/VÍDEO: `].join("\n\n");
 }

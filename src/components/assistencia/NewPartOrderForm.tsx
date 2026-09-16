@@ -124,6 +124,21 @@ export function NewPartOrderForm({
                 </button>
               </div>
             ) : null}
+            {/* Produto do cliente ao lado da peça -- pedido do Victor
+                16/09/2026: "a parte de produto do cliente também precisa
+                seguir a mesma lógica e pode ir pra perto da peça, já que
+                uma peça está ligada a um produto". Passa a variar por
+                linha igual part_name/part_code/color (ver readParts,
+                pecas-actions.ts), não é mais compartilhado pela
+                solicitação inteira. */}
+            <Field label="Produto do cliente">
+              <input
+                name="product"
+                defaultValue={i === 0 ? defaultValues?.product : undefined}
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              />
+            </Field>
             <Field label="Peça *">
               <input name="part_name" required={i === 0} defaultValue="" className="rounded border px-3 py-2" style={inputStyle} />
             </Field>
@@ -213,24 +228,14 @@ export function NewPartOrderForm({
         </Field>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Produto do cliente">
-          <input
-            name="product"
-            defaultValue={defaultValues?.product}
-            className="rounded border px-3 py-2"
-            style={inputStyle}
-          />
-        </Field>
-        <Field label="Nome do cliente">
-          <input
-            name="client_name"
-            defaultValue={defaultValues?.clientName}
-            className="rounded border px-3 py-2"
-            style={inputStyle}
-          />
-        </Field>
-      </div>
+      <Field label="Nome do cliente">
+        <input
+          name="client_name"
+          defaultValue={defaultValues?.clientName}
+          className="rounded border px-3 py-2"
+          style={inputStyle}
+        />
+      </Field>
 
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="CPF do cliente">
