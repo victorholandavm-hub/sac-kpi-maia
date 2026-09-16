@@ -4,6 +4,7 @@ import { hashPin } from "./montadorAuth";
 import { isMostruarioRequest, type RequestType } from "./serviceRequests";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
+import { VISITA_REQUEST_TYPES } from "./assistenciaLabels";
 
 // Cacheado 60s -- mesmo motivo/pedido de listStores (serviceRequests.ts):
 // lista de referência que quase nunca muda, mas era buscada do zero (com
@@ -252,10 +253,21 @@ export async function listPaymentItems(
   const rows = await fetchAllPagesParallel<PaymentItemRow>((from, to) => {
     let query = admin
       .from("service_request_items")
+      // !inner -- precisa pra poder filtrar por request.type logo abaixo
+      // (embed comum, sem !inner, não permite filtro na tabela aninhada).
       .select(
-        "id, product, quantity, unit_value, payment_released, payment_released_at, request:service_requests(id, ticket_number, type, status, assembler_name, client_name, order_code, created_at, stores(name))",
+        "id, product, quantity, unit_value, payment_released, payment_released_at, request:service_requests!inner(id, ticket_number, type, status, assembler_name, client_name, order_code, created_at, stores(name))",
         { count: "exact" }
       )
+      // Só os 4 tipos que são visita de montador de verdade (VISITA_REQUEST_TYPES
+      // -- montagem/desmontagem/troca_peça/vistoria) -- achado 16/09/2026
+      // (Victor: "os sem montador ta aparecendo na lista de pagamento por
+      // que?"): sem esse filtro, essa consulta trazia TODO item de
+      // qualquer tipo de chamado (troca/entrega/recolhimento de produto,
+      // envio de peça...) -- tipos que estruturalmente NUNCA têm montador
+      // nem valor (não é campo esquecido, é campo que não se aplica), só
+      // empilhando como ruído no balde "Sem montador definido".
+      .in("request.type", VISITA_REQUEST_TYPES)
       .order("created_at", { ascending: false })
       .range(from, to);
     // Visão geral (sem montador escolhido) só mostra quem já tem valor --
