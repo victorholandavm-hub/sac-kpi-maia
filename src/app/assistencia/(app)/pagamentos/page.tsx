@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPaymentItems, listAssemblers, paymentStage, type PaymentItem } from "@/lib/payments";
-import { PAYMENTS_CONTROLLER_NAME } from "@/lib/assistenciaLabels";
+import { PAYMENTS_CONTROLLER_NAME, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { PaymentsExportButton } from "@/components/assistencia/PaymentsExportButton";
@@ -69,6 +69,15 @@ export default async function PagamentosPage({
   );
   const items = pendentes ? allItems.filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente") : allItems;
   const groups = groupByAssembler(items);
+  // Manoel escondido só da LISTA -- pedido do Victor 16/09/2026: "pode
+  // excluir visualmente apenas, manoel dessa lista de pagamentos". Não
+  // mexe em Total/Pago/Pendente acima (continuam somando `items`, sem
+  // filtro) nem nos dados -- ele é o único montador funcionário nosso
+  // (MANOEL_ONLY_ASSEMBLER), não item de pagamento a terceiro, só não
+  // deveria aparecer na lista. Mesmo espírito de exclusão do Manoel já
+  // existente nos cards de KPI do Relatório de montagem detalhado (ver
+  // relatorios/page.tsx).
+  const visibleGroups = groups.filter((g) => g.assemblerName !== MANOEL_ONLY_ASSEMBLER);
   const grandTotal = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
   const pendingTotal = items
     .filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente")
@@ -124,7 +133,7 @@ export default async function PagamentosPage({
         </div>
       </div>
 
-      {groups.length === 0 ? (
+      {visibleGroups.length === 0 ? (
         <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
           <p className="text-sm text-gray-400 dark:text-gray-500">
             {assembler
@@ -135,7 +144,7 @@ export default async function PagamentosPage({
           </p>
         </div>
       ) : (
-        groups.map((group) => {
+        visibleGroups.map((group) => {
           const total = group.items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
           return (
             <AssemblerPaymentGroup
@@ -148,7 +157,7 @@ export default async function PagamentosPage({
               // filtro, ou quando é o único grupo na tela -- senão fica
               // recolhido, pra não ter que descer passando pelas montagens
               // de todo mundo só pra ver o próximo montador.
-              defaultOpen={group.assemblerName === assembler || groups.length === 1}
+              defaultOpen={group.assemblerName === assembler || visibleGroups.length === 1}
             />
           );
         })
