@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { randomUUID } from "crypto";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { isPartOrderStatus } from "@/lib/partOrders";
+import { isPartOrderStatus, listPartOrdersByGroupId, type PartOrder } from "@/lib/partOrders";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { requirePecasActor } from "@/lib/pecasAccess";
 
@@ -29,12 +30,29 @@ function revalidatePecasPaths(id?: string) {
 
 export type PartOrderFormState = { error?: string; success?: boolean } | undefined;
 
+// Uma solicitação pode ter várias peças -- pedido do Victor 16/09/2026:
+// "adicione a opção de eu adicionar mais de uma peça na mesma solicitação,
+// pois quando solicitamos mais de uma peça junta, a fábrica manda tudo
+// junto". O formulário (NewPartOrderForm.tsx) manda part_name/part_code/
+// color REPETIDOS (mesmo name em vários <input>) -- FormData.getAll já
+// devolve tudo na ordem digitada, index a index. Linhas com peça em
+// branco (ex.: usuário adicionou uma linha extra e não preencheu) são
+// ignoradas.
+function readParts(formData: FormData): { partName: string; partCode: string | null; color: string | null }[] {
+  const names = formData.getAll("part_name").map((v) => String(v).trim());
+  const codes = formData.getAll("part_code").map((v) => String(v).trim());
+  const colors = formData.getAll("color").map((v) => String(v).trim());
+  return names
+    .map((partName, i) => ({ partName, partCode: codes[i] || null, color: colors[i] || null }))
+    .filter((p) => p.partName.length > 0);
+}
+
 export async function createPartOrder(_state: PartOrderFormState, formData: FormData): Promise<PartOrderFormState> {
   const actor = await requirePecasActor();
 
-  const partName = String(formData.get("part_name") ?? "").trim();
-  if (!partName) {
-    return { error: "Informe a peça." };
+  const parts = readParts(formData);
+  if (parts.length === 0) {
+    return { error: "Informe ao menos uma peça." };
   }
 
   const supplierChoice = String(formData.get("supplier") ?? "").trim();
@@ -63,53 +81,87 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
 
   const defaultExpectedAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  // Todo pedido novo continua a numeração da planilha "Solicitação de
-  // peças" (CH0001..CH1643 no histórico importado) -- pedido do Victor
-  // 09/09/2026: "se o ultimo chamado é o CH1643, o proximo deve ser o
-  // CH1644". ch_number_seq (migration 0119) garante isso sem risco de
-  // corrida entre duas criações ao mesmo tempo. Formatação ("CH" + zero à
-  // esquerda) sai do banco e vem pra cá (migration 0122) -- lpad truncou
-  // em vez de só preencher (0121 corrigiu isso e AINDA ASSIM aconteceu de
-  // novo, achado do Victor 10/09/2026 -- sem confirmar a causa exata,
-  // tirar a formatação de string do banco de vez é a saída mais segura).
-  // padStart do JS nunca trunca, só preenche quando é menor.
-  const { data: chSeq, error: chError } = await admin.rpc("next_ch_seq");
-  if (chError) {
-    return { error: `Não foi possível gerar o número do chamado: ${chError.message}` };
-  }
-  const chNumber = `CH${String(chSeq).padStart(3, "0")}`;
+  // Campos compartilhados por TODAS as peças desta solicitação (cliente,
+  // fornecedor, nota fiscal...) -- só part_name/part_code/color variam por
+  // peça (ver parts acima).
+  const sharedFields = {
+    service_request_id: emptyToNull(formData.get("service_request_id")),
+    client_name: emptyToNull(formData.get("client_name")),
+    client_cpf: emptyToNull(formData.get("client_cpf")),
+    client_phone: emptyToNull(formData.get("client_phone")),
+    client_email: emptyToNull(formData.get("client_email")),
+    product: emptyToNull(formData.get("product")),
+    supplier: supplier || null,
+    representative,
+    representative_email: representativeEmail,
+    representative_phone: representativePhone,
+    requested_by: actor.name,
+    notes: emptyToNull(formData.get("notes")),
+    expected_at: emptyToNull(formData.get("expected_at")) ?? defaultExpectedAt,
+    invoice_number: emptyToNull(formData.get("invoice_number")),
+  };
+  // group_id só quando há mais de uma peça -- pedido avulso continua sem
+  // (null), comportamento de sempre. Amarra as peças desta submissão pro
+  // e-mail poder listar todas juntas (ver PartOrderEmailButton.tsx).
+  const groupId = parts.length > 1 ? randomUUID() : null;
 
-  const { data, error } = await admin
-    .from("part_orders")
-    .insert({
-      external_reference: chNumber,
-      service_request_id: emptyToNull(formData.get("service_request_id")),
-      client_name: emptyToNull(formData.get("client_name")),
-      client_cpf: emptyToNull(formData.get("client_cpf")),
-      client_phone: emptyToNull(formData.get("client_phone")),
-      client_email: emptyToNull(formData.get("client_email")),
-      product: emptyToNull(formData.get("product")),
-      part_name: partName,
-      part_code: emptyToNull(formData.get("part_code")),
-      color: emptyToNull(formData.get("color")),
-      supplier: supplier || null,
-      representative,
-      representative_email: representativeEmail,
-      representative_phone: representativePhone,
-      requested_by: actor.name,
-      notes: emptyToNull(formData.get("notes")),
-      expected_at: emptyToNull(formData.get("expected_at")) ?? defaultExpectedAt,
-      invoice_number: emptyToNull(formData.get("invoice_number")),
-    })
-    .select("id")
-    .single();
+  // Um INSERT por peça -- cada uma continua sua PRÓPRIA linha (status,
+  // chegada, envio ao cliente rastreados individualmente, ver comentário
+  // no topo do arquivo de migration 0131) e seu PRÓPRIO número de chamado
+  // (next_ch_seq chamado uma vez por peça, mesma numeração sequencial da
+  // planilha "Solicitação de peças" -- ver comentário original abaixo).
+  // Sequencial (não Promise.all) de propósito -- next_ch_seq depende de
+  // ordem, e são no máximo umas poucas peças por solicitação.
+  const createdIds: string[] = [];
+  for (const part of parts) {
+    // Todo pedido novo continua a numeração da planilha "Solicitação de
+    // peças" (CH0001..CH1643 no histórico importado) -- pedido do Victor
+    // 09/09/2026: "se o ultimo chamado é o CH1643, o proximo deve ser o
+    // CH1644". ch_number_seq (migration 0119) garante isso sem risco de
+    // corrida entre duas criações ao mesmo tempo. Formatação ("CH" + zero à
+    // esquerda) sai do banco e vem pra cá (migration 0122) -- lpad truncou
+    // em vez de só preencher (0121 corrigiu isso e AINDA ASSIM aconteceu de
+    // novo, achado do Victor 10/09/2026 -- sem confirmar a causa exata,
+    // tirar a formatação de string do banco de vez é a saída mais segura).
+    // padStart do JS nunca trunca, só preenche quando é menor.
+    const { data: chSeq, error: chError } = await admin.rpc("next_ch_seq");
+    if (chError) {
+      return { error: `Não foi possível gerar o número do chamado: ${chError.message}` };
+    }
+    const chNumber = `CH${String(chSeq).padStart(3, "0")}`;
 
-  if (error || !data) {
-    return { error: `Não foi possível criar o pedido de peça: ${error?.message ?? "erro desconhecido"}` };
+    const { data, error } = await admin
+      .from("part_orders")
+      .insert({
+        ...sharedFields,
+        external_reference: chNumber,
+        part_name: part.partName,
+        part_code: part.partCode,
+        color: part.color,
+        group_id: groupId,
+      })
+      .select("id")
+      .single();
+
+    if (error || !data) {
+      return { error: `Não foi possível criar o pedido de peça "${part.partName}": ${error?.message ?? "erro desconhecido"}` };
+    }
+    createdIds.push(data.id as string);
   }
 
   revalidatePecasPaths();
   return { success: true };
+}
+
+// Peças-irmãs de uma solicitação (mesmo group_id) -- usado pelo botão de
+// e-mail (PartOrderEmailButton.tsx) pra montar um corpo só com todas as
+// peças, sob demanda (só quando o usuário abre o e-mail), sem precisar que
+// quem renderizou a lista já tivesse o grupo inteiro carregado (a lista de
+// pedidos pode estar paginada/filtrada e cortar peças da mesma
+// solicitação em páginas diferentes).
+export async function getPartOrderGroup(groupId: string): Promise<PartOrder[]> {
+  await requirePecasActor();
+  return listPartOrdersByGroupId(groupId);
 }
 
 // Corrigir os dados de um pedido já criado -- pedido do Victor 10/09/2026:

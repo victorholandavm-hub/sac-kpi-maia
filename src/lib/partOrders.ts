@@ -116,6 +116,12 @@ export type PartOrder = {
   // em vez de enviada_ao_cliente).
   resolvedWithoutPartAt: string | null;
   resolvedWithoutPartBy: string | null;
+  // Amarra peças pedidas NA MESMA submissão do formulário -- pedido do
+  // Victor 16/09/2026: "adicione a opção de eu adicionar mais de uma peça
+  // na mesma solicitação, pois... a fábrica manda tudo junto". null =
+  // pedido avulso (comportamento de sempre). Ver listPartOrdersByGroupId
+  // abaixo.
+  groupId: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -148,12 +154,13 @@ type PartOrderRow = {
   invoice_number: string | null;
   resolved_without_part_at: string | null;
   resolved_without_part_by: string | null;
+  group_id: string | null;
   created_at: string;
   updated_at: string;
 };
 
 const PART_ORDER_COLUMNS =
-  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, invoice_number, resolved_without_part_at, resolved_without_part_by, created_at, updated_at";
+  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, invoice_number, resolved_without_part_at, resolved_without_part_by, group_id, created_at, updated_at";
 
 function toPartOrder(row: PartOrderRow): PartOrder {
   return {
@@ -184,6 +191,7 @@ function toPartOrder(row: PartOrderRow): PartOrder {
     invoiceNumber: row.invoice_number,
     resolvedWithoutPartAt: row.resolved_without_part_at,
     resolvedWithoutPartBy: row.resolved_without_part_by,
+    groupId: row.group_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -227,6 +235,19 @@ export async function getPartOrder(id: string): Promise<PartOrder | null> {
   const { data, error } = await admin.from("part_orders").select(PART_ORDER_COLUMNS).eq("id", id).single();
   if (error || !data) return null;
   return toPartOrder(data as unknown as PartOrderRow);
+}
+
+// Peças-irmãs da mesma solicitação (mesmo group_id) -- pedido do Victor
+// 16/09/2026: "adicione a opção de eu adicionar mais de uma peça na mesma
+// solicitação, pois... a fábrica manda tudo junto". Usado pra montar um
+// e-mail SÓ com todas as peças da solicitação (ver PartOrderEmailButton.tsx)
+// e pra mostrar "faz parte de uma solicitação com mais peças" no detalhe.
+// Ordenado por criação -- mesma ordem que foram digitadas no formulário.
+export async function listPartOrdersByGroupId(groupId: string): Promise<PartOrder[]> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("part_orders").select(PART_ORDER_COLUMNS).eq("group_id", groupId).order("created_at");
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as PartOrderRow[]).map(toPartOrder);
 }
 
 export type PartOrderLinkMatch = {

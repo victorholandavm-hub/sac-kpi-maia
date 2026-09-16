@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import { createPartOrder, type PartOrderFormState } from "@/app/assistencia/pecas-actions";
 import type { SupplierContact } from "@/lib/partOrders";
@@ -45,6 +45,22 @@ export function NewPartOrderForm({
   const [representative, setRepresentative] = useState("");
   const [representativeEmail, setRepresentativeEmail] = useState("");
   const [representativePhone, setRepresentativePhone] = useState("");
+  // Mais de uma peça na mesma solicitação -- pedido do Victor 16/09/2026:
+  // "quando solicitamos mais de uma peça junta, a fábrica manda tudo
+  // junto". Só a LISTA DE LINHAS é estado React (pra adicionar/remover
+  // funcionar); os 3 campos de cada linha continuam não-controlados
+  // (defaultValue), sem onChange a cada tecla. Todas usam o MESMO name
+  // (part_name/part_code/color) -- o server action lê tudo de uma vez via
+  // FormData.getAll, index a index (ver readParts, pecas-actions.ts).
+  const [partRowKeys, setPartRowKeys] = useState<number[]>([0]);
+  const nextPartKeyRef = useRef(1);
+
+  function addPartRow() {
+    setPartRowKeys((prev) => [...prev, nextPartKeyRef.current++]);
+  }
+  function removePartRow(key: number) {
+    setPartRowKeys((prev) => (prev.length > 1 ? prev.filter((k) => k !== key) : prev));
+  }
 
   function handleSupplierChange(value: string) {
     setSupplier(value);
@@ -86,17 +102,55 @@ export function NewPartOrderForm({
         <input type="hidden" name="service_request_id" value={defaultValues.serviceRequestId} />
       ) : null}
 
-      <Field label="Peça *">
-        <input name="part_name" required defaultValue="" className="rounded border px-3 py-2" style={inputStyle} />
-      </Field>
-
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Código da peça">
-          <input name="part_code" className="rounded border px-3 py-2" style={inputStyle} />
-        </Field>
-        <Field label="Cor">
-          <input name="color" className="rounded border px-3 py-2" style={inputStyle} />
-        </Field>
+      <div className="flex flex-col gap-2">
+        {partRowKeys.map((key, i) => (
+          <div
+            key={key}
+            className="rounded-lg border p-3 flex flex-col gap-3 relative"
+            style={{ borderColor: "var(--border)", background: partRowKeys.length > 1 ? "var(--surface-1)" : undefined }}
+          >
+            {partRowKeys.length > 1 ? (
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+                  Peça {i + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removePartRow(key)}
+                  className="text-xs underline"
+                  style={{ color: "var(--status-critical)" }}
+                >
+                  Remover
+                </button>
+              </div>
+            ) : null}
+            <Field label="Peça *">
+              <input name="part_name" required={i === 0} defaultValue="" className="rounded border px-3 py-2" style={inputStyle} />
+            </Field>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Código da peça">
+                <input name="part_code" className="rounded border px-3 py-2" style={inputStyle} />
+              </Field>
+              <Field label="Cor">
+                <input name="color" className="rounded border px-3 py-2" style={inputStyle} />
+              </Field>
+            </div>
+          </div>
+        ))}
+        {/* Mais de uma peça na mesma solicitação -- pedido do Victor
+            16/09/2026: "quando solicitamos mais de uma peça junta, a
+            fábrica manda tudo junto". Fornecedor/cliente/nota fiscal etc.
+            (resto do formulário) continuam compartilhados por todas as
+            peças dessa solicitação -- só peça/código/cor variam linha a
+            linha. */}
+        <button
+          type="button"
+          onClick={addPartRow}
+          className="text-sm font-medium self-start underline"
+          style={{ color: "var(--brand-green)" }}
+        >
+          + Adicionar outra peça
+        </button>
       </div>
 
       <Field label="Fornecedor">
@@ -229,7 +283,7 @@ export function NewPartOrderForm({
         className="rounded px-4 py-2 font-medium self-start disabled:opacity-60"
         style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
       >
-        {pending ? "Criando…" : "Criar pedido de peça"}
+        {pending ? "Criando…" : partRowKeys.length > 1 ? `Criar pedido com ${partRowKeys.length} peças` : "Criar pedido de peça"}
       </button>
     </form>
   );
