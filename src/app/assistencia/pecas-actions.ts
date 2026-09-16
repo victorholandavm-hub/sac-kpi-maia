@@ -34,16 +34,22 @@ export type PartOrderFormState = { error?: string; success?: boolean } | undefin
 // "adicione a opção de eu adicionar mais de uma peça na mesma solicitação,
 // pois quando solicitamos mais de uma peça junta, a fábrica manda tudo
 // junto". O formulário (NewPartOrderForm.tsx) manda part_name/part_code/
-// color REPETIDOS (mesmo name em vários <input>) -- FormData.getAll já
-// devolve tudo na ordem digitada, index a index. Linhas com peça em
-// branco (ex.: usuário adicionou uma linha extra e não preencheu) são
-// ignoradas.
-function readParts(formData: FormData): { partName: string; partCode: string | null; color: string | null }[] {
+// color/product REPETIDOS (mesmo name em vários <input>) -- FormData.getAll
+// já devolve tudo na ordem digitada, index a index. `product` entrou aqui
+// (não é mais campo compartilhado da solicitação) -- pedido do Victor
+// 16/09/2026 (revisão no mesmo dia): "produto do cliente também precisa
+// seguir a mesma lógica... já que uma peça está ligada a um produto".
+// Linhas com peça em branco (ex.: usuário adicionou uma linha extra e não
+// preencheu) são ignoradas.
+function readParts(
+  formData: FormData
+): { partName: string; partCode: string | null; color: string | null; product: string | null }[] {
   const names = formData.getAll("part_name").map((v) => String(v).trim());
   const codes = formData.getAll("part_code").map((v) => String(v).trim());
   const colors = formData.getAll("color").map((v) => String(v).trim());
+  const products = formData.getAll("product").map((v) => String(v).trim());
   return names
-    .map((partName, i) => ({ partName, partCode: codes[i] || null, color: colors[i] || null }))
+    .map((partName, i) => ({ partName, partCode: codes[i] || null, color: colors[i] || null, product: products[i] || null }))
     .filter((p) => p.partName.length > 0);
 }
 
@@ -82,15 +88,15 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
   const defaultExpectedAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   // Campos compartilhados por TODAS as peças desta solicitação (cliente,
-  // fornecedor, nota fiscal...) -- só part_name/part_code/color variam por
-  // peça (ver parts acima).
+  // fornecedor, nota fiscal...) -- part_name/part_code/color/product variam
+  // por peça (ver parts acima; product saiu daqui 16/09/2026, mesma
+  // revisão do pedido original: "uma peça está ligada a um produto").
   const sharedFields = {
     service_request_id: emptyToNull(formData.get("service_request_id")),
     client_name: emptyToNull(formData.get("client_name")),
     client_cpf: emptyToNull(formData.get("client_cpf")),
     client_phone: emptyToNull(formData.get("client_phone")),
     client_email: emptyToNull(formData.get("client_email")),
-    product: emptyToNull(formData.get("product")),
     supplier: supplier || null,
     representative,
     representative_email: representativeEmail,
@@ -138,6 +144,7 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
         part_name: part.partName,
         part_code: part.partCode,
         color: part.color,
+        product: part.product,
         group_id: groupId,
       })
       .select("id")
