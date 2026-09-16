@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { logPrint } from "@/app/assistencia/actions";
 
 export type PrintTarget = {
   id: string;
   ticketNumber: number;
   clientName: string | null;
-  // Já tem evento "printed" registrado (ver logPrint/getRequestDetail) --
-  // calculado no servidor, junto com `isAdmin` (ver comentário abaixo).
+  // Já tem evento "printed" registrado (ver /api/assistencia/log-print/
+  // getRequestDetail) -- calculado no servidor, junto com `isAdmin` (ver
+  // comentário abaixo).
   alreadyPrinted: boolean;
 };
 
@@ -26,16 +26,24 @@ export type PrintTarget = {
 // pelas páginas que renderizam isso (despacho/page.tsx,
 // despacho-lote/page.tsx), calculado no servidor com a mesma condição
 // (`!isAdmin && alreadyPrinted`). Esse componente só decide SE chama
-// `window.print()` e loga (`logPrint`) só as que realmente vão sair.
+// `window.print()` e loga (via /api/assistencia/log-print) só as que
+// realmente vão sair.
 export function PrintButton({ targets, isAdmin }: { targets: PrintTarget[]; isAdmin: boolean }) {
   const [blocked, setBlocked] = useState<PrintTarget[] | null>(null);
 
   function doPrint(ids: string[]) {
     if (ids.length === 0) return;
-    logPrint(ids).catch(() => {
-      // Impressão em si não pode depender do log -- se falhar, só não
-      // fica registrado dessa vez, não impede a pessoa de imprimir.
-    });
+    // POST comum (não Server Action) -- pedido do Victor 16/09/2026: "o
+    // botão de imprimir não funciona, funciona apenas quando aperto ctrl
+    // + P" (ver comentário completo em /api/assistencia/log-print/
+    // route.ts). Impressão em si não pode depender do log -- se o fetch
+    // falhar por qualquer motivo, só não fica registrado dessa vez, não
+    // impede a pessoa de imprimir.
+    fetch("/api/assistencia/log-print", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestIds: ids }),
+    }).catch(() => {});
     window.print();
   }
 

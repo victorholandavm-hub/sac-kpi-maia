@@ -116,7 +116,14 @@ function InvoicePage({ photo }: { photo: RequestPhoto }) {
   const pdfUrl = `${photo.url}#toolbar=0&navpanes=0&scrollbar=0`;
   return (
     <div
-      className="rounded-lg border overflow-hidden flex flex-col text-sm mt-4"
+      // Moldura (borda arredondada + fundo + título "Nota fiscal") só na
+      // TELA -- pedido do Victor 16/09/2026: "tem como ser impresso a
+      // nota fiscal limpa, só o pdf, sem colocar numa moldura do sistema
+      // como é hoje?". Na tela ajuda a identificar o bloco; no papel, é
+      // só a nota do fornecedor mesmo, sem nenhuma marca do sistema por
+      // cima -- print:* remove borda/fundo/padding só na impressão
+      // (classe, não style inline, porque style não tem variante print).
+      className="rounded-lg border overflow-hidden flex flex-col text-sm mt-4 print:rounded-none print:border-0 print:mt-0 print:bg-transparent"
       // `break-before: page` (forçava página NOVA sempre) trocado por
       // `break-inside: avoid` (11/09/2026, achado do Victor: "ainda está
       // do mesmo jeito" mesmo depois de reduzir o espaço em branco do
@@ -130,8 +137,10 @@ function InvoicePage({ photo }: { photo: RequestPhoto }) {
       // precisar forçar nada.
       style={{ background: "var(--surface-1)", borderColor: "var(--border)", breakInside: "avoid", pageBreakInside: "avoid" }}
     >
-      <SectionTitle>Nota fiscal</SectionTitle>
-      <div className="px-4 py-3 flex justify-center">
+      <div className="print:hidden">
+        <SectionTitle>Nota fiscal</SectionTitle>
+      </div>
+      <div className="px-4 py-3 flex justify-center print:p-0">
         {photo.isPdf ? (
           <embed src={pdfUrl} type="application/pdf" style={{ width: "100%", height: "260mm" }} />
         ) : (
@@ -219,6 +228,9 @@ export function DespachoCard({ request, invoicePhoto }: { request: ServiceReques
       <SectionTitle>Dados do cliente</SectionTitle>
       <div className="grid sm:grid-cols-2 gap-3 px-4 py-3">
         <Field label="Nome" value={request.clientName} />
+        {/* Pedido do Victor 16/09/2026: "coloque o cpf do cliente na
+            notificação impressa". */}
+        <Field label="CPF" value={request.clientCpf} />
         <Field label="Telefone" value={request.clientPhone} />
         <Field label="Endereço" value={enderecoCompleto} />
         {request.clientTimeRestriction ? <Field label="⏰ Restrição de horário" value={request.clientTimeRestriction} /> : null}
