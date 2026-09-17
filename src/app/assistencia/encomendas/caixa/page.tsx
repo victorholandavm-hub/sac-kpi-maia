@@ -17,7 +17,7 @@ import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomend
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
 import { LojaTabs } from "@/components/assistencia/LojaTabs";
-import { FilterPill } from "@/components/assistencia/FilterPill";
+import { UnderlineTab } from "@/components/UnderlineTab";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { NotificationBell } from "@/components/assistencia/NotificationBell";
 import { listLojaNotificationsAction } from "@/app/assistencia/notifications-actions";
@@ -117,9 +117,12 @@ export default async function EncomendasCaixaPage({
 
       {requester.kind === "gerente" ? <LojaTabs /> : null}
 
-      <div className="flex items-center gap-2">
-        <FilterPill href={viewHref("abertos")} label="Em aberto" selected={!showCompleted} />
-        <FilterPill href={viewHref("concluidos")} label="Entregues/cancelados" selected={showCompleted} />
+      {/* Aba sublinhada -- pedido do Victor 17/09/2026: "deixe igual" ao
+          padrão já usado em Peças/Fornecedores/Estoque, KPIs etc. (ver
+          UnderlineTab.tsx). */}
+      <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+        <UnderlineTab href={viewHref("abertos")} label="Em aberto" active={!showCompleted} />
+        <UnderlineTab href={viewHref("concluidos")} label="Entregues/cancelados" active={showCompleted} />
       </div>
 
       {!showCompleted ? (

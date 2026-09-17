@@ -18,7 +18,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
 import { LojaStoreFilter } from "@/components/assistencia/LojaStoreFilter";
 import { LojaTabs } from "@/components/assistencia/LojaTabs";
-import { FilterPill } from "@/components/assistencia/FilterPill";
+import { UnderlineTab } from "@/components/UnderlineTab";
 import { LojaDeadlineControl } from "@/components/assistencia/LojaDeadlineControl";
 import { ProductsModalButton } from "@/components/assistencia/ProductsModalButton";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
@@ -185,21 +185,23 @@ export default async function LojaHomePage({
 
       <LojaStoreFilter stores={stores} selectedStoreId={storeId} />
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <FilterPill href={viewHref("abertas")} label="Em aberto" selected={!showCompleted && !showAwaitingApproval} />
+      {/* Aba sublinhada -- pedido do Victor 17/09/2026: "deixe igual" ao
+          padrão já usado em Peças/Fornecedores/Estoque, KPIs etc. (ver
+          UnderlineTab.tsx). */}
+      <div className="flex items-center gap-2 flex-wrap border-b" style={{ borderColor: "var(--border)" }}>
+        <UnderlineTab href={viewHref("abertas")} label="Em aberto" active={!showCompleted && !showAwaitingApproval} />
         {/* Pedido do Victor 31/08/2026: montagem/desmontagem concluída
             pelo montador só fecha de verdade depois de aprovada aqui
             (ver LojaApprovalCard/lojaApproveMontagemConclusion). Cor
-            própria (series-3) só quando tem pendência e a aba não está
-            selecionada -- mesmo espírito de antes, via a variante `color`
-            de FilterPill. */}
-        <FilterPill
+            própria (series-3) só quando tem pendência -- mesma variante
+            `color` de antes, agora em UnderlineTab. */}
+        <UnderlineTab
           href={viewHref("aguardando_aprovacao")}
           label={`Aguardando aprovação${pendingApprovalCount > 0 ? ` (${pendingApprovalCount})` : ""}`}
-          selected={showAwaitingApproval}
+          active={showAwaitingApproval}
           color={pendingApprovalCount > 0 ? "var(--series-3)" : undefined}
         />
-        <FilterPill href={viewHref("concluidas")} label="Concluídas" selected={showCompleted} />
+        <UnderlineTab href={viewHref("concluidas")} label="Concluídas" active={showCompleted} />
       </div>
 
       {!showCompleted && !showAwaitingApproval ? (
