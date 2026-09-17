@@ -19,6 +19,7 @@ import {
   DELIVERY_ITEM_NOUN,
   ALL_REQUEST_TYPES,
   CAUSA_RAIZ_OPTIONS,
+  CAUSA_RAIZ_ALL_VALUES,
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
 import { notifyTelegramNewRequest, notifyTelegramStatusChange } from "@/lib/telegram";
@@ -2026,7 +2027,12 @@ export async function updateRequestDetails(
   // motorista/detalhe de fato foi escolhida.
   const isDelivery = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
   const causaRaiz = isDelivery ? emptyToNull(formData.get("causa_raiz")) : null;
-  if (causaRaiz && !(CAUSA_RAIZ_OPTIONS as readonly string[]).includes(causaRaiz)) {
+  // Edição aceita qualquer valor JÁ válido algum dia (CAUSA_RAIZ_ALL_VALUES),
+  // não só os oferecidos hoje pro dropdown (CAUSA_RAIZ_OPTIONS) -- senão só
+  // abrir e salvar um chamado antigo classificado com uma causa removida da
+  // lista (ver assistenciaLabels.ts) seria rejeitado sem nem ter mudado esse
+  // campo.
+  if (causaRaiz && !CAUSA_RAIZ_ALL_VALUES.includes(causaRaiz)) {
     return { error: "Causa raiz inválida." };
   }
   let causaCarga: string | null = null;
