@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
 // "aguardando_resposta" e "cancelada" (pedido do Victor 09/09/2026, planilha
 // "Solicitação de peças") -- "aguardando_resposta" é ANTES de
@@ -248,37 +249,69 @@ function toPartOrder(row: PartOrderRow): PartOrder {
   };
 }
 
+// "Atrasado" (>30 dias desde aberto) / "Entrando em atraso" (20-30 dias) --
+// pedido do Victor 17/09/2026: filtro pra achar chamados de peça esquecidos,
+// diferente do "atrasado" que já existe por linha (isOverdue em
+// PecasTable.tsx, que compara contra expected_at, um prazo manual por
+// chamado). Este é baseado só na IDADE do chamado (created_at), e só faz
+// sentido pra quem ainda está aberto -- mesmo conjunto de status "fechado"
+// já repetido em pecas-actions.ts/PartOrderActions.tsx/PecasTable.tsx.
+export type PartOrderAtrasoFilter = "atrasado" | "entrando_em_atraso";
+
+export function isPartOrderAtrasoFilter(value: string | undefined | null): value is PartOrderAtrasoFilter {
+  return value === "atrasado" || value === "entrando_em_atraso";
+}
+
+const CLOSED_PART_ORDER_STATUSES: PartOrderStatus[] = ["encerrado", "cancelada", "devolvida_ao_estoque"];
+
 export async function listPartOrders(
-  opts: { status?: PartOrderStatus; q?: string; supplier?: string } = {}
+  opts: { status?: PartOrderStatus; q?: string; supplier?: string; atraso?: PartOrderAtrasoFilter } = {}
 ): Promise<PartOrder[]> {
   const admin = getSupabaseAdmin();
-  let query = admin.from("part_orders").select(PART_ORDER_COLUMNS).order("created_at", { ascending: false });
 
-  if (opts.status) {
-    query = query.eq("status", opts.status);
-  }
-  if (opts.supplier) {
-    query = query.eq("supplier", opts.supplier);
-  }
+  const rows = await fetchAllPagesParallel<PartOrderRow>((from, to) => {
+    let query = admin
+      .from("part_orders")
+      .select(PART_ORDER_COLUMNS, { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
-  const q = opts.q?.trim();
-  if (q) {
-    const qSafe = sanitizeOrFilterValue(q);
-    query = query.or(
-      [
-        `client_name.ilike.%${qSafe}%`,
-        `client_cpf.ilike.%${qSafe}%`,
-        `product.ilike.%${qSafe}%`,
-        `part_name.ilike.%${qSafe}%`,
-        `part_code.ilike.%${qSafe}%`,
-      ].join(",")
-    );
-  }
+    if (opts.status) {
+      query = query.eq("status", opts.status);
+    }
+    if (opts.supplier) {
+      query = query.eq("supplier", opts.supplier);
+    }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+    if (opts.atraso) {
+      query = query.not("status", "in", `(${CLOSED_PART_ORDER_STATUSES.join(",")})`);
+      const cutoff30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      if (opts.atraso === "atrasado") {
+        query = query.lt("created_at", cutoff30);
+      } else {
+        const cutoff20 = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString();
+        query = query.gte("created_at", cutoff30).lt("created_at", cutoff20);
+      }
+    }
 
-  return ((data ?? []) as unknown as PartOrderRow[]).map(toPartOrder);
+    const q = opts.q?.trim();
+    if (q) {
+      const qSafe = sanitizeOrFilterValue(q);
+      query = query.or(
+        [
+          `client_name.ilike.%${qSafe}%`,
+          `client_cpf.ilike.%${qSafe}%`,
+          `product.ilike.%${qSafe}%`,
+          `part_name.ilike.%${qSafe}%`,
+          `part_code.ilike.%${qSafe}%`,
+        ].join(",")
+      );
+    }
+
+    return query as unknown as PromiseLike<PagedQueryResult<PartOrderRow>>;
+  });
+
+  return rows.map(toPartOrder);
 }
 
 export async function getPartOrder(id: string): Promise<PartOrder | null> {
