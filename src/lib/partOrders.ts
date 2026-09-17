@@ -253,16 +253,20 @@ function toPartOrder(row: PartOrderRow): PartOrder {
 // pedido do Victor 17/09/2026: filtro pra achar chamados de peça esquecidos,
 // diferente do "atrasado" que já existe por linha (isOverdue em
 // PecasTable.tsx, que compara contra expected_at, um prazo manual por
-// chamado). Este é baseado só na IDADE do chamado (created_at), e só faz
-// sentido pra quem ainda está aberto -- mesmo conjunto de status "fechado"
-// já repetido em pecas-actions.ts/PartOrderActions.tsx/PecasTable.tsx.
+// chamado). Este é baseado só na IDADE do chamado (created_at). Correção
+// do mesmo dia (Victor: "quando estiver como peça recebida, não deve
+// continuar como em atraso") -- o atraso é em relação ao FORNECEDOR, então
+// só faz sentido enquanto o chamado ainda está esperando a peça chegar
+// (aguardando_resposta/aguardando_peca). A partir de peca_recebida em
+// diante (peça já chegou, resta só o lado interno -- enviar ao cliente,
+// encerrar etc.) deixa de contar, mesmo que o chamado continue "aberto".
 export type PartOrderAtrasoFilter = "atrasado" | "entrando_em_atraso";
 
 export function isPartOrderAtrasoFilter(value: string | undefined | null): value is PartOrderAtrasoFilter {
   return value === "atrasado" || value === "entrando_em_atraso";
 }
 
-const CLOSED_PART_ORDER_STATUSES: PartOrderStatus[] = ["encerrado", "cancelada", "devolvida_ao_estoque"];
+const ATRASO_ELIGIBLE_STATUSES: PartOrderStatus[] = ["aguardando_resposta", "aguardando_peca"];
 
 export async function listPartOrders(
   opts: { status?: PartOrderStatus; q?: string; supplier?: string; atraso?: PartOrderAtrasoFilter } = {}
@@ -284,7 +288,7 @@ export async function listPartOrders(
     }
 
     if (opts.atraso) {
-      query = query.not("status", "in", `(${CLOSED_PART_ORDER_STATUSES.join(",")})`);
+      query = query.in("status", ATRASO_ELIGIBLE_STATUSES);
       const cutoff30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       if (opts.atraso === "atrasado") {
         query = query.lt("created_at", cutoff30);
