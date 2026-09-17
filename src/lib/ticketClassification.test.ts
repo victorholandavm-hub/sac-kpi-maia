@@ -55,6 +55,17 @@ describe("pickStore", () => {
     expect(pickStore("Fui na loja de Mangabeira")).toBeNull();
   });
 
+  it("identifica a filial certa de Mangabeira quando o número aparece junto", () => {
+    expect(pickStore("Comprei na Maia 2 Mangabeira semana passada")).toBe("loja-206");
+    expect(pickStore("Fui na Maia 3 Mangabeira")).toBe("loja-207");
+    expect(pickStore("Atendimento na Líder 1 Mangabeira")).toBe("loja-205");
+  });
+
+  it("identifica Maia Shopping (212) e Maia CD (213) pelo termo usado no dia a dia", () => {
+    expect(pickStore("Comprei no Shopping semana passada")).toBe("loja-212");
+    expect(pickStore("A peça ficou parada no CD")).toBe("loja-213");
+  });
+
   it("retorna null quando nenhuma loja é mencionada", () => {
     expect(pickStore("Preciso de ajuda com meu pedido")).toBeNull();
   });
