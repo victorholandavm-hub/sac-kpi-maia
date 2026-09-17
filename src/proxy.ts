@@ -13,6 +13,12 @@ const PASSTHROUGH_PREFIXES = [
   "/api/sync",
   "/api/backup",
   "/api/totvs-sync",
+  // Reconciliação periódica de tags do GHL (ver tagReconciliation.ts) --
+  // mesmo motivo dos outros crons acima: não começa com /api/sync, cairia
+  // no redirect de auth do painel de KPIs sem isso (mesma classe de bug já
+  // pega em /api/assistencia/log-print, 16/09/2026 -- aprendida a lição
+  // dessa vez, adicionado já na criação da rota).
+  "/api/reconcile-tags",
   "/api/montador/upload-photo",
   "/api/motorista/upload-photo",
   // Upload de foto pela equipe (assistência/admin/SAC) na tela de detalhe

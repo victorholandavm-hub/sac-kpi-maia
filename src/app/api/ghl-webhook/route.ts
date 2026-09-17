@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { reconcileContactTags } from "@/lib/tagReconciliation";
 
 function parseTags(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.map(String).map((t) => t.trim()).filter(Boolean);
@@ -52,61 +53,16 @@ export async function POST(req: NextRequest) {
   }
   const contactId = contact.id as string;
 
-  const { data: currentRows, error: currentError } = await supabase
-    .from("contact_current_tags")
-    .select("tag")
-    .eq("contact_id", contactId);
-  if (currentError) {
-    return NextResponse.json({ error: currentError.message }, { status: 500 });
-  }
-  const existingTags = new Set((currentRows ?? []).map((r) => r.tag as string));
-
-  const added = [...incomingTags].filter((t) => !existingTags.has(t));
-  const removed = [...existingTags].filter((t) => !incomingTags.has(t));
-  const now = new Date().toISOString();
-
-  if (added.length > 0) {
-    const events = added.map((tag) => ({
-      contact_id: contactId,
-      ghl_contact_id: ghlContactId,
-      tag,
-      action: "added",
-      event_at: now,
+  try {
+    const { added, removed } = await reconcileContactTags({
+      contactId,
+      ghlContactId,
+      incomingTags: [...incomingTags],
       source: "webhook",
-      raw_payload: body,
-    }));
-    const { error } = await supabase.from("tag_events").insert(events);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-    const { error: upsertError } = await supabase
-      .from("contact_current_tags")
-      .upsert(
-        added.map((tag) => ({ contact_id: contactId, tag, since: now })),
-        { onConflict: "contact_id,tag" }
-      );
-    if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 });
+      rawPayload: body,
+    });
+    return NextResponse.json({ ok: true, added, removed });
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
-
-  if (removed.length > 0) {
-    const events = removed.map((tag) => ({
-      contact_id: contactId,
-      ghl_contact_id: ghlContactId,
-      tag,
-      action: "removed",
-      event_at: now,
-      source: "webhook",
-      raw_payload: body,
-    }));
-    const { error } = await supabase.from("tag_events").insert(events);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-    const { error: deleteError } = await supabase
-      .from("contact_current_tags")
-      .delete()
-      .eq("contact_id", contactId)
-      .in("tag", removed);
-    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ ok: true, added, removed });
 }

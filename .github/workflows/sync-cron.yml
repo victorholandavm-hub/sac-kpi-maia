@@ -60,6 +60,17 @@ jobs:
         run: |
           curl -sf --max-time 170 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://sac.lojasmaia.com.br/api/sync-ai-classify"
+      # Rede de segurança pro /api/ghl-webhook (achado 17/09/2026: o
+      # workflow do GHL ficou 3 semanas apontando pro domínio antigo da
+      # Vercel sem ninguém perceber) -- confirma via API do GHL o estado
+      # atual de tags de quem teve conversa nas últimas 48h (default da
+      # rota), pra pegar sozinho qualquer lacuna se o push do webhook parar
+      # de novo por qualquer motivo.
+      - name: Chamar /api/reconcile-tags
+        continue-on-error: true
+        run: |
+          curl -sf --max-time 170 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://sac.lojasmaia.com.br/api/reconcile-tags"
       - name: Chamar /api/backup
         continue-on-error: true
         run: |
