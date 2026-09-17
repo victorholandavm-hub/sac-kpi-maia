@@ -76,3 +76,19 @@ export async function findGhlConversationId(ghlContactId: string): Promise<strin
   const data = await res.json();
   return data.conversations?.[0]?.id ?? null;
 }
+
+// Estado ATUAL das tags de um contato, direto na API do GHL -- rede de
+// segurança pro webhook de tags (/api/ghl-webhook, ver tagReconciliation.ts):
+// se o GHL não conseguir entregar o push por qualquer motivo (URL do webhook
+// desatualizada depois de uma migração, por exemplo -- foi exatamente o que
+// aconteceu 26/08 a 17/09/2026, achado pelo Victor comparando uma tag real
+// no GHL contra o painel de KPIs), essa consulta pull recupera o estado sem
+// depender do evento em si, só do estado atual do contato.
+export async function getGhlContactTags(ghlContactId: string): Promise<string[] | null> {
+  const res = await fetch(`${BASE_URL}/contacts/${ghlContactId}`, { headers: ghlHeaders() });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const tags: unknown = data.contact?.tags;
+  if (!Array.isArray(tags)) return [];
+  return tags.map(String);
+}

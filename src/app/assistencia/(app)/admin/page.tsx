@@ -33,6 +33,7 @@ const SYNC_JOB_LABELS: Record<SyncJob, string> = {
   ghl: "GoHighLevel (conversas)",
   backup: "Backup diário do Supabase",
   "ai-classify": "Classificação por IA (categoria/produto/loja do SAC)",
+  "reconcile-tags": "Reconciliação de tags do GHL (rede de segurança do webhook)",
 };
 
 // Sem casa decimal nem "há 0h" logo depois de rodar -- minuto é preciso o
