@@ -478,6 +478,21 @@ export async function addPedidoNoteAction(pedidoId: string, note: string): Promi
   revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
 }
 
+// Válvula de escape pra pedido que ficou sem cupom fiscal (createPedidoEncomenda
+// e saveEncomendaPhoto são duas escritas separadas em encomendas-actions.ts --
+// se a segunda falhar, o pedido já foi criado e fica sem foto, sem rollback).
+// Restrito a admin/assistência (mesmo nível de acesso de cancelPedido) porque é
+// uma correção de exceção, não parte do fluxo normal -- e funciona em qualquer
+// status, já que o problema pode ser notado bem depois de "solicitado".
+export async function addEncomendaPhotoAction(pedidoId: string, file: File): Promise<void> {
+  const actor = await requireEncomendaActor();
+  if (actor.role !== "admin" && actor.role !== "assistencia") {
+    throw new Error(`Ação não permitida para o papel "${actor.role}".`);
+  }
+  await saveEncomendaPhoto({ pedidoId, file, uploadedBy: actor.name, caption: "Cupom fiscal (anexado depois)" });
+  revalidatePath(`/assistencia/encomendas/fila/${pedidoId}`);
+}
+
 // Prazo fábrica -> CD: obrigatório em advancePedidoStatus na primeira vez
 // (transição solicitado -> em_producao), mas continua editável depois disso
 // -- só quem é dono dessa etapa (fábrica, ou o CD quando o fornecedor é

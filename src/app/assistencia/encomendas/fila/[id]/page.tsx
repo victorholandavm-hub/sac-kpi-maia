@@ -8,6 +8,7 @@ import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRe
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { PedidoPrazoField } from "@/components/assistencia/PedidoPrazoField";
 import { listEncomendaPhotos } from "@/lib/pedidoEncomendaPhotos";
+import { AddEncomendaPhotoForm } from "@/components/assistencia/AddEncomendaPhotoForm";
 import { FormSection } from "@/components/assistencia/FormSection";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { StatusStepper } from "@/components/assistencia/StatusStepper";
@@ -135,16 +136,23 @@ export default async function PedidoEncomendaDetailPage({ params }: { params: Pr
             </div>
           </FormSection>
 
-          {photos.length > 0 ? (
+          {photos.length > 0 || actor.role === "admin" || actor.role === "assistencia" ? (
             <FormSection title="Cupom fiscal">
-              <div className="flex flex-wrap gap-2">
-                {photos.map((p) => (
-                  <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.url} alt="Cupom fiscal" className="h-32 w-32 object-cover rounded-lg border border-gray-200 dark:border-gray-600" />
-                  </a>
-                ))}
-              </div>
+              {photos.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {photos.map((p) => (
+                    <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.url} alt="Cupom fiscal" className="h-32 w-32 object-cover rounded-lg border border-gray-200 dark:border-gray-600" />
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  Nenhuma foto anexada.
+                </p>
+              )}
+              {actor.role === "admin" || actor.role === "assistencia" ? <AddEncomendaPhotoForm pedidoId={pedido.id} /> : null}
             </FormSection>
           ) : null}
         </div>
