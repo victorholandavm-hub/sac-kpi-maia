@@ -78,23 +78,52 @@ const PRODUCT_KEYWORDS = [
   "mesa",
 ];
 
+// Termo real usado no dia a dia por quem atende, pras filiais cuja última
+// palavra do rótulo não serve de discriminador sozinha -- achado 17/09/2026
+// (Victor: "por que só 6% tem a loja? Maia shopping é loja 212, Maia CD é
+// 213"). "212": "Maia Shopping M" tem "M" como última palavra -- curto
+// demais, batia em quase qualquer texto (bug já pego pelos testes antes,
+// ver comentário abaixo); "213": "Maia CD" tem "CD" com só 2 letras, também
+// barrado pelo tamanho mínimo. Nenhum dos dois sufixos crus dá pra usar,
+// mas "Shopping"/"CD" são exatamente como cliente/atendente se referem a
+// essas lojas na prática.
+const STORE_KEYWORD_OVERRIDES: Record<string, string> = {
+  "212": "shopping",
+  "213": "cd",
+};
+
 // Discriminador único por loja -- só a parte do nome que não se repete em
-// outra filial (ex.: "Mangabeira" aparece em 3 lojas diferentes, então não
-// entra aqui; "Bayeux" só existe numa). Evita loja errada por match ambíguo.
-// Com fronteira de palavra (\b) e tamanho mínimo -- sem isso, "212": "Maia
-// Shopping M" vira discriminador "M" sozinho, que bate em quase qualquer
-// texto (bug pego pelos testes: toda mensagem virava "loja-212").
+// outra filial. Tenta a ÚLTIMA palavra primeiro (ex.: "Bayeux"); quando ela
+// se repete em mais de uma filial (ex.: "Mangabeira" em 3 lojas diferentes),
+// tenta as 2 últimas palavras -- "1 Mangabeira"/"2 Mangabeira"/
+// "3 Mangabeira" já são únicas cada uma, mesmo a palavra final sozinha não
+// sendo (achado 17/09/2026, mesmo motivo do override acima: essas 3 lojas
+// nunca apareciam em "Chamados por loja"). "Mangabeira" pura (sem número)
+// continua ambígua de propósito -- ver teste "não identifica loja com nome
+// ambíguo". Com fronteira de palavra (\b) e tamanho mínimo -- sem isso,
+// "212": "Maia Shopping M" viraria discriminador "M" sozinho, que bate em
+// quase qualquer texto (bug pego pelos testes: toda mensagem virava
+// "loja-212") -- por isso "M"/"CD" crus ficam de fora e usam o override
+// acima em vez do sufixo automático.
 const STORE_DISCRIMINATORS: { discriminator: RegExp; number: string }[] = (() => {
-  const lastWordCount = new Map<string, number>();
+  function suffix(label: string, wordCount: number): string {
+    return label.trim().split(/\s+/).slice(-wordCount).join(" ");
+  }
+  const allLabels = Object.values(STORE_LABELS);
   const entries = Object.entries(STORE_LABELS).map(([number, label]) => {
-    const lastWord = label.trim().split(/\s+/).pop()!;
-    lastWordCount.set(lastWord, (lastWordCount.get(lastWord) ?? 0) + 1);
-    return { number, lastWord };
+    const override = STORE_KEYWORD_OVERRIDES[number];
+    if (override) return { number, keyword: override };
+    for (const wordCount of [1, 2]) {
+      const candidate = suffix(label, wordCount);
+      const collisions = allLabels.filter((l) => suffix(l, wordCount) === candidate).length;
+      if (collisions === 1 && candidate.length >= 3) return { number, keyword: candidate };
+    }
+    return { number, keyword: null };
   });
   return entries
-    .filter((e) => (lastWordCount.get(e.lastWord) ?? 0) === 1 && e.lastWord.length >= 3)
+    .filter((e): e is { number: string; keyword: string } => e.keyword !== null)
     .map((e) => ({
-      discriminator: new RegExp(`\\b${e.lastWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i"),
+      discriminator: new RegExp(`\\b${e.keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i"),
       number: e.number,
     }));
 })();

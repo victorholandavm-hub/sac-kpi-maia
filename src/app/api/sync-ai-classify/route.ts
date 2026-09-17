@@ -54,12 +54,13 @@ async function runClassify() {
     return NextResponse.json({ ok: true, candidatesChecked: 0, classified: 0 });
   }
 
-  // v_ticket_enriched é a única fonte confiável de categoria/produto hoje
-  // (tags do GHL) -- cruza só com os pendentes acima, não a view inteira.
+  // v_ticket_enriched é a única fonte confiável de categoria/produto/loja
+  // hoje (tags do GHL) -- cruza só com os pendentes acima, não a view
+  // inteira.
   const ids = pendingConvos.map((c) => c.id);
   const { data: ticketRows, error: ticketError } = await supabase
     .from("v_ticket_enriched")
-    .select("conversation_id, category, product")
+    .select("conversation_id, category, product, store_tag")
     .in("conversation_id", ids);
   if (ticketError) throw ticketError;
 
@@ -79,10 +80,16 @@ async function runClassify() {
     // automática.
     const needsCategory = !ticket || !ticket.category || ticket.category === "cat-duvida";
     const needsProduct = !ticket || !ticket.product;
+    // Faltava aqui -- achado 17/09/2026 (Victor: "por que só 6% tem a
+    // loja?"). Sem essa checagem, um chamado que já tinha categoria E
+    // produto marcados no GHL (mas nunca a loja) era considerado
+    // "específico o bastante" e pulava a classificação por IA pra sempre --
+    // exatamente o caso mais comum de cobertura de loja baixa.
+    const needsStore = !ticket || !ticket.store_tag;
 
-    if (!needsCategory && !needsProduct) {
-      // Já tem categoria específica e produto marcados manualmente -- marca
-      // como analisado sem gastar a requisição ao GHL, só pra não
+    if (!needsCategory && !needsProduct && !needsStore) {
+      // Já tem categoria específica, produto e loja marcados manualmente --
+      // marca como analisado sem gastar a requisição ao GHL, só pra não
       // reconsultar essa mesma conversa toda rodada.
       await supabase.from("conversations").update({ ai_analyzed_at: new Date().toISOString() }).eq("id", convo.id);
       skippedAlreadySpecific++;
