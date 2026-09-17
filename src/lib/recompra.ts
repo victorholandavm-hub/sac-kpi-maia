@@ -313,18 +313,25 @@ const CLV_FATOR_RETENCAO_ATRITO_ALTO = 0.5;
 
 async function buildAtritoPorCliente(): Promise<Map<string, number>> {
   const admin = getSupabaseAdmin();
-  // 575 chamados no total hoje (07/09/2026) -- cabe numa página só, sem
-  // precisar de fetchAllPagesParallel. Se a base crescer muito além de
-  // 1000, isso precisa da mesma paginação usada acima.
-  const { data, error } = await admin
-    .from("service_requests")
-    .select("client_protheus_code, causa_raiz")
-    .not("client_protheus_code", "is", null)
-    .in("type", DELIVERY_REQUEST_TYPES as unknown as string[]);
-  if (error) throw new Error(error.message);
+  type Row = { client_protheus_code: string; causa_raiz: string | null };
+  // Paginado (fetchAllPagesParallel) -- 07/09/2026 isso cabia numa página
+  // só (575 chamados no total), mas o comentário original já avisava:
+  // "se a base crescer muito além de 1000, isso precisa da mesma
+  // paginação usada acima". Aconteceu no filtro do bug de Pagamentos
+  // (achado 16/09/2026), então a auditoria seguinte (17/09/2026) trouxe
+  // essa paginação preventivamente aqui também, antes de estourar.
+  const data = await fetchAllPagesParallel<Row>(
+    (from, to) =>
+      admin
+        .from("service_requests")
+        .select("client_protheus_code, causa_raiz", { count: "exact" })
+        .not("client_protheus_code", "is", null)
+        .in("type", DELIVERY_REQUEST_TYPES as unknown as string[])
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<Row>>
+  );
 
   const score = new Map<string, number>();
-  for (const r of (data ?? []) as { client_protheus_code: string; causa_raiz: string | null }[]) {
+  for (const r of data) {
     if (!r.causa_raiz) continue;
     const peso = ATRITO_WEIGHTS[r.causa_raiz] ?? ATRITO_PESO_LEVE;
     score.set(r.client_protheus_code, (score.get(r.client_protheus_code) ?? 0) + peso);

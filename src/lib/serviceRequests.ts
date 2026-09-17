@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
 import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES, MANOEL_ONLY_ASSEMBLER } from "./assistenciaLabels";
+import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
 export type RequestType =
   | "montagem"
@@ -1456,17 +1457,23 @@ export async function listScheduledRequests(
   // mesmo conjunto que a aba "Visitas" da fila já usa (montagem/
   // desmontagem/recolhimento/troca_peca/vistoria) -- Agenda é só a agenda
   // dos montadores, tipo de entrega/notificação não tem nada a ver aqui.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const query: any = admin
-    .from("service_requests")
-    .select(SUMMARY_COLUMNS)
-    .in("type", [...VISITA_REQUEST_TYPES])
-    .or("scheduled_date.not.is.null,approved_deadline.not.is.null");
+  // Paginado (fetchAllPagesParallel) -- achado 17/09/2026 (auditoria pós-
+  // bug de Pagamentos, ver payments.ts): sem paginação, essa busca já
+  // cortaria silenciosamente linhas mais antigas assim que
+  // service_requests passasse de 1000 (sem status/data de corte aqui --
+  // acumula todo chamado de visita já agendado/com prazo, pra sempre).
+  const rows = await fetchAllPagesParallel<SummaryRow>(
+    (from, to) =>
+      admin
+        .from("service_requests")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .select(SUMMARY_COLUMNS as any, { count: "exact" })
+        .in("type", [...VISITA_REQUEST_TYPES])
+        .or("scheduled_date.not.is.null,approved_deadline.not.is.null")
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<SummaryRow>>
+  );
 
-  const { data, error } = (await query) as { data: SummaryRow[] | null; error: { message: string } | null };
-  if (error) throw new Error(error.message);
-
-  let items = ((data ?? []) as unknown as SummaryRow[]).map(toSummary);
+  let items = rows.map(toSummary);
 
   if (opts.range === "atrasado") {
     items = items.filter((r) => {
@@ -1773,18 +1780,6 @@ export async function getRequestsReport(
   opts: { dateFrom?: string; dateTo?: string; alvo?: "mostruario" | "cliente"; types?: RequestType[] } = {}
 ): Promise<RequestsReport> {
   const admin = getSupabaseAdmin();
-  let query = admin
-    .from("service_requests")
-    .select("id, ticket_number, store_id, seller_name, type, status, causa_raiz, reason, created_at, order_code, client_name, stores(name)");
-
-  if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
-  if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
-  // Sem filtro de `type` na query -- ver comentário acima, causa_raiz
-  // precisa das linhas de troca_produto mesmo quando `types` pede só
-  // montagem/desmontagem pro resto do relatório.
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
 
   type Row = {
     id: string;
@@ -1800,7 +1795,28 @@ export async function getRequestsReport(
     client_name: string | null;
     stores: { name: string } | null;
   };
-  const allRows = (data ?? []) as unknown as Row[];
+  // Paginado (fetchAllPagesParallel) -- achado 17/09/2026 (auditoria pós-
+  // bug de Pagamentos, ver payments.ts): sem `dateFrom`/`dateTo` (chamador
+  // não filtrou período), essa busca pegava service_requests inteira --
+  // hoje só não corta nada porque a tela de Relatórios sempre manda um
+  // período (mês atual por padrão), mas a proteção morava no CHAMADOR, não
+  // aqui -- outro chamador (ou uma mudança futura na tela) sem esse mesmo
+  // cuidado voltaria a cortar linhas antigas em silêncio assim que a
+  // tabela passasse de 1000.
+  const allRows = await fetchAllPagesParallel<Row>((from, to) => {
+    let query = admin
+      .from("service_requests")
+      .select("id, ticket_number, store_id, seller_name, type, status, causa_raiz, reason, created_at, order_code, client_name, stores(name)", {
+        count: "exact",
+      })
+      .range(from, to);
+    if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
+    if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
+    // Sem filtro de `type` na query -- ver comentário acima, causa_raiz
+    // precisa das linhas de troca_produto mesmo quando `types` pede só
+    // montagem/desmontagem pro resto do relatório.
+    return query as unknown as PromiseLike<PagedQueryResult<Row>>;
+  });
   const rows = opts.alvo
     ? allRows.filter((r) => isMostruarioRequest(r.order_code, r.client_name) === (opts.alvo === "mostruario"))
     : allRows;
@@ -1872,17 +1888,6 @@ export async function getMontagemReconciliation(opts: {
   alvo?: "mostruario" | "cliente";
 }): Promise<MontagemReconciliation> {
   const admin = getSupabaseAdmin();
-  let query = admin
-    .from("service_requests")
-    .select(
-      "id, ticket_number, type, status, assembler_name, reason, order_code, client_name, created_at, stores(name), service_request_items(id)"
-    )
-    .in("type", ["montagem", "desmontagem"]);
-  if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
-  if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
 
   type Row = {
     id: string;
@@ -1897,7 +1902,21 @@ export async function getMontagemReconciliation(opts: {
     stores: { name: string } | null;
     service_request_items: { id: string }[];
   };
-  const allRows = (data ?? []) as unknown as Row[];
+  // Paginado (fetchAllPagesParallel) -- ver comentário equivalente em
+  // getRequestsReport acima (auditoria 17/09/2026).
+  const allRows = await fetchAllPagesParallel<Row>((from, to) => {
+    let query = admin
+      .from("service_requests")
+      .select(
+        "id, ticket_number, type, status, assembler_name, reason, order_code, client_name, created_at, stores(name), service_request_items(id)",
+        { count: "exact" }
+      )
+      .in("type", ["montagem", "desmontagem"])
+      .range(from, to);
+    if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
+    if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
+    return query as unknown as PromiseLike<PagedQueryResult<Row>>;
+  });
   const rows = opts.alvo
     ? allRows.filter((r) => isMostruarioRequest(r.order_code, r.client_name) === (opts.alvo === "mostruario"))
     : allRows;
@@ -1974,16 +1993,6 @@ export async function getServiceTypeIndicators(
   opts: { dateFrom?: string; dateTo?: string; alvo?: "mostruario" | "cliente" } = {}
 ): Promise<ServiceTypeIndicators> {
   const admin = getSupabaseAdmin();
-  let query = admin
-    .from("service_requests")
-    .select("id, ticket_number, store_id, type, assembler_name, status, client_name, order_code, created_at, completed_at, stores(name)")
-    .in("type", types);
-
-  if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
-  if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
 
   type Row = {
     id: string;
@@ -1998,7 +2007,23 @@ export async function getServiceTypeIndicators(
     completed_at: string | null;
     stores: { name: string } | null;
   };
-  const allRows = (data ?? []) as unknown as Row[];
+  // Paginado (fetchAllPagesParallel) -- ver comentário equivalente em
+  // getRequestsReport acima (auditoria 17/09/2026). Especialmente
+  // importante aqui: `types` pode ser a lista inteira de tipos ("todos",
+  // ver RESOLVE_INDICATOR_TYPES em relatorios/page.tsx), então esse era o
+  // caso mais próximo de repetir o bug de Pagamentos na prática.
+  const allRows = await fetchAllPagesParallel<Row>((from, to) => {
+    let query = admin
+      .from("service_requests")
+      .select("id, ticket_number, store_id, type, assembler_name, status, client_name, order_code, created_at, completed_at, stores(name)", {
+        count: "exact",
+      })
+      .in("type", types)
+      .range(from, to);
+    if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
+    if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
+    return query as unknown as PromiseLike<PagedQueryResult<Row>>;
+  });
   const rows = opts.alvo
     ? allRows.filter((r) => isMostruarioRequest(r.order_code, r.client_name) === (opts.alvo === "mostruario"))
     : allRows;
