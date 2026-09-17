@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getTecnicoSession } from "@/app/assistencia/tecnico-actions";
-import { listPartOrders, listSuppliers, isPartOrderStatus, type PartOrder } from "@/lib/partOrders";
+import { listPartOrders, listSuppliers, isPartOrderStatus, isPartOrderAtrasoFilter, type PartOrder } from "@/lib/partOrders";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { PecasTable } from "@/components/assistencia/PecasTable";
@@ -9,11 +9,12 @@ import { TecnicoPecasFrame } from "@/components/assistencia/TecnicoPecasFrame";
 
 export const dynamic = "force-dynamic";
 
-function buildHref(params: { status?: string; q?: string; supplier?: string }) {
+function buildHref(params: { status?: string; q?: string; supplier?: string; atraso?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
   if (params.supplier) sp.set("supplier", params.supplier);
+  if (params.atraso) sp.set("atraso", params.atraso);
   const qs = sp.toString();
   return qs ? `/assistencia/tecnico/pecas?${qs}` : "/assistencia/tecnico/pecas";
 }
@@ -29,6 +30,12 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Canceladas", value: "cancelada" },
 ];
 
+// Ver comentário equivalente em assistencia/pecas/page.tsx.
+const ATRASO_FILTERS: { label: string; value: "atrasado" | "entrando_em_atraso"; color: string }[] = [
+  { label: "Entrando em atraso (20-30d)", value: "entrando_em_atraso", color: "var(--status-warning)" },
+  { label: "Atrasado (+30d)", value: "atrasado", color: "var(--status-critical)" },
+];
+
 // Rota própria da equipe técnica pra Peças -- pedido do Victor 14/09/2026,
 // depois de ver a versão anterior (compartilhada com assistência, só o
 // cabeçalho mudava): "fica ruim se for compartilhada com a equipe tecnica
@@ -39,17 +46,18 @@ const FILTERS: { label: string; value: string | null }[] = [
 export default async function TecnicoPecasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; supplier?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; supplier?: string; atraso?: string }>;
 }) {
   const tecnicoName = await getTecnicoSession();
   if (!tecnicoName) {
     redirect("/assistencia/tecnico/login");
   }
 
-  const { status, q, supplier } = await searchParams;
+  const { status, q, supplier, atraso } = await searchParams;
   const filterStatus = isPartOrderStatus(status) ? status : undefined;
+  const filterAtraso = isPartOrderAtrasoFilter(atraso) ? atraso : undefined;
   const [orders, suppliers]: [PartOrder[], string[]] = await Promise.all([
-    listPartOrders({ status: filterStatus, q, supplier }),
+    listPartOrders({ status: filterStatus, q, supplier, atraso: filterAtraso }),
     listSuppliers(),
   ]);
 
@@ -65,7 +73,7 @@ export default async function TecnicoPecasPage({
               key={f.label}
               label={f.label}
               selected={(f.value ?? undefined) === filterStatus}
-              href={buildHref({ status: f.value ?? undefined, q, supplier })}
+              href={buildHref({ status: f.value ?? undefined, q, supplier, atraso: filterAtraso })}
             />
           ))}
         </div>
@@ -79,12 +87,25 @@ export default async function TecnicoPecasPage({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
+        {ATRASO_FILTERS.map((f) => (
+          <FilterPill
+            key={f.value}
+            label={f.label}
+            color={f.color}
+            selected={f.value === filterAtraso}
+            href={buildHref({ status: filterStatus, q, supplier, atraso: f.value === filterAtraso ? undefined : f.value })}
+          />
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
         <FilterSelect name="supplier" placeholder="Todos os fornecedores" options={suppliers} />
       </div>
 
       <form action="/assistencia/tecnico/pecas" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
         {supplier ? <input type="hidden" name="supplier" value={supplier} /> : null}
+        {filterAtraso ? <input type="hidden" name="atraso" value={filterAtraso} /> : null}
         <input
           type="search"
           name="q"
@@ -97,7 +118,7 @@ export default async function TecnicoPecasPage({
         </button>
         {q ? (
           <Link
-            href={buildHref({ status: filterStatus, supplier })}
+            href={buildHref({ status: filterStatus, supplier, atraso: filterAtraso })}
             className="text-xs underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
             Limpar busca

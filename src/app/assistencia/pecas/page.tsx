@@ -1,15 +1,16 @@
 import Link from "next/link";
-import { listPartOrders, listSuppliers, isPartOrderStatus, type PartOrder } from "@/lib/partOrders";
+import { listPartOrders, listSuppliers, isPartOrderStatus, isPartOrderAtrasoFilter, type PartOrder } from "@/lib/partOrders";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { PecasTable } from "@/components/assistencia/PecasTable";
 import { UnderlineTab } from "@/components/UnderlineTab";
 
-function buildHref(params: { status?: string; q?: string; supplier?: string }) {
+function buildHref(params: { status?: string; q?: string; supplier?: string; atraso?: string }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
   if (params.supplier) sp.set("supplier", params.supplier);
+  if (params.atraso) sp.set("atraso", params.atraso);
   const qs = sp.toString();
   return qs ? `/assistencia/pecas?${qs}` : "/assistencia/pecas";
 }
@@ -25,18 +26,28 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Canceladas", value: "cancelada" },
 ];
 
+// Filtro por IDADE do chamado (created_at), não por status -- pedido do
+// Victor 17/09/2026: "filtro com todos os chamados que conste atrasado,
+// que são os que passam de 30 dias, e também os de 20 a 30 dias (entrando
+// em atraso)". Ver PartOrderAtrasoFilter em partOrders.ts.
+const ATRASO_FILTERS: { label: string; value: "atrasado" | "entrando_em_atraso"; color: string }[] = [
+  { label: "Entrando em atraso (20-30d)", value: "entrando_em_atraso", color: "var(--status-warning)" },
+  { label: "Atrasado (+30d)", value: "atrasado", color: "var(--status-critical)" },
+];
+
 export default async function PecasQueuePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; supplier?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; supplier?: string; atraso?: string }>;
 }) {
   // O layout (pecas/layout.tsx) já garante acesso (Profile assistência/
   // admin -- equipe técnica tem rota própria, /assistencia/tecnico/pecas,
   // desde 14/09/2026) -- nada a checar aqui.
-  const { status, q, supplier } = await searchParams;
+  const { status, q, supplier, atraso } = await searchParams;
   const filterStatus = isPartOrderStatus(status) ? status : undefined;
+  const filterAtraso = isPartOrderAtrasoFilter(atraso) ? atraso : undefined;
   const [orders, suppliers]: [PartOrder[], string[]] = await Promise.all([
-    listPartOrders({ status: filterStatus, q, supplier }),
+    listPartOrders({ status: filterStatus, q, supplier, atraso: filterAtraso }),
     listSuppliers(),
   ]);
 
@@ -66,7 +77,7 @@ export default async function PecasQueuePage({
               key={f.label}
               label={f.label}
               selected={(f.value ?? undefined) === filterStatus}
-              href={buildHref({ status: f.value ?? undefined, q, supplier })}
+              href={buildHref({ status: f.value ?? undefined, q, supplier, atraso: filterAtraso })}
             />
           ))}
         </div>
@@ -80,12 +91,25 @@ export default async function PecasQueuePage({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
+        {ATRASO_FILTERS.map((f) => (
+          <FilterPill
+            key={f.value}
+            label={f.label}
+            color={f.color}
+            selected={f.value === filterAtraso}
+            href={buildHref({ status: filterStatus, q, supplier, atraso: f.value === filterAtraso ? undefined : f.value })}
+          />
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
         <FilterSelect name="supplier" placeholder="Todos os fornecedores" options={suppliers} />
       </div>
 
       <form action="/assistencia/pecas" method="GET" className="flex items-center gap-2 flex-wrap">
         {filterStatus ? <input type="hidden" name="status" value={filterStatus} /> : null}
         {supplier ? <input type="hidden" name="supplier" value={supplier} /> : null}
+        {filterAtraso ? <input type="hidden" name="atraso" value={filterAtraso} /> : null}
         <input
           type="search"
           name="q"
@@ -97,7 +121,7 @@ export default async function PecasQueuePage({
           Buscar
         </button>
         {q ? (
-          <Link href={buildHref({ status: filterStatus, supplier })} className="text-xs underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+          <Link href={buildHref({ status: filterStatus, supplier, atraso: filterAtraso })} className="text-xs underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             Limpar busca
           </Link>
         ) : null}
