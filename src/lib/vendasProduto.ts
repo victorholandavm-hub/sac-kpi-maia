@@ -1,6 +1,16 @@
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { sanitizeOrFilterValue } from "./searchFilter";
+
+// Cache de 5 min pras consultas pesadas desta tela -- pedido do Victor
+// 17/09/2026: "a mudança entre as páginas seja mais rápida" (kpis -> clientes
+// -> vendas -> avaliações). Nada aqui tinha cache nenhum (ver comentários
+// "achado 2026-08-13"/"BUG DE PERFORMANCE" abaixo -- já foram otimizadas em
+// TEMPO de query, mas continuavam refazendo a mesma varredura do zero em toda
+// navegação, mesmo pro período padrão de sempre). Sem impacto na filtragem em
+// si -- só memoiza o resultado por alguns minutos.
+const VENDAS_CACHE_REVALIDATE_SECONDS = 300;
 
 // Tela "Vendas por produto" (admin + CD, ver 0073_vendas_produto_rls.sql):
 // curva semanal de um produto, ranking dos mais vendidos e classificação por
@@ -161,12 +171,16 @@ export function familiaLogisticaDaCategoria(key: ProdutoCategoriaKey): FamiliaLo
 // usuário), mas essa checagem fica de proteção permanente: se o sync algum
 // dia atrasar nesse cursor de novo, a tela avisa em vez de mentir um número
 // baixo.
-export async function getEarliestSyncedOrderDate(): Promise<string | null> {
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("totvs_orders").select("issue_date").order("issue_date", { ascending: true }).limit(1).maybeSingle();
-  if (error) throw new Error(error.message);
-  return data?.issue_date ?? null;
-}
+export const getEarliestSyncedOrderDate = unstable_cache(
+  async (): Promise<string | null> => {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.from("totvs_orders").select("issue_date").order("issue_date", { ascending: true }).limit(1).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data?.issue_date ?? null;
+  },
+  ["earliest-synced-order-date"],
+  { revalidate: VENDAS_CACHE_REVALIDATE_SECONDS }
+);
 
 export type ProdutoSugestao = { productCode: string; description: string | null };
 
@@ -228,37 +242,41 @@ type ItemComData = {
 // cortava silenciosamente nesse caso (achado 20/08/2026, revisão pedida
 // pelo Victor) -- paginado de verdade agora, mesmo padrão de
 // fetchItensDoPeriodo mais abaixo.
-export async function getVendaCurvaProduto(productCode: string, range: DateRange): Promise<ProdutoVendaCurva | null> {
-  const trimmed = productCode.trim();
-  if (!trimmed) return null;
+export const getVendaCurvaProduto = unstable_cache(
+  async (productCode: string, range: DateRange): Promise<ProdutoVendaCurva | null> => {
+    const trimmed = productCode.trim();
+    if (!trimmed) return null;
 
-  const admin = getSupabaseAdmin();
-  const rows = await fetchAllPagesParallel<ItemComData>(
-    (from, to) =>
-      admin
-        .from("totvs_order_items")
-        .select("quantity, total, description, totvs_orders!inner(issue_date)", { count: "exact" })
-        .eq("product", trimmed)
-        .gte("totvs_orders.issue_date", range.from)
-        .lte("totvs_orders.issue_date", range.to)
-        .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemComData>>,
-    { pageSize: RANKING_PAGE_SIZE }
-  );
+    const admin = getSupabaseAdmin();
+    const rows = await fetchAllPagesParallel<ItemComData>(
+      (from, to) =>
+        admin
+          .from("totvs_order_items")
+          .select("quantity, total, description, totvs_orders!inner(issue_date)", { count: "exact" })
+          .eq("product", trimmed)
+          .gte("totvs_orders.issue_date", range.from)
+          .lte("totvs_orders.issue_date", range.to)
+          .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemComData>>,
+      { pageSize: RANKING_PAGE_SIZE }
+    );
 
-  let description: string | null = null;
-  if (rows.length > 0) {
-    description = rows[0].description;
-  } else {
-    // Produto pode existir (catálogo veio de vendas antigas) mas sem
-    // movimento no período -- ainda assim mostra a curva zerada em vez de
-    // "produto não encontrado", que seria enganoso.
-    const { data: anyRow } = await admin.from("totvs_order_items").select("description").eq("product", trimmed).limit(1).maybeSingle();
-    if (!anyRow) return null;
-    description = anyRow.description;
-  }
+    let description: string | null = null;
+    if (rows.length > 0) {
+      description = rows[0].description;
+    } else {
+      // Produto pode existir (catálogo veio de vendas antigas) mas sem
+      // movimento no período -- ainda assim mostra a curva zerada em vez de
+      // "produto não encontrado", que seria enganoso.
+      const { data: anyRow } = await admin.from("totvs_order_items").select("description").eq("product", trimmed).limit(1).maybeSingle();
+      if (!anyRow) return null;
+      description = anyRow.description;
+    }
 
-  return buildCurva(trimmed, description, rows, range);
-}
+    return buildCurva(trimmed, description, rows, range);
+  },
+  ["venda-curva-produto"],
+  { revalidate: VENDAS_CACHE_REVALIDATE_SECONDS }
+);
 
 function buildCurva(productCode: string, description: string | null, rows: ItemComData[], range: DateRange): ProdutoVendaCurva {
   const porSemana = new Map<string, { quantidade: number; valor: number }>();
@@ -349,35 +367,39 @@ type OrderWithItemsRow = {
   items: { product: string | null; description: string | null; quantity: number; total: number }[];
 };
 
-export async function fetchItensDoPeriodo(range: DateRange): Promise<ItemRankingRow[]> {
-  const admin = getSupabaseAdmin();
+export const fetchItensDoPeriodo = unstable_cache(
+  async (range: DateRange): Promise<ItemRankingRow[]> => {
+    const admin = getSupabaseAdmin();
 
-  const orders = await fetchAllPagesParallel<OrderWithItemsRow>(
-    (from, to) =>
-      admin
-        .from("totvs_orders")
-        .select("issue_date, items:totvs_order_items(product, description, quantity, total)", { count: "exact" })
-        .gte("issue_date", range.from)
-        .lte("issue_date", range.to)
-        .range(from, to) as unknown as PromiseLike<PagedQueryResult<OrderWithItemsRow>>,
-    { pageSize: RANKING_PAGE_SIZE }
-  );
+    const orders = await fetchAllPagesParallel<OrderWithItemsRow>(
+      (from, to) =>
+        admin
+          .from("totvs_orders")
+          .select("issue_date, items:totvs_order_items(product, description, quantity, total)", { count: "exact" })
+          .gte("issue_date", range.from)
+          .lte("issue_date", range.to)
+          .range(from, to) as unknown as PromiseLike<PagedQueryResult<OrderWithItemsRow>>,
+      { pageSize: RANKING_PAGE_SIZE }
+    );
 
-  const result: ItemRankingRow[] = [];
-  for (const order of orders) {
-    for (const item of order.items) {
-      if (!item.product) continue;
-      result.push({
-        product: item.product,
-        description: item.description,
-        quantity: item.quantity,
-        total: item.total,
-        totvs_orders: { issue_date: order.issue_date },
-      });
+    const result: ItemRankingRow[] = [];
+    for (const order of orders) {
+      for (const item of order.items) {
+        if (!item.product) continue;
+        result.push({
+          product: item.product,
+          description: item.description,
+          quantity: item.quantity,
+          total: item.total,
+          totvs_orders: { issue_date: order.issue_date },
+        });
+      }
     }
-  }
-  return result;
-}
+    return result;
+  },
+  ["fetch-itens-periodo"],
+  { revalidate: VENDAS_CACHE_REVALIDATE_SECONDS }
+);
 
 // categoria opcional -- quando informada, filtra o ranking só pra produtos
 // classificados nela (ver classificarProduto). Extraída de listRankingProdutos
@@ -539,9 +561,12 @@ export const RUNWAY_DIAS_ALERTA = 7;
 // atraso do último sync, não é em tempo real) + dias de cobertura (saldo /
 // média de saída diária nos últimos 30 dias, sempre relativo a hoje, igual
 // listTendenciaProdutos).
-export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<Map<string, ProdutoSaldoEstoque>> {
+// Mesmo motivo de listTendenciaProdutosEntries acima (Map não sobrevive à
+// serialização do unstable_cache) -- devolve pares, a wrapper pública
+// reconstrói o Map.
+async function listSaldoEstoqueProdutosEntries(productCodes: string[]): Promise<[string, ProdutoSaldoEstoque][]> {
   const resultado = new Map<string, ProdutoSaldoEstoque>();
-  if (productCodes.length === 0) return resultado;
+  if (productCodes.length === 0) return [];
 
   const admin = getSupabaseAdmin();
 
@@ -613,7 +638,17 @@ export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<
   } catch (err) {
     console.error("listSaldoEstoqueProdutos:", (err as Error).message);
   }
-  return resultado;
+  return [...resultado.entries()];
+}
+
+const listSaldoEstoqueProdutosCached = unstable_cache(
+  listSaldoEstoqueProdutosEntries,
+  ["saldo-estoque-produtos"],
+  { revalidate: VENDAS_CACHE_REVALIDATE_SECONDS }
+);
+
+export async function listSaldoEstoqueProdutos(productCodes: string[]): Promise<Map<string, ProdutoSaldoEstoque>> {
+  return new Map(await listSaldoEstoqueProdutosCached(productCodes));
 }
 
 export type ProdutoPrazo = {
@@ -747,9 +782,14 @@ function isoDateSub(dias: number): string {
 // "infinito", vira `null` (sem base de comparação -- produto novo ou sem
 // venda nenhuma nas 4 semanas anteriores), a UI trata isso escondendo o
 // indicador em vez de mostrar um percentual sem sentido.
-export async function listTendenciaProdutos(productCodes: string[]): Promise<Map<string, ProdutoTendencia>> {
+// unstable_cache serializa o retorno em JSON pra guardar -- um Map vira "{}"
+// nesse processo (JSON.stringify(new Map(...)) não guarda as entradas), por
+// isso a função cacheada devolve um array de pares (serializável de
+// verdade) e só a wrapper pública (mesmo nome/assinatura de antes, todos os
+// chamadores continuam iguais) reconstrói o Map.
+async function listTendenciaProdutosEntries(productCodes: string[]): Promise<[string, ProdutoTendencia][]> {
   const resultado = new Map<string, ProdutoTendencia>();
-  if (productCodes.length === 0) return resultado;
+  if (productCodes.length === 0) return [];
 
   const fim = isoDateSub(0);
   const inicioUltimas = isoDateSub(TENDENCIA_SEMANAS * 7);
@@ -783,7 +823,17 @@ export async function listTendenciaProdutos(productCodes: string[]): Promise<Map
     const variacaoPct = previas > 0 ? Math.round(((ultimas - previas) / previas) * 100) : null;
     resultado.set(code, { variacaoPct });
   }
-  return resultado;
+  return [...resultado.entries()];
+}
+
+const listTendenciaProdutosCached = unstable_cache(
+  listTendenciaProdutosEntries,
+  ["tendencia-produtos"],
+  { revalidate: VENDAS_CACHE_REVALIDATE_SECONDS }
+);
+
+export async function listTendenciaProdutos(productCodes: string[]): Promise<Map<string, ProdutoTendencia>> {
+  return new Map(await listTendenciaProdutosCached(productCodes));
 }
 
 export type CategoriaResumo = { key: ProdutoCategoriaKey; label: string; quantidade: number; valor: number };
