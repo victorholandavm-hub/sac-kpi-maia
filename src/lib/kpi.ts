@@ -1,7 +1,9 @@
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import type { DateRange } from "./dateRange";
+import type { DateRange, RangePreset } from "./dateRange";
 import { fetchInBatches } from "./supabaseBatch";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
+import { categoryLabel, storeLabel } from "./labels";
 
 export type TicketRow = {
   conversation_id: string;
@@ -989,14 +991,27 @@ export async function listTicketsForDay(date: string, fromTime: string, toTime: 
   });
 }
 
-export async function getKpiData(
-  range: DateRange,
-  labelFns: {
-    categoryLabel: (tag: string) => string;
-    storeLabel: (tag: string) => string;
-  }
-): Promise<KpiData> {
-  const supabase = getSupabaseAdmin();
+// Achado 17/09/2026 (pedido do Victor: "a mudança entre as páginas seja mais
+// rápida" -- /kpis -> /clientes -> /vendas -> /avaliações demorando muito):
+// essa função varre v_ticket_enriched e conversations INTEIROS (sem filtro
+// de data na query -- o `range` só filtra em memória depois, ver usos
+// abaixo), sem cache nenhum -- refeito do zero em TODA navegação, inclusive
+// quando /kpis e /avaliações pedem exatamente o mesmo período em sequência.
+// unstable_cache resolve o caso comum (mesmo período, poucos minutos de
+// diferença) sem mudar a filtragem em si -- `to: new Date()` do resolveRange
+// muda a cada milissegundo, então a chave usa um "balde" de 5 min (mesmo
+// valor do revalidate) em vez do timestamp exato, senão nunca bateria cache.
+const KPI_CACHE_BUCKET_MS = 5 * 60 * 1000;
+
+export async function getKpiData(range: DateRange): Promise<KpiData> {
+  const bucketedTo = new Date(Math.floor(range.to.getTime() / KPI_CACHE_BUCKET_MS) * KPI_CACHE_BUCKET_MS);
+  return getKpiDataCached(range.preset, range.from ? range.from.toISOString() : null, bucketedTo.toISOString());
+}
+
+const getKpiDataCached = unstable_cache(
+  async (preset: RangePreset | "custom", fromIso: string | null, toIso: string): Promise<KpiData> => {
+    const range: DateRange = { preset, from: fromIso ? new Date(fromIso) : null, to: new Date(toIso) };
+    const supabase = getSupabaseAdmin();
 
   // PostgREST limita cada resposta (max_rows do projeto, normalmente 1000),
   // entao paginamos com .range() ate esgotar os dados -- em PARALELO (ver
@@ -1215,10 +1230,10 @@ export async function getKpiData(
     (a, b) => new Date(b.asked_at).getTime() - new Date(a.asked_at).getTime()
   );
 
-  const storeBreakdown = buildStoreBreakdown(rows, labelFns.storeLabel, labelFns.categoryLabel);
+  const storeBreakdown = buildStoreBreakdown(rows, storeLabel, categoryLabel);
   const categoryTickets = buildCategoryTicketsMap(rows);
   const productTickets = buildProductTicketsMap(rows);
-  const storeCategories = buildStoreCategoryMap(rows, labelFns.categoryLabel);
+  const storeCategories = buildStoreCategoryMap(rows, categoryLabel);
   const agentDrilldown = buildAgentDrilldown(rows);
   // Nome/telefone dos chamados por trás do "problema mais comum" (loja,
   // categoria geral e semana anterior) -- query em lote única (mesmo padrão
@@ -1267,7 +1282,7 @@ export async function getKpiData(
     slaMinutesThreshold: 30,
     recurrenceCount,
     recurrencePct: rows.length > 0 ? Math.round((recurrenceCount / rows.length) * 100) : null,
-    paretoSummary: buildParetoSummary(byCategory, rows.length, labelFns.categoryLabel),
+    paretoSummary: buildParetoSummary(byCategory, rows.length, categoryLabel),
     storeBreakdown,
     categoryTickets,
     productTickets,
@@ -1282,11 +1297,14 @@ export async function getKpiData(
     previousWeek,
     escalations,
     escalationList,
-    escalationByStore: buildEscalationByStore(escalationRows, labelFns.storeLabel),
+    escalationByStore: buildEscalationByStore(escalationRows, storeLabel),
     byAgentStats: buildAgentStats(rows),
     performanceReport: buildPerformanceReportSet(allRows, new Date()),
     npsSummary: buildNpsSummary(rows, untrackedNpsScores),
     npsDetractors,
     agentDrilldown,
   };
-}
+  },
+  ["kpi-data"],
+  { revalidate: 300 }
+);

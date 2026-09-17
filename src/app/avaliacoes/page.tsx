@@ -1,6 +1,5 @@
 import { getKpiData } from "@/lib/kpi";
 import { resolveRange } from "@/lib/dateRange";
-import { categoryLabel, storeLabel } from "@/lib/labels";
 import { listStoreGoogleReviews } from "@/lib/googleReviews";
 import { getNpsTrend } from "@/lib/npsTrend";
 import { listNpsDetratores, getNpsResumoPorFaseAdicional } from "@/lib/npsDetratores";
@@ -29,7 +28,7 @@ export default async function AvaliacoesPage({
   const params = await searchParams;
   const range = resolveRange(params);
   const [data, googleReviews, npsTrend, npsDetratores, resumoFasesAdicionais, compraNpsResumo] = await Promise.all([
-    getKpiData(range, { categoryLabel, storeLabel }),
+    getKpiData(range),
     listStoreGoogleReviews(),
     getNpsTrend(NPS_TREND_WEEKS),
     listNpsDetratores(),
