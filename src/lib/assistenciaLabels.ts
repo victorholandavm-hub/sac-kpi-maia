@@ -441,12 +441,19 @@ export const ARSENAL_HIGHLIGHT_COLORS: Record<string, string> = {
 // 14/08/2026 -- separadas por pedido do usuário, pra dar pra medir as duas
 // coisas de forma independente (ver 0080_causa_raiz_conferencia_motorista.sql,
 // nenhuma linha existente usava "erro_cd" ainda, migration sem backfill).
+// Removidas da lista SELECIONÁVEL 17/09/2026 (pedido do Victor): "erro_loja",
+// "armazenamento_cd", "sujeira_conferencia" e "outro" -- continuam em
+// CAUSA_RAIZ_LABELS/CAUSA_RAIZ_ERRO_INTERNO abaixo (chamados antigos já
+// classificados assim, constraint do banco também continua aceitando, ver
+// migration 0133) -- só não aparecem mais pra escolher num chamado novo.
 export const CAUSA_RAIZ_OPTIONS = [
   "erro_conferencia",
   "erro_motorista",
-  "erro_loja",
   "erro_vendedor",
   "erro_sac",
+  // Opção nova -- pedido do Victor 17/09/2026: faltava opção pra erro do
+  // caixa (lançamento de venda, faturamento) distinto de erro do vendedor.
+  "erro_caixa",
   "avaria_transporte",
   "defeito_fabricacao",
   // Opção nova -- pedido do Victor 29/08/2026: "muitas notificações de
@@ -465,33 +472,7 @@ export const CAUSA_RAIZ_OPTIONS = [
   // (conferência/expedição não bateu o kit completo antes de enviar),
   // nunca um defeito do fabricante ou do transporte.
   "peca_nao_entregue",
-  // Opção nova -- pedido do Victor 29/08/2026: "existe um outro problema
-  // tambem que é em relação aos produtos que foram entregues sujos x
-  // entregues avariados de fabrica, pois isso diferencia se o problema é
-  // de armazenamento/conferencia no CD ou se é defeito da fabricação".
-  // Antes disso, "sujo"/"manchado"/"mofado" não tinha causa própria --
-  // investigação via SQL 29/08/2026 achou 8 chamados com esse tipo de
-  // motivo, espalhados em 3 causas raiz DIFERENTES (3x erro_conferencia,
-  // 2x outro, 3x defeito_fabricacao) -- sem padrão nenhum, cada um
-  // escolhia o que parecia mais perto por falta de opção certa. Sujeira/
-  // mofo/mancha é sintoma de armazenamento inadequado (umidade, produto
-  // empilhado errado, tempo parado demais no CD antes de sair) -- nunca
-  // saiu da fábrica assim, então virar "defeito_fabricacao" mascarava um
-  // problema que é da própria operação do CD, não do fabricante.
-  "armazenamento_cd",
-  // Opção nova -- pedido do Victor 02/09/2026: "quando o motivo é que o
-  // produto foi sujo, so tem a opção de colocar que foi culpa de
-  // armazenamento, quando na verdade, quando o produto sai sujo, pode ser
-  // culpa do conferente tambem". "armazenamento_cd" (acima) cobre sujeira
-  // que já veio do jeito que o produto foi guardado no CD -- essa aqui é
-  // o outro caso: o produto já estava sujo/manchado/mofado e o conferente
-  // não barrou antes de sair. Mesma estrutura de "erro_conferencia" (carga
-  // + conferente obrigatórios, ver SacCreateRequestForm.tsx/actions.ts),
-  // só que classificada à parte pra não misturar "produto errado saiu"
-  // com "produto sujo passou pela conferência".
-  "sujeira_conferencia",
   "solicitacao_cliente",
-  "outro",
 ] as const;
 
 export const CAUSA_RAIZ_LABELS: Record<string, string> = {
@@ -500,6 +481,7 @@ export const CAUSA_RAIZ_LABELS: Record<string, string> = {
   erro_loja: "Erro da loja",
   erro_vendedor: "Erro do vendedor",
   erro_sac: "Erro do SAC",
+  erro_caixa: "Erro do caixa",
   avaria_transporte: "Avaria no transporte",
   defeito_fabricacao: "Defeito de fabricação",
   peca_nao_entregue: "Peça não entregue na venda (esqueceram de mandar, peça em si sem problema nenhum)",
@@ -508,6 +490,15 @@ export const CAUSA_RAIZ_LABELS: Record<string, string> = {
   solicitacao_cliente: "Solicitação do cliente (desistência/arrependimento)",
   outro: "Outro",
 };
+
+// Todo valor já válido (inclui os 4 removidos de CAUSA_RAIZ_OPTIONS
+// 17/09/2026) -- usado pra VALIDAR edição de chamado já existente
+// (updateRequestDetails, actions.ts), nunca pra criação nova (essa sim
+// restrita a CAUSA_RAIZ_OPTIONS). Sem isso, só abrir/salvar a edição de um
+// chamado antigo classificado "erro_loja"/"outro"/etc. (sem nem mexer nesse
+// campo) seria rejeitado pelo servidor por um valor que era válido quando
+// foi salvo e deixou de ser oferecido como opção nova.
+export const CAUSA_RAIZ_ALL_VALUES: string[] = Object.keys(CAUSA_RAIZ_LABELS);
 
 // Causas que são retrabalho interno (alguém do time errou), em vez de algo
 // externo (transporte, fábrica) ou uma decisão legítima do cliente -- pedido
@@ -524,6 +515,7 @@ export const CAUSA_RAIZ_ERRO_INTERNO: string[] = [
   "erro_loja",
   "erro_vendedor",
   "erro_sac",
+  "erro_caixa",
   "peca_nao_entregue",
   "armazenamento_cd",
   "sujeira_conferencia",

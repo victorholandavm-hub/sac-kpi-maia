@@ -52,6 +52,14 @@ export function EditRequestForm({
   // carga+conferente, erro_motorista pede carga+motorista, "outro" pede o
   // detalhe -- só que aqui já parte do valor atual do chamado, não vazio.
   const [causaRaiz, setCausaRaiz] = useState(request.causaRaiz ?? "");
+  // Mesma ideia de typeOptions acima -- a causa raiz atual sempre aparece
+  // como opção, mesmo que tenha sido removida da lista de escolha pra
+  // chamado NOVO (ver CAUSA_RAIZ_OPTIONS, assistenciaLabels.ts, 17/09/2026).
+  const causaRaizOptions = (CAUSA_RAIZ_OPTIONS as readonly string[]).includes(request.causaRaiz ?? "")
+    ? CAUSA_RAIZ_OPTIONS
+    : request.causaRaiz
+      ? [request.causaRaiz, ...CAUSA_RAIZ_OPTIONS]
+      : CAUSA_RAIZ_OPTIONS;
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -201,7 +209,7 @@ export function EditRequestForm({
             style={inputStyle}
           >
             <option value="">Não informado</option>
-            {CAUSA_RAIZ_OPTIONS.map((c) => (
+            {causaRaizOptions.map((c) => (
               <option key={c} value={c}>
                 {CAUSA_RAIZ_LABELS[c]}
               </option>
