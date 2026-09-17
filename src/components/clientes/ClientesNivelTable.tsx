@@ -19,7 +19,7 @@
 // componentes shadcn/ui. Mandar TODOS os milhares de clientes pro cliente
 // de uma vez (pra paginação/ordenação 100% client-side) pesaria demais no
 // payload inicial -- por isso `manualPagination` aqui, não getPaginationRowModel.
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 // @tanstack/react-table v9 troca useReactTable/getCoreRowModel/
 // getExpandedRowModel/ColumnDef (API v8 clássica) por um modelo novo de
 // registro explícito de "features" (useTable + tableFeatures(...)) --
@@ -31,14 +31,8 @@ import { Fragment, useEffect, useRef, useState } from "react";
 // -- mais seguro pra um teste local rápido do que reescrever em cima da
 // API nova sem testar direito. flexRender continua vindo do pacote
 // principal (não muda entre v8/v9).
-import {
-  type LegacyColumnDef as ColumnDef,
-  getCoreRowModel,
-  getExpandedRowModel,
-  useLegacyTable as useReactTable,
-} from "@tanstack/react-table/legacy";
+import { type LegacyColumnDef as ColumnDef, getCoreRowModel, useLegacyTable as useReactTable } from "@tanstack/react-table/legacy";
 import { flexRender } from "@tanstack/react-table";
-import type { ExpandedState } from "@tanstack/table-core";
 import { ChevronRight, MoreHorizontal, Copy } from "lucide-react";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -48,8 +42,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { getComprasDoClienteAction } from "@/app/clientes/actions";
-import type { ClienteNivelInfo, ClienteCompra } from "@/lib/clientes";
+import { ComprasModalButton } from "@/components/ComprasModalButton";
+import type { ClienteNivelInfo } from "@/lib/clientes";
 import { CLIENTE_NIVEL_LABELS, CLIENTE_NIVEL_COLORS } from "@/lib/clientes";
 
 const CLV_HORIZONTE_ANOS = 5;
@@ -64,82 +58,6 @@ function formatDateOnly(value: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
-// Sub-tabela de compras (expandida por linha) -- mesmo dado/ação de
-// ClienteHistoricoRow.tsx (getComprasDoClienteAction, busca só no 1º
-// clique), reescrita aqui em cima dos componentes shadcn/ui em vez do
-// <table> cru.
-function ComprasExpandidas({ clientId }: { clientId: string }) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [compras, setCompras] = useState<ClienteCompra[] | null>(null);
-
-  useEffect(() => {
-    getComprasDoClienteAction(clientId)
-      .then((result) => setCompras(result.compras))
-      .catch(() => setError("Não foi possível carregar as compras."))
-      .finally(() => setLoading(false));
-  }, [clientId]);
-
-  if (loading) {
-    return <p className="text-sm text-muted-foreground px-4 py-3">Carregando…</p>;
-  }
-  if (error) {
-    return <p className="text-sm text-destructive px-4 py-3">{error}</p>;
-  }
-  if (!compras || compras.length === 0) {
-    return <p className="text-sm text-muted-foreground px-4 py-3">Nenhuma compra encontrada pra esse cliente.</p>;
-  }
-
-  const totalVendas = compras.filter((c) => c.type === "Venda").reduce((sum, c) => sum + c.invoiceTotal, 0);
-  const totalDevolucoes = compras.filter((c) => c.type === "Devolucao").reduce((sum, c) => sum + c.invoiceTotal, 0);
-
-  return (
-    <div className="flex flex-col gap-2 px-4 py-3">
-      <div className="flex items-center gap-4 flex-wrap text-xs text-muted-foreground">
-        <span>
-          Total gasto (líquido): <strong className="text-foreground">{formatBRL(totalVendas + totalDevolucoes)}</strong>
-        </span>
-        {totalDevolucoes !== 0 ? <span>Devolvido: {formatBRL(Math.abs(totalDevolucoes))}</span> : null}
-      </div>
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Data</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Nota fiscal</TableHead>
-              <TableHead>Loja</TableHead>
-              <TableHead>Vendedor(a)</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {compras.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell className="whitespace-nowrap">{formatDateOnly(c.issueDate)}</TableCell>
-                <TableCell className="whitespace-nowrap">
-                  <Badge variant={c.type === "Devolucao" ? "destructive" : "outline"}>
-                    {c.type === "Devolucao" ? "Devolução" : "Venda"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">{c.invoice ?? "—"}</TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">{c.branch ?? "—"}</TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">{c.sellerName ?? "—"}</TableCell>
-                {/* invoice_total já vem líquido/assinado do Protheus
-                    (negativo pra devolução) -- formatBRL já mostra o sinal
-                    sozinho. */}
-                <TableCell className={`text-right whitespace-nowrap ${c.type === "Devolucao" ? "text-destructive" : ""}`}>
-                  {formatBRL(c.invoiceTotal)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
-  );
-}
-
 export function ClientesNivelTable({
   items,
   clvByClientId,
@@ -149,8 +67,6 @@ export function ClientesNivelTable({
   // Server -> Client -- veio convertido em clientes/page.tsx.
   clvByClientId: Record<string, number>;
 }) {
-  const [expanded, setExpanded] = useState<ExpandedState>({});
-
   // Aviso visual de que dá pra rolar a tabela pro lado -- pedido do Victor
   // 15/09/2026 depois de achar que as colunas da direita estavam sendo
   // "cortadas" (na verdade só rolam, mas sem indicação nenhuma o scrollbar
@@ -227,19 +143,11 @@ export function ClientesNivelTable({
       id: "nome",
       accessorFn: (c) => c.nome ?? c.clientId,
       header: "Nome",
-      // Coluna de nomes alinhada à esquerda (pedido explícito) -- botão de
-      // expandir/recolher junto, mesmo comportamento de
-      // ClienteHistoricoRow.tsx (não navega, expande a linha logo abaixo).
-      cell: ({ row }) => (
-        <button
-          type="button"
-          onClick={() => row.toggleExpanded()}
-          className="flex items-center gap-1.5 text-left font-medium hover:underline decoration-dotted"
-        >
-          <ChevronRight className={`size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 ${row.getIsExpanded() ? "rotate-90" : ""}`} />
-          {row.original.nome ?? row.original.clientId}
-        </button>
-      ),
+      // Texto simples, sem botão de expandir -- pedido do Victor
+      // 16/09/2026: histórico de compras vira o botão "Ver compras" na
+      // coluna própria (ver coluna "compras" abaixo), mesma lógica de "Ver
+      // produtos (N)" da tela de Entregas, em vez de expandir a linha.
+      cell: ({ row }) => <span className="font-medium">{row.original.nome ?? row.original.clientId}</span>,
     },
     {
       id: "nivel",
@@ -263,7 +171,14 @@ export function ClientesNivelTable({
       id: "compras",
       accessorKey: "compras",
       header: () => <div className="text-right">Compras</div>,
-      cell: ({ getValue }) => <div className="text-right tabular-nums">{getValue<number>()}</div>,
+      // Botão "Ver compras (N)" em vez de só o número -- pedido do Victor
+      // 16/09/2026, mesma lógica de "Ver produtos (N)" da tela de Entregas
+      // (abre modal em vez de expandir a linha, ver ComprasModalButton.tsx).
+      cell: ({ row, getValue }) => (
+        <div className="text-right">
+          <ComprasModalButton clientId={row.original.clientId} count={getValue<number>()} />
+        </div>
+      ),
     },
     {
       id: "gasto",
@@ -319,9 +234,6 @@ export function ClientesNivelTable({
             <MoreHorizontal className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => row.toggleExpanded()}>
-              <ChevronRight className="size-3.5" /> Ver histórico de compras
-            </DropdownMenuItem>
             {row.original.cpfCnpj ? (
               <DropdownMenuItem onClick={() => navigator.clipboard.writeText(row.original.cpfCnpj!)}>
                 <Copy className="size-3.5" /> Copiar CPF/CNPJ
@@ -336,16 +248,8 @@ export function ClientesNivelTable({
   const table = useReactTable({
     data: items,
     columns,
-    state: { expanded },
-    onExpandedChange: setExpanded,
     getRowId: (row) => row.clientId,
     getCoreRowModel: getCoreRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
-    // Por padrão o v9 só deixa expandir linha que tenha subRows (uso normal
-    // seria dados hierárquicos) -- aqui a "expansão" é só um painel de
-    // detalhe por linha (histórico de compras), sem hierarquia nenhuma, daí
-    // precisa liberar explicitamente ou toggleExpanded() nunca faz nada.
-    getRowCanExpand: () => true,
     // Paginação/ordenação continuam a cargo do servidor (ver comentário no
     // topo do arquivo) -- só a apresentação da página atual é da tabela.
     manualPagination: true,
@@ -373,7 +277,11 @@ export function ClientesNivelTable({
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="bg-[color-mix(in_srgb,var(--brand-green)_10%,var(--surface-1))]">
               {headerGroup.headers.map((header) => (
-                <TableHead key={header.id} className="whitespace-nowrap">
+                // Cabeçalho compacto/uppercase -- pedido do Victor 16/09/2026:
+                // "fiquem com a tabela muito parecida com a lógica dessa"
+                // (tela de Entregas, EntregasFlatList.tsx: text-[11px]
+                // uppercase tracking-wider text-muted-foreground).
+                <TableHead key={header.id} className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                 </TableHead>
               ))}
@@ -382,22 +290,13 @@ export function ClientesNivelTable({
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows.map((row) => (
-            <Fragment key={row.id}>
-              <TableRow className="hover:bg-[var(--surface-2)]">
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="whitespace-nowrap">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-              {row.getIsExpanded() ? (
-                <TableRow key={`${row.id}-expanded`} className="bg-[color-mix(in_srgb,var(--brand-green)_6%,var(--surface-2))] hover:bg-[color-mix(in_srgb,var(--brand-green)_6%,var(--surface-2))]">
-                  <TableCell colSpan={columns.length} className="p-0">
-                    <ComprasExpandidas clientId={row.original.clientId} />
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </Fragment>
+            <TableRow key={row.id} className="hover:bg-[var(--surface-2)]">
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id} className="whitespace-nowrap">
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
           ))}
         </TableBody>
       </Table>

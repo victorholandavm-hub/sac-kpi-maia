@@ -203,9 +203,12 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
           <div className="min-w-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
+                {/* Cabeçalho compacto/uppercase -- pedido do Victor
+                    16/09/2026: "fiquem com a tabela muito parecida com a
+                    lógica dessa" (tela de Entregas, EntregasFlatList.tsx). */}
                 <tr
-                  className="text-xs"
-                  style={{ color: "var(--text-secondary)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                  className="text-[11px] uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
                 >
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Status</th>
@@ -215,6 +218,7 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cidade</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Canal de aquisição</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -223,7 +227,6 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
                     key={c.protheusCode}
                     clientId={c.protheusCode}
                     name={c.name}
-                    colSpan={8}
                     accentColor={CLIENTE_STATUS_COLORS[c.status]}
                   >
                     <td className="px-4 py-2 whitespace-nowrap">
@@ -570,9 +573,12 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
           <DualScrollTable>
             <table className="w-full text-sm">
               <thead>
+                {/* Cabeçalho compacto/uppercase -- pedido do Victor
+                    16/09/2026: "fiquem com a tabela muito parecida com a
+                    lógica dessa" (tela de Entregas, EntregasFlatList.tsx). */}
                 <tr
-                  className="text-xs"
-                  style={{ color: "var(--text-secondary)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                  className="text-[11px] uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
                 >
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Segmento</th>
@@ -600,6 +606,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     </span>
                   </th>
                   <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Contato</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
@@ -608,7 +615,7 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
                     key={c.clientId}
                     clientId={c.clientId}
                     name={c.nome ?? c.clientId}
-                    colSpan={10}
+                    comprasCount={c.compras}
                     accentColor={RECOMPRA_SEGMENTO_COLORS[c.segmento]}
                   >
                     <td className="px-4 py-2 whitespace-nowrap">
