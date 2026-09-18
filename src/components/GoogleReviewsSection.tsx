@@ -21,6 +21,60 @@ const RANK_COLORS: Record<number, string> = {
   3: "#CD7F32",
 };
 
+type EvolutionPeriod = "semana" | "mes" | "tudo";
+
+const EVOLUTION_PERIOD_OPTIONS: { id: EvolutionPeriod; label: string }[] = [
+  { id: "semana", label: "Última semana" },
+  { id: "mes", label: "Último mês" },
+  { id: "tudo", label: "Desde o início" },
+];
+
+type EvolutionEntry = {
+  storeId: string;
+  storeName: string;
+  baselineRating: number;
+  baselineDate: string;
+  latestRating: number;
+  latestDate: string;
+  ratingDelta: number;
+  reviewCountDelta: number;
+};
+
+// Lê o delta certo pro período escolhido -- pedido do Victor 18/09/2026:
+// "preciso comprar[sic] a evolução semanal e mensal". "tudo" reaproveita
+// evolutionRatingDelta/first (desde a 1ª leitura já registrada, existia
+// antes desse filtro); "semana"/"mes" usam evolutionWeek/evolutionMonth
+// (janela fixa de dias, ver googleReviews.ts) -- lojas sem leitura antiga o
+// suficiente pra essa janela simplesmente não entram no ranking do período.
+function evolutionEntryFor(store: StoreGoogleReviews, period: EvolutionPeriod): EvolutionEntry | null {
+  if (!store.latest) return null;
+  if (period === "tudo") {
+    if (store.evolutionRatingDelta === null || !store.first) return null;
+    return {
+      storeId: store.storeId,
+      storeName: store.storeName,
+      baselineRating: store.first.rating,
+      baselineDate: store.first.capturedAt,
+      latestRating: store.latest.rating,
+      latestDate: store.latest.capturedAt,
+      ratingDelta: store.evolutionRatingDelta,
+      reviewCountDelta: store.evolutionReviewCountDelta ?? 0,
+    };
+  }
+  const window = period === "semana" ? store.evolutionWeek : store.evolutionMonth;
+  if (!window) return null;
+  return {
+    storeId: store.storeId,
+    storeName: store.storeName,
+    baselineRating: window.baseline.rating,
+    baselineDate: window.baseline.capturedAt,
+    latestRating: store.latest.rating,
+    latestDate: store.latest.capturedAt,
+    ratingDelta: window.ratingDelta,
+    reviewCountDelta: window.reviewCountDelta,
+  };
+}
+
 // Avaliações do Google por loja -- puxadas manualmente uma vez por semana
 // (pedido do Victor 18/08/2026: o Google não deixa automatizar de forma
 // confiável, ver src/lib/googleReviews.ts). Usado na página /avaliacoes
@@ -31,6 +85,7 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
   const router = useRouter();
   const [selectedStoreId, setSelectedStoreId] = useState<string>(stores[0]?.storeId ?? "");
   const selectedStore = stores.find((s) => s.storeId === selectedStoreId) ?? null;
+  const [evolutionPeriod, setEvolutionPeriod] = useState<EvolutionPeriod>("semana");
 
   // Ranking por nota atual, maior pra menor -- pedido do Victor 19/08/2026.
   // Quem ainda não tem leitura fica sem posição, no fim da lista (não dá
@@ -60,13 +115,14 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
   // por acaso).
   const evolutionRanked = useMemo(() => {
     return stores
-      .filter((s) => s.evolutionRatingDelta !== null)
+      .map((s) => evolutionEntryFor(s, evolutionPeriod))
+      .filter((e): e is EvolutionEntry => e !== null)
       .sort((a, b) => {
-        const byRating = b.evolutionRatingDelta! - a.evolutionRatingDelta!;
+        const byRating = b.ratingDelta - a.ratingDelta;
         if (byRating !== 0) return byRating;
-        return (b.evolutionReviewCountDelta ?? 0) - (a.evolutionReviewCountDelta ?? 0);
+        return b.reviewCountDelta - a.reviewCountDelta;
       });
-  }, [stores]);
+  }, [stores, evolutionPeriod]);
 
   const chartData = useMemo(
     () => (selectedStore?.history ?? []).map((p) => ({ date: p.capturedAt, rating: p.rating })),
@@ -95,17 +151,41 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
         </table>
       </div>
 
-      {evolutionRanked.length > 0 ? (
-        <div className="rounded-lg overflow-x-auto" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
-          <div className="px-3 pt-3 flex flex-col gap-0.5">
+      <div className="rounded-lg overflow-x-auto" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
+        <div className="px-3 pt-3 flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex flex-col gap-0.5">
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               Ranking de evolução
             </h3>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Quem mais melhorou a nota desde a primeira leitura registrada, não só na última semana.
+              {evolutionPeriod === "tudo"
+                ? "Quem mais melhorou a nota desde a primeira leitura registrada."
+                : `Quem mais melhorou a nota no(a) ${EVOLUTION_PERIOD_OPTIONS.find((o) => o.id === evolutionPeriod)!.label.toLowerCase()}.`}
             </p>
           </div>
-          <table className="w-full text-sm border-collapse min-w-[640px]">
+          <div className="flex gap-1 rounded-lg p-0.5" style={{ background: "var(--surface-2)" }}>
+            {EVOLUTION_PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setEvolutionPeriod(opt.id)}
+                className="text-xs font-medium px-2.5 py-1.5 rounded-md"
+                style={{
+                  background: evolutionPeriod === opt.id ? "var(--brand-green)" : "transparent",
+                  color: evolutionPeriod === opt.id ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {evolutionRanked.length === 0 ? (
+          <p className="px-3 pb-3 pt-2 text-sm" style={{ color: "var(--text-muted)" }}>
+            Ainda não tem histórico com essa profundidade pra nenhuma loja — volte a conferir daqui algumas semanas.
+          </p>
+        ) : (
+          <table className="w-full text-sm border-collapse min-w-[640px] mt-2">
             <thead>
               <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
                 <th className="px-3 py-2 text-right font-semibold">#</th>
@@ -116,13 +196,12 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
               </tr>
             </thead>
             <tbody>
-              {evolutionRanked.map((s, i) => {
+              {evolutionRanked.map((e, i) => {
                 const rank = i + 1;
                 const rankColor = RANK_COLORS[rank];
-                const delta = s.evolutionRatingDelta!;
                 return (
                   <tr
-                    key={s.storeId}
+                    key={e.storeId}
                     className="border-b"
                     style={{
                       borderColor: "var(--gridline)",
@@ -133,21 +212,21 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
                       {rank}
                     </td>
                     <td className="px-3 py-2" style={{ color: "var(--text-primary)" }}>
-                      {s.storeName}
+                      {e.storeName}
                     </td>
                     <td className="px-3 py-2">
                       <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        {s.first!.rating.toFixed(1)} →
+                        {e.baselineRating.toFixed(1)} →
                       </span>{" "}
                       <span className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
-                        {s.latest!.rating.toFixed(1)}
+                        {e.latestRating.toFixed(1)}
                       </span>{" "}
-                      {delta !== 0 ? (
+                      {e.ratingDelta !== 0 ? (
                         <span
                           className="text-xs font-medium"
-                          style={{ color: delta > 0 ? "var(--status-good)" : "var(--status-critical)" }}
+                          style={{ color: e.ratingDelta > 0 ? "var(--status-good)" : "var(--status-critical)" }}
                         >
-                          {delta > 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}
+                          {e.ratingDelta > 0 ? "▲" : "▼"} {Math.abs(e.ratingDelta).toFixed(1)}
                         </span>
                       ) : (
                         <span className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -156,18 +235,18 @@ export function GoogleReviewsSection({ stores }: { stores: StoreGoogleReviews[] 
                       )}
                     </td>
                     <td className="px-3 py-2" style={{ color: "var(--text-secondary)" }}>
-                      {s.evolutionReviewCountDelta! > 0 ? `+${s.evolutionReviewCountDelta}` : s.evolutionReviewCountDelta}
+                      {e.reviewCountDelta > 0 ? `+${e.reviewCountDelta}` : e.reviewCountDelta}
                     </td>
                     <td className="px-3 py-2 text-xs" style={{ color: "var(--text-muted)" }}>
-                      {formatDate(s.first!.capturedAt)} – {formatDate(s.latest!.capturedAt)}
+                      {formatDate(e.baselineDate)} – {formatDate(e.latestDate)}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </div>
-      ) : null}
+        )}
+      </div>
 
       <div className="rounded-lg p-4" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}>
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
