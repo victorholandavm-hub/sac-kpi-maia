@@ -12,7 +12,8 @@ import {
 } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
 import { getRotaWeekOverview, startOfRotaWeek, addDays, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
-import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
+import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES, MANOEL_ONLY_ASSEMBLER, JUNIOR_TRUCK_LOG_MANAGER_NAME } from "@/lib/assistenciaLabels";
+import { listJuniorTruckEntries } from "@/lib/juniorTruck";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 import { AssistenciaQueueGroup } from "@/components/assistencia/AssistenciaQueueGroup";
@@ -20,6 +21,7 @@ import { EntregasFlatList } from "@/components/assistencia/EntregasFlatList";
 import { EntregasKanbanHoje } from "@/components/assistencia/EntregasKanbanHoje";
 import { isDeliveryScheduled } from "@/components/assistencia/DeliveryStatusBadge";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
+import { JuniorTruckModalButton } from "@/components/assistencia/JuniorTruckModalButton";
 import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcut";
 import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
@@ -296,6 +298,7 @@ export default async function AssistenciaQueuePage({
   // esses tipos.
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
   const today = new Date().toISOString().slice(0, 10);
+  const isJuniorTruckManager = profile.fullName === JUNIOR_TRUCK_LOG_MANAGER_NAME;
   const [
     { items: rawRequests, total: rawTotal },
     stores,
@@ -305,6 +308,7 @@ export default async function AssistenciaQueuePage({
     entregasRoutesOverview,
     todayRequestsFull,
     visitasAtrasadasRaw,
+    juniorTruckEntries,
   ] = await Promise.all([
       listRequests({
         status: filterStatus,
@@ -347,6 +351,11 @@ export default async function AssistenciaQueuePage({
       // página/filtro de status escolhido -- sempre reflete o total de
       // verdade, igual o overdueCount da Agenda.
       !showPecas ? listScheduledRequests({ range: "atrasado" }) : Promise.resolve([]),
+      // Botão "Caminhão do Junior" -- pedido do Victor 18/09/2026: "apenas
+      // para mim". Só busca quando é de fato o Victor E a aba Entregas está
+      // ativa (onde o botão mora, ao lado de "Gestão de Motoristas &
+      // Escala") -- evita consulta à toa pro resto da equipe.
+      showPecas && isJuniorTruckManager ? listJuniorTruckEntries() : Promise.resolve([]),
     ]);
   // Programado/Não programado não são status de verdade no banco (ver
   // ENTREGA_FILTERS acima) -- `.eq("status", "aberta")` já rolou no
@@ -979,7 +988,10 @@ export default async function AssistenciaQueuePage({
                 today={today}
                 routesOverview={entregasRoutesOverview}
                 motoristaAction={
-                  <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+                  <>
+                    <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+                    {isJuniorTruckManager ? <JuniorTruckModalButton initialEntries={juniorTruckEntries} /> : null}
+                  </>
                 }
               />
               {/* Isolando "Hoje" (isHojePresetOnly) não mostra o resto --
