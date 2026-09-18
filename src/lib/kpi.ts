@@ -4,6 +4,7 @@ import type { DateRange, RangePreset } from "./dateRange";
 import { fetchInBatches } from "./supabaseBatch";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { categoryLabel, storeLabel } from "./labels";
+import { getVendasCountPorLoja, getEarliestSyncedOrderDate } from "./vendasProduto";
 
 export type TicketRow = {
   conversation_id: string;
@@ -218,6 +219,10 @@ export type StoreBreakdown = {
 
 export type KpiData = {
   totalTickets: number;
+  // Vendas (TOTVS) no mesmo período selecionado -- ver getVendasCountPorLoja,
+  // vendasProduto.ts. Contexto de referência ao lado de totalTickets, não
+  // faz parte do cálculo de nenhum outro campo aqui.
+  totalVendasNoPeriodo: number;
   resolvedCount: number;
   openCount: number;
   resolvedByTagCount: number;
@@ -1019,6 +1024,16 @@ const getKpiDataCached = unstable_cache(
   // 19/08/2026 (perf, pedido do Victor): essa era sequencial, uma das
   // maiores fatias dos 5,8s que /kpis chegou a demorar pra carregar.
   const pageSize = 1000;
+  // Quantidade de vendas (TOTVS, totvs_orders type='Venda') no MESMO período
+  // selecionado -- pedido do Victor 18/09/2026: "384 chamados no SAC, mas em
+  // relação a quantas vendas?". Mesma função já usada em kpiAssistencia.ts
+  // (getVendasCountPorLoja) -- aqui só soma todas as lojas, sem quebrar por
+  // loja. Sem filtro de data escolhido (preset "all"/range.from null) usa o
+  // início do histórico sincronizado como piso, mesmo fallback de lá.
+  const vendaRangeFromPromise = range.from ? Promise.resolve(range.from.toISOString().slice(0, 10)) : getEarliestSyncedOrderDate();
+  const vendasCountPromise = vendaRangeFromPromise.then((vendaRangeFrom) =>
+    getVendasCountPorLoja({ from: vendaRangeFrom ?? range.to.toISOString().slice(0, 10), to: range.to.toISOString().slice(0, 10) })
+  );
   const ticketRows = await fetchAllPagesParallel<TicketRow>(
     (from, to) =>
       supabase
@@ -1255,8 +1270,12 @@ const getKpiDataCached = unstable_cache(
     }
   }
 
+  const vendasPorLoja = await vendasCountPromise;
+  const totalVendasNoPeriodo = [...vendasPorLoja.values()].reduce((a, b) => a + b, 0);
+
   return {
     totalTickets: rows.length,
+    totalVendasNoPeriodo,
     resolvedCount: resolvedRows.length,
     openCount: openRows.length,
     resolvedByTagCount: rows.filter((r) => r.resolved_by_tag).length,

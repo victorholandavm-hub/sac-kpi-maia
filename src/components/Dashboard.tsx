@@ -131,7 +131,12 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           uma que demorou 10min certinho, mas são situações bem diferentes
           pro cliente no WhatsApp). */}
       <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <StatTile label="Total de chamados" value={data.totalTickets} size="lg" />
+        <StatTile
+          label="Total de chamados"
+          value={data.totalTickets}
+          size="lg"
+          note={`de ${data.totalVendasNoPeriodo.toLocaleString("pt-BR")} venda${data.totalVendasNoPeriodo === 1 ? "" : "s"} no período`}
+        />
         <StatTile
           label="Resposta no 1º contato"
           value={data.avgFirstResponseMinutes ?? "—"}

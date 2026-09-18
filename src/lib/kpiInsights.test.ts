@@ -21,6 +21,7 @@ function metric(key: string, overrides: Partial<PerformanceMetric> = {}): Perfor
 function baseData(overrides: Partial<KpiData> = {}): KpiData {
   return {
     totalTickets: 0,
+    totalVendasNoPeriodo: 0,
     resolvedCount: 0,
     openCount: 0,
     resolvedByTagCount: 0,
