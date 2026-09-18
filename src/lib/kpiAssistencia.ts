@@ -148,6 +148,11 @@ function aggregate(
 
 export type AssistenciaKpiData = {
   totalChamados: number;
+  // Vendas (TOTVS) no mesmo período selecionado -- pedido do Victor
+  // 18/09/2026 ("em relação a quantas vendas?"), mesma soma de
+  // byStoreVendaVsAssistencia (vendasPorLoja) abaixo, só sem quebrar por
+  // loja. Contexto de referência ao lado de totalChamados.
+  totalVendasNoPeriodo: number;
   dailyVolume: DayCount[];
   // Contagem de verdade de produtos distintos -- byProduct abaixo é
   // cortado em PRODUCT_RANKING_LIMIT (senão o gráfico vira uma parede de
@@ -808,6 +813,7 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
 
   return {
     totalChamados: rows.length,
+    totalVendasNoPeriodo: [...vendasPorLoja.values()].reduce((a, b) => a + b, 0),
     dailyVolume,
     distinctProductCount: produtoCount.size,
     byProduct,

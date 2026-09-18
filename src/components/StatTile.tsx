@@ -7,6 +7,7 @@ export function StatTile({
   valueColor,
   badge,
   onClick,
+  note,
 }: {
   label: string;
   value: string | number;
@@ -25,6 +26,12 @@ export function StatTile({
   // Opcional: sem isso o card continua só leitura, mesmo comportamento de
   // sempre.
   onClick?: () => void;
+  // Linha de contexto discreta abaixo do valor -- texto puro, sem fundo
+  // (diferente de `badge`, que é um selo colorido pra status/alerta).
+  // Pedido do Victor 18/09/2026: "quantidade de vendas do período" junto
+  // do card de Total de chamados (ver getVendasCountPorLoja,
+  // vendasProduto.ts) -- contexto de referência, não um alerta.
+  note?: string;
 }) {
   // "lg" é pensado pra números curtos ("130") -- valor longo (ex.: "R$
   // 105.768,50") estourava a largura do card, cortado pela borda (achado
@@ -80,6 +87,11 @@ export function StatTile({
           style={{ background: badge.color, color: "#fff" }}
         >
           {badge.label}
+        </span>
+      ) : null}
+      {note ? (
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {note}
         </span>
       ) : null}
     </div>

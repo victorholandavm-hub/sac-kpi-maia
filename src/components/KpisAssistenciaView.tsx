@@ -49,7 +49,12 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
   return (
     <div className="flex flex-col gap-6">
       <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <StatTile label="Total de chamados de assistência" value={data.totalChamados} size="lg" />
+        <StatTile
+          label="Total de chamados de assistência"
+          value={data.totalChamados}
+          size="lg"
+          note={`de ${data.totalVendasNoPeriodo.toLocaleString("pt-BR")} venda${data.totalVendasNoPeriodo === 1 ? "" : "s"} no período`}
+        />
         {/* Prejuízo Total Estimado em Estoque -- pedido do Victor
             10/09/2026: soma (1) prejuízo de PRODUTO (unidades trocadas/
             enviadas × custo de reposição do Protheus, totvs_stock.unit_cost)
