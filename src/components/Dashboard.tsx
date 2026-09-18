@@ -135,7 +135,9 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
           label="Total de chamados"
           value={data.totalTickets}
           size="lg"
-          note={`de ${data.totalVendasNoPeriodo.toLocaleString("pt-BR")} venda${data.totalVendasNoPeriodo === 1 ? "" : "s"} no período`}
+          note={`de ${data.totalVendasNoPeriodo.toLocaleString("pt-BR")} venda${data.totalVendasNoPeriodo === 1 ? "" : "s"} no período${
+            data.totalVendasNoPeriodo > 0 ? ` (${((data.totalTickets / data.totalVendasNoPeriodo) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)` : ""
+          }`}
         />
         <StatTile
           label="Resposta no 1º contato"
