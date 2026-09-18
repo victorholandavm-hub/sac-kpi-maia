@@ -1,9 +1,10 @@
-import { getAssistenciaKpiData } from "@/lib/kpiAssistencia";
+import { getAssistenciaKpiData, getAssistenciaMonthlyEvolution } from "@/lib/kpiAssistencia";
 import { resolveRange } from "@/lib/dateRange";
 import { AppHeader } from "@/components/AppHeader";
 import { KpisSectionTabs } from "@/components/KpisSectionTabs";
 import { RangePicker } from "@/components/RangePicker";
 import { KpisAssistenciaView } from "@/components/KpisAssistenciaView";
+import { AssistenciaMonthlyEvolutionTable } from "@/components/AssistenciaMonthlyEvolutionTable";
 
 export const revalidate = 60;
 
@@ -24,7 +25,7 @@ export default async function KpisAssistenciaPage({
 }) {
   const params = await searchParams;
   const range = resolveRange(params, "month");
-  const data = await getAssistenciaKpiData(range);
+  const [data, monthlyEvolution] = await Promise.all([getAssistenciaKpiData(range), getAssistenciaMonthlyEvolution()]);
 
   return (
     <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
@@ -43,6 +44,8 @@ export default async function KpisAssistenciaPage({
       <RangePicker range={range} basePath="/kpis-assistencia" />
 
       <KpisAssistenciaView data={data} />
+
+      <AssistenciaMonthlyEvolutionTable rows={monthlyEvolution} />
     </div>
   );
 }

@@ -837,3 +837,74 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     ticketsByTag,
   };
 }
+
+export type AssistenciaMonthlyEvolutionRow = {
+  monthKey: string;
+  monthLabel: string;
+  totalChamados: number;
+  totalVendas: number;
+  pct: number | null;
+};
+
+const MONTH_LABELS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+// Evolução mensal do KPI "Total de chamados de assistência" -- pedido do
+// Victor 18/09/2026: tabela com Mês/Ano, Total de Chamados, Total de
+// Vendas e % (mesma fórmula/escopo do card principal desta tela, ver
+// DELIVERY_REQUEST_TYPES/getVendasCountPorLoja acima -- não conta
+// montagem/desmontagem/vistoria/troca de peça, mesmo aviso já no
+// subtítulo da página). Independente do período escolhido no RangePicker
+// (esse filtra UM período; aqui é sempre os últimos `monthsBack` meses,
+// sempre a mesma janela, é uma tendência ao longo do tempo). Só contagem
+// (count:exact,head:true) em vez de buscar as linhas inteiras -- muito
+// mais barato pra um número por mês, sem precisar de fetchAllPagesParallel.
+export async function getAssistenciaMonthlyEvolution(monthsBack: number = 12): Promise<AssistenciaMonthlyEvolutionRow[]> {
+  const admin = getSupabaseAdmin();
+  const now = new Date();
+  // Corta meses anteriores ao início do sync de vendas do TOTVS -- senão um
+  // mês sem nenhuma venda sincronizada mostraria "0 vendas" (e % infinito/
+  // enganoso) só por falta de dado, não porque a loja não vendeu nada.
+  // Mesmo cuidado de "dadosIncompletos" em vendas/page.tsx.
+  const earliestSyncedDate = await getEarliestSyncedOrderDate();
+  const earliestSyncedMonthKey = earliestSyncedDate ? earliestSyncedDate.slice(0, 7) : null;
+
+  const months: { key: string; year: number; month: number }[] = [];
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (earliestSyncedMonthKey && key < earliestSyncedMonthKey) continue;
+    months.push({ key, year: d.getFullYear(), month: d.getMonth() });
+  }
+
+  return Promise.all(
+    months.map(async ({ key, year, month }) => {
+      const fromIso = new Date(Date.UTC(year, month, 1)).toISOString();
+      const toIsoExclusive = new Date(Date.UTC(year, month + 1, 1)).toISOString();
+      const fromDate = fromIso.slice(0, 10);
+      const toDateExclusive = toIsoExclusive.slice(0, 10);
+
+      const [chamadosResult, vendasResult] = await Promise.all([
+        admin
+          .from("service_requests")
+          .select("id", { count: "exact", head: true })
+          .in("type", DELIVERY_REQUEST_TYPES)
+          .not("status", "eq", "cancelada")
+          .gte("created_at", fromIso)
+          .lt("created_at", toIsoExclusive),
+        admin.from("totvs_orders").select("id", { count: "exact", head: true }).eq("type", "Venda").gte("issue_date", fromDate).lt("issue_date", toDateExclusive),
+      ]);
+      if (chamadosResult.error) throw new Error(chamadosResult.error.message);
+      if (vendasResult.error) throw new Error(vendasResult.error.message);
+
+      const totalChamados = chamadosResult.count ?? 0;
+      const totalVendas = vendasResult.count ?? 0;
+      return {
+        monthKey: key,
+        monthLabel: `${MONTH_LABELS_PT[month]}/${year}`,
+        totalChamados,
+        totalVendas,
+        pct: totalVendas > 0 ? Math.round((totalChamados / totalVendas) * 1000) / 10 : null,
+      };
+    })
+  );
+}
