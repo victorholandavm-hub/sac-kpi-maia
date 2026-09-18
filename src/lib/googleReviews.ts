@@ -23,10 +23,56 @@ export type StoreGoogleReviews = {
   // ratingDelta) ou quando first === latest (mesma leitura, sem intervalo).
   evolutionRatingDelta: number | null;
   evolutionReviewCountDelta: number | null;
+  // Evolução com janela fixa (7/30 dias antes da última leitura) -- pedido
+  // do Victor 18/09/2026: "preciso comparar a evolução semanal e mensal"
+  // (filtro na tela, ver GoogleReviewsSection.tsx). Diferente de
+  // evolutionRatingDelta acima (que sempre compara com a 1ª leitura já
+  // registrada, desde o início do histórico) -- aqui compara com a leitura
+  // mais recente que já existia há pelo menos 7/30 dias. null quando o
+  // histórico ainda não tem 7/30 dias de profundidade.
+  evolutionWeek: EvolutionWindow | null;
+  evolutionMonth: EvolutionWindow | null;
+};
+
+export type EvolutionWindow = {
+  baseline: GoogleReviewPoint;
+  ratingDelta: number;
+  reviewCountDelta: number;
 };
 
 type StoreRow = { id: string; name: string; google_maps_url: string | null };
 type ReviewRow = { store_id: string; captured_at: string; rating: number; review_count: number };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Acha a leitura mais recente que já existia há pelo menos `daysBack` dias
+// da última leitura -- não necessariamente EXATAMENTE 7/30 dias atrás
+// (leitura é semanal, manual, datas não caem certinho toda semana). history
+// já vem ordenado ascendente (ver query abaixo).
+function findBaseline(history: GoogleReviewPoint[], latest: GoogleReviewPoint, daysBack: number): GoogleReviewPoint | null {
+  const cutoff = new Date(latest.capturedAt).getTime() - daysBack * DAY_MS;
+  let candidate: GoogleReviewPoint | null = null;
+  for (const point of history) {
+    if (point.capturedAt === latest.capturedAt) break;
+    if (new Date(point.capturedAt).getTime() <= cutoff) {
+      candidate = point;
+    } else {
+      break;
+    }
+  }
+  return candidate;
+}
+
+function evolutionWindow(history: GoogleReviewPoint[], latest: GoogleReviewPoint | null, daysBack: number): EvolutionWindow | null {
+  if (!latest) return null;
+  const baseline = findBaseline(history, latest, daysBack);
+  if (!baseline) return null;
+  return {
+    baseline,
+    ratingDelta: Math.round((latest.rating - baseline.rating) * 10) / 10,
+    reviewCountDelta: latest.reviewCount - baseline.reviewCount,
+  };
+}
 
 // Maia 2 Mangabeira e Maia CD saem da lista (pedido do Victor 19/08/2026) --
 // Maia 2 Mangabeira não existe mais como listagem própria (virou Maia 3,
@@ -72,6 +118,8 @@ export async function listStoreGoogleReviews(): Promise<StoreGoogleReviews[]> {
         first,
         evolutionRatingDelta: latest && first && first !== latest ? Math.round((latest.rating - first.rating) * 10) / 10 : null,
         evolutionReviewCountDelta: latest && first && first !== latest ? latest.reviewCount - first.reviewCount : null,
+        evolutionWeek: evolutionWindow(history, latest, 7),
+        evolutionMonth: evolutionWindow(history, latest, 30),
       };
     });
 }
