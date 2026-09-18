@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { getProfile, requireRole } from "@/lib/dal";
+import { getProfile, requireRole, type Profile } from "@/lib/dal";
 import { hashPin } from "@/lib/montadorAuth";
 import { resetPinAttempts } from "@/lib/pinLockout";
 import { PIN_LENGTH, isValidPinFormat } from "@/lib/pinConfig";
@@ -25,6 +25,15 @@ import {
   type Rota,
 } from "@/lib/rotas";
 import { INTERNAL_FABRICAS } from "@/lib/fabricas";
+import { JUNIOR_TRUCK_LOG_MANAGER_NAME } from "@/lib/assistenciaLabels";
+import {
+  listJuniorTruckEntries as listJuniorTruckEntriesLib,
+  createJuniorTruckEntry as createJuniorTruckEntryLib,
+  updateJuniorTruckEntry as updateJuniorTruckEntryLib,
+  deleteJuniorTruckEntry as deleteJuniorTruckEntryLib,
+  type JuniorTruckEntry,
+  type JuniorTruckInput,
+} from "@/lib/juniorTruck";
 
 export type FormState = { error?: string; success?: boolean } | undefined;
 
@@ -400,4 +409,53 @@ export async function removeRotaHoliday(date: string): Promise<void> {
   revalidatePath("/assistencia/admin");
   revalidatePath("/assistencia/fila");
   revalidatePath("/assistencia/sac/notificacoes");
+}
+
+// Controle dos horários do caminhão do Junior -- pedido do Victor
+// 18/09/2026: "preciso que apareça apenas para mim". `requireRole` sozinho
+// não bastaria (outros admins também passariam) -- checagem extra pelo
+// nome exato do profile, mesmo padrão de PAYMENTS_CONTROLLER_NAME (ver
+// assistenciaLabels.ts). Defesa em profundidade: o botão já nem aparece
+// pra quem não é o Victor (ver fila/page.tsx), mas o server action confere
+// de novo por baixo dos panos, não confia só na UI escondida.
+function requireJuniorTruckManager(profile: Profile): void {
+  requireRole(profile, "admin");
+  if (profile.fullName !== JUNIOR_TRUCK_LOG_MANAGER_NAME) {
+    throw new Error("Ação não permitida.");
+  }
+}
+
+export async function listJuniorTruckEntries(): Promise<JuniorTruckEntry[]> {
+  const profile = await getProfile();
+  requireJuniorTruckManager(profile);
+  return listJuniorTruckEntriesLib();
+}
+
+function validateJuniorTruckInput(input: JuniorTruckInput): void {
+  if (!input.logDate) throw new Error("Informe a data.");
+}
+
+export async function createJuniorTruckEntry(input: JuniorTruckInput): Promise<JuniorTruckEntry> {
+  const profile = await getProfile();
+  requireJuniorTruckManager(profile);
+  validateJuniorTruckInput(input);
+  const entry = await createJuniorTruckEntryLib(input, profile.fullName);
+  revalidatePath("/assistencia/fila");
+  return entry;
+}
+
+export async function updateJuniorTruckEntry(id: string, input: JuniorTruckInput): Promise<JuniorTruckEntry> {
+  const profile = await getProfile();
+  requireJuniorTruckManager(profile);
+  validateJuniorTruckInput(input);
+  const entry = await updateJuniorTruckEntryLib(id, input);
+  revalidatePath("/assistencia/fila");
+  return entry;
+}
+
+export async function deleteJuniorTruckEntry(id: string): Promise<void> {
+  const profile = await getProfile();
+  requireJuniorTruckManager(profile);
+  await deleteJuniorTruckEntryLib(id);
+  revalidatePath("/assistencia/fila");
 }

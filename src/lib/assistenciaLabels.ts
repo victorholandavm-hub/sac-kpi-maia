@@ -361,6 +361,14 @@ export const DISPATCH_SUPERVISOR_DRIVERS = ["Everton", "Samuel"];
 // consegue, por pedido explícito do Victor (dono do sistema).
 export const PAYMENTS_CONTROLLER_NAME = "Antonio";
 
+// Controle dos horários do caminhão do Junior (carregamento/saída/chegada/
+// descarregamento, ver JuniorTruckModalButton.tsx) -- pedido do Victor
+// 18/09/2026: "preciso que apareça apenas para mim". Mesmo padrão de
+// PAYMENTS_CONTROLLER_NAME acima (nome exato do profile, checado nos
+// server actions também -- defesa em profundidade, não confia só no botão
+// escondido na UI).
+export const JUNIOR_TRUCK_LOG_MANAGER_NAME = "Victor";
+
 // Lojas com montador próprio (Mamanguape/214, Campina Grande/216 -- ver
 // listOwnStoreAssemblers em payments.ts). Montagem/desmontagem/vistoria
 // dessas lojas é responsabilidade exclusiva delas: só a própria loja e os
