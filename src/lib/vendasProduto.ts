@@ -493,6 +493,27 @@ export async function getVendasCountPorLoja(range: DateRange): Promise<Map<strin
   return counts;
 }
 
+// Mesma contagem acima, mas só o TOTAL (sem quebra por loja) -- achado
+// 18/09/2026 (perf, causa raiz do "Minified React error #441"/"canceling
+// statement due to statement timeout" visto em /avaliacoes e outras telas):
+// getKpiData (kpi.ts) só precisava do total pra "N vendas no período", mas
+// chamava getVendasCountPorLoja acima, que baixa TODA linha crua de
+// totvs_orders no período só pra somar em JS -- com o preset padrão "all"
+// (avaliações, sem filtro escolhido) isso varre a tabela inteira desde
+// 2021 (178 mil+ linhas), estourando o statement_timeout do Postgres.
+// count:exact,head:true faz o Postgres contar sem devolver nenhuma linha.
+export async function getVendasCountTotal(range: DateRange): Promise<number> {
+  const admin = getSupabaseAdmin();
+  const { count, error } = await admin
+    .from("totvs_orders")
+    .select("id", { count: "exact", head: true })
+    .eq("type", "Venda")
+    .gte("issue_date", range.from)
+    .lte("issue_date", range.to);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 // Custo de reposição (totvs_stock.unit_cost, sincronizado do
 // WSStock.unitCost via syncStock em totvsSync.ts) por código -- foto do
 // catálogo ATUAL, sem período (custo de reposição não é histórico aqui,
