@@ -1,22 +1,36 @@
-import type { AssistenciaMonthlyEvolutionRow } from "@/lib/kpiAssistencia";
+export type MonthlyEvolutionRow = {
+  monthKey: string;
+  monthLabel: string;
+  totalChamados: number;
+  totalVendas: number;
+  pct: number | null;
+};
 
-// Tabela de evolução mensal do KPI "Total de chamados de assistência" --
-// pedido do Victor 18/09/2026. Sempre os últimos N meses (ver
-// getAssistenciaMonthlyEvolution), independente do período escolhido no
-// RangePicker da tela -- é uma tendência ao longo do tempo, não um recorte
-// único. Mais recente por último (cronológico) -- lê como um gráfico de
-// evolução, não como um ranking.
-export function AssistenciaMonthlyEvolutionTable({ rows }: { rows: AssistenciaMonthlyEvolutionRow[] }) {
+// Tabela de evolução mensal (chamados x vendas x %) -- pedido do Victor
+// 18/09/2026, primeiro pra assistência e depois pro SAC ("faltou o da aba
+// do sac"). Componente compartilhado pelas duas telas -- só troca o título/
+// subtítulo e a fonte dos dados (getAssistenciaMonthlyEvolution em
+// kpiAssistencia.ts / getKpiMonthlyEvolution em kpi.ts), o formato da linha
+// é idêntico nos dois casos.
+export function MonthlyEvolutionTable({
+  rows,
+  title = "Evolução mensal",
+  subtitle = "Total de chamados, total de vendas e o percentual entre os dois, mês a mês.",
+}: {
+  rows: MonthlyEvolutionRow[];
+  title?: string;
+  subtitle?: string;
+}) {
   if (rows.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-2">
       <div>
         <h2 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
-          Evolução mensal
+          {title}
         </h2>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Total de chamados de assistência, total de vendas e o percentual entre os dois, mês a mês.
+          {subtitle}
         </p>
       </div>
       <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-x-auto">

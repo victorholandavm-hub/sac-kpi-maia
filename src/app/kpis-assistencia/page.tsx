@@ -4,7 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { KpisSectionTabs } from "@/components/KpisSectionTabs";
 import { RangePicker } from "@/components/RangePicker";
 import { KpisAssistenciaView } from "@/components/KpisAssistenciaView";
-import { AssistenciaMonthlyEvolutionTable } from "@/components/AssistenciaMonthlyEvolutionTable";
+import { MonthlyEvolutionTable } from "@/components/MonthlyEvolutionTable";
 
 export const revalidate = 60;
 
@@ -45,7 +45,10 @@ export default async function KpisAssistenciaPage({
 
       <KpisAssistenciaView data={data} />
 
-      <AssistenciaMonthlyEvolutionTable rows={monthlyEvolution} />
+      <MonthlyEvolutionTable
+        rows={monthlyEvolution}
+        subtitle="Total de chamados de assistência, total de vendas e o percentual entre os dois, mês a mês."
+      />
     </div>
   );
 }
