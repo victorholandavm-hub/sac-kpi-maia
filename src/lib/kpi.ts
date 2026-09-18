@@ -1327,3 +1327,59 @@ const getKpiDataCached = unstable_cache(
   ["kpi-data"],
   { revalidate: 300 }
 );
+
+export type KpiMonthlyEvolutionRow = {
+  monthKey: string;
+  monthLabel: string;
+  totalChamados: number;
+  totalVendas: number;
+  pct: number | null;
+};
+
+const MONTH_LABELS_PT_SAC = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+// Evolução mensal do KPI "Total de chamados" (SAC) -- mesmo padrão já usado
+// pra assistência (ver getAssistenciaMonthlyEvolution em kpiAssistencia.ts),
+// pedido do Victor 18/09/2026 ("faltou o da aba do sac"). Conta TODO chamado
+// de v_ticket_enriched (mesmo escopo de totalTickets acima, sem filtro de
+// tipo), não só os que já têm loja/categoria marcada.
+export async function getKpiMonthlyEvolution(monthsBack: number = 12): Promise<KpiMonthlyEvolutionRow[]> {
+  const supabase = getSupabaseAdmin();
+  const now = new Date();
+  const earliestSyncedDate = await getEarliestSyncedOrderDate();
+  const earliestSyncedMonthKey = earliestSyncedDate ? earliestSyncedDate.slice(0, 7) : null;
+
+  const months: { key: string; year: number; month: number }[] = [];
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (earliestSyncedMonthKey && key < earliestSyncedMonthKey) continue;
+    months.push({ key, year: d.getFullYear(), month: d.getMonth() });
+  }
+
+  return Promise.all(
+    months.map(async ({ key, year, month }) => {
+      const fromIso = new Date(Date.UTC(year, month, 1)).toISOString();
+      const toIsoExclusive = new Date(Date.UTC(year, month + 1, 1)).toISOString();
+      const fromDate = fromIso.slice(0, 10);
+      const toDateExclusive = toIsoExclusive.slice(0, 10);
+
+      const [chamadosResult, vendasResult] = await Promise.all([
+        supabase.from("v_ticket_enriched").select("conversation_id", { count: "exact", head: true }).gte("opened_at", fromIso).lt("opened_at", toIsoExclusive),
+        supabase.from("totvs_orders").select("id", { count: "exact", head: true }).eq("type", "Venda").gte("issue_date", fromDate).lt("issue_date", toDateExclusive),
+      ]);
+      if (chamadosResult.error) throw new Error(chamadosResult.error.message);
+      if (vendasResult.error) throw new Error(vendasResult.error.message);
+
+      const totalChamados = chamadosResult.count ?? 0;
+      const totalVendas = vendasResult.count ?? 0;
+      return {
+        monthKey: key,
+        monthLabel: `${MONTH_LABELS_PT_SAC[month]}/${year}`,
+        totalChamados,
+        totalVendas,
+        pct: totalVendas > 0 ? Math.round((totalChamados / totalVendas) * 1000) / 10 : null,
+      };
+    })
+  );
+}

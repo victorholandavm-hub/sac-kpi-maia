@@ -1,4 +1,4 @@
-import { getKpiData } from "@/lib/kpi";
+import { getKpiData, getKpiMonthlyEvolution } from "@/lib/kpi";
 import { resolveRange } from "@/lib/dateRange";
 import { Dashboard } from "@/components/Dashboard";
 import { AppHeader } from "@/components/AppHeader";
@@ -15,14 +15,14 @@ export default async function KpisPage({
   // Default "este mês" pedido do Victor 20/08/2026 -- só aqui (o painel de
   // avaliações, que reaproveita o mesmo resolveRange, continua com "all").
   const range = resolveRange(params, "month");
-  const data = await getKpiData(range);
+  const [data, monthlyEvolution] = await Promise.all([getKpiData(range), getKpiMonthlyEvolution()]);
   return (
     <>
       <div className="max-w-6xl mx-auto px-6 pt-6 flex flex-col gap-4">
         <AppHeader />
         <KpisSectionTabs active="sac" />
       </div>
-      <Dashboard data={data} range={range} />
+      <Dashboard data={data} range={range} monthlyEvolution={monthlyEvolution} />
     </>
   );
 }

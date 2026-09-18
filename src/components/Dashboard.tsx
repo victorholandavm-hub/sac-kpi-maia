@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { KpiData, Count, StoreBreakdownTicket } from "@/lib/kpi";
+import type { KpiData, Count, StoreBreakdownTicket, KpiMonthlyEvolutionRow } from "@/lib/kpi";
 import type { DateRange } from "@/lib/dateRange";
 import { StatTile } from "./StatTile";
 import { BarRanking } from "./BarRanking";
@@ -19,6 +19,7 @@ import { NpsCard, NPS_INDEX_TARGET, indexColor, NPS_SCORE_LABELS } from "./NpsCa
 import { CategoryTicketsModal } from "./CategoryTicketsModal";
 import { CategoryBreakdownModal } from "./CategoryBreakdownModal";
 import { InsightGrid } from "./InsightCard";
+import { MonthlyEvolutionTable } from "./MonthlyEvolutionTable";
 import { buildHeadlineInsights, buildPerformanceInsights, buildGargalosInsights } from "@/lib/kpiInsights";
 import { categoryLabel, storeLabel, productLabel } from "@/lib/labels";
 
@@ -37,7 +38,7 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
-export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) {
+export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; range: DateRange; monthlyEvolution: KpiMonthlyEvolutionRow[] }) {
   // `tag` preserva o valor cru ("cat-duvida") por trás do label traduzido --
   // usado pra abrir o drill-down (data.categoryTickets é indexado pela tag).
   const byCategory = data.byCategory.map((c) => ({ ...c, tag: c.label, label: categoryLabel(c.label) }));
@@ -218,6 +219,8 @@ export function Dashboard({ data, range }: { data: KpiData; range: DateRange }) 
             <BarRanking title="Chamados por produto" data={byProduct} coverage={data.productCoverage} onSelect={openProductDrilldown} />
             <BarRanking title="Chamados por loja" data={byStore} coverage={data.storeCoverage} onSelect={openStoreCategoryDrilldown} />
           </section>
+
+          <MonthlyEvolutionTable rows={monthlyEvolution} />
         </div>
       ) : null}
 
