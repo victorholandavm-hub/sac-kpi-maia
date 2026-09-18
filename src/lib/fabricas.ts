@@ -21,6 +21,7 @@ export const EXTERNAL_FABRICAS: string[] = [
   "Tekshine",
   "Tuboarte",
   "Valdemoveis",
+  "MGM",
 ];
 
 export function findInternalFabrica(id: string | null | undefined): InternalFabrica | undefined {

@@ -14,7 +14,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { DriverRouteGroup } from "@/components/assistencia/DriverRouteGroup";
 import { NotifyRouteWhatsAppButton } from "@/components/assistencia/NotifyRouteWhatsAppButton";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
-import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, groupByDateBucket } from "@/lib/dateBuckets";
+import { DATE_BUCKET_ORDER, DATE_BUCKET_LABELS, bucketByScheduledDate } from "@/lib/dateBuckets";
 import { ROTAS, ROTA_LABELS, getRotaWeekOverview, JP_DEFAULT_DRIVER, type Rota } from "@/lib/rotas";
 import { DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
 
@@ -30,15 +30,21 @@ const ROTA_GROUP_LABELS: Record<RotaGroupKey, string> = { ...ROTA_LABELS, [NO_RO
 
 type RotaDateGroup = { key: string; label: string; open: boolean; items: DriverRequestView[] };
 
+// Balde de DATA primeiro, rota depois -- correção 18/09/2026 (pedido do
+// Victor: "as não concluídas ou atrasadas... fiquem abaixo das notificações
+// de assistência do dia"). Antes disso o loop era rota-por-fora/balde-por-
+// dentro: "atrasado" já ia pro fim DENTRO da mesma rota (pedido de
+// 08/09/2026, ver DATE_BUCKET_ORDER), mas com mais de uma rota ativa o
+// atrasado de uma rota ainda aparecia ANTES do "hoje" de outra rota,
+// porque cada rota inteira (todos os seus baldes, atrasado incluso) era
+// despejada de uma vez antes de passar pra próxima. Invertendo a ordem dos
+// loops, TODO atrasado de TODA rota vai pro final da página de verdade.
 function groupByRotaAndBucket(items: DriverRequestView[]): RotaDateGroup[] {
   const groups: RotaDateGroup[] = [];
-  for (const rotaKey of ROTA_GROUP_ORDER) {
-    const rotaItems = items.filter((item) => (item.rota ?? NO_ROTA) === rotaKey);
-    if (rotaItems.length === 0) continue;
-    const buckets = groupByDateBucket(rotaItems, (r) => r.scheduledDate);
-    for (const bucketKey of DATE_BUCKET_ORDER) {
-      const bucketItems = buckets.get(bucketKey);
-      if (!bucketItems || bucketItems.length === 0) continue;
+  for (const bucketKey of DATE_BUCKET_ORDER) {
+    for (const rotaKey of ROTA_GROUP_ORDER) {
+      const bucketItems = items.filter((item) => (item.rota ?? NO_ROTA) === rotaKey && bucketByScheduledDate(item.scheduledDate) === bucketKey);
+      if (bucketItems.length === 0) continue;
       groups.push({
         key: `${rotaKey}_${bucketKey}`,
         label: `Rota: ${ROTA_GROUP_LABELS[rotaKey]} · ${DATE_BUCKET_LABELS[bucketKey]}`,
