@@ -177,7 +177,7 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
   const { data: request, error } = await admin
     .from("service_requests")
     .select(
-      "status, store_id, ticket_number, type, client_name, assembler_name, requested_by_name, requester:profiles!requested_by(full_name)"
+      "status, store_id, ticket_number, type, client_name, assembler_name, requested_by_name, requester:profiles!requested_by(full_name), stores(name)"
     )
     .eq("id", requestId)
     .maybeSingle();
@@ -224,6 +224,7 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
       type: request.type,
       newStatus: "concluida",
       clientName: request.client_name,
+      storeName: request.stores?.[0]?.name,
       requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
       assemblerName: request.assembler_name,
     });
@@ -282,6 +283,7 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
     type: request.type,
     newStatus: "remarcar",
     clientName: request.client_name,
+    storeName: request.stores?.[0]?.name,
     requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
     assemblerName: request.assembler_name,
   });

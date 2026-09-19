@@ -777,7 +777,7 @@ export async function cancelServiceRequestByGerente(requestId: string, note: str
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
     .select(
-      "status, store_id, type, ticket_number, client_name, requested_by_name, assembler_name, driver_name, requester:profiles!requested_by(full_name)"
+      "status, store_id, type, ticket_number, client_name, requested_by_name, assembler_name, driver_name, requester:profiles!requested_by(full_name), stores(name)"
     )
     .eq("id", requestId)
     .single();
@@ -820,6 +820,7 @@ export async function cancelServiceRequestByGerente(requestId: string, note: str
     type: current.type,
     newStatus: "cancelada",
     clientName: current.client_name,
+    storeName: current.stores?.[0]?.name,
     requestedByName: current.requester?.[0]?.full_name ?? current.requested_by_name,
     assemblerName: current.assembler_name,
     driverName: current.driver_name,
@@ -975,7 +976,7 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
     .select(
-      "status, type, assembler_name, driver_name, store_id, deadline_status, ticket_number, client_name, requested_by_name, requester:profiles!requested_by(full_name)"
+      "status, type, assembler_name, driver_name, store_id, deadline_status, ticket_number, client_name, requested_by_name, requester:profiles!requested_by(full_name), stores(name)"
     )
     .eq("id", requestId)
     .single();
@@ -1041,6 +1042,7 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
     type: current.type,
     newStatus,
     clientName: current.client_name,
+    storeName: current.stores?.[0]?.name,
     requestedByName: current.requester?.[0]?.full_name ?? current.requested_by_name,
     assemblerName: current.assembler_name,
     driverName: current.driver_name,
@@ -2477,10 +2479,12 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     to_status: "aberta",
   });
 
+  const { data: storeForNotify } = await admin.from("stores").select("name").eq("id", storeId).single();
   await notifyTelegramNewRequest({
     ticketNumber: data.ticket_number,
     type,
     clientName,
+    storeName: storeForNotify?.name,
     requestedByName: profile.fullName,
     assemblerName,
     driverName: driverNameForError ?? driverNameForRota,
