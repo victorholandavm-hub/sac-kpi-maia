@@ -1,4 +1,4 @@
-import { REQUEST_TYPE_LABELS, STATUS_LABELS, DELIVERY_REQUEST_TYPES } from "./assistenciaLabels";
+import { REQUEST_TYPE_LABELS, STATUS_LABELS, DELIVERY_REQUEST_TYPES, MANOEL_ONLY_ASSEMBLER } from "./assistenciaLabels";
 
 // Bot do Telegram -- pedido do Victor 04/09/2026: "criar um bot para me
 // avisar quando houver uma nova solicitação de montagem/desmontagem, nova
@@ -16,9 +16,17 @@ import { REQUEST_TYPE_LABELS, STATUS_LABELS, DELIVERY_REQUEST_TYPES } from "./as
 // libera ele mandar de volta pra ela) e o chat_id dela entra na lista.
 // Disparo em paralelo (Promise.all) -- uma pessoa com bloqueio/erro no
 // Telegram não atrasa nem derruba o envio pras outras.
-async function sendTelegramMessage(text: string): Promise<void> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatIds = (process.env.TELEGRAM_CHAT_IDS ?? "")
+// Segundo bot, só montagem/desmontagem (pedido do Victor 19/09/2026: "tenho
+// o robo que me tras informações sobre entregas, visitas e etc, agora eu
+// preciso de um robô apenas com montagem/demonstagem, apenas da aba de
+// visitas, sem agenda de manoel") -- token/chat ids PRÓPRIOS (bot separado
+// no Telegram, não reaproveita TELEGRAM_BOT_TOKEN), mesmo padrão de "sem as
+// duas env vars, não faz nada" do bot principal. Ver notifyTelegramNewRequest/
+// notifyTelegramStatusChange abaixo, que disparam nos dois bots quando o
+// chamado é montagem/desmontagem e o montador não é o Manoel (MANOEL_ONLY_ASSEMBLER).
+async function sendTelegramMessage(text: string, tokenEnvVar = "TELEGRAM_BOT_TOKEN", chatIdsEnvVar = "TELEGRAM_CHAT_IDS"): Promise<void> {
+  const token = process.env[tokenEnvVar];
+  const chatIds = (process.env[chatIdsEnvVar] ?? "")
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
@@ -83,6 +91,13 @@ function requestNotifyLines(params: RequestNotifyParams): string[] {
 // notificação de assistencia" no pedido original, esclarecido com o
 // Victor via pergunta. notificação_externa fica de fora (não é nem um nem
 // outro grupo).
+// Só monta/desmonta, sem Manoel -- ver comentário do bot separado acima.
+// assemblerName pode não estar definido ainda (ex.: recém-criada, sem
+// montador atribuído) -- não é o Manoel nesse caso, então passa.
+function isMontagemVisitaSemManoel(type: string, assemblerName?: string | null): boolean {
+  return (type === "montagem" || type === "desmontagem") && assemblerName !== MANOEL_ONLY_ASSEMBLER;
+}
+
 export function notifyTelegramNewRequest(params: RequestNotifyParams): Promise<void> {
   const isMontagemDesmontagem = params.type === "montagem" || params.type === "desmontagem";
   const isDelivery = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(params.type);
@@ -91,7 +106,13 @@ export function notifyTelegramNewRequest(params: RequestNotifyParams): Promise<v
   const emoji = isMontagemDesmontagem ? "🪑" : "🚚";
   const label = REQUEST_TYPE_LABELS[params.type] ?? params.type;
   const lines = [`${emoji} Nova solicitação: ${label}`, `#${params.ticketNumber}`, ...requestNotifyLines(params)];
-  return sendTelegramMessage(lines.join("\n"));
+  const text = lines.join("\n");
+
+  const sends = [sendTelegramMessage(text)];
+  if (isMontagemVisitaSemManoel(params.type, params.assemblerName)) {
+    sends.push(sendTelegramMessage(text, "TELEGRAM_BOT_TOKEN_MONTAGEM", "TELEGRAM_CHAT_IDS_MONTAGEM"));
+  }
+  return Promise.all(sends).then(() => undefined);
 }
 
 export function notifyTelegramNewEncomenda(params: {
@@ -123,5 +144,11 @@ export function notifyTelegramStatusChange(params: RequestNotifyParams & { newSt
   const statusLabel = STATUS_LABELS[params.newStatus] ?? params.newStatus;
   const emoji = params.newStatus === "concluida" ? "✅" : params.newStatus === "cancelada" ? "❌" : params.newStatus === "remarcar" ? "🔁" : "⏳";
   const lines = [`${emoji} #${params.ticketNumber} (${label}) → ${statusLabel}`, ...requestNotifyLines(params)];
-  return sendTelegramMessage(lines.join("\n"));
+  const text = lines.join("\n");
+
+  const sends = [sendTelegramMessage(text)];
+  if (isMontagemVisitaSemManoel(params.type, params.assemblerName)) {
+    sends.push(sendTelegramMessage(text, "TELEGRAM_BOT_TOKEN_MONTAGEM", "TELEGRAM_CHAT_IDS_MONTAGEM"));
+  }
+  return Promise.all(sends).then(() => undefined);
 }
