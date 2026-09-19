@@ -149,6 +149,14 @@ function aggregate(
     .sort((a, b) => b.count - a.count);
 }
 
+// Meta ideal do "% de assistência" (chamados de assistência / vendas do
+// período * 100) -- pedido do Victor 19/09/2026, print de referência:
+// Atual 5,5%, Meta de Curto Prazo (3 meses) 4,2%, Meta de Médio Prazo
+// (Ideal) < 3,0%. Só a meta ideal (mais rígida) entra como constante -- é
+// ela que decide o badge vermelho em KpisAssistenciaView.tsx quando o
+// percentual atual fica acima.
+export const ASSISTENCIA_TAXA_META_IDEAL_PCT = 3.0;
+
 export type AssistenciaKpiData = {
   totalChamados: number;
   // Vendas (TOTVS) no mesmo período selecionado -- pedido do Victor

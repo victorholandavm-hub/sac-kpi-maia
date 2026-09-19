@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { KpiData, Count, StoreBreakdownTicket, KpiMonthlyEvolutionRow } from "@/lib/kpi";
+import { SAC_TAXA_META_IDEAL_PCT, type KpiData, type Count, type StoreBreakdownTicket, type KpiMonthlyEvolutionRow } from "@/lib/kpi";
 import type { DateRange } from "@/lib/dateRange";
 import { StatTile } from "./StatTile";
 import { BarRanking } from "./BarRanking";
@@ -106,6 +106,13 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
   const performanceInsights = buildPerformanceInsights(data);
   const gargalosInsights = buildGargalosInsights(data);
 
+  // "Taxa de SAC Global" -- pedido do Victor 19/09/2026: badge vermelho no
+  // card de Total de chamados quando a taxa (chamados / vendas do período)
+  // fica acima da meta ideal (SAC_TAXA_META_IDEAL_PCT, kpi.ts). null sem
+  // vendas no período pra dividir (mesmo guard do note logo abaixo).
+  const sacTaxaPct = data.totalVendasNoPeriodo > 0 ? (data.totalTickets / data.totalVendasNoPeriodo) * 100 : null;
+  const sacForaDoIdeal = sacTaxaPct !== null && sacTaxaPct > SAC_TAXA_META_IDEAL_PCT;
+
   return (
     <div className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
       <div className="flex flex-col gap-3">
@@ -137,8 +144,17 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
           value={data.totalTickets}
           size="lg"
           note={`de ${data.totalVendasNoPeriodo.toLocaleString("pt-BR")} venda${data.totalVendasNoPeriodo === 1 ? "" : "s"} no período${
-            data.totalVendasNoPeriodo > 0 ? ` (${((data.totalTickets / data.totalVendasNoPeriodo) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)` : ""
+            sacTaxaPct !== null ? ` (${sacTaxaPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)` : ""
           }`}
+          badge={
+            sacForaDoIdeal
+              ? {
+                  label: `Fora da meta ideal (< ${SAC_TAXA_META_IDEAL_PCT.toLocaleString("pt-BR")}%)`,
+                  color: "var(--status-critical)",
+                  title: `Taxa de SAC atual: ${sacTaxaPct!.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%. Meta de excelência (padrão de mercado): abaixo de ${SAC_TAXA_META_IDEAL_PCT.toLocaleString("pt-BR")}%.`,
+                }
+              : undefined
+          }
         />
         <StatTile
           label="Resposta no 1º contato"

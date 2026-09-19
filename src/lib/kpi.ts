@@ -217,6 +217,13 @@ export type StoreBreakdown = {
   topCategoryTickets: StoreBreakdownTicket[];
 };
 
+// Meta ideal da "Taxa de SAC Global" (chamados / vendas do período * 100) --
+// pedido do Victor 19/09/2026, print de referência: Status Atual 9,1%
+// (Crítico), Meta de Curto Prazo 6,0%, Meta de Excelência < 4,5%. Só a meta
+// de excelência (mais rígida) entra como constante -- é ela que decide o
+// badge vermelho em Dashboard.tsx quando a taxa atual fica acima.
+export const SAC_TAXA_META_IDEAL_PCT = 4.5;
+
 export type KpiData = {
   totalTickets: number;
   // Vendas (TOTVS) no mesmo período selecionado -- ver getVendasCountTotal,
