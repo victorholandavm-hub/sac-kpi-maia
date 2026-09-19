@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Count } from "@/lib/kpi";
-import type { AssistenciaKpiData } from "@/lib/kpiAssistencia";
+import { ASSISTENCIA_TAXA_META_IDEAL_PCT, type AssistenciaKpiData } from "@/lib/kpiAssistencia";
 import type { ReportRowItem } from "@/lib/serviceRequests";
 import { StatTile } from "./StatTile";
 import { BarRanking } from "./BarRanking";
@@ -46,6 +46,13 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
     value: c.count,
   }));
 
+  // "% de assistência" -- pedido do Victor 19/09/2026: badge vermelho no
+  // card de Total de chamados de assistência quando o percentual (chamados
+  // / vendas do período) fica acima da meta ideal (ASSISTENCIA_TAXA_META_IDEAL_PCT,
+  // kpiAssistencia.ts).
+  const assistenciaTaxaPct = data.totalVendasNoPeriodo > 0 ? (data.totalChamados / data.totalVendasNoPeriodo) * 100 : null;
+  const assistenciaForaDoIdeal = assistenciaTaxaPct !== null && assistenciaTaxaPct > ASSISTENCIA_TAXA_META_IDEAL_PCT;
+
   return (
     <div className="flex flex-col gap-6">
       <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -54,8 +61,17 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           value={data.totalChamados}
           size="lg"
           note={`de ${data.totalVendasNoPeriodo.toLocaleString("pt-BR")} venda${data.totalVendasNoPeriodo === 1 ? "" : "s"} no período${
-            data.totalVendasNoPeriodo > 0 ? ` (${((data.totalChamados / data.totalVendasNoPeriodo) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)` : ""
+            assistenciaTaxaPct !== null ? ` (${assistenciaTaxaPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)` : ""
           }`}
+          badge={
+            assistenciaForaDoIdeal
+              ? {
+                  label: `Fora da meta ideal (< ${ASSISTENCIA_TAXA_META_IDEAL_PCT.toLocaleString("pt-BR")}%)`,
+                  color: "var(--status-critical)",
+                  title: `Percentual atual: ${assistenciaTaxaPct!.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%. Meta de médio prazo (padrão de excelência industrial): abaixo de ${ASSISTENCIA_TAXA_META_IDEAL_PCT.toLocaleString("pt-BR")}%.`,
+                }
+              : undefined
+          }
         />
         {/* Prejuízo Total Estimado em Estoque -- pedido do Victor
             10/09/2026: soma (1) prejuízo de PRODUTO (unidades trocadas/
