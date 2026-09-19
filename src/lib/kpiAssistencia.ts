@@ -114,6 +114,9 @@ const CONFERENTE_ALIASES: Record<string, string> = {
   // diferente. Não mexe em "VINICIOS E FLÁVIO"/"VINICIOS/FLÁVIO" (combo
   // com outra pessoa, responsabilidade conjunta, não é o mesmo caso).
   VINICIUS: "VINICIOS",
+  // Achado 19/09/2026 (pedido do Victor: "ewerton e everton, são a mesma
+  // pessoa") -- grafia genuinamente diferente (V/W), não só caixa.
+  EWERTON: "EVERTON",
 };
 
 function canonicalConferenteKey(raw: string): string {
