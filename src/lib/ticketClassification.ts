@@ -18,11 +18,57 @@ export type TicketClassification = {
   confidence: "alta" | "media" | "baixa";
 };
 
+// Menção ao entregador/motorista/transportadora, reaproveitada pelos 4
+// sub-motivos abaixo (cada um exige ESSA menção E uma das palavras-chave
+// específicas dele, via lookahead -- as duas podem estar em qualquer ordem/
+// mensagem da conversa, não precisam estar juntas na mesma frase). Uma
+// regex POR palavra-chave (não uma só combinada) -- de propósito, pra
+// "hits" (pickCategory conta quantos padrões da regra batem) ficar do
+// mesmo tamanho da regra genérica equivalente (ex.: cat-atraso tem 4
+// padrões abaixo; cat-entregador-atraso precisa ter os mesmos 4, senão
+// perde a categoria genérica em contagem quando 2+ frases da MESMA regra
+// batem no mesmo texto).
+const ENTREGADOR_MENTION = "(?:entregador|motorista|transportadora)";
+function entregadorSubRules(keywordPatterns: string[]): RegExp[] {
+  return keywordPatterns.map((kw) => new RegExp(`(?=[\\s\\S]*${ENTREGADOR_MENTION})(?=[\\s\\S]*(?:${kw}))`, "i"));
+}
+
 // Ordem importa: em caso de empate na contagem de acertos, a primeira da
 // lista vence -- categorias mais específicas ficam antes das mais genéricas/
-// ambíguas (ex.: "cat-entregador" antes de "cat-atraso", já que uma
-// reclamação de entregador quase sempre também menciona atraso).
+// ambíguas. Os 4 sub-motivos de "problema com entregador" (pedido do Victor
+// 19/09/2026: "esse problema com entregador fica muito amplo") ficam antes
+// do catch-all "cat-entregador" -- ele passa a pegar só o que sobra (menção
+// ao entregador sem nenhuma das 4 palavras-chave mais específicas batendo).
+// Mesmas palavras-chave já usadas em cat-atraso/cat-avaria/cat-entregaerrada
+// mais abaixo (que continuam existindo, pra reclamações que NÃO mencionam
+// entregador) -- "cat-entregador-educacao" é a única categoria nova de
+// verdade (mau atendimento/grosseria não tinha cobertura nenhuma antes).
 const CATEGORY_RULES: { tag: string; patterns: RegExp[] }[] = [
+  {
+    tag: "cat-entregador-atraso",
+    patterns: entregadorSubRules(["atras", "n[aã]o chegou", "ainda n[aã]o (recebi|chegou)", "prazo (vencid|estourad)"]),
+  },
+  {
+    tag: "cat-entregador-avaria",
+    patterns: entregadorSubRules(["avari", "quebrad", "quebrou", "riscad", "manchad", "defeito", "danificad"]),
+  },
+  {
+    tag: "cat-entregador-enderecoerrado",
+    patterns: entregadorSubRules(["endere[cç]o errado", "entregou no (lugar|endere[cç]o) errado", "entrega errada"]),
+  },
+  {
+    tag: "cat-entregador-educacao",
+    patterns: entregadorSubRules([
+      "mal[ -]educad",
+      "deseducad",
+      "grosseir",
+      "falta de respeito",
+      "desrespeit",
+      "p[ée]ssimo atendimento",
+      "atendimento (ruim|p[ée]ssimo)",
+      "agressiv",
+    ]),
+  },
   { tag: "cat-entregador", patterns: [/entregador/i, /motorista/i, /transportadora/i] },
   { tag: "cat-erroloja", patterns: [/erro da loja/i, /a loja errou/i, /funcionári[ao] da loja/i] },
   { tag: "cat-errocd", patterns: [/centro de distribui[cç][aã]o/i, /saiu errado do cd\b/i, /\bcd\b errou/i] },

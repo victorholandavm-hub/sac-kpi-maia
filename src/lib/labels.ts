@@ -7,7 +7,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   "cat-errovendedor": "Erro do vendedor",
   "cat-duvida": "Dúvida",
   "cat-entregaerrada": "Entrega/endereço errado",
-  "cat-entregador": "Problema com entregador",
+  "cat-entregador": "Problema com entregador (outro)",
+  // Sub-motivos de "Problema com entregador" -- pedido do Victor
+  // 19/09/2026: "esse problema com entregador fica muito amplo". Só entram
+  // quando a conversa menciona entregador/motorista/transportadora JUNTO
+  // com uma palavra-chave mais específica (ver ticketClassification.ts) --
+  // "cat-entregador" acima vira só o resto (menção ao entregador sem
+  // motivo mais específico batido, ex.: reclamação vaga).
+  "cat-entregador-atraso": "Entregador -- atraso",
+  "cat-entregador-avaria": "Entregador -- avaria no produto",
+  "cat-entregador-enderecoerrado": "Entregador -- endereço errado",
+  "cat-entregador-educacao": "Entregador -- mau atendimento",
   "cat-errocd": "Erro do centro de distribuição",
   "cat-erroloja": "Erro da loja",
   "cat-erroconferencia": "Erro de conferência",
