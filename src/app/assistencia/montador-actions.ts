@@ -150,7 +150,7 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, deadline_status, type, ticket_number, client_name, requested_by_name, requester:profiles!requested_by(full_name)")
+    .select("assembler_name, status, store_id, deadline_status, type, ticket_number, client_name, requested_by_name, requester:profiles!requested_by(full_name), stores(name)")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -236,6 +236,7 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
     type: request.type,
     newStatus: nextStatus,
     clientName: request.client_name,
+    storeName: request.stores?.[0]?.name,
     requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
     assemblerName,
   });
@@ -259,7 +260,7 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, ticket_number, type, client_name, requested_by_name, requester:profiles!requested_by(full_name)")
+    .select("assembler_name, status, store_id, ticket_number, type, client_name, requested_by_name, requester:profiles!requested_by(full_name), stores(name)")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -297,6 +298,7 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
     type: request.type,
     newStatus: "remarcar",
     clientName: request.client_name,
+    storeName: request.stores?.[0]?.name,
     requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
     assemblerName,
   });
@@ -334,7 +336,7 @@ export async function montadorCompletePartially(requestId: string, completedItem
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, ticket_number, type, client_name, requested_by_name, requester:profiles!requested_by(full_name)")
+    .select("assembler_name, status, store_id, ticket_number, type, client_name, requested_by_name, requester:profiles!requested_by(full_name), stores(name)")
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -414,6 +416,7 @@ export async function montadorCompletePartially(requestId: string, completedItem
     type: request.type,
     newStatus: nextStatus,
     clientName: request.client_name,
+    storeName: request.stores?.[0]?.name,
     requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
     assemblerName,
   });
