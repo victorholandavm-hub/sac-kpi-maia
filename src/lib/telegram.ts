@@ -1,4 +1,4 @@
-import { REQUEST_TYPE_LABELS, STATUS_LABELS, DELIVERY_REQUEST_TYPES, MANOEL_ONLY_ASSEMBLER } from "./assistenciaLabels";
+import { REQUEST_TYPE_LABELS, STATUS_LABELS, DELIVERY_REQUEST_TYPES, VISITA_REQUEST_TYPES } from "./assistenciaLabels";
 
 // Bot do Telegram -- pedido do Victor 04/09/2026: "criar um bot para me
 // avisar quando houver uma nova solicitação de montagem/desmontagem, nova
@@ -16,14 +16,18 @@ import { REQUEST_TYPE_LABELS, STATUS_LABELS, DELIVERY_REQUEST_TYPES, MANOEL_ONLY
 // libera ele mandar de volta pra ela) e o chat_id dela entra na lista.
 // Disparo em paralelo (Promise.all) -- uma pessoa com bloqueio/erro no
 // Telegram não atrasa nem derruba o envio pras outras.
-// Segundo bot, só montagem/desmontagem (pedido do Victor 19/09/2026: "tenho
-// o robo que me tras informações sobre entregas, visitas e etc, agora eu
+// Segundo bot, só a aba "Visitas" (pedido do Victor 19/09/2026: "tenho o
+// robo que me tras informações sobre entregas, visitas e etc, agora eu
 // preciso de um robô apenas com montagem/demonstagem, apenas da aba de
-// visitas, sem agenda de manoel") -- token/chat ids PRÓPRIOS (bot separado
-// no Telegram, não reaproveita TELEGRAM_BOT_TOKEN), mesmo padrão de "sem as
-// duas env vars, não faz nada" do bot principal. Ver notifyTelegramNewRequest/
-// notifyTelegramStatusChange abaixo, que disparam nos dois bots quando o
-// chamado é montagem/desmontagem e o montador não é o Manoel (MANOEL_ONLY_ASSEMBLER).
+// visitas" -- e, no mesmo dia, ampliado: "coloque as atualizações de manoel
+// tambem no bot" e "adicione um evento tambem quando a equipe de
+// assistencia escolher o montador para uma visita"). Token/chat ids
+// PRÓPRIOS (bot separado no Telegram, não reaproveita TELEGRAM_BOT_TOKEN),
+// mesmo padrão de "sem as duas env vars, não faz nada" do bot principal.
+// Escopo = VISITA_REQUEST_TYPES (montagem, desmontagem, troca_peca,
+// vistoria -- os 2 últimos são sempre o Manoel, MANOEL_ONLY_TYPES em
+// assistenciaLabels.ts) -- sem exclusão de montador nenhuma, ao contrário
+// da 1ª versão desse bot (que tirava o Manoel de propósito).
 async function sendTelegramMessage(text: string, tokenEnvVar = "TELEGRAM_BOT_TOKEN", chatIdsEnvVar = "TELEGRAM_CHAT_IDS"): Promise<void> {
   const token = process.env[tokenEnvVar];
   const chatIds = (process.env[chatIdsEnvVar] ?? "")
@@ -73,10 +77,11 @@ function requestNotifyLines(params: RequestNotifyParams): string[] {
   if (params.storeName) lines.push(`Loja: ${params.storeName}`);
   if (params.clientName) lines.push(`Cliente: ${params.clientName}`);
   if (params.requestedByName) lines.push(`Solicitado por: ${params.requestedByName}`);
-  // Montador só faz sentido pra montagem/desmontagem; motorista pro resto
-  // (entrega/envio/recolhimento) -- mesmo corte de sempre (ver
-  // DELIVERY_REQUEST_TYPES), pra não mostrar "Motorista: —" numa montagem.
-  if (params.type === "montagem" || params.type === "desmontagem") {
+  // Montador faz sentido pra qualquer tipo da aba "Visitas" (montagem,
+  // desmontagem, troca de peça, vistoria); motorista pro resto (entrega/
+  // envio/recolhimento) -- mesmo corte de sempre (ver DELIVERY_REQUEST_TYPES/
+  // VISITA_REQUEST_TYPES), pra não mostrar "Motorista: —" numa montagem.
+  if ((VISITA_REQUEST_TYPES as readonly string[]).includes(params.type)) {
     if (params.assemblerName) lines.push(`Montador: ${params.assemblerName}`);
   } else if (params.driverName) {
     lines.push(`Motorista: ${params.driverName}`);
@@ -91,27 +96,30 @@ function requestNotifyLines(params: RequestNotifyParams): string[] {
 // notificação de assistencia" no pedido original, esclarecido com o
 // Victor via pergunta. notificação_externa fica de fora (não é nem um nem
 // outro grupo).
-// Só monta/desmonta, sem Manoel -- ver comentário do bot separado acima.
-// assemblerName pode não estar definido ainda (ex.: recém-criada, sem
-// montador atribuído) -- não é o Manoel nesse caso, então passa.
-function isMontagemVisitaSemManoel(type: string, assemblerName?: string | null): boolean {
-  return (type === "montagem" || type === "desmontagem") && assemblerName !== MANOEL_ONLY_ASSEMBLER;
+// Ver comentário do bot separado acima -- escopo é só o tipo (VISITA_REQUEST_TYPES),
+// sem checar quem é o montador.
+function isVisitaBotType(type: string): boolean {
+  return (VISITA_REQUEST_TYPES as readonly string[]).includes(type);
 }
 
 export function notifyTelegramNewRequest(params: RequestNotifyParams): Promise<void> {
   const isMontagemDesmontagem = params.type === "montagem" || params.type === "desmontagem";
   const isDelivery = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(params.type);
-  if (!isMontagemDesmontagem && !isDelivery) return Promise.resolve();
+  // Bot principal só monta/desmonta + entrega/envio/recolhimento na criação
+  // (nunca incluiu vistoria/troca de peça -- não fizeram parte do pedido
+  // original de 04/09/2026). Bot da aba Visitas (abaixo) é mais amplo.
+  const sendsToMainBot = isMontagemDesmontagem || isDelivery;
+  const sendsToVisitaBot = isVisitaBotType(params.type);
+  if (!sendsToMainBot && !sendsToVisitaBot) return Promise.resolve();
 
   const emoji = isMontagemDesmontagem ? "🪑" : "🚚";
   const label = REQUEST_TYPE_LABELS[params.type] ?? params.type;
   const lines = [`${emoji} Nova solicitação: ${label}`, `#${params.ticketNumber}`, ...requestNotifyLines(params)];
   const text = lines.join("\n");
 
-  const sends = [sendTelegramMessage(text)];
-  if (isMontagemVisitaSemManoel(params.type, params.assemblerName)) {
-    sends.push(sendTelegramMessage(text, "TELEGRAM_BOT_TOKEN_MONTAGEM", "TELEGRAM_CHAT_IDS_MONTAGEM"));
-  }
+  const sends: Promise<void>[] = [];
+  if (sendsToMainBot) sends.push(sendTelegramMessage(text));
+  if (sendsToVisitaBot) sends.push(sendTelegramMessage(text, "TELEGRAM_BOT_TOKEN_MONTAGEM", "TELEGRAM_CHAT_IDS_MONTAGEM"));
   return Promise.all(sends).then(() => undefined);
 }
 
@@ -147,8 +155,19 @@ export function notifyTelegramStatusChange(params: RequestNotifyParams & { newSt
   const text = lines.join("\n");
 
   const sends = [sendTelegramMessage(text)];
-  if (isMontagemVisitaSemManoel(params.type, params.assemblerName)) {
+  if (isVisitaBotType(params.type)) {
     sends.push(sendTelegramMessage(text, "TELEGRAM_BOT_TOKEN_MONTAGEM", "TELEGRAM_CHAT_IDS_MONTAGEM"));
   }
   return Promise.all(sends).then(() => undefined);
+}
+
+// Pedido do Victor 19/09/2026: "adicione um evento tambem quando a equipe
+// de assistencia escolher o montador para uma visita" -- ver setAssemblerName
+// (actions.ts). Só nesse 2º bot (aba Visitas) -- o bot principal nunca
+// avisou de atribuição de montador, só criação/status-chave.
+export function notifyTelegramAssemblerAssigned(params: RequestNotifyParams): Promise<void> {
+  if (!isVisitaBotType(params.type)) return Promise.resolve();
+  const label = REQUEST_TYPE_LABELS[params.type] ?? params.type;
+  const lines = [`🔧 Montador definido: ${label}`, `#${params.ticketNumber}`, ...requestNotifyLines(params)];
+  return sendTelegramMessage(lines.join("\n"), "TELEGRAM_BOT_TOKEN_MONTAGEM", "TELEGRAM_CHAT_IDS_MONTAGEM");
 }

@@ -10,9 +10,28 @@ describe("pickCategory", () => {
     expect(pickCategory("O sofá chegou todo riscado e com um defeito na costura")?.category).toBe("cat-avaria");
   });
 
-  it("identifica problema com o entregador antes de atraso quando os dois aparecem", () => {
-    const result = pickCategory("O entregador foi grosseiro e chegou atrasado também");
-    expect(result?.category).toBe("cat-entregador");
+  // Achado 19/09/2026 (Victor: "esse problema com entregador fica muito
+  // amplo") -- entregador + palavra-chave específica vira sub-motivo, não
+  // mais o catch-all genérico "cat-entregador".
+  it("identifica atraso do entregador (sub-motivo específico, não o catch-all genérico)", () => {
+    const result = pickCategory("O entregador chegou atrasado, o prazo já tinha vencido");
+    expect(result?.category).toBe("cat-entregador-atraso");
+  });
+
+  it("identifica avaria causada pelo entregador", () => {
+    expect(pickCategory("O motorista derrubou a caixa e o produto chegou quebrado")?.category).toBe("cat-entregador-avaria");
+  });
+
+  it("identifica endereço errado do entregador", () => {
+    expect(pickCategory("O entregador entregou no endereço errado")?.category).toBe("cat-entregador-enderecoerrado");
+  });
+
+  it("identifica mau atendimento do entregador", () => {
+    expect(pickCategory("O entregador foi muito mal educado com a cliente")?.category).toBe("cat-entregador-educacao");
+  });
+
+  it("cai no catch-all genérico quando menciona entregador sem motivo específico", () => {
+    expect(pickCategory("Reclamação sobre o entregador, cliente não quis detalhar")?.category).toBe("cat-entregador");
   });
 
   it("identifica montagem", () => {

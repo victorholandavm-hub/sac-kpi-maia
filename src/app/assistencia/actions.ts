@@ -22,7 +22,7 @@ import {
   CAUSA_RAIZ_ALL_VALUES,
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
-import { notifyTelegramNewRequest, notifyTelegramStatusChange } from "@/lib/telegram";
+import { notifyTelegramNewRequest, notifyTelegramStatusChange, notifyTelegramAssemblerAssigned } from "@/lib/telegram";
 import { resolveDriverName, listOwnStoreAssemblers } from "@/lib/payments";
 import { getPhotoForAuth, deleteRequestPhoto, saveRequestPhoto } from "@/lib/servicePhotos";
 import { randomUUID } from "crypto";
@@ -1333,7 +1333,11 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
 
   const admin = getSupabaseAdmin();
 
-  const { data: current } = await admin.from("service_requests").select("type").eq("id", requestId).single();
+  const { data: current } = await admin
+    .from("service_requests")
+    .select("type, ticket_number, client_name, requested_by_name, store_id")
+    .eq("id", requestId)
+    .single();
   if (!current) throw new Error("Solicitação não encontrada.");
   requireManageAccess(profile, current.type);
   if ((MANOEL_ONLY_TYPES as readonly string[]).includes(current.type) && trimmed !== MANOEL_ONLY_ASSEMBLER) {
@@ -1350,6 +1354,20 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
     actor_id: profile.id,
     event_type: "note_added",
     note: `Montador definido: ${trimmed}`,
+  });
+
+  let storeName: string | null = null;
+  if (current.store_id) {
+    const { data: store } = await admin.from("stores").select("name").eq("id", current.store_id).single();
+    storeName = store?.name ?? null;
+  }
+  await notifyTelegramAssemblerAssigned({
+    ticketNumber: current.ticket_number,
+    type: current.type,
+    clientName: current.client_name,
+    storeName,
+    requestedByName: current.requested_by_name,
+    assemblerName: trimmed,
   });
 
   revalidatePath("/assistencia/fila");
