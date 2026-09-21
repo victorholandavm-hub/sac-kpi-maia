@@ -89,7 +89,7 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           <StatusPill
             label={`${data.prejuizoCobertura.pct}% com custo de produto rastreado`}
             tone="critical"
-            title={`Soma custo de produto (unidades × custo de reposição do Protheus) com custo operacional estimado (frete/motoboy, valor fixo por tipo -- não vem do ERP). A parte de PRODUTO só está rastreada em ${data.prejuizoCobertura.withValue} de ${data.prejuizoCobertura.total} chamados (${data.prejuizoCobertura.pct}%) -- quem não tem código Protheus + custo sincronizado entra só com o custo operacional estimado. Clique no card pra ver o detalhamento.`}
+            title={`Soma custo de produto (unidades × custo de reposição do Protheus, ajustado por fator de recuperação de ativo quando o item retorna) com custo operacional estimado (frete/logística, valor fixo por tipo -- não vem do ERP). O custo de produto vem do Protheus (custo exato) em ${data.prejuizoCobertura.withValue} de ${data.prejuizoCobertura.total} chamados (${data.prejuizoCobertura.pct}%) -- o resto usa o custo médio da categoria do produto como estimativa. Clique no card pra ver o detalhamento.`}
           />
         </KpiCardShell>
         <KpiCardShell>

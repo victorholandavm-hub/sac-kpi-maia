@@ -84,9 +84,11 @@ export function PrejuizoDetalheModal({
             1. Prejuízo de estoque (produto)
           </h4>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            Unidades trocadas/enviadas × custo de reposição do Protheus (totvs_stock.unit_cost). Rastreado em{" "}
-            {prejuizoCobertura.withValue} de {prejuizoCobertura.total} chamados ({prejuizoCobertura.pct}%) — o resto não tem código do
-            produto ou custo sincronizado, então só entra com o custo operacional abaixo.
+            Unidades trocadas/enviadas × custo de reposição do Protheus (totvs_stock.unit_cost), com desconto de 30% (fator de
+            recuperação de ativo) pra produto que retorna à assistência/fábrica, e zerado pra entrega de produto (o item já foi
+            computado na venda original). Custo exato do Protheus em {prejuizoCobertura.withValue} de {prejuizoCobertura.total}{" "}
+            chamados ({prejuizoCobertura.pct}%) — o resto usa o custo médio da categoria do produto como estimativa (nunca R$0),
+            exceto quando não tem nem código do produto identificado.
           </p>
           {topProdutos.length === 0 ? (
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -140,7 +142,8 @@ export function PrejuizoDetalheModal({
             2. Custo operacional (estimativa fixa por tipo)
           </h4>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            Sem custo real de frete/operação no ERP — valor fixo por chamado, definido manualmente por tipo de solicitação.
+            Sem custo real de frete/operação no ERP — valor fixo por tipo de solicitação, com um multiplicador de 1,5x quando o
+            chamado envolve produto volumoso (estofado, colchão etc. — exige caminhão e equipe dupla).
           </p>
           <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
             <table className="w-full text-xs" style={{ minWidth: "420px" }}>
@@ -162,7 +165,10 @@ export function PrejuizoDetalheModal({
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
                 {custoOperacionalPorTipo.map((r) => (
-                  <tr key={r.type}>
+                  // key = type + label (não só type) -- desde 21/09/2026 um
+                  // mesmo tipo pode virar 2 linhas (padrão vs. produto
+                  // volumoso, ver custoOperacionalPorTipo em kpiAssistencia.ts).
+                  <tr key={`${r.type}-${r.label}`}>
                     <td className="px-2 py-1.5" style={{ color: "var(--text-primary)" }}>
                       {r.label}
                     </td>

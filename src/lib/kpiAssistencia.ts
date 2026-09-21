@@ -7,8 +7,10 @@ import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES, ALL_REQ
 import { ROTA_LABELS, type Rota } from "./rotas";
 import {
   classificarProdutoAssistencia,
+  familiaLogisticaDaCategoria,
   getVendaQuantidadePorCodigoNoPeriodo,
   getCustoUnitarioPorCodigo,
+  getCustoMedioPorCategoria,
   getEarliestSyncedOrderDate,
   getVendasCountPorLoja,
 } from "./vendasProduto";
@@ -292,13 +294,20 @@ export type ProductBreakageStat = Count & {
   // MIN_VENDA_PARA_TAXA (ruído estatístico de baixo volume) -- UI mostra
   // "N/A" nesses casos, nunca 0% (0% sugeriria "nunca quebra", enganoso).
   taxaQuebraPct: number | null;
+  // Custo exato do Protheus (totvs_stock.unit_cost) quando existe; senão o
+  // custo MÉDIO da categoria do produto (getCustoMedioPorCategoria,
+  // vendasProduto.ts -- pedido do Victor 21/09/2026: "não some R$0").
+  // null só no bucket "Não identificado" (sem código nenhum pra
+  // classificar) -- ver prejuizoCobertura em AssistenciaKpiData, que mede
+  // só a fatia com custo EXATO (não a estimada por categoria).
   custoUnitario: number | null;
-  // Prejuízo de ESTOQUE só (produto: unidades × custo de reposição) --
-  // null quando não sabemos o custo (produto sem custo sincronizado, ou
-  // bucket "Não identificado", sem código nenhum). Ver prejuizoCobertura
-  // em AssistenciaKpiData (mede quantos chamados têm esse valor de
-  // verdade) -- renomeado de `prejuizoEstimado` (10/09/2026) quando o
-  // custo operacional entrou, pra não confundir os dois.
+  // Prejuízo de ESTOQUE só (produto: quantidade AJUSTADA -- ver
+  // PRODUCT_COST_MULTIPLIER_POR_TIPO, 0 pra entrega/0,7 pra troca e
+  // recolhimento de produto/1 pro resto -- × custo de reposição, exato ou
+  // por categoria). null só quando custoUnitario é null (bucket "Não
+  // identificado"). Ver prejuizoCobertura em AssistenciaKpiData --
+  // renomeado de `prejuizoEstimado` (10/09/2026) quando o custo
+  // operacional entrou, pra não confundir os dois.
   prejuizoEstoque: number | null;
   // Estimativa ESTÁTICA de frete/operação por tipo de chamado (valores
   // fixos do Victor, ver CUSTO_OPERACIONAL_POR_TIPO abaixo) -- sempre um
@@ -323,21 +332,56 @@ export type ProductBreakageStat = Count & {
 // por chamado, valores dados por ele (não calculados/sincronizados de
 // lugar nenhum). "Troca com recolhimento" (rótulo que troca_produto usa
 // na tela do motorista, DRIVER_TYPE_LABELS) e "Troca de produto" (rótulo
-// do mesmo tipo em REQUEST_TYPE_LABELS) são o MESMO `type` no banco --
-// confirmado com o Victor 10/09/2026 que o valor certo é R$120 (o R$150
-// que ele também citou pro mesmo tipo não se aplica a nada).
+// do mesmo tipo em REQUEST_TYPE_LABELS) são o MESMO `type` no banco.
 // entrega_produto e envio_recolhimento_peca entraram em 10/09/2026 (ajuste
 // fino pós-teste do Victor, depois de ver o relatório com os dois
 // zerados) -- valores igualmente estáticos/estimados, mesmo racional dos
 // outros 4.
+// troca_produto: R$120 -> R$180 em 21/09/2026 (pedido do Victor: "a troca
+// exige fluxo duplo -- ir deixar o novo e trazer o antigo de volta").
 const CUSTO_OPERACIONAL_POR_TIPO: Partial<Record<RequestType, number>> = {
-  troca_produto: 120, // "Troca com recolhimento" -- frete de recolhimento + reentrega
+  troca_produto: 180, // fluxo duplo -- leva o produto novo, recolhe o antigo
   entrega_produto: 90,
   envio_peca: 40, // frete/motoboy
   recolhimento: 60, // recolhimento de peça
   recolhimento_produto: 60, // recolhimento de produto
   envio_recolhimento_peca: 70,
 };
+
+// Multiplicador de volume/porte -- pedido do Victor 21/09/2026: produto
+// grande/pesado (Estofados, Colchões...) exige caminhão + equipe dupla,
+// diferente de uma peça pequena/ferragem que qualquer motoboy resolve.
+// Reaproveita familiaLogisticaDaCategoria (vendasProduto.ts, já usada em
+// /vendas pro mesmo conceito de "ocupa muito espaço no caminhão?") --
+// "grande"/"medio" aplica o multiplicador, "pequeno" mantém o valor
+// padrão. Só nos 3 fluxos que o Victor nomeou (Troca, Envio, Recolhimento
+// -- os 2 últimos cobrem peça E produto); Entrega de produto fica de fora
+// de propósito (não foi citada nesse pedido).
+const MULTIPLICADOR_PRODUTO_VOLUMOSO = 1.5;
+const TIPOS_ELEGIVEIS_MULTIPLICADOR_VOLUME = new Set<RequestType>([
+  "troca_produto",
+  "envio_peca",
+  "recolhimento",
+  "recolhimento_produto",
+  "envio_recolhimento_peca",
+]);
+
+// Fator de Recuperação de Ativo -- pedido do Victor 21/09/2026: produto
+// que RETORNA pra fábrica/assistência (troca, recolhimento de produto) tem
+// valor residual de reaproveitamento (matéria-prima, saldão), não é perda
+// total do custo de reposição do Protheus -- 30% de desconto no prejuízo
+// de ESTOQUE (não no operacional). "Entrega de produto" (item que faltou
+// na entrega original, já vendido/computado antes) não perde produto
+// NENHUM -- custo de estoque zerado, só o operacional acima conta.
+const FATOR_RECUPERACAO_ATIVO = 0.7;
+const PRODUCT_COST_MULTIPLIER_POR_TIPO: Partial<Record<RequestType, number>> = {
+  entrega_produto: 0,
+  troca_produto: FATOR_RECUPERACAO_ATIVO,
+  recolhimento_produto: FATOR_RECUPERACAO_ATIVO,
+};
+function productCostMultiplier(type: RequestType): number {
+  return PRODUCT_COST_MULTIPLIER_POR_TIPO[type] ?? 1;
+}
 
 // Linha do breakdown "custo operacional por tipo" -- ver
 // custoOperacionalPorTipo em AssistenciaKpiData/PrejuizoDetalheModal.tsx.
@@ -454,6 +498,13 @@ const getAssistenciaKpiDataCached = unstable_cache(
   // rodar -- inclusive dentro do próprio loop principal, que processa um
   // item de cada vez.
   const produtosPorChamado = new Map<string, string>();
+  // Chamado tem produto "volumoso" (categoria grande/médio, ver
+  // MULTIPLICADOR_PRODUTO_VOLUMOSO acima) -- basta UM item do chamado
+  // bater pra ele todo contar como volumoso (o caminhão vai de qualquer
+  // jeito). Montado no mesmo pré-passe acima (precisa de TODOS os itens
+  // de cada chamado prontos antes do loop principal usar isso pro custo
+  // operacional).
+  const chamadosComProdutoVolumoso = new Set<string>();
   {
     const itensPorChamado = new Map<string, string[]>();
     for (const item of items) {
@@ -462,8 +513,24 @@ const getAssistenciaKpiDataCached = unstable_cache(
       const lista = itensPorChamado.get(item.request_id) ?? [];
       lista.push(label);
       itensPorChamado.set(item.request_id, lista);
+
+      const categoria = classificarProdutoAssistencia(item.product);
+      if (categoria.key !== "peca_avulsa" && familiaLogisticaDaCategoria(categoria.key) !== "pequeno") {
+        chamadosComProdutoVolumoso.add(item.request_id);
+      }
     }
     for (const [id, produtos] of itensPorChamado) produtosPorChamado.set(id, produtos.join(", "));
+  }
+
+  // Custo operacional de UM chamado -- base do tipo (CUSTO_OPERACIONAL_POR_TIPO)
+  // x 1,5 se for um tipo elegível (TIPOS_ELEGIVEIS_MULTIPLICADOR_VOLUME) E o
+  // chamado tiver produto volumoso. Usada tanto no breakdown por código
+  // (abaixo) quanto no total/por-tipo (mais abaixo).
+  function custoOperacionalDoChamado(type: RequestType, requestId: string): number {
+    const base = CUSTO_OPERACIONAL_POR_TIPO[type] ?? 0;
+    if (base === 0) return 0;
+    const volumoso = TIPOS_ELEGIVEIS_MULTIPLICADOR_VOLUME.has(type) && chamadosComProdutoVolumoso.has(requestId);
+    return volumoso ? base * MULTIPLICADOR_PRODUTO_VOLUMOSO : base;
   }
 
   // Volumetria por dia -- mesmo formato (DayCount) do resto do painel de
@@ -547,7 +614,10 @@ const getAssistenciaKpiDataCached = unstable_cache(
   // diferentes de chamado pra chamado, e a descrição exibida aqui é só a
   // PRIMEIRA vista (rótulo, não chave de agrupamento).
   const codigoPorChamado = new Set<string>();
-  const breakagePorCodigo = new Map<string, { label: string; count: number; itensQuantidade: number; custoOperacionalEstimado: number }>();
+  const breakagePorCodigo = new Map<
+    string,
+    { label: string; count: number; itensQuantidade: number; itensQuantidadeAjustada: number; custoOperacionalEstimado: number }
+  >();
   for (const item of items) {
     if (!item.product) continue;
     const parentRow = rowById.get(item.request_id);
@@ -567,20 +637,27 @@ const getAssistenciaKpiDataCached = unstable_cache(
       label: codigo === CODIGO_NAO_IDENTIFICADO ? LABEL_NAO_IDENTIFICADO : item.product,
       count: 0,
       itensQuantidade: 0,
+      itensQuantidadeAjustada: 0,
       custoOperacionalEstimado: 0,
     };
     // itensQuantidade soma toda linha (sem dedupe -- unidade física de
     // verdade), `count` só cresce uma vez por chamado (mesmo dedupe de
-    // produtoCount acima, base da Taxa de Quebra).
+    // produtoCount acima, base da Taxa de Quebra). itensQuantidadeAjustada
+    // é a mesma soma, mas pesada pelo Fator de Recuperação de Ativo do TIPO
+    // do chamado (productCostMultiplier, ver PRODUCT_COST_MULTIPLIER_POR_TIPO
+    // acima) -- base do prejuízo de ESTOQUE mais abaixo, não da exibição
+    // de quantidade física (que continua usando itensQuantidade cru).
     breakageEntry.itensQuantidade += item.quantity ?? 1;
+    breakageEntry.itensQuantidadeAjustada += (item.quantity ?? 1) * productCostMultiplier(parentRow.type);
     if (!codigoPorChamado.has(codigoDedupeKey)) {
       codigoPorChamado.add(codigoDedupeKey);
       breakageEntry.count += 1;
-      // Custo operacional do TIPO do chamado (ver CUSTO_OPERACIONAL_POR_TIPO)
-      // -- atribuído à linha desse código (ver nota de possível
-      // sobreposição em ProductBreakageStat.custoOperacionalEstimado
-      // acima; o total do relatório não usa essa soma por linha).
-      breakageEntry.custoOperacionalEstimado += CUSTO_OPERACIONAL_POR_TIPO[parentRow.type] ?? 0;
+      // Custo operacional do TIPO do chamado, já com o multiplicador de
+      // volume se aplicável (ver custoOperacionalDoChamado acima) --
+      // atribuído à linha desse código (ver nota de possível sobreposição
+      // em ProductBreakageStat.custoOperacionalEstimado acima; o total do
+      // relatório não usa essa soma por linha).
+      breakageEntry.custoOperacionalEstimado += custoOperacionalDoChamado(parentRow.type, parentRow.id);
       const breakageTag = `produto_quebra:${codigo}`;
       (ticketsByTag[breakageTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
     }
@@ -647,9 +724,13 @@ const getAssistenciaKpiDataCached = unstable_cache(
   // conferiu noutros gráficos, fora do escopo desse cruzamento).
   const chamadosFromIso = `${vendaRange.from}T00:00:00.000Z`;
   const chamadosToIso = `${vendaRange.to}T23:59:59.999Z`;
-  const [vendaQtdPorCodigo, custoPorCodigo, vendasPorLoja, chamadosTodosTiposRows, allStores] = await Promise.all([
+  const [vendaQtdPorCodigo, custoPorCodigo, custoMedioPorCategoria, vendasPorLoja, chamadosTodosTiposRows, allStores] = await Promise.all([
     getVendaQuantidadePorCodigoNoPeriodo(codigosReais, vendaRange),
     getCustoUnitarioPorCodigo(codigosReais),
+    // Ponto cego (código sem custo sincronizado) -- pedido do Victor
+    // 21/09/2026: em vez de R$0, usa o custo médio da categoria do
+    // produto (ver getCustoMedioPorCategoria/vendasProduto.ts).
+    getCustoMedioPorCategoria(),
     // "Vendas x Assistência Técnica" (ver VendaVsAssistenciaStat acima) --
     // denominador, do Protheus.
     getVendasCountPorLoja(vendaRange),
@@ -757,19 +838,36 @@ const getAssistenciaKpiDataCached = unstable_cache(
     .sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1));
 
   let prejuizoEstoqueTotal = 0;
-  let chamadosComCusto = 0;
+  // "Rastreado" = custo EXATO do código (totvs_stock.unit_cost direto),
+  // não a estimativa por categoria abaixo -- é o que prejuizoCobertura
+  // (badge "X% com custo de produto rastreado") mede, pra continuar
+  // avisando quanto do total é dado real vs. estimado, mesmo agora que
+  // "sem custo exato" não vira mais R$0.
+  let chamadosComCustoExato = 0;
   const byProductBreakageAll: ProductBreakageStat[] = [...breakagePorCodigo.entries()].map(([codigo, entry]) => {
     const isNaoIdentificado = codigo === CODIGO_NAO_IDENTIFICADO;
     const vendaQtd = isNaoIdentificado ? 0 : (vendaQtdPorCodigo.get(codigo) ?? 0);
-    const custoUnitario = isNaoIdentificado ? null : (custoPorCodigo.get(codigo) ?? null);
+    const custoExato = isNaoIdentificado ? null : (custoPorCodigo.get(codigo) ?? null);
+    // Ponto cego -- pedido do Victor 21/09/2026: código real (não o
+    // bucket "Não identificado") sem custo sincronizado usa o custo médio
+    // da categoria do produto em vez de R$0 (ver getCustoMedioPorCategoria/
+    // vendasProduto.ts).
+    const custoUnitario =
+      custoExato ?? (isNaoIdentificado ? null : (custoMedioPorCategoria[classificarProdutoAssistencia(entry.label).key] ?? null));
     // N/A (não 0%) quando: sem código, sem venda no período, ou venda
     // abaixo de MIN_VENDA_PARA_TAXA (ruído de baixo volume) -- ver
     // comentário em ProductBreakageStat/MIN_VENDA_PARA_TAXA acima.
     const taxaQuebraPct = !isNaoIdentificado && vendaQtd >= MIN_VENDA_PARA_TAXA ? (entry.count / vendaQtd) * 100 : null;
-    const prejuizoEstoque = custoUnitario != null ? entry.itensQuantidade * custoUnitario : null;
+    // itensQuantidadeAjustada (não itensQuantidade cru) -- já vem pesada
+    // pelo Fator de Recuperação de Ativo do tipo do chamado (0 pra
+    // entrega_produto, 0,7 pra troca/recolhimento de produto, 1 pro
+    // resto -- ver PRODUCT_COST_MULTIPLIER_POR_TIPO).
+    const prejuizoEstoque = custoUnitario != null ? entry.itensQuantidadeAjustada * custoUnitario : null;
     if (prejuizoEstoque != null) {
       prejuizoEstoqueTotal += prejuizoEstoque;
-      chamadosComCusto += entry.count;
+    }
+    if (custoExato != null) {
+      chamadosComCustoExato += entry.count;
     }
     return {
       label: entry.label,
@@ -792,16 +890,29 @@ const getAssistenciaKpiDataCached = unstable_cache(
   // ProductBreakageStat.custoOperacionalEstimado). Esses aqui são os
   // valores certos pro card de destaque e pro detalhamento ao clicar
   // (PrejuizoDetalheModal.tsx, pedido do Victor 10/09/2026: "mostre os
-  // valores detalhados e como chegou a esse valor").
-  const chamadosPorTipoMap = new Map<RequestType, number>();
+  // valores detalhados e como chegou a esse valor"). Agrupado por
+  // (tipo, volumoso) -- não só tipo -- desde 21/09/2026: um mesmo tipo
+  // pode ter chamados no valor padrão E chamados com o multiplicador de
+  // 1,5x (MULTIPLICADOR_PRODUTO_VOLUMOSO), então vira 2 linhas em vez de
+  // quebrar a conta "subtotal = count × valorUnitario" que o detalhamento
+  // depende.
+  const custoOperacionalAgg = new Map<string, { type: RequestType; volumoso: boolean; count: number; valorUnitario: number }>();
   for (const r of rows) {
-    chamadosPorTipoMap.set(r.type, (chamadosPorTipoMap.get(r.type) ?? 0) + 1);
+    const volumoso = TIPOS_ELEGIVEIS_MULTIPLICADOR_VOLUME.has(r.type) && chamadosComProdutoVolumoso.has(r.id);
+    const valorUnitario = custoOperacionalDoChamado(r.type, r.id);
+    const key = `${r.type}|${volumoso}`;
+    const agg = custoOperacionalAgg.get(key) ?? { type: r.type, volumoso, count: 0, valorUnitario };
+    agg.count += 1;
+    custoOperacionalAgg.set(key, agg);
   }
-  const custoOperacionalPorTipo: CustoOperacionalPorTipoRow[] = [...chamadosPorTipoMap.entries()]
-    .map(([type, count]) => {
-      const valorUnitario = CUSTO_OPERACIONAL_POR_TIPO[type] ?? 0;
-      return { type, label: REQUEST_TYPE_LABELS[type] ?? type, count, valorUnitario, subtotal: count * valorUnitario };
-    })
+  const custoOperacionalPorTipo: CustoOperacionalPorTipoRow[] = [...custoOperacionalAgg.values()]
+    .map(({ type, volumoso, count, valorUnitario }) => ({
+      type,
+      label: (REQUEST_TYPE_LABELS[type] ?? type) + (volumoso ? " (produto volumoso, 1,5x)" : ""),
+      count,
+      valorUnitario,
+      subtotal: count * valorUnitario,
+    }))
     .sort((a, b) => b.subtotal - a.subtotal);
   const custoOperacionalTotal = custoOperacionalPorTipo.reduce((soma, r) => soma + r.subtotal, 0);
   const prejuizoTotalEstimado = prejuizoEstoqueTotal + custoOperacionalTotal;
@@ -828,15 +939,18 @@ const getAssistenciaKpiDataCached = unstable_cache(
   const byProductBreakageTopValor = [...byProductBreakageAll]
     .sort((a, b) => b.prejuizoEstimado - a.prejuizoEstimado)
     .slice(0, PRODUCT_RANKING_LIMIT);
-  // Cobertura do custo de PRODUTO só (prejuizoEstoque) -- o custo
+  // Cobertura do custo EXATO de PRODUTO só (prejuizoEstoque) -- o custo
   // OPERACIONAL não precisa de badge de cobertura, é sempre um valor
   // conhecido por construção (estimativa fixa por tipo, ver
   // CUSTO_OPERACIONAL_POR_TIPO), mesmo quando 0 pros tipos sem valor
-  // definido ainda.
+  // definido ainda. Usa chamadosComCustoExato (não conta a estimativa por
+  // categoria, ver bloco acima) -- do contrário essa cobertura bateria
+  // perto de 100% sempre (quase todo código cai numa categoria com média),
+  // escondendo justamente o que é dado real do Protheus vs. estimativa.
   const prejuizoCobertura: Coverage = {
-    withValue: chamadosComCusto,
+    withValue: chamadosComCustoExato,
     total: rows.length,
-    pct: rows.length > 0 ? Math.round((chamadosComCusto / rows.length) * 100) : 0,
+    pct: rows.length > 0 ? Math.round((chamadosComCustoExato / rows.length) * 100) : 0,
   };
 
   return {
