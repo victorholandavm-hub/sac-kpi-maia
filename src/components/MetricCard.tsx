@@ -1,14 +1,17 @@
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { KpiCardShell, StatusPill } from "./KpiCardShell";
 
 // Card de métrica com a PORCENTAGEM como protagonista -- pedido do Victor
-// 21/09/2026 (spec de UX/UI detalhada): "a métrica principal deve ser a
+// 19/09/2026 (spec de UX/UI detalhada): "a métrica principal deve ser a
 // porcentagem... é o indicador crítico de sucesso. O número absoluto e o
 // contexto total devem vir logo abaixo em tamanho menor". Diferente do
 // StatTile genérico (usado em todo o resto do painel, valor absoluto em
 // destaque) -- esse aqui é específico pra métricas de TAXA com meta
 // definida (hoje: Total de chamados do SAC/assistência vs. meta ideal,
 // ver Dashboard.tsx/KpisAssistenciaView.tsx), por isso é um componente à
-// parte em vez de mais uma variante dentro do StatTile.
+// parte em vez de mais uma variante dentro do StatTile. Usa KpiCardShell
+// (KpiCardShell.tsx) -- mesma casca visual dos outros cards da fileira
+// (pedido do Victor 21/09/2026: "manter a consistência visual").
 export function MetricCard({
   title,
   pct,
@@ -34,7 +37,7 @@ export function MetricCard({
   const foraDaMeta = pct !== null && pct > metaIdealPct;
 
   return (
-    <div className="rounded-xl bg-white dark:bg-gray-800 shadow-sm p-5 flex flex-col gap-3 min-w-0">
+    <KpiCardShell accentColor={pct !== null ? (foraDaMeta ? "var(--status-critical)" : "var(--status-good)") : undefined}>
       <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
         {title}
       </span>
@@ -46,16 +49,11 @@ export function MetricCard({
         </span>
 
         {pct !== null ? (
-          <span
-            className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-1 shrink-0"
-            style={{
-              background: `color-mix(in srgb, ${foraDaMeta ? "var(--status-critical)" : "var(--status-good)"} 16%, var(--surface-1))`,
-              color: foraDaMeta ? "var(--status-critical)" : "var(--status-good)",
-            }}
-          >
-            {foraDaMeta ? <AlertTriangle size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
-            {foraDaMeta ? "Fora da meta" : "Dentro da meta"}
-          </span>
+          <StatusPill
+            label={foraDaMeta ? "Fora da meta" : "Dentro da meta"}
+            tone={foraDaMeta ? "critical" : "good"}
+            icon={foraDaMeta ? <AlertTriangle size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
+          />
         ) : null}
       </div>
 
@@ -68,6 +66,6 @@ export function MetricCard({
           Meta ideal do período: menos de {metaIdealPct.toLocaleString("pt-BR")}%
         </span>
       </div>
-    </div>
+    </KpiCardShell>
   );
 }
