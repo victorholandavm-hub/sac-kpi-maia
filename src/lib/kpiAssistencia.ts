@@ -1,6 +1,7 @@
+import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
-import type { DateRange } from "./dateRange";
+import type { DateRange, RangePreset } from "./dateRange";
 import type { Count, Coverage, DayCount } from "./kpi";
 import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES, ALL_REQUEST_TYPES } from "./assistenciaLabels";
 import { ROTA_LABELS, type Rota } from "./rotas";
@@ -380,10 +381,26 @@ const PRODUCT_RANKING_LIMIT = 20;
 // positiva que alguém precisaria lembrar de atualizar).
 const VENDA_VS_ASSISTENCIA_TYPES = ALL_REQUEST_TYPES.filter((t) => t !== "montagem" && t !== "desmontagem");
 
+// Achado 21/09/2026 (pedido do Victor: "quando eu vou de kpis do sac pra
+// assistencia, está demorando muito") -- essa função varre service_requests
+// + service_request_items INTEIROS (paginado) e ainda cruza com Protheus
+// (custo/vendas por produto) pro Prejuízo Estimado, sem cache nenhum --
+// refeita do zero em TODA navegação pra /kpis-assistencia, mesmo pedindo o
+// mesmo período de segundos atrás. Mesmo remédio já aplicado em kpi.ts
+// (getKpiData) 17/09/2026 pro mesmo sintoma em /kpis: unstable_cache com
+// chave "baldeada" de 5 min (range.to muda a cada milissegundo, só o balde
+// garante cache hit).
+const ASSISTENCIA_CACHE_BUCKET_MS = 5 * 60 * 1000;
+
 export async function getAssistenciaKpiData(range: DateRange): Promise<AssistenciaKpiData> {
+  const bucketedTo = new Date(Math.floor(range.to.getTime() / ASSISTENCIA_CACHE_BUCKET_MS) * ASSISTENCIA_CACHE_BUCKET_MS);
+  return getAssistenciaKpiDataCached(range.preset, range.from ? range.from.toISOString() : null, bucketedTo.toISOString());
+}
+
+const getAssistenciaKpiDataCached = unstable_cache(
+  async (preset: RangePreset | "custom", fromIso: string | null, toIso: string): Promise<AssistenciaKpiData> => {
+  const range: DateRange = { preset, from: fromIso ? new Date(fromIso) : null, to: new Date(toIso) };
   const admin = getSupabaseAdmin();
-  const fromIso = range.from ? range.from.toISOString() : null;
-  const toIso = range.to.toISOString();
 
   const rows = await fetchAllPagesParallel<RequestRow>(
     (from, to) => {
@@ -847,7 +864,10 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
     byStoreVendaVsAssistencia,
     ticketsByTag,
   };
-}
+  },
+  ["assistencia-kpi-data"],
+  { revalidate: 300 }
+);
 
 export type AssistenciaMonthlyEvolutionRow = {
   monthKey: string;
@@ -869,7 +889,8 @@ const MONTH_LABELS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago",
 // sempre a mesma janela, é uma tendência ao longo do tempo). Só contagem
 // (count:exact,head:true) em vez de buscar as linhas inteiras -- muito
 // mais barato pra um número por mês, sem precisar de fetchAllPagesParallel.
-export async function getAssistenciaMonthlyEvolution(monthsBack: number = 12): Promise<AssistenciaMonthlyEvolutionRow[]> {
+export const getAssistenciaMonthlyEvolution = unstable_cache(
+  async (monthsBack: number = 12): Promise<AssistenciaMonthlyEvolutionRow[]> => {
   const admin = getSupabaseAdmin();
   const now = new Date();
   // Corta meses anteriores ao início do sync de vendas do TOTVS -- senão um
@@ -918,4 +939,7 @@ export async function getAssistenciaMonthlyEvolution(monthsBack: number = 12): P
       };
     })
   );
-}
+  },
+  ["assistencia-monthly-evolution"],
+  { revalidate: 300 }
+);
