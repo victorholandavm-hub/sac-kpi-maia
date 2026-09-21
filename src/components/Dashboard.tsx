@@ -6,6 +6,7 @@ import { SAC_TAXA_META_IDEAL_PCT, type KpiData, type Count, type StoreBreakdownT
 import type { DateRange } from "@/lib/dateRange";
 import { StatTile } from "./StatTile";
 import { MetricCard } from "./MetricCard";
+import { KpiCardShell } from "./KpiCardShell";
 import { BarRanking } from "./BarRanking";
 import { VolumeChart } from "./VolumeChart";
 import { BacklogTrendChart } from "./BacklogTrendChart";
@@ -147,32 +148,47 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
           totalLabel={`de ${data.totalVendasNoPeriodo.toLocaleString("pt-BR")} venda${data.totalVendasNoPeriodo === 1 ? "" : "s"} no período`}
           metaIdealPct={SAC_TAXA_META_IDEAL_PCT}
         />
-        <StatTile
-          label="Resposta no 1º contato"
-          value={data.avgFirstResponseMinutes ?? "—"}
-          suffix={data.avgFirstResponseMinutes !== null ? "min" : undefined}
-          size="lg"
-        />
-        <StatTile
-          label="Respondidos em até 5min"
-          value={data.pctWithin5Min !== null ? `${data.pctWithin5Min}%` : "—"}
-          size="lg"
-          valueColor={data.pctWithin5Min !== null && data.pctWithin5Min < 50 ? "var(--status-warning)" : undefined}
-        />
-        <StatTile
-          label={`Satisfação (NPS, meta ${NPS_INDEX_TARGET})`}
-          value={data.npsSummary.npsIndex ?? "—"}
-          size="lg"
-          accent="var(--brand-orange)"
-          valueColor={indexColor(data.npsSummary.npsIndex)}
-        />
-        <StatTile
-          label="Urgência alta em aberto"
-          value={data.highUrgencyOpenCount}
-          size="lg"
-          accent="var(--status-critical)"
-          valueColor={data.highUrgencyOpenCount > 0 ? "var(--status-critical)" : undefined}
-        />
+        <KpiCardShell>
+          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            Resposta no 1º contato
+          </span>
+          <span className="text-5xl font-bold leading-none" style={{ color: "var(--text-primary)" }}>
+            {data.avgFirstResponseMinutes ?? "—"}
+            {data.avgFirstResponseMinutes !== null ? <span className="text-2xl font-semibold ml-0.5">min</span> : null}
+          </span>
+        </KpiCardShell>
+        <KpiCardShell
+          accentColor={data.pctWithin5Min !== null && data.pctWithin5Min < 50 ? "var(--status-warning)" : undefined}
+        >
+          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            Respondidos em até 5min
+          </span>
+          <span
+            className="text-5xl font-bold leading-none"
+            style={{ color: data.pctWithin5Min !== null && data.pctWithin5Min < 50 ? "var(--status-warning)" : "var(--text-primary)" }}
+          >
+            {data.pctWithin5Min !== null ? `${data.pctWithin5Min}%` : "—"}
+          </span>
+        </KpiCardShell>
+        <KpiCardShell accentColor={indexColor(data.npsSummary.npsIndex)}>
+          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            Satisfação (NPS, meta {NPS_INDEX_TARGET})
+          </span>
+          <span className="text-5xl font-bold leading-none" style={{ color: indexColor(data.npsSummary.npsIndex) }}>
+            {data.npsSummary.npsIndex ?? "—"}
+          </span>
+        </KpiCardShell>
+        <KpiCardShell accentColor={data.highUrgencyOpenCount > 0 ? "var(--status-critical)" : undefined}>
+          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            Urgência alta em aberto
+          </span>
+          <span
+            className="text-5xl font-bold leading-none"
+            style={{ color: data.highUrgencyOpenCount > 0 ? "var(--status-critical)" : "var(--text-primary)" }}
+          >
+            {data.highUrgencyOpenCount}
+          </span>
+        </KpiCardShell>
       </section>
 
       <InsightGrid insights={headlineInsights} />
