@@ -5,6 +5,7 @@ import Link from "next/link";
 import { SAC_TAXA_META_IDEAL_PCT, type KpiData, type Count, type StoreBreakdownTicket, type KpiMonthlyEvolutionRow } from "@/lib/kpi";
 import type { DateRange } from "@/lib/dateRange";
 import { StatTile } from "./StatTile";
+import { MetricCard } from "./MetricCard";
 import { BarRanking } from "./BarRanking";
 import { VolumeChart } from "./VolumeChart";
 import { BacklogTrendChart } from "./BacklogTrendChart";
@@ -106,12 +107,11 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
   const performanceInsights = buildPerformanceInsights(data);
   const gargalosInsights = buildGargalosInsights(data);
 
-  // "Taxa de SAC Global" -- pedido do Victor 19/09/2026: badge vermelho no
-  // card de Total de chamados quando a taxa (chamados / vendas do período)
-  // fica acima da meta ideal (SAC_TAXA_META_IDEAL_PCT, kpi.ts). null sem
-  // vendas no período pra dividir (mesmo guard do note logo abaixo).
+  // "Taxa de SAC Global" -- pedido do Victor 19/09/2026: card dedicado
+  // (MetricCard) no lugar do Total de chamados quando a taxa (chamados /
+  // vendas do período) tem meta ideal pra comparar (SAC_TAXA_META_IDEAL_PCT,
+  // kpi.ts). null sem vendas no período pra dividir.
   const sacTaxaPct = data.totalVendasNoPeriodo > 0 ? (data.totalTickets / data.totalVendasNoPeriodo) * 100 : null;
-  const sacForaDoIdeal = sacTaxaPct !== null && sacTaxaPct > SAC_TAXA_META_IDEAL_PCT;
 
   return (
     <div className="max-w-6xl mx-auto p-6 flex flex-col gap-6">
@@ -139,22 +139,13 @@ export function Dashboard({ data, range, monthlyEvolution }: { data: KpiData; ra
           uma que demorou 10min certinho, mas são situações bem diferentes
           pro cliente no WhatsApp). */}
       <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <StatTile
-          label="Total de chamados"
-          value={data.totalTickets}
-          size="lg"
-          note={`de ${data.totalVendasNoPeriodo.toLocaleString("pt-BR")} venda${data.totalVendasNoPeriodo === 1 ? "" : "s"} no período${
-            sacTaxaPct !== null ? ` (${sacTaxaPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)` : ""
-          }`}
-          badge={
-            sacForaDoIdeal
-              ? {
-                  label: `Fora da meta ideal (< ${SAC_TAXA_META_IDEAL_PCT.toLocaleString("pt-BR")}%)`,
-                  color: "var(--status-critical)",
-                  title: `Taxa de SAC atual: ${sacTaxaPct!.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%. Meta de excelência (padrão de mercado): abaixo de ${SAC_TAXA_META_IDEAL_PCT.toLocaleString("pt-BR")}%.`,
-                }
-              : undefined
-          }
+        <MetricCard
+          title="Total de chamados"
+          pct={sacTaxaPct}
+          count={data.totalTickets}
+          countNoun="chamados"
+          totalLabel={`de ${data.totalVendasNoPeriodo.toLocaleString("pt-BR")} venda${data.totalVendasNoPeriodo === 1 ? "" : "s"} no período`}
+          metaIdealPct={SAC_TAXA_META_IDEAL_PCT}
         />
         <StatTile
           label="Resposta no 1º contato"
