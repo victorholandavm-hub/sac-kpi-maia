@@ -66,13 +66,13 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
         />
         {/* Prejuízo Total Estimado em Estoque -- pedido do Victor
             10/09/2026: soma (1) prejuízo de PRODUTO (unidades trocadas/
-            enviadas × custo de reposição do Protheus, totvs_stock.unit_cost)
-            com (2) custo OPERACIONAL estático por tipo de chamado (frete/
-            motoboy, sem valor real no ERP -- estimativa fixa do Victor,
-            ver CUSTO_OPERACIONAL_POR_TIPO em kpiAssistencia.ts). A tag só
+            enviadas × custo de reposição do Protheus, totvs_stock.unit_cost,
+            já com o Fator de Recuperação de Ativo/ponto cego por categoria)
+            com (2) custo LOGÍSTICO real diluído (frota própria, R$38,05 por
+            chamado, ver CUSTO_LOGISTICO_BASE em kpiAssistencia.ts). A tag só
             cobre a cobertura da parte (1) -- a (2) é sempre um valor
-            conhecido por construção (estimativa), não precisa de
-            cobertura. Reestilizado 21/09/2026 (pedido do Victor: "tag leve
+            conhecido por construção, não precisa de cobertura. Reestilizado
+            21/09/2026 (pedido do Victor: "tag leve
             no mesmo estilo do primeiro card" + valor não pode quebrar
             linha) -- usa KpiCardShell/StatusPill em vez do StatTile
             genérico, mesma casca visual do MetricCard ao lado. */}

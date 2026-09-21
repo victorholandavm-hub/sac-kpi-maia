@@ -139,11 +139,12 @@ export function PrejuizoDetalheModal({
 
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--text-muted)" }}>
-            2. Custo operacional (estimativa fixa por tipo)
+            2. Custo logístico (frota própria)
           </h4>
           <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
-            Sem custo real de frete/operação no ERP — valor fixo por tipo de solicitação, com um multiplicador de 1,5x quando o
-            chamado envolve produto volumoso (estofado, colchão etc. — exige caminhão e equipe dupla).
+            Custo real diluído da frota própria (1 caminhão, 1 motorista, 2 ajudantes, ~13 chamados/dia de rota): R$38,05 por
+            chamado, igual pra qualquer tipo, com um multiplicador de 1,5x quando o chamado envolve produto volumoso (estofado,
+            colchão etc. — exige caminhão e equipe dupla).
           </p>
           <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
             <table className="w-full text-xs" style={{ minWidth: "420px" }}>
