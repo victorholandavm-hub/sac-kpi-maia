@@ -1,5 +1,4 @@
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { KpiCardShell, StatusPill } from "./KpiCardShell";
+import { KpiCardShell } from "./KpiCardShell";
 
 // Card de métrica com a PORCENTAGEM como protagonista -- pedido do Victor
 // 19/09/2026 (spec de UX/UI detalhada): "a métrica principal deve ser a
@@ -12,6 +11,13 @@ import { KpiCardShell, StatusPill } from "./KpiCardShell";
 // parte em vez de mais uma variante dentro do StatTile. Usa KpiCardShell
 // (KpiCardShell.tsx) -- mesma casca visual dos outros cards da fileira
 // (pedido do Victor 21/09/2026: "manter a consistência visual").
+//
+// Achado 21/09/2026 (Victor: "tire a tarja de 'fora da meta' e coloque o
+// numero percentual em vermelho caso esteja fora da meta, e verde se
+// estiver dentro da meta") -- a tag StatusPill que existia aqui antes saiu;
+// o status agora é só a COR do número (menos poluição visual, o mesmo
+// sinal). Vale pras duas abas (SAC e assistência) porque as duas usam este
+// mesmo componente.
 export function MetricCard({
   title,
   pct,
@@ -22,7 +28,7 @@ export function MetricCard({
 }: {
   title: string;
   // null quando não há vendas no período pra calcular a taxa -- card cai
-  // pro estado "sem dado" (sem tag de meta, sem porcentagem).
+  // pro estado "sem dado" (sem cor de status, sem porcentagem).
   pct: number | null;
   count: number;
   // "chamado"/"chamados" -- singular/plural de quem chama (SAC usa
@@ -35,27 +41,18 @@ export function MetricCard({
   metaIdealPct: number;
 }) {
   const foraDaMeta = pct !== null && pct > metaIdealPct;
+  const pctColor = pct === null ? "var(--text-primary)" : foraDaMeta ? "var(--status-critical)" : "var(--status-good)";
 
   return (
-    <KpiCardShell accentColor={pct !== null ? (foraDaMeta ? "var(--status-critical)" : "var(--status-good)") : undefined}>
+    <KpiCardShell accentColor={pct !== null ? pctColor : undefined}>
       <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
         {title}
       </span>
 
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <span className="text-5xl font-bold leading-none" style={{ color: "var(--text-primary)" }}>
-          {pct !== null ? pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}
-          {pct !== null ? <span className="text-2xl font-semibold ml-0.5">%</span> : null}
-        </span>
-
-        {pct !== null ? (
-          <StatusPill
-            label={foraDaMeta ? "Fora da meta" : "Dentro da meta"}
-            tone={foraDaMeta ? "critical" : "good"}
-            icon={foraDaMeta ? <AlertTriangle size={13} aria-hidden="true" /> : <CheckCircle2 size={13} aria-hidden="true" />}
-          />
-        ) : null}
-      </div>
+      <span className="text-5xl font-bold leading-none" style={{ color: pctColor }}>
+        {pct !== null ? pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}
+        {pct !== null ? <span className="text-2xl font-semibold ml-0.5">%</span> : null}
+      </span>
 
       <span className="text-sm" style={{ color: "var(--text-muted)" }}>
         {count.toLocaleString("pt-BR")} {countNoun} {totalLabel}
