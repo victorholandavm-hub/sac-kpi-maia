@@ -327,44 +327,26 @@ export type ProductBreakageStat = Count & {
   prejuizoEstimado: number;
 };
 
-// Custo operacional ESTÁTICO por tipo de chamado -- pedido do Victor
-// 10/09/2026: sem custo real de frete/operação no ERP, estimativa fixa
-// por chamado, valores dados por ele (não calculados/sincronizados de
-// lugar nenhum). "Troca com recolhimento" (rótulo que troca_produto usa
-// na tela do motorista, DRIVER_TYPE_LABELS) e "Troca de produto" (rótulo
-// do mesmo tipo em REQUEST_TYPE_LABELS) são o MESMO `type` no banco.
-// entrega_produto e envio_recolhimento_peca entraram em 10/09/2026 (ajuste
-// fino pós-teste do Victor, depois de ver o relatório com os dois
-// zerados) -- valores igualmente estáticos/estimados, mesmo racional dos
-// outros 4.
-// troca_produto: R$120 -> R$180 em 21/09/2026 (pedido do Victor: "a troca
-// exige fluxo duplo -- ir deixar o novo e trazer o antigo de volta").
-const CUSTO_OPERACIONAL_POR_TIPO: Partial<Record<RequestType, number>> = {
-  troca_produto: 180, // fluxo duplo -- leva o produto novo, recolhe o antigo
-  entrega_produto: 90,
-  envio_peca: 40, // frete/motoboy
-  recolhimento: 60, // recolhimento de peça
-  recolhimento_produto: 60, // recolhimento de produto
-  envio_recolhimento_peca: 70,
-};
+// Custo logístico REAL diluído -- pedido do Victor 21/09/2026: "descobrimos
+// os custos reais da nossa operação... 1 caminhão próprio, 1 motorista, 2
+// ajudantes, média fixa de 13 chamados/dia de rota". Substitui a matriz de
+// estimativas por tipo de 10-21/09/2026 (R$120/90/40/60/60/70, cada uma um
+// palpite separado) por um valor ÚNICO real -- a mesma frota atende
+// qualquer um dos 6 tipos de DELIVERY_REQUEST_TYPES (troca, entrega,
+// envio/recolhimento de peça ou produto), então todos pagam o mesmo frete
+// diluído. Sem diferença nenhuma por tipo mais -- CUSTO_OPERACIONAL_POR_TIPO
+// (Record por tipo) saiu de propósito, não faz mais sentido existir.
+const CUSTO_LOGISTICO_BASE = 38.05;
 
-// Multiplicador de volume/porte -- pedido do Victor 21/09/2026: produto
-// grande/pesado (Estofados, Colchões...) exige caminhão + equipe dupla,
-// diferente de uma peça pequena/ferragem que qualquer motoboy resolve.
-// Reaproveita familiaLogisticaDaCategoria (vendasProduto.ts, já usada em
-// /vendas pro mesmo conceito de "ocupa muito espaço no caminhão?") --
-// "grande"/"medio" aplica o multiplicador, "pequeno" mantém o valor
-// padrão. Só nos 3 fluxos que o Victor nomeou (Troca, Envio, Recolhimento
-// -- os 2 últimos cobrem peça E produto); Entrega de produto fica de fora
-// de propósito (não foi citada nesse pedido).
+// Multiplicador de volume/porte -- pedido do Victor 21/09/2026 (mesmo dia,
+// 2ª mensagem): "itens grandes como sofás e colchões ocupam muito mais
+// espaço no baú e exigem esforço máximo dos ajudantes" -- R$38,05 × 1,5 =
+// R$57,07. Reaproveita familiaLogisticaDaCategoria (vendasProduto.ts, já
+// usada em /vendas pro mesmo conceito de "ocupa muito espaço no
+// caminhão?") -- "grande"/"medio" aplica o multiplicador, "pequeno"
+// mantém o frete seco. Vale pra QUALQUER um dos 6 tipos agora (não só um
+// subconjunto) -- o frete base já é o mesmo pra todos.
 const MULTIPLICADOR_PRODUTO_VOLUMOSO = 1.5;
-const TIPOS_ELEGIVEIS_MULTIPLICADOR_VOLUME = new Set<RequestType>([
-  "troca_produto",
-  "envio_peca",
-  "recolhimento",
-  "recolhimento_produto",
-  "envio_recolhimento_peca",
-]);
 
 // Fator de Recuperação de Ativo -- pedido do Victor 21/09/2026: produto
 // que RETORNA pra fábrica/assistência (troca, recolhimento de produto) tem
@@ -522,15 +504,14 @@ const getAssistenciaKpiDataCached = unstable_cache(
     for (const [id, produtos] of itensPorChamado) produtosPorChamado.set(id, produtos.join(", "));
   }
 
-  // Custo operacional de UM chamado -- base do tipo (CUSTO_OPERACIONAL_POR_TIPO)
-  // x 1,5 se for um tipo elegível (TIPOS_ELEGIVEIS_MULTIPLICADOR_VOLUME) E o
-  // chamado tiver produto volumoso. Usada tanto no breakdown por código
-  // (abaixo) quanto no total/por-tipo (mais abaixo).
-  function custoOperacionalDoChamado(type: RequestType, requestId: string): number {
-    const base = CUSTO_OPERACIONAL_POR_TIPO[type] ?? 0;
-    if (base === 0) return 0;
-    const volumoso = TIPOS_ELEGIVEIS_MULTIPLICADOR_VOLUME.has(type) && chamadosComProdutoVolumoso.has(requestId);
-    return volumoso ? base * MULTIPLICADOR_PRODUTO_VOLUMOSO : base;
+  // Custo operacional de UM chamado -- CUSTO_LOGISTICO_BASE (R$38,05) x 1,5
+  // se o chamado tiver produto volumoso, senão o valor seco. Todo `rows` já
+  // é DELIVERY_REQUEST_TYPES (filtro da query acima) -- não precisa checar
+  // tipo, a frota própria atende os 6 tipos igual. Usada tanto no
+  // breakdown por código (abaixo) quanto no total/por-tipo (mais abaixo).
+  function custoOperacionalDoChamado(requestId: string): number {
+    const volumoso = chamadosComProdutoVolumoso.has(requestId);
+    return volumoso ? CUSTO_LOGISTICO_BASE * MULTIPLICADOR_PRODUTO_VOLUMOSO : CUSTO_LOGISTICO_BASE;
   }
 
   // Volumetria por dia -- mesmo formato (DayCount) do resto do painel de
@@ -657,7 +638,7 @@ const getAssistenciaKpiDataCached = unstable_cache(
       // atribuído à linha desse código (ver nota de possível sobreposição
       // em ProductBreakageStat.custoOperacionalEstimado acima; o total do
       // relatório não usa essa soma por linha).
-      breakageEntry.custoOperacionalEstimado += custoOperacionalDoChamado(parentRow.type, parentRow.id);
+      breakageEntry.custoOperacionalEstimado += custoOperacionalDoChamado(parentRow.id);
       const breakageTag = `produto_quebra:${codigo}`;
       (ticketsByTag[breakageTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
     }
@@ -898,8 +879,8 @@ const getAssistenciaKpiDataCached = unstable_cache(
   // depende.
   const custoOperacionalAgg = new Map<string, { type: RequestType; volumoso: boolean; count: number; valorUnitario: number }>();
   for (const r of rows) {
-    const volumoso = TIPOS_ELEGIVEIS_MULTIPLICADOR_VOLUME.has(r.type) && chamadosComProdutoVolumoso.has(r.id);
-    const valorUnitario = custoOperacionalDoChamado(r.type, r.id);
+    const volumoso = chamadosComProdutoVolumoso.has(r.id);
+    const valorUnitario = custoOperacionalDoChamado(r.id);
     const key = `${r.type}|${volumoso}`;
     const agg = custoOperacionalAgg.get(key) ?? { type: r.type, volumoso, count: 0, valorUnitario };
     agg.count += 1;
