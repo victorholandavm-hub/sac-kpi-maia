@@ -538,6 +538,43 @@ export async function getCustoUnitarioPorCodigo(codes: string[]): Promise<Map<st
   return resultado;
 }
 
+// Custo médio de reposição POR CATEGORIA (não por código) -- pedido do
+// Victor 21/09/2026: "se o produto não tiver unit_cost mapeado no
+// Protheus, não some R$0. Calcule o prejuízo usando o custo médio dos
+// produtos da mesma categoria que possuem o dado preenchido no sistema."
+// Fonte é o catálogo INTEIRO do Protheus (totvs_stock, ~3.700 linhas hoje
+// -- pequeno, cabe numa consulta só, nada a ver com os scans de centenas
+// de milhares de linhas já corrigidos nesta mesma sessão), classificado
+// por description via classificarProdutoAssistencia (mesma função que
+// kpiAssistencia.ts já usa pra categoria do item do chamado) -- é "quanto
+// custa em média um produto dessa família" (colchão, roupeiro etc.), não
+// o código específico que faltou custo. Record (não Map) de propósito --
+// unstable_cache serializa o retorno em JSON, e Map vira "{}" silenciosamente
+// (achado já documentado em outras funções desta sessão).
+export const getCustoMedioPorCategoria = unstable_cache(
+  async (): Promise<Record<string, number>> => {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.from("totvs_stock").select("description, unit_cost");
+    if (error) throw new Error(error.message);
+
+    const somaPorCategoria = new Map<string, number>();
+    const countPorCategoria = new Map<string, number>();
+    for (const row of data ?? []) {
+      if (row.unit_cost == null) continue;
+      const categoria = classificarProdutoAssistencia(row.description);
+      somaPorCategoria.set(categoria.key, (somaPorCategoria.get(categoria.key) ?? 0) + (Number(row.unit_cost) || 0));
+      countPorCategoria.set(categoria.key, (countPorCategoria.get(categoria.key) ?? 0) + 1);
+    }
+    const resultado: Record<string, number> = {};
+    for (const [categoria, soma] of somaPorCategoria) {
+      resultado[categoria] = soma / (countPorCategoria.get(categoria) ?? 1);
+    }
+    return resultado;
+  },
+  ["custo-medio-por-categoria"],
+  { revalidate: VENDAS_CACHE_REVALIDATE_SECONDS }
+);
+
 export type ProdutoSaldoEstoque = {
   // "o que tem em estoque" -- saldo físico no CD (current_balance),
   // independente de já estar comprometido com venda ou não.
