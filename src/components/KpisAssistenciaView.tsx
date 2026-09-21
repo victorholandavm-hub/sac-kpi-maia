@@ -53,6 +53,20 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
   // (ASSISTENCIA_TAXA_META_IDEAL_PCT, kpiAssistencia.ts).
   const assistenciaTaxaPct = data.totalVendasNoPeriodo > 0 ? (data.totalChamados / data.totalVendasNoPeriodo) * 100 : null;
 
+  // Economia potencial -- pedido do Victor 21/09/2026: "quanto de economia
+  // teriamos caso estivessemos no percentual ideal em comparação ao que
+  // temos hoje". "Chamados a mais" que o volume de vendas do período
+  // justificaria na meta ideal (ASSISTENCIA_TAXA_META_IDEAL_PCT) ×
+  // prejuízo MÉDIO por chamado (prejuizoTotalEstimado / totalChamados --
+  // já inclui estoque + logístico, ver getAssistenciaKpiData) = quanto
+  // esses chamados excedentes custaram no período. Nunca negativo -- já
+  // dentro/abaixo da meta ideal não vira "economia negativa", vira 0
+  // (nada a economizar).
+  const custoMedioPorChamado = data.totalChamados > 0 ? data.prejuizoTotalEstimado / data.totalChamados : 0;
+  const chamadosNaMetaIdeal = data.totalVendasNoPeriodo * (ASSISTENCIA_TAXA_META_IDEAL_PCT / 100);
+  const chamadosExcedentes = Math.max(0, Math.round(data.totalChamados - chamadosNaMetaIdeal));
+  const economiaPotencial = chamadosExcedentes * custoMedioPorChamado;
+
   return (
     <div className="flex flex-col gap-6">
       <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -108,12 +122,31 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
             {data.byStore.length}
           </span>
         </KpiCardShell>
-        <KpiCardShell>
+        {/* Economia potencial (meta ideal) -- pedido do Victor 21/09/2026,
+            no lugar do card "Rotas com chamado no período" (esse dado
+            continua disponível no ranking "Chamados por rota" mais abaixo,
+            só saiu do resumo do topo). Vermelho quando há economia
+            (sinaliza custo evitável); verde quando já está na meta ideal
+            (nada a economizar) -- mesma lógica de cor do MetricCard. */}
+        <KpiCardShell accentColor={economiaPotencial > 0 ? "var(--status-critical)" : "var(--status-good)"}>
           <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-            Rotas com chamado no período
+            Economia potencial (meta ideal)
+            <span
+              className="ml-1"
+              style={{ color: "var(--text-muted)" }}
+              aria-hidden="true"
+              title={`${chamadosExcedentes} chamado${chamadosExcedentes === 1 ? "" : "s"} a mais do que a meta ideal (< ${ASSISTENCIA_TAXA_META_IDEAL_PCT.toLocaleString("pt-BR")}%) justificaria pro volume de vendas do período, × ${formatBRL(custoMedioPorChamado)} de prejuízo médio por chamado (estoque + logística).`}
+            >
+              ⓘ
+            </span>
           </span>
-          <span className="text-5xl font-bold leading-none" style={{ color: "var(--text-primary)" }}>
-            {data.byRota.length}
+          <span className="text-2xl font-bold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+            {formatBRL(economiaPotencial)}
+          </span>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            {chamadosExcedentes > 0
+              ? `${chamadosExcedentes} chamado${chamadosExcedentes === 1 ? "" : "s"} a mais que a meta`
+              : "Já dentro da meta ideal"}
           </span>
         </KpiCardShell>
       </section>
