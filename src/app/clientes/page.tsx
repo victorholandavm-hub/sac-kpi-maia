@@ -51,13 +51,22 @@ function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function buildHref(params: { view?: string; q?: string; status?: string; nivel?: string; segmento?: string; page?: number }): string {
+function buildHref(params: {
+  view?: string;
+  q?: string;
+  status?: string;
+  nivel?: string;
+  segmento?: string;
+  inativo?: string;
+  page?: number;
+}): string {
   const sp = new URLSearchParams();
   if (params.view && params.view !== "nivel") sp.set("view", params.view);
   if (params.q) sp.set("q", params.q);
   if (params.status) sp.set("status", params.status);
   if (params.nivel) sp.set("nivel", params.nivel);
   if (params.segmento) sp.set("segmento", params.segmento);
+  if (params.inativo) sp.set("inativo", params.inativo);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/clientes?${qs}` : "/clientes";
@@ -66,10 +75,10 @@ function buildHref(params: { view?: string; q?: string; status?: string; nivel?:
 export default async function ClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; q?: string; status?: string; nivel?: string; segmento?: string; page?: string }>;
+  searchParams: Promise<{ view?: string; q?: string; status?: string; nivel?: string; segmento?: string; inativo?: string; page?: string }>;
 }) {
   await requireDashboardAuth();
-  const { view: viewParam, q, status, nivel, segmento, page: pageParam } = await searchParams;
+  const { view: viewParam, q, status, nivel, segmento, inativo, page: pageParam } = await searchParams;
   // Nível de relacionamento é a aba de aterrissagem (pedido do Victor
   // 15/08/2026) -- "status" só aparece quando pedido explicitamente na URL.
   const view = viewParam === "status" ? "status" : viewParam === "recompra" ? "recompra" : "nivel";
@@ -99,7 +108,7 @@ export default async function ClientesPage({
       ) : view === "recompra" ? (
         <RecompraView q={q} segmento={segmento} page={page} />
       ) : (
-        <NivelView q={q} nivel={nivel} page={page} />
+        <NivelView q={q} nivel={nivel} inativo={inativo} page={page} />
       )}
     </div>
   );
@@ -294,8 +303,13 @@ async function StatusView({ q, status, page }: { q?: string; status?: string; pa
   );
 }
 
-async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page: number }) {
+async function NivelView({ q, nivel, inativo, page }: { q?: string; nivel?: string; inativo?: string; page: number }) {
   const filterNivel = isClienteNivel(nivel) ? nivel : undefined;
+  // "Só inativos" -- pedido do Victor 21/09/2026: já existia o badge
+  // ⚠ por linha/card (inativoRecente, sem comprar há 180+ dias, ver
+  // DIAS_INATIVO_RECENTE em clientes.ts), mas sem jeito de FILTRAR só
+  // esses clientes -- precisava rolar a lista inteira procurando os ⚠.
+  const filterInativo = inativo === "1";
   const [todos, clvPorCliente] = await Promise.all([listClientesPorNivel(), listClvProjetadoPorCliente()]);
   // Potencial de receita projetado -- soma sobre TODOS os clientes (não só
   // a página/filtro atual), mesmo espírito de "prejuízo total" na Taxa de
@@ -318,6 +332,11 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
       (c) => (c.nome ?? "").toLowerCase().includes(qLower) || (c.cpfCnpj ?? "").toLowerCase().includes(qLower)
     );
   }
+  // Contagem ANTES do filtro de inativo (não depois) -- é o "quantos tem
+  // pra filtrar" que o toggle abaixo mostra, dentro do recorte de
+  // nível/busca já aplicado.
+  const totalInativosNoRecorte = filtrados.filter((c) => c.inativoRecente).length;
+  if (filterInativo) filtrados = filtrados.filter((c) => c.inativoRecente);
   // Maior gasto primeiro dentro de cada nível já filtrado -- ordem que
   // mais importa pra achar rápido quem vale mais dentro do recorte.
   filtrados = [...filtrados].sort((a, b) => b.gastoAcumulado - a.gastoAcumulado);
@@ -354,7 +373,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
         {CLIENTE_NIVEIS.map((n) => (
           <Link
             key={n}
-            href={buildHref({ view: "nivel", q, nivel: filterNivel === n ? undefined : n })}
+            href={buildHref({ view: "nivel", q, nivel: filterNivel === n ? undefined : n, inativo: filterInativo ? "1" : undefined })}
             className="rounded-xl border p-4 flex flex-col gap-1 transition-all hover:-translate-y-0.5 hover:shadow-md"
             style={{
               background: `color-mix(in srgb, ${CLIENTE_NIVEL_COLORS[n]} ${filterNivel === n ? 10 : 5}%, var(--surface-1))`,
@@ -394,6 +413,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
       <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap">
         <input type="hidden" name="view" value="nivel" />
         {filterNivel ? <input type="hidden" name="nivel" value={filterNivel} /> : null}
+        {filterInativo ? <input type="hidden" name="inativo" value="1" /> : null}
         <input
           type="search"
           name="q"
@@ -405,7 +425,22 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
         <button type="submit" className="text-sm px-4 py-2 rounded font-medium" style={{ background: "var(--brand-orange)", color: "#fff" }}>
           Buscar
         </button>
-        {q || filterNivel ? (
+        {/* Toggle "só inativos" -- pedido do Victor 21/09/2026. Link (não
+            checkbox) pra ficar no mesmo padrão de navegação GET dos cards
+            de nível acima (clicar de novo desliga o filtro); contagem no
+            próprio rótulo já reflete nível/busca em vigor (totalInativosNoRecorte). */}
+        <Link
+          href={buildHref({ view: "nivel", q, nivel: filterNivel, inativo: filterInativo ? undefined : "1" })}
+          className="text-sm px-3 py-2 rounded border font-medium flex items-center gap-1.5 whitespace-nowrap"
+          style={{
+            borderColor: filterInativo ? "var(--status-critical)" : "var(--border)",
+            color: filterInativo ? "var(--status-critical)" : "var(--text-secondary)",
+            background: filterInativo ? "color-mix(in srgb, var(--status-critical) 12%, var(--surface-1))" : "transparent",
+          }}
+        >
+          ⚠ Só inativos ({totalInativosNoRecorte})
+        </Link>
+        {q || filterNivel || filterInativo ? (
           <Link href={buildHref({ view: "nivel" })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             Limpar
           </Link>
@@ -436,7 +471,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
       {totalPages > 1 ? (
         <div className="flex items-center gap-2">
           <Link
-            href={buildHref({ view: "nivel", q, nivel: filterNivel, page: Math.max(1, pageClamped - 1) })}
+            href={buildHref({ view: "nivel", q, nivel: filterNivel, inativo: filterInativo ? "1" : undefined, page: Math.max(1, pageClamped - 1) })}
             aria-disabled={pageClamped <= 1}
             className="text-sm px-3 py-1.5 rounded border"
             style={{
@@ -448,7 +483,7 @@ async function NivelView({ q, nivel, page }: { q?: string; nivel?: string; page:
             ← Anterior
           </Link>
           <Link
-            href={buildHref({ view: "nivel", q, nivel: filterNivel, page: Math.min(totalPages, pageClamped + 1) })}
+            href={buildHref({ view: "nivel", q, nivel: filterNivel, inativo: filterInativo ? "1" : undefined, page: Math.min(totalPages, pageClamped + 1) })}
             aria-disabled={pageClamped >= totalPages}
             className="text-sm px-3 py-1.5 rounded border"
             style={{
