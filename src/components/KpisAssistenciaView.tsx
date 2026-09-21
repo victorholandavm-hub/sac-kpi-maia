@@ -100,7 +100,16 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
         <KpiCardShell accentColor="var(--status-critical)" onClick={() => setShowPrejuizoDetalhe(true)}>
           <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
             Prejuízo total estimado em estoque
-            <span className="ml-1" style={{ color: "var(--text-muted)" }} aria-hidden="true">
+            {/* Tooltip nativo (title) -- pedido do Victor 21/09/2026: texto
+                explicando a regra de negócio do valor total (custo exato +
+                estimativa proporcional do produto pai) separado do que o
+                badge de cobertura abaixo mede (só custo exato, ver title
+                do StatusPill mais abaixo). */}
+            <span
+              className="ml-1"
+              style={{ color: "var(--text-muted)" }}
+              title="O valor total combina o custo real exato do ERP com modelos de estimativas proporcionais para peças (calculados sobre o produto pai do chamado). O badge de cobertura permanece medindo estritamente os itens com custo real idêntico e mapeado via código no Protheus, servindo como auditoria de precisão do cadastro de engenharia de produtos."
+            >
               ⓘ
             </span>
           </span>
