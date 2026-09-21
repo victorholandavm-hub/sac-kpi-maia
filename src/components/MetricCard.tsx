@@ -12,12 +12,17 @@ import { KpiCardShell } from "./KpiCardShell";
 // (KpiCardShell.tsx) -- mesma casca visual dos outros cards da fileira
 // (pedido do Victor 21/09/2026: "manter a consistência visual").
 //
-// Achado 21/09/2026 (Victor: "tire a tarja de 'fora da meta' e coloque o
-// numero percentual em vermelho caso esteja fora da meta, e verde se
-// estiver dentro da meta") -- a tag StatusPill que existia aqui antes saiu;
-// o status agora é só a COR do número (menos poluição visual, o mesmo
-// sinal). Vale pras duas abas (SAC e assistência) porque as duas usam este
-// mesmo componente.
+// Achado 21/09/2026 (Victor, duas mensagens no mesmo dia): 1ª -- "tire a
+// tarja de 'fora da meta' e coloque o numero percentual em vermelho caso
+// esteja fora da meta, e verde se estiver dentro da meta" (a StatusPill
+// saiu, só a cor do número ficou). 2ª -- pediu a tag de volta ("tag de
+// status... ao lado do número"), mas com um estilo específico (rounded-md,
+// não rounded-full) -- não é a mesma StatusPill de KpiCardShell.tsx
+// (reaproveitada no card de Prejuízo, com rounded-full -- não mexida aqui
+// pra não mudar aquele também), é uma tag local só deste componente. Cor
+// do número + tag convivem agora -- os dois sinalizam o mesmo status,
+// nenhum pedido cancelou o outro de verdade. Vale pras duas abas (SAC e
+// assistência) porque as duas usam este mesmo componente.
 export function MetricCard({
   title,
   pct,
@@ -49,10 +54,20 @@ export function MetricCard({
         {title}
       </span>
 
-      <span className="text-5xl font-bold leading-none" style={{ color: pctColor }}>
-        {pct !== null ? pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}
-        {pct !== null ? <span className="text-2xl font-semibold ml-0.5">%</span> : null}
-      </span>
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <span className="text-5xl font-bold leading-none" style={{ color: pctColor }}>
+          {pct !== null ? pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) : "—"}
+          {pct !== null ? <span className="text-2xl font-semibold ml-0.5">%</span> : null}
+        </span>
+        {pct !== null ? (
+          <span
+            className="text-xs font-semibold rounded-md px-2 py-1 shrink-0"
+            style={{ background: `color-mix(in srgb, ${pctColor} 14%, var(--surface-1))`, color: pctColor }}
+          >
+            {foraDaMeta ? "Fora da meta" : "Dentro da meta"}
+          </span>
+        ) : null}
+      </div>
 
       <span className="text-sm" style={{ color: "var(--text-muted)" }}>
         {count.toLocaleString("pt-BR")} {countNoun} {totalLabel}
