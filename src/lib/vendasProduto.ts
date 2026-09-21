@@ -538,6 +538,32 @@ export async function getCustoUnitarioPorCodigo(codes: string[]): Promise<Map<st
   return resultado;
 }
 
+// Custo de reposição por DESCRIÇÃO exata (não por código) -- pedido do
+// Victor 21/09/2026, 2ª rodada: pro "Produto Pai" de um chamado de Envio de
+// peça (service_request_items.product, texto igual ao selecionado no
+// catálogo na hora de abrir o chamado -- confirmado por amostragem contra
+// totvs_stock.description, match exato). Não cacheada (ao contrário de
+// getCustoMedioPorCategoria acima) -- a lista de descrições varia a cada
+// chamada (período/produtos diferentes), unstable_cache não ajudaria aqui;
+// mesmo padrão não cacheado de getCustoUnitarioPorCodigo acima.
+export async function getCustoUnitarioPorDescricaoProduto(descricoes: string[]): Promise<Map<string, number>> {
+  const resultado = new Map<string, number>();
+  if (descricoes.length === 0) return resultado;
+
+  try {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin.from("totvs_stock").select("description, unit_cost").in("description", descricoes);
+    if (error) throw new Error(error.message);
+    for (const row of data ?? []) {
+      if (row.unit_cost == null) continue;
+      resultado.set(row.description, Number(row.unit_cost) || 0);
+    }
+  } catch (err) {
+    console.error("getCustoUnitarioPorDescricaoProduto:", (err as Error).message);
+  }
+  return resultado;
+}
+
 // Custo médio de reposição POR CATEGORIA (não por código) -- pedido do
 // Victor 21/09/2026: "se o produto não tiver unit_cost mapeado no
 // Protheus, não some R$0. Calcule o prejuízo usando o custo médio dos

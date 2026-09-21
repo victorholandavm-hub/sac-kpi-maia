@@ -10,6 +10,7 @@ import {
   familiaLogisticaDaCategoria,
   getVendaQuantidadePorCodigoNoPeriodo,
   getCustoUnitarioPorCodigo,
+  getCustoUnitarioPorDescricaoProduto,
   getCustoMedioPorCategoria,
   getEarliestSyncedOrderDate,
   getVendasCountPorLoja,
@@ -365,6 +366,64 @@ function productCostMultiplier(type: RequestType): number {
   return PRODUCT_COST_MULTIPLIER_POR_TIPO[type] ?? 1;
 }
 
+// Ponto cego do "Envio de peça" -- pedido do Victor 21/09/2026, 2ª rodada:
+// desde 14/09/2026 (migration 0127) o atendente é obrigado a vincular o
+// PRODUTO PAI ao chamado (service_request_items.product = descrição do
+// produto inteiro, part_name = a peça específica -- ver comentário no topo
+// do arquivo/PART_TYPES_REQUIRE_PART_NAME em actions.ts). Quando a PEÇA em
+// si não tem custo exato sincronizado (caso comum -- peças avulsas raramente
+// têm product_code próprio no Protheus), usa uma FRAÇÃO do custo do produto
+// pai (totvs_stock.unit_cost via description, ver
+// getCustoUnitarioPorDescricaoProduto/vendasProduto.ts) em vez de cair no
+// bucket "sem custo nenhum" -- elimina boa parte do "ponto cego" que hoje
+// aparece como % não rastreado no painel (a maioria concentrada exatamente
+// aqui, envio de peça sem part_code cadastrado).
+//
+// Peça Estrutural (20% do produto pai) -- porta, tampo, lateral, base,
+// frente, fundo: peça grande, cara de repor. Componente Menor (5%) --
+// puxador, led, prateleira, parafuso, dobradiça, corrediça, perfil, OU
+// qualquer texto que não bata com nenhuma das duas listas (padrão pedido
+// pelo Victor: "se não der match em nenhuma das palavras acima, considere
+// Componente Menor"). Por isso só a lista Estrutural vira array de
+// verdade abaixo -- Componente Menor é só o fallback de tudo que não é
+// Estrutural, não precisa de lista própria pra decidir.
+const PECA_ESTRUTURAL_KEYWORDS = ["PORTA", "TAMPO", "LATERAL", "BASE", "FRENTE", "FUNDO"];
+const PECA_ESTRUTURAL_PCT = 0.2;
+const COMPONENTE_MENOR_PCT = 0.05;
+
+function fatorProporcaoPeca(itemText: string): number {
+  const upper = itemText.toUpperCase();
+  return PECA_ESTRUTURAL_KEYWORDS.some((k) => upper.includes(k)) ? PECA_ESTRUTURAL_PCT : COMPONENTE_MENOR_PCT;
+}
+
+// Resolve o custo unitário de UM item de chamado -- ordem de prioridade:
+// (1) custo exato do CÓDIGO da peça no Protheus (custoExatoCodigo, já
+// resolvido por chamado); (2) pra "Envio de peça" sem custo exato, fração
+// do custo do produto pai (ver comentário acima -- vale mesmo dentro do
+// bucket CODIGO_NAO_IDENTIFICADO, que antes SEMPRE caía em null aqui,
+// mesmo sabendo o produto pai); (3) custo médio da categoria do produto
+// (ponto cego "genérico" já existente, 21/09/2026 1ª rodada) -- não se
+// aplica dentro de CODIGO_NAO_IDENTIFICADO (sem código, sem como saber se
+// o item pertence à mesma categoria do rótulo do grupo).
+function resolverCustoUnitarioItem(
+  item: { product: string | null; part_name: string | null },
+  parentType: RequestType,
+  isNaoIdentificado: boolean,
+  custoExatoCodigo: number | null,
+  custoPorDescricaoPai: Map<string, number>,
+  custoMedioPorCategoria: Record<string, number>
+): number | null {
+  if (custoExatoCodigo != null) return custoExatoCodigo;
+  if (parentType === "envio_peca" && item.product) {
+    const custoPai = custoPorDescricaoPai.get(item.product);
+    if (custoPai != null) {
+      return custoPai * fatorProporcaoPeca(item.part_name ?? item.product);
+    }
+  }
+  if (isNaoIdentificado) return null;
+  return item.product ? (custoMedioPorCategoria[classificarProdutoAssistencia(item.product).key] ?? null) : null;
+}
+
 // Linha do breakdown "custo operacional por tipo" -- ver
 // custoOperacionalPorTipo em AssistenciaKpiData/PrejuizoDetalheModal.tsx.
 export type CustoOperacionalPorTipoRow = {
@@ -454,7 +513,11 @@ const getAssistenciaKpiDataCached = unstable_cache(
   const ids = rows.map((r) => r.id);
   // part_code/quantity entraram 10/09/2026 -- base do cruzamento com
   // vendas (Taxa de Quebra/Prejuízo, ver ProductBreakageStat acima).
-  type ItemRow = { request_id: string; product: string | null; part_code: string | null; quantity: number | null };
+  // part_name entrou 21/09/2026 (2ª rodada) -- texto da PEÇA específica em
+  // "Envio de peça" (product virou o produto PAI inteiro desde 14/09/2026,
+  // ver comentário em resolverCustoUnitarioItem/fatorProporcaoPeca acima),
+  // usado pra classificar Peça Estrutural vs Componente Menor.
+  type ItemRow = { request_id: string; product: string | null; part_code: string | null; part_name: string | null; quantity: number | null };
   const items =
     ids.length === 0
       ? []
@@ -462,7 +525,7 @@ const getAssistenciaKpiDataCached = unstable_cache(
           (from, to) =>
             admin
               .from("service_request_items")
-              .select("request_id, product, part_code, quantity", { count: "exact" })
+              .select("request_id, product, part_code, part_name, quantity", { count: "exact" })
               .in("request_id", ids)
               .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemRow>>,
           { pageSize: PAGE_SIZE }
@@ -597,8 +660,29 @@ const getAssistenciaKpiDataCached = unstable_cache(
   const codigoPorChamado = new Set<string>();
   const breakagePorCodigo = new Map<
     string,
-    { label: string; count: number; itensQuantidade: number; itensQuantidadeAjustada: number; custoOperacionalEstimado: number }
+    {
+      label: string;
+      count: number;
+      itensQuantidade: number;
+      custoOperacionalEstimado: number;
+      // Preenchidos num 2º passe sobre `items`, DEPOIS do Promise.all mais
+      // abaixo (custo exato/categoria/produto pai só ficam prontos ali) --
+      // ver resolverCustoUnitarioItem. custoUnitarioSomaPeso/PesoTotal é
+      // média ponderada pela quantidade CRUA (não a ajustada pelo Fator de
+      // Recuperação de Ativo) -- é "quanto custa 1 unidade desse código",
+      // conceito independente do desconto por tipo; prejuizoEstoqueEstimado
+      // já é o valor FINAL (com o fator aplicado), soma direta do byProductBreakageAll.
+      prejuizoEstoqueEstimado: number;
+      custoUnitarioSomaPeso: number;
+      custoUnitarioPesoTotal: number;
+    }
   >();
+  // Descrições de produto PAI que precisam de custo (Envio de peça sem
+  // custo exato da peça, ver resolverCustoUnitarioItem) -- coletado aqui
+  // (mesmo passe que já varre `items`) pra buscar só o necessário em
+  // getCustoUnitarioPorDescricaoProduto (Promise.all mais abaixo), não a
+  // tabela toda.
+  const descricoesProdutoPaiEnvioPeca = new Set<string>();
   for (const item of items) {
     if (!item.product) continue;
     const parentRow = rowById.get(item.request_id);
@@ -618,18 +702,19 @@ const getAssistenciaKpiDataCached = unstable_cache(
       label: codigo === CODIGO_NAO_IDENTIFICADO ? LABEL_NAO_IDENTIFICADO : item.product,
       count: 0,
       itensQuantidade: 0,
-      itensQuantidadeAjustada: 0,
       custoOperacionalEstimado: 0,
+      prejuizoEstoqueEstimado: 0,
+      custoUnitarioSomaPeso: 0,
+      custoUnitarioPesoTotal: 0,
     };
     // itensQuantidade soma toda linha (sem dedupe -- unidade física de
     // verdade), `count` só cresce uma vez por chamado (mesmo dedupe de
-    // produtoCount acima, base da Taxa de Quebra). itensQuantidadeAjustada
-    // é a mesma soma, mas pesada pelo Fator de Recuperação de Ativo do TIPO
-    // do chamado (productCostMultiplier, ver PRODUCT_COST_MULTIPLIER_POR_TIPO
-    // acima) -- base do prejuízo de ESTOQUE mais abaixo, não da exibição
-    // de quantidade física (que continua usando itensQuantidade cru).
+    // produtoCount acima, base da Taxa de Quebra). O prejuízo de ESTOQUE em
+    // si (prejuizoEstoqueEstimado/custoUnitarioSomaPeso/PesoTotal) só é
+    // calculado num 2º passe mais abaixo, depois do Promise.all que resolve
+    // custo exato/categoria/produto pai -- ver resolverCustoUnitarioItem.
     breakageEntry.itensQuantidade += item.quantity ?? 1;
-    breakageEntry.itensQuantidadeAjustada += (item.quantity ?? 1) * productCostMultiplier(parentRow.type);
+    if (parentRow.type === "envio_peca") descricoesProdutoPaiEnvioPeca.add(item.product);
     if (!codigoPorChamado.has(codigoDedupeKey)) {
       codigoPorChamado.add(codigoDedupeKey);
       breakageEntry.count += 1;
@@ -682,6 +767,7 @@ const getAssistenciaKpiDataCached = unstable_cache(
   // mesmo recurso que a tela de Vendas usa pra avisar período fora do que
   // o sync cobre).
   const codigosReais = [...breakagePorCodigo.keys()].filter((c) => c !== CODIGO_NAO_IDENTIFICADO);
+  const descricoesPai = [...descricoesProdutoPaiEnvioPeca];
   const vendaRangeFrom = range.from
     ? range.from.toISOString().slice(0, 10)
     : ((await getEarliestSyncedOrderDate()) ?? range.to.toISOString().slice(0, 10));
@@ -705,46 +791,51 @@ const getAssistenciaKpiDataCached = unstable_cache(
   // conferiu noutros gráficos, fora do escopo desse cruzamento).
   const chamadosFromIso = `${vendaRange.from}T00:00:00.000Z`;
   const chamadosToIso = `${vendaRange.to}T23:59:59.999Z`;
-  const [vendaQtdPorCodigo, custoPorCodigo, custoMedioPorCategoria, vendasPorLoja, chamadosTodosTiposRows, allStores] = await Promise.all([
-    getVendaQuantidadePorCodigoNoPeriodo(codigosReais, vendaRange),
-    getCustoUnitarioPorCodigo(codigosReais),
-    // Ponto cego (código sem custo sincronizado) -- pedido do Victor
-    // 21/09/2026: em vez de R$0, usa o custo médio da categoria do
-    // produto (ver getCustoMedioPorCategoria/vendasProduto.ts).
-    getCustoMedioPorCategoria(),
-    // "Vendas x Assistência Técnica" (ver VendaVsAssistenciaStat acima) --
-    // denominador, do Protheus.
-    getVendasCountPorLoja(vendaRange),
-    // Numerador -- VENDA_VS_ASSISTENCIA_TYPES (não DELIVERY_REQUEST_TYPES
-    // de `rows`, ver comentário em byStoreVendaVsAssistencia), mesma
-    // janela de dias de `vendaRange` (ver chamadosFromIso/chamadosToIso
-    // acima -- não fromIso/toIso do `rows` principal, que usa uma borda
-    // ligeiramente diferente). Cancelada fica de fora, mesmo motivo/filtro
-    // de `rows` acima (nunca virou assistência de verdade). Linha inteira
-    // (não só store_id) -- pedido do Victor 14/09/2026: clicar no
-    // percentual abre a lista desses chamados (ver
-    // VendaVsAssistenciaStat.tickets abaixo).
-    fetchAllPagesParallel<ChamadoTodosTiposRow>(
-      (from, to) =>
-        admin
-          .from("service_requests")
-          .select("id, ticket_number, type, status, store_id, client_name, created_at, reason", { count: "exact" })
-          .in("type", VENDA_VS_ASSISTENCIA_TYPES)
-          .not("status", "eq", "cancelada")
-          .gte("created_at", chamadosFromIso)
-          .lte("created_at", chamadosToIso)
-          .range(from, to) as unknown as PromiseLike<PagedQueryResult<ChamadoTodosTiposRow>>,
-      { pageSize: PAGE_SIZE }
-    ),
-    // Nomes de TODAS as lojas -- achado ao revisar esses números
-    // 14/09/2026: resolver o nome só a partir do join de `chamadosTodosTiposRows`
-    // (como a primeira versão fazia) deixa sem nome exatamente a loja que
-    // teve vendas mas ZERO chamados no período -- o melhor caso possível,
-    // mas ficava mostrando o código cru da filial (ex.: "213") em vez do
-    // nome. `listStores()` (serviceRequests.ts) já é cacheada 60s e cobre
-    // TODAS as lojas, com ou sem chamado.
-    listStores(),
-  ]);
+  const [vendaQtdPorCodigo, custoPorCodigo, custoPorDescricaoPai, custoMedioPorCategoria, vendasPorLoja, chamadosTodosTiposRows, allStores] =
+    await Promise.all([
+      getVendaQuantidadePorCodigoNoPeriodo(codigosReais, vendaRange),
+      getCustoUnitarioPorCodigo(codigosReais),
+      // Custo do produto PAI (Envio de peça sem custo exato da peça, ver
+      // resolverCustoUnitarioItem/fatorProporcaoPeca acima) -- pedido do
+      // Victor 21/09/2026, 2ª rodada.
+      getCustoUnitarioPorDescricaoProduto(descricoesPai),
+      // Ponto cego (código sem custo sincronizado) -- pedido do Victor
+      // 21/09/2026: em vez de R$0, usa o custo médio da categoria do
+      // produto (ver getCustoMedioPorCategoria/vendasProduto.ts).
+      getCustoMedioPorCategoria(),
+      // "Vendas x Assistência Técnica" (ver VendaVsAssistenciaStat acima) --
+      // denominador, do Protheus.
+      getVendasCountPorLoja(vendaRange),
+      // Numerador -- VENDA_VS_ASSISTENCIA_TYPES (não DELIVERY_REQUEST_TYPES
+      // de `rows`, ver comentário em byStoreVendaVsAssistencia), mesma
+      // janela de dias de `vendaRange` (ver chamadosFromIso/chamadosToIso
+      // acima -- não fromIso/toIso do `rows` principal, que usa uma borda
+      // ligeiramente diferente). Cancelada fica de fora, mesmo motivo/filtro
+      // de `rows` acima (nunca virou assistência de verdade). Linha inteira
+      // (não só store_id) -- pedido do Victor 14/09/2026: clicar no
+      // percentual abre a lista desses chamados (ver
+      // VendaVsAssistenciaStat.tickets abaixo).
+      fetchAllPagesParallel<ChamadoTodosTiposRow>(
+        (from, to) =>
+          admin
+            .from("service_requests")
+            .select("id, ticket_number, type, status, store_id, client_name, created_at, reason", { count: "exact" })
+            .in("type", VENDA_VS_ASSISTENCIA_TYPES)
+            .not("status", "eq", "cancelada")
+            .gte("created_at", chamadosFromIso)
+            .lte("created_at", chamadosToIso)
+            .range(from, to) as unknown as PromiseLike<PagedQueryResult<ChamadoTodosTiposRow>>,
+        { pageSize: PAGE_SIZE }
+      ),
+      // Nomes de TODAS as lojas -- achado ao revisar esses números
+      // 14/09/2026: resolver o nome só a partir do join de `chamadosTodosTiposRows`
+      // (como a primeira versão fazia) deixa sem nome exatamente a loja que
+      // teve vendas mas ZERO chamados no período -- o melhor caso possível,
+      // mas ficava mostrando o código cru da filial (ex.: "213") em vez do
+      // nome. `listStores()` (serviceRequests.ts) já é cacheada 60s e cobre
+      // TODAS as lojas, com ou sem chamado.
+      listStores(),
+    ]);
   const storeNameById = new Map(allStores.map((s) => [s.id, s.name]));
   // Produto(s) desses chamados -- pedido do Victor 14/09/2026: "coloque o
   // nome do produto também" no resumo (TicketResumoModal.tsx). Mesmo
@@ -818,32 +909,61 @@ const getAssistenciaKpiDataCached = unstable_cache(
     })
     .sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1));
 
+  // 2º passe sobre `items` -- só agora (depois do Promise.all acima) custo
+  // exato/categoria/produto pai estão todos prontos. Resolve o custo
+  // unitário de CADA ITEM (não mais um único custoUnitario por código,
+  // como antes 21/09/2026) -- necessário porque o bucket
+  // CODIGO_NAO_IDENTIFICADO mistura itens de tipos/produtos diferentes, e
+  // agora "Envio de peça" dentro desse bucket pode ter custo (produto pai
+  // conhecido) enquanto outro tipo no MESMO bucket continua sem --
+  // impossível capturar isso com um valor só por código. Acumula em
+  // custoUnitarioSomaPeso/PesoTotal (média ponderada pela quantidade CRUA,
+  // pro "custo do produto" exibido no tooltip do ranking) e
+  // prejuizoEstoqueEstimado (soma já com o Fator de Recuperação de Ativo
+  // aplicado, pro prejuízo de verdade).
+  for (const item of items) {
+    if (!item.product) continue;
+    const parentRow = rowById.get(item.request_id);
+    if (!parentRow) continue;
+    const codigo = item.part_code?.trim() || CODIGO_NAO_IDENTIFICADO;
+    const entry = breakagePorCodigo.get(codigo);
+    if (!entry) continue;
+    const isNaoIdentificado = codigo === CODIGO_NAO_IDENTIFICADO;
+    const custoExatoCodigo = isNaoIdentificado ? null : (custoPorCodigo.get(codigo) ?? null);
+    const custoUnitarioItem = resolverCustoUnitarioItem(item, parentRow.type, isNaoIdentificado, custoExatoCodigo, custoPorDescricaoPai, custoMedioPorCategoria);
+    if (custoUnitarioItem != null) {
+      const qty = item.quantity ?? 1;
+      entry.custoUnitarioSomaPeso += custoUnitarioItem * qty;
+      entry.custoUnitarioPesoTotal += qty;
+      entry.prejuizoEstoqueEstimado += custoUnitarioItem * qty * productCostMultiplier(parentRow.type);
+    }
+  }
+
   let prejuizoEstoqueTotal = 0;
   // "Rastreado" = custo EXATO do código (totvs_stock.unit_cost direto),
-  // não a estimativa por categoria abaixo -- é o que prejuizoCobertura
-  // (badge "X% com custo de produto rastreado") mede, pra continuar
-  // avisando quanto do total é dado real vs. estimado, mesmo agora que
-  // "sem custo exato" não vira mais R$0.
+  // não a estimativa por categoria/produto pai abaixo -- é o que
+  // prejuizoCobertura (badge "X% com custo de produto rastreado") mede,
+  // pra continuar avisando quanto do total é dado real vs. estimado.
   let chamadosComCustoExato = 0;
   const byProductBreakageAll: ProductBreakageStat[] = [...breakagePorCodigo.entries()].map(([codigo, entry]) => {
     const isNaoIdentificado = codigo === CODIGO_NAO_IDENTIFICADO;
     const vendaQtd = isNaoIdentificado ? 0 : (vendaQtdPorCodigo.get(codigo) ?? 0);
     const custoExato = isNaoIdentificado ? null : (custoPorCodigo.get(codigo) ?? null);
-    // Ponto cego -- pedido do Victor 21/09/2026: código real (não o
-    // bucket "Não identificado") sem custo sincronizado usa o custo médio
-    // da categoria do produto em vez de R$0 (ver getCustoMedioPorCategoria/
-    // vendasProduto.ts).
-    const custoUnitario =
-      custoExato ?? (isNaoIdentificado ? null : (custoMedioPorCategoria[classificarProdutoAssistencia(entry.label).key] ?? null));
+    // Custo unitário exibido = média ponderada (por quantidade crua) dos
+    // custos por item resolvidos no 2º passe acima -- ver comentário na
+    // declaração de breakagePorCodigo. null só quando NENHUM item do
+    // código conseguiu resolver custo nenhum (nem exato, nem produto pai,
+    // nem categoria).
+    const custoUnitario = entry.custoUnitarioPesoTotal > 0 ? entry.custoUnitarioSomaPeso / entry.custoUnitarioPesoTotal : null;
     // N/A (não 0%) quando: sem código, sem venda no período, ou venda
     // abaixo de MIN_VENDA_PARA_TAXA (ruído de baixo volume) -- ver
     // comentário em ProductBreakageStat/MIN_VENDA_PARA_TAXA acima.
     const taxaQuebraPct = !isNaoIdentificado && vendaQtd >= MIN_VENDA_PARA_TAXA ? (entry.count / vendaQtd) * 100 : null;
-    // itensQuantidadeAjustada (não itensQuantidade cru) -- já vem pesada
-    // pelo Fator de Recuperação de Ativo do tipo do chamado (0 pra
-    // entrega_produto, 0,7 pra troca/recolhimento de produto, 1 pro
+    // Já vem pronto do 2º passe acima -- soma por item, cada um já com o
+    // Fator de Recuperação de Ativo do TIPO daquele chamado aplicado (0
+    // pra entrega_produto, 0,7 pra troca/recolhimento de produto, 1 pro
     // resto -- ver PRODUCT_COST_MULTIPLIER_POR_TIPO).
-    const prejuizoEstoque = custoUnitario != null ? entry.itensQuantidadeAjustada * custoUnitario : null;
+    const prejuizoEstoque = custoUnitario != null ? entry.prejuizoEstoqueEstimado : null;
     if (prejuizoEstoque != null) {
       prejuizoEstoqueTotal += prejuizoEstoque;
     }

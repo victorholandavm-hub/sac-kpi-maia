@@ -87,8 +87,9 @@ export function PrejuizoDetalheModal({
             Unidades trocadas/enviadas × custo de reposição do Protheus (totvs_stock.unit_cost), com desconto de 30% (fator de
             recuperação de ativo) pra produto que retorna à assistência/fábrica, e zerado pra entrega de produto (o item já foi
             computado na venda original). Custo exato do Protheus em {prejuizoCobertura.withValue} de {prejuizoCobertura.total}{" "}
-            chamados ({prejuizoCobertura.pct}%) — o resto usa o custo médio da categoria do produto como estimativa (nunca R$0),
-            exceto quando não tem nem código do produto identificado.
+            chamados ({prejuizoCobertura.pct}%) — pra Envio de peça sem custo exato da peça, usa 20% (peça estrutural) ou 5%
+            (componente menor) do custo do produto pai vinculado ao chamado; o restante usa o custo médio da categoria do produto
+            (nunca R$0), exceto quando não tem nem código do produto identificado nem produto pai com custo conhecido.
           </p>
           {topProdutos.length === 0 ? (
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
