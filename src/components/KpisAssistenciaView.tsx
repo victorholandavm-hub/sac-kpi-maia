@@ -10,6 +10,7 @@ import { BarRanking } from "./BarRanking";
 import { ProductBreakageRanking } from "./assistencia/ProductBreakageRanking";
 import { VendaVsAssistenciaTable } from "./assistencia/VendaVsAssistenciaTable";
 import { PrejuizoDetalheModal } from "./assistencia/PrejuizoDetalheModal";
+import { DiagnosticoEstrategicoModal } from "./assistencia/DiagnosticoEstrategicoModal";
 import { VolumeChart } from "./VolumeChart";
 import { CausaRaizDonutChart } from "./CausaRaizDonutChart";
 import { AssistenciaTicketsModal } from "./AssistenciaTicketsModal";
@@ -31,6 +32,11 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
   // modal já lê tudo direto de `data`) -- mais simples que replicar o
   // padrão de ticketsModal acima, que precisa saber QUAL barra foi clicada.
   const [showPrejuizoDetalhe, setShowPrejuizoDetalhe] = useState(false);
+  // Modal de Diagnóstico Estratégico -- pedido do Victor 21/09/2026, aberto
+  // pelo card "Economia potencial (meta ideal)". Mesmo padrão booleano de
+  // showPrejuizoDetalhe acima -- conteúdo 100% estático, não depende de
+  // qual card/linha foi clicada.
+  const [showDiagnosticoEstrategico, setShowDiagnosticoEstrategico] = useState(false);
 
   function openDrilldown(item: Count) {
     const tag = item.tag ?? item.label;
@@ -127,15 +133,21 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
             continua disponível no ranking "Chamados por rota" mais abaixo,
             só saiu do resumo do topo). Vermelho quando há economia
             (sinaliza custo evitável); verde quando já está na meta ideal
-            (nada a economizar) -- mesma lógica de cor do MetricCard. */}
-        <KpiCardShell accentColor={economiaPotencial > 0 ? "var(--status-critical)" : "var(--status-good)"}>
+            (nada a economizar) -- mesma lógica de cor do MetricCard. Clique
+            abre o Diagnóstico Estratégico (DiagnosticoEstrategicoModal.tsx,
+            pedido do Victor no mesmo dia: "plano de ataque" pra reduzir a
+            taxa pra menos de 3%). */}
+        <KpiCardShell
+          accentColor={economiaPotencial > 0 ? "var(--status-critical)" : "var(--status-good)"}
+          onClick={() => setShowDiagnosticoEstrategico(true)}
+        >
           <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
             Economia potencial (meta ideal)
             <span
               className="ml-1"
               style={{ color: "var(--text-muted)" }}
               aria-hidden="true"
-              title={`${chamadosExcedentes} chamado${chamadosExcedentes === 1 ? "" : "s"} a mais do que a meta ideal (< ${ASSISTENCIA_TAXA_META_IDEAL_PCT.toLocaleString("pt-BR")}%) justificaria pro volume de vendas do período, × ${formatBRL(custoMedioPorChamado)} de prejuízo médio por chamado (estoque + logística).`}
+              title={`${chamadosExcedentes} chamado${chamadosExcedentes === 1 ? "" : "s"} a mais do que a meta ideal (< ${ASSISTENCIA_TAXA_META_IDEAL_PCT.toLocaleString("pt-BR")}%) justificaria pro volume de vendas do período, × ${formatBRL(custoMedioPorChamado)} de prejuízo médio por chamado (estoque + logística). Clique pra ver o plano de ataque.`}
             >
               ⓘ
             </span>
@@ -232,6 +244,8 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           onClose={() => setShowPrejuizoDetalhe(false)}
         />
       ) : null}
+
+      {showDiagnosticoEstrategico ? <DiagnosticoEstrategicoModal onClose={() => setShowDiagnosticoEstrategico(false)} /> : null}
     </div>
   );
 }
