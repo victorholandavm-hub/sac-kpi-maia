@@ -33,8 +33,9 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
   // padrão de ticketsModal acima, que precisa saber QUAL barra foi clicada.
   const [showPrejuizoDetalhe, setShowPrejuizoDetalhe] = useState(false);
   // Modal de Diagnóstico Estratégico -- pedido do Victor 21/09/2026, aberto
-  // pelo card "Economia potencial (meta ideal)". Mesmo padrão booleano de
-  // showPrejuizoDetalhe acima -- conteúdo 100% estático, não depende de
+  // pelo card "Prejuízo acima da meta" (renomeado de "Economia potencial
+  // (meta ideal)" no mesmo dia, valor/cálculo continuam os mesmos). Mesmo
+  // padrão booleano de showPrejuizoDetalhe acima -- conteúdo 100% estático, não depende de
   // qual card/linha foi clicada.
   const [showDiagnosticoEstrategico, setShowDiagnosticoEstrategico] = useState(false);
 
@@ -128,8 +129,9 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
             {data.byStore.length}
           </span>
         </KpiCardShell>
-        {/* Economia potencial (meta ideal) -- pedido do Victor 21/09/2026,
-            no lugar do card "Rotas com chamado no período" (esse dado
+        {/* Prejuízo acima da meta (nome do card, renomeado de "Economia
+            potencial (meta ideal)" -- pedido do Victor 21/09/2026, no
+            lugar do card "Rotas com chamado no período" (esse dado
             continua disponível no ranking "Chamados por rota" mais abaixo,
             só saiu do resumo do topo). Vermelho quando há economia
             (sinaliza custo evitável); verde quando já está na meta ideal
@@ -142,7 +144,7 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
           onClick={() => setShowDiagnosticoEstrategico(true)}
         >
           <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-            Economia potencial (meta ideal)
+            Prejuízo acima da meta
             <span
               className="ml-1"
               style={{ color: "var(--text-muted)" }}

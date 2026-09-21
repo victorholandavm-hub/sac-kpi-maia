@@ -120,7 +120,11 @@ export function DiagnosticoEstrategicoModal({ onClose }: { onClose: () => void }
           </button>
         </div>
 
-        <div className="p-5 flex flex-col gap-6">
+        {/* Grid 2 colunas em telas grandes -- pedido do Victor 21/09/2026:
+            "evitar o excesso de scroll vertical e permitir visualizar todo
+            o plano de ação de uma vez só na tela". Empilhado (1 coluna) em
+            telas pequenas, onde 2 colunas ficariam espremidas demais. */}
+        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <section className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <AlertTriangle size={16} style={{ color: "var(--status-critical)" }} aria-hidden="true" />
