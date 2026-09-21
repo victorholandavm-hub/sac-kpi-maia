@@ -19,7 +19,7 @@
 // componentes shadcn/ui. Mandar TODOS os milhares de clientes pro cliente
 // de uma vez (pra paginação/ordenação 100% client-side) pesaria demais no
 // payload inicial -- por isso `manualPagination` aqui, não getPaginationRowModel.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 // @tanstack/react-table v9 troca useReactTable/getCoreRowModel/
 // getExpandedRowModel/ColumnDef (API v8 clássica) por um modelo novo de
 // registro explícito de "features" (useTable + tableFeatures(...)) --
@@ -58,6 +58,52 @@ function formatDateOnly(value: string | null): string {
   return `${d}/${m}/${y}`;
 }
 
+// Ordenação por coluna no CLIENTE (não volta pro servidor) -- pedido do
+// Victor 21/09/2026: "quando eu clicar em pos., compras, gasto acum.,
+// ultima compra ou dias sem comprar, a tabela seja organizada de acordo
+// com a coluna que eu cliquei". Só essas 5 colunas (as outras -- nome,
+// nível, CLV, loja -- não foram pedidas). 1º clique numa coluna nova =
+// desc (maior/mais recente primeiro, o que costuma interessar mais à
+// primeira vista); 2º clique na MESMA coluna alterna pra asc; clicar em
+// "Pos." sempre volta ao estado padrão (a ordem que a página já manda,
+// por gasto acumulado geral -- ver NivelView em clientes/page.tsx), não
+// um "3º clique" na mesma coluna -- é o próprio pedido do Victor ("se
+// clicar em pos., ele volta pra pos. padrão").
+type SortColumn = "compras" | "gasto" | "ultimaCompra" | "diasSemComprar";
+type SortState = { column: SortColumn; direction: "asc" | "desc" } | null;
+
+function SortableHeader({
+  label,
+  active,
+  direction,
+  onClick,
+  align = "right",
+}: {
+  label: string;
+  active: boolean;
+  direction: "asc" | "desc" | null;
+  onClick: () => void;
+  // "Última compra" é a única coluna ordenável alinhada à esquerda (o
+  // resto -- Pos., Compras, Gasto acum., Dias sem comprar -- é numérico,
+  // à direita) -- precisa bater com o alinhamento da CÉLULA de cada
+  // coluna, senão cabeçalho e dado ficam desencontrados.
+  align?: "left" | "right";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-1 w-full hover:text-foreground transition-colors cursor-pointer ${align === "right" ? "justify-end" : "justify-start"}`}
+      style={{ color: active ? "var(--brand-orange)" : undefined }}
+    >
+      {label}
+      <span className="text-[9px] leading-none w-2.5 shrink-0" aria-hidden="true">
+        {direction ? (direction === "asc" ? "▲" : "▼") : ""}
+      </span>
+    </button>
+  );
+}
+
 export function ClientesNivelTable({
   items,
   clvByClientId,
@@ -77,6 +123,37 @@ export function ClientesNivelTable({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const scrollElRef = useRef<HTMLDivElement | null>(null);
   const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const [sort, setSort] = useState<SortState>(null);
+  function toggleSort(column: SortColumn) {
+    setSort((prev) => (prev && prev.column === column ? { column, direction: prev.direction === "desc" ? "asc" : "desc" } : { column, direction: "desc" }));
+  }
+  const sortedItems = useMemo(() => {
+    if (!sort) return items;
+    const dir = sort.direction === "asc" ? 1 : -1;
+    const valueOf = (c: ClienteNivelInfo): number | null => {
+      switch (sort.column) {
+        case "compras":
+          return c.compras;
+        case "gasto":
+          return c.gastoAcumulado;
+        case "ultimaCompra":
+          return c.ultimaCompra ? new Date(c.ultimaCompra).getTime() : null;
+        case "diasSemComprar":
+          return c.diasSemComprar;
+      }
+    };
+    return [...items].sort((a, b) => {
+      const av = valueOf(a);
+      const bv = valueOf(b);
+      // Sem dado (nunca comprou) sempre por último, nas duas direções --
+      // não faz sentido esse cliente competir por "maior" nem "menor".
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (av - bv) * dir;
+    });
+  }, [items, sort]);
 
   // Barra de rolagem duplicada no topo -- pedido do Victor 15/09/2026:
   // tabela comprida (muitas linhas), o scrollbar horizontal só aparece no
@@ -136,7 +213,11 @@ export function ClientesNivelTable({
       // esquerda do dado, mesmo as duas bordas direitas coincidindo
       // (confirmado por medição -- thead/tbody sempre têm a mesma largura
       // de coluna numa <table> só). Abreviar encolhe essa folga.
-      header: () => <div className="text-right">Pos.</div>,
+      // Clicável -- pedido do Victor 21/09/2026: "se clicar em pos., ele
+      // volta pra pos. padrão", ou seja, reseta a ordenação das outras
+      // colunas (ver toggleSort/sort acima) pra ordem original que a
+      // página já manda.
+      header: () => <SortableHeader label="Pos." active={sort === null} direction={null} onClick={() => setSort(null)} />,
       cell: ({ row }) => <div className="text-right text-muted-foreground tabular-nums">{row.original.posicaoNoNivel}º</div>,
     },
     {
@@ -170,7 +251,14 @@ export function ClientesNivelTable({
     {
       id: "compras",
       accessorKey: "compras",
-      header: () => <div className="text-right">Compras</div>,
+      header: () => (
+        <SortableHeader
+          label="Compras"
+          active={sort?.column === "compras"}
+          direction={sort?.column === "compras" ? sort.direction : null}
+          onClick={() => toggleSort("compras")}
+        />
+      ),
       // Botão "Ver compras (N)" em vez de só o número -- pedido do Victor
       // 16/09/2026, mesma lógica de "Ver produtos (N)" da tela de Entregas
       // (abre modal em vez de expandir a linha, ver ComprasModalButton.tsx).
@@ -185,12 +273,36 @@ export function ClientesNivelTable({
       accessorKey: "gastoAcumulado",
       // Coluna de valores financeiros alinhada à direita + moeda pt-BR
       // (pedido explícito).
-      header: () => <div className="text-right">Gasto acum.</div>,
+      header: () => (
+        <SortableHeader
+          label="Gasto acum."
+          active={sort?.column === "gasto"}
+          direction={sort?.column === "gasto" ? sort.direction : null}
+          onClick={() => toggleSort("gasto")}
+        />
+      ),
       cell: ({ getValue }) => <div className="text-right font-semibold text-[var(--brand-green)] tabular-nums">{formatBRL(getValue<number>())}</div>,
     },
     {
       id: "clv",
-      header: () => <div className="text-right">CLV ({CLV_HORIZONTE_ANOS}a)</div>,
+      header: () => (
+        <div className="flex items-center gap-1 justify-end">
+          CLV ({CLV_HORIZONTE_ANOS}a)
+          {/* Pedido do Victor 21/09/2026: explicar o que é CLV direto na
+              coluna -- é onde o número aparece linha a linha, diferente do
+              "i" do card "Potencial de receita projetado" acima (que
+              explica a FÓRMULA de agregação, ver clientes/page.tsx), esse
+              aqui explica o CONCEITO pra quem nunca ouviu o termo. */}
+          <span
+            title="CLV = Customer Lifetime Value (valor vitalício projetado). Não é gasto ÷ anos de relacionamento: pra cada categoria de produto que o cliente já comprou, projeta quantos ciclos de reposição cabem nos próximos 5 anos × o valor médio que ele gastou nessa categoria, com desconto de 50% se o histórico de atrito com a assistência técnica for alto."
+            aria-label="O que é CLV"
+            className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0 normal-case"
+            style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
+          >
+            i
+          </span>
+        </div>
+      ),
       cell: ({ row }) => {
         const clv = clvByClientId[row.original.clientId];
         return <div className="text-right text-muted-foreground tabular-nums">{clv !== undefined ? formatBRL(clv) : "—"}</div>;
@@ -205,12 +317,27 @@ export function ClientesNivelTable({
     {
       id: "ultimaCompra",
       accessorKey: "ultimaCompra",
-      header: "Última compra",
+      header: () => (
+        <SortableHeader
+          label="Última compra"
+          active={sort?.column === "ultimaCompra"}
+          direction={sort?.column === "ultimaCompra" ? sort.direction : null}
+          onClick={() => toggleSort("ultimaCompra")}
+          align="left"
+        />
+      ),
       cell: ({ getValue }) => <span className="text-muted-foreground whitespace-nowrap">{formatDateOnly(getValue<string | null>())}</span>,
     },
     {
       id: "diasSemComprar",
-      header: () => <div className="text-right">Dias sem comprar</div>,
+      header: () => (
+        <SortableHeader
+          label="Dias sem comprar"
+          active={sort?.column === "diasSemComprar"}
+          direction={sort?.column === "diasSemComprar" ? sort.direction : null}
+          onClick={() => toggleSort("diasSemComprar")}
+        />
+      ),
       cell: ({ row }) => (
         <div className={`text-right tabular-nums ${row.original.inativoRecente ? "text-destructive" : "text-muted-foreground"}`}>
           {row.original.diasSemComprar ?? "—"}
@@ -246,7 +373,7 @@ export function ClientesNivelTable({
   ];
 
   const table = useReactTable({
-    data: items,
+    data: sortedItems,
     columns,
     getRowId: (row) => row.clientId,
     getCoreRowModel: getCoreRowModel(),
