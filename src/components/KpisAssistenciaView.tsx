@@ -4,8 +4,8 @@ import { useState } from "react";
 import type { Count } from "@/lib/kpi";
 import { ASSISTENCIA_TAXA_META_IDEAL_PCT, type AssistenciaKpiData } from "@/lib/kpiAssistencia";
 import type { ReportRowItem } from "@/lib/serviceRequests";
-import { StatTile } from "./StatTile";
 import { MetricCard } from "./MetricCard";
+import { KpiCardShell, StatusPill } from "./KpiCardShell";
 import { BarRanking } from "./BarRanking";
 import { ProductBreakageRanking } from "./assistencia/ProductBreakageRanking";
 import { VendaVsAssistenciaTable } from "./assistencia/VendaVsAssistenciaTable";
@@ -69,25 +69,53 @@ export function KpisAssistenciaView({ data }: { data: AssistenciaKpiData }) {
             enviadas × custo de reposição do Protheus, totvs_stock.unit_cost)
             com (2) custo OPERACIONAL estático por tipo de chamado (frete/
             motoboy, sem valor real no ERP -- estimativa fixa do Victor,
-            ver CUSTO_OPERACIONAL_POR_TIPO em kpiAssistencia.ts). O badge
-            só cobre a cobertura da parte (1) -- a (2) é sempre um valor
+            ver CUSTO_OPERACIONAL_POR_TIPO em kpiAssistencia.ts). A tag só
+            cobre a cobertura da parte (1) -- a (2) é sempre um valor
             conhecido por construção (estimativa), não precisa de
-            cobertura. */}
-        <StatTile
-          label="Prejuízo total estimado em estoque"
-          value={formatBRL(data.prejuizoTotalEstimado)}
-          size="lg"
-          accent="var(--status-critical)"
-          onClick={() => setShowPrejuizoDetalhe(true)}
-          badge={{
-            label: `${data.prejuizoCobertura.pct}% com custo de produto rastreado`,
-            color: "var(--status-critical)",
-            title: `Soma custo de produto (unidades × custo de reposição do Protheus) com custo operacional estimado (frete/motoboy, valor fixo por tipo -- não vem do ERP). A parte de PRODUTO só está rastreada em ${data.prejuizoCobertura.withValue} de ${data.prejuizoCobertura.total} chamados (${data.prejuizoCobertura.pct}%) -- quem não tem código Protheus + custo sincronizado entra só com o custo operacional estimado. Clique no card pra ver o detalhamento.`,
-          }}
-        />
-        <StatTile label="Produtos distintos com chamado" value={data.distinctProductCount} />
-        <StatTile label="Lojas com chamado no período" value={data.byStore.length} />
-        <StatTile label="Rotas com chamado no período" value={data.byRota.length} />
+            cobertura. Reestilizado 21/09/2026 (pedido do Victor: "tag leve
+            no mesmo estilo do primeiro card" + valor não pode quebrar
+            linha) -- usa KpiCardShell/StatusPill em vez do StatTile
+            genérico, mesma casca visual do MetricCard ao lado. */}
+        <KpiCardShell accentColor="var(--status-critical)" onClick={() => setShowPrejuizoDetalhe(true)}>
+          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            Prejuízo total estimado em estoque
+            <span className="ml-1" style={{ color: "var(--text-muted)" }} aria-hidden="true">
+              ⓘ
+            </span>
+          </span>
+          <span className="text-2xl font-bold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+            {formatBRL(data.prejuizoTotalEstimado)}
+          </span>
+          <StatusPill
+            label={`${data.prejuizoCobertura.pct}% com custo de produto rastreado`}
+            tone="critical"
+            title={`Soma custo de produto (unidades × custo de reposição do Protheus) com custo operacional estimado (frete/motoboy, valor fixo por tipo -- não vem do ERP). A parte de PRODUTO só está rastreada em ${data.prejuizoCobertura.withValue} de ${data.prejuizoCobertura.total} chamados (${data.prejuizoCobertura.pct}%) -- quem não tem código Protheus + custo sincronizado entra só com o custo operacional estimado. Clique no card pra ver o detalhamento.`}
+          />
+        </KpiCardShell>
+        <KpiCardShell>
+          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            Produtos distintos com chamado
+          </span>
+          <span className="text-5xl font-bold leading-none" style={{ color: "var(--text-primary)" }}>
+            {data.distinctProductCount}
+          </span>
+        </KpiCardShell>
+        <KpiCardShell>
+          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            Lojas com chamado no período
+          </span>
+          <span className="text-5xl font-bold leading-none" style={{ color: "var(--text-primary)" }}>
+            {data.byStore.length}
+          </span>
+        </KpiCardShell>
+        <KpiCardShell>
+          <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            Rotas com chamado no período
+          </span>
+          <span className="text-5xl font-bold leading-none" style={{ color: "var(--text-primary)" }}>
+            {data.byRota.length}
+          </span>
+        </KpiCardShell>
       </section>
 
       <VolumeChart data={data.dailyVolume} title="Volume de chamados de assistência por dia" />
