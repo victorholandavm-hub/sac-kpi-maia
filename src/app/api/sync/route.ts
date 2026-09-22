@@ -4,7 +4,7 @@ import { businessMinutesBetween } from "@/lib/businessHours";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
 import { fetchGhlMessages, upsertGhlContact, addContactTag, findGhlConversationId, type GhlMessage } from "@/lib/ghlClient";
 import { isMostruarioRequest } from "@/lib/serviceRequests";
-import { NPS_GHL_TAG } from "@/lib/npsDetratores";
+import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "@/lib/npsDetratores";
 import { enrollPendingCompraNps, detectPendingCompraNpsResponses } from "@/lib/nps2Meses";
 import { enrollPendingEntregaNps, detectPendingEntregaNpsResponses } from "@/lib/entregaNps";
 
@@ -114,15 +114,22 @@ async function firstResponseMinutes(ghlConversationId: string): Promise<number |
 // (ex.: "4 - Satisfeito") -- confirmado inspecionando mensagens reais via
 // API antes de escrever esse regex. Pega a resposta mais recente que bater
 // com o padrão, caso o cliente responda a enquete mais de uma vez.
-const NPS_PATTERN = /^([1-5])\s*-\s*(muito insatisfeito|insatisfeito|indiferente|satisfeito|muito satisfeito)\s*$/i;
-
+// NPS_1_5_PATTERN (npsDetratores.ts) -- mesmo regex reaproveitado por
+// detectPendingNpsResponses abaixo desde 22/09/2026 (as 4 pesquisas
+// adicionais passaram a usar o mesmo mecanismo de WhatsApp List Message do
+// SAC, pedido do Victor). Risco aceito: se o mesmo cliente tiver duas
+// pesquisas pendentes na mesma conversa ao mesmo tempo (ex.: SAC e
+// assistência técnica), uma resposta pode em teoria bater com as duas --
+// detectPendingNpsResponses mitiga isso parcialmente (só aceita resposta
+// depois do enviado_em daquela pesquisa específica), mas não elimina o
+// risco por completo. Raro na prática, não bloqueou a decisão.
 async function detectNpsScore(ghlConversationId: string): Promise<{ score: number; answeredAt: string } | null> {
   const msgs = await fetchGhlMessages(ghlConversationId);
   if (!msgs) return null;
-  const matches = msgs.filter((m) => m.direction === "inbound" && NPS_PATTERN.test((m.body ?? "").trim()));
+  const matches = msgs.filter((m) => m.direction === "inbound" && NPS_1_5_PATTERN.test((m.body ?? "").trim()));
   if (matches.length === 0) return null;
   const last = matches[matches.length - 1];
-  const score = Number(NPS_PATTERN.exec(last.body!.trim())![1]);
+  const score = Number(NPS_1_5_PATTERN.exec(last.body!.trim())![1]);
   return { score, answeredAt: last.dateAdded };
 }
 
@@ -213,15 +220,11 @@ async function enrollPendingNps(supabase: ReturnType<typeof getSupabaseAdmin>): 
   return { enrolled, errors };
 }
 
-// Resposta é um número sozinho de 0 a 10 (a lista de opções do template
-// ecoa só o número escolhido, sem palavra junto -- diferente do padrão
-// "N - descrição" do NPS do SAC acima, de propósito, pra nunca colidir os
-// dois regex numa mesma conversa). Só considera mensagem inbound DEPOIS de
-// enviado_em -- diferente do detectNpsScore acima (que pega a última da
-// conversa inteira), aqui precisa disso porque a mesma conversa pode ter
-// mais de uma pesquisa (SAC + montagem + assistência) ao longo do tempo.
-const NPS_SCORE_PATTERN = /^\s*(10|[0-9])\s*$/;
-
+// Mesmo padrão de resposta do SAC (NPS_1_5_PATTERN, ver detectNpsScore
+// acima) -- só considera mensagem inbound DEPOIS de enviado_em, diferente
+// de detectNpsScore (que pega a última da conversa inteira): aqui precisa
+// disso porque a mesma conversa pode ter mais de uma pesquisa (SAC +
+// montagem + assistência) ao longo do tempo.
 async function detectPendingNpsResponses(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<number> {
   const { data: pending } = await supabase
     .from("service_request_nps")
@@ -238,10 +241,10 @@ async function detectPendingNpsResponses(supabase: ReturnType<typeof getSupabase
     if (!msgs) continue;
     const sentAtMs = new Date(row.enviado_em).getTime();
     const reply = msgs.find(
-      (m) => m.direction === "inbound" && new Date(m.dateAdded).getTime() > sentAtMs && NPS_SCORE_PATTERN.test((m.body ?? "").trim())
+      (m) => m.direction === "inbound" && new Date(m.dateAdded).getTime() > sentAtMs && NPS_1_5_PATTERN.test((m.body ?? "").trim())
     );
     if (!reply) continue;
-    const score = Number(NPS_SCORE_PATTERN.exec(reply.body!.trim())![1]);
+    const score = Number(NPS_1_5_PATTERN.exec(reply.body!.trim())![1]);
     await supabase.from("service_request_nps").update({ score, respondido_em: reply.dateAdded }).eq("request_id", row.request_id);
     answered++;
   }

@@ -3,7 +3,7 @@ import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
 import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages } from "./ghlClient";
-import { NPS_GHL_TAG } from "./npsDetratores";
+import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 
 // NPS "Pós-entrega" -- pedido do Victor 22/09/2026: pergunta sobre a
 // entrega ORIGINAL da compra (o caminhão leva o móvel pela primeira vez),
@@ -115,8 +115,6 @@ export async function enrollPendingEntregaNps(): Promise<{ enrolled: number; err
   return { enrolled, errors };
 }
 
-const SCORE_PATTERN = /^\s*(10|[0-9])\s*$/;
-
 export async function detectPendingEntregaNpsResponses(): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data: pending } = await admin
@@ -134,10 +132,10 @@ export async function detectPendingEntregaNpsResponses(): Promise<number> {
     if (!msgs) continue;
     const sentAtMs = new Date(row.enviado_em).getTime();
     const reply = msgs.find(
-      (m) => m.direction === "inbound" && new Date(m.dateAdded).getTime() > sentAtMs && SCORE_PATTERN.test((m.body ?? "").trim())
+      (m) => m.direction === "inbound" && new Date(m.dateAdded).getTime() > sentAtMs && NPS_1_5_PATTERN.test((m.body ?? "").trim())
     );
     if (!reply) continue;
-    const score = Number(SCORE_PATTERN.exec(reply.body!.trim())![1]);
+    const score = Number(NPS_1_5_PATTERN.exec(reply.body!.trim())![1]);
     await admin.from("entrega_nps").update({ score, respondido_em: reply.dateAdded }).eq("order_id", row.order_id);
     answered++;
   }
