@@ -3,7 +3,7 @@ import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
 import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages } from "./ghlClient";
-import { NPS_GHL_TAG, type NpsFaseResumo } from "./npsDetratores";
+import { NPS_GHL_TAG, NPS_1_5_PATTERN, type NpsFaseResumo } from "./npsDetratores";
 
 // NPS "2 meses pós-recebimento" -- pedido do Victor 09/09/2026: "Cliente so
 // pode receber uma a cada 90 dias. Gatilho é a data de entrega, e coloque 2
@@ -145,12 +145,6 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; erro
   return { enrolled, errors };
 }
 
-// Mesmo padrão de detectPendingNpsResponses (api/sync/route.ts) -- resposta
-// é um número sozinho de 0 a 10, só considera mensagem inbound DEPOIS de
-// enviado_em (mesma conversa pode ter mais de uma pesquisa ao longo do
-// tempo, incluindo a do SAC).
-const SCORE_PATTERN = /^\s*(10|[0-9])\s*$/;
-
 export async function detectPendingCompraNpsResponses(): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data: pending } = await admin
@@ -168,20 +162,22 @@ export async function detectPendingCompraNpsResponses(): Promise<number> {
     if (!msgs) continue;
     const sentAtMs = new Date(row.enviado_em).getTime();
     const reply = msgs.find(
-      (m) => m.direction === "inbound" && new Date(m.dateAdded).getTime() > sentAtMs && SCORE_PATTERN.test((m.body ?? "").trim())
+      (m) => m.direction === "inbound" && new Date(m.dateAdded).getTime() > sentAtMs && NPS_1_5_PATTERN.test((m.body ?? "").trim())
     );
     if (!reply) continue;
-    const score = Number(SCORE_PATTERN.exec(reply.body!.trim())![1]);
+    const score = Number(NPS_1_5_PATTERN.exec(reply.body!.trim())![1]);
     await admin.from("compra_nps").update({ score, respondido_em: reply.dateAdded }).eq("order_id", row.order_id);
     answered++;
   }
   return answered;
 }
 
-// Resumo (NPS clássico: %promotores - %detratores) pro card "2 meses
-// pós-recebimento" do Resumo de /avaliacoes -- mesmo formato de
-// getNpsResumoPorFaseAdicional (npsDetratores.ts), função própria porque
-// compra_nps é tabela separada (sem chamado de assistência por trás).
+// Resumo (NPS clássico: %promotores - %detratores, adaptado pra escala 1-5
+// -- promotor 4-5, detrator 1-2, mesmo critério de buildNpsSummary/kpi.ts)
+// pro card "2 meses pós-recebimento" do Resumo de /avaliacoes -- mesmo
+// formato de getNpsResumoPorFaseAdicional (npsDetratores.ts), função
+// própria porque compra_nps é tabela separada (sem chamado de assistência
+// por trás).
 export async function getCompraNpsResumo(): Promise<NpsFaseResumo> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.from("compra_nps").select("score").not("score", "is", null);
@@ -189,8 +185,8 @@ export async function getCompraNpsResumo(): Promise<NpsFaseResumo> {
 
   const scores = (data ?? []).map((r) => r.score as number);
   if (scores.length === 0) return { npsIndex: null, responseCount: 0 };
-  const promoters = scores.filter((s) => s >= 9).length;
-  const detractors = scores.filter((s) => s <= 6).length;
+  const promoters = scores.filter((s) => s >= 4).length;
+  const detractors = scores.filter((s) => s <= 2).length;
   const npsIndex = Math.round(((promoters - detractors) / scores.length) * 100);
   return { npsIndex, responseCount: scores.length };
 }

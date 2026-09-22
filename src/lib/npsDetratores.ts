@@ -2,11 +2,14 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 
 // Lista de trabalho unificada de detratores -- pedido do Victor 08/09/2026:
 // nome/contato/motivo de todo mundo que deu nota baixa em QUALQUER NPS que
-// o sistema roda, não só o do SAC. Duas escalas diferentes coexistem de
-// propósito (não convertidas pra uma "nota única"): SAC usa 1-5 (detrator =
-// 1 ou 2, mesmo critério de NpsDetractor em kpi.ts) e montagem/assistência
-// técnica/entrega/compra usam 0-10, o NPS de verdade (detrator = 0 a 6,
-// padrão de mercado).
+// o sistema roda, não só o do SAC. Todas as 5 pesquisas usam a MESMA
+// escala 1-5 desde 22/09/2026 (pedido do Victor: "eu prefiro como funciona
+// hoje a avaliação do sac") -- promotor 4-5, neutro 3, detrator 1-2, mesmo
+// critério de buildNpsSummary (kpi.ts, SAC) e NPS_1_5_PATTERN abaixo.
+// Antes disso montagem/assistência técnica/entrega/compra usavam 0-10 (NPS
+// clássico de mercado) -- revertido pra ficar consistente com o mecanismo
+// do SAC (WhatsApp List Message, resposta = "N - Label" ecoada de volta),
+// não um número livre digitado.
 export const NPS_DETRATOR_ORIGENS = ["sac", "montagem", "assistencia_tecnica", "entrega", "compra"] as const;
 export type NpsDetratorOrigem = (typeof NPS_DETRATOR_ORIGENS)[number];
 
@@ -31,6 +34,15 @@ export const NPS_GHL_TAG: Partial<Record<NpsDetratorOrigem, string>> = {
   entrega: "gatilho-nps-entrega",
   compra: "gatilho-nps-compra",
 };
+
+// Padrão de resposta via WhatsApp List Message -- mesmo mecanismo do NPS
+// do SAC (detectNpsScore, api/sync/route.ts), reaproveitado desde
+// 22/09/2026 pelas 4 pesquisas adicionais: o cliente toca numa das 5
+// opções da lista e o WhatsApp ecoa de volta o texto exato dela ("5 -
+// Muito satisfeito" etc.), nunca um número livre digitado à mão. Uma só
+// definição aqui em vez de copiada em cada arquivo (api/sync/route.ts,
+// nps2Meses.ts, entregaNps.ts) -- evita as 3 cópias divergirem um dia.
+export const NPS_1_5_PATTERN = /^([1-5])\s*-\s*(muito insatisfeito|insatisfeito|indiferente|satisfeito|muito satisfeito)\s*$/i;
 
 // Taxonomia de recuperação de detrator -- padrão de "closed-loop feedback"
 // usado em CX de varejo (contatar -> tentar reverter -> registrar
@@ -110,14 +122,14 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
       .from("service_request_nps")
       .select("request_id, tipo, score, respondido_em, service_requests(client_name, client_phone)")
       .not("score", "is", null)
-      .lte("score", 6)
+      .lte("score", 2)
       .gte("respondido_em", sinceIso)
       .order("respondido_em", { ascending: false }),
     admin
       .from("compra_nps")
       .select("order_id, client_id, score, respondido_em, totvs_orders(client_name)")
       .not("score", "is", null)
-      .lte("score", 6)
+      .lte("score", 2)
       .gte("respondido_em", sinceIso)
       .order("respondido_em", { ascending: false }),
     // "Pós-entrega" (entregaNps.ts) -- mesma forma de compra_nps acima
@@ -127,7 +139,7 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
       .from("entrega_nps")
       .select("order_id, client_id, score, respondido_em, totvs_orders(client_name)")
       .not("score", "is", null)
-      .lte("score", 6)
+      .lte("score", 2)
       .gte("respondido_em", sinceIso)
       .order("respondido_em", { ascending: false }),
     admin.from("nps_detrator_status").select("origem, origem_id, status, motivo, atualizado_em"),
@@ -207,7 +219,7 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
       origem,
       origemId: r.request_id,
       score: r.score,
-      escala: "0-10" as const,
+      escala: "1-5" as const,
       respondidoEm: r.respondido_em,
       clientName: sr?.client_name ?? null,
       clientPhone: sr?.client_phone ?? null,
@@ -239,7 +251,7 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
       origem: "compra" as const,
       origemId: r.order_id,
       score: r.score,
-      escala: "0-10" as const,
+      escala: "1-5" as const,
       respondidoEm: r.respondido_em,
       clientName: order?.client_name ?? null,
       clientPhone: phoneByClientId.get(r.client_id) ?? null,
@@ -265,7 +277,7 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
       origem: "entrega" as const,
       origemId: r.order_id,
       score: r.score,
-      escala: "0-10" as const,
+      escala: "1-5" as const,
       respondidoEm: r.respondido_em,
       clientName: order?.client_name ?? null,
       clientPhone: phoneByClientIdEntrega.get(r.client_id) ?? null,
@@ -300,10 +312,13 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
   if (error) throw new Error(error.message);
   if (entregaError) throw new Error(entregaError.message);
 
+  // Classificação NPS adaptada pra escala 1-5 (mesmo critério de
+  // buildNpsSummary, kpi.ts/SAC, desde 22/09/2026): promotor 4-5, detrator
+  // 1-2, sem o "6" do meio que a escala 0-10 original teria como corte.
   function npsFromScores(scores: number[]): NpsFaseResumo {
     if (scores.length === 0) return { npsIndex: null, responseCount: 0 };
-    const promoters = scores.filter((s) => s >= 9).length;
-    const detractors = scores.filter((s) => s <= 6).length;
+    const promoters = scores.filter((s) => s >= 4).length;
+    const detractors = scores.filter((s) => s <= 2).length;
     const npsIndex = Math.round(((promoters - detractors) / scores.length) * 100);
     return { npsIndex, responseCount: scores.length };
   }
