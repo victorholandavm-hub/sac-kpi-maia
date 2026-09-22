@@ -31,11 +31,13 @@ import {
   type RecompraSegmento,
   type RecompraCandidato,
 } from "@/lib/recompra";
+import { listEstornos } from "@/lib/estornos";
 import { AppHeader } from "@/components/AppHeader";
 import { ClienteHistoricoRow } from "@/components/ClienteHistoricoRow";
 import { RecompraContatoCell } from "@/components/RecompraContatoCell";
 import { RecompraNaoContatarManager } from "@/components/RecompraNaoContatarManager";
 import { CanalAquisicaoSelect } from "@/components/CanalAquisicaoSelect";
+import { EstornoFormCard } from "@/components/clientes/EstornoFormCard";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +60,7 @@ function buildHref(params: {
   nivel?: string;
   segmento?: string;
   inativo?: string;
+  loja?: string;
   page?: number;
 }): string {
   const sp = new URLSearchParams();
@@ -67,6 +70,7 @@ function buildHref(params: {
   if (params.nivel) sp.set("nivel", params.nivel);
   if (params.segmento) sp.set("segmento", params.segmento);
   if (params.inativo) sp.set("inativo", params.inativo);
+  if (params.loja) sp.set("loja", params.loja);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/clientes?${qs}` : "/clientes";
@@ -75,13 +79,23 @@ function buildHref(params: {
 export default async function ClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; q?: string; status?: string; nivel?: string; segmento?: string; inativo?: string; page?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    q?: string;
+    status?: string;
+    nivel?: string;
+    segmento?: string;
+    inativo?: string;
+    loja?: string;
+    page?: string;
+  }>;
 }) {
   await requireDashboardAuth();
-  const { view: viewParam, q, status, nivel, segmento, inativo, page: pageParam } = await searchParams;
+  const { view: viewParam, q, status, nivel, segmento, inativo, loja, page: pageParam } = await searchParams;
   // Nível de relacionamento é a aba de aterrissagem (pedido do Victor
-  // 15/08/2026) -- "status" só aparece quando pedido explicitamente na URL.
-  const view = viewParam === "status" ? "status" : viewParam === "recompra" ? "recompra" : "nivel";
+  // 15/08/2026) -- "status"/"recompra"/"estornos" só aparecem quando
+  // pedidos explicitamente na URL.
+  const view = viewParam === "status" ? "status" : viewParam === "recompra" ? "recompra" : viewParam === "estornos" ? "estornos" : "nivel";
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
   return (
@@ -101,12 +115,15 @@ export default async function ClientesPage({
         <UnderlineTab href={buildHref({ view: "status" })} label="Status (Protheus)" active={view === "status"} color="var(--brand-orange)" />
         <UnderlineTab href={buildHref({ view: "nivel" })} label="Nível de relacionamento" active={view === "nivel"} color="var(--brand-orange)" />
         <UnderlineTab href={buildHref({ view: "recompra" })} label="Propensão a recompra" active={view === "recompra"} color="var(--brand-orange)" />
+        <UnderlineTab href={buildHref({ view: "estornos" })} label="Estornos" active={view === "estornos"} color="var(--brand-orange)" />
       </div>
 
       {view === "status" ? (
         <StatusView q={q} status={status} page={page} />
       ) : view === "recompra" ? (
         <RecompraView q={q} segmento={segmento} page={page} />
+      ) : view === "estornos" ? (
+        <EstornosView q={q} loja={loja} page={page} />
       ) : (
         <NivelView q={q} nivel={nivel} inativo={inativo} page={page} />
       )}
@@ -746,6 +763,223 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
       ) : null}
 
       <RecompraNaoContatarManager items={naoContatar} />
+    </>
+  );
+}
+
+// Aba "Estornos" -- pedido do Victor 22/09/2026: histórico de pedidos de
+// reembolso do SAC/lojas, curado à mão a partir do grupo de WhatsApp "Lojas
+// Maia e Líder Caixas" (backfill de 59 casos, 27/07 a 06/09/2026 -- ver
+// migration 0135_estornos.sql) + cadastro de novos casos direto por aqui
+// daqui pra frente (EstornoFormCard.tsx), mesmo espírito de Avaliações
+// Google (sem API pra puxar isso automaticamente, registro manual). Sem
+// paginação/filtro no banco (listEstornos busca tudo) -- mesmo padrão de
+// NivelView/RecompraView acima, tabela pequena o bastante pra caber
+// inteira na memória.
+async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page: number }) {
+  const todos = await listEstornos();
+
+  // Loja é texto livre (como foi digitado no grupo do WhatsApp, não um ID
+  // de `stores`) -- agrupamento por string exata, não um enum fechado como
+  // nível/status/segmento nas outras abas. Ordenado por valor reembolsado
+  // (quem pesa mais no total primeiro), não por nome -- é a pergunta mais
+  // provável ("onde está saindo mais dinheiro em estorno").
+  const porLoja = new Map<string, { count: number; total: number }>();
+  for (const e of todos) {
+    const entry = porLoja.get(e.loja) ?? { count: 0, total: 0 };
+    entry.count += 1;
+    entry.total += e.valorReembolso;
+    porLoja.set(e.loja, entry);
+  }
+  const lojasOrdenadas = [...porLoja.entries()].sort((a, b) => b[1].total - a[1].total);
+
+  const qLower = q?.trim().toLowerCase();
+  let filtrados = todos;
+  if (loja) filtrados = filtrados.filter((e) => e.loja === loja);
+  if (qLower) {
+    filtrados = filtrados.filter(
+      (e) =>
+        e.cliente.toLowerCase().includes(qLower) ||
+        (e.cpfCnpj ?? "").toLowerCase().includes(qLower) ||
+        (e.produto ?? "").toLowerCase().includes(qLower) ||
+        (e.motivo ?? "").toLowerCase().includes(qLower) ||
+        (e.status ?? "").toLowerCase().includes(qLower)
+    );
+  }
+  // Já vem ordenado por data_solicitacao desc (listEstornos) -- filtro
+  // acima preserva a ordem, sem precisar resortear.
+
+  const totalValorGeral = todos.reduce((sum, e) => sum + e.valorReembolso, 0);
+  const totalValorFiltrado = filtrados.reduce((sum, e) => sum + e.valorReembolso, 0);
+  const total = filtrados.length;
+  const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
+  const pageClamped = Math.min(page, totalPages);
+  const pageItems = filtrados.slice((pageClamped - 1) * LIST_PAGE_SIZE, pageClamped * LIST_PAGE_SIZE);
+
+  return (
+    <>
+      <p className="text-xs -mt-4 max-w-2xl" style={{ color: "var(--text-muted)" }}>
+        {todos.length} estornos registrados desde 27/07/2026 — R${" "}
+        <strong style={{ color: "var(--status-critical)" }}>{formatBRL(totalValorGeral)}</strong> reembolsados no total. Histórico curado à
+        mão a partir do grupo de WhatsApp &quot;Lojas Maia e Líder Caixas&quot; (o WhatsApp Web só libera histórico a partir da data em que
+        o time entrou no grupo, não cobre período anterior) + cadastro manual direto aqui.
+      </p>
+
+      <EstornoFormCard />
+
+      <div className="grid sm:grid-cols-4 gap-4">
+        {lojasOrdenadas.map(([lojaNome, info]) => (
+          <Link
+            key={lojaNome}
+            href={buildHref({ view: "estornos", q, loja: loja === lojaNome ? undefined : lojaNome })}
+            className="rounded-xl border p-4 flex flex-col gap-1 transition-all hover:-translate-y-0.5 hover:shadow-md"
+            style={{
+              background: `color-mix(in srgb, var(--status-critical) ${loja === lojaNome ? 10 : 5}%, var(--surface-1))`,
+              borderColor: `color-mix(in srgb, var(--status-critical) ${loja === lojaNome ? 100 : 35}%, var(--border))`,
+              borderTopWidth: 3,
+              borderTopColor: "var(--status-critical)",
+            }}
+          >
+            <span className="text-2xl font-bold" style={{ color: "var(--status-critical)" }}>
+              {info.count}
+            </span>
+            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              {lojaNome}
+            </span>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {formatBRL(info.total)}
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap">
+        <input type="hidden" name="view" value="estornos" />
+        {loja ? <input type="hidden" name="loja" value={loja} /> : null}
+        <input
+          type="search"
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Buscar por cliente, CPF, produto, motivo ou status…"
+          className="text-sm flex-1 min-w-[220px] rounded border px-3 py-2"
+          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+        />
+        <button type="submit" className="text-sm px-4 py-2 rounded font-medium" style={{ background: "var(--brand-orange)", color: "#fff" }}>
+          Buscar
+        </button>
+        {q || loja ? (
+          <Link href={buildHref({ view: "estornos" })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            Limpar
+          </Link>
+        ) : null}
+      </form>
+
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        {total} estorno{total === 1 ? "" : "s"} encontrado{total === 1 ? "" : "s"} · R$ {formatBRL(totalValorFiltrado)} no recorte
+        {totalPages > 1 ? ` · página ${pageClamped} de ${totalPages}` : ""}
+      </p>
+
+      {pageItems.length === 0 ? (
+        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Nenhum estorno encontrado.
+          </p>
+        </div>
+      ) : (
+        <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+          <DualScrollTable>
+            <table className="w-full text-sm">
+              <thead>
+                <tr
+                  className="text-[11px] uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                >
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Solicitação</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cliente</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Loja</th>
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Valor</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Venda</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Pagamento</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Motivo</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Produto</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Autorizado por</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                {pageItems.map((e) => (
+                  <tr key={e.id}>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {formatDateOnly(e.dataSolicitacao)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                      <span className="font-medium">{e.cliente}</span>
+                      {e.cpfCnpj ? (
+                        <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                          {e.cpfCnpj}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {e.loja}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--status-critical)" }}>
+                      {formatBRL(e.valorReembolso)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {formatDateOnly(e.dataVenda)}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {e.formaPagamento ?? "—"}
+                    </td>
+                    <td className="px-4 py-2 max-w-[280px]" style={{ color: "var(--text-secondary)" }}>
+                      {e.motivo ?? "—"}
+                    </td>
+                    <td className="px-4 py-2 max-w-[280px]" style={{ color: "var(--text-secondary)" }}>
+                      {e.produto ?? "—"}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {e.autorizadoPor ?? "—"}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {e.status ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DualScrollTable>
+        </div>
+      )}
+
+      {totalPages > 1 ? (
+        <div className="flex items-center gap-2">
+          <Link
+            href={buildHref({ view: "estornos", q, loja, page: Math.max(1, pageClamped - 1) })}
+            aria-disabled={pageClamped <= 1}
+            className="text-sm px-3 py-1.5 rounded border"
+            style={{
+              borderColor: "var(--border)",
+              color: pageClamped <= 1 ? "var(--text-muted)" : "var(--text-primary)",
+              pointerEvents: pageClamped <= 1 ? "none" : undefined,
+            }}
+          >
+            ← Anterior
+          </Link>
+          <Link
+            href={buildHref({ view: "estornos", q, loja, page: Math.min(totalPages, pageClamped + 1) })}
+            aria-disabled={pageClamped >= totalPages}
+            className="text-sm px-3 py-1.5 rounded border"
+            style={{
+              borderColor: "var(--border)",
+              color: pageClamped >= totalPages ? "var(--text-muted)" : "var(--text-primary)",
+              pointerEvents: pageClamped >= totalPages ? "none" : undefined,
+            }}
+          >
+            Próxima →
+          </Link>
+        </div>
+      ) : null}
     </>
   );
 }
