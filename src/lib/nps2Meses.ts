@@ -2,14 +2,17 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
-import { upsertGhlContact, addContactToWorkflow, findGhlConversationId, fetchGhlMessages } from "./ghlClient";
-import type { NpsFaseResumo } from "./npsDetratores";
+import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages } from "./ghlClient";
+import { NPS_GHL_TAG, type NpsFaseResumo } from "./npsDetratores";
 
 // NPS "2 meses pós-recebimento" -- pedido do Victor 09/09/2026: "Cliente so
 // pode receber uma a cada 90 dias. Gatilho é a data de entrega, e coloque 2
-// meses apos o recebimento e nao um [mês]". Diferente dos outros 3 tipos de
-// NPS (service_request_nps, um chamado de assistência por trás): esse é
-// por PEDIDO de venda (totvs_orders), sem chamado nenhum envolvido.
+// meses apos o recebimento e nao um [mês]". Diferente de montagem/
+// assistência técnica (service_request_nps, um chamado de assistência por
+// trás): esse é por PEDIDO de venda (totvs_orders), sem chamado nenhum
+// envolvido -- mesmo espírito de "Pós-entrega" (entregaNps.ts, tabela
+// própria pelo mesmo motivo), só que com uma janela bem mais larga (2
+// meses em vez de dias).
 //
 // Volume bem maior que os outros 3 juntos (~7.600 pedidos/mês contra ~450)
 // -- por isso o limite de 90 dias por cliente (não manda de novo pra quem
@@ -33,9 +36,6 @@ function isoDaysAgo(days: number): string {
 }
 
 export async function enrollPendingCompraNps(): Promise<{ enrolled: number; errors: string[] }> {
-  const workflowId = process.env.GHL_WORKFLOW_ID_COMPRA;
-  if (!workflowId) return { enrolled: 0, errors: [] };
-
   const admin = getSupabaseAdmin();
   const errors: string[] = [];
 
@@ -132,8 +132,8 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; erro
       errors.push(`compra-nps ${candidate.id}: não achou/criou contato no GHL`);
       continue;
     }
-    if (!(await addContactToWorkflow(contactId, workflowId))) {
-      errors.push(`compra-nps ${candidate.id}: falha ao matricular no workflow`);
+    if (!(await addContactTag(contactId, NPS_GHL_TAG.compra!))) {
+      errors.push(`compra-nps ${candidate.id}: falha ao aplicar a tag no GHL`);
       continue;
     }
     const { error: insertError } = await admin

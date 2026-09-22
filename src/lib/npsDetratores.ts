@@ -18,6 +18,20 @@ export const NPS_DETRATOR_ORIGEM_LABELS: Record<NpsDetratorOrigem, string> = {
   compra: "2 meses pós-recebimento",
 };
 
+// Tag do GHL que dispara o Workflow de cada pesquisa -- pedido do Victor
+// 22/09/2026. Cada Workflow (criado direto no GHL, fora daqui) já tem
+// "Contact Tag" (filtro "Tag added") como trigger + o template de WhatsApp
+// como ação seguinte -- aplicar a tag (addContactTag, ghlClient.ts) é o
+// suficiente pra disparar o envio. "sac" fica de fora -- aquele NPS usa
+// outro mecanismo (nps_score direto na conversa do GHL, sem Workflow de
+// tag nenhum por trás).
+export const NPS_GHL_TAG: Partial<Record<NpsDetratorOrigem, string>> = {
+  montagem: "gatilho-nps-montagem",
+  assistencia_tecnica: "gatilho-nps-assistencia",
+  entrega: "gatilho-nps-entrega",
+  compra: "gatilho-nps-compra",
+};
+
 // Taxonomia de recuperação de detrator -- padrão de "closed-loop feedback"
 // usado em CX de varejo (contatar -> tentar reverter -> registrar
 // resultado), pedido do Victor 08/09/2026: "algo que o mercado de varejo
@@ -82,6 +96,7 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
     { data: sacRows, error: sacError },
     { data: reqRows, error: reqError },
     { data: compraRows, error: compraError },
+    { data: entregaRows, error: entregaError },
     { data: statusRows, error: statusError },
   ] = await Promise.all([
     admin
@@ -105,9 +120,20 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
       .lte("score", 6)
       .gte("respondido_em", sinceIso)
       .order("respondido_em", { ascending: false }),
+    // "Pós-entrega" (entregaNps.ts) -- mesma forma de compra_nps acima
+    // (por PEDIDO de venda, não por chamado), tabela própria desde
+    // 22/09/2026.
+    admin
+      .from("entrega_nps")
+      .select("order_id, client_id, score, respondido_em, totvs_orders(client_name)")
+      .not("score", "is", null)
+      .lte("score", 6)
+      .gte("respondido_em", sinceIso)
+      .order("respondido_em", { ascending: false }),
     admin.from("nps_detrator_status").select("origem, origem_id, status, motivo, atualizado_em"),
   ]);
   if (sacError) throw new Error(sacError.message);
+  if (entregaError) throw new Error(entregaError.message);
   if (reqError) throw new Error(reqError.message);
   if (compraError) throw new Error(compraError.message);
   if (statusError) throw new Error(statusError.message);
@@ -170,7 +196,12 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
   };
   const req: NpsDetrator[] = ((reqRows ?? []) as unknown as ReqRow[]).map((r) => {
     const sr = Array.isArray(r.service_requests) ? r.service_requests[0] : r.service_requests;
-    const origem = (r.tipo === "montagem" || r.tipo === "entrega" ? r.tipo : "assistencia_tecnica") as NpsDetratorOrigem;
+    // "entrega" não é mais gravado aqui desde 22/09/2026 -- virou pesquisa
+    // própria (entrega_nps, sobre a compra, não sobre um chamado, ver
+    // classifyNpsTipo em api/sync/route.ts) -- fallback continua aceitando
+    // o valor por segurança (linha antiga que já exista no banco), mas
+    // nada novo grava isso aqui.
+    const origem = (r.tipo === "montagem" ? "montagem" : "assistencia_tecnica") as NpsDetratorOrigem;
     const resolved = resolveStatus(origem, r.request_id);
     return {
       origem,
@@ -217,7 +248,33 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
     };
   });
 
-  return [...sac, ...req, ...compra].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
+  // "Pós-entrega" (entrega_nps) -- mesma forma de "compra" acima (por
+  // PEDIDO de venda, telefone via totvs_clientes).
+  type EntregaRow = CompraRow;
+  const entregaClientIds = [...new Set(((entregaRows ?? []) as EntregaRow[]).map((r) => r.client_id))];
+  const phoneByClientIdEntrega = new Map<string, string | null>();
+  if (entregaClientIds.length > 0) {
+    const { data: clienteRows, error: clientesError } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", entregaClientIds);
+    if (clientesError) throw new Error(clientesError.message);
+    for (const c of clienteRows ?? []) phoneByClientIdEntrega.set(c.protheus_code as string, c.phone1 as string | null);
+  }
+  const entrega: NpsDetrator[] = ((entregaRows ?? []) as EntregaRow[]).map((r) => {
+    const order = Array.isArray(r.totvs_orders) ? r.totvs_orders[0] : r.totvs_orders;
+    const resolved = resolveStatus("entrega", r.order_id);
+    return {
+      origem: "entrega" as const,
+      origemId: r.order_id,
+      score: r.score,
+      escala: "0-10" as const,
+      respondidoEm: r.respondido_em,
+      clientName: order?.client_name ?? null,
+      clientPhone: phoneByClientIdEntrega.get(r.client_id) ?? null,
+      motivoSugerido: null,
+      ...resolved,
+    };
+  });
+
+  return [...sac, ...req, ...compra, ...entrega].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
 }
 
 export type NpsFaseResumo = { npsIndex: number | null; responseCount: number };
@@ -231,19 +288,34 @@ export type NpsFaseResumo = { npsIndex: number | null; responseCount: number };
 // começarem a responder de verdade, já calcula sozinho.
 export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" | "assistencia_tecnica" | "entrega", NpsFaseResumo>> {
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("service_request_nps").select("tipo, score").not("score", "is", null);
+  // "entrega" vem de uma tabela separada (entrega_nps, ver entregaNps.ts)
+  // desde 22/09/2026 -- por PEDIDO de venda, não por chamado de
+  // assistência (service_request_nps). Consulta própria aqui em vez de
+  // importar getEntregaNpsResumo de entregaNps.ts pra não criar
+  // dependência circular (aquele arquivo já importa NPS_GHL_TAG daqui).
+  const [{ data, error }, { data: entregaData, error: entregaError }] = await Promise.all([
+    admin.from("service_request_nps").select("tipo, score").not("score", "is", null),
+    admin.from("entrega_nps").select("score").not("score", "is", null),
+  ]);
   if (error) throw new Error(error.message);
+  if (entregaError) throw new Error(entregaError.message);
 
-  function resumoFor(tipo: "montagem" | "assistencia_tecnica" | "entrega"): NpsFaseResumo {
-    const scores = (data ?? []).filter((r) => r.tipo === tipo).map((r) => r.score as number);
+  function npsFromScores(scores: number[]): NpsFaseResumo {
     if (scores.length === 0) return { npsIndex: null, responseCount: 0 };
     const promoters = scores.filter((s) => s >= 9).length;
     const detractors = scores.filter((s) => s <= 6).length;
     const npsIndex = Math.round(((promoters - detractors) / scores.length) * 100);
     return { npsIndex, responseCount: scores.length };
   }
+  function resumoFor(tipo: "montagem" | "assistencia_tecnica"): NpsFaseResumo {
+    return npsFromScores((data ?? []).filter((r) => r.tipo === tipo).map((r) => r.score as number));
+  }
 
-  return { montagem: resumoFor("montagem"), assistencia_tecnica: resumoFor("assistencia_tecnica"), entrega: resumoFor("entrega") };
+  return {
+    montagem: resumoFor("montagem"),
+    assistencia_tecnica: resumoFor("assistencia_tecnica"),
+    entrega: npsFromScores((entregaData ?? []).map((r) => r.score as number)),
+  };
 }
 
 export async function registrarStatusDetrator(

@@ -77,6 +77,23 @@ export async function findGhlConversationId(ghlContactId: string): Promise<strin
   return data.conversations?.[0]?.id ?? null;
 }
 
+// Aplica uma tag no contato -- é o próprio gatilho de envio das pesquisas
+// de NPS (montagem/assistência técnica/entrega/compra, pedido do Victor
+// 22/09/2026): cada Workflow no GHL já tem "Contact Tag" (filtro "Tag
+// added") como trigger + a ação de mandar o template de WhatsApp logo em
+// seguida -- aplicar a tag aqui é o suficiente, o workflow dispara sozinho
+// do lado de lá. Não usa a matrícula direta em workflow (addContactToWorkflow
+// abaixo) de propósito -- os workflows dessas pesquisas foram desenhados
+// pra reagir à tag, não pra receber matrícula direta.
+export async function addContactTag(ghlContactId: string, tag: string): Promise<boolean> {
+  const res = await fetch(`${BASE_URL}/contacts/${ghlContactId}/tags`, {
+    method: "POST",
+    headers: { ...ghlHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ tags: [tag] }),
+  });
+  return res.ok;
+}
+
 // Estado ATUAL das tags de um contato, direto na API do GHL -- rede de
 // segurança pro webhook de tags (/api/ghl-webhook, ver tagReconciliation.ts):
 // se o GHL não conseguir entregar o push por qualquer motivo (URL do webhook
