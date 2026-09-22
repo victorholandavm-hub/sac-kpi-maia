@@ -1,11 +1,36 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { isPartOrderStatus, listPartOrdersByGroupId, listPartOrderItems, type PartOrder, type PartOrderItem } from "@/lib/partOrders";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { requirePecasActor } from "@/lib/pecasAccess";
+import { savePhotoFile } from "@/lib/localPhotoStorage";
+
+const ATTACHMENT_MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// Anexo (foto da peça avariada, em PDF) -- pedido do Victor 22/09/2026.
+// Confere os bytes reais do arquivo (magic bytes), não só o Content-Type
+// que o navegador mandou -- mesma defesa em profundidade de servicePhotos.ts
+// (uploadPhotoBytes), só restrita a PDF (não é foto de chamado, não
+// reaproveita aquele allowlist de imagem+pdf).
+async function uploadPartOrderAttachment(partOrderId: string, file: File): Promise<string> {
+  if (file.type !== "application/pdf") {
+    throw new Error("O anexo precisa ser um arquivo PDF.");
+  }
+  if (file.size > ATTACHMENT_MAX_SIZE_BYTES) {
+    throw new Error("O anexo é grande demais (máximo 10 MB).");
+  }
+  const buffer = Buffer.from(await file.arrayBuffer());
+  if (buffer.length < 5 || buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+    throw new Error("O conteúdo do arquivo não é um PDF válido.");
+  }
+  const path = `part-orders/${partOrderId}/${randomUUID()}.pdf`;
+  await savePhotoFile(path, buffer);
+  return path;
+}
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const str = String(value ?? "").trim();
@@ -163,6 +188,23 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
     );
     if (itemsError) {
       return { error: `Pedido criado (${chNumber}), mas não foi possível salvar as demais peças: ${itemsError.message}` };
+    }
+  }
+
+  // Anexo (foto da peça avariada, PDF) -- pedido do Victor 22/09/2026.
+  // Opcional -- input vazio chega aqui como uma string vazia, não um File
+  // (comportamento padrão de <input type="file"> sem seleção), por isso o
+  // `instanceof File` cobre os dois casos sem checagem extra.
+  const attachmentFile = formData.get("attachment");
+  if (attachmentFile instanceof File && attachmentFile.size > 0) {
+    try {
+      const attachmentPath = await uploadPartOrderAttachment(partOrderId, attachmentFile);
+      const { error: attachError } = await admin.from("part_orders").update({ attachment_path: attachmentPath }).eq("id", partOrderId);
+      if (attachError) {
+        return { error: `Pedido criado (${chNumber}), mas não foi possível salvar o anexo: ${attachError.message}` };
+      }
+    } catch (err) {
+      return { error: `Pedido criado (${chNumber}), mas não foi possível enviar o anexo: ${err instanceof Error ? err.message : "erro desconhecido"}` };
     }
   }
 

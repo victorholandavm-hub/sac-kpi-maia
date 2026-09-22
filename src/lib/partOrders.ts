@@ -2,6 +2,17 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
+// NÃO importa photoPublicUrl de localPhotoStorage.ts aqui de propósito --
+// esse módulo usa node:fs/promises (Node puro), e este arquivo (partOrders.ts)
+// é importado por componentes CLIENTE (PecasTable.tsx/PartOrderQuickStatus.tsx,
+// só por causa de PART_ORDER_STATUSES) -- puxar node:fs pro bundle do
+// navegador quebra o build (Turbopack: "chunking context does not support
+// external modules"). Mesma lógica de photoPublicUrl copiada aqui (função
+// pura, sem I/O) -- se aquela mudar, atualizar as duas.
+function attachmentPublicUrl(relativePath: string): string {
+  return `/api/photos/${relativePath.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 // "aguardando_resposta" e "cancelada" (pedido do Victor 09/09/2026, planilha
 // "Solicitação de peças") -- "aguardando_resposta" é ANTES de
 // "aguardando_peca" no fluxo real: fornecedor ainda nem confirmou que vai
@@ -110,6 +121,10 @@ export type PartOrder = {
   // Número da nota fiscal -- pedido do Victor 15/09/2026: vai no corpo do
   // e-mail pro representante do fornecedor (ver PartOrderEmailButton.tsx).
   invoiceNumber: string | null;
+  // Anexo (foto da peça avariada, PDF) -- pedido do Victor 22/09/2026. Um
+  // só por pedido, opcional -- ver createPartOrder (pecas-actions.ts) e
+  // migration 0136. null = nenhum anexo enviado.
+  attachmentUrl: string | null;
   // Quando preenchido, o CASO do cliente já foi resolvido por outro meio,
   // sem esperar esta peça -- pedido do Victor 14/09/2026, migration 0126
   // (ver PartOrderActions.tsx). A peça em si continua seu fluxo normal até
@@ -198,6 +213,7 @@ type PartOrderRow = {
   expected_at: string | null;
   notes: string | null;
   invoice_number: string | null;
+  attachment_path: string | null;
   resolved_without_part_at: string | null;
   resolved_without_part_by: string | null;
   group_id: string | null;
@@ -211,7 +227,7 @@ type PartOrderRow = {
 };
 
 const PART_ORDER_COLUMNS =
-  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, invoice_number, resolved_without_part_at, resolved_without_part_by, group_id, part_order_items(count), created_at, updated_at";
+  "id, ticket_number, service_request_id, client_name, client_cpf, client_phone, client_email, product, part_name, part_code, color, supplier, representative, representative_email, representative_phone, service_requests(type), external_reference, requested_by, status, part_arrived_at, sent_to_client_at, closed_at, expected_at, notes, invoice_number, attachment_path, resolved_without_part_at, resolved_without_part_by, group_id, part_order_items(count), created_at, updated_at";
 
 function toPartOrder(row: PartOrderRow): PartOrder {
   return {
@@ -240,6 +256,7 @@ function toPartOrder(row: PartOrderRow): PartOrder {
     expectedAt: row.expected_at,
     notes: row.notes,
     invoiceNumber: row.invoice_number,
+    attachmentUrl: row.attachment_path ? attachmentPublicUrl(row.attachment_path) : null,
     resolvedWithoutPartAt: row.resolved_without_part_at,
     resolvedWithoutPartBy: row.resolved_without_part_by,
     groupId: row.group_id,
