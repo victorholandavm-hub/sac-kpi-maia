@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { listComprasDoCliente, setCanalAquisicao, isCanalAquisicao, type ClienteCompra } from "@/lib/clientes";
 import { registrarContato, registrarResultadoContato, marcarNaoContatar, desmarcarNaoContatar, type RecompraResultado } from "@/lib/recompra";
+import { createEstorno, type NovoEstornoInput } from "@/lib/estornos";
 
 // Busca sob demanda, só quando o nome é clicado -- pedido do Victor
 // 20/08/2026: "não quero que ao clicar vá para outra tela, tem que expandir
@@ -60,5 +61,21 @@ export async function setCanalAquisicaoAction(clientId: string, canal: string): 
   await requireDashboardAuth();
   if (!isCanalAquisicao(canal)) throw new Error("Canal inválido.");
   await setCanalAquisicao(clientId, canal, "");
+  revalidatePath("/clientes");
+}
+
+// Aba "Estornos" -- pedido do Victor 22/09/2026: registrar novos casos
+// direto pelo painel a partir de agora (o histórico de 27/07 a 06/09/2026
+// veio de uma extração manual do WhatsApp, ver migration 0135_estornos.sql),
+// mesmo padrão de saveGoogleReviewSnapshot (kpis/actions.ts) -- validação
+// mínima aqui, o resto (trim, string vazia -> null) já é feito em
+// createEstorno (estornos.ts).
+export async function createEstornoAction(input: NovoEstornoInput): Promise<void> {
+  await requireDashboardAuth();
+  if (!input.dataSolicitacao) throw new Error("Informe a data da solicitação.");
+  if (!input.cliente.trim()) throw new Error("Informe o nome do cliente.");
+  if (!input.loja.trim()) throw new Error("Informe a loja.");
+  if (!Number.isFinite(input.valorReembolso) || input.valorReembolso <= 0) throw new Error("Valor de reembolso inválido.");
+  await createEstorno(input);
   revalidatePath("/clientes");
 }
