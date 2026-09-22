@@ -192,6 +192,19 @@ export async function PartOrderDetailContent({ id, basePath }: { id: string; bas
           {/* Pedido do Victor 15/09/2026 -- vai no e-mail pro representante
               do fornecedor (ver PartOrderEmailButton.tsx). */}
           <Field label="Nota fiscal" value={order.invoiceNumber} />
+          {order.attachmentUrl ? (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Anexo</span>
+              <a
+                href={order.attachmentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium underline text-gray-900 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                Ver anexo (PDF)
+              </a>
+            </div>
+          ) : null}
           <ExpectedAtField orderId={order.id} expectedAt={order.expectedAt} />
         </Block>
 

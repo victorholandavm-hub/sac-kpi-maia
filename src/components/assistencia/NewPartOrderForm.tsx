@@ -276,6 +276,16 @@ export function NewPartOrderForm({
         <textarea name="notes" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
+      <Field label="Anexo (foto da peça avariada, em PDF)">
+        {/* Pedido do Victor 22/09/2026: "anexar o arquivo em PDF da foto
+            feita da peça avariada". Um anexo só por pedido -- ver
+            attachment_path (part_orders, migration 0136) e uploadPartOrderAttachment
+            (pecas-actions.ts). accept é só uma dica pro seletor de arquivo
+            do navegador -- a validação de verdade (magic bytes) acontece
+            no servidor. */}
+        <input name="attachment" type="file" accept="application/pdf" className="rounded border px-3 py-2" style={inputStyle} />
+      </Field>
+
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>
           {state.error}
