@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { businessMinutesBetween } from "@/lib/businessHours";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
-import { fetchGhlMessages, upsertGhlContact, addContactToWorkflow, findGhlConversationId, type GhlMessage } from "@/lib/ghlClient";
+import { fetchGhlMessages, upsertGhlContact, addContactTag, findGhlConversationId, type GhlMessage } from "@/lib/ghlClient";
 import { isMostruarioRequest } from "@/lib/serviceRequests";
-import { DELIVERY_REQUEST_TYPES } from "@/lib/assistenciaLabels";
+import { NPS_GHL_TAG } from "@/lib/npsDetratores";
 import { enrollPendingCompraNps, detectPendingCompraNpsResponses } from "@/lib/nps2Meses";
+import { enrollPendingEntregaNps, detectPendingEntregaNpsResponses } from "@/lib/entregaNps";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -137,19 +138,20 @@ const MONTAGEM_NPS_TYPES = new Set(["montagem", "desmontagem"]);
 // ADDRESS_NUMBER_REQUIRED_TYPES em serviceRequests.ts) -- não faz sentido
 // perguntar NPS de uma visita que não existiu.
 const NPS_EXCLUDED_TYPES = new Set(["notificacao_externa"]);
-// "Entrega" (motorista) separado de "assistência técnica" (montador) --
-// achado 09/09/2026: os dois caíam no mesmo balde ("assistencia_tecnica"),
-// desalinhado com o Resumo de /avaliacoes, que já mostra "Pós-entrega" e
-// "Pós-assistência técnica" como cards separados. DELIVERY_REQUEST_TYPES
-// (troca/entrega de produto, envio/recolhimento de peça) é exatamente o
-// que o motorista atende -- mesmo critério que ratingKind (clientRating.ts)
-// já usa pra separar a tela de avaliação do motorista da do montador.
-const ENTREGA_NPS_TYPES = new Set(DELIVERY_REQUEST_TYPES as readonly string[]);
-
-function classifyNpsTipo(type: string): "montagem" | "assistencia_tecnica" | "entrega" | null {
+// Achado 09/09/2026, revertido 22/09/2026: "entrega" (troca/entrega de
+// produto, envio/recolhimento de peça, atendido pelo motorista) chegou a
+// ser um tipo próprio, separado de "assistência técnica" -- pedido do
+// Victor nessa data revisitando o assunto: "tudo o que for de notificação
+// de assistência, incluindo entrega de produto, vai ser classificado para
+// nps pós assistência". "Pós-entrega" virou outra coisa (a entrega
+// ORIGINAL da compra, sem chamado de assistência nenhum por trás -- ver
+// entregaNps.ts, mesmo espírito do nps2Meses.ts/compra_nps), por isso todo
+// tipo de chamado de assistência (troca/entrega de produto, envio/
+// recolhimento de peça, troca de peça, vistoria etc.) cai em
+// "assistencia_tecnica" agora, sem exceção.
+function classifyNpsTipo(type: string): "montagem" | "assistencia_tecnica" | null {
   if (MONTAGEM_NPS_TYPES.has(type)) return "montagem";
   if (NPS_EXCLUDED_TYPES.has(type)) return null;
-  if (ENTREGA_NPS_TYPES.has(type)) return "entrega";
   return "assistencia_tecnica";
 }
 
@@ -163,16 +165,13 @@ type NpsCandidate = {
 
 // Só manda pra quem concluiu de verdade nas últimas 48h (mesma janela do
 // resto deste sync) -- `service_request_nps` sem linha pro request_id é o
-// critério de "ainda não mandei". Workflows ainda sem template aprovado
-// (GHL_WORKFLOW_ID_* vazio) -- função vira no-op até esses envs existirem,
-// pra nunca matricular ninguém com o placeholder por engano num deploy
-// futuro antes da hora.
+// critério de "ainda não mandei". Tag do GHL (NPS_GHL_TAG, npsDetratores.ts)
+// dispara o Workflow correspondente sozinha (Contact Tag como trigger,
+// configurado direto no GHL) -- não depende de nenhuma variável de
+// ambiente (achado 22/09/2026: a versão anterior, por ID de workflow,
+// nunca chegou a ser configurada no servidor e ficou 0 execuções o tempo
+// todo sem ninguém perceber).
 async function enrollPendingNps(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<{ enrolled: number; errors: string[] }> {
-  const montagemWorkflowId = process.env.GHL_WORKFLOW_ID_MONTAGEM;
-  const assistenciaWorkflowId = process.env.GHL_WORKFLOW_ID_ASSISTENCIA;
-  const entregaWorkflowId = process.env.GHL_WORKFLOW_ID_ENTREGA;
-  if (!montagemWorkflowId || !assistenciaWorkflowId || !entregaWorkflowId) return { enrolled: 0, errors: [] };
-
   const sinceIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const { data: candidates, error } = await supabase
     .from("service_requests")
@@ -197,14 +196,14 @@ async function enrollPendingNps(supabase: ReturnType<typeof getSupabaseAdmin>): 
     const tipo = classifyNpsTipo(candidate.type);
     if (!tipo) continue;
 
-    const workflowId = tipo === "montagem" ? montagemWorkflowId : tipo === "entrega" ? entregaWorkflowId : assistenciaWorkflowId;
+    const tag = NPS_GHL_TAG[tipo]!;
     const contactId = await upsertGhlContact(candidate.client_phone, candidate.client_name);
     if (!contactId) {
       errors.push(`nps ${candidate.id}: não achou/criou contato no GHL`);
       continue;
     }
-    if (!(await addContactToWorkflow(contactId, workflowId))) {
-      errors.push(`nps ${candidate.id}: falha ao matricular no workflow`);
+    if (!(await addContactTag(contactId, tag))) {
+      errors.push(`nps ${candidate.id}: falha ao aplicar a tag no GHL`);
       continue;
     }
     const { error: insertError } = await supabase.from("service_request_nps").insert({ request_id: candidate.id, tipo, ghl_contact_id: contactId });
@@ -366,11 +365,18 @@ async function runSync() {
   // NPS "2 meses pós-recebimento" -- pedido do Victor 09/09/2026. Fonte de
   // dado (totvs_orders/totvs_delivery_cargas) e destinatário (client_id,
   // não requestId) diferentes dos 3 tipos acima, por isso função própria
-  // em nps2Meses.ts em vez de mais um `if` aqui -- mesma proteção deles
-  // (no-op sem GHL_WORKFLOW_ID_COMPRA configurado).
+  // em nps2Meses.ts em vez de mais um `if` aqui.
   const { enrolled: compraNpsEnrolled, errors: compraNpsErrors } = await enrollPendingCompraNps();
   errors.push(...compraNpsErrors);
   const compraNpsAnswered = await detectPendingCompraNpsResponses();
+
+  // NPS "Pós-entrega" -- pedido do Victor 22/09/2026: a entrega ORIGINAL da
+  // compra (não um chamado de assistência), mesma fonte de dado que
+  // "Compra" acima (totvs_delivery_cargas/totvs_orders), só que com janela
+  // bem mais curta (dias, não meses) -- ver entregaNps.ts.
+  const { enrolled: entregaNpsEnrolled, errors: entregaNpsErrors } = await enrollPendingEntregaNps();
+  errors.push(...entregaNpsErrors);
+  const entregaNpsAnswered = await detectPendingEntregaNpsResponses();
 
   const ok = errors.length === 0;
   await recordSyncRun(
@@ -385,6 +391,8 @@ async function runSync() {
       montagemAssistNpsAnswered,
       compraNpsEnrolled,
       compraNpsAnswered,
+      entregaNpsEnrolled,
+      entregaNpsAnswered,
     },
     errors
   );
@@ -399,6 +407,8 @@ async function runSync() {
     montagemAssistNpsAnswered,
     compraNpsEnrolled,
     compraNpsAnswered,
+    entregaNpsEnrolled,
+    entregaNpsAnswered,
     errors,
   });
 }
