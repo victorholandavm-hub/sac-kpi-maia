@@ -71,6 +71,21 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
     request.status === "concluida" && request.deliveryRating === null && !isMostruarioRequest(request.orderCode, request.clientName);
   const montadorDate = montadorEffectiveDate(request);
   const mapsQuery = [request.clientAddress, request.clientAddressNumber, request.clientNeighborhood].filter(Boolean).join(", ");
+  // Achado do Victor 22/09/2026: "quando eles colocam concluido
+  // parcialmente, se ele forem tentar concluir os outros que ficaram
+  // abertos, nao conseguem... aparece só que está esperando aprovação da
+  // loja". Antes disso, aguardando_aprovacao escondia o painel de Ações
+  // inteiro pro montador -- certo pra um chamado SEM itens (não tem mais
+  // nada mesmo pra fazer, só esperar o gerente), errado pra um chamado
+  // com itens onde a "Concluir parcialmente" deixou alguns pendentes: o
+  // montador ainda pode (e devia poder) marcar o resto, mesmo com os
+  // primeiros itens já enviados pra aprovação -- montadorCompletePartially/
+  // montadorCompleteRequest (montador-actions.ts) já aceitam isso sem
+  // problema (marcam completed=true de novo nos que faltam, sobem
+  // status pra aguardando_aprovacao de novo -- idempotente pros que já
+  // estavam concluídos).
+  const hasPendingItems = request.items.some((item) => !item.completed);
+  const showActions = !showCompleted && (request.status !== "aguardando_aprovacao" || hasPendingItems);
 
   return (
     <ToastProvider>
@@ -261,7 +276,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
           )}
         </div>
 
-        {!showCompleted && request.status !== "aguardando_aprovacao" ? (
+        {showActions ? (
           <div
             className="rounded-lg p-4 flex flex-col gap-3"
             style={{ background: "var(--surface-1)", border: "2px solid var(--brand-green)" }}
@@ -269,12 +284,23 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
               Ações
             </h3>
+            {request.status === "aguardando_aprovacao" ? (
+              // Alguns itens já foram concluídos e mandados pra aprovação
+              // (ver ✓ Feito na lista de produtos acima) -- isso aqui é só
+              // pros que faltam, não trava o resto.
+              <p
+                className="text-xs font-medium rounded-lg p-2"
+                style={{ background: "color-mix(in srgb, var(--series-3) 15%, var(--surface-1))", color: "var(--text-secondary)" }}
+              >
+                ⏳ O que já foi marcado como feito está aguardando aprovação da loja. Continue com o que falta abaixo.
+              </p>
+            ) : null}
             <MontadorRequestActions requestId={request.id} items={request.items} />
           </div>
         ) : request.status === "aguardando_aprovacao" ? (
-          // Nada mais pro montador fazer aqui -- pedido do Victor
-          // 31/08/2026: só o gerente da loja aprova a partir daqui (ver
-          // loja/page.tsx).
+          // Sem item pendente nenhum -- nada mais pro montador fazer aqui
+          // (pedido do Victor 31/08/2026: só o gerente da loja aprova a
+          // partir daqui, ver loja/page.tsx).
           <div
             className="rounded-lg p-4 flex flex-col gap-1"
             style={{ background: "color-mix(in srgb, var(--series-3) 12%, var(--surface-1))", border: "2px solid var(--series-3)" }}
