@@ -6,8 +6,18 @@ import { revalidatePath } from "next/cache";
 import { resolveEstornoRequester } from "@/lib/estornoRequester";
 import { createEstornoRequest } from "@/lib/estornoRequests";
 import { uploadPendingRequestPhoto } from "@/lib/servicePhotos";
+import { findTotvsClientByCode, type TotvsClientMatch } from "@/lib/totvsLookup";
 
 export type EstornoFormState = { error?: string } | undefined;
+
+// Código do cliente primeiro no formulário -- pedido do Victor 23/09/2026:
+// puxa nome + CPF automaticamente, mesmo padrão de lookupTotvsClientForEncomenda
+// (encomendas-actions.ts).
+export async function lookupTotvsClientForEstorno(code: string): Promise<TotvsClientMatch | null> {
+  const requester = await resolveEstornoRequester();
+  if (!requester) return null;
+  return findTotvsClientByCode(code);
+}
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
   const str = String(value ?? "").trim();
