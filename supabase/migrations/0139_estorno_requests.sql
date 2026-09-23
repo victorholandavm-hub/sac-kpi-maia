@@ -14,7 +14,7 @@ create table financeiros (
 
 create table estorno_requests (
   id uuid primary key default gen_random_uuid(),
-  store_id uuid not null references stores(id),
+  store_id text not null references stores(id),
   requester_role text not null check (requester_role in ('caixa','gerente')),
   requester_name text not null,
   cliente_nome text not null,
