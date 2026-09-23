@@ -1,13 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   createEstornoRequestAction,
   lookupTotvsClientForEstorno,
   lookupTotvsProductForEstorno,
   type EstornoFormState,
 } from "@/app/assistencia/estornos-actions";
-import { MoneyInput } from "./MoneyInput";
+import { MoneyInput, MoneyFieldRaw } from "./MoneyInput";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -89,11 +89,33 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
   }, [codigoProduto]);
 
   // Pix ou Cartão (com parcelas) -- pedido do Victor 23/09/2026: antes era
-  // texto livre. Combina num único valor pro campo forma_pagamento (mesma
-  // coluna de sempre) via hidden input.
-  const [metodoPagamento, setMetodoPagamento] = useState<"pix" | "cartao">("pix");
-  const [parcelas, setParcelas] = useState(PARCELAS[0]);
-  const formaPagamento = metodoPagamento === "pix" ? "Pix" : `Cartão - ${parcelas}`;
+  // texto livre. Pode ter MAIS de uma forma na mesma venda (pedido do
+  // Victor, revisão do mesmo dia: "as vezes o cliente paga um pedaço no
+  // valor no pix e outro pedaço no cartão") -- lista de linhas, cada uma
+  // com método + parcelas (se cartão) + valor daquela parte. Combina tudo
+  // num único texto pro campo forma_pagamento (mesma coluna de sempre) via
+  // hidden input.
+  const pagamentoIdSeq = useRef(1);
+  const [pagamentos, setPagamentos] = useState(() => [{ id: 0, metodo: "pix" as "pix" | "cartao", parcelas: PARCELAS[0], cents: 0 }]);
+
+  function addPagamento() {
+    setPagamentos((prev) => [...prev, { id: pagamentoIdSeq.current++, metodo: "pix", parcelas: PARCELAS[0], cents: 0 }]);
+  }
+  function removePagamento(id: number) {
+    setPagamentos((prev) => prev.filter((p) => p.id !== id));
+  }
+  function updatePagamento(id: number, patch: Partial<(typeof pagamentos)[number]>) {
+    setPagamentos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }
+
+  const formaPagamento = pagamentos
+    .filter((p) => p.cents > 0)
+    .map((p) => {
+      const label = p.metodo === "pix" ? "Pix" : `Cartão - ${p.parcelas}`;
+      const valor = (p.cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      return `${label}: ${valor}`;
+    })
+    .join(" + ");
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -169,29 +191,55 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
         </Field>
       </div>
 
-      <Field label="Forma de pagamento">
-        <div className="flex items-center gap-3">
-          <select
-            value={metodoPagamento}
-            onChange={(e) => setMetodoPagamento(e.target.value as "pix" | "cartao")}
-            className="rounded border px-3 py-2"
-            style={inputStyle}
-          >
-            <option value="pix">Pix</option>
-            <option value="cartao">Cartão</option>
-          </select>
-          {metodoPagamento === "cartao" ? (
-            <select value={parcelas} onChange={(e) => setParcelas(e.target.value)} className="rounded border px-3 py-2" style={inputStyle}>
-              {PARCELAS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
+      <div className="flex flex-col gap-2">
+        <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+          Forma de pagamento
+        </span>
+        {/* Mais de uma linha quando o cliente pagou parte no Pix e parte no
+            cartão -- pedido do Victor 23/09/2026. */}
+        {pagamentos.map((p) => (
+          <div key={p.id} className="flex items-center gap-2 flex-wrap">
+            <select
+              value={p.metodo}
+              onChange={(e) => updatePagamento(p.id, { metodo: e.target.value as "pix" | "cartao" })}
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            >
+              <option value="pix">Pix</option>
+              <option value="cartao">Cartão</option>
             </select>
-          ) : null}
-        </div>
+            {p.metodo === "cartao" ? (
+              <select
+                value={p.parcelas}
+                onChange={(e) => updatePagamento(p.id, { parcelas: e.target.value })}
+                className="rounded border px-3 py-2"
+                style={inputStyle}
+              >
+                {PARCELAS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            <MoneyFieldRaw cents={p.cents} onChange={(cents) => updatePagamento(p.id, { cents })} />
+            {pagamentos.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => removePagamento(p.id)}
+                className="text-xs underline"
+                style={{ color: "var(--status-critical)" }}
+              >
+                remover
+              </button>
+            ) : null}
+          </div>
+        ))}
+        <button type="button" onClick={addPagamento} className="text-xs underline self-start" style={{ color: "var(--brand-green)" }}>
+          + Adicionar forma de pagamento
+        </button>
         <input type="hidden" name="forma_pagamento" value={formaPagamento} />
-      </Field>
+      </div>
 
       <Field label="Código do produto">
         <input
