@@ -6,43 +6,62 @@ import { uploadPhotoRequest } from "@/lib/uploadPhotoClient";
 import { recusarEstornoAction } from "@/app/assistencia/financeiro-estornos-actions";
 
 // Ações do financeiro/admin sobre uma solicitação pendente: anexar o
-// comprovante do estorno (upload + conclusão num só passo, ver
-// /api/financeiro/upload-comprovante) ou recusar com motivo -- mesmo padrão
-// de "Negar pedido" em PedidoEncomendaActions.tsx.
+// comprovante do estorno e SÓ DEPOIS confirmar em "Concluir" (pedido do
+// Victor 23/09/2026, revisado: antes o upload já concluía sozinho, agora
+// são dois passos -- escolhe o arquivo, confere, e clica em concluir) ou
+// recusar com motivo -- mesmo padrão de "Negar pedido" em
+// PedidoEncomendaActions.tsx.
 export function EstornoFinanceiroActions({ requestId }: { requestId: string }) {
   const { pending, run } = useQuickAction();
+  const [comprovante, setComprovante] = useState<File | null>(null);
+  const [inputKey, setInputKey] = useState(0);
   const [showDeny, setShowDeny] = useState(false);
   const [denyReason, setDenyReason] = useState("");
-  const [inputKey, setInputKey] = useState(0);
 
-  function uploadComprovante(file: File) {
+  function concluir() {
+    if (!comprovante) return;
     run(async () => {
       const formData = new FormData();
-      formData.set("comprovante", file);
+      formData.set("comprovante", comprovante);
       formData.set("requestId", requestId);
       await uploadPhotoRequest("/api/financeiro/upload-comprovante", formData);
+      setComprovante(null);
       setInputKey((k) => k + 1);
     }, "Estorno marcado como concluído.");
   }
 
   return (
     <div className="flex flex-col gap-2 pt-2" style={{ borderTop: "1px solid var(--gridline)" }}>
-      <label
-        className="text-sm rounded-lg px-3 py-2.5 font-semibold text-center cursor-pointer self-start"
-        style={{ border: "2px dashed var(--status-good)", color: "var(--status-good)", opacity: pending ? 0.6 : 1, pointerEvents: pending ? "none" : "auto" }}
-      >
-        {pending ? "Enviando…" : "📎 Anexar comprovante e concluir"}
-        <input
-          key={inputKey}
-          type="file"
-          accept="image/*,application/pdf"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) uploadComprovante(file);
-          }}
-        />
-      </label>
+      <div className="flex items-center gap-2 flex-wrap">
+        <label
+          className="text-sm rounded-lg px-3 py-2 font-semibold text-center cursor-pointer"
+          style={{ border: "2px dashed var(--status-good)", color: "var(--status-good)", opacity: pending ? 0.6 : 1, pointerEvents: pending ? "none" : "auto" }}
+        >
+          📎 {comprovante ? "Trocar comprovante" : "Anexar comprovante"}
+          <input
+            key={inputKey}
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            onChange={(e) => setComprovante(e.target.files?.[0] ?? null)}
+          />
+        </label>
+        {comprovante ? (
+          <>
+            <span className="text-xs truncate max-w-[200px]" style={{ color: "var(--text-secondary)" }}>
+              {comprovante.name}
+            </span>
+            <button
+              disabled={pending}
+              onClick={concluir}
+              className="text-sm rounded-lg px-3 py-2 font-semibold text-white disabled:opacity-60"
+              style={{ background: "var(--status-good)" }}
+            >
+              {pending ? "Enviando…" : "✓ Concluir"}
+            </button>
+          </>
+        ) : null}
+      </div>
 
       {showDeny ? (
         <div className="flex flex-col gap-2">

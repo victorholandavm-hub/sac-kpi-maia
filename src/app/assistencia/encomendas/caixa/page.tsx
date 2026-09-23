@@ -107,11 +107,16 @@ export default async function EncomendasCaixaPage({
           >
             + Novo pedido
           </Link>
-          {/* Caixa não renderiza LojaTabs (só gerente, ver abaixo) -- link
+          {/* Caixa não renderiza LojaTabs (só gerente, ver abaixo) -- botão
               avulso pra ele também chegar em Estornos (pedido do Victor
-              23/09/2026). */}
+              23/09/2026, revisado no mesmo dia: "o botão 'estornos' tem
+              que ficar como um botão mesmo" -- era um link sublinhado). */}
           {requester.kind === "caixa" ? (
-            <Link href="/assistencia/estornos" className="text-sm underline whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+            <Link
+              href="/assistencia/estornos"
+              className="text-sm px-4 py-2.5 rounded-lg font-semibold whitespace-nowrap border transition-all duration-200 hover:brightness-95"
+              style={{ borderColor: "var(--brand-orange)", color: "var(--brand-orange)" }}
+            >
               Estornos
             </Link>
           ) : null}

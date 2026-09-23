@@ -193,6 +193,30 @@ export async function marcarEstornoConcluido(id: string, financeiroName: string,
   if (error) throw new Error(error.message);
 }
 
+export type EstornoRequestsSummary = { pendente: number; concluido: number; recusado: number; valorPendente: number };
+
+// Resumo pro topo da fila do financeiro/admin -- mesmo espírito dos
+// StatTile de contagem por status que já aparecem em Encomendas/Peças.
+export async function getEstornoRequestsSummary(): Promise<EstornoRequestsSummary> {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("estorno_requests").select("status, valor_reembolso");
+  if (error) throw new Error(error.message);
+
+  const summary: EstornoRequestsSummary = { pendente: 0, concluido: 0, recusado: 0, valorPendente: 0 };
+  for (const row of data ?? []) {
+    const status = row.status as EstornoRequestStatus;
+    if (status === "pendente") {
+      summary.pendente++;
+      summary.valorPendente += Number(row.valor_reembolso);
+    } else if (status === "concluido") {
+      summary.concluido++;
+    } else if (status === "recusado") {
+      summary.recusado++;
+    }
+  }
+  return summary;
+}
+
 export async function recusarEstornoRequest(id: string, financeiroName: string, motivo: string): Promise<void> {
   const trimmed = motivo.trim();
   if (!trimmed) throw new Error("Informe o motivo da recusa.");
