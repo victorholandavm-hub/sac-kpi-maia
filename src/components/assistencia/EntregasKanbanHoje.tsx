@@ -6,6 +6,7 @@ import Link from "next/link";
 import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
+import { BulkRotaBar } from "./NotificacoesList";
 import { DELIVERY_TYPE_COLORS } from "./AssistenciaQueueGroup";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { getDayRouteGroupsAction } from "@/app/assistencia/actions";
@@ -482,6 +483,7 @@ export function EntregasKanbanHoje({
   // abaixo (dependem de visibleRows, calculado depois do early-return logo
   // abaixo) -- só o useState em si precisa ficar antes dele, incondicional
   // (regra dos hooks).
+  const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // "Rotas" -- extraído numa variável pra reaproveitar tanto no corpo cheio
@@ -871,13 +873,22 @@ export function EntregasKanbanHoje({
           >
             🖨️ Imprimir selecionados
           </Link>
-          <button
-            type="button"
-            onClick={() => setSelected(new Set())}
-            className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-          >
-            cancelar
-          </button>
+          {/* Mudar motorista/rota em bloco -- pedido do Victor 23/09/2026:
+              "ficou assim, não apareceu" (a aba Hoje é essa tela, renderizada
+              por EntregasKanbanHoje.tsx, não EntregasFlatList.tsx -- o
+              conserto anterior tinha ido pro componente errado). Mesmo
+              BulkRotaBar já usado no SAC (NotificacoesList.tsx) e no quadro
+              de grupos (AssistenciaQueueGroup.tsx), reaproveitado aqui. */}
+          <BulkRotaBar
+            selectedIds={[...selected]}
+            count={selected.size}
+            onDone={() => {
+              setSelected(new Set());
+              router.refresh();
+            }}
+            onPartialProgress={() => router.refresh()}
+            onCancel={() => setSelected(new Set())}
+          />
         </div>
       ) : null}
     </div>
