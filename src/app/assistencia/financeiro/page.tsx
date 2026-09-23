@@ -174,7 +174,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                     Recusado por {r.recusadoPor}: {r.motivoRecusa}
                   </p>
                 ) : null}
-                {r.status === "pendente" ? <EstornoFinanceiroActions requestId={r.id} /> : null}
+                {r.status === "pendente" || r.status === "concluido" ? <EstornoFinanceiroActions requestId={r.id} status={r.status} /> : null}
               </div>
             </details>
           ))}

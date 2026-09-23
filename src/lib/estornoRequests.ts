@@ -179,7 +179,10 @@ export async function marcarEstornoConcluido(id: string, financeiroName: string,
   const admin = getSupabaseAdmin();
   const { data: current } = await admin.from("estorno_requests").select("status").eq("id", id).maybeSingle();
   if (!current) throw new Error("Solicitação não encontrada.");
-  if (current.status !== "pendente") throw new Error("Essa solicitação já foi processada.");
+  // Recusado é terminal -- não dá pra "concluir por cima". Pendente (1ª vez)
+  // ou concluído (trocar o comprovante errado, pedido do Victor 23/09/2026)
+  // são os dois casos válidos aqui.
+  if (current.status === "recusado") throw new Error("Essa solicitação foi recusada -- não dá pra concluir.");
 
   const { error } = await admin
     .from("estorno_requests")
@@ -189,6 +192,22 @@ export async function marcarEstornoConcluido(id: string, financeiroName: string,
       concluido_por: financeiroName,
       concluido_em: new Date().toISOString(),
     })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// Desfaz a conclusão (comprovante errado, ou concluiu sem querer) -- volta
+// pra pendente, limpando o comprovante e quem concluiu. Pedido do Victor
+// 23/09/2026.
+export async function desfazerConclusaoEstorno(id: string): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { data: current } = await admin.from("estorno_requests").select("status").eq("id", id).maybeSingle();
+  if (!current) throw new Error("Solicitação não encontrada.");
+  if (current.status !== "concluido") throw new Error("Essa solicitação não está concluída.");
+
+  const { error } = await admin
+    .from("estorno_requests")
+    .update({ status: "pendente", anexo_comprovante_path: null, concluido_por: null, concluido_em: null })
     .eq("id", id);
   if (error) throw new Error(error.message);
 }
