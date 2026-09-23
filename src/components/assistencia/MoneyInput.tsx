@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 const inputStyle = { borderColor: "var(--border)" };
 
 // Máscara de centavos -- pedido do Victor 23/09/2026: "deixe os 00 depois
@@ -32,17 +30,5 @@ export function MoneyFieldRaw({ cents, onChange, required }: { cents: number; on
       className="rounded border px-3 py-2 text-right tabular-nums"
       style={inputStyle}
     />
-  );
-}
-
-export function MoneyInput({ name, required, defaultValueCents = 0 }: { name: string; required?: boolean; defaultValueCents?: number }) {
-  const [cents, setCents] = useState(defaultValueCents);
-  const decimalValue = (cents / 100).toFixed(2);
-
-  return (
-    <>
-      <MoneyFieldRaw cents={cents} onChange={setCents} required={required} />
-      <input type="hidden" name={name} value={decimalValue} />
-    </>
   );
 }
