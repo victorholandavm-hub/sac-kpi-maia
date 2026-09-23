@@ -21,6 +21,9 @@ const PASSTHROUGH_PREFIXES = [
   "/api/reconcile-tags",
   "/api/montador/upload-photo",
   "/api/motorista/upload-photo",
+  // Upload do comprovante de estorno pelo financeiro -- mesmo motivo dos
+  // dois acima (POST comum em vez de Server Action).
+  "/api/financeiro/upload-comprovante",
   // Upload de foto pela equipe (assistência/admin/SAC) na tela de detalhe
   // do chamado -- mesmo motivo dos dois acima (POST comum em vez de Server
   // Action, ver route.ts), precisa do mesmo passthrough: não começa com

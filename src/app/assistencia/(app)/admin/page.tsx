@@ -3,6 +3,7 @@ import { listStores } from "@/lib/serviceRequests";
 import { listGerentesWithPinStatus } from "@/lib/gerentes";
 import { listAssemblersWithPinStatus, listDriversWithPinStatus } from "@/lib/payments";
 import { listTecnicosWithPinStatus } from "@/lib/tecnicos";
+import { listFinanceirosWithPinStatus } from "@/lib/financeiros";
 import { listSuppliers } from "@/lib/partOrders";
 import { listProdutosEncomenda } from "@/lib/pedidosEncomenda";
 import { listCdOperadoresWithPinStatus, listFabricaOperadoresWithPinStatus } from "@/lib/encomendaAuth";
@@ -17,6 +18,7 @@ import { AddCaixaForm } from "@/components/assistencia/AddCaixaForm";
 import { AssemblerPinField } from "@/components/assistencia/AssemblerPinField";
 import { DriverPinField } from "@/components/assistencia/DriverPinField";
 import { TecnicoPinField } from "@/components/assistencia/TecnicoPinField";
+import { FinanceiroPinField } from "@/components/assistencia/FinanceiroPinField";
 import { GerentePinField } from "@/components/assistencia/GerentePinField";
 import { ProdutoEncomendaAdmin } from "@/components/assistencia/ProdutoEncomendaAdmin";
 import { CaixaPinField } from "@/components/assistencia/CaixaPinField";
@@ -86,6 +88,7 @@ export default async function AdminPage() {
     rotaConfig,
     rotaHolidays,
     syncRuns,
+    financeiros,
   ] = await Promise.all([
     listStores(),
     listGerentesWithPinStatus(),
@@ -101,6 +104,7 @@ export default async function AdminPage() {
     getRotaWeekdayConfig(),
     listRotaHolidays(),
     listLatestSyncRuns(),
+    listFinanceirosWithPinStatus(),
   ]);
   const syncByJob = new Map(syncRuns.map((r) => [r.job, r]));
 
@@ -182,6 +186,22 @@ export default async function AdminPage() {
             ))}
           </ul>
           <AddSimpleEntryForm kind="tecnico" />
+        </AdminSection>
+
+        <AdminSection title="Financeiro" count={financeiros.length}>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            Defina um PIN de {PIN_LENGTH} números pra cada um acessar{" "}
+            <span className="font-mono">/assistencia/financeiro</span> -- fila de solicitações de estorno das
+            lojas, pra processar e anexar o comprovante (ou recusar com motivo).
+          </p>
+          <ul className="flex flex-col gap-2">
+            {financeiros.map((f) => (
+              <li key={f.name}>
+                <FinanceiroPinField name={f.name} hasPin={f.hasPin} />
+              </li>
+            ))}
+          </ul>
+          <AddSimpleEntryForm kind="financeiro" />
         </AdminSection>
 
         <AdminSection title="Fornecedores" count={suppliers.length}>

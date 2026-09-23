@@ -7,6 +7,7 @@ const TABS = [
   { label: "Montagens", href: "/assistencia/loja" },
   { label: "Encomendas", href: "/assistencia/encomendas/caixa" },
   { label: "Trocas", href: "/assistencia/loja/trocas" },
+  { label: "Estornos", href: "/assistencia/estornos" },
 ];
 
 export function LojaTabs() {

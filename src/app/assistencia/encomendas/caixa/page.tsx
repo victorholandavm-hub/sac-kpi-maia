@@ -107,6 +107,14 @@ export default async function EncomendasCaixaPage({
           >
             + Novo pedido
           </Link>
+          {/* Caixa não renderiza LojaTabs (só gerente, ver abaixo) -- link
+              avulso pra ele também chegar em Estornos (pedido do Victor
+              23/09/2026). */}
+          {requester.kind === "caixa" ? (
+            <Link href="/assistencia/estornos" className="text-sm underline whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+              Estornos
+            </Link>
+          ) : null}
           <form action={signOutAction}>
             <button type="submit" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               Sair
