@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
+import { BulkRotaBar } from "./NotificacoesList";
 import { DELIVERY_TYPE_COLORS } from "./AssistenciaQueueGroup";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { ROTA_LABELS } from "@/lib/rotas";
@@ -115,6 +116,7 @@ function EntregaFlatRow({ r, selected, onToggleSelected }: { r: ServiceRequestSu
 // linha + "selecionar todas" + barra flutuante com link pra despacho-lote),
 // só que pra essa lista em vez do quadro de hoje.
 export function EntregasFlatList({ items }: { items: ServiceRequestSummary[] }) {
+  const router = useRouter();
   const sorted = sortByScheduledDate(items);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -179,13 +181,24 @@ export function EntregasFlatList({ items }: { items: ServiceRequestSummary[] }) 
           >
             🖨️ Imprimir selecionados
           </Link>
-          <button
-            type="button"
-            onClick={() => setSelected(new Set())}
-            className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-          >
-            cancelar
-          </button>
+          {/* Mudar motorista/rota em bloco -- pedido do Victor 23/09/2026:
+              "eu preciso que na aba de entregas, eu posso mudar a
+              rota/motorista, em bloco". Mesmo BulkRotaBar já usado no SAC
+              (NotificacoesList.tsx) e no quadro "Hoje"
+              (AssistenciaQueueGroup.tsx), reaproveitado aqui em vez de
+              duplicado -- essa lista (view achatada, sem agrupar por dia/
+              rota, ver comentário no topo do arquivo) era a única aba de
+              Entregas que ainda não tinha esse botão. */}
+          <BulkRotaBar
+            selectedIds={[...selected]}
+            count={selected.size}
+            onDone={() => {
+              setSelected(new Set());
+              router.refresh();
+            }}
+            onPartialProgress={() => router.refresh()}
+            onCancel={() => setSelected(new Set())}
+          />
         </div>
       ) : null}
     </div>
