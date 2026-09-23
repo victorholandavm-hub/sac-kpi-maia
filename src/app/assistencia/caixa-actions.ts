@@ -68,7 +68,11 @@ export async function caixaSignIn(_state: CaixaFormState, formData: FormData): P
     secure: true,
     sameSite: "lax",
     maxAge: CAIXA_SESSION_MAX_AGE,
-    path: "/assistencia/encomendas",
+    // "/assistencia" (não só "/assistencia/encomendas") -- pedido do Victor
+    // 23/09/2026: caixa deixou de ser só encomendas, também solicita estorno
+    // em /assistencia/estornos. Sem isso o cookie não era enviado nessa rota
+    // (fora do prefixo antigo) e a caixa caía de volta no login.
+    path: "/assistencia",
   });
 
   redirect("/assistencia/encomendas/caixa");
@@ -76,7 +80,7 @@ export async function caixaSignIn(_state: CaixaFormState, formData: FormData): P
 
 export async function caixaSignOut() {
   const cookieStore = await cookies();
-  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia" });
   redirect("/assistencia/encomendas/caixa/login");
 }
 

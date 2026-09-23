@@ -55,7 +55,7 @@ export async function fabricaSignIn(_state: FabricaFormState, formData: FormData
   // válido "sequestra" a identidade em resolveEncomendaRequester /
   // requireEncomendaActor, mesmo com esse login de fábrica tendo dado certo.
   cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia/encomendas" });
-  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia" });
   cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia" });
 
   cookieStore.set(FABRICA_COOKIE_NAME, signFabricaSession(data.name), {

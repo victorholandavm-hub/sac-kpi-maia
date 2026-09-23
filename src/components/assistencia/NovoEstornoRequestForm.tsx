@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import { createEstornoRequestAction, type EstornoFormState } from "@/app/assistencia/estornos-actions";
+import { useActionState, useEffect, useState } from "react";
+import { createEstornoRequestAction, lookupTotvsClientForEstorno, type EstornoFormState } from "@/app/assistencia/estornos-actions";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -21,6 +21,39 @@ function Field({ label, required, children }: { label: string; required?: boolea
 export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: string; name: string }[] }) {
   const [state, formAction, pending] = useActionState<EstornoFormState, FormData>(createEstornoRequestAction, undefined);
 
+  // Código do cliente puxa nome + CPF automaticamente -- pedido do Victor
+  // 23/09/2026, mesmo padrão de lookupTotvsClientForEncomenda
+  // (NovoPedidoEncomendaForm.tsx), só que aqui PREENCHE os campos (esse
+  // formulário tem nome/CPF de verdade, não é só uma conferência). Os dois
+  // continuam editáveis à mão -- cobre o cliente sem cadastro completo ou
+  // um código digitado errado.
+  const [codigoCliente, setCodigoCliente] = useState("");
+  const [clienteNome, setClienteNome] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!codigoCliente.trim()) {
+        setLookupStatus("idle");
+        return;
+      }
+      setLookupStatus("loading");
+      lookupTotvsClientForEstorno(codigoCliente)
+        .then((match) => {
+          if (!match) {
+            setLookupStatus("not_found");
+            return;
+          }
+          setClienteNome(match.name);
+          setCpf(match.cpfCnpj ?? "");
+          setLookupStatus("found");
+        })
+        .catch(() => setLookupStatus("not_found"));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [codigoCliente]);
+
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
       {storeOptions && storeOptions.length > 1 ? (
@@ -38,15 +71,44 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
         </Field>
       ) : null}
 
-      <Field label="Cliente" required>
-        <input name="cliente_nome" type="text" required className="rounded border px-3 py-2" style={inputStyle} />
+      <Field label="Código do cliente">
+        <input
+          name="codigo_cliente"
+          type="text"
+          value={codigoCliente}
+          onChange={(e) => setCodigoCliente(e.target.value)}
+          placeholder="Código do cliente na venda"
+          className="rounded border px-3 py-2"
+          style={inputStyle}
+        />
+        {lookupStatus === "loading" ? (
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Buscando…
+          </span>
+        ) : lookupStatus === "found" ? (
+          <span className="text-xs" style={{ color: "var(--status-good)" }}>
+            Cliente encontrado: {clienteNome}
+          </span>
+        ) : lookupStatus === "not_found" ? (
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Código não encontrado -- preencha nome e CPF à mão.
+          </span>
+        ) : null}
       </Field>
       <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="CPF">
-          <input name="cpf" type="text" className="rounded border px-3 py-2" style={inputStyle} />
+        <Field label="Cliente" required>
+          <input
+            name="cliente_nome"
+            type="text"
+            required
+            value={clienteNome}
+            onChange={(e) => setClienteNome(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
         </Field>
-        <Field label="Código do cliente">
-          <input name="codigo_cliente" type="text" className="rounded border px-3 py-2" style={inputStyle} />
+        <Field label="CPF">
+          <input name="cpf" type="text" value={cpf} onChange={(e) => setCpf(e.target.value)} className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
       </div>
       <div className="grid sm:grid-cols-2 gap-4">

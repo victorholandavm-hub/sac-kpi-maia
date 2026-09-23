@@ -49,7 +49,7 @@ export async function cdSignIn(_state: CdFormState, formData: FormData): Promise
   // ainda válido "sequestra" a identidade em resolveEncomendaRequester /
   // requireEncomendaActor, mesmo com esse login de CD tendo dado certo.
   cookieStore.delete({ name: FABRICA_COOKIE_NAME, path: "/assistencia/encomendas" });
-  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia" });
   cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia" });
 
   // path "/assistencia" (não só "/assistencia/encomendas") -- descoberto em

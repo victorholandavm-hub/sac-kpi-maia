@@ -68,7 +68,7 @@ export async function lojaGerenteSignIn(_state: LojaGerenteFormState, formData: 
   // não deixar nenhuma outra sessão pendurada).
   cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia/encomendas" });
   cookieStore.delete({ name: FABRICA_COOKIE_NAME, path: "/assistencia/encomendas" });
-  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia/encomendas" });
+  cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia" });
 
   cookieStore.set(LOJA_GERENTE_COOKIE_NAME, signLojaGerenteSession(data.name), {
     httpOnly: true,
