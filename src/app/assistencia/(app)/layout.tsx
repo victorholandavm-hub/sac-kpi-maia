@@ -81,6 +81,11 @@ export default async function AssistenciaAppLayout({
                   Admin
                 </Link>
               ) : null}
+              {isAdmin ? (
+                <Link href="/assistencia/financeiro" className="text-sm font-semibold" style={{ color: "var(--brand-orange)" }}>
+                  Estornos
+                </Link>
+              ) : null}
               <form action={signOut}>
                 <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
                   Sair

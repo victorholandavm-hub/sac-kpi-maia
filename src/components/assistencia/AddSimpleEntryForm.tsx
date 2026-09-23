@@ -1,7 +1,16 @@
 "use client";
 
 import { useActionState } from "react";
-import { addAssembler, addSupplier, addDriver, addTecnico, addCdOperador, addFabricaOperador, type FormState } from "@/app/assistencia/admin-actions";
+import {
+  addAssembler,
+  addSupplier,
+  addDriver,
+  addTecnico,
+  addCdOperador,
+  addFabricaOperador,
+  addFinanceiro,
+  type FormState,
+} from "@/app/assistencia/admin-actions";
 import { INTERNAL_FABRICAS } from "@/lib/fabricas";
 
 const ACTIONS = {
@@ -11,6 +20,7 @@ const ACTIONS = {
   supplier: addSupplier,
   cd: addCdOperador,
   fabrica: addFabricaOperador,
+  financeiro: addFinanceiro,
 };
 
 const PLACEHOLDERS = {
@@ -20,6 +30,7 @@ const PLACEHOLDERS = {
   supplier: "Novo fornecedor",
   cd: "Novo operador do CD",
   fabrica: "Novo operador da fábrica",
+  financeiro: "Novo financeiro",
 };
 
 export function AddSimpleEntryForm({ kind }: { kind: keyof typeof ACTIONS }) {

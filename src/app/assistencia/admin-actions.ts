@@ -10,6 +10,7 @@ import { setGerenteStores } from "@/lib/gerentes";
 import { addCaixa as addCaixaLib, setCaixaAtivo as setCaixaAtivoLib } from "@/lib/caixas";
 import { resolveDriverName } from "@/lib/payments";
 import { resolveTecnicoName } from "@/lib/tecnicos";
+import { resolveFinanceiroName } from "@/lib/financeiros";
 import { upsertProdutoEncomenda, setProdutoEncomendaAtivo } from "@/lib/pedidosEncomenda";
 import {
   addCdOperador as addCdOperadorLib,
@@ -162,6 +163,36 @@ export async function setTecnicoPin(name: string, pin: string): Promise<void> {
   const { error } = await admin.from("tecnicos").update({ pin_hash: hashPin(pin) }).eq("name", name);
   if (error) throw new Error(error.message);
   await resetPinAttempts("tecnicos", "name", name);
+
+  revalidatePath("/assistencia/admin");
+}
+
+export async function addFinanceiro(_state: FormState, formData: FormData): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  const typedName = String(formData.get("name") ?? "").trim();
+  if (!typedName) return { error: "Informe o nome." };
+  const name = await resolveFinanceiroName(typedName);
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("financeiros").upsert({ name }, { onConflict: "name" });
+  if (error) return { error: error.message };
+
+  revalidatePath("/assistencia/admin");
+  return { success: true };
+}
+
+export async function setFinanceiroPin(name: string, pin: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  if (!isValidPinFormat(pin)) throw new Error(`O PIN precisa ter exatamente ${PIN_LENGTH} números.`);
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("financeiros").update({ pin_hash: hashPin(pin) }).eq("name", name);
+  if (error) throw new Error(error.message);
+  await resetPinAttempts("financeiros", "name", name);
 
   revalidatePath("/assistencia/admin");
 }
