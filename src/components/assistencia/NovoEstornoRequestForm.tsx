@@ -7,7 +7,7 @@ import {
   lookupTotvsProductForEstorno,
   type EstornoFormState,
 } from "@/app/assistencia/estornos-actions";
-import { MoneyInput, MoneyFieldRaw } from "./MoneyInput";
+import { MoneyFieldRaw } from "./MoneyInput";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -22,6 +22,19 @@ function Field({ label, required, children }: { label: string; required?: boolea
 }
 
 const PARCELAS = ["À vista", ...Array.from({ length: 11 }, (_, i) => `${i + 2}x`)];
+
+type MetodoPagamento = "credito" | "debito" | "pix" | "dinheiro" | "carne";
+const METODO_LABELS: Record<MetodoPagamento, string> = {
+  credito: "Cartão de Crédito",
+  debito: "Cartão de Débito",
+  pix: "Pix",
+  dinheiro: "Dinheiro",
+  carne: "Carnê",
+};
+
+function formatMoney(cents: number): string {
+  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
 // Campos do print de referência do Victor (WhatsApp de estorno, 23/09/2026)
 // -- mesmo padrão de formulário de NewPartOrderForm.tsx (FormData + Server
@@ -88,18 +101,17 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
     return () => clearTimeout(timer);
   }, [codigoProduto]);
 
-  // Pix ou Cartão (com parcelas) -- pedido do Victor 23/09/2026: antes era
-  // texto livre. Pode ter MAIS de uma forma na mesma venda (pedido do
-  // Victor, revisão do mesmo dia: "as vezes o cliente paga um pedaço no
-  // valor no pix e outro pedaço no cartão") -- lista de linhas, cada uma
-  // com método + parcelas (se cartão) + valor daquela parte. Combina tudo
-  // num único texto pro campo forma_pagamento (mesma coluna de sempre) via
-  // hidden input.
+  // Forma de pagamento com 5 opções (pedido do Victor 23/09/2026, lista
+  // exata que ele passou) -- só "Cartão de Crédito" pede parcelas. Pode ter
+  // MAIS de uma forma na mesma venda (revisão do mesmo dia: "as vezes o
+  // cliente paga um pedaço no valor no pix e outro pedaço no cartão") --
+  // lista de linhas, cada uma com método + parcelas (se crédito) + valor
+  // daquela parte.
   const pagamentoIdSeq = useRef(1);
-  const [pagamentos, setPagamentos] = useState(() => [{ id: 0, metodo: "pix" as "pix" | "cartao", parcelas: PARCELAS[0], cents: 0 }]);
+  const [pagamentos, setPagamentos] = useState(() => [{ id: 0, metodo: "pix" as MetodoPagamento, parcelas: PARCELAS[0], cents: 0 }]);
 
   function addPagamento() {
-    setPagamentos((prev) => [...prev, { id: pagamentoIdSeq.current++, metodo: "pix", parcelas: PARCELAS[0], cents: 0 }]);
+    setPagamentos((prev) => [...prev, { id: pagamentoIdSeq.current++, metodo: "pix" as MetodoPagamento, parcelas: PARCELAS[0], cents: 0 }]);
   }
   function removePagamento(id: number) {
     setPagamentos((prev) => prev.filter((p) => p.id !== id));
@@ -108,14 +120,27 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
     setPagamentos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
 
-  const formaPagamento = pagamentos
-    .filter((p) => p.cents > 0)
-    .map((p) => {
-      const label = p.metodo === "pix" ? "Pix" : `Cartão - ${p.parcelas}`;
-      const valor = (p.cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-      return `${label}: ${valor}`;
-    })
-    .join(" + ");
+  // Frete -- pedido do Victor 23/09/2026: "também tem que ter o frete e a
+  // opção de colocar o valor do frete". Entra na soma do valor final junto
+  // com as formas de pagamento, mas não é uma forma de pagamento em si (por
+  // isso fica fora da lista `pagamentos`, com seu próprio campo).
+  const [freteCents, setFreteCents] = useState(0);
+
+  const pagamentosTotalCents = pagamentos.reduce((sum, p) => sum + p.cents, 0);
+  const valorFinalCents = pagamentosTotalCents + freteCents;
+
+  // Junta tudo num único texto pro campo forma_pagamento (mesma coluna de
+  // sempre, sem mudança de schema) -- "você mesmo juntaria tudo e mostrava
+  // o valor final pra quem está solicitando" (pedido do Victor).
+  const formaPagamento = [
+    ...pagamentos
+      .filter((p) => p.cents > 0)
+      .map((p) => {
+        const label = p.metodo === "credito" ? `${METODO_LABELS[p.metodo]} - ${p.parcelas}` : METODO_LABELS[p.metodo];
+        return `${label}: ${formatMoney(p.cents)}`;
+      }),
+    ...(freteCents > 0 ? [`Frete: ${formatMoney(freteCents)}`] : []),
+  ].join(" + ");
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -182,14 +207,9 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
           <input name="nf_devolucao" type="text" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
       </div>
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Valor do reembolso" required>
-          <MoneyInput name="valor_reembolso" required />
-        </Field>
-        <Field label="Data da venda">
-          <input name="data_venda" type="date" className="rounded border px-3 py-2" style={inputStyle} />
-        </Field>
-      </div>
+      <Field label="Data da venda">
+        <input name="data_venda" type="date" className="rounded border px-3 py-2 max-w-[200px]" style={inputStyle} />
+      </Field>
 
       <div className="flex flex-col gap-2">
         <span className="text-sm" style={{ color: "var(--text-primary)" }}>
@@ -201,14 +221,17 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
           <div key={p.id} className="flex items-center gap-2 flex-wrap">
             <select
               value={p.metodo}
-              onChange={(e) => updatePagamento(p.id, { metodo: e.target.value as "pix" | "cartao" })}
+              onChange={(e) => updatePagamento(p.id, { metodo: e.target.value as MetodoPagamento })}
               className="rounded border px-3 py-2"
               style={inputStyle}
             >
-              <option value="pix">Pix</option>
-              <option value="cartao">Cartão</option>
+              {(Object.keys(METODO_LABELS) as MetodoPagamento[]).map((m) => (
+                <option key={m} value={m}>
+                  {METODO_LABELS[m]}
+                </option>
+              ))}
             </select>
-            {p.metodo === "cartao" ? (
+            {p.metodo === "credito" ? (
               <select
                 value={p.parcelas}
                 onChange={(e) => updatePagamento(p.id, { parcelas: e.target.value })}
@@ -240,6 +263,27 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
         </button>
         <input type="hidden" name="forma_pagamento" value={formaPagamento} />
       </div>
+
+      <Field label="Frete">
+        <div className="max-w-[160px]">
+          <MoneyFieldRaw cents={freteCents} onChange={setFreteCents} />
+        </div>
+      </Field>
+
+      {/* Valor final = soma das formas de pagamento + frete -- calculado e
+          mostrado pra quem está solicitando conferir, não digitado à mão
+          (pedido do Victor 23/09/2026: "você mesmo juntaria tudo e mostrava
+          o valor final pra quem está solicitando"). Vira o valor_reembolso
+          de sempre via hidden input. */}
+      <div className="rounded-lg p-3 flex items-center justify-between" style={{ background: "var(--gridline)" }}>
+        <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+          Valor final do reembolso
+        </span>
+        <span className="text-lg font-bold tabular-nums" style={{ color: "var(--brand-green)" }}>
+          {formatMoney(valorFinalCents)}
+        </span>
+      </div>
+      <input type="hidden" name="valor_reembolso" value={(valorFinalCents / 100).toFixed(2)} />
 
       <Field label="Código do produto">
         <input
