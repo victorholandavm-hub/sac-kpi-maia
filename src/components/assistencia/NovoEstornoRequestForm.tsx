@@ -1,7 +1,13 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { createEstornoRequestAction, lookupTotvsClientForEstorno, type EstornoFormState } from "@/app/assistencia/estornos-actions";
+import {
+  createEstornoRequestAction,
+  lookupTotvsClientForEstorno,
+  lookupTotvsProductForEstorno,
+  type EstornoFormState,
+} from "@/app/assistencia/estornos-actions";
+import { MoneyInput } from "./MoneyInput";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -14,6 +20,8 @@ function Field({ label, required, children }: { label: string; required?: boolea
     </label>
   );
 }
+
+const PARCELAS = ["À vista", ...Array.from({ length: 11 }, (_, i) => `${i + 2}x`)];
 
 // Campos do print de referência do Victor (WhatsApp de estorno, 23/09/2026)
 // -- mesmo padrão de formulário de NewPartOrderForm.tsx (FormData + Server
@@ -30,29 +38,62 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
   const [codigoCliente, setCodigoCliente] = useState("");
   const [clienteNome, setClienteNome] = useState("");
   const [cpf, setCpf] = useState("");
-  const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+  const [clienteLookupStatus, setClienteLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!codigoCliente.trim()) {
-        setLookupStatus("idle");
+        setClienteLookupStatus("idle");
         return;
       }
-      setLookupStatus("loading");
+      setClienteLookupStatus("loading");
       lookupTotvsClientForEstorno(codigoCliente)
         .then((match) => {
           if (!match) {
-            setLookupStatus("not_found");
+            setClienteLookupStatus("not_found");
             return;
           }
           setClienteNome(match.name);
           setCpf(match.cpfCnpj ?? "");
-          setLookupStatus("found");
+          setClienteLookupStatus("found");
         })
-        .catch(() => setLookupStatus("not_found"));
+        .catch(() => setClienteLookupStatus("not_found"));
     }, 400);
     return () => clearTimeout(timer);
   }, [codigoCliente]);
+
+  // Mesma ideia pro produto -- pedido do Victor 23/09/2026.
+  const [codigoProduto, setCodigoProduto] = useState("");
+  const [produto, setProduto] = useState("");
+  const [produtoLookupStatus, setProdutoLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!codigoProduto.trim()) {
+        setProdutoLookupStatus("idle");
+        return;
+      }
+      setProdutoLookupStatus("loading");
+      lookupTotvsProductForEstorno(codigoProduto)
+        .then((match) => {
+          if (!match) {
+            setProdutoLookupStatus("not_found");
+            return;
+          }
+          setProduto(match.description ?? codigoProduto);
+          setProdutoLookupStatus("found");
+        })
+        .catch(() => setProdutoLookupStatus("not_found"));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [codigoProduto]);
+
+  // Pix ou Cartão (com parcelas) -- pedido do Victor 23/09/2026: antes era
+  // texto livre. Combina num único valor pro campo forma_pagamento (mesma
+  // coluna de sempre) via hidden input.
+  const [metodoPagamento, setMetodoPagamento] = useState<"pix" | "cartao">("pix");
+  const [parcelas, setParcelas] = useState(PARCELAS[0]);
+  const formaPagamento = metodoPagamento === "pix" ? "Pix" : `Cartão - ${parcelas}`;
 
   return (
     <form action={formAction} className="flex flex-col gap-4 max-w-xl">
@@ -81,15 +122,15 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
           className="rounded border px-3 py-2"
           style={inputStyle}
         />
-        {lookupStatus === "loading" ? (
+        {clienteLookupStatus === "loading" ? (
           <span className="text-xs" style={{ color: "var(--text-muted)" }}>
             Buscando…
           </span>
-        ) : lookupStatus === "found" ? (
+        ) : clienteLookupStatus === "found" ? (
           <span className="text-xs" style={{ color: "var(--status-good)" }}>
             Cliente encontrado: {clienteNome}
           </span>
-        ) : lookupStatus === "not_found" ? (
+        ) : clienteLookupStatus === "not_found" ? (
           <span className="text-xs" style={{ color: "var(--text-muted)" }}>
             Código não encontrado -- preencha nome e CPF à mão.
           </span>
@@ -120,19 +161,73 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
         </Field>
       </div>
       <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Valor do reembolso (R$)" required>
-          <input name="valor_reembolso" type="text" inputMode="decimal" required placeholder="0,00" className="rounded border px-3 py-2" style={inputStyle} />
+        <Field label="Valor do reembolso" required>
+          <MoneyInput name="valor_reembolso" required />
         </Field>
         <Field label="Data da venda">
           <input name="data_venda" type="date" className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
       </div>
+
       <Field label="Forma de pagamento">
-        <input name="forma_pagamento" type="text" placeholder="Ex.: 6x Master" className="rounded border px-3 py-2" style={inputStyle} />
+        <div className="flex items-center gap-3">
+          <select
+            value={metodoPagamento}
+            onChange={(e) => setMetodoPagamento(e.target.value as "pix" | "cartao")}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          >
+            <option value="pix">Pix</option>
+            <option value="cartao">Cartão</option>
+          </select>
+          {metodoPagamento === "cartao" ? (
+            <select value={parcelas} onChange={(e) => setParcelas(e.target.value)} className="rounded border px-3 py-2" style={inputStyle}>
+              {PARCELAS.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </div>
+        <input type="hidden" name="forma_pagamento" value={formaPagamento} />
+      </Field>
+
+      <Field label="Código do produto">
+        <input
+          name="codigo_produto"
+          type="text"
+          value={codigoProduto}
+          onChange={(e) => setCodigoProduto(e.target.value)}
+          placeholder="Código do produto na venda"
+          className="rounded border px-3 py-2"
+          style={inputStyle}
+        />
+        {produtoLookupStatus === "loading" ? (
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Buscando…
+          </span>
+        ) : produtoLookupStatus === "found" ? (
+          <span className="text-xs" style={{ color: "var(--status-good)" }}>
+            Produto encontrado
+          </span>
+        ) : produtoLookupStatus === "not_found" ? (
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Código não encontrado -- preencha o produto à mão.
+          </span>
+        ) : null}
       </Field>
       <Field label="Produto">
-        <input name="produto" type="text" className="rounded border px-3 py-2" style={inputStyle} />
+        <input
+          name="produto"
+          type="text"
+          value={produto}
+          onChange={(e) => setProduto(e.target.value)}
+          className="rounded border px-3 py-2"
+          style={inputStyle}
+        />
       </Field>
+
       <Field label="Motivo">
         <textarea name="motivo" rows={2} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>

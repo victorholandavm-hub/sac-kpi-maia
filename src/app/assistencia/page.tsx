@@ -9,6 +9,7 @@ import {
   BoxIcon,
   ShieldIcon,
   ClipboardCheckIcon,
+  CoinsIcon,
 } from "@/components/assistencia/RoleIcons";
 
 // Nunca servir isso de cache estático/CDN — sempre gerar fresco a cada request.
@@ -122,6 +123,14 @@ export default function AssistenciaHomePage() {
             borderColor="var(--brand-orange)"
             title="Equipe técnica"
             subtitle="Destino do produto"
+          />
+          <RoleCard
+            href="/assistencia/financeiro/login"
+            icon={<CoinsIcon color="var(--brand-green)" />}
+            iconBg="var(--brand-green-soft)"
+            borderColor="var(--brand-green)"
+            title="Financeiro"
+            subtitle="Solicitações de estorno"
           />
           <RoleCard
             href="/assistencia/login"

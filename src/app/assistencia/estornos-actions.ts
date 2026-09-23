@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { resolveEstornoRequester } from "@/lib/estornoRequester";
 import { createEstornoRequest } from "@/lib/estornoRequests";
 import { uploadPendingRequestPhoto } from "@/lib/servicePhotos";
-import { findTotvsClientByCode, type TotvsClientMatch } from "@/lib/totvsLookup";
+import { findTotvsClientByCode, findTotvsProductByCode, type TotvsClientMatch, type TotvsProductMatch } from "@/lib/totvsLookup";
 
 export type EstornoFormState = { error?: string } | undefined;
 
@@ -17,6 +17,13 @@ export async function lookupTotvsClientForEstorno(code: string): Promise<TotvsCl
   const requester = await resolveEstornoRequester();
   if (!requester) return null;
   return findTotvsClientByCode(code);
+}
+
+// Mesma ideia pro código do produto -- pedido do Victor 23/09/2026.
+export async function lookupTotvsProductForEstorno(code: string): Promise<TotvsProductMatch | null> {
+  const requester = await resolveEstornoRequester();
+  if (!requester) return null;
+  return findTotvsProductByCode(code);
 }
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
