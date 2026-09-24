@@ -231,6 +231,28 @@ export function PartOrderEmailButton({
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                  Para (representante)
+                </span>
+                {/* Pedido do Victor 24/09/2026: "preciso que... fique o
+                    e-mail do representante daquela solicitação" -- já
+                    existia em part_orders.representative_email, mas não
+                    aparecia em lugar nenhum desse modal. Campo próprio
+                    (não dentro do corpo -- não faz sentido o destinatário
+                    aparecer no texto do e-mail em si), com o mesmo botão
+                    de copiar dos outros dois campos. */}
+                {o.representativeEmail ? <CopyButton text={o.representativeEmail} label="Copiar e-mail" /> : null}
+              </div>
+              <p
+                className="text-sm rounded border px-3 py-2"
+                style={{ borderColor: "var(--border)", color: o.representativeEmail ? "var(--text-primary)" : "var(--text-muted)" }}
+              >
+                {o.representativeEmail ?? "Sem e-mail cadastrado pro representante."}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
                   Assunto
                 </span>
                 <CopyButton text={subject} label="Copiar assunto" />
