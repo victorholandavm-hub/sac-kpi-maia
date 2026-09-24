@@ -96,20 +96,6 @@ export function ClipboardCheckIcon({ color }: { color: string }) {
   );
 }
 
-export function CoinsIcon({ color }: { color: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>
-      <path
-        d="M8.5 12a4.5 3 0 1 0 9 0 4.5 3 0 1 0-9 0ZM8.5 12v4.5a4.5 3 0 0 0 9 0V12M4 9.5a4.5 3 0 1 0 9 0 4.5 3 0 1 0-9 0ZM4 9.5V14a4.5 3 0 0 0 4.5 3"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function TruckIcon({ color }: { color: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" style={{ color }}>

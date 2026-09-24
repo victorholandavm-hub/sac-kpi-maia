@@ -1,49 +1,32 @@
 import Image from "next/image";
 import Link from "next/link";
-import {
-  StoreIcon,
-  WrenchIcon,
-  HeadsetIcon,
-  HardHatIcon,
-  TruckIcon,
-  BoxIcon,
-  ShieldIcon,
-  ClipboardCheckIcon,
-  CoinsIcon,
-} from "@/components/assistencia/RoleIcons";
+import { Store, Box, Wrench, Headphones, Hammer, Truck, ShieldCheck, DollarSign, UserCheck } from "lucide-react";
 
 // Nunca servir isso de cache estático/CDN — sempre gerar fresco a cada request.
 export const dynamic = "force-dynamic";
 
-function RoleCard({
-  href,
-  icon,
-  iconBg,
-  borderColor,
-  title,
-  subtitle,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  borderColor: string;
-  title: string;
-  subtitle: string;
-}) {
+// Redesenho pedido pelo Victor 24/09/2026: cor de borda única (não mais
+// alternando laranja/verde por papel), ícone num círculo sutil, hierarquia
+// de texto mais clara, hover suave -- "faça isso localmente primeiro" (pra
+// ele revisar antes de estender esse mesmo estilo pras 9 telas de login).
+function RoleCard({ href, icon, title, subtitle }: { href: string; icon: React.ReactNode; title: string; subtitle: string }) {
   return (
     <Link
       href={href}
-      className="group w-36 h-36 sm:w-40 sm:h-40 rounded-xl border p-4 flex flex-col items-center justify-center gap-2 text-center transition-all hover:-translate-y-0.5 hover:shadow-md"
-      style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: `3px solid ${borderColor}` }}
+      className="group rounded-xl border p-5 flex flex-col items-center text-center gap-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--brand-green)]"
+      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
     >
-      <div className="rounded-full p-3 shrink-0" style={{ background: iconBg }}>
+      <span
+        className="rounded-full p-3 flex items-center justify-center text-[var(--text-secondary)] group-hover:text-[var(--brand-green)] transition-colors duration-200 [&_svg]:w-6 [&_svg]:h-6"
+        style={{ background: "var(--gridline)" }}
+      >
         {icon}
-      </div>
+      </span>
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+        <span className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
           {title}
         </span>
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+        <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
           {subtitle}
         </span>
       </div>
@@ -51,10 +34,22 @@ function RoleCard({
   );
 }
 
+const ROLES = [
+  { href: "/assistencia/loja/login", icon: <Store />, title: "Gerente de loja", subtitle: "Equipe, encomendas e prazos" },
+  { href: "/assistencia/encomendas", icon: <Box />, title: "Encomendas", subtitle: "Caixa, CD e fábrica" },
+  { href: "/assistencia/login", icon: <Wrench />, title: "Equipe assistência", subtitle: "Fila e chamados" },
+  { href: "/assistencia/sac/login", icon: <Headphones />, title: "SAC", subtitle: "Notificação e troca" },
+  { href: "/assistencia/montador/login", icon: <Hammer />, title: "Montador", subtitle: "Meus chamados" },
+  { href: "/assistencia/motorista/login", icon: <Truck />, title: "Motorista", subtitle: "Minhas rotas" },
+  { href: "/assistencia/tecnico/login", icon: <ShieldCheck />, title: "Equipe técnica", subtitle: "Destino do produto" },
+  { href: "/assistencia/financeiro/login", icon: <DollarSign />, title: "Financeiro", subtitle: "Solicitações de estorno" },
+  { href: "/assistencia/login", icon: <UserCheck />, title: "Admin", subtitle: "E-mail e senha" },
+];
+
 export default function AssistenciaHomePage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="max-w-xl w-full flex flex-col items-center gap-8 text-center">
+      <div className="max-w-3xl w-full flex flex-col items-center gap-8 text-center">
         <div className="flex flex-col items-center gap-3">
           <Image src="/logo.png" alt="Lojas Maia" width={225} height={225} className="h-20 w-20 object-contain" />
           <div>
@@ -67,79 +62,10 @@ export default function AssistenciaHomePage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-4">
-          <RoleCard
-            href="/assistencia/loja/login"
-            icon={<StoreIcon color="var(--brand-orange)" />}
-            iconBg="var(--brand-orange-soft)"
-            borderColor="var(--brand-orange)"
-            title="Gerente de loja"
-            subtitle="Equipe, encomendas e prazos"
-          />
-          <RoleCard
-            href="/assistencia/encomendas"
-            icon={<BoxIcon color="var(--brand-orange)" />}
-            iconBg="var(--brand-orange-soft)"
-            borderColor="var(--brand-orange)"
-            title="Encomendas"
-            subtitle="Caixa, CD e fábrica"
-          />
-          <RoleCard
-            href="/assistencia/login"
-            icon={<WrenchIcon color="var(--brand-green)" />}
-            iconBg="var(--brand-green-soft)"
-            borderColor="var(--brand-green)"
-            title="Equipe assistência"
-            subtitle="Fila e chamados"
-          />
-          <RoleCard
-            href="/assistencia/sac/login"
-            icon={<HeadsetIcon color="var(--brand-green)" />}
-            iconBg="var(--brand-green-soft)"
-            borderColor="var(--brand-green)"
-            title="SAC"
-            subtitle="Notificação e troca"
-          />
-          <RoleCard
-            href="/assistencia/montador/login"
-            icon={<HardHatIcon color="var(--brand-orange)" />}
-            iconBg="var(--brand-orange-soft)"
-            borderColor="var(--brand-orange)"
-            title="Montador"
-            subtitle="Meus chamados"
-          />
-          <RoleCard
-            href="/assistencia/motorista/login"
-            icon={<TruckIcon color="var(--brand-green)" />}
-            iconBg="var(--brand-green-soft)"
-            borderColor="var(--brand-green)"
-            title="Motorista"
-            subtitle="Minhas rotas"
-          />
-          <RoleCard
-            href="/assistencia/tecnico/login"
-            icon={<ClipboardCheckIcon color="var(--brand-orange)" />}
-            iconBg="var(--brand-orange-soft)"
-            borderColor="var(--brand-orange)"
-            title="Equipe técnica"
-            subtitle="Destino do produto"
-          />
-          <RoleCard
-            href="/assistencia/financeiro/login"
-            icon={<CoinsIcon color="var(--brand-green)" />}
-            iconBg="var(--brand-green-soft)"
-            borderColor="var(--brand-green)"
-            title="Financeiro"
-            subtitle="Solicitações de estorno"
-          />
-          <RoleCard
-            href="/assistencia/login"
-            icon={<ShieldIcon color="var(--brand-orange)" />}
-            iconBg="var(--brand-orange-soft)"
-            borderColor="var(--brand-orange)"
-            title="Admin"
-            subtitle="E-mail e senha"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          {ROLES.map((r) => (
+            <RoleCard key={r.title} href={r.href} icon={r.icon} title={r.title} subtitle={r.subtitle} />
+          ))}
         </div>
       </div>
     </div>
