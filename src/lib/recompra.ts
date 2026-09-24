@@ -1,6 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
-import { listClientesPorNivel, diasEntre, type ClienteNivel } from "./clientes";
+import { listClientesPorNivel, diasEntre, type ClienteNivel, type ClienteNivelInfo } from "./clientes";
 import { DELIVERY_REQUEST_TYPES, CAUSA_RAIZ_ERRO_INTERNO } from "./assistenciaLabels";
 
 // Motor de Recompra, Fase 1 -- pedido do Victor 07/09/2026 ("desenho
@@ -275,187 +275,221 @@ export async function listClvProjetadoPorCliente(): Promise<Map<string, number>>
 }
 
 // -----------------------------------------------------------------------
-// Frequência & Potencial de Recompra -- pedido do Victor 24/09/2026: uma
-// visão por categoria (não reduzida a "só a pior" como listRecompraCandidatos
-// faz via buildJanelaPorCliente), com selo de 3 níveis e ação de WhatsApp.
-// Reaproveita os mesmos dados já calculados acima (categoriasPorCliente),
-// sem I/O novo pra isso -- só telefone (fora do pipeline de recompra até
-// hoje, ver listPhonePorClienteIds em clientes.ts) e "itens da última
-// compra" (a view só guarda qtd_compras = total histórico de linhas, não
-// a quantidade da compra mais recente) precisam de consulta própria, só
-// pra página visível (ver enrichFrequenciaItensPorPagina abaixo), nunca
-// pro dataset inteiro -- mesmo cuidado de egress/timeout documentado em
-// fetchCategoriasPorCliente acima.
+// Frequência & Potencial de Recompra -- Motor de Recomendação por Padrões
+// de Associação. Pedido do Victor 24/09/2026, 2ª versão (a 1ª, linha por
+// cliente×categoria com selo de ciclo de reposição, foi substituída
+// inteiramente aqui) -- pedia "padrões descobertos pela IA" com dado
+// mockado; recusado de novo pelo mesmo motivo de sempre (tela de
+// produção com WhatsApp de verdade), mas dessa vez o pedido é
+// genuinamente melhor E a maior parte já existe:
+//
+// - buildAfinidadeGlobal (Fase 3, acima) já é uma regra de associação de
+//   verdade -- P(B|A) real entre categorias, só nunca exposta como
+//   "padrão detectado" na UI.
+// - v_clientes_agregado_nivel (compras/primeira_compra/ultima_compra, já
+//   buscado por listClientesPorNivel) dá o padrão de "Fidelidade Ativa"
+//   (quem faz 3+ compras retorna a cada N meses) -- N aqui é MEDIDO
+//   (mediana real), não chutado.
+//
+// O que não dá pra fazer sem uma migration nova: o intervalo REAL entre
+// comprar A e comprar B (a view só guarda a ÚLTIMA data por categoria,
+// não a 1ª -- não dá pra medir o intervalo sem reescanear o histórico de
+// item inteiro, e mexer nessa view já causou 2 incidentes antes,
+// migrations 0123/0124/0129). Por isso a "janela" do cross-sell usa o
+// ciclo típico já aceito da categoria destino (CATEGORIAS_CICLO), como
+// estimativa rotulada -- não como medição.
 // -----------------------------------------------------------------------
 
-// Agrupamento em 2 baldes pedido pelo Victor ("Lojas Maia vende apenas
-// móveis e colchões") -- inferido por cima das 7 categorias já existentes
-// (CATEGORIAS_CICLO), NÃO confirmado literalmente por ele; fácil de
-// remapear aqui se quiser outra divisão depois.
-export const CATEGORIA_BUCKETS = ["moveis", "colchoes"] as const;
-export type CategoriaBucket = (typeof CATEGORIA_BUCKETS)[number];
-export const CATEGORIA_BUCKET_LABELS: Record<CategoriaBucket, string> = { moveis: "Móveis", colchoes: "Colchões" };
+// Amostra mínima pra um par de categoria virar "padrão detectado" --
+// evita cards enganosos tipo "100% de confiança" com 1 cliente só (mesmo
+// problema visto na prática na aba de Propensão hoje).
+const MIN_AMOSTRA_PADRAO = 20;
+const LIMITE_PADROES_CROSS_SELL = 4;
+// Mesmo gatilho "entrando na janela" que RATIO_NA_JANELA já usa no resto
+// do motor -- não um número novo pra essa tela.
+const RATIO_GATILHO_FIDELIDADE = 0.85;
 
-const CATEGORIA_BUCKET_BY_KEY: Record<string, CategoriaBucket> = {
-  protetor: "colchoes",
-  travesseiro: "colchoes",
-  colchao: "colchoes",
-  estofado: "moveis",
-  cama: "moveis",
-  roupeiro: "moveis",
-  mesa: "moveis",
-};
+export type PadraoAssociacao =
+  | {
+      tipo: "fidelidade";
+      id: "fidelidade";
+      compraMinima: number;
+      // Mediana real (medida, não estimada) do intervalo entre compras
+      // dos clientes qualificados.
+      intervaloMedioDias: number;
+      amostraTotal: number;
+      confiancaPct: number;
+    }
+  | {
+      tipo: "cross_sell";
+      id: string;
+      categoriaOrigem: CategoriaCiclo;
+      categoriaDestino: CategoriaCiclo;
+      confiancaPct: number;
+      amostraOrigem: number;
+      // Estimativa (ciclo típico da categoria destino), não medição --
+      // ver comentário no topo do bloco.
+      janelaMesesEstimativa: number;
+    };
 
-export function isCategoriaBucket(value: string | undefined | null): value is CategoriaBucket {
-  return !!value && (CATEGORIA_BUCKETS as readonly string[]).includes(value);
-}
-
-// 3 níveis, mesmo limiar de RATIO_NA_JANELA já usado no resto do motor --
-// não é um número novo inventado só pra essa tela.
-export const STATUS_CICLO = ["no_prazo", "na_janela", "atrasado"] as const;
-export type StatusCiclo = (typeof STATUS_CICLO)[number];
-
-export const STATUS_CICLO_LABELS: Record<StatusCiclo, string> = {
-  no_prazo: "No Prazo",
-  na_janela: "Na Janela de Recompra",
-  atrasado: "Atrasado",
-};
-
-export const STATUS_CICLO_COLORS: Record<StatusCiclo, string> = {
-  no_prazo: "var(--status-good)",
-  na_janela: "var(--status-warning)",
-  atrasado: "var(--status-critical)",
-};
-
-function statusCicloFromRatio(ratio: number): StatusCiclo {
-  if (ratio >= 1) return "atrasado";
-  if (ratio >= RATIO_NA_JANELA) return "na_janela";
-  return "no_prazo";
-}
-
-export type FrequenciaRecompraRow = {
+export type LeadRecompra = {
   clientId: string;
   nome: string | null;
-  categoriaKey: string;
-  categoriaLabel: string;
-  bucket: CategoriaBucket;
-  qtdComprasHistorico: number;
-  ultimaCompra: string;
-  diasSemComprar: number;
-  // Ciclo TÍPICO da categoria (CATEGORIAS_CICLO[].cicloMeses * 30), não
-  // uma média pessoal medida do cliente -- a view só guarda a compra mais
-  // recente por categoria, não a 1ª, então não dá pra calcular intervalo
-  // pessoal real hoje sem migrar v_recompra_categorias_por_cliente (já
-  // causou 2 incidentes em produção, migrations 0123/0124/0129 -- fora de
-  // escopo por ora). Mostrar isso na UI com uma nota deixando claro que é
-  // o ciclo de mercado da categoria, não do cliente específico.
-  cicloMedioDias: number;
-  ratio: number;
-  statusCiclo: StatusCiclo;
-  // Preenchidos só depois de enrichFrequenciaItensPorPagina/telefone --
-  // null até lá, de propósito (ver comentário nas funções).
-  itens: number | null;
+  nivel: ClienteNivel;
+  padraoId: string;
+  padraoLabel: string;
+  proximaCompraProvavel: string;
+  confiancaPct: number;
+  diasGatilho: number;
+  // Preenchido só depois de listPhonePorClienteIds, pra página visível --
+  // null até lá, de propósito.
   phone: string | null;
 };
 
-// Uma linha por cliente×categoria (dentro do balde filtrado), ordenada
-// pela mais "vencida" primeiro -- diferente de listRecompraCandidatos,
-// que reduz pra 1 linha por cliente via buildJanelaPorCliente. Exclui
-// quem pediu não ser mais contatado (mesma salvaguarda de LGPD de sempre)
-// e quem não tem nome resolvido (cliente interno etc., já filtrado por
-// listClientesPorNivel).
-export async function listFrequenciaRecompra(bucketFiltro?: CategoriaBucket): Promise<FrequenciaRecompraRow[]> {
+function mediana(valores: number[]): number {
+  if (valores.length === 0) return 0;
+  const sorted = [...valores].sort((a, b) => a - b);
+  const meio = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[meio - 1] + sorted[meio]) / 2 : sorted[meio];
+}
+
+// Padrão 1 -- "Fidelidade Ativa": clientes com 3+ compras tendem a
+// retornar num intervalo próprio deles. Intervalo pessoal =
+// (última - primeira compra) ÷ (compras - 1); a "janela do padrão" é a
+// MEDIANA real desse intervalo entre todos os qualificados, e a
+// "confiança" é quantos deles realmente caem perto dessa mediana (não só
+// "quantos têm 3+ compras").
+function detectarPadraoFidelidade(niveis: ClienteNivelInfo[]): { padrao: PadraoAssociacao & { tipo: "fidelidade" }; leads: LeadRecompra[] } | null {
+  const qualificados = niveis.filter((c) => c.compras >= 3 && c.primeiraCompra && c.ultimaCompra);
+  if (qualificados.length === 0) return null;
+
+  const intervalos = qualificados.map((c) => ({
+    cliente: c,
+    intervaloMedioDias: diasEntre(c.primeiraCompra!, new Date(`${c.ultimaCompra}T00:00:00`)) / (c.compras - 1),
+  }));
+  const intervaloMediano = mediana(intervalos.map((i) => i.intervaloMedioDias));
+  const aderentes = intervalos.filter((i) => i.intervaloMedioDias >= intervaloMediano * 0.5 && i.intervaloMedioDias <= intervaloMediano * 1.5);
+
+  const padrao: PadraoAssociacao & { tipo: "fidelidade" } = {
+    tipo: "fidelidade",
+    id: "fidelidade",
+    compraMinima: 3,
+    intervaloMedioDias: Math.round(intervaloMediano),
+    amostraTotal: qualificados.length,
+    confiancaPct: Math.round((aderentes.length / qualificados.length) * 100),
+  };
+
+  // Gatilho: usa o intervalo PESSOAL de cada cliente (não a mediana
+  // global) -- mais preciso que um número fixo igual pra todo mundo.
+  const leads: LeadRecompra[] = [];
+  for (const { cliente, intervaloMedioDias } of intervalos) {
+    if (cliente.diasSemComprar === null) continue;
+    if (cliente.diasSemComprar < intervaloMedioDias * RATIO_GATILHO_FIDELIDADE) continue;
+    leads.push({
+      clientId: cliente.clientId,
+      nome: cliente.nome,
+      nivel: cliente.nivel,
+      padraoId: "fidelidade",
+      padraoLabel: `${cliente.compras} compras, última há ${cliente.diasSemComprar} dias`,
+      proximaCompraProvavel: "Nova compra (fidelidade)",
+      confiancaPct: padrao.confiancaPct,
+      diasGatilho: cliente.diasSemComprar,
+      phone: null,
+    });
+  }
+  return { padrao, leads };
+}
+
+// Padrão 2 -- sequência de categoria: reaproveita buildAfinidadeGlobal
+// (P(B|A) real, já existe) pra achar, por categoria de origem A, a
+// categoria B mais associada -- só entram como "padrão detectado" pares
+// com amostra >= MIN_AMOSTRA_PADRAO, top N por confiança.
+function detectarPadroesCrossSell(
+  categoriasPorCliente: Map<string, Map<string, CategoriaAcumulada>>,
+  niveis: ClienteNivelInfo[]
+): { padroes: (PadraoAssociacao & { tipo: "cross_sell" })[]; leads: LeadRecompra[] } {
+  const afinidadeGlobal = buildAfinidadeGlobal(categoriasPorCliente);
+  const nivelPorCliente = new Map(niveis.map((c) => [c.clientId, c]));
+  const hoje = new Date();
+
+  const countCategoria = new Map<string, number>();
+  for (const categorias of categoriasPorCliente.values()) {
+    for (const key of categorias.keys()) countCategoria.set(key, (countCategoria.get(key) ?? 0) + 1);
+  }
+
+  const candidatos: (PadraoAssociacao & { tipo: "cross_sell" })[] = [];
+  for (const catA of CATEGORIAS_CICLO) {
+    const amostraOrigem = countCategoria.get(catA.key) ?? 0;
+    if (amostraOrigem < MIN_AMOSTRA_PADRAO) continue;
+    const melhor = (afinidadeGlobal.get(catA.key) ?? [])[0];
+    if (!melhor) continue;
+    candidatos.push({
+      tipo: "cross_sell",
+      id: `${catA.key}->${melhor.categoria.key}`,
+      categoriaOrigem: catA,
+      categoriaDestino: melhor.categoria,
+      confiancaPct: Math.round(melhor.score * 100),
+      amostraOrigem,
+      janelaMesesEstimativa: melhor.categoria.cicloMeses,
+    });
+  }
+  candidatos.sort((a, b) => b.confiancaPct - a.confiancaPct);
+  const padroes = candidatos.slice(0, LIMITE_PADROES_CROSS_SELL);
+
+  // Gatilho por par: só "já assentou" (>= 30 dias desde que comprou A --
+  // dá tempo antes de sugerir o complemento, mesmo espírito do "Cliente C
+  // ainda não ativou o gatilho" do pedido original) quem já tem A e ainda
+  // não tem B. NÃO usa a janela estimada (cicloMeses da categoria
+  // DESTINO) como corte aqui -- testado na prática e produz corte absurdo
+  // pra pares tipo protetor(24 meses)->colchão(96 meses): 70% de 96 meses
+  // é ~5,6 anos, maior que o próprio histórico sincronizado (2021 até
+  // hoje), zerando os leads de um padrão com 80% de confiança. A janela
+  // estimada continua exibida no card como contexto, só não filtra quem
+  // vira lead.
+  const DIAS_MINIMO_ASSENTAMENTO = 30;
+  const leads: LeadRecompra[] = [];
+  for (const padrao of padroes) {
+    for (const [clientId, categorias] of categoriasPorCliente) {
+      const origem = categorias.get(padrao.categoriaOrigem.key);
+      if (!origem || categorias.has(padrao.categoriaDestino.key)) continue;
+      const diasDesdeOrigem = diasEntre(origem.data, hoje);
+      if (diasDesdeOrigem < DIAS_MINIMO_ASSENTAMENTO) continue;
+      const cliente = nivelPorCliente.get(clientId);
+      if (!cliente) continue;
+      leads.push({
+        clientId,
+        nome: cliente.nome,
+        nivel: cliente.nivel,
+        padraoId: padrao.id,
+        padraoLabel: `Comprou ${padrao.categoriaOrigem.label} há ${diasDesdeOrigem} dias`,
+        proximaCompraProvavel: padrao.categoriaDestino.label,
+        confiancaPct: padrao.confiancaPct,
+        diasGatilho: diasDesdeOrigem,
+        phone: null,
+      });
+    }
+  }
+  return { padroes, leads };
+}
+
+// Junta os 2 padrões numa chamada só -- cards (padroes) + leads (tabela),
+// mesma fonte de dados buscada uma única vez. Exclui quem está em "não
+// contatar" (LGPD), igual ao resto do motor.
+export async function listPadroesEDeadsRecompra(): Promise<{ padroes: PadraoAssociacao[]; leads: LeadRecompra[] }> {
   const [niveis, categoriasPorCliente, naoContatar] = await Promise.all([
     listClientesPorNivel(),
     buildCategoriasPorCliente(),
     listClientesNaoContatar(),
   ]);
-  const nomePorCliente = new Map(niveis.map((c) => [c.clientId, c.nome]));
-  const hoje = new Date();
 
-  const linhas: FrequenciaRecompraRow[] = [];
-  for (const [clientId, porCategoria] of categoriasPorCliente) {
-    if (naoContatar.has(clientId)) continue;
-    if (!nomePorCliente.has(clientId)) continue;
-    for (const [key, acumulada] of porCategoria) {
-      const categoria = CATEGORIAS_CICLO.find((c) => c.key === key);
-      if (!categoria) continue;
-      const bucket = CATEGORIA_BUCKET_BY_KEY[key];
-      if (bucketFiltro && bucket !== bucketFiltro) continue;
+  const fidelidade = detectarPadraoFidelidade(niveis);
+  const crossSell = detectarPadroesCrossSell(categoriasPorCliente, niveis);
 
-      const diasSemComprar = diasEntre(acumulada.data, hoje);
-      const cicloMedioDias = categoria.cicloMeses * 30;
-      const ratio = diasSemComprar / cicloMedioDias;
+  const padroes: PadraoAssociacao[] = [...(fidelidade ? [fidelidade.padrao] : []), ...crossSell.padroes];
+  const leads = [...(fidelidade?.leads ?? []), ...crossSell.leads].filter((l) => !naoContatar.has(l.clientId));
+  leads.sort((a, b) => b.diasGatilho - a.diasGatilho);
 
-      linhas.push({
-        clientId,
-        nome: nomePorCliente.get(clientId) ?? null,
-        categoriaKey: key,
-        categoriaLabel: categoria.label,
-        bucket,
-        qtdComprasHistorico: acumulada.qtdCompras,
-        ultimaCompra: acumulada.data,
-        diasSemComprar,
-        cicloMedioDias,
-        ratio,
-        statusCiclo: statusCicloFromRatio(ratio),
-        itens: null,
-        phone: null,
-      });
-    }
-  }
-
-  linhas.sort((a, b) => b.ratio - a.ratio);
-  return linhas;
-}
-
-type ItemComCategoriaRow = {
-  client_id: string;
-  issue_date: string;
-  items: { description: string | null; quantity: number }[] | null;
-};
-
-// Enriquecimento em lote só pra página visível (nunca pro dataset
-// inteiro). A view materializada não guarda quantidade nem detalha por
-// linha de item, só "quantas linhas no histórico inteiro" (qtd_compras)
-// -- pra saber quanto foi a ÚLTIMA compra de cada categoria, precisa ir
-// direto no pedido (mesmo padrão de nested select já usado em
-// vendasProduto.ts).
-export async function enrichFrequenciaItensPorPagina(rows: FrequenciaRecompraRow[]): Promise<FrequenciaRecompraRow[]> {
-  const clientIds = [...new Set(rows.map((r) => r.clientId))];
-  if (clientIds.length === 0) return rows;
-
-  const admin = getSupabaseAdmin();
-  const { data, error } = await admin
-    .from("totvs_orders")
-    .select("client_id, issue_date, items:totvs_order_items(description, quantity)")
-    .in("client_id", clientIds)
-    .eq("type", "Venda")
-    .returns<ItemComCategoriaRow[]>();
-  if (error) throw new Error(error.message);
-
-  // Por (clientId, categoriaKey): mantém só a maior issue_date vista;
-  // itens de pedidos com a mesma data (venda dividida em mais de uma
-  // nota) somam juntos -- mesmo critério "pega o mais recente" de
-  // buildJanelaPorCliente, só no nível de item em vez de categoria.
-  const maxDate = new Map<string, string>();
-  const qtyAtMaxDate = new Map<string, number>();
-  for (const order of data ?? []) {
-    for (const item of order.items ?? []) {
-      const categoria = inferCategoriaCiclo(item.description);
-      if (!categoria) continue;
-      const key = `${order.client_id}::${categoria.key}`;
-      const cur = maxDate.get(key);
-      if (!cur || order.issue_date > cur) {
-        maxDate.set(key, order.issue_date);
-        qtyAtMaxDate.set(key, item.quantity);
-      } else if (order.issue_date === cur) {
-        qtyAtMaxDate.set(key, (qtyAtMaxDate.get(key) ?? 0) + item.quantity);
-      }
-    }
-  }
-
-  return rows.map((r) => ({ ...r, itens: qtyAtMaxDate.get(`${r.clientId}::${r.categoriaKey}`) ?? null }));
+  return { padroes, leads };
 }
 
 // -----------------------------------------------------------------------
