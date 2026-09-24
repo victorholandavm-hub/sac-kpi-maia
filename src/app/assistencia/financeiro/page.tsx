@@ -70,7 +70,10 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
             </button>
           </form>
         ) : (
-          <Link href="/assistencia" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+          // "/assistencia" é a tela de escolha de papel (cards de login) --
+          // achado do Victor 24/09/2026: parecia "voltar pro login" em vez
+          // de voltar pro painel. Admin volta pra própria tela de início.
+          <Link href="/assistencia/inicio" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             ← Voltar
           </Link>
         )}
