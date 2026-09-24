@@ -369,7 +369,7 @@ async function runSync() {
   // dado (totvs_orders/totvs_delivery_cargas) e destinatário (client_id,
   // não requestId) diferentes dos 3 tipos acima, por isso função própria
   // em nps2Meses.ts em vez de mais um `if` aqui.
-  const { enrolled: compraNpsEnrolled, errors: compraNpsErrors } = await enrollPendingCompraNps();
+  const { enrolled: compraNpsEnrolled, semTelefone: compraNpsSemTelefone, errors: compraNpsErrors } = await enrollPendingCompraNps();
   errors.push(...compraNpsErrors);
   const compraNpsAnswered = await detectPendingCompraNpsResponses();
 
@@ -377,7 +377,7 @@ async function runSync() {
   // compra (não um chamado de assistência), mesma fonte de dado que
   // "Compra" acima (totvs_delivery_cargas/totvs_orders), só que com janela
   // bem mais curta (dias, não meses) -- ver entregaNps.ts.
-  const { enrolled: entregaNpsEnrolled, errors: entregaNpsErrors } = await enrollPendingEntregaNps();
+  const { enrolled: entregaNpsEnrolled, semTelefone: entregaNpsSemTelefone, errors: entregaNpsErrors } = await enrollPendingEntregaNps();
   errors.push(...entregaNpsErrors);
   const entregaNpsAnswered = await detectPendingEntregaNpsResponses();
 
@@ -393,8 +393,10 @@ async function runSync() {
       montagemAssistNpsEnrolled,
       montagemAssistNpsAnswered,
       compraNpsEnrolled,
+      compraNpsSemTelefone,
       compraNpsAnswered,
       entregaNpsEnrolled,
+      entregaNpsSemTelefone,
       entregaNpsAnswered,
     },
     errors
@@ -409,8 +411,10 @@ async function runSync() {
     montagemAssistNpsEnrolled,
     montagemAssistNpsAnswered,
     compraNpsEnrolled,
+    compraNpsSemTelefone,
     compraNpsAnswered,
     entregaNpsEnrolled,
+    entregaNpsSemTelefone,
     entregaNpsAnswered,
     errors,
   });

@@ -35,7 +35,7 @@ function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-export async function enrollPendingCompraNps(): Promise<{ enrolled: number; errors: string[] }> {
+export async function enrollPendingCompraNps(): Promise<{ enrolled: number; semTelefone: number; errors: string[] }> {
   const admin = getSupabaseAdmin();
   const errors: string[] = [];
 
@@ -52,8 +52,8 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; erro
     .lte("dt_retorno", toDate)
     .in("status_entrega", RESOLVIDO_LABELS)
     .returns<CargaRow[]>();
-  if (cargasError) return { enrolled: 0, errors: [`compra-nps cargas: ${cargasError.message}`] };
-  if (!cargas || cargas.length === 0) return { enrolled: 0, errors: [] };
+  if (cargasError) return { enrolled: 0, semTelefone: 0, errors: [`compra-nps cargas: ${cargasError.message}`] };
+  if (!cargas || cargas.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
   // 2. Cruza com o pedido de venda -- mesmo join (invoice+serie, sem
   // branch/filial) já descoberto e usado em recompra.ts.
@@ -71,10 +71,10 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; erro
     .select("id, invoice, serie, client_id, client_name")
     .in("invoice", notasFiscais)
     .returns<OrderRow[]>();
-  if (ordersError) return { enrolled: 0, errors: [`compra-nps pedidos: ${ordersError.message}`] };
+  if (ordersError) return { enrolled: 0, semTelefone: 0, errors: [`compra-nps pedidos: ${ordersError.message}`] };
 
   const candidates = (orderRows ?? []).filter((o) => o.invoice && o.serie && seriesByNota.get(o.invoice)?.has(o.serie) && o.client_id);
-  if (candidates.length === 0) return { enrolled: 0, errors: [] };
+  if (candidates.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
   // 3. Já enviado pra esse pedido? Já opt-out desse cliente (mesma lista
   // do Motor de Recompra, "legítimo interesse" pede opção de saída)?
@@ -88,7 +88,7 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; erro
   let eligible = candidates.filter(
     (c) => !alreadySent.has(c.id) && !naoContatar.has(c.client_id as string) && !isMostruarioRequest(c.invoice, c.client_name)
   );
-  if (eligible.length === 0) return { enrolled: 0, errors: [] };
+  if (eligible.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
   // 4. Um cliente pode ter mais de um pedido entregue na mesma janela --
   // só uma pesquisa por cliente por rodada (o limite de 90 dias abaixo
@@ -111,11 +111,19 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; erro
     .gte("enviado_em", sinceIso);
   const recentlyContacted = new Set((recentSends ?? []).map((r) => r.client_id as string));
   eligible = eligible.filter((c) => !recentlyContacted.has(c.client_id as string));
-  if (eligible.length === 0) return { enrolled: 0, errors: [] };
+  if (eligible.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
   // 6. Telefone -- totvs_orders não tem, precisa do cadastro (mesmo join
   // client_id = protheus_code que o resto do projeto já usa, ver
-  // clientes.ts). Sem telefone cadastrado, não dá pra mandar.
+  // clientes.ts). Sem telefone cadastrado, não dá pra mandar -- `totvs_clientes`
+  // só cobre uma fração de quem já comprou (mesmo gap documentado em
+  // totvsLookup.ts/findTotvsClientByCode -- 24.584 códigos distintos como
+  // comprador, só 3.760 com cadastro sincronizado, confirmado 03/09/2026),
+  // diferente de montagem/assistência técnica (telefone vem direto do
+  // chamado, sempre presente). Contado à parte em `semTelefone` (não é
+  // erro de execução, é um limite de dado conhecido) -- achado do Victor
+  // 24/09/2026: enrolled em 0 parecia "sem ninguém elegível" quando na
+  // verdade tinha candidato, só sem telefone.
   const clientIds = [...new Set(eligible.map((c) => c.client_id as string))];
   const { data: clienteRows } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", clientIds);
   const phoneByClientId = new Map((clienteRows ?? []).map((r) => [r.protheus_code as string, r.phone1 as string | null]));
@@ -123,9 +131,13 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; erro
   eligible = eligible.slice(0, MAX_ENROLL_PER_RUN);
 
   let enrolled = 0;
+  let semTelefone = 0;
   for (const candidate of eligible) {
     const phone = phoneByClientId.get(candidate.client_id as string);
-    if (!phone) continue;
+    if (!phone) {
+      semTelefone++;
+      continue;
+    }
 
     const contactId = await upsertGhlContact(phone, candidate.client_name);
     if (!contactId) {
@@ -142,7 +154,7 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; erro
     if (insertError) errors.push(`compra-nps ${candidate.id}: ${insertError.message}`);
     else enrolled++;
   }
-  return { enrolled, errors };
+  return { enrolled, semTelefone, errors };
 }
 
 export async function detectPendingCompraNpsResponses(): Promise<number> {
