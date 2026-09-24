@@ -3,6 +3,7 @@ import Image from "next/image";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { signOutDashboard } from "@/app/login/actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -21,33 +22,46 @@ const TABS = [
 
 export function AppHeader() {
   const pathname = usePathname();
+  const isHome = pathname === "/";
 
   return (
     <header className="flex items-center gap-4 pb-4 flex-wrap" style={{ borderBottom: "3px solid var(--brand-orange)" }}>
       <Image src="/logo.png" alt="Lojas Maia" width={225} height={225} className="h-12 w-12 object-contain shrink-0" />
-      <nav className="flex-1 flex items-center gap-2 flex-wrap">
-        {TABS.map((tab) => {
-          const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
-          return (
-            <Link
-              key={tab.key}
-              href={tab.href}
-              className="text-sm px-3 py-1.5 rounded-full whitespace-nowrap"
-              style={{
-                background: active ? "var(--brand-orange)" : "transparent",
-                color: active ? "#fff" : "var(--text-secondary)",
-                fontWeight: active ? 600 : 400,
-              }}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Abas somem na tela inicial -- pedido do Victor 24/09/2026: os 4
+          cards centrais já fazem essa navegação, repetir em cima poluía o
+          topo. Nas outras telas (KPIs, Clientes, Vendas, Avaliações) as
+          abas continuam, é a única forma de trocar de seção por ali. */}
+      {!isHome ? (
+        <nav className="flex-1 flex items-center gap-2 flex-wrap">
+          {TABS.map((tab) => {
+            const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
+            return (
+              <Link
+                key={tab.key}
+                href={tab.href}
+                className="text-sm px-3 py-1.5 rounded-full whitespace-nowrap"
+                style={{
+                  background: active ? "var(--brand-orange)" : "transparent",
+                  color: active ? "#fff" : "var(--text-secondary)",
+                  fontWeight: active ? 600 : 400,
+                }}
+              >
+                {tab.label}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : (
+        <div className="flex-1" />
+      )}
       <ThemeToggle />
       <form action={signOutDashboard}>
-        <button type="submit" className="text-sm underline shrink-0" style={{ color: "var(--text-secondary)" }}>
-          Sair
+        <button
+          type="submit"
+          className="text-sm font-medium px-3 py-1.5 rounded-full border inline-flex items-center gap-1.5 shrink-0 transition-colors hover:border-[var(--status-critical)] hover:text-[var(--status-critical)]"
+          style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+        >
+          <LogOut size={14} /> Sair
         </button>
       </form>
     </header>
