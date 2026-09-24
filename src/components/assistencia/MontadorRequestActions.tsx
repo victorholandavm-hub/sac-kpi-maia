@@ -12,13 +12,33 @@ import type { AssemblerRequestItem } from "@/lib/serviceRequests";
 
 type Mode = null | "complete" | "issue" | "partial";
 
-export function MontadorRequestActions({ requestId, items }: { requestId: string; items: AssemblerRequestItem[] }) {
+export function MontadorRequestActions({
+  requestId,
+  items,
+  // IDs dos itens sem foto ainda -- calculado no server component pai
+  // (mesma checagem que o indicador "📷 N / sem foto" da seção de Fotos
+  // já usa). Achado do Victor 24/09/2026: clicar "Sim, concluído" (ou
+  // "Concluir parcialmente" com item sem foto marcado) sem isso derrubava
+  // a tela com erro cru do React (a validação do servidor é a mesma, só
+  // que via exceção -- ver montadorCompleteRequest/montadorCompletePartially
+  // em montador-actions.ts) em vez de avisar de forma clara ANTES de
+  // tentar.
+  itemIdsMissingPhotos = [],
+}: {
+  requestId: string;
+  items: AssemblerRequestItem[];
+  itemIdsMissingPhotos?: string[];
+}) {
   const { pending, run, showToast } = useQuickAction();
   const [mode, setMode] = useState<Mode>(null);
   const [issueReason, setIssueReason] = useState("");
   const [note, setNote] = useState("");
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [partialNote, setPartialNote] = useState("");
+
+  const missingPhotoSet = new Set(itemIdsMissingPhotos);
+  const missingPhotoProducts = items.filter((item) => missingPhotoSet.has(item.id)).map((item) => item.product);
+  const checkedMissingPhotoProducts = items.filter((item) => checkedIds.includes(item.id) && missingPhotoSet.has(item.id)).map((item) => item.product);
 
   function confirmIssue() {
     if (!issueReason.trim()) {
@@ -115,12 +135,27 @@ export function MontadorRequestActions({ requestId, items }: { requestId: string
 
       {mode === "complete" ? (
         <div className="flex flex-col gap-2 rounded-lg border p-3" style={{ borderColor: "var(--status-good)" }}>
-          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-            Confirmar que esse chamado foi concluído?
-          </span>
+          {missingPhotoProducts.length > 0 ? (
+            <div
+              className="flex flex-col gap-1 rounded-lg p-2.5"
+              style={{ background: "color-mix(in srgb, var(--status-warning) 12%, var(--surface-1))", border: "1px solid var(--status-warning)" }}
+            >
+              <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+                ⚠ Falta foto de: {missingPhotoProducts.join(", ")}
+              </span>
+              <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                Envie a foto de cada item na seção acima antes de concluir. Se só alguns itens estão prontos, use
+                &ldquo;Concluir parcialmente&rdquo; em vez disso.
+              </span>
+            </div>
+          ) : (
+            <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+              Confirmar que esse chamado foi concluído?
+            </span>
+          )}
           <div className="flex items-center gap-2">
             <button
-              disabled={pending}
+              disabled={pending || missingPhotoProducts.length > 0}
               onClick={finishComplete}
               className="text-sm rounded-lg px-3 py-2.5 font-medium disabled:opacity-60 flex-1"
               style={{ background: "var(--status-good)", color: "#fff" }}
@@ -166,10 +201,28 @@ export function MontadorRequestActions({ requestId, items }: { requestId: string
                   ) : null}
                   {item.quantity > 1 ? `${item.quantity}x ` : ""}
                   {item.product}
+                  {missingPhotoSet.has(item.id) ? (
+                    <span className="text-xs font-medium ml-1.5" style={{ color: "var(--status-warning)" }}>
+                      sem foto
+                    </span>
+                  ) : null}
                 </span>
               </label>
             ))}
           </div>
+          {checkedMissingPhotoProducts.length > 0 ? (
+            <div
+              className="flex flex-col gap-1 rounded-lg p-2.5"
+              style={{ background: "color-mix(in srgb, var(--status-critical) 12%, var(--surface-1))", border: "1px solid var(--status-critical)" }}
+            >
+              <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+                ⚠ Falta foto de: {checkedMissingPhotoProducts.join(", ")}
+              </span>
+              <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                Envie a foto na seção acima antes de continuar, ou desmarque esse item.
+              </span>
+            </div>
+          ) : null}
           {checkedIds.length === items.length && items.length > 0 ? (
             <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
               Marcou tudo? Se terminou a visita inteira, use &ldquo;Marcar como concluído&rdquo; em vez desta opção.
@@ -185,7 +238,7 @@ export function MontadorRequestActions({ requestId, items }: { requestId: string
           />
           <div className="flex items-center gap-2">
             <button
-              disabled={pending || checkedIds.length === 0}
+              disabled={pending || checkedIds.length === 0 || checkedMissingPhotoProducts.length > 0}
               onClick={confirmPartial}
               className="text-sm rounded-lg px-3 py-2.5 font-medium disabled:opacity-60 flex-1"
               style={{ background: "var(--status-warning)", color: "#fff" }}
