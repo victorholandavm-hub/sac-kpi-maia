@@ -31,7 +31,7 @@ export function AcionarClienteButton({ nome, phone, mensagem }: { nome: string |
       className="text-xs font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap"
       style={{ background: "color-mix(in srgb, #25d366 18%, transparent)", color: "#1da851" }}
     >
-      💬 Acionar Cliente
+      🎁 Gerar Oferta
     </a>
   );
 }

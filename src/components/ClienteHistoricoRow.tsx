@@ -25,7 +25,10 @@ export function ClienteHistoricoRow({
   children,
 }: {
   clientId: string;
-  name: string;
+  // String na maioria das telas; aceita ReactNode pra quem precisa
+  // empilhar algo abaixo do nome (ex.: badge de nível, aba Frequência &
+  // Potencial de Recompra) sem precisar de uma coluna própria pra isso.
+  name: React.ReactNode;
   // Colunas ANTES do nome (ex.: "Posição" na visão Nível de relacionamento)
   // -- a maioria das tabelas não tem nenhuma, daí opcional.
   leadingCells?: React.ReactNode;
