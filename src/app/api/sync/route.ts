@@ -178,7 +178,9 @@ type NpsCandidate = {
 // ambiente (achado 22/09/2026: a versão anterior, por ID de workflow,
 // nunca chegou a ser configurada no servidor e ficou 0 execuções o tempo
 // todo sem ninguém perceber).
-async function enrollPendingNps(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<{ enrolled: number; errors: string[] }> {
+async function enrollPendingNps(
+  supabase: ReturnType<typeof getSupabaseAdmin>
+): Promise<{ enrolled: number; mostruarioSkipped: number; semTelefone: number; errors: string[] }> {
   const sinceIso = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const { data: candidates, error } = await supabase
     .from("service_requests")
@@ -186,8 +188,8 @@ async function enrollPendingNps(supabase: ReturnType<typeof getSupabaseAdmin>): 
     .eq("status", "concluida")
     .gte("completed_at", sinceIso)
     .returns<NpsCandidate[]>();
-  if (error) return { enrolled: 0, errors: [`nps candidatos: ${error.message}`] };
-  if (!candidates || candidates.length === 0) return { enrolled: 0, errors: [] };
+  if (error) return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [`nps candidatos: ${error.message}`] };
+  if (!candidates || candidates.length === 0) return { enrolled: 0, mostruarioSkipped: 0, semTelefone: 0, errors: [] };
 
   const { data: already } = await supabase
     .from("service_request_nps")
@@ -197,9 +199,24 @@ async function enrollPendingNps(supabase: ReturnType<typeof getSupabaseAdmin>): 
 
   const errors: string[] = [];
   let enrolled = 0;
+  // Contados à parte pra não confundir "sem candidato elegível" com "tinha
+  // candidato, mas era esperado não contatar" -- achado do Victor
+  // 24/09/2026: montagem de mostruário (não tem cliente de verdade por
+  // trás) nunca tem telefone, e isso é certo, não um gap de dado como o
+  // de compra/entrega (ver nps2Meses.ts/entregaNps.ts). Mostruário checado
+  // ANTES do telefone pra não cair no balde genérico de "sem telefone".
+  let mostruarioSkipped = 0;
+  let semTelefone = 0;
   for (const candidate of candidates) {
-    if (alreadySent.has(candidate.id) || !candidate.client_phone) continue;
-    if (isMostruarioRequest(candidate.order_code, candidate.client_name)) continue;
+    if (alreadySent.has(candidate.id)) continue;
+    if (isMostruarioRequest(candidate.order_code, candidate.client_name)) {
+      mostruarioSkipped++;
+      continue;
+    }
+    if (!candidate.client_phone) {
+      semTelefone++;
+      continue;
+    }
     const tipo = classifyNpsTipo(candidate.type);
     if (!tipo) continue;
 
@@ -217,7 +234,7 @@ async function enrollPendingNps(supabase: ReturnType<typeof getSupabaseAdmin>): 
     if (insertError) errors.push(`nps ${candidate.id}: ${insertError.message}`);
     else enrolled++;
   }
-  return { enrolled, errors };
+  return { enrolled, mostruarioSkipped, semTelefone, errors };
 }
 
 // Mesmo padrão de resposta do SAC (NPS_1_5_PATTERN, ver detectNpsScore
@@ -361,7 +378,12 @@ async function runSync() {
     }
   }
 
-  const { enrolled: montagemAssistNpsEnrolled, errors: npsEnrollErrors } = await enrollPendingNps(supabase);
+  const {
+    enrolled: montagemAssistNpsEnrolled,
+    mostruarioSkipped: montagemAssistNpsMostruarioSkipped,
+    semTelefone: montagemAssistNpsSemTelefone,
+    errors: npsEnrollErrors,
+  } = await enrollPendingNps(supabase);
   errors.push(...npsEnrollErrors);
   const montagemAssistNpsAnswered = await detectPendingNpsResponses(supabase);
 
@@ -391,6 +413,8 @@ async function runSync() {
       responsesComputed,
       npsComputed,
       montagemAssistNpsEnrolled,
+      montagemAssistNpsMostruarioSkipped,
+      montagemAssistNpsSemTelefone,
       montagemAssistNpsAnswered,
       compraNpsEnrolled,
       compraNpsSemTelefone,
@@ -409,6 +433,8 @@ async function runSync() {
     responsesComputed,
     npsComputed,
     montagemAssistNpsEnrolled,
+    montagemAssistNpsMostruarioSkipped,
+    montagemAssistNpsSemTelefone,
     montagemAssistNpsAnswered,
     compraNpsEnrolled,
     compraNpsSemTelefone,
