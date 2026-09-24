@@ -8,6 +8,7 @@ import {
   listClientes,
   listClientesPorNivel,
   listCanalAquisicaoPorCliente,
+  listPhonePorClienteIds,
   isClienteStatus,
   isClienteNivel,
   CLIENTE_STATUSES,
@@ -22,12 +23,19 @@ import {
   listRecompraCandidatos,
   listRecompraNaoContatarCompleto,
   listClvProjetadoPorCliente,
+  listFrequenciaRecompra,
+  enrichFrequenciaItensPorPagina,
   isRecompraSegmento,
+  isCategoriaBucket,
   RECOMPRA_SEGMENTOS,
   RECOMPRA_SEGMENTO_LABELS,
   RECOMPRA_SEGMENTO_DESCRICOES,
   RECOMPRA_SEGMENTO_COLORS,
   CLV_HORIZONTE_ANOS,
+  CATEGORIA_BUCKETS,
+  CATEGORIA_BUCKET_LABELS,
+  STATUS_CICLO_LABELS,
+  STATUS_CICLO_COLORS,
   type RecompraSegmento,
   type RecompraCandidato,
 } from "@/lib/recompra";
@@ -38,6 +46,8 @@ import { RecompraContatoCell } from "@/components/RecompraContatoCell";
 import { RecompraNaoContatarManager } from "@/components/RecompraNaoContatarManager";
 import { CanalAquisicaoSelect } from "@/components/CanalAquisicaoSelect";
 import { EstornoFormCard } from "@/components/clientes/EstornoFormCard";
+import { AcionarClienteButton } from "@/components/clientes/AcionarClienteButton";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +69,7 @@ function buildHref(params: {
   status?: string;
   nivel?: string;
   segmento?: string;
+  categoria?: string;
   inativo?: string;
   loja?: string;
   page?: number;
@@ -69,6 +80,7 @@ function buildHref(params: {
   if (params.status) sp.set("status", params.status);
   if (params.nivel) sp.set("nivel", params.nivel);
   if (params.segmento) sp.set("segmento", params.segmento);
+  if (params.categoria) sp.set("categoria", params.categoria);
   if (params.inativo) sp.set("inativo", params.inativo);
   if (params.loja) sp.set("loja", params.loja);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
@@ -85,17 +97,27 @@ export default async function ClientesPage({
     status?: string;
     nivel?: string;
     segmento?: string;
+    categoria?: string;
     inativo?: string;
     loja?: string;
     page?: string;
   }>;
 }) {
   await requireDashboardAuth();
-  const { view: viewParam, q, status, nivel, segmento, inativo, loja, page: pageParam } = await searchParams;
+  const { view: viewParam, q, status, nivel, segmento, categoria, inativo, loja, page: pageParam } = await searchParams;
   // Nível de relacionamento é a aba de aterrissagem (pedido do Victor
-  // 15/08/2026) -- "status"/"recompra"/"estornos" só aparecem quando
-  // pedidos explicitamente na URL.
-  const view = viewParam === "status" ? "status" : viewParam === "recompra" ? "recompra" : viewParam === "estornos" ? "estornos" : "nivel";
+  // 15/08/2026) -- "status"/"recompra"/"estornos"/"frequencia" só aparecem
+  // quando pedidos explicitamente na URL.
+  const view =
+    viewParam === "status"
+      ? "status"
+      : viewParam === "recompra"
+        ? "recompra"
+        : viewParam === "frequencia"
+          ? "frequencia"
+          : viewParam === "estornos"
+            ? "estornos"
+            : "nivel";
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
   return (
@@ -115,6 +137,12 @@ export default async function ClientesPage({
         <UnderlineTab href={buildHref({ view: "status" })} label="Status (Protheus)" active={view === "status"} color="var(--brand-orange)" />
         <UnderlineTab href={buildHref({ view: "nivel" })} label="Nível de relacionamento" active={view === "nivel"} color="var(--brand-orange)" />
         <UnderlineTab href={buildHref({ view: "recompra" })} label="Propensão a recompra" active={view === "recompra"} color="var(--brand-orange)" />
+        <UnderlineTab
+          href={buildHref({ view: "frequencia" })}
+          label="Frequência & Potencial de Recompra"
+          active={view === "frequencia"}
+          color="var(--brand-orange)"
+        />
         <UnderlineTab href={buildHref({ view: "estornos" })} label="Estornos" active={view === "estornos"} color="var(--brand-orange)" />
       </div>
 
@@ -122,6 +150,8 @@ export default async function ClientesPage({
         <StatusView q={q} status={status} page={page} />
       ) : view === "recompra" ? (
         <RecompraView q={q} segmento={segmento} page={page} />
+      ) : view === "frequencia" ? (
+        <FrequenciaView q={q} categoria={categoria} page={page} />
       ) : view === "estornos" ? (
         <EstornosView q={q} loja={loja} page={page} />
       ) : (
@@ -763,6 +793,238 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
       ) : null}
 
       <RecompraNaoContatarManager items={naoContatar} />
+    </>
+  );
+}
+
+// Aba "Frequência & Potencial de Recompra" -- pedido do Victor 24/09/2026:
+// diferente de "Propensão a recompra" acima (que reduz cada cliente à sua
+// categoria mais atrasada, listRecompraCandidatos), esta mostra uma linha
+// por cliente×categoria dentro do balde Móveis/Colchões selecionado, com
+// selo de 3 níveis e ação direta de WhatsApp -- ver listFrequenciaRecompra
+// em recompra.ts pro porquê disso não caber na régua existente. Telefone
+// (AcionarClienteButton) e "itens da última compra" só são buscados pra
+// página visível (enrichFrequenciaItensPorPagina/listPhonePorClienteIds),
+// nunca pro dataset inteiro filtrado.
+async function FrequenciaView({ q, categoria, page }: { q?: string; categoria?: string; page: number }) {
+  const filterBucket = isCategoriaBucket(categoria) ? categoria : undefined;
+  const todos = await listFrequenciaRecompra(filterBucket);
+
+  // Cards de insight -- estatística real sobre o balde selecionado (não a
+  // busca por nome, que é um refinamento à parte), nunca dado inventado.
+  const intervaloMedioDias = todos.length > 0 ? Math.round(todos.reduce((sum, r) => sum + r.cicloMedioDias, 0) / todos.length) : 0;
+  const prontosPorCategoria = new Map<string, number>();
+  let totalProntos = 0;
+  for (const r of todos) {
+    if (r.statusCiclo === "no_prazo") continue;
+    totalProntos += 1;
+    prontosPorCategoria.set(r.categoriaLabel, (prontosPorCategoria.get(r.categoriaLabel) ?? 0) + 1);
+  }
+  let padraoDetectado: { categoria: string; pct: number } | null = null;
+  for (const [cat, count] of prontosPorCategoria) {
+    const pct = Math.round((count / totalProntos) * 100);
+    if (!padraoDetectado || pct > padraoDetectado.pct) padraoDetectado = { categoria: cat, pct };
+  }
+
+  const qLower = q?.trim().toLowerCase();
+  const filtrados = qLower ? todos.filter((r) => (r.nome ?? "").toLowerCase().includes(qLower)) : todos;
+
+  const total = filtrados.length;
+  const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
+  const pageClamped = Math.min(page, totalPages);
+  const pageItemsRaw = filtrados.slice((pageClamped - 1) * LIST_PAGE_SIZE, pageClamped * LIST_PAGE_SIZE);
+
+  const clientIdsNaPagina = [...new Set(pageItemsRaw.map((r) => r.clientId))];
+  const [pageItensEnriquecidos, phonePorCliente] = await Promise.all([
+    enrichFrequenciaItensPorPagina(pageItemsRaw),
+    listPhonePorClienteIds(clientIdsNaPagina),
+  ]);
+  const pageItems = pageItensEnriquecidos.map((r) => ({ ...r, phone: phonePorCliente.get(r.clientId) ?? null }));
+
+  return (
+    <>
+      <p className="text-xs -mt-4 max-w-2xl" style={{ color: "var(--text-muted)" }}>
+        {todos.length} combinações cliente×categoria (dentro do filtro atual), cruzando dias desde a
+        última compra da categoria com o ciclo de reposição típico dela -- mesmo motor da aba
+        &quot;Propensão a recompra&quot;, sem reduzir ao pior caso de cada cliente.
+      </p>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div
+          className="rounded-xl border p-4 flex flex-col gap-1"
+          style={{ background: "color-mix(in srgb, var(--brand-orange) 5%, var(--surface-1))", borderColor: "var(--border)", borderTopWidth: 3, borderTopColor: "var(--brand-orange)" }}
+        >
+          <span className="text-2xl font-bold" style={{ color: "var(--brand-orange)" }}>
+            {intervaloMedioDias > 0 ? `${intervaloMedioDias} dias` : "—"}
+          </span>
+          <span className="text-sm font-medium flex items-center gap-1" style={{ color: "var(--text-primary)" }}>
+            Intervalo médio de recompra
+            <span
+              title="Ciclo típico de reposição da categoria (não uma média pessoal medida do cliente -- a view não guarda a 1ª compra de cada categoria, só a mais recente), média sobre todas as combinações cliente×categoria do filtro atual."
+              aria-label="Como o intervalo médio de recompra é calculado"
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
+              style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
+            >
+              i
+            </span>
+          </span>
+        </div>
+        <div
+          className="rounded-xl border p-4 flex flex-col gap-1"
+          style={{ background: "color-mix(in srgb, var(--brand-orange) 5%, var(--surface-1))", borderColor: "var(--border)", borderTopWidth: 3, borderTopColor: "var(--brand-orange)" }}
+        >
+          <span className="text-2xl font-bold" style={{ color: "var(--brand-orange)" }}>
+            {padraoDetectado ? `${padraoDetectado.pct}%` : "—"}
+          </span>
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+            {padraoDetectado
+              ? `${padraoDetectado.categoria} concentra ${padraoDetectado.pct}% dos clientes prontos pra contato nesta seleção.`
+              : "Padrão detectado"}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterPill href={buildHref({ view: "frequencia", q })} label="Todos" selected={!filterBucket} />
+        {CATEGORIA_BUCKETS.map((b) => (
+          <FilterPill key={b} href={buildHref({ view: "frequencia", q, categoria: b })} label={CATEGORIA_BUCKET_LABELS[b]} selected={filterBucket === b} />
+        ))}
+      </div>
+
+      <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap">
+        <input type="hidden" name="view" value="frequencia" />
+        {filterBucket ? <input type="hidden" name="categoria" value={filterBucket} /> : null}
+        <input
+          type="search"
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Buscar por nome…"
+          className="text-sm flex-1 min-w-[220px] rounded border px-3 py-2"
+          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+        />
+        <button type="submit" className="text-sm px-4 py-2 rounded font-medium" style={{ background: "var(--brand-orange)", color: "#fff" }}>
+          Buscar
+        </button>
+        {q ? (
+          <Link href={buildHref({ view: "frequencia", categoria: filterBucket })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+            Limpar
+          </Link>
+        ) : null}
+      </form>
+
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        {total} combinaç{total === 1 ? "ão" : "ões"} cliente×categoria encontrada{total === 1 ? "" : "s"}
+        {totalPages > 1 ? ` · página ${pageClamped} de ${totalPages}` : ""}
+      </p>
+
+      {pageItems.length === 0 ? (
+        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Nenhum cliente encontrado.
+          </p>
+        </div>
+      ) : (
+        <div className="min-w-0 rounded-lg overflow-hidden" style={{ border: "2px solid var(--brand-green)" }}>
+          <DualScrollTable>
+            <table className="w-full text-sm">
+              <thead>
+                <tr
+                  className="text-[11px] uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
+                >
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Categoria</th>
+                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Itens</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1">
+                      Frequência média
+                      <span
+                        title="Ciclo TÍPICO de reposição dessa categoria (não uma média pessoal medida deste cliente -- a view não guarda a 1ª compra de cada categoria, só a mais recente)."
+                        aria-label="O que é a frequência média"
+                        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
+                        style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
+                      >
+                        i
+                      </span>
+                    </span>
+                  </th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Status do ciclo</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Ação</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
+                {pageItems.map((r) => (
+                  <ClienteHistoricoRow
+                    key={`${r.clientId}::${r.categoriaKey}`}
+                    clientId={r.clientId}
+                    name={r.nome ?? r.clientId}
+                    comprasCount={r.qtdComprasHistorico}
+                    accentColor={STATUS_CICLO_COLORS[r.statusCiclo]}
+                  >
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {r.categoriaLabel}
+                    </td>
+                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {r.itens ?? "—"}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      {formatDateOnly(r.ultimaCompra)} · há {r.diasSemComprar} dias
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                      a cada {r.cicloMedioDias} dias
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                        style={{
+                          color: STATUS_CICLO_COLORS[r.statusCiclo],
+                          background: `color-mix(in srgb, ${STATUS_CICLO_COLORS[r.statusCiclo]} 15%, transparent)`,
+                        }}
+                      >
+                        {STATUS_CICLO_LABELS[r.statusCiclo]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <AcionarClienteButton nome={r.nome} phone={r.phone} />
+                    </td>
+                  </ClienteHistoricoRow>
+                ))}
+              </tbody>
+            </table>
+          </DualScrollTable>
+        </div>
+      )}
+
+      {totalPages > 1 ? (
+        <div className="flex items-center gap-2">
+          <Link
+            href={buildHref({ view: "frequencia", q, categoria: filterBucket, page: Math.max(1, pageClamped - 1) })}
+            aria-disabled={pageClamped <= 1}
+            className="text-sm px-3 py-1.5 rounded border"
+            style={{
+              borderColor: "var(--border)",
+              color: pageClamped <= 1 ? "var(--text-muted)" : "var(--text-primary)",
+              pointerEvents: pageClamped <= 1 ? "none" : undefined,
+            }}
+          >
+            ← Anterior
+          </Link>
+          <Link
+            href={buildHref({ view: "frequencia", q, categoria: filterBucket, page: Math.min(totalPages, pageClamped + 1) })}
+            aria-disabled={pageClamped >= totalPages}
+            className="text-sm px-3 py-1.5 rounded border"
+            style={{
+              borderColor: "var(--border)",
+              color: pageClamped >= totalPages ? "var(--text-muted)" : "var(--text-primary)",
+              pointerEvents: pageClamped >= totalPages ? "none" : undefined,
+            }}
+          >
+            Próxima →
+          </Link>
+        </div>
+      ) : null}
     </>
   );
 }
