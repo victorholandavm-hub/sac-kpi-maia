@@ -1,66 +1,85 @@
 import Link from "next/link";
+import { BarChart3, Users, TrendingUp, SquareStar } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
+
+// Redesenho pedido pelo Victor 24/09/2026: seção central mais imponente
+// (título + subtítulo) e cards com ícone/hover mais trabalhados -- as abas
+// do cabeçalho somem nessa tela (ver AppHeader.tsx), já que esses 4 cards
+// fazem a mesma navegação.
+const AREAS = [
+  {
+    href: "/kpis",
+    icon: BarChart3,
+    color: "var(--brand-orange)",
+    title: "KPIs",
+    description: "Indicadores de atendimento do SAC e desempenho da assistência técnica.",
+  },
+  {
+    href: "/clientes",
+    icon: Users,
+    color: "var(--brand-green)",
+    title: "Clientes",
+    description: "Gestão e perfil de relacionamento de clientes ativos e inativos.",
+  },
+  {
+    href: "/vendas",
+    icon: TrendingUp,
+    color: "var(--brand-orange)",
+    title: "Vendas",
+    description: "Análise da curva de vendas, ranking de faturamento e categorias de produtos.",
+  },
+  {
+    href: "/avaliacoes",
+    icon: SquareStar,
+    color: "var(--brand-green)",
+    title: "Avaliações",
+    description: "Evolução do NPS do SAC e monitoramento de avaliações do Google por loja.",
+  },
+];
 
 export default async function Home() {
   await requireDashboardAuth();
   return (
-    <div className="max-w-3xl mx-auto p-6 flex flex-col gap-6">
+    <div className="max-w-4xl mx-auto p-6 flex flex-col gap-10">
       <AppHeader />
-      {/* 4 lado a lado -- pedido do Victor 18/08/2026: Vendas tinha virado
-          aba do cabeçalho mas ficou de fora desses cards grandes da tela
-          inicial (Avaliações entrou do mesmo jeito em 19/08/2026). Cartões
-          um pouco menores (p-4/text-lg) pra caber numa linha só; empilha em
-          telas bem estreitas. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full max-w-3xl">
-        <Link
-          href="/kpis"
-          className="rounded-xl border p-4 flex flex-col gap-1.5"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
-        >
-          <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
-            KPIs
-          </h2>
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            Indicadores de atendimento do SAC — e da assistência técnica, numa sub-aba própria.
-          </p>
-        </Link>
-        <Link
-          href="/clientes"
-          className="rounded-xl border p-4 flex flex-col gap-1.5"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
-        >
-          <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
-            Clientes
-          </h2>
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            Perfil de compra/relacionamento — ativos, inativos e quem nunca comprou.
-          </p>
-        </Link>
-        <Link
-          href="/vendas"
-          className="rounded-xl border p-4 flex flex-col gap-1.5"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
-        >
-          <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
-            Vendas
-          </h2>
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            Curva de venda, ranking e tipo de produto.
-          </p>
-        </Link>
-        <Link
-          href="/avaliacoes"
-          className="rounded-xl border p-4 flex flex-col gap-1.5"
-          style={{ background: "var(--surface-1)", borderColor: "var(--border)", borderTop: "3px solid var(--brand-orange)" }}
-        >
-          <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
-            Avaliações
-          </h2>
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            NPS do SAC e avaliações do Google por loja, com evolução ao longo do tempo.
-          </p>
-        </Link>
+
+      <div className="flex flex-col items-center gap-2 text-center pt-4">
+        <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>
+          Bem-vindo ao Painel de Controle
+        </h1>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          Selecione uma área para gerenciar
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full">
+        {AREAS.map((area) => {
+          const Icon = area.icon;
+          return (
+            <Link
+              key={area.href}
+              href={area.href}
+              className="group rounded-xl bg-white dark:bg-gray-800 border p-6 flex flex-col gap-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <span
+                className="rounded-full p-3 w-fit transition-colors duration-200"
+                style={{ background: `color-mix(in srgb, ${area.color} 15%, transparent)`, color: area.color }}
+              >
+                <Icon size={24} />
+              </span>
+              <div className="flex flex-col gap-1">
+                <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+                  {area.title}
+                </h2>
+                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                  {area.description}
+                </p>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
