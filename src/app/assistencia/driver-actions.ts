@@ -527,6 +527,13 @@ export async function driverBulkSetRota(
     }
     const updatePayload: Record<string, unknown> = { scheduled_date: scheduledDate, rota };
     if (match) updatePayload.driver_name = match.driverName ?? null;
+    // "Remarcar" ("Não concluída" no selo, ver DeliveryStatusBadge.tsx) some
+    // assim que a notificação ganha uma data nova -- mesmo comportamento já
+    // existente em setSchedule (actions.ts), só que faltava aqui: essa ação
+    // mexe direto em scheduled_date/rota sem passar por setSchedule (ver
+    // comentário da função acima), então nunca limpava esse status sozinha.
+    // Achado do Victor 24/09/2026.
+    if (row.status === "remarcar") updatePayload.status = "em_andamento";
     const { error: updateError } = await admin.from("service_requests").update(updatePayload).eq("id", row.id);
     if (updateError) {
       errors.push(`#${row.ticket_number}: ${updateError.message}`);
