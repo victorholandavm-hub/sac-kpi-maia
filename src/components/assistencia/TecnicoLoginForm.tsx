@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { tecnicoSignIn, type TecnicoFormState } from "@/app/assistencia/tecnico-actions";
 import { PIN_LENGTH } from "@/lib/pinConfig";
 import { usePinAutoSubmit } from "./usePinAutoSubmit";
+import { loginInputClassName, loginInputStyle } from "./LoginFormShell";
 
 export function TecnicoLoginForm() {
   const [state, formAction, pending] = useActionState<TecnicoFormState, FormData>(tecnicoSignIn, undefined);
@@ -18,14 +19,7 @@ export function TecnicoLoginForm() {
     >
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
         Seu nome
-        <input
-          name="name"
-          type="text"
-          required
-          autoComplete="off"
-          className="rounded border px-3 py-2"
-          style={{ borderColor: "var(--border)" }}
-        />
+        <input name="name" type="text" required autoComplete="off" className={loginInputClassName} style={loginInputStyle} />
       </label>
       <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
         PIN
@@ -38,8 +32,8 @@ export function TecnicoLoginForm() {
           required
           autoComplete="off"
           onChange={onPinChange}
-          className="rounded border px-3 py-2 text-center text-2xl tracking-[0.5em]"
-          style={{ borderColor: "var(--border)" }}
+          className={`${loginInputClassName} text-center text-2xl tracking-[0.5em]`}
+          style={loginInputStyle}
         />
       </label>
       {state?.error ? (
@@ -50,8 +44,8 @@ export function TecnicoLoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded px-3 py-2 font-medium disabled:opacity-60"
-        style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
+        className="rounded-lg px-3 py-2.5 font-semibold text-white disabled:opacity-60 transition-colors"
+        style={{ background: "#1B5E3C" }}
       >
         {pending ? "Entrando…" : "Entrar"}
       </button>
