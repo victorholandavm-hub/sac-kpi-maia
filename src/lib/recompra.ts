@@ -275,6 +275,190 @@ export async function listClvProjetadoPorCliente(): Promise<Map<string, number>>
 }
 
 // -----------------------------------------------------------------------
+// Frequência & Potencial de Recompra -- pedido do Victor 24/09/2026: uma
+// visão por categoria (não reduzida a "só a pior" como listRecompraCandidatos
+// faz via buildJanelaPorCliente), com selo de 3 níveis e ação de WhatsApp.
+// Reaproveita os mesmos dados já calculados acima (categoriasPorCliente),
+// sem I/O novo pra isso -- só telefone (fora do pipeline de recompra até
+// hoje, ver listPhonePorClienteIds em clientes.ts) e "itens da última
+// compra" (a view só guarda qtd_compras = total histórico de linhas, não
+// a quantidade da compra mais recente) precisam de consulta própria, só
+// pra página visível (ver enrichFrequenciaItensPorPagina abaixo), nunca
+// pro dataset inteiro -- mesmo cuidado de egress/timeout documentado em
+// fetchCategoriasPorCliente acima.
+// -----------------------------------------------------------------------
+
+// Agrupamento em 2 baldes pedido pelo Victor ("Lojas Maia vende apenas
+// móveis e colchões") -- inferido por cima das 7 categorias já existentes
+// (CATEGORIAS_CICLO), NÃO confirmado literalmente por ele; fácil de
+// remapear aqui se quiser outra divisão depois.
+export const CATEGORIA_BUCKETS = ["moveis", "colchoes"] as const;
+export type CategoriaBucket = (typeof CATEGORIA_BUCKETS)[number];
+export const CATEGORIA_BUCKET_LABELS: Record<CategoriaBucket, string> = { moveis: "Móveis", colchoes: "Colchões" };
+
+const CATEGORIA_BUCKET_BY_KEY: Record<string, CategoriaBucket> = {
+  protetor: "colchoes",
+  travesseiro: "colchoes",
+  colchao: "colchoes",
+  estofado: "moveis",
+  cama: "moveis",
+  roupeiro: "moveis",
+  mesa: "moveis",
+};
+
+export function isCategoriaBucket(value: string | undefined | null): value is CategoriaBucket {
+  return !!value && (CATEGORIA_BUCKETS as readonly string[]).includes(value);
+}
+
+// 3 níveis, mesmo limiar de RATIO_NA_JANELA já usado no resto do motor --
+// não é um número novo inventado só pra essa tela.
+export const STATUS_CICLO = ["no_prazo", "na_janela", "atrasado"] as const;
+export type StatusCiclo = (typeof STATUS_CICLO)[number];
+
+export const STATUS_CICLO_LABELS: Record<StatusCiclo, string> = {
+  no_prazo: "No Prazo",
+  na_janela: "Na Janela de Recompra",
+  atrasado: "Atrasado",
+};
+
+export const STATUS_CICLO_COLORS: Record<StatusCiclo, string> = {
+  no_prazo: "var(--status-good)",
+  na_janela: "var(--status-warning)",
+  atrasado: "var(--status-critical)",
+};
+
+function statusCicloFromRatio(ratio: number): StatusCiclo {
+  if (ratio >= 1) return "atrasado";
+  if (ratio >= RATIO_NA_JANELA) return "na_janela";
+  return "no_prazo";
+}
+
+export type FrequenciaRecompraRow = {
+  clientId: string;
+  nome: string | null;
+  categoriaKey: string;
+  categoriaLabel: string;
+  bucket: CategoriaBucket;
+  qtdComprasHistorico: number;
+  ultimaCompra: string;
+  diasSemComprar: number;
+  // Ciclo TÍPICO da categoria (CATEGORIAS_CICLO[].cicloMeses * 30), não
+  // uma média pessoal medida do cliente -- a view só guarda a compra mais
+  // recente por categoria, não a 1ª, então não dá pra calcular intervalo
+  // pessoal real hoje sem migrar v_recompra_categorias_por_cliente (já
+  // causou 2 incidentes em produção, migrations 0123/0124/0129 -- fora de
+  // escopo por ora). Mostrar isso na UI com uma nota deixando claro que é
+  // o ciclo de mercado da categoria, não do cliente específico.
+  cicloMedioDias: number;
+  ratio: number;
+  statusCiclo: StatusCiclo;
+  // Preenchidos só depois de enrichFrequenciaItensPorPagina/telefone --
+  // null até lá, de propósito (ver comentário nas funções).
+  itens: number | null;
+  phone: string | null;
+};
+
+// Uma linha por cliente×categoria (dentro do balde filtrado), ordenada
+// pela mais "vencida" primeiro -- diferente de listRecompraCandidatos,
+// que reduz pra 1 linha por cliente via buildJanelaPorCliente. Exclui
+// quem pediu não ser mais contatado (mesma salvaguarda de LGPD de sempre)
+// e quem não tem nome resolvido (cliente interno etc., já filtrado por
+// listClientesPorNivel).
+export async function listFrequenciaRecompra(bucketFiltro?: CategoriaBucket): Promise<FrequenciaRecompraRow[]> {
+  const [niveis, categoriasPorCliente, naoContatar] = await Promise.all([
+    listClientesPorNivel(),
+    buildCategoriasPorCliente(),
+    listClientesNaoContatar(),
+  ]);
+  const nomePorCliente = new Map(niveis.map((c) => [c.clientId, c.nome]));
+  const hoje = new Date();
+
+  const linhas: FrequenciaRecompraRow[] = [];
+  for (const [clientId, porCategoria] of categoriasPorCliente) {
+    if (naoContatar.has(clientId)) continue;
+    if (!nomePorCliente.has(clientId)) continue;
+    for (const [key, acumulada] of porCategoria) {
+      const categoria = CATEGORIAS_CICLO.find((c) => c.key === key);
+      if (!categoria) continue;
+      const bucket = CATEGORIA_BUCKET_BY_KEY[key];
+      if (bucketFiltro && bucket !== bucketFiltro) continue;
+
+      const diasSemComprar = diasEntre(acumulada.data, hoje);
+      const cicloMedioDias = categoria.cicloMeses * 30;
+      const ratio = diasSemComprar / cicloMedioDias;
+
+      linhas.push({
+        clientId,
+        nome: nomePorCliente.get(clientId) ?? null,
+        categoriaKey: key,
+        categoriaLabel: categoria.label,
+        bucket,
+        qtdComprasHistorico: acumulada.qtdCompras,
+        ultimaCompra: acumulada.data,
+        diasSemComprar,
+        cicloMedioDias,
+        ratio,
+        statusCiclo: statusCicloFromRatio(ratio),
+        itens: null,
+        phone: null,
+      });
+    }
+  }
+
+  linhas.sort((a, b) => b.ratio - a.ratio);
+  return linhas;
+}
+
+type ItemComCategoriaRow = {
+  client_id: string;
+  issue_date: string;
+  items: { description: string | null; quantity: number }[] | null;
+};
+
+// Enriquecimento em lote só pra página visível (nunca pro dataset
+// inteiro). A view materializada não guarda quantidade nem detalha por
+// linha de item, só "quantas linhas no histórico inteiro" (qtd_compras)
+// -- pra saber quanto foi a ÚLTIMA compra de cada categoria, precisa ir
+// direto no pedido (mesmo padrão de nested select já usado em
+// vendasProduto.ts).
+export async function enrichFrequenciaItensPorPagina(rows: FrequenciaRecompraRow[]): Promise<FrequenciaRecompraRow[]> {
+  const clientIds = [...new Set(rows.map((r) => r.clientId))];
+  if (clientIds.length === 0) return rows;
+
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
+    .from("totvs_orders")
+    .select("client_id, issue_date, items:totvs_order_items(description, quantity)")
+    .in("client_id", clientIds)
+    .eq("type", "Venda")
+    .returns<ItemComCategoriaRow[]>();
+  if (error) throw new Error(error.message);
+
+  // Por (clientId, categoriaKey): mantém só a maior issue_date vista;
+  // itens de pedidos com a mesma data (venda dividida em mais de uma
+  // nota) somam juntos -- mesmo critério "pega o mais recente" de
+  // buildJanelaPorCliente, só no nível de item em vez de categoria.
+  const maxDate = new Map<string, string>();
+  const qtyAtMaxDate = new Map<string, number>();
+  for (const order of data ?? []) {
+    for (const item of order.items ?? []) {
+      const categoria = inferCategoriaCiclo(item.description);
+      if (!categoria) continue;
+      const key = `${order.client_id}::${categoria.key}`;
+      const cur = maxDate.get(key);
+      if (!cur || order.issue_date > cur) {
+        maxDate.set(key, order.issue_date);
+        qtyAtMaxDate.set(key, item.quantity);
+      } else if (order.issue_date === cur) {
+        qtyAtMaxDate.set(key, (qtyAtMaxDate.get(key) ?? 0) + item.quantity);
+      }
+    }
+  }
+
+  return rows.map((r) => ({ ...r, itens: qtyAtMaxDate.get(`${r.clientId}::${r.categoriaKey}`) ?? null }));
+}
+
+// -----------------------------------------------------------------------
 // Índice de atrito pós-venda
 // -----------------------------------------------------------------------
 

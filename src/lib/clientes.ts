@@ -550,6 +550,20 @@ export async function listComprasDoCliente(
   };
 }
 
+// Telefone em lote -- promovido do padrão inline já usado em nps2Meses.ts
+// (mesmo join client_id = protheus_code, mesmo gap de cobertura documentado
+// lá: totvs_clientes só cobre uma fração de quem já comprou). Usado pela
+// aba "Frequência & Potencial de Recompra" (recompra.ts) pro botão
+// "Acionar Cliente" -- só pra clientIds da página visível, nunca pro
+// dataset inteiro.
+export async function listPhonePorClienteIds(clientIds: string[]): Promise<Map<string, string | null>> {
+  if (clientIds.length === 0) return new Map();
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", clientIds);
+  if (error) throw new Error(error.message);
+  return new Map((data ?? []).map((r) => [r.protheus_code as string, r.phone1 as string | null]));
+}
+
 // -----------------------------------------------------------------------
 // Canal de aquisição -- pedido do Victor 07/09/2026: "como esse cliente
 // chegou até a loja". Não existe em nenhum sistema hoje (nem Protheus, nem
