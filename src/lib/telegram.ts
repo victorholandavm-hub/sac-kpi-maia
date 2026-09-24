@@ -70,6 +70,14 @@ type RequestNotifyParams = {
   requestedByName?: string | null;
   assemblerName?: string | null;
   driverName?: string | null;
+  // Data (e hora, se tiver) programada pelo atendente pra essa demanda --
+  // pedido do Victor 24/09/2026: "as montagens e as notificações de
+  // assistência venham com a data que foi programada". Omitido em silêncio
+  // quando ainda não tem data (mesma convenção dos outros campos opcionais
+  // desta lista) -- na criação normalmente ainda não tem; aparece a partir
+  // do primeiro aviso disparado depois de setSchedule marcar uma data.
+  scheduledDate?: string | null;
+  scheduledTime?: string | null;
 };
 
 function requestNotifyLines(params: RequestNotifyParams): string[] {
@@ -77,6 +85,11 @@ function requestNotifyLines(params: RequestNotifyParams): string[] {
   if (params.storeName) lines.push(`Loja: ${params.storeName}`);
   if (params.clientName) lines.push(`Cliente: ${params.clientName}`);
   if (params.requestedByName) lines.push(`Solicitado por: ${params.requestedByName}`);
+  if (params.scheduledDate) {
+    const [y, m, d] = params.scheduledDate.split("-");
+    const dataFormatada = `${d}/${m}/${y}`;
+    lines.push(params.scheduledTime ? `Data programada: ${dataFormatada} ${params.scheduledTime.slice(0, 5)}` : `Data programada: ${dataFormatada}`);
+  }
   // Montador faz sentido pra qualquer tipo da aba "Visitas" (montagem,
   // desmontagem, troca de peça, vistoria); motorista pro resto (entrega/
   // envio/recolhimento) -- mesmo corte de sempre (ver DELIVERY_REQUEST_TYPES/

@@ -150,7 +150,9 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, deadline_status, type, ticket_number, client_name, requested_by_name, requester:profiles!requested_by(full_name), stores(name)")
+    .select(
+      "assembler_name, status, store_id, deadline_status, type, ticket_number, client_name, requested_by_name, scheduled_date, scheduled_time, requester:profiles!requested_by(full_name), stores(name)"
+    )
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -239,6 +241,8 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
     storeName: request.stores?.[0]?.name,
     requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
     assemblerName,
+    scheduledDate: request.scheduled_date,
+    scheduledTime: request.scheduled_time,
   });
 
   revalidatePath("/assistencia/montador");
@@ -260,7 +264,9 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, ticket_number, type, client_name, requested_by_name, requester:profiles!requested_by(full_name), stores(name)")
+    .select(
+      "assembler_name, status, store_id, ticket_number, type, client_name, requested_by_name, scheduled_date, scheduled_time, requester:profiles!requested_by(full_name), stores(name)"
+    )
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -301,6 +307,8 @@ export async function montadorReportIssue(requestId: string, reason: string): Pr
     storeName: request.stores?.[0]?.name,
     requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
     assemblerName,
+    scheduledDate: request.scheduled_date,
+    scheduledTime: request.scheduled_time,
   });
 
   revalidatePath("/assistencia/montador");
@@ -336,7 +344,9 @@ export async function montadorCompletePartially(requestId: string, completedItem
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("assembler_name, status, store_id, ticket_number, type, client_name, requested_by_name, requester:profiles!requested_by(full_name), stores(name)")
+    .select(
+      "assembler_name, status, store_id, ticket_number, type, client_name, requested_by_name, scheduled_date, scheduled_time, requester:profiles!requested_by(full_name), stores(name)"
+    )
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.assembler_name !== assemblerName) {
@@ -419,6 +429,8 @@ export async function montadorCompletePartially(requestId: string, completedItem
     storeName: request.stores?.[0]?.name,
     requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
     assemblerName,
+    scheduledDate: request.scheduled_date,
+    scheduledTime: request.scheduled_time,
   });
 
   revalidatePath("/assistencia/montador");
