@@ -63,6 +63,15 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
     request.items.length > 0 &&
     assemblerName !== MANOEL_ONLY_ASSEMBLER;
   const generalPhotos = needsItemPhotos ? photos.filter((p) => !p.itemId) : photos;
+  // Achado do Victor 24/09/2026 (montador mateusjp): clicar "Sim,
+  // concluído" sem foto de algum item derrubava a tela inteira (erro cru
+  // do React em vez de mensagem amigável -- ver error.tsx novo e o fix
+  // em MontadorRequestActions.tsx). Calculado aqui (mesma checagem que o
+  // indicador "📷 N / sem foto" já usa acima) pra avisar ANTES de tentar,
+  // sem precisar de round-trip nenhum ao servidor. IDs (não nomes) pra
+  // dar pra cruzar com o item marcado no modo "Concluir parcialmente"
+  // também.
+  const itemIdsMissingPhotos = needsItemPhotos ? request.items.filter((item) => !photos.some((p) => p.itemId === item.id)).map((item) => item.id) : [];
   const showCompleted = request.status === "concluida" || request.status === "cancelada";
   // QR de avaliação só faz sentido pra chamado real de cliente, já concluído
   // e ainda sem nota -- mostruário fica de fora (avaliação é do gerente da
@@ -295,7 +304,7 @@ export default async function MontadorRequestDetailPage({ params }: { params: Pr
                 ⏳ O que já foi marcado como feito está aguardando aprovação da loja. Continue com o que falta abaixo.
               </p>
             ) : null}
-            <MontadorRequestActions requestId={request.id} items={request.items} />
+            <MontadorRequestActions requestId={request.id} items={request.items} itemIdsMissingPhotos={itemIdsMissingPhotos} />
           </div>
         ) : request.status === "aguardando_aprovacao" ? (
           // Sem item pendente nenhum -- nada mais pro montador fazer aqui
