@@ -777,7 +777,7 @@ export async function cancelServiceRequestByGerente(requestId: string, note: str
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
     .select(
-      "status, store_id, type, ticket_number, client_name, requested_by_name, assembler_name, driver_name, requester:profiles!requested_by(full_name), stores(name)"
+      "status, store_id, type, ticket_number, client_name, requested_by_name, assembler_name, driver_name, scheduled_date, scheduled_time, requester:profiles!requested_by(full_name), stores(name)"
     )
     .eq("id", requestId)
     .single();
@@ -824,6 +824,8 @@ export async function cancelServiceRequestByGerente(requestId: string, note: str
     requestedByName: current.requester?.[0]?.full_name ?? current.requested_by_name,
     assemblerName: current.assembler_name,
     driverName: current.driver_name,
+    scheduledDate: current.scheduled_date,
+    scheduledTime: current.scheduled_time,
   });
 
   revalidatePath("/assistencia/loja");
@@ -976,7 +978,7 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
   const { data: current, error: fetchError } = await admin
     .from("service_requests")
     .select(
-      "status, type, assembler_name, driver_name, store_id, deadline_status, ticket_number, client_name, requested_by_name, requester:profiles!requested_by(full_name), stores(name)"
+      "status, type, assembler_name, driver_name, store_id, deadline_status, ticket_number, client_name, requested_by_name, scheduled_date, scheduled_time, requester:profiles!requested_by(full_name), stores(name)"
     )
     .eq("id", requestId)
     .single();
@@ -1046,6 +1048,8 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
     requestedByName: current.requester?.[0]?.full_name ?? current.requested_by_name,
     assemblerName: current.assembler_name,
     driverName: current.driver_name,
+    scheduledDate: current.scheduled_date,
+    scheduledTime: current.scheduled_time,
   });
 
   revalidatePath("/assistencia/fila");
@@ -1251,6 +1255,8 @@ export async function createExchangeChild(
     clientName: parent.client_name,
     requestedByName: profile.fullName,
     driverName: parent.driver_name,
+    scheduledDate: parent.scheduled_date,
+    scheduledTime: parent.scheduled_time,
   });
 
   revalidatePath("/assistencia/fila");
@@ -1337,7 +1343,7 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
 
   const { data: current } = await admin
     .from("service_requests")
-    .select("type, ticket_number, client_name, requested_by_name, store_id")
+    .select("type, ticket_number, client_name, requested_by_name, store_id, scheduled_date, scheduled_time")
     .eq("id", requestId)
     .single();
   if (!current) throw new Error("Solicitação não encontrada.");
@@ -1370,6 +1376,8 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
     storeName,
     requestedByName: current.requested_by_name,
     assemblerName: trimmed,
+    scheduledDate: current.scheduled_date,
+    scheduledTime: current.scheduled_time,
   });
 
   revalidatePath("/assistencia/fila");
@@ -2488,6 +2496,8 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     requestedByName: profile.fullName,
     assemblerName,
     driverName: driverNameForError ?? driverNameForRota,
+    scheduledDate: emptyToNull(formData.get("scheduled_date")),
+    scheduledTime: emptyToNull(formData.get("scheduled_time")),
   });
 
   revalidatePath("/assistencia/fila");
@@ -2906,7 +2916,15 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     to_status: "aberta",
   });
 
-  await notifyTelegramNewRequest({ ticketNumber: data.ticket_number, type, clientName, requestedByName: profile.fullName, driverName });
+  await notifyTelegramNewRequest({
+    ticketNumber: data.ticket_number,
+    type,
+    clientName,
+    requestedByName: profile.fullName,
+    driverName,
+    scheduledDate: scheduledDate || null,
+    scheduledTime: scheduledTime || null,
+  });
 
   revalidatePath("/assistencia/sac");
   redirect(`/assistencia/${data.id}`);

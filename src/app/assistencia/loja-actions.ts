@@ -177,7 +177,7 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
   const { data: request, error } = await admin
     .from("service_requests")
     .select(
-      "status, store_id, ticket_number, type, client_name, assembler_name, requested_by_name, requester:profiles!requested_by(full_name), stores(name)"
+      "status, store_id, ticket_number, type, client_name, assembler_name, requested_by_name, scheduled_date, scheduled_time, requester:profiles!requested_by(full_name), stores(name)"
     )
     .eq("id", requestId)
     .maybeSingle();
@@ -227,6 +227,8 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
       storeName: request.stores?.[0]?.name,
       requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
       assemblerName: request.assembler_name,
+      scheduledDate: request.scheduled_date,
+      scheduledTime: request.scheduled_time,
     });
 
     revalidatePath("/assistencia/loja");
@@ -286,6 +288,8 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
     storeName: request.stores?.[0]?.name,
     requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
     assemblerName: request.assembler_name,
+    scheduledDate: request.scheduled_date,
+    scheduledTime: request.scheduled_time,
   });
 
   revalidatePath("/assistencia/loja");

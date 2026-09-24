@@ -198,7 +198,9 @@ export async function driverCompleteRequest(requestId: string): Promise<void> {
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("driver_name, status, store_id, type, ticket_number, client_name, requested_by_name, requester:profiles!requested_by(full_name)")
+    .select(
+      "driver_name, status, store_id, type, ticket_number, client_name, requested_by_name, scheduled_date, scheduled_time, requester:profiles!requested_by(full_name)"
+    )
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.driver_name !== driverName) {
@@ -249,6 +251,8 @@ export async function driverCompleteRequest(requestId: string): Promise<void> {
     clientName: request.client_name,
     requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
     driverName,
+    scheduledDate: request.scheduled_date,
+    scheduledTime: request.scheduled_time,
   });
 
   revalidatePath("/assistencia/motorista");
@@ -267,7 +271,9 @@ export async function driverReportIssue(requestId: string, reason: string): Prom
   const admin = getSupabaseAdmin();
   const { data: request, error } = await admin
     .from("service_requests")
-    .select("driver_name, status, store_id, type, ticket_number, client_name, requested_by_name, requester:profiles!requested_by(full_name)")
+    .select(
+      "driver_name, status, store_id, type, ticket_number, client_name, requested_by_name, scheduled_date, scheduled_time, requester:profiles!requested_by(full_name)"
+    )
     .eq("id", requestId)
     .maybeSingle();
   if (error || !request || request.driver_name !== driverName) {
@@ -307,6 +313,8 @@ export async function driverReportIssue(requestId: string, reason: string): Prom
     clientName: request.client_name,
     requestedByName: request.requester?.[0]?.full_name ?? request.requested_by_name,
     driverName,
+    scheduledDate: request.scheduled_date,
+    scheduledTime: request.scheduled_time,
   });
 
   revalidatePath("/assistencia/motorista");
