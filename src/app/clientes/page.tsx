@@ -23,21 +23,16 @@ import {
   listRecompraCandidatos,
   listRecompraNaoContatarCompleto,
   listClvProjetadoPorCliente,
-  listFrequenciaRecompra,
-  enrichFrequenciaItensPorPagina,
+  listPadroesEDeadsRecompra,
   isRecompraSegmento,
-  isCategoriaBucket,
   RECOMPRA_SEGMENTOS,
   RECOMPRA_SEGMENTO_LABELS,
   RECOMPRA_SEGMENTO_DESCRICOES,
   RECOMPRA_SEGMENTO_COLORS,
   CLV_HORIZONTE_ANOS,
-  CATEGORIA_BUCKETS,
-  CATEGORIA_BUCKET_LABELS,
-  STATUS_CICLO_LABELS,
-  STATUS_CICLO_COLORS,
   type RecompraSegmento,
   type RecompraCandidato,
+  type PadraoAssociacao,
 } from "@/lib/recompra";
 import { listEstornos } from "@/lib/estornos";
 import { AppHeader } from "@/components/AppHeader";
@@ -48,6 +43,7 @@ import { CanalAquisicaoSelect } from "@/components/CanalAquisicaoSelect";
 import { EstornoFormCard } from "@/components/clientes/EstornoFormCard";
 import { AcionarClienteButton } from "@/components/clientes/AcionarClienteButton";
 import { FilterPill } from "@/components/assistencia/FilterPill";
+import { Shield, Cloud, BedDouble, Sofa, BedSingle, DoorClosed, Table2, Repeat, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +65,7 @@ function buildHref(params: {
   status?: string;
   nivel?: string;
   segmento?: string;
-  categoria?: string;
+  padrao?: string;
   inativo?: string;
   loja?: string;
   page?: number;
@@ -80,7 +76,7 @@ function buildHref(params: {
   if (params.status) sp.set("status", params.status);
   if (params.nivel) sp.set("nivel", params.nivel);
   if (params.segmento) sp.set("segmento", params.segmento);
-  if (params.categoria) sp.set("categoria", params.categoria);
+  if (params.padrao) sp.set("padrao", params.padrao);
   if (params.inativo) sp.set("inativo", params.inativo);
   if (params.loja) sp.set("loja", params.loja);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
@@ -97,14 +93,14 @@ export default async function ClientesPage({
     status?: string;
     nivel?: string;
     segmento?: string;
-    categoria?: string;
+    padrao?: string;
     inativo?: string;
     loja?: string;
     page?: string;
   }>;
 }) {
   await requireDashboardAuth();
-  const { view: viewParam, q, status, nivel, segmento, categoria, inativo, loja, page: pageParam } = await searchParams;
+  const { view: viewParam, q, status, nivel, segmento, padrao, inativo, loja, page: pageParam } = await searchParams;
   // Nível de relacionamento é a aba de aterrissagem (pedido do Victor
   // 15/08/2026) -- "status"/"recompra"/"estornos"/"frequencia" só aparecem
   // quando pedidos explicitamente na URL.
@@ -151,7 +147,7 @@ export default async function ClientesPage({
       ) : view === "recompra" ? (
         <RecompraView q={q} segmento={segmento} page={page} />
       ) : view === "frequencia" ? (
-        <FrequenciaView q={q} categoria={categoria} page={page} />
+        <FrequenciaView q={q} padrao={padrao} page={page} />
       ) : view === "estornos" ? (
         <EstornosView q={q} loja={loja} page={page} />
       ) : (
@@ -797,103 +793,171 @@ async function RecompraView({ q, segmento, page }: { q?: string; segmento?: stri
   );
 }
 
-// Aba "Frequência & Potencial de Recompra" -- pedido do Victor 24/09/2026:
-// diferente de "Propensão a recompra" acima (que reduz cada cliente à sua
-// categoria mais atrasada, listRecompraCandidatos), esta mostra uma linha
-// por cliente×categoria dentro do balde Móveis/Colchões selecionado, com
-// selo de 3 níveis e ação direta de WhatsApp -- ver listFrequenciaRecompra
-// em recompra.ts pro porquê disso não caber na régua existente. Telefone
-// (AcionarClienteButton) e "itens da última compra" só são buscados pra
-// página visível (enrichFrequenciaItensPorPagina/listPhonePorClienteIds),
-// nunca pro dataset inteiro filtrado.
-async function FrequenciaView({ q, categoria, page }: { q?: string; categoria?: string; page: number }) {
-  const filterBucket = isCategoriaBucket(categoria) ? categoria : undefined;
-  const todos = await listFrequenciaRecompra(filterBucket);
+// Ícone por categoria (Lucide) -- confirmados existentes no pacote
+// instalado via grep no .d.ts antes de usar (evita o gotcha do
+// MessageSquareStar de mais cedo hoje, que não existia nessa versão).
+const CATEGORIA_ICONS: Record<string, typeof Shield> = {
+  protetor: Shield,
+  travesseiro: Cloud,
+  colchao: BedDouble,
+  estofado: Sofa,
+  cama: BedSingle,
+  roupeiro: DoorClosed,
+  mesa: Table2,
+};
 
-  // Cards de insight -- estatística real sobre o balde selecionado (não a
-  // busca por nome, que é um refinamento à parte), nunca dado inventado.
-  const intervaloMedioDias = todos.length > 0 ? Math.round(todos.reduce((sum, r) => sum + r.cicloMedioDias, 0) / todos.length) : 0;
-  const prontosPorCategoria = new Map<string, number>();
-  let totalProntos = 0;
-  for (const r of todos) {
-    if (r.statusCiclo === "no_prazo") continue;
-    totalProntos += 1;
-    prontosPorCategoria.set(r.categoriaLabel, (prontosPorCategoria.get(r.categoriaLabel) ?? 0) + 1);
-  }
-  let padraoDetectado: { categoria: string; pct: number } | null = null;
-  for (const [cat, count] of prontosPorCategoria) {
-    const pct = Math.round((count / totalProntos) * 100);
-    if (!padraoDetectado || pct > padraoDetectado.pct) padraoDetectado = { categoria: cat, pct };
-  }
+function confiancaBadge(pct: number): { label: string; color: string } {
+  if (pct >= 60) return { label: "Alto", color: "var(--status-good)" };
+  if (pct >= 35) return { label: "Médio", color: "var(--status-warning)" };
+  return { label: "Baixo", color: "var(--status-critical)" };
+}
 
+function padraoLabelCurto(padrao: PadraoAssociacao): string {
+  return padrao.tipo === "fidelidade" ? "Fidelidade Ativa" : `${padrao.categoriaOrigem.label} → ${padrao.categoriaDestino.label}`;
+}
+
+// Mensagem personalizada por padrão -- pedido do Victor 24/09/2026
+// ("Gerar Oferta Personalizada via WhatsApp"): cross-sell menciona a
+// categoria que o cliente já tem e a sugerida; fidelidade é genérica
+// (não tem uma 2ª categoria específica pra citar).
+function mensagemOferta(nome: string | null, padrao: PadraoAssociacao | undefined): string | undefined {
+  if (!padrao) return undefined;
+  if (padrao.tipo === "fidelidade") {
+    return `Olá${nome ? `, ${nome}` : ""}! Você já é cliente de confiança da Lojas Maia -- separamos uma condição especial pra sua próxima compra. Quer que a gente te mande mais detalhes?`;
+  }
+  return `Olá${nome ? `, ${nome}` : ""}! Notamos que você já tem um(a) ${padrao.categoriaOrigem.label.toLowerCase()} -- que tal completar com um(a) ${padrao.categoriaDestino.label.toLowerCase()}? Temos uma condição especial pra você.`;
+}
+
+// Aba "Frequência & Potencial de Recompra" -- Motor de Recomendação por
+// Padrões de Associação, pedido do Victor 24/09/2026 (2ª versão -- a 1ª,
+// linha por cliente×categoria com selo de ciclo de reposição, foi
+// substituída inteiramente por essa). Ver comentário completo em
+// listPadroesEDeadsRecompra (recompra.ts) pro que é medido de verdade
+// (Fidelidade Ativa) vs. estimado (janela do cross-sell) e por quê.
+// Telefone (AcionarClienteButton) só é buscado pra página visível
+// (listPhonePorClienteIds), nunca pro dataset inteiro filtrado.
+async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string; page: number }) {
+  const { padroes, leads: todosLeads } = await listPadroesEDeadsRecompra();
+  const padroesPorId = new Map(padroes.map((p) => [p.id, p]));
+
+  const filtroPadrao = padrao && padroesPorId.has(padrao) ? padrao : undefined;
+  let filtrados = filtroPadrao ? todosLeads.filter((l) => l.padraoId === filtroPadrao) : todosLeads;
   const qLower = q?.trim().toLowerCase();
-  const filtrados = qLower ? todos.filter((r) => (r.nome ?? "").toLowerCase().includes(qLower)) : todos;
+  if (qLower) filtrados = filtrados.filter((l) => (l.nome ?? "").toLowerCase().includes(qLower));
 
   const total = filtrados.length;
   const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
   const pageClamped = Math.min(page, totalPages);
   const pageItemsRaw = filtrados.slice((pageClamped - 1) * LIST_PAGE_SIZE, pageClamped * LIST_PAGE_SIZE);
 
-  const clientIdsNaPagina = [...new Set(pageItemsRaw.map((r) => r.clientId))];
-  const [pageItensEnriquecidos, phonePorCliente] = await Promise.all([
-    enrichFrequenciaItensPorPagina(pageItemsRaw),
-    listPhonePorClienteIds(clientIdsNaPagina),
-  ]);
-  const pageItems = pageItensEnriquecidos.map((r) => ({ ...r, phone: phonePorCliente.get(r.clientId) ?? null }));
+  const clientIdsNaPagina = [...new Set(pageItemsRaw.map((l) => l.clientId))];
+  const phonePorCliente = await listPhonePorClienteIds(clientIdsNaPagina);
+  const pageItems = pageItemsRaw.map((l) => ({ ...l, phone: phonePorCliente.get(l.clientId) ?? null }));
 
   return (
     <>
       <p className="text-xs -mt-4 max-w-2xl" style={{ color: "var(--text-muted)" }}>
-        {todos.length} combinações cliente×categoria (dentro do filtro atual), cruzando dias desde a
-        última compra da categoria com o ciclo de reposição típico dela -- mesmo motor da aba
-        &quot;Propensão a recompra&quot;, sem reduzir ao pior caso de cada cliente.
+        {todosLeads.length} clientes prontos pra contato, a partir de {padroes.length} padrão
+        {padroes.length === 1 ? "" : "ões"} de comportamento detectado{padroes.length === 1 ? "" : "s"} no histórico
+        real de vendas -- não é dado simulado, é o mesmo motor de afinidade de categoria já usado na aba
+        &quot;Propensão a recompra&quot;, mais um padrão novo de recorrência.
       </p>
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <div
-          className="rounded-xl border p-4 flex flex-col gap-1"
-          style={{ background: "color-mix(in srgb, var(--brand-orange) 5%, var(--surface-1))", borderColor: "var(--border)", borderTopWidth: 3, borderTopColor: "var(--brand-orange)" }}
-        >
-          <span className="text-2xl font-bold" style={{ color: "var(--brand-orange)" }}>
-            {intervaloMedioDias > 0 ? `${intervaloMedioDias} dias` : "—"}
-          </span>
-          <span className="text-sm font-medium flex items-center gap-1" style={{ color: "var(--text-primary)" }}>
-            Intervalo médio de recompra
-            <span
-              title="Ciclo típico de reposição da categoria (não uma média pessoal medida do cliente -- a view não guarda a 1ª compra de cada categoria, só a mais recente), média sobre todas as combinações cliente×categoria do filtro atual."
-              aria-label="Como o intervalo médio de recompra é calculado"
-              className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
-              style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
-            >
-              i
-            </span>
-          </span>
+      {padroes.length === 0 ? (
+        <div className="rounded-lg border p-6 text-center" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Nenhum padrão com amostra suficiente ainda.
+          </p>
         </div>
-        <div
-          className="rounded-xl border p-4 flex flex-col gap-1"
-          style={{ background: "color-mix(in srgb, var(--brand-orange) 5%, var(--surface-1))", borderColor: "var(--border)", borderTopWidth: 3, borderTopColor: "var(--brand-orange)" }}
-        >
-          <span className="text-2xl font-bold" style={{ color: "var(--brand-orange)" }}>
-            {padraoDetectado ? `${padraoDetectado.pct}%` : "—"}
-          </span>
-          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-            {padraoDetectado
-              ? `${padraoDetectado.categoria} concentra ${padraoDetectado.pct}% dos clientes prontos pra contato nesta seleção.`
-              : "Padrão detectado"}
-          </span>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {padroes.map((p) => {
+            const badge = confiancaBadge(p.confiancaPct);
+            if (p.tipo === "fidelidade") {
+              return (
+                <div
+                  key={p.id}
+                  className="rounded-xl border p-4 flex flex-col gap-2"
+                  style={{ background: "color-mix(in srgb, var(--brand-orange) 5%, var(--surface-1))", borderColor: "var(--border)", borderTopWidth: 3, borderTopColor: "var(--brand-orange)" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Repeat className="w-5 h-5" style={{ color: "var(--brand-orange)" }} />
+                    <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                      Fidelidade Ativa
+                    </span>
+                  </div>
+                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                    Clientes com {p.compraMinima}+ compras tendem a retornar a cada{" "}
+                    <strong>~{Math.round(p.intervaloMedioDias / 30)} meses</strong> (mediana medida, não estimada).
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-auto">
+                    <span
+                      className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                      style={{ color: badge.color, background: `color-mix(in srgb, ${badge.color} 15%, transparent)` }}
+                    >
+                      {badge.label} · {p.confiancaPct}%
+                    </span>
+                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      com base em {p.amostraTotal} clientes
+                    </span>
+                  </div>
+                </div>
+              );
+            }
+            const IconeOrigem = CATEGORIA_ICONS[p.categoriaOrigem.key] ?? Table2;
+            const IconeDestino = CATEGORIA_ICONS[p.categoriaDestino.key] ?? Table2;
+            return (
+              <div
+                key={p.id}
+                className="rounded-xl border p-4 flex flex-col gap-2"
+                style={{ background: "color-mix(in srgb, var(--brand-orange) 5%, var(--surface-1))", borderColor: "var(--border)", borderTopWidth: 3, borderTopColor: "var(--brand-orange)" }}
+              >
+                <div className="flex items-center gap-2">
+                  <IconeOrigem className="w-5 h-5" style={{ color: "var(--text-secondary)" }} />
+                  <ArrowRight className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
+                  <IconeDestino className="w-5 h-5" style={{ color: "var(--brand-orange)" }} />
+                  <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {p.categoriaOrigem.label} → {p.categoriaDestino.label}
+                  </span>
+                </div>
+                <p className="text-xs flex items-center gap-1" style={{ color: "var(--text-secondary)" }}>
+                  Janela estimada: ~{p.janelaMesesEstimativa} meses
+                  <span
+                    title="Estimativa pelo ciclo típico de reposição da categoria seguinte (mesmo número usado no resto do motor) -- não é o intervalo medido entre as duas compras. Medir isso de verdade exigiria reescanear o histórico de item inteiro, fora de escopo por ora."
+                    aria-label="Como a janela é estimada"
+                    className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
+                    style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
+                  >
+                    i
+                  </span>
+                </p>
+                <div className="flex items-center gap-1.5 mt-auto flex-wrap">
+                  <span
+                    className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                    style={{ color: badge.color, background: `color-mix(in srgb, ${badge.color} 15%, transparent)` }}
+                  >
+                    {badge.label} · {p.confiancaPct}%
+                  </span>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    com base em {p.amostraOrigem} clientes
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      )}
 
       <div className="flex items-center gap-2 flex-wrap">
-        <FilterPill href={buildHref({ view: "frequencia", q })} label="Todos" selected={!filterBucket} />
-        {CATEGORIA_BUCKETS.map((b) => (
-          <FilterPill key={b} href={buildHref({ view: "frequencia", q, categoria: b })} label={CATEGORIA_BUCKET_LABELS[b]} selected={filterBucket === b} />
+        <FilterPill href={buildHref({ view: "frequencia", q })} label="Todos" selected={!filtroPadrao} />
+        {padroes.map((p) => (
+          <FilterPill key={p.id} href={buildHref({ view: "frequencia", q, padrao: p.id })} label={padraoLabelCurto(p)} selected={filtroPadrao === p.id} />
         ))}
       </div>
 
       <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap">
         <input type="hidden" name="view" value="frequencia" />
-        {filterBucket ? <input type="hidden" name="categoria" value={filterBucket} /> : null}
+        {filtroPadrao ? <input type="hidden" name="padrao" value={filtroPadrao} /> : null}
         <input
           type="search"
           name="q"
@@ -906,14 +970,14 @@ async function FrequenciaView({ q, categoria, page }: { q?: string; categoria?: 
           Buscar
         </button>
         {q ? (
-          <Link href={buildHref({ view: "frequencia", categoria: filterBucket })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+          <Link href={buildHref({ view: "frequencia", padrao: filtroPadrao })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             Limpar
           </Link>
         ) : null}
       </form>
 
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-        {total} combinaç{total === 1 ? "ão" : "ões"} cliente×categoria encontrada{total === 1 ? "" : "s"}
+        {total} lead{total === 1 ? "" : "s"} encontrado{total === 1 ? "" : "s"}
         {totalPages > 1 ? ` · página ${pageClamped} de ${totalPages}` : ""}
       </p>
 
@@ -932,65 +996,49 @@ async function FrequenciaView({ q, categoria, page }: { q?: string; categoria?: 
                   className="text-[11px] uppercase tracking-wider"
                   style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
                 >
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nome</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Categoria</th>
-                  <th className="text-right font-semibold px-4 py-2.5 whitespace-nowrap">Itens</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1">
-                      Frequência média
-                      <span
-                        title="Ciclo TÍPICO de reposição dessa categoria (não uma média pessoal medida deste cliente -- a view não guarda a 1ª compra de cada categoria, só a mais recente)."
-                        aria-label="O que é a frequência média"
-                        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0"
-                        style={{ background: "var(--surface-2)", color: "var(--text-muted)", cursor: "help" }}
-                      >
-                        i
-                      </span>
-                    </span>
-                  </th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Status do ciclo</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cliente</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nível</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Padrão ativado</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Próxima compra provável</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Confiança</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Ação</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Compras</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {pageItems.map((r) => (
-                  <ClienteHistoricoRow
-                    key={`${r.clientId}::${r.categoriaKey}`}
-                    clientId={r.clientId}
-                    name={r.nome ?? r.clientId}
-                    comprasCount={r.qtdComprasHistorico}
-                    accentColor={STATUS_CICLO_COLORS[r.statusCiclo]}
-                  >
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {r.categoriaLabel}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {r.itens ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {formatDateOnly(r.ultimaCompra)} · há {r.diasSemComprar} dias
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      a cada {r.cicloMedioDias} dias
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <span
-                        className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{
-                          color: STATUS_CICLO_COLORS[r.statusCiclo],
-                          background: `color-mix(in srgb, ${STATUS_CICLO_COLORS[r.statusCiclo]} 15%, transparent)`,
-                        }}
-                      >
-                        {STATUS_CICLO_LABELS[r.statusCiclo]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <AcionarClienteButton nome={r.nome} phone={r.phone} />
-                    </td>
-                  </ClienteHistoricoRow>
-                ))}
+                {pageItems.map((l) => {
+                  const badge = confiancaBadge(l.confiancaPct);
+                  const padraoDoLead = padroesPorId.get(l.padraoId);
+                  return (
+                    <ClienteHistoricoRow
+                      key={`${l.clientId}::${l.padraoId}`}
+                      clientId={l.clientId}
+                      name={l.nome ?? l.clientId}
+                      accentColor={badge.color}
+                    >
+                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                        {CLIENTE_NIVEL_LABELS[l.nivel]}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                        {l.padraoLabel}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                        {l.proximaCompraProvavel}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        <span
+                          className="text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+                          style={{ color: badge.color, background: `color-mix(in srgb, ${badge.color} 15%, transparent)` }}
+                        >
+                          {badge.label} · {l.confiancaPct}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        <AcionarClienteButton nome={l.nome} phone={l.phone} mensagem={mensagemOferta(l.nome, padraoDoLead)} />
+                      </td>
+                    </ClienteHistoricoRow>
+                  );
+                })}
               </tbody>
             </table>
           </DualScrollTable>
@@ -1000,7 +1048,7 @@ async function FrequenciaView({ q, categoria, page }: { q?: string; categoria?: 
       {totalPages > 1 ? (
         <div className="flex items-center gap-2">
           <Link
-            href={buildHref({ view: "frequencia", q, categoria: filterBucket, page: Math.max(1, pageClamped - 1) })}
+            href={buildHref({ view: "frequencia", q, padrao: filtroPadrao, page: Math.max(1, pageClamped - 1) })}
             aria-disabled={pageClamped <= 1}
             className="text-sm px-3 py-1.5 rounded border"
             style={{
@@ -1012,7 +1060,7 @@ async function FrequenciaView({ q, categoria, page }: { q?: string; categoria?: 
             ← Anterior
           </Link>
           <Link
-            href={buildHref({ view: "frequencia", q, categoria: filterBucket, page: Math.min(totalPages, pageClamped + 1) })}
+            href={buildHref({ view: "frequencia", q, padrao: filtroPadrao, page: Math.min(totalPages, pageClamped + 1) })}
             aria-disabled={pageClamped >= totalPages}
             className="text-sm px-3 py-1.5 rounded border"
             style={{

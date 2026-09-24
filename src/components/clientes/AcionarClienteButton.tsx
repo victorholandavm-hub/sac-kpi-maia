@@ -7,7 +7,12 @@ import { whatsappHref } from "@/lib/phone";
 // com o Victor: cliente sem telefone esconde o botão e mostra "sem
 // telefone" -- nunca um botão cinza/desabilitado, pra não sugerir que dá
 // pra clicar mesmo assim.
-export function AcionarClienteButton({ nome, phone }: { nome: string | null; phone: string | null }) {
+//
+// `mensagem` opcional -- pedido do Victor 24/09/2026 ("Gerar Oferta
+// Personalizada via WhatsApp" pro motor de padrões de associação): cada
+// padrão detectado (fidelidade, cross-sell de categoria X->Y) manda sua
+// própria mensagem via essa prop; sem ela, cai na genérica de sempre.
+export function AcionarClienteButton({ nome, phone, mensagem }: { nome: string | null; phone: string | null; mensagem?: string }) {
   if (!phone) {
     return (
       <span className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -16,7 +21,7 @@ export function AcionarClienteButton({ nome, phone }: { nome: string | null; pho
     );
   }
 
-  const msg = `Olá${nome ? `, ${nome}` : ""}! Notamos que já faz um tempo desde sua última compra na Lojas Maia — separamos uma condição especial pra você. Quer que a gente te mande mais detalhes?`;
+  const msg = mensagem ?? `Olá${nome ? `, ${nome}` : ""}! Notamos que já faz um tempo desde sua última compra na Lojas Maia — separamos uma condição especial pra você. Quer que a gente te mande mais detalhes?`;
 
   return (
     <a
