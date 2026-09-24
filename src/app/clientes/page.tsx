@@ -18,6 +18,7 @@ import {
   CLIENTE_NIVEL_LABELS,
   CLIENTE_NIVEL_COLORS,
   CLIENTE_NIVEL_CRITERIA,
+  type ClienteNivel,
 } from "@/lib/clientes";
 import {
   listRecompraCandidatos,
@@ -42,8 +43,7 @@ import { RecompraNaoContatarManager } from "@/components/RecompraNaoContatarMana
 import { CanalAquisicaoSelect } from "@/components/CanalAquisicaoSelect";
 import { EstornoFormCard } from "@/components/clientes/EstornoFormCard";
 import { AcionarClienteButton } from "@/components/clientes/AcionarClienteButton";
-import { FilterPill } from "@/components/assistencia/FilterPill";
-import { Shield, Cloud, BedDouble, Sofa, BedSingle, DoorClosed, Table2, Repeat, ArrowRight } from "lucide-react";
+import { Shield, Cloud, BedDouble, Sofa, BedSingle, DoorClosed, Table2, Repeat, ArrowRight, Layers } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -812,8 +812,29 @@ function confiancaBadge(pct: number): { label: string; color: string } {
   return { label: "Baixo", color: "var(--status-critical)" };
 }
 
-function padraoLabelCurto(padrao: PadraoAssociacao): string {
-  return padrao.tipo === "fidelidade" ? "Fidelidade Ativa" : `${padrao.categoriaOrigem.label} → ${padrao.categoriaDestino.label}`;
+// Mesmo padrão visual de "card de filtro clicável" já usado nos cards de
+// Status/Nível/Segmento mais acima neste arquivo (background/borda mais
+// fortes quando selecionado) -- reaproveitado aqui pros cards de padrão,
+// que agora TAMBÉM são o filtro (pedido do Victor 24/09/2026: clicar no
+// card, não numa pill separada embaixo).
+function padraoCardStyle(color: string, selected: boolean): React.CSSProperties {
+  return {
+    background: `color-mix(in srgb, ${color} ${selected ? 10 : 5}%, var(--surface-1))`,
+    borderColor: `color-mix(in srgb, ${color} ${selected ? 100 : 35}%, var(--border))`,
+    borderTopWidth: 3,
+    borderTopColor: color,
+  };
+}
+
+function nivelBadge(nivel: ClienteNivel) {
+  return (
+    <span
+      className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full mt-1"
+      style={{ color: CLIENTE_NIVEL_COLORS[nivel], background: `color-mix(in srgb, ${CLIENTE_NIVEL_COLORS[nivel]} 15%, transparent)` }}
+    >
+      {CLIENTE_NIVEL_LABELS[nivel]}
+    </span>
+  );
 }
 
 // Mensagem personalizada por padrão -- pedido do Victor 24/09/2026
@@ -870,15 +891,37 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
           </p>
         </div>
       ) : (
+        // Cards SÃO o filtro (pedido do Victor 24/09/2026: clicar no card
+        // em vez de numa pill separada embaixo) -- Link, não button, pra
+        // continuar no mesmo padrão de roteamento por query string do
+        // resto da tela (sem useState/"use client").
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Link
+            href={buildHref({ view: "frequencia", q })}
+            className="rounded-xl border p-4 flex flex-col gap-2 transition-all hover:-translate-y-0.5 hover:shadow-md"
+            style={padraoCardStyle("var(--brand-green)", !filtroPadrao)}
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5" style={{ color: "var(--brand-green)" }} />
+              <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                Todos
+              </span>
+            </div>
+            <p className="text-xs mt-auto" style={{ color: "var(--text-secondary)" }}>
+              {todosLeads.length} lead{todosLeads.length === 1 ? "" : "s"} no total, {padroes.length} padrão
+              {padroes.length === 1 ? "" : "ões"}
+            </p>
+          </Link>
           {padroes.map((p) => {
             const badge = confiancaBadge(p.confiancaPct);
+            const selected = filtroPadrao === p.id;
             if (p.tipo === "fidelidade") {
               return (
-                <div
+                <Link
                   key={p.id}
-                  className="rounded-xl border p-4 flex flex-col gap-2"
-                  style={{ background: "color-mix(in srgb, var(--brand-orange) 5%, var(--surface-1))", borderColor: "var(--border)", borderTopWidth: 3, borderTopColor: "var(--brand-orange)" }}
+                  href={buildHref({ view: "frequencia", q, padrao: p.id })}
+                  className="rounded-xl border p-4 flex flex-col gap-2 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                  style={padraoCardStyle("var(--brand-orange)", selected)}
                 >
                   <div className="flex items-center gap-2">
                     <Repeat className="w-5 h-5" style={{ color: "var(--brand-orange)" }} />
@@ -901,16 +944,17 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
                       com base em {p.amostraTotal} clientes
                     </span>
                   </div>
-                </div>
+                </Link>
               );
             }
             const IconeOrigem = CATEGORIA_ICONS[p.categoriaOrigem.key] ?? Table2;
             const IconeDestino = CATEGORIA_ICONS[p.categoriaDestino.key] ?? Table2;
             return (
-              <div
+              <Link
                 key={p.id}
-                className="rounded-xl border p-4 flex flex-col gap-2"
-                style={{ background: "color-mix(in srgb, var(--brand-orange) 5%, var(--surface-1))", borderColor: "var(--border)", borderTopWidth: 3, borderTopColor: "var(--brand-orange)" }}
+                href={buildHref({ view: "frequencia", q, padrao: p.id })}
+                className="rounded-xl border p-4 flex flex-col gap-2 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                style={padraoCardStyle("var(--brand-orange)", selected)}
               >
                 <div className="flex items-center gap-2">
                   <IconeOrigem className="w-5 h-5" style={{ color: "var(--text-secondary)" }} />
@@ -942,18 +986,11 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
                     com base em {p.amostraOrigem} clientes
                   </span>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>
       )}
-
-      <div className="flex items-center gap-2 flex-wrap">
-        <FilterPill href={buildHref({ view: "frequencia", q })} label="Todos" selected={!filtroPadrao} />
-        {padroes.map((p) => (
-          <FilterPill key={p.id} href={buildHref({ view: "frequencia", q, padrao: p.id })} label={padraoLabelCurto(p)} selected={filtroPadrao === p.id} />
-        ))}
-      </div>
 
       <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap">
         <input type="hidden" name="view" value="frequencia" />
@@ -997,8 +1034,7 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
                   style={{ color: "var(--text-muted)", background: "color-mix(in srgb, var(--brand-green) 10%, var(--surface-1))" }}
                 >
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Cliente</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Nível</th>
-                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Padrão ativado</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Última compra</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Próxima compra provável</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Confiança</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Ação</th>
@@ -1013,14 +1049,20 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
                     <ClienteHistoricoRow
                       key={`${l.clientId}::${l.padraoId}`}
                       clientId={l.clientId}
-                      name={l.nome ?? l.clientId}
+                      name={
+                        <>
+                          {l.nome ?? l.clientId}
+                          <br />
+                          {nivelBadge(l.nivel)}
+                        </>
+                      }
                       accentColor={badge.color}
                     >
-                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                        {CLIENTE_NIVEL_LABELS[l.nivel]}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                        {l.padraoLabel}
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        <div style={{ color: "var(--text-primary)" }}>{l.padraoLabel}</div>
+                        <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          Há {l.diasGatilho.toLocaleString("pt-BR")} dias
+                        </div>
                       </td>
                       <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
                         {l.proximaCompraProvavel}

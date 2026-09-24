@@ -337,6 +337,10 @@ export type LeadRecompra = {
   nome: string | null;
   nivel: ClienteNivel;
   padraoId: string;
+  // Curto de propósito (só o produto/contexto, ex. "Mesa/Rack/Estante" ou
+  // "3 compras") -- o "há N dias" mora em diasGatilho, renderizado à
+  // parte na UI (pedido do Victor 24/09/2026: produto em texto normal,
+  // contador de tempo destacado em cinza, não misturados na mesma frase).
   padraoLabel: string;
   proximaCompraProvavel: string;
   confiancaPct: number;
@@ -390,7 +394,7 @@ function detectarPadraoFidelidade(niveis: ClienteNivelInfo[]): { padrao: PadraoA
       nome: cliente.nome,
       nivel: cliente.nivel,
       padraoId: "fidelidade",
-      padraoLabel: `${cliente.compras} compras, última há ${cliente.diasSemComprar} dias`,
+      padraoLabel: `${cliente.compras} compras`,
       proximaCompraProvavel: "Nova compra (fidelidade)",
       confiancaPct: padrao.confiancaPct,
       diasGatilho: cliente.diasSemComprar,
@@ -461,7 +465,7 @@ function detectarPadroesCrossSell(
         nome: cliente.nome,
         nivel: cliente.nivel,
         padraoId: padrao.id,
-        padraoLabel: `Comprou ${padrao.categoriaOrigem.label} há ${diasDesdeOrigem} dias`,
+        padraoLabel: padrao.categoriaOrigem.label,
         proximaCompraProvavel: padrao.categoriaDestino.label,
         confiancaPct: padrao.confiancaPct,
         diasGatilho: diasDesdeOrigem,
