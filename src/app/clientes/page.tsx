@@ -35,7 +35,9 @@ import {
   type RecompraCandidato,
   type PadraoAssociacao,
 } from "@/lib/recompra";
-import { listEstornos } from "@/lib/estornos";
+import { listEstornos, type EstornoRow } from "@/lib/estornos";
+import { listAllEstornoRequests, type EstornoRequestStatus } from "@/lib/estornoRequests";
+import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { AppHeader } from "@/components/AppHeader";
 import { ClienteHistoricoRow } from "@/components/ClienteHistoricoRow";
 import { RecompraContatoCell } from "@/components/RecompraContatoCell";
@@ -1119,28 +1121,102 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
   );
 }
 
+// Rótulo igual ao já usado em EstornoStatusBadge.tsx (fluxo loja->financeiro)
+// -- mesmo texto em português, sem reexportar o componente só por causa do
+// mapa de labels.
+const ESTORNO_REQUEST_STATUS_LABELS: Record<EstornoRequestStatus, string> = {
+  pendente: "Pendente",
+  concluido: "Concluído",
+  recusado: "Recusado",
+};
+
 // Aba "Estornos" -- pedido do Victor 22/09/2026: histórico de pedidos de
 // reembolso do SAC/lojas, curado à mão a partir do grupo de WhatsApp "Lojas
 // Maia e Líder Caixas" (backfill de 59 casos, 27/07 a 06/09/2026 -- ver
-// migration 0135_estornos.sql) + cadastro de novos casos direto por aqui
-// daqui pra frente (EstornoFormCard.tsx), mesmo espírito de Avaliações
-// Google (sem API pra puxar isso automaticamente, registro manual). Sem
-// paginação/filtro no banco (listEstornos busca tudo) -- mesmo padrão de
-// NivelView/RecompraView acima, tabela pequena o bastante pra caber
-// inteira na memória.
-async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page: number }) {
-  const todos = await listEstornos();
+// migration 0135_estornos.sql) + cadastro manual (EstornoFormCard.tsx).
+//
+// A partir de 25/09/2026 (pedido do Victor: "todos os dados que irão para
+// a aba de Estornos... puxarão os dados das solicitações de estorno vindo
+// das lojas para o financeiro"), mescla esse histórico manual com o fluxo
+// real de solicitação loja->financeiro (estorno_requests, ver
+// estornoRequests.ts/EstornoFinanceiroActions.tsx) -- confirmado com o
+// Victor: mantém os dois juntos (nada do histórico manual se perde) e
+// mantém o formulário manual pra casos fora do fluxo normal.
+//
+// "R$ reembolsados" só soma dinheiro que de fato saiu: todo registro
+// manual (é histórico já consumado, curado depois do fato) + só as
+// solicitações com status "concluido" (pendente ainda não saiu, recusado
+// nunca vai sair) -- ver `efetivado` abaixo. A CONTAGEM nos cards de loja
+// conta tudo (qualquer status), pra dar visibilidade do volume de
+// solicitação, não só do que já foi pago.
+//
+// Sem paginação/filtro no banco -- mesmo padrão de NivelView/RecompraView
+// acima, os dois conjuntos juntos ainda cabem inteiros na memória.
+type EstornoMerged = EstornoRow & { efetivado: boolean };
 
-  // Loja é texto livre (como foi digitado no grupo do WhatsApp, não um ID
-  // de `stores`) -- agrupamento por string exata, não um enum fechado como
-  // nível/status/segmento nas outras abas. Ordenado por valor reembolsado
-  // (quem pesa mais no total primeiro), não por nome -- é a pergunta mais
-  // provável ("onde está saindo mais dinheiro em estorno").
+// "(repetida)", "(nota fiscal)", "(3ª ref.)" etc. -- sufixo livre que o
+// time já usa pra anotar o nome do cliente na curadoria manual (grupo de
+// WhatsApp), poluindo a coluna Cliente. Refinamento visual pedido do
+// Victor 25/09/2026: extrai o sufixo entre parênteses e mostra como badge
+// discreto ao lado do nome, em vez de misturado no texto.
+function splitClienteFlag(cliente: string): { nome: string; flag: string | null } {
+  const match = cliente.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+  if (!match) return { nome: cliente, flag: null };
+  return { nome: match[1], flag: match[2] };
+}
+
+// Forma de pagamento é texto livre curado à mão (varia muito: "CRÉDITO 7X
+// MASTER", "VISA 12X (+ frete R$80)", "PIX MÁQUINETA"...) -- classifica
+// numa categoria com badge colorido pra ficar escaneável, sem descartar o
+// texto original (continua completo no tooltip do badge).
+function classificarPagamento(raw: string): { label: string; color: string } {
+  const upper = raw.toUpperCase();
+  if (upper.includes("PIX")) return { label: "PIX", color: "var(--status-good)" };
+  if (upper.includes("CRÉDITO") || upper.includes("CREDITO") || upper.includes("VISA") || upper.includes("MASTER")) {
+    return { label: "Crédito", color: "var(--series-5)" };
+  }
+  if (upper.includes("DÉBITO") || upper.includes("DEBITO")) return { label: "Débito", color: "var(--text-muted)" };
+  if (upper.includes("TRANSFER")) return { label: "Transferência", color: "var(--series-4)" };
+  if (upper.includes("ESPÉCIE") || upper.includes("ESPECIE") || upper.includes("DINHEIRO")) {
+    return { label: "Espécie", color: "var(--series-3)" };
+  }
+  return { label: "Outro", color: "var(--text-muted)" };
+}
+
+async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page: number }) {
+  const [manuais, solicitacoes] = await Promise.all([listEstornos(), listAllEstornoRequests()]);
+
+  const doManual: EstornoMerged[] = manuais.map((e) => ({ ...e, efetivado: true }));
+  const daSolicitacao: EstornoMerged[] = solicitacoes.map((r) => ({
+    id: `req-${r.id}`,
+    dataSolicitacao: r.createdAt.slice(0, 10),
+    cliente: r.clienteNome,
+    cpfCnpj: r.cpf,
+    codigoCliente: r.codigoCliente,
+    valorReembolso: r.valorReembolso,
+    dataVenda: r.dataVenda,
+    formaPagamento: r.formaPagamento,
+    motivo: r.motivo,
+    produto: r.produto,
+    autorizadoPor: r.autorizadoPor,
+    loja: r.storeName,
+    status: ESTORNO_REQUEST_STATUS_LABELS[r.status],
+    efetivado: r.status === "concluido",
+  }));
+  const todos = [...doManual, ...daSolicitacao].sort((a, b) => b.dataSolicitacao.localeCompare(a.dataSolicitacao));
+
+  // Loja é texto livre no histórico manual (como foi digitado no grupo do
+  // WhatsApp) mas o nome oficial de `stores` na solicitação real -- os dois
+  // deveriam bater na prática (mesmo nome de loja em qualquer tela do
+  // sistema), então agrupamento por string exata continua funcionando pros
+  // dois juntos. Ordenado por valor reembolsado (quem pesa mais no total
+  // primeiro), não por nome -- é a pergunta mais provável ("onde está saindo
+  // mais dinheiro em estorno").
   const porLoja = new Map<string, { count: number; total: number }>();
   for (const e of todos) {
     const entry = porLoja.get(e.loja) ?? { count: 0, total: 0 };
     entry.count += 1;
-    entry.total += e.valorReembolso;
+    if (e.efetivado) entry.total += e.valorReembolso;
     porLoja.set(e.loja, entry);
   }
   const lojasOrdenadas = [...porLoja.entries()].sort((a, b) => b[1].total - a[1].total);
@@ -1161,8 +1237,8 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
   // Já vem ordenado por data_solicitacao desc (listEstornos) -- filtro
   // acima preserva a ordem, sem precisar resortear.
 
-  const totalValorGeral = todos.reduce((sum, e) => sum + e.valorReembolso, 0);
-  const totalValorFiltrado = filtrados.reduce((sum, e) => sum + e.valorReembolso, 0);
+  const totalValorGeral = todos.filter((e) => e.efetivado).reduce((sum, e) => sum + e.valorReembolso, 0);
+  const totalValorFiltrado = filtrados.filter((e) => e.efetivado).reduce((sum, e) => sum + e.valorReembolso, 0);
   const total = filtrados.length;
   const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
   const pageClamped = Math.min(page, totalPages);
@@ -1171,63 +1247,53 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
   return (
     <>
       <p className="text-xs -mt-4 max-w-2xl" style={{ color: "var(--text-muted)" }}>
-        {todos.length} estornos registrados desde 27/07/2026 — R${" "}
-        <strong style={{ color: "var(--status-critical)" }}>{formatBRL(totalValorGeral)}</strong> reembolsados no total. Histórico curado à
-        mão a partir do grupo de WhatsApp &quot;Lojas Maia e Líder Caixas&quot; (o WhatsApp Web só libera histórico a partir da data em que
-        o time entrou no grupo, não cobre período anterior) + cadastro manual direto aqui.
+        {todos.length} estornos registrados desde 27/07/2026 —{" "}
+        <strong style={{ color: "var(--status-critical)" }}>{formatBRL(totalValorGeral)}</strong> efetivamente reembolsados. Histórico
+        curado à mão a partir do grupo de WhatsApp &quot;Lojas Maia e Líder Caixas&quot; (o WhatsApp Web só libera histórico a partir da data
+        em que o time entrou no grupo, não cobre período anterior) + cadastro manual direto aqui, junto com as solicitações reais enviadas
+        pelas lojas ao financeiro (pendente/concluído/recusado). Só concluído (e todo o histórico manual, já consumado) entra na soma acima
+        -- pendente ainda não saiu, recusado nunca vai sair.
       </p>
 
       <EstornoFormCard />
 
-      <div className="grid sm:grid-cols-4 gap-4">
-        {lojasOrdenadas.map(([lojaNome, info]) => (
-          <Link
-            key={lojaNome}
-            href={buildHref({ view: "estornos", q, loja: loja === lojaNome ? undefined : lojaNome })}
-            className="rounded-xl border p-4 flex flex-col gap-1 transition-all hover:-translate-y-0.5 hover:shadow-md"
-            style={{
-              background: `color-mix(in srgb, var(--status-critical) ${loja === lojaNome ? 10 : 5}%, var(--surface-1))`,
-              borderColor: `color-mix(in srgb, var(--status-critical) ${loja === lojaNome ? 100 : 35}%, var(--border))`,
-              borderTopWidth: 3,
-              borderTopColor: "var(--status-critical)",
-            }}
-          >
-            <span className="text-2xl font-bold" style={{ color: "var(--status-critical)" }}>
-              {info.count}
-            </span>
-            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-              {lojaNome}
-            </span>
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {formatBRL(info.total)}
-            </span>
-          </Link>
-        ))}
-      </div>
-
-      <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap">
-        <input type="hidden" name="view" value="estornos" />
-        {loja ? <input type="hidden" name="loja" value={loja} /> : null}
-        <input
-          type="search"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Buscar por cliente, CPF, produto, motivo ou status…"
-          className="text-sm flex-1 min-w-[220px] rounded border px-3 py-2"
-          style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+      {/* Barra superior (busca + filtro por loja) -- pedido do Victor
+          25/09/2026 (refinamento visual): substitui a grade de cards por
+          loja por um filtro compacto (FilterSelect, mesmo componente já
+          usado em Fornecedores/Pagamentos), cada opção já mostrando a
+          quantidade de estornos daquela loja. O total em R$ por loja
+          continua acessível -- basta selecionar a loja e ver a linha
+          "X estornos encontrados · R$ Y no recorte" logo abaixo. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap flex-1">
+          <input type="hidden" name="view" value="estornos" />
+          {loja ? <input type="hidden" name="loja" value={loja} /> : null}
+          <input
+            type="search"
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Buscar por cliente, CPF, produto, motivo ou status…"
+            className="text-sm flex-1 min-w-[220px] rounded border px-3 py-2"
+            style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+          />
+          <button type="submit" className="text-sm px-4 py-2 rounded font-medium" style={{ background: "var(--brand-orange)", color: "#fff" }}>
+            Buscar
+          </button>
+        </form>
+        <FilterSelect
+          name="loja"
+          placeholder="Todas as lojas"
+          options={lojasOrdenadas.map(([lojaNome, info]) => ({ value: lojaNome, label: `${lojaNome} (${info.count})` }))}
         />
-        <button type="submit" className="text-sm px-4 py-2 rounded font-medium" style={{ background: "var(--brand-orange)", color: "#fff" }}>
-          Buscar
-        </button>
         {q || loja ? (
           <Link href={buildHref({ view: "estornos" })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             Limpar
           </Link>
         ) : null}
-      </form>
+      </div>
 
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-        {total} estorno{total === 1 ? "" : "s"} encontrado{total === 1 ? "" : "s"} · R$ {formatBRL(totalValorFiltrado)} no recorte
+        {total} estorno{total === 1 ? "" : "s"} encontrado{total === 1 ? "" : "s"} · {formatBRL(totalValorFiltrado)} no recorte
         {totalPages > 1 ? ` · página ${pageClamped} de ${totalPages}` : ""}
       </p>
 
@@ -1259,45 +1325,67 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
-                {pageItems.map((e) => (
-                  <tr key={e.id}>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {formatDateOnly(e.dataSolicitacao)}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                      <span className="font-medium">{e.cliente}</span>
-                      {e.cpfCnpj ? (
-                        <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
-                          {e.cpfCnpj}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {e.loja}
-                    </td>
-                    <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--status-critical)" }}>
-                      {formatBRL(e.valorReembolso)}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {formatDateOnly(e.dataVenda)}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {e.formaPagamento ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 max-w-[280px]" style={{ color: "var(--text-secondary)" }}>
-                      {e.motivo ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 max-w-[280px]" style={{ color: "var(--text-secondary)" }}>
-                      {e.produto ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {e.autorizadoPor ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                      {e.status ?? "—"}
-                    </td>
-                  </tr>
-                ))}
+                {pageItems.map((e) => {
+                  const { nome, flag } = splitClienteFlag(e.cliente);
+                  const pagamento = e.formaPagamento ? classificarPagamento(e.formaPagamento) : null;
+                  return (
+                    <tr key={e.id} className="even:bg-[var(--surface-2)]">
+                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                        {formatDateOnly(e.dataSolicitacao)}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
+                        <span className="font-medium">{nome}</span>
+                        {flag ? (
+                          <span
+                            className="ml-1.5 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full align-middle whitespace-nowrap"
+                            style={{ color: "var(--brand-orange)", background: "color-mix(in srgb, var(--brand-orange) 15%, transparent)" }}
+                          >
+                            {flag}
+                          </span>
+                        ) : null}
+                        {e.cpfCnpj ? (
+                          <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                            {e.cpfCnpj}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                        {e.loja}
+                      </td>
+                      <td className="text-right px-4 py-2 whitespace-nowrap font-semibold" style={{ color: "var(--status-critical)" }}>
+                        {formatBRL(e.valorReembolso)}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                        {formatDateOnly(e.dataVenda)}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {pagamento ? (
+                          <span
+                            title={e.formaPagamento ?? undefined}
+                            className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap cursor-help"
+                            style={{ color: pagamento.color, background: `color-mix(in srgb, ${pagamento.color} 15%, transparent)` }}
+                          >
+                            {pagamento.label}
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--text-secondary)" }}>—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 max-w-[280px]" style={{ color: "var(--text-secondary)" }}>
+                        {e.motivo ?? "—"}
+                      </td>
+                      <td className="px-4 py-2 max-w-[280px]" style={{ color: "var(--text-secondary)" }}>
+                        {e.produto ?? "—"}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                        {e.autorizadoPor ?? "—"}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                        {e.status ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </DualScrollTable>
