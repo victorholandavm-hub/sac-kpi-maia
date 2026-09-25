@@ -41,6 +41,14 @@ type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "recolhiment
 // recolher, sem entregar nada -- já é auto-explicativo pelos itens listados).
 const DELIVERY_TYPES: SacType[] = ["troca_produto", "entrega_produto", "envio_peca", "recolhimento_produto"];
 
+const ALL_SAC_TYPE_OPTIONS: { value: SacType; label: string }[] = [
+  { value: "troca_produto", label: `${REQUEST_TYPE_LABELS.troca_produto} (recolher + entregar)` },
+  { value: "entrega_produto", label: `${REQUEST_TYPE_LABELS.entrega_produto} (sem recolhimento)` },
+  { value: "envio_peca", label: REQUEST_TYPE_LABELS.envio_peca },
+  { value: "recolhimento_produto", label: `${REQUEST_TYPE_LABELS.recolhimento_produto} (sem entrega)` },
+  { value: "notificacao_externa", label: "Notificação externa (sem troca de produto)" },
+];
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
@@ -234,14 +242,22 @@ export function SacCreateRequestForm({
   stores,
   drivers,
   cargas,
+  allowedTypes,
 }: {
   stores: Store[];
   drivers: string[];
   cargas: { carga: string; label: string }[];
+  // Luis e Iasmyn (assistência) só podem criar os 3 tipos de
+  // ASSISTENCIA_ALSO_MANAGED_TYPES -- pedido do Victor 25/09/2026, ver
+  // sac/nova/page.tsx e ASSISTENCIA_CAN_CREATE_SAC_TYPES em
+  // assistenciaLabels.ts. Sem essa prop (SAC/admin) mostra os 5 tipos de
+  // sempre, sem mudança de comportamento.
+  allowedTypes?: readonly SacType[];
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createSacRequest, undefined);
   const formRef = useRef<HTMLFormElement>(null);
-  const [type, setType] = useState<SacType>("troca_produto");
+  const typeOptions = allowedTypes ? ALL_SAC_TYPE_OPTIONS.filter((o) => allowedTypes.includes(o.value)) : ALL_SAC_TYPE_OPTIONS;
+  const [type, setType] = useState<SacType>(typeOptions[0]?.value ?? "troca_produto");
   const isDelivery = DELIVERY_TYPES.includes(type);
   const showProduct = isDelivery;
   // Só existe pra troca_produto -- controla se carga/conferente aparecem
@@ -393,11 +409,11 @@ export function SacCreateRequestForm({
             className="rounded border px-3 py-2"
             style={inputStyle}
           >
-            <option value="troca_produto">{REQUEST_TYPE_LABELS.troca_produto} (recolher + entregar)</option>
-            <option value="entrega_produto">{REQUEST_TYPE_LABELS.entrega_produto} (sem recolhimento)</option>
-            <option value="envio_peca">{REQUEST_TYPE_LABELS.envio_peca}</option>
-            <option value="recolhimento_produto">{REQUEST_TYPE_LABELS.recolhimento_produto} (sem entrega)</option>
-            <option value="notificacao_externa">Notificação externa (sem troca de produto)</option>
+            {typeOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
         </Field>
 

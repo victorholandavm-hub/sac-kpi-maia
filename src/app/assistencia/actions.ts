@@ -11,6 +11,8 @@ import {
   SAC_CATEGORIES,
   SAC_CATEGORY_LABELS,
   SAC_MANAGED_TYPES,
+  ASSISTENCIA_ALSO_MANAGED_TYPES,
+  ASSISTENCIA_CAN_CREATE_SAC_TYPES,
   MANOEL_ONLY_TYPES,
   MANOEL_ONLY_ASSEMBLER,
   REQUEST_TYPE_LABELS,
@@ -2163,7 +2165,15 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   if (!REQUEST_TYPES.includes(type as (typeof REQUEST_TYPES)[number])) {
     return { error: "Tipo de solicitação inválido." };
   }
-  if (profile.role === "assistencia" && (SAC_MANAGED_TYPES as readonly string[]).includes(type)) {
+  // Luis e Iasmyn podem criar os 3 tipos que a assistência já podia
+  // GERENCIAR desde 27/08/2026 (ASSISTENCIA_ALSO_MANAGED_TYPES) mas não
+  // CRIAR -- pedido do Victor 25/09/2026 (ver ASSISTENCIA_CAN_CREATE_SAC_TYPES,
+  // assistenciaLabels.ts). notificacao_externa continua travado (não faz
+  // parte de ASSISTENCIA_ALSO_MANAGED_TYPES).
+  const podeCriarTipoSac =
+    (ASSISTENCIA_CAN_CREATE_SAC_TYPES as readonly string[]).includes(profile.fullName) &&
+    (ASSISTENCIA_ALSO_MANAGED_TYPES as readonly string[]).includes(type);
+  if (profile.role === "assistencia" && (SAC_MANAGED_TYPES as readonly string[]).includes(type) && !podeCriarTipoSac) {
     return { error: "Esse tipo de solicitação é gerenciado pelo SAC." };
   }
 
