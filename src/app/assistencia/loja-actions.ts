@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getOptionalProfile } from "@/lib/dal";
 import { isMostruarioRequest } from "@/lib/serviceRequests";
+import { deletePhotosForItems } from "@/lib/servicePhotos";
 import { getGerenteStoreIds } from "@/lib/gerentes";
 import { notifyAssistencia } from "@/lib/notifications";
 import { notifyTelegramStatusChange } from "@/lib/telegram";
@@ -243,6 +244,14 @@ export async function lojaApproveMontagemConclusion(requestId: string, notDoneIt
     .eq("request_id", requestId)
     .in("id", notDoneItemIds);
   if (itemsError) throw new Error(itemsError.message);
+
+  // Apaga a(s) foto(s) antiga(s) desses itens -- achado 25/09/2026: sem
+  // isso, a foto que o montador já tinha enviado continuava vinculada ao
+  // item mesmo depois da rejeição, e um 2º "concluído" sem foto nova
+  // passava direto (hasPhotoForEveryCompletedItem só confere SE existe
+  // foto, não se é a foto do reenvio) -- anulava o propósito de pedir
+  // prova de que o item foi refeito.
+  await deletePhotosForItems(notDoneItemIds);
 
   const { data: updated, error: updateError } = await admin
     .from("service_requests")

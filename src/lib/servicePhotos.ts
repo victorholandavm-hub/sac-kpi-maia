@@ -275,6 +275,32 @@ export async function deleteRequestPhoto(photoId: string): Promise<void> {
   if (delError) throw new Error(delError.message);
 }
 
+// Chame quando o gerente da loja REJEITA um item já marcado como feito
+// (lojaApproveMontagemConclusion, loja-actions.ts) -- achado 25/09/2026
+// (revisão do módulo de montagem): sem isso, a foto antiga do montador
+// continuava vinculada ao item mesmo depois da rejeição, então um 2º
+// clique em "concluído" sem tirar foto nova passava direto em
+// hasPhotoForEveryCompletedItem (que só confere SE existe alguma foto,
+// não se é recente) -- anulava o propósito da rejeição, que é forçar
+// prova de que o item foi refeito de verdade.
+export async function deletePhotosForItems(itemIds: string[]): Promise<void> {
+  if (itemIds.length === 0) return;
+  const admin = getSupabaseAdmin();
+  const { data: rows, error } = await admin.from("service_request_photos").select("id, storage_path").in("item_id", itemIds);
+  if (error) throw new Error(error.message);
+  if (!rows || rows.length === 0) return;
+
+  await deletePhotoFiles(rows.map((r) => r.storage_path as string));
+  const { error: delError } = await admin
+    .from("service_request_photos")
+    .delete()
+    .in(
+      "id",
+      rows.map((r) => r.id as string)
+    );
+  if (delError) throw new Error(delError.message);
+}
+
 // Chame antes de apagar uma solicitação manualmente (não há tela no app pra
 // isso hoje — só acontece via limpeza administrativa direta no banco) pra não
 // deixar arquivo órfão no disco: o ON DELETE CASCADE da tabela só apaga a

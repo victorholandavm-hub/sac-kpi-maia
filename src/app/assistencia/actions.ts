@@ -20,6 +20,7 @@ import {
   ALL_REQUEST_TYPES,
   CAUSA_RAIZ_OPTIONS,
   CAUSA_RAIZ_ALL_VALUES,
+  PAYMENTS_CONTROLLER_NAME,
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
 import { notifyTelegramNewRequest, notifyTelegramStatusChange, notifyTelegramAssemblerAssigned } from "@/lib/telegram";
@@ -2382,6 +2383,20 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     if (pickupError) return pickupError;
   }
   const items = [...primaryItems, ...secondaryItems, ...pickupItems];
+
+  // Só quem controla pagamento (PAYMENTS_CONTROLLER_NAME) pode definir
+  // valor de item -- mesma trava de requirePaymentsController
+  // (pagamentos-actions.ts/setItemUnitValue), fechada aqui também.
+  // Achado 25/09/2026 (revisão do módulo de pagamentos): o campo "Valor
+  // (R$)" do formulário Nova Rápida (QuickCreateRequestForm.tsx) gravava
+  // unit_value direto na criação sem checar quem estava criando --
+  // qualquer assistência/admin conseguia precificar um item antes mesmo
+  // da montagem começar, sem revisão nenhuma. setItemUnitValue já trava
+  // isso pra toda edição POSTERIOR; faltava a mesma trava aqui, na
+  // criação.
+  if (items.some((item) => item.unitValue !== null) && profile.fullName !== PAYMENTS_CONTROLLER_NAME) {
+    return { error: `Só ${PAYMENTS_CONTROLLER_NAME} pode definir valor de item.` };
+  }
 
   // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
   // pra montagem/desmontagem -- antes era só uma sugestão pra autopreencher
