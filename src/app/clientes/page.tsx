@@ -38,6 +38,7 @@ import {
 import { listEstornos, type EstornoRow } from "@/lib/estornos";
 import { listAllEstornoRequests, type EstornoRequestStatus } from "@/lib/estornoRequests";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
+import { FilterPill } from "@/components/assistencia/FilterPill";
 import { AppHeader } from "@/components/AppHeader";
 import { ClienteHistoricoRow } from "@/components/ClienteHistoricoRow";
 import { RecompraContatoCell } from "@/components/RecompraContatoCell";
@@ -45,7 +46,8 @@ import { RecompraNaoContatarManager } from "@/components/RecompraNaoContatarMana
 import { CanalAquisicaoSelect } from "@/components/CanalAquisicaoSelect";
 import { EstornoFormCard } from "@/components/clientes/EstornoFormCard";
 import { AcionarClienteButton } from "@/components/clientes/AcionarClienteButton";
-import { Shield, Cloud, BedDouble, Sofa, BedSingle, DoorClosed, Table2, Repeat, ArrowRight, Layers } from "lucide-react";
+import { Shield, Cloud, BedDouble, Sofa, BedSingle, DoorClosed, Table2, Repeat, ArrowRight, Layers, Search } from "lucide-react";
+import { whatsappHref } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +72,7 @@ function buildHref(params: {
   padrao?: string;
   inativo?: string;
   loja?: string;
+  urgencia?: string;
   page?: number;
 }): string {
   const sp = new URLSearchParams();
@@ -81,6 +84,7 @@ function buildHref(params: {
   if (params.padrao) sp.set("padrao", params.padrao);
   if (params.inativo) sp.set("inativo", params.inativo);
   if (params.loja) sp.set("loja", params.loja);
+  if (params.urgencia) sp.set("urgencia", params.urgencia);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/clientes?${qs}` : "/clientes";
@@ -98,11 +102,12 @@ export default async function ClientesPage({
     padrao?: string;
     inativo?: string;
     loja?: string;
+    urgencia?: string;
     page?: string;
   }>;
 }) {
   await requireDashboardAuth();
-  const { view: viewParam, q, status, nivel, segmento, padrao, inativo, loja, page: pageParam } = await searchParams;
+  const { view: viewParam, q, status, nivel, segmento, padrao, inativo, loja, urgencia, page: pageParam } = await searchParams;
   // Nível de relacionamento é a aba de aterrissagem (pedido do Victor
   // 15/08/2026) -- "status"/"recompra"/"estornos"/"frequencia" só aparecem
   // quando pedidos explicitamente na URL.
@@ -151,7 +156,7 @@ export default async function ClientesPage({
       ) : view === "frequencia" ? (
         <FrequenciaView q={q} padrao={padrao} page={page} />
       ) : view === "estornos" ? (
-        <EstornosView q={q} loja={loja} page={page} />
+        <EstornosView q={q} loja={loja} urgencia={urgencia} page={page} />
       ) : (
         <NivelView q={q} nivel={nivel} inativo={inativo} page={page} />
       )}
@@ -1183,7 +1188,38 @@ function classificarPagamento(raw: string): { label: string; color: string } {
   return { label: "Outro", color: "var(--text-muted)" };
 }
 
-async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page: number }) {
+// Nível de urgência -- pedido do Victor 25/09/2026 (refinamento visual da
+// aba, 3ª rodada). Só "Pendente" (a única fase de verdade em aberto, real,
+// do fluxo loja->financeiro) pode ser "Crítico" ou "Em negociação" -- caso
+// já concluído/recusado (fluxo real) ou já consumado (histórico manual)
+// não tem mais o que fazer, vira "Resolvido" sem depender do texto do
+// motivo pra isso. Dentro de "Pendente", classifica pelo teor do motivo:
+// palavras que indicam falha grave da loja (produto errado, falta,
+// atraso, avaria) viram crítico; o resto (desistência, troca, reserva
+// pra outro cliente etc.) vira "em negociação".
+type Urgencia = "critico" | "negociacao" | "resolvido";
+
+const URGENCIA_LABELS: Record<Urgencia, string> = {
+  critico: "Crítico",
+  negociacao: "Em negociação",
+  resolvido: "Resolvido",
+};
+
+const URGENCIA_COLORS: Record<Urgencia, string> = {
+  critico: "var(--status-critical)",
+  negociacao: "var(--status-warning)",
+  resolvido: "var(--status-good)",
+};
+
+const MOTIVO_CRITICO_KEYWORDS = ["errado", "atraso", "demora", "avaria", "não entregue", "nao entregue", "não recebeu", "nao recebeu", "falta de produto", "falta"];
+
+function classificarUrgencia(e: EstornoMerged): Urgencia {
+  if (e.status !== "Pendente") return "resolvido";
+  const motivoLower = (e.motivo ?? "").toLowerCase();
+  return MOTIVO_CRITICO_KEYWORDS.some((kw) => motivoLower.includes(kw)) ? "critico" : "negociacao";
+}
+
+async function EstornosView({ q, loja, urgencia, page }: { q?: string; loja?: string; urgencia?: string; page: number }) {
   const [manuais, solicitacoes] = await Promise.all([listEstornos(), listAllEstornoRequests()]);
 
   const doManual: EstornoMerged[] = manuais.map((e) => ({ ...e, efetivado: true }));
@@ -1221,9 +1257,14 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
   }
   const lojasOrdenadas = [...porLoja.entries()].sort((a, b) => b[1].total - a[1].total);
 
+  const filterUrgencia = urgencia === "critico" || urgencia === "negociacao" || urgencia === "resolvido" ? urgencia : undefined;
+  const porUrgencia: Record<Urgencia, number> = { critico: 0, negociacao: 0, resolvido: 0 };
+  for (const e of todos) porUrgencia[classificarUrgencia(e)] += 1;
+
   const qLower = q?.trim().toLowerCase();
   let filtrados = todos;
   if (loja) filtrados = filtrados.filter((e) => e.loja === loja);
+  if (filterUrgencia) filtrados = filtrados.filter((e) => classificarUrgencia(e) === filterUrgencia);
   if (qLower) {
     filtrados = filtrados.filter(
       (e) =>
@@ -1242,7 +1283,16 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
   const total = filtrados.length;
   const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
   const pageClamped = Math.min(page, totalPages);
-  const pageItems = filtrados.slice((pageClamped - 1) * LIST_PAGE_SIZE, pageClamped * LIST_PAGE_SIZE);
+  const pageItemsRaw = filtrados.slice((pageClamped - 1) * LIST_PAGE_SIZE, pageClamped * LIST_PAGE_SIZE);
+
+  // Telefone só pra página visível (mesmo cuidado de sempre, ver
+  // Frequência & Potencial de Recompra acima) -- via codigoCliente
+  // (código Protheus), quando existir. Nem todo estorno tem esse código
+  // preenchido (histórico manual às vezes não tinha), esses ficam sem
+  // telefone (nunca inventado).
+  const codigosNaPagina = [...new Set(pageItemsRaw.map((e) => e.codigoCliente).filter((c): c is string => !!c))];
+  const phonePorCodigo = await listPhonePorClienteIds(codigosNaPagina);
+  const pageItems = pageItemsRaw.map((e) => ({ ...e, phone: e.codigoCliente ? (phonePorCodigo.get(e.codigoCliente) ?? null) : null }));
 
   return (
     <>
@@ -1268,14 +1318,18 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
         <form action="/clientes" method="GET" className="flex items-center gap-2 flex-wrap flex-1">
           <input type="hidden" name="view" value="estornos" />
           {loja ? <input type="hidden" name="loja" value={loja} /> : null}
-          <input
-            type="search"
-            name="q"
-            defaultValue={q ?? ""}
-            placeholder="Buscar por cliente, CPF, produto, motivo ou status…"
-            className="text-sm flex-1 min-w-[220px] rounded border px-3 py-2"
-            style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
-          />
+          {filterUrgencia ? <input type="hidden" name="urgencia" value={filterUrgencia} /> : null}
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-muted)" }} aria-hidden />
+            <input
+              type="search"
+              name="q"
+              defaultValue={q ?? ""}
+              placeholder="Buscar por cliente, CPF, produto, motivo ou status…"
+              className="text-sm w-full rounded border pl-8 pr-3 py-2"
+              style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}
+            />
+          </div>
           <button type="submit" className="text-sm px-4 py-2 rounded font-medium" style={{ background: "var(--brand-orange)", color: "#fff" }}>
             Buscar
           </button>
@@ -1285,11 +1339,27 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
           placeholder="Todas as lojas"
           options={lojasOrdenadas.map(([lojaNome, info]) => ({ value: lojaNome, label: `${lojaNome} (${info.count})` }))}
         />
-        {q || loja ? (
+        {q || loja || filterUrgencia ? (
           <Link href={buildHref({ view: "estornos" })} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             Limpar
           </Link>
         ) : null}
+      </div>
+
+      {/* Filtro rápido por urgência -- pedido do Victor 25/09/2026. Só
+          "Pendente" (fluxo real loja->financeiro) pode ser crítico/em
+          negociação -- ver classificarUrgencia acima pro critério. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <FilterPill href={buildHref({ view: "estornos", q, loja })} label="Todos" selected={!filterUrgencia} />
+        {(["critico", "negociacao", "resolvido"] as const).map((u) => (
+          <FilterPill
+            key={u}
+            href={buildHref({ view: "estornos", q, loja, urgencia: u })}
+            label={`${URGENCIA_LABELS[u]} (${porUrgencia[u]})`}
+            selected={filterUrgencia === u}
+            color={URGENCIA_COLORS[u]}
+          />
+        ))}
       </div>
 
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -1322,12 +1392,14 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Produto</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Autorizado por</th>
                   <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Status</th>
+                  <th className="text-left font-semibold px-4 py-2.5 whitespace-nowrap">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "var(--gridline)" }}>
                 {pageItems.map((e) => {
                   const { nome, flag } = splitClienteFlag(e.cliente);
                   const pagamento = e.formaPagamento ? classificarPagamento(e.formaPagamento) : null;
+                  const urgenciaLinha = classificarUrgencia(e);
                   return (
                     <tr key={e.id} className="even:bg-[var(--surface-2)]">
                       <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
@@ -1346,6 +1418,11 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
                         {e.cpfCnpj ? (
                           <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
                             {e.cpfCnpj}
+                          </span>
+                        ) : null}
+                        {e.phone ? (
+                          <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                            {e.phone}
                           </span>
                         ) : null}
                       </td>
@@ -1371,8 +1448,16 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
                           <span style={{ color: "var(--text-secondary)" }}>—</span>
                         )}
                       </td>
-                      <td className="px-4 py-2 max-w-[280px]" style={{ color: "var(--text-secondary)" }}>
-                        {e.motivo ?? "—"}
+                      <td className="px-4 py-2 max-w-[280px]">
+                        <span
+                          className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap mb-1"
+                          style={{ color: URGENCIA_COLORS[urgenciaLinha], background: `color-mix(in srgb, ${URGENCIA_COLORS[urgenciaLinha]} 15%, transparent)` }}
+                        >
+                          {URGENCIA_LABELS[urgenciaLinha]}
+                        </span>
+                        <span className="block" style={{ color: "var(--text-secondary)" }}>
+                          {e.motivo ?? "—"}
+                        </span>
                       </td>
                       <td className="px-4 py-2 max-w-[280px]" style={{ color: "var(--text-secondary)" }}>
                         {e.produto ?? "—"}
@@ -1382,6 +1467,23 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
                       </td>
                       <td className="px-4 py-2 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
                         {e.status ?? "—"}
+                      </td>
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        {e.phone ? (
+                          <a
+                            href={whatsappHref(e.phone, `Olá${nome ? `, ${nome}` : ""}! Estamos acompanhando sua solicitação de estorno na Lojas Maia.`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap"
+                            style={{ background: "color-mix(in srgb, #25d366 18%, transparent)", color: "#1da851" }}
+                          >
+                            💬 Tratar caso
+                          </a>
+                        ) : (
+                          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                            sem telefone
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -1395,7 +1497,7 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
       {totalPages > 1 ? (
         <div className="flex items-center gap-2">
           <Link
-            href={buildHref({ view: "estornos", q, loja, page: Math.max(1, pageClamped - 1) })}
+            href={buildHref({ view: "estornos", q, loja, urgencia: filterUrgencia, page: Math.max(1, pageClamped - 1) })}
             aria-disabled={pageClamped <= 1}
             className="text-sm px-3 py-1.5 rounded border"
             style={{
@@ -1407,7 +1509,7 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
             ← Anterior
           </Link>
           <Link
-            href={buildHref({ view: "estornos", q, loja, page: Math.min(totalPages, pageClamped + 1) })}
+            href={buildHref({ view: "estornos", q, loja, urgencia: filterUrgencia, page: Math.min(totalPages, pageClamped + 1) })}
             aria-disabled={pageClamped >= totalPages}
             className="text-sm px-3 py-1.5 rounded border"
             style={{
