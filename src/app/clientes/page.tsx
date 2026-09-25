@@ -35,7 +35,8 @@ import {
   type RecompraCandidato,
   type PadraoAssociacao,
 } from "@/lib/recompra";
-import { listEstornos } from "@/lib/estornos";
+import { listEstornos, type EstornoRow } from "@/lib/estornos";
+import { listAllEstornoRequests, type EstornoRequestStatus } from "@/lib/estornoRequests";
 import { AppHeader } from "@/components/AppHeader";
 import { ClienteHistoricoRow } from "@/components/ClienteHistoricoRow";
 import { RecompraContatoCell } from "@/components/RecompraContatoCell";
@@ -1119,28 +1120,73 @@ async function FrequenciaView({ q, padrao, page }: { q?: string; padrao?: string
   );
 }
 
+// Rótulo igual ao já usado em EstornoStatusBadge.tsx (fluxo loja->financeiro)
+// -- mesmo texto em português, sem reexportar o componente só por causa do
+// mapa de labels.
+const ESTORNO_REQUEST_STATUS_LABELS: Record<EstornoRequestStatus, string> = {
+  pendente: "Pendente",
+  concluido: "Concluído",
+  recusado: "Recusado",
+};
+
 // Aba "Estornos" -- pedido do Victor 22/09/2026: histórico de pedidos de
 // reembolso do SAC/lojas, curado à mão a partir do grupo de WhatsApp "Lojas
 // Maia e Líder Caixas" (backfill de 59 casos, 27/07 a 06/09/2026 -- ver
-// migration 0135_estornos.sql) + cadastro de novos casos direto por aqui
-// daqui pra frente (EstornoFormCard.tsx), mesmo espírito de Avaliações
-// Google (sem API pra puxar isso automaticamente, registro manual). Sem
-// paginação/filtro no banco (listEstornos busca tudo) -- mesmo padrão de
-// NivelView/RecompraView acima, tabela pequena o bastante pra caber
-// inteira na memória.
-async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page: number }) {
-  const todos = await listEstornos();
+// migration 0135_estornos.sql) + cadastro manual (EstornoFormCard.tsx).
+//
+// A partir de 25/09/2026 (pedido do Victor: "todos os dados que irão para
+// a aba de Estornos... puxarão os dados das solicitações de estorno vindo
+// das lojas para o financeiro"), mescla esse histórico manual com o fluxo
+// real de solicitação loja->financeiro (estorno_requests, ver
+// estornoRequests.ts/EstornoFinanceiroActions.tsx) -- confirmado com o
+// Victor: mantém os dois juntos (nada do histórico manual se perde) e
+// mantém o formulário manual pra casos fora do fluxo normal.
+//
+// "R$ reembolsados" só soma dinheiro que de fato saiu: todo registro
+// manual (é histórico já consumado, curado depois do fato) + só as
+// solicitações com status "concluido" (pendente ainda não saiu, recusado
+// nunca vai sair) -- ver `efetivado` abaixo. A CONTAGEM nos cards de loja
+// conta tudo (qualquer status), pra dar visibilidade do volume de
+// solicitação, não só do que já foi pago.
+//
+// Sem paginação/filtro no banco -- mesmo padrão de NivelView/RecompraView
+// acima, os dois conjuntos juntos ainda cabem inteiros na memória.
+type EstornoMerged = EstornoRow & { efetivado: boolean };
 
-  // Loja é texto livre (como foi digitado no grupo do WhatsApp, não um ID
-  // de `stores`) -- agrupamento por string exata, não um enum fechado como
-  // nível/status/segmento nas outras abas. Ordenado por valor reembolsado
-  // (quem pesa mais no total primeiro), não por nome -- é a pergunta mais
-  // provável ("onde está saindo mais dinheiro em estorno").
+async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page: number }) {
+  const [manuais, solicitacoes] = await Promise.all([listEstornos(), listAllEstornoRequests()]);
+
+  const doManual: EstornoMerged[] = manuais.map((e) => ({ ...e, efetivado: true }));
+  const daSolicitacao: EstornoMerged[] = solicitacoes.map((r) => ({
+    id: `req-${r.id}`,
+    dataSolicitacao: r.createdAt.slice(0, 10),
+    cliente: r.clienteNome,
+    cpfCnpj: r.cpf,
+    codigoCliente: r.codigoCliente,
+    valorReembolso: r.valorReembolso,
+    dataVenda: r.dataVenda,
+    formaPagamento: r.formaPagamento,
+    motivo: r.motivo,
+    produto: r.produto,
+    autorizadoPor: r.autorizadoPor,
+    loja: r.storeName,
+    status: ESTORNO_REQUEST_STATUS_LABELS[r.status],
+    efetivado: r.status === "concluido",
+  }));
+  const todos = [...doManual, ...daSolicitacao].sort((a, b) => b.dataSolicitacao.localeCompare(a.dataSolicitacao));
+
+  // Loja é texto livre no histórico manual (como foi digitado no grupo do
+  // WhatsApp) mas o nome oficial de `stores` na solicitação real -- os dois
+  // deveriam bater na prática (mesmo nome de loja em qualquer tela do
+  // sistema), então agrupamento por string exata continua funcionando pros
+  // dois juntos. Ordenado por valor reembolsado (quem pesa mais no total
+  // primeiro), não por nome -- é a pergunta mais provável ("onde está saindo
+  // mais dinheiro em estorno").
   const porLoja = new Map<string, { count: number; total: number }>();
   for (const e of todos) {
     const entry = porLoja.get(e.loja) ?? { count: 0, total: 0 };
     entry.count += 1;
-    entry.total += e.valorReembolso;
+    if (e.efetivado) entry.total += e.valorReembolso;
     porLoja.set(e.loja, entry);
   }
   const lojasOrdenadas = [...porLoja.entries()].sort((a, b) => b[1].total - a[1].total);
@@ -1161,8 +1207,8 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
   // Já vem ordenado por data_solicitacao desc (listEstornos) -- filtro
   // acima preserva a ordem, sem precisar resortear.
 
-  const totalValorGeral = todos.reduce((sum, e) => sum + e.valorReembolso, 0);
-  const totalValorFiltrado = filtrados.reduce((sum, e) => sum + e.valorReembolso, 0);
+  const totalValorGeral = todos.filter((e) => e.efetivado).reduce((sum, e) => sum + e.valorReembolso, 0);
+  const totalValorFiltrado = filtrados.filter((e) => e.efetivado).reduce((sum, e) => sum + e.valorReembolso, 0);
   const total = filtrados.length;
   const totalPages = Math.max(1, Math.ceil(total / LIST_PAGE_SIZE));
   const pageClamped = Math.min(page, totalPages);
@@ -1171,10 +1217,12 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
   return (
     <>
       <p className="text-xs -mt-4 max-w-2xl" style={{ color: "var(--text-muted)" }}>
-        {todos.length} estornos registrados desde 27/07/2026 — R${" "}
-        <strong style={{ color: "var(--status-critical)" }}>{formatBRL(totalValorGeral)}</strong> reembolsados no total. Histórico curado à
-        mão a partir do grupo de WhatsApp &quot;Lojas Maia e Líder Caixas&quot; (o WhatsApp Web só libera histórico a partir da data em que
-        o time entrou no grupo, não cobre período anterior) + cadastro manual direto aqui.
+        {todos.length} estornos registrados desde 27/07/2026 —{" "}
+        <strong style={{ color: "var(--status-critical)" }}>{formatBRL(totalValorGeral)}</strong> efetivamente reembolsados. Histórico
+        curado à mão a partir do grupo de WhatsApp &quot;Lojas Maia e Líder Caixas&quot; (o WhatsApp Web só libera histórico a partir da data
+        em que o time entrou no grupo, não cobre período anterior) + cadastro manual direto aqui, junto com as solicitações reais enviadas
+        pelas lojas ao financeiro (pendente/concluído/recusado). Só concluído (e todo o histórico manual, já consumado) entra na soma acima
+        -- pendente ainda não saiu, recusado nunca vai sair.
       </p>
 
       <EstornoFormCard />
@@ -1227,7 +1275,7 @@ async function EstornosView({ q, loja, page }: { q?: string; loja?: string; page
       </form>
 
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-        {total} estorno{total === 1 ? "" : "s"} encontrado{total === 1 ? "" : "s"} · R$ {formatBRL(totalValorFiltrado)} no recorte
+        {total} estorno{total === 1 ? "" : "s"} encontrado{total === 1 ? "" : "s"} · {formatBRL(totalValorFiltrado)} no recorte
         {totalPages > 1 ? ` · página ${pageClamped} de ${totalPages}` : ""}
       </p>
 
