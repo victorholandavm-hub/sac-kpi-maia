@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type PrintTarget = {
   id: string;
@@ -25,36 +25,65 @@ export type PrintTarget = {
 // não é feita aqui -- é CSS (`display:none` no @media print) aplicado
 // pelas páginas que renderizam isso (despacho/page.tsx,
 // despacho-lote/page.tsx), calculado no servidor com a mesma condição
-// (`!isAdmin && alreadyPrinted`). Esse componente só decide SE chama
-// `window.print()` e loga (via /api/assistencia/log-print) só as que
-// realmente vão sair.
+// (`!isAdmin && alreadyPrinted`). Esse componente só decide QUANDO loga
+// (via /api/assistencia/log-print) e quais ids -- as que realmente vão
+// sair no papel.
+//
+// Achado do Victor 25/09/2026 (2ª rodada do mesmo sintoma relatado em
+// 16/09/2026, já corrigido uma vez -- mas por outra causa: aquela era
+// Server Action com ID de build ficando velho após deploy, já migrada pra
+// rota de API comum, ver log-print/route.ts): clicar em "Imprimir" às
+// vezes registrava a impressão sem nada abrir de verdade, e Ctrl+P
+// imprimia de verdade sem registrar nada -- furando a trava de 1
+// impressão por atendente. Causa raiz desta vez: o log disparava no
+// CLIQUE, logo antes de `window.print()` -- um `window.print()` que
+// falhasse por qualquer motivo (bloqueio do navegador, erro etc.) ainda
+// contava como impresso; e Ctrl+P nunca passa pelo onClick, então nunca
+// chegava a chamar o log.
+//
+// Corrigido trocando o gatilho do log de "clique no botão" pro evento
+// `afterprint` do navegador -- esse evento dispara sempre que uma
+// impressão de fato acontece na página, não importa como foi disparada
+// (nosso botão, Ctrl+P, ou o menu do navegador). Loga só depois que a
+// impressão realmente ocorreu, e cobre os 3 jeitos de imprimir, não só o
+// clique no botão.
 export function PrintButton({ targets, isAdmin }: { targets: PrintTarget[]; isAdmin: boolean }) {
   const [blocked, setBlocked] = useState<PrintTarget[] | null>(null);
 
-  function doPrint(ids: string[]) {
-    if (ids.length === 0) return;
-    // POST comum (não Server Action) -- pedido do Victor 16/09/2026: "o
-    // botão de imprimir não funciona, funciona apenas quando aperto ctrl
-    // + P" (ver comentário completo em /api/assistencia/log-print/
-    // route.ts). Impressão em si não pode depender do log -- se o fetch
-    // falhar por qualquer motivo, só não fica registrado dessa vez, não
-    // impede a pessoa de imprimir.
-    fetch("/api/assistencia/log-print", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestIds: ids }),
-    }).catch(() => {});
-    window.print();
-  }
+  // IDs que vão sair de verdade no papel se uma impressão acontecer AGORA
+  // nesta página -- admin reimprime tudo (nada escondido por CSS), não-
+  // admin só o que ainda não tinha sido impresso (o resto já sai escondido
+  // no papel via CSS, ver comentário acima). Guardado num ref (não state)
+  // porque o listener de afterprint é registrado uma vez só, no mount, e
+  // precisa sempre ler o valor mais atual sem precisar reatachar o
+  // listener a cada render.
+  const idsParaLogRef = useRef<string[]>([]);
+  useEffect(() => {
+    idsParaLogRef.current = isAdmin ? targets.map((t) => t.id) : targets.filter((t) => !t.alreadyPrinted).map((t) => t.id);
+  }, [targets, isAdmin]);
+
+  useEffect(() => {
+    function onAfterPrint() {
+      const ids = idsParaLogRef.current;
+      if (ids.length === 0) return;
+      fetch("/api/assistencia/log-print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestIds: ids }),
+      }).catch(() => {});
+    }
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => window.removeEventListener("afterprint", onAfterPrint);
+  }, []);
 
   function handleClick() {
     if (isAdmin) {
-      doPrint(targets.map((t) => t.id));
+      window.print();
       return;
     }
     const already = targets.filter((t) => t.alreadyPrinted);
     if (already.length === 0) {
-      doPrint(targets.map((t) => t.id));
+      window.print();
       return;
     }
     // Pelo menos uma já foi impressa -- mostra o aviso antes de imprimir
@@ -106,7 +135,7 @@ export function PrintButton({ targets, isAdmin }: { targets: PrintTarget[]; isAd
                 <button
                   onClick={() => {
                     setBlocked(null);
-                    doPrint(pendentes.map((t) => t.id));
+                    window.print();
                   }}
                   className="text-sm px-3 py-2 rounded font-medium"
                   style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}
