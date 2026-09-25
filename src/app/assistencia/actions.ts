@@ -2556,7 +2556,13 @@ const SAC_REQUEST_TYPES = [
 // e a instrução de recolhimento em texto livre.
 export async function createSacRequest(_state: FormState, formData: FormData): Promise<FormState> {
   const profile = await getProfile();
-  requireRole(profile, "admin", "sac");
+  // Luis e Iasmyn (assistência) entram aqui só pra criar os 3 tipos de
+  // ASSISTENCIA_ALSO_MANAGED_TYPES -- pedido do Victor 25/09/2026, mesmo
+  // carve-out de createQuickRequest (ver ASSISTENCIA_CAN_CREATE_SAC_TYPES,
+  // assistenciaLabels.ts). O resto da assistência continua sem acessar
+  // essa action (sac/nova/page.tsx já barra a tela pra quem não é
+  // Luis/Iasmyn).
+  requireRole(profile, "admin", "sac", "assistencia");
 
   const storeId = String(formData.get("store_id") ?? "").trim();
   if (!storeId) return { error: "Selecione a loja." };
@@ -2564,6 +2570,15 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const type = String(formData.get("type") ?? "troca_produto");
   if (!(SAC_REQUEST_TYPES as readonly string[]).includes(type)) {
     return { error: "Tipo inválido." };
+  }
+
+  if (profile.role === "assistencia") {
+    const podeCriarTipoSac =
+      (ASSISTENCIA_CAN_CREATE_SAC_TYPES as readonly string[]).includes(profile.fullName) &&
+      (ASSISTENCIA_ALSO_MANAGED_TYPES as readonly string[]).includes(type);
+    if (!podeCriarTipoSac) {
+      return { error: "Esse tipo de solicitação é gerenciado pelo SAC." };
+    }
   }
 
   // Nota fiscal obrigatória só pra Entregas (troca/entrega de produto,
