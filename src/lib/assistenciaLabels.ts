@@ -263,6 +263,17 @@ export const SAC_ALSO_MANAGED_TYPES = ["envio_peca", "recolhimento", "envio_reco
 // enxergar esse conjunto também.
 export const ASSISTENCIA_ALSO_MANAGED_TYPES = ["troca_produto", "entrega_produto", "recolhimento_produto"] as const;
 
+// Luis e Iasmyn (assistência) podem CRIAR os 3 tipos de ASSISTENCIA_ALSO_MANAGED_TYPES
+// -- pedido do Victor 25/09/2026. Diferente do resto da assistência, que só
+// pode GERENCIAR (editar/processar) esses 3 tipos depois de criados pelo SAC
+// (ver requireManageAccess, dal.ts) -- CRIAR continuava travado só pro SAC
+// (ver createQuickRequest, actions.ts), mesmo pra quem já tinha ganhado a
+// permissão de editar em 27/08/2026 (Iasmyn é a mesma pessoa do achado
+// original ali, ver comentário de ASSISTENCIA_ALSO_MANAGED_TYPES acima).
+// notificacao_externa fica de fora de propósito -- mesmo limite de
+// ASSISTENCIA_ALSO_MANAGED_TYPES (não é tipo de entrega).
+export const ASSISTENCIA_CAN_CREATE_SAC_TYPES = ["Luis", "Iasmyn"];
+
 // União dos dois grupos acima -- todo tipo de chamado que existe hoje (mesmas
 // chaves de REQUEST_TYPE_LABELS). Usado só pra oferecer a troca de tipo na
 // edição do chamado (ver manageableTypesForRole) -- lista central pra não

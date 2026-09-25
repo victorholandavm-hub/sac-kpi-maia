@@ -6,12 +6,19 @@ import { listDrivers } from "@/lib/payments";
 import { listCargasRecentes } from "@/lib/cargas";
 import { SacCreateRequestForm } from "@/components/assistencia/SacCreateRequestForm";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { ASSISTENCIA_ALSO_MANAGED_TYPES, ASSISTENCIA_CAN_CREATE_SAC_TYPES } from "@/lib/assistenciaLabels";
 
 export const dynamic = "force-dynamic";
 
 export default async function SacNovaSolicitacaoPage() {
   const profile = await getProfile();
-  if (profile.role !== "sac" && profile.role !== "admin") {
+  // Luis e Iasmyn (assistência) entram aqui só pra criar os 3 tipos de
+  // ASSISTENCIA_ALSO_MANAGED_TYPES -- pedido do Victor 25/09/2026. O
+  // dropdown já vem restrito a esses 3 (ver allowedTypes abaixo); o
+  // bloqueio de verdade pro resto continua sendo o createSacRequest no
+  // servidor, isso aqui só evita mostrar uma tela que ia dar erro.
+  const podeCriarTipoSac = profile.role === "assistencia" && (ASSISTENCIA_CAN_CREATE_SAC_TYPES as readonly string[]).includes(profile.fullName);
+  if (profile.role !== "sac" && profile.role !== "admin" && !podeCriarTipoSac) {
     redirect("/assistencia/inicio");
   }
 
@@ -33,17 +40,34 @@ export default async function SacNovaSolicitacaoPage() {
     // assume pra si (só que sem mx-auto, ficava desalinhado à esquerda numa
     // página w-full). Essa tela fica fora do grupo (app) -- SAC não tem
     // sessão Supabase Auth, ver requireEncomendaActor -- por isso nunca
-    // pegou o teto de largura de lá.
+    // pegou o teto de largura de lá. Luis/Iasmyn (assistência, com sessão)
+    // também passam por aqui desde 25/09/2026, mas só de passagem (ver
+    // podeCriarTipoSac acima) -- não valia mover a tela pro grupo (app) só
+    // por causa dos dois.
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-      <AssistenciaHeader title="Nova entrega" subtitle="Troca/entrega de produto, envio de peça ou notificação externa.">
-        <Link href="/assistencia/sac" className="text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150">
+      <AssistenciaHeader
+        title="Nova entrega"
+        subtitle={
+          podeCriarTipoSac ? "Troca, entrega ou recolhimento de produto." : "Troca/entrega de produto, envio de peça ou notificação externa."
+        }
+      >
+        {/* Luis/Iasmyn não têm sessão em /assistencia/sac (SAC-only) --
+            "Voltar" leva pra onde eles de fato vieram. */}
+        <Link
+          href={podeCriarTipoSac ? "/assistencia/nova-entrega" : "/assistencia/sac"}
+          className="text-sm font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
+        >
           ← Voltar
         </Link>
       </AssistenciaHeader>
 
-      <Link href="/assistencia/sac/nova-visita" className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150 self-start">
-        Precisa de montagem ou desmontagem? Vá pra Nova visita →
-      </Link>
+      {/* /assistencia/sac/nova-visita também é SAC-only -- pra Luis/Iasmyn
+          o equivalente é /assistencia/nova-rapida (QuickCreateRequestForm). */}
+      {podeCriarTipoSac ? null : (
+        <Link href="/assistencia/sac/nova-visita" className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-150 self-start">
+          Precisa de montagem ou desmontagem? Vá pra Nova visita →
+        </Link>
+      )}
       {/* Recolhimento de PEÇA é domínio da Assistência (ver
           assistenciaLabels.ts) -- único tipo que falta aqui. Só admin
           (supervisão dos dois times) ganha esse atalho, espelhando o de
@@ -54,7 +78,12 @@ export default async function SacNovaSolicitacaoPage() {
         </Link>
       ) : null}
 
-      <SacCreateRequestForm stores={stores} drivers={drivers} cargas={cargas} />
+      <SacCreateRequestForm
+        stores={stores}
+        drivers={drivers}
+        cargas={cargas}
+        allowedTypes={podeCriarTipoSac && profile.role === "assistencia" ? ASSISTENCIA_ALSO_MANAGED_TYPES : undefined}
+      />
     </div>
   );
 }
