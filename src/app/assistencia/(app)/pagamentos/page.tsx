@@ -69,24 +69,27 @@ export default async function PagamentosPage({
   );
   const items = pendentes ? allItems.filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente") : allItems;
   const groups = groupByAssembler(items);
-  // Manoel escondido só da LISTA -- pedido do Victor 16/09/2026: "pode
-  // excluir visualmente apenas, manoel dessa lista de pagamentos". Não
-  // mexe em Total/Pago/Pendente acima (continuam somando `items`, sem
-  // filtro) nem nos dados -- ele é o único montador funcionário nosso
-  // (MANOEL_ONLY_ASSEMBLER), não item de pagamento a terceiro, só não
-  // deveria aparecer na lista. Mesmo espírito de exclusão do Manoel já
-  // existente nos cards de KPI do Relatório de montagem detalhado (ver
-  // relatorios/page.tsx).
+  // Manoel escondido da LISTA -- pedido do Victor 16/09/2026: "pode
+  // excluir visualmente apenas, manoel dessa lista de pagamentos". Os
+  // totais (Total/Pago/Pendente) TAMBÉM excluem ele desde 25/09/2026 --
+  // corrigido pra ficar consistente com o Relatório de montagem
+  // detalhado, que já excluía ("manoel nao entra nessa conta, pois é de
+  // casa", ver relatorios/page.tsx): ele é o único montador funcionário
+  // nosso (MANOEL_ONLY_ASSEMBLER), não item de pagamento a terceiro --
+  // sem essa exclusão aqui, o dia que algum item dele ganhasse valor
+  // inflaria o "Total a pagar a montadores" em silêncio, sem aparecer em
+  // lugar nenhum da tela pra explicar por quê.
   const visibleGroups = groups.filter((g) => g.assemblerName !== MANOEL_ONLY_ASSEMBLER);
-  const grandTotal = items.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
-  const pendingTotal = items
+  const itemsForTotals = items.filter((i) => i.assemblerName !== MANOEL_ONLY_ASSEMBLER);
+  const grandTotal = itemsForTotals.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
+  const pendingTotal = itemsForTotals
     .filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente")
     .reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
   // "Pago" = soma do que o Antonio já marcou como pago (payment_released) --
   // junto com "Pendente" ao lado, deixa visível o desconto: Total = Pago +
   // Pendente (+ o que ainda tá "a montar", sem entrar na conta de nenhum
   // dos dois).
-  const paidTotal = items.filter((i) => i.paymentReleased).reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
+  const paidTotal = itemsForTotals.filter((i) => i.paymentReleased).reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
 
   return (
     <div className="flex flex-col gap-4">
