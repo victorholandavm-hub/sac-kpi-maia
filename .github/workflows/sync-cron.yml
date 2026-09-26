@@ -52,8 +52,17 @@ jobs:
             "https://sac.lojasmaia.com.br/api/totvs-sync"
       - name: Chamar /api/sync
         continue-on-error: true
+        # --max-time 290 (não mais 170) -- achado do Victor 26/09/2026: com
+        # as 4 pesquisas de NPS adicionadas em 22/09/2026 (cada detecção de
+        # resposta chama a API do GHL 2x por pendência, até 100 por
+        # pesquisa), a rota passou a estourar os 170s daqui bem antes do
+        # proxy_read_timeout do Nginx (também subido pra 300s no mesmo
+        # commit, ver sac-maia.conf na VPS) -- toda execução do cron vinha
+        # "falhando" (exit 22) mesmo com o trabalho de verdade completando
+        # no servidor por trás (confirmado: enrollment continuava gravando
+        # no banco mesmo com o curl retornando 504).
         run: |
-          curl -sf --max-time 170 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          curl -sf --max-time 290 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://sac.lojasmaia.com.br/api/sync"
       - name: Chamar /api/sync-ai-classify
         continue-on-error: true
