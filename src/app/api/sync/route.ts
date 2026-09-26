@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { businessMinutesBetween } from "@/lib/businessHours";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
 import { fetchGhlMessages, upsertGhlContact, addContactTag, findGhlConversationId, type GhlMessage } from "@/lib/ghlClient";
-import { isMostruarioRequest } from "@/lib/serviceRequests";
+import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "@/lib/serviceRequests";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "@/lib/npsDetratores";
 import { enrollPendingCompraNps, detectPendingCompraNpsResponses } from "@/lib/nps2Meses";
 import { enrollPendingEntregaNps, detectPendingEntregaNpsResponses } from "@/lib/entregaNps";
@@ -213,7 +213,7 @@ async function enrollPendingNps(
       mostruarioSkipped++;
       continue;
     }
-    if (!candidate.client_phone) {
+    if (!candidate.client_phone || isPlaceholderPhone(candidate.client_phone)) {
       semTelefone++;
       continue;
     }
@@ -221,7 +221,7 @@ async function enrollPendingNps(
     if (!tipo) continue;
 
     const tag = NPS_GHL_TAG[tipo]!;
-    const contactId = await upsertGhlContact(candidate.client_phone, candidate.client_name);
+    const contactId = await upsertGhlContact(firstPhone(candidate.client_phone), candidate.client_name);
     if (!contactId) {
       errors.push(`nps ${candidate.id}: não achou/criou contato no GHL`);
       continue;

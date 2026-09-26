@@ -339,7 +339,7 @@ async function setSyncState(supabase: SupabaseAdmin, key: string, value: string)
   await supabase.from("totvs_sync_state").upsert({ key, value }, { onConflict: "key" });
 }
 
-type SyncResult = { checked: number; upserted: number; errors: string[] };
+export type SyncResult = { checked: number; upserted: number; errors: string[] };
 
 // Depois de falhar 3 execuções seguidas NA MESMA página (cada uma já com os
 // 3 retries de fetchTotvs esgotados), pula ela em vez de tentar pra sempre
@@ -543,37 +543,29 @@ const BACKFILL_MAX_CODES = 80;
 // tempo buscar código por código de 3600+ clientes) que não bateram com o
 // que já sincronizamos, e busca CADA UM via SearchQuery, que funciona
 // mesmo quando a listagem não traz o cliente.
-async function backfillMissingClients(supabase: SupabaseAdmin): Promise<SyncResult> {
+// Núcleo reaproveitável do backfill -- extraído em 26/09/2026 (achado do
+// Victor: Pós-entrega/2-meses quase sem candidato elegível, mesmo com
+// centenas de entregas reais na janela) pra também poder ser chamado a
+// partir de fora daqui, com os PRÓPRIOS candidatos de quem chama (ver
+// entregaNps.ts/nps2Meses.ts) em vez de só os 2 gatilhos de sempre
+// (chamado de assistência, pedido de encomenda). `codes` já vem sem
+// filtrar contra o que já existe -- essa função confere sozinha.
+//
+// Exportado com cautela quanto ao import: quem importar isso (Next.js,
+// não o script standalone) tem que evitar puxar módulos que só resolvem
+// import sem extensão (ver comentário de RESOLVIDO_LABELS em
+// entregasRisco.ts) -- não é um problema pra quem importa DAQUI pra fora
+// (o sentido contrário é que quebraria `node scripts/totvs-sync.ts`).
+export async function backfillClientCodes(supabase: SupabaseAdmin, codes: Set<string>, maxCodes = BACKFILL_MAX_CODES): Promise<SyncResult> {
   const started = Date.now();
-  const since = isoDate(new Date(Date.now() - BACKFILL_LOOKBACK_DAYS * DAY_MS));
   const errors: string[] = [];
   let checked = 0;
   let upserted = 0;
-
-  const codes = new Set<string>();
-  const { data: reqRows } = await supabase
-    .from("service_requests")
-    .select("client_protheus_code")
-    .not("client_protheus_code", "is", null)
-    .gte("created_at", since);
-  for (const r of reqRows ?? []) {
-    const code = (r.client_protheus_code as string | null)?.trim();
-    if (code) codes.add(code);
-  }
-  const { data: pedidoRows } = await supabase
-    .from("pedidos_encomenda")
-    .select("cliente_codigo")
-    .not("cliente_codigo", "is", null)
-    .gte("created_at", since);
-  for (const r of pedidoRows ?? []) {
-    const code = (r.cliente_codigo as string | null)?.trim();
-    if (code) codes.add(code);
-  }
   if (codes.size === 0) return { checked, upserted, errors };
 
   const { data: existing } = await supabase.from("totvs_clientes").select("protheus_code").in("protheus_code", [...codes]);
   const existingCodes = new Set((existing ?? []).map((r) => r.protheus_code as string));
-  const missing = [...codes].filter((c) => !existingCodes.has(c)).slice(0, BACKFILL_MAX_CODES);
+  const missing = [...codes].filter((c) => !existingCodes.has(c)).slice(0, maxCodes);
 
   for (const code of missing) {
     if (Date.now() - started > BACKFILL_TIME_BUDGET_MS) break;
@@ -616,6 +608,32 @@ async function backfillMissingClients(supabase: SupabaseAdmin): Promise<SyncResu
   }
 
   return { checked, upserted, errors };
+}
+
+async function backfillMissingClients(supabase: SupabaseAdmin): Promise<SyncResult> {
+  const since = isoDate(new Date(Date.now() - BACKFILL_LOOKBACK_DAYS * DAY_MS));
+
+  const codes = new Set<string>();
+  const { data: reqRows } = await supabase
+    .from("service_requests")
+    .select("client_protheus_code")
+    .not("client_protheus_code", "is", null)
+    .gte("created_at", since);
+  for (const r of reqRows ?? []) {
+    const code = (r.client_protheus_code as string | null)?.trim();
+    if (code) codes.add(code);
+  }
+  const { data: pedidoRows } = await supabase
+    .from("pedidos_encomenda")
+    .select("cliente_codigo")
+    .not("cliente_codigo", "is", null)
+    .gte("created_at", since);
+  for (const r of pedidoRows ?? []) {
+    const code = (r.cliente_codigo as string | null)?.trim();
+    if (code) codes.add(code);
+  }
+
+  return backfillClientCodes(supabase, codes);
 }
 
 // Grava a PÁGINA inteira de pedidos (e itens) em duas chamadas só, em vez

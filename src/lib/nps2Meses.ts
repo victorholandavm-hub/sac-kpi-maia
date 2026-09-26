@@ -1,9 +1,10 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { isMostruarioRequest } from "./serviceRequests";
+import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
 import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages } from "./ghlClient";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN, type NpsFaseResumo } from "./npsDetratores";
+import { backfillClientCodes } from "./totvsSync";
 
 // NPS "2 meses pós-recebimento" -- pedido do Victor 09/09/2026: "Cliente so
 // pode receber uma a cada 90 dias. Gatilho é a data de entrega, e coloque 2
@@ -20,6 +21,12 @@ import { NPS_GHL_TAG, NPS_1_5_PATTERN, type NpsFaseResumo } from "./npsDetratore
 // pra não fazer o /api/sync demorar mais do que já demora (ver o histórico
 // de timeout do Nginx, corrigido 08/09/2026 -- não é pra repetir).
 const MAX_ENROLL_PER_RUN = 50;
+// Teto próprio pro backfill de cadastro, menor que MAX_ENROLL_PER_RUN --
+// mesmo racional de entregaNps.ts: cada código faltante é uma chamada de
+// verdade ao Protheus, e essa função já compete pelo mesmo orçamento de
+// tempo do /api/sync que as outras 3 pesquisas de NPS (--max-time 290, ver
+// sync-cron.yml). O resto dos códigos sem cadastro fica pra próxima rodada.
+const BACKFILL_MAX_CODES_PER_RUN = 20;
 
 // Janela de 7 dias (não só "exatamente 60 dias atrás") -- absorve o sync
 // ficando fora do ar por alguns dias sem perder ninguém que devia ter
@@ -113,6 +120,13 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; semT
   eligible = eligible.filter((c) => !recentlyContacted.has(c.client_id as string));
   if (eligible.length === 0) return { enrolled: 0, semTelefone: 0, errors: [] };
 
+  // Cortado pro teto ANTES de calcular clientIds/backfill (achado do Victor
+  // 26/09/2026) -- senão o backfill abaixo tentaria cobrir todo mundo
+  // elegível na janela (pode ser bem mais que MAX_ENROLL_PER_RUN), gastando
+  // o orçamento de chamadas ao Protheus com gente que nem vai ser
+  // processada nesta rodada mesmo.
+  eligible = eligible.slice(0, MAX_ENROLL_PER_RUN);
+
   // 6. Telefone -- totvs_orders não tem, precisa do cadastro (mesmo join
   // client_id = protheus_code que o resto do projeto já usa, ver
   // clientes.ts). Sem telefone cadastrado, não dá pra mandar -- `totvs_clientes`
@@ -125,21 +139,29 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; semT
   // 24/09/2026: enrolled em 0 parecia "sem ninguém elegível" quando na
   // verdade tinha candidato, só sem telefone.
   const clientIds = [...new Set(eligible.map((c) => c.client_id as string))];
+  // Backfill reativo -- achado do Victor 26/09/2026: de 861 clientes reais
+  // com entrega numa janela de teste, só 38 (4,4%) estavam em
+  // totvs_clientes. Causa raiz é um bug do lado do Protheus (a listagem em
+  // massa usada pelo sync regular não traz vários clientes reais e ativos,
+  // ver backfillMissingClients/backfillClientCodes em totvsSync.ts) --
+  // SearchQuery por código individual funciona. O sync regular só reage a
+  // código citado em chamado de assistência/pedido de encomenda; aqui
+  // busca direto pelos códigos que ESTA leva de candidatos precisa, antes
+  // de checar telefone.
+  await backfillClientCodes(admin, new Set(clientIds), BACKFILL_MAX_CODES_PER_RUN);
   const { data: clienteRows } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", clientIds);
   const phoneByClientId = new Map((clienteRows ?? []).map((r) => [r.protheus_code as string, r.phone1 as string | null]));
-
-  eligible = eligible.slice(0, MAX_ENROLL_PER_RUN);
 
   let enrolled = 0;
   let semTelefone = 0;
   for (const candidate of eligible) {
     const phone = phoneByClientId.get(candidate.client_id as string);
-    if (!phone) {
+    if (!phone || isPlaceholderPhone(phone)) {
       semTelefone++;
       continue;
     }
 
-    const contactId = await upsertGhlContact(phone, candidate.client_name);
+    const contactId = await upsertGhlContact(firstPhone(phone), candidate.client_name);
     if (!contactId) {
       errors.push(`compra-nps ${candidate.id}: não achou/criou contato no GHL`);
       continue;
