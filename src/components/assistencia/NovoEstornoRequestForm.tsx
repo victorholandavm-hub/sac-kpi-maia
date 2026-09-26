@@ -36,6 +36,91 @@ function formatMoney(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+type ProdutoItem = { id: number; codigo: string; produto: string };
+
+// Uma linha de produto, com o mesmo lookup por código de sempre -- extraído
+// em componente próprio (em vez de um array de useEffect por índice) pra
+// cada linha ter seu próprio debounce isolado, mesmo racional de cada
+// pedido de encomenda ter seu próprio ItemsCell. Só devolve pro pai o
+// resultado final (via onChange) -- quem junta tudo num texto só é o
+// formulário pai, igual já faz com `pagamentos`.
+function ProdutoRow({
+  value,
+  onChange,
+  onRemove,
+  showRemove,
+}: {
+  value: ProdutoItem;
+  onChange: (patch: Partial<ProdutoItem>) => void;
+  onRemove: () => void;
+  showRemove: boolean;
+}) {
+  const [status, setStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!value.codigo.trim()) {
+        setStatus("idle");
+        return;
+      }
+      setStatus("loading");
+      lookupTotvsProductForEstorno(value.codigo)
+        .then((match) => {
+          if (!match) {
+            setStatus("not_found");
+            return;
+          }
+          onChange({ produto: match.description ?? value.codigo });
+          setStatus("found");
+        })
+        .catch(() => setStatus("not_found"));
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onChange muda a cada render (closure sobre o id), só o código deve reiniciar o debounce.
+  }, [value.codigo]);
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-3" style={inputStyle}>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={value.codigo}
+          onChange={(e) => onChange({ codigo: e.target.value })}
+          placeholder="Código do produto na venda"
+          className="rounded border px-3 py-2 flex-1"
+          style={inputStyle}
+        />
+        {showRemove ? (
+          <button type="button" onClick={onRemove} className="text-xs underline shrink-0" style={{ color: "var(--status-critical)" }}>
+            remover
+          </button>
+        ) : null}
+      </div>
+      {status === "loading" ? (
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Buscando…
+        </span>
+      ) : status === "found" ? (
+        <span className="text-xs" style={{ color: "var(--status-good)" }}>
+          Produto encontrado
+        </span>
+      ) : status === "not_found" ? (
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Código não encontrado -- preencha o produto à mão.
+        </span>
+      ) : null}
+      <input
+        type="text"
+        value={value.produto}
+        onChange={(e) => onChange({ produto: e.target.value })}
+        placeholder="Nome do produto"
+        className="rounded border px-3 py-2"
+        style={inputStyle}
+      />
+    </div>
+  );
+}
+
 // Campos do print de referência do Victor (WhatsApp de estorno, 23/09/2026)
 // -- mesmo padrão de formulário de NewPartOrderForm.tsx (FormData + Server
 // Action, anexo obrigatório).
@@ -75,31 +160,26 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
     return () => clearTimeout(timer);
   }, [codigoCliente]);
 
-  // Mesma ideia pro produto -- pedido do Victor 23/09/2026.
-  const [codigoProduto, setCodigoProduto] = useState("");
-  const [produto, setProduto] = useState("");
-  const [produtoLookupStatus, setProdutoLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+  // Mais de um produto na mesma venda -- pedido do Victor 26/09/2026, mesmo
+  // padrão de lista repetível já usado em `pagamentos` (add/remove, junta
+  // tudo num texto só pro campo `produto` de sempre, sem mudança de
+  // schema).
+  const produtoIdSeq = useRef(1);
+  const [produtos, setProdutos] = useState<ProdutoItem[]>(() => [{ id: 0, codigo: "", produto: "" }]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!codigoProduto.trim()) {
-        setProdutoLookupStatus("idle");
-        return;
-      }
-      setProdutoLookupStatus("loading");
-      lookupTotvsProductForEstorno(codigoProduto)
-        .then((match) => {
-          if (!match) {
-            setProdutoLookupStatus("not_found");
-            return;
-          }
-          setProduto(match.description ?? codigoProduto);
-          setProdutoLookupStatus("found");
-        })
-        .catch(() => setProdutoLookupStatus("not_found"));
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [codigoProduto]);
+  function addProduto() {
+    setProdutos((prev) => [...prev, { id: produtoIdSeq.current++, codigo: "", produto: "" }]);
+  }
+  function removeProduto(id: number) {
+    setProdutos((prev) => prev.filter((p) => p.id !== id));
+  }
+  function updateProduto(id: number, patch: Partial<ProdutoItem>) {
+    setProdutos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }
+  const produtoTexto = produtos
+    .map((p) => p.produto.trim())
+    .filter(Boolean)
+    .join("; ");
 
   // Forma de pagamento com 5 opções (pedido do Victor 23/09/2026, lista
   // exata que ele passou) -- só "Cartão de Crédito" pede parcelas. Pode ter
@@ -285,40 +365,24 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
       </div>
       <input type="hidden" name="valor_reembolso" value={(valorFinalCents / 100).toFixed(2)} />
 
-      <Field label="Código do produto">
-        <input
-          name="codigo_produto"
-          type="text"
-          value={codigoProduto}
-          onChange={(e) => setCodigoProduto(e.target.value)}
-          placeholder="Código do produto na venda"
-          className="rounded border px-3 py-2"
-          style={inputStyle}
-        />
-        {produtoLookupStatus === "loading" ? (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Buscando…
-          </span>
-        ) : produtoLookupStatus === "found" ? (
-          <span className="text-xs" style={{ color: "var(--status-good)" }}>
-            Produto encontrado
-          </span>
-        ) : produtoLookupStatus === "not_found" ? (
-          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Código não encontrado -- preencha o produto à mão.
-          </span>
-        ) : null}
-      </Field>
-      <Field label="Produto">
-        <input
-          name="produto"
-          type="text"
-          value={produto}
-          onChange={(e) => setProduto(e.target.value)}
-          className="rounded border px-3 py-2"
-          style={inputStyle}
-        />
-      </Field>
+      <div className="flex flex-col gap-2">
+        <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+          Produto
+        </span>
+        {produtos.map((p) => (
+          <ProdutoRow
+            key={p.id}
+            value={p}
+            onChange={(patch) => updateProduto(p.id, patch)}
+            onRemove={() => removeProduto(p.id)}
+            showRemove={produtos.length > 1}
+          />
+        ))}
+        <button type="button" onClick={addProduto} className="text-xs underline self-start" style={{ color: "var(--brand-green)" }}>
+          + Adicionar produto
+        </button>
+        <input type="hidden" name="produto" value={produtoTexto} />
+      </div>
 
       <Field label="Motivo">
         <textarea name="motivo" rows={2} className="rounded border px-3 py-2" style={inputStyle} />
