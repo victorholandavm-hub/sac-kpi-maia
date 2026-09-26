@@ -4,6 +4,7 @@ import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
 import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages } from "./ghlClient";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
+import { backfillClientCodes } from "./totvsSync";
 
 // NPS "Pós-entrega" -- pedido do Victor 22/09/2026: pergunta sobre a
 // entrega ORIGINAL da compra (o caminhão leva o móvel pela primeira vez),
@@ -16,6 +17,13 @@ import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 // específica, não sobre a experiência geral -- um cliente com 2 entregas
 // na mesma semana pode legitimamente receber as duas pesquisas).
 const MAX_ENROLL_PER_RUN = 50;
+// Teto próprio pro backfill de cadastro (menor que MAX_ENROLL_PER_RUN) --
+// cada código faltante custa uma chamada de verdade ao Protheus (SearchQuery),
+// e /api/sync já reúne as 4 pesquisas de NPS numa chamada só, com um
+// orçamento de tempo apertado (ver .github/workflows/sync-cron.yml,
+// --max-time 290). 20 é conservador o bastante pra não estourar isso
+// sozinho -- o resto dos códigos sem cadastro fica pra próxima rodada.
+const BACKFILL_MAX_CODES_PER_RUN = 20;
 
 // 1-2 dias depois da entrega -- dá tempo do cliente abrir a caixa/montar
 // antes de perguntar, mas ainda perto o bastante da experiência pra
@@ -96,6 +104,16 @@ export async function enrollPendingEntregaNps(): Promise<{ enrolled: number; sem
   // telefone próprio -- candidato elegível sem cadastro sincronizado não
   // tem como ser contatado (ver `semTelefone` abaixo).
   const clientIds = [...new Set(eligible.map((c) => c.client_id as string))];
+  // Backfill reativo -- achado do Victor 26/09/2026: de 861 clientes reais
+  // com entrega numa janela de teste, só 38 (4,4%) estavam em
+  // totvs_clientes. Causa raiz é um bug do lado do Protheus (a listagem em
+  // massa usada pelo sync regular não traz vários clientes reais e ativos,
+  // ver backfillMissingClients/backfillClientCodes em totvsSync.ts) --
+  // SearchQuery por código individual funciona. O sync regular só reage a
+  // código citado em chamado de assistência/pedido de encomenda; aqui
+  // busca direto pelos códigos que ESTA leva de candidatos precisa, antes
+  // de checar telefone.
+  await backfillClientCodes(admin, new Set(clientIds), BACKFILL_MAX_CODES_PER_RUN);
   const { data: clienteRows } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", clientIds);
   const phoneByClientId = new Map((clienteRows ?? []).map((r) => [r.protheus_code as string, r.phone1 as string | null]));
 
