@@ -54,7 +54,13 @@ export async function fabricaSignIn(_state: FabricaFormState, formData: FormData
   // mesmo navegador -- sem isso, um cookie antigo de CD/caixa/gerente ainda
   // válido "sequestra" a identidade em resolveEncomendaRequester /
   // requireEncomendaActor, mesmo com esse login de fábrica tendo dado certo.
-  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia/encomendas" });
+  // CD_COOKIE_NAME só no path novo ("/assistencia") -- achado do Victor
+  // 26/09/2026, confirmado via Network tab: cookies() do Next só emite UM
+  // Set-Cookie por nome de cookie por resposta (mutações pendentes ficam
+  // num Map por nome, não por nome+path) -- chamar .delete() duas vezes
+  // pro mesmo nome faz a segunda sobrescrever a primeira. Ver comentário
+  // completo em cd-actions.ts (cdSignOut).
+  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia" });
   cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia" });
   cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia" });
 

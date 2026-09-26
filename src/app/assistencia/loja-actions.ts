@@ -67,7 +67,11 @@ export async function lojaGerenteSignIn(_state: LojaGerenteFormState, formData: 
   // válido pode confundir telas que leem essas sessões (mesmo com a
   // prioridade de gerente em resolveEncomendaRequester, mais robusto já
   // não deixar nenhuma outra sessão pendurada).
-  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia/encomendas" });
+  // CD_COOKIE_NAME só no path novo -- ver comentário em cd-actions.ts
+  // (cdSignOut): cookies() do Next só emite UM Set-Cookie por nome de
+  // cookie por resposta, chamar .delete() duas vezes pro mesmo nome faz a
+  // segunda sobrescrever a primeira.
+  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia" });
   cookieStore.delete({ name: FABRICA_COOKIE_NAME, path: "/assistencia/encomendas" });
   cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia" });
 

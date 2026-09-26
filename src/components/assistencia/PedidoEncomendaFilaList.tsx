@@ -76,7 +76,16 @@ function DeadlineCell({ p, chegadaCd }: { p: PedidoEncomendaSummary; chegadaCd?:
   }
   if (p.prazoCdLoja) return <DeadlineTag dateStr={p.prazoCdLoja} sub="prazo p/ loja" />;
   if (p.prazoFabricaCd) return <DeadlineTag dateStr={p.prazoFabricaCd} sub="prazo p/ cd" />;
-  return null;
+  // Traço mudo em vez de coluna em branco -- achado do Victor 26/09/2026
+  // (print real de Carlos·Fábrica): como essa coluna tem largura FIXA
+  // (12%, "colunas fixas" é decisão de 25/08/2026), linha sem prazo
+  // (exatamente as do bloco "sem prazo definido" logo acima) deixava um
+  // vão vazio entre a posição na fila e a coluna de item -- o espaço em si
+  // é o mesmo de sempre, mas sem nada preenchendo ele a leitura passa a
+  // impressão de posição e produto "desconectados". Um traço mudo ocupa o
+  // mesmo respiro sem repetir a informação (a linha já está dentro do
+  // bloco "SEM PRAZO DEFINIDO", não precisa dizer de novo).
+  return <span className="text-sm text-gray-300 dark:text-gray-600">—</span>;
 }
 
 // Coluna "Quantidade e Produto" -- pedido do Victor 25/08/2026: "Destaque
@@ -87,18 +96,37 @@ function DeadlineCell({ p, chegadaCd }: { p: PedidoEncomendaSummary; chegadaCd?:
 // documentada em FabricaProducaoView.tsx, decisão do Victor 22/08/2026 de
 // não mexer no schema agora) -- não dá pra recortar em blocos garantidamente
 // certos sem isso.
-function ItemsCell({ items }: { items: PedidoEncomendaItem[] }) {
+// Exportado pra reaproveitar na visão Loja/Caixa (achado do diagnóstico de
+// UX da Fila de Encomendas, Victor 25-26/09/2026: a lista de itens de lá
+// era uma frase única via `.join(", ")`, sem separação por item -- mesmo
+// componente evita duas implementações divergindo aos poucos, ver
+// caixa/page.tsx). SAC continua com o `.join(", ")` antigo por enquanto
+// (pedido do Victor 26/09/2026: "deixa o SAC pra depois").
+export function ItemsCell({ items }: { items: PedidoEncomendaItem[] }) {
   return (
     <div className="flex flex-col gap-1 min-w-0">
       {items.map((item, idx) => (
-        <div key={idx} className="flex items-center gap-2 min-w-0">
+        <div key={idx} className="flex items-start gap-2 min-w-0">
           <span
             className="text-xs font-extrabold shrink-0 rounded px-1.5 py-0.5"
             style={{ color: "#fff", background: "var(--brand-orange)" }}
           >
             {item.quantidade}x
           </span>
-          <span className="text-sm font-bold truncate uppercase text-gray-800 dark:text-gray-100">{item.produtoDescricao}</span>
+          {/* line-clamp-2 (não truncate) + title -- achado do diagnóstico
+              de UX da Fila de Encomendas (Victor 25-26/09/2026, confirmado
+              no print do Flávio·CD): descrição de 1 linha só já cortava
+              antes do fim em casos reais ("AEREO CELESTE/BRILHANTE 40CM
+              1PT BASCULANTE - CIN/TITANI…"), escondendo justo a cor/
+              acabamento que costuma vir no final do texto. 2 linhas dá mais
+              fôlego sem esticar a altura da linha por completo; title
+              cobre o resto via tooltip nativo, sem precisar de componente novo. */}
+          <span
+            title={item.produtoDescricao}
+            className="text-sm font-bold uppercase text-gray-800 dark:text-gray-100 line-clamp-2"
+          >
+            {item.produtoDescricao}
+          </span>
         </div>
       ))}
     </div>
@@ -156,7 +184,12 @@ function PedidoRow({
           />
         ) : null}
         {position ? (
-          <div className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none" style={{ background: "var(--brand-green)", color: "#fff" }}>
+          // --series-5 (azul no claro, neutro no escuro) em vez do verde da
+          // marca -- achado do Victor 26/09/2026: posição na fila é
+          // informação neutra (ordem), não status, e o verde lia como
+          // "concluído/sucesso" por engano. Mesmo ajuste em caixa/page.tsx e
+          // encomendas/sac/page.tsx.
+          <div className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none" style={{ background: "var(--series-5)", color: "#fff" }}>
             <span className="text-xs font-bold">{position}º</span>
           </div>
         ) : null}
@@ -245,6 +278,17 @@ export function PedidoEncomendaFilaList({
 }) {
   const positionMap = new Map(queuePosition);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Bloco "sem prazo" mostra só os N primeiros por padrão -- achado do
+  // diagnóstico de UX da Fila de Encomendas (Victor 25-26/09/2026,
+  // confirmado no print do Flávio·CD): sem limite, o bloco chegou a ter 30
+  // pedidos soltos, um embaixo do outro, dominando a tela inteira e
+  // empurrando a fila com prazo real pra depois de muito scroll -- o
+  // oposto do que o bloco foi feito pra resolver (pedido original do
+  // Victor 25/08/2026: destacar esses casos, não engolir a tela). Continua
+  // "sempre visível" (não vira acordeão fechado) até esse limite -- some só
+  // o excedente, com um botão pra revelar.
+  const SEM_PRAZO_VISIBLE_LIMIT = 8;
+  const [semPrazoShowAll, setSemPrazoShowAll] = useState(false);
   const { pending, run } = useQuickAction();
 
   function toggle(id: string) {
@@ -312,8 +356,20 @@ export function PedidoEncomendaFilaList({
               </span>
             </div>
             <div className="divide-y bg-white dark:bg-gray-800" style={{ borderColor: "var(--status-warning)" }}>
-              {semPrazo.map(renderRow)}
+              {(semPrazoShowAll ? semPrazo : semPrazo.slice(0, SEM_PRAZO_VISIBLE_LIMIT)).map(renderRow)}
             </div>
+            {semPrazo.length > SEM_PRAZO_VISIBLE_LIMIT ? (
+              <div className="px-4 py-2 bg-white dark:bg-gray-800 border-t" style={{ borderColor: "var(--status-warning)" }}>
+                <button
+                  type="button"
+                  onClick={() => setSemPrazoShowAll((v) => !v)}
+                  className="text-xs font-semibold underline"
+                  style={{ color: "var(--status-warning)" }}
+                >
+                  {semPrazoShowAll ? "Mostrar menos" : `Mostrar todos (${semPrazo.length - SEM_PRAZO_VISIBLE_LIMIT} a mais)`}
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

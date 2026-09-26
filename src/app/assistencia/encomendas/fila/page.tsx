@@ -81,7 +81,16 @@ export default async function EncomendasQueuePage({
   // técnica... enquanto o vendedor precisa ver a ordem por pedido
   // individual". Só troca como os MESMOS `pedidos` já filtrados são
   // exibidos (ver FabricaProducaoView.tsx) -- nenhum filtro/dado novo.
-  const fabricaView = view === "fabrica";
+  // Só faz sentido pra quem planeja corte/estofamento (fábrica) ou
+  // supervisiona os dois times (admin/assistência) -- achado do diagnóstico
+  // de UX da Fila de Encomendas (Victor 25-26/09/2026, confirmado no print
+  // do Flávio·CD): o botão aparecia igual pro CD, que nunca usa essa
+  // consolidação. `canUseFabricaView` também neutraliza um `?view=fabrica`
+  // preso na URL (link antigo, favorito) pro CD -- sem isso o botão sumia
+  // mas a página continuava renderizando FabricaProducaoView se alguém
+  // chegasse direto com o parâmetro.
+  const canUseFabricaView = actor.role === "fabrica" || actor.role === "admin" || actor.role === "assistencia";
+  const fabricaView = view === "fabrica" && canUseFabricaView;
 
   // Fábrica nunca enxerga pedido externo -- só o(s) da(s) fábrica(s)
   // própria(s) que é dela (a maioria tem uma só; fabricaId nulo, caso do
@@ -224,7 +233,21 @@ export default async function EncomendasQueuePage({
           loja + chips, esses dois não fazem parte da consolidação. */}
       <div className="sticky top-0 z-20 flex flex-col gap-2 py-2" style={{ background: "var(--background)", borderBottom: "1px solid var(--border)" }}>
         <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">
-          {FILTERS.map((f) => {
+          {FILTERS
+            // Chip zerado só some se não for o filtro ativo -- senão o
+            // pill selecionado podia desaparecer debaixo do próprio
+            // usuário ao trocar loja/fornecedor. "Em andamento"/"Todos"
+            // nunca somem: são a âncora de navegação da barra, mesmo em 0
+            // (achado do diagnóstico de UX da Fila de Encomendas, Victor
+            // 25-26/09/2026: os 11 chips sempre apareciam mesmo zerados,
+            // ex. "Em carga (0)" ocupando espaço ao lado dos que importam).
+            .filter((f) => {
+              if (f.value === null || f.value === "todos") return true;
+              const activeValue = showAllStatuses ? "todos" : (filterStatus ?? null);
+              if (f.value === activeValue) return true;
+              return (statusCounts.get(f.value) ?? 0) > 0;
+            })
+            .map((f) => {
             const activeValue = showAllStatuses ? "todos" : (filterStatus ?? null);
             const selected = (f.value ?? null) === activeValue;
             const isStatusPill = !!f.value && f.value !== "todos";
@@ -286,16 +309,18 @@ export default async function EncomendasQueuePage({
           precisa ver o total do lote para corte e estofamento, enquanto o
           vendedor precisa ver a ordem por pedido individual". Só troca a
           forma de exibir os MESMOS pedidos já filtrados -- ver
-          FabricaProducaoView.tsx. */}
-      <Link
-        href={buildHref({ status, store, fornecedor, q, view: fabricaView ? undefined : "fabrica" })}
-        className={`text-sm px-3.5 py-2 rounded-lg font-medium whitespace-nowrap self-start transition-all duration-200 ${
-          fabricaView ? "text-white shadow-sm hover:brightness-110" : "border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100"
-        }`}
-        style={fabricaView ? { background: "var(--brand-orange)" } : undefined}
-      >
-        {fabricaView ? "📋 Voltar para visão por pedido" : "🏭 Alternar para visão fábrica"}
-      </Link>
+          FabricaProducaoView.tsx. Gate por canUseFabricaView (ver acima). */}
+      {canUseFabricaView ? (
+        <Link
+          href={buildHref({ status, store, fornecedor, q, view: fabricaView ? undefined : "fabrica" })}
+          className={`text-sm px-3.5 py-2 rounded-lg font-medium whitespace-nowrap self-start transition-all duration-200 ${
+            fabricaView ? "text-white shadow-sm hover:brightness-110" : "border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:text-gray-800 dark:hover:text-gray-100"
+          }`}
+          style={fabricaView ? { background: "var(--brand-orange)" } : undefined}
+        >
+          {fabricaView ? "📋 Voltar para visão por pedido" : "🏭 Alternar para visão fábrica"}
+        </Link>
+      ) : null}
 
       {pedidos.length === 0 ? (
         <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">

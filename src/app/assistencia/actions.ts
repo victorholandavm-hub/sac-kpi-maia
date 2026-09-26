@@ -43,6 +43,10 @@ import {
   signAssistenciaTeamPending,
   verifyAssistenciaTeamPending,
 } from "@/lib/assistenciaTeamAuth";
+import { CD_COOKIE_NAME } from "@/lib/cdAuth";
+import { FABRICA_COOKIE_NAME } from "@/lib/fabricaAuth";
+import { CAIXA_COOKIE_NAME } from "@/lib/caixaAuth";
+import { LOJA_GERENTE_COOKIE_NAME } from "@/lib/lojaAuth";
 import { verifyPin } from "@/lib/pinAuth";
 import { checkPinLockout, recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
@@ -161,6 +165,32 @@ async function establishAssistenciaIdentitySession(profileId: string): Promise<b
     // vezes tenta renovar um refresh token de uma sessão anterior que já não
     // é mais válido e lança um erro não tratado em vez de simplesmente trocar.
     await supabase.auth.signOut();
+
+    const cookieStore = await cookies();
+    // Limpa qualquer sessão PIN de CD/fábrica/caixa/gerente que tenha
+    // sobrado no navegador -- achado do Victor 26/09/2026: SAC testava
+    // "Minhas encomendas" e caía na tela pública de Encomendas (parecendo
+    // "voltar pro login") mesmo já logado. Causa: cada login por PIN
+    // (cdSignIn, fabricaSignIn, caixaSignIn, lojaGerenteSignIn) já limpa os
+    // OUTROS 3 cookies de PIN ao entrar -- mas login por Supabase Auth
+    // (aqui, usado tanto pelo SAC via sacPinSignIn quanto pela equipe via
+    // chooseAssistenciaIdentity) nunca limpava nenhum, porque é um sistema
+    // de sessão inteiramente separado. resolveEncomendaRequester()
+    // (encomendaRequester.ts) confere PIN de gerente/caixa/cd/fábrica ANTES
+    // de checar a sessão Supabase Auth -- um cookie de PIN esquecido de um
+    // teste anterior no mesmo navegador vencia e escondia a sessão real do
+    // SAC. Mesmos nomes/paths de cookie que os 4 logins de PIN já usam pra
+    // limpar uns aos outros. CD_COOKIE_NAME só no path novo
+    // ("/assistencia") -- achado do Victor 26/09/2026, confirmado via
+    // Network tab (header Set-Cookie real da resposta): a API cookies() do
+    // Next guarda mutações pendentes num Map por NOME de cookie, não por
+    // nome+path -- chamar .delete() duas vezes pro mesmo nome (path velho
+    // + path novo) faz a segunda sobrescrever a primeira, só UM Set-Cookie
+    // sai de verdade. Ver comentário completo em cd-actions.ts (cdSignOut).
+    cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia" });
+    cookieStore.delete({ name: FABRICA_COOKIE_NAME, path: "/assistencia/encomendas" });
+    cookieStore.delete({ name: CAIXA_COOKIE_NAME, path: "/assistencia" });
+    cookieStore.delete({ name: LOJA_GERENTE_COOKIE_NAME, path: "/assistencia" });
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: "magiclink",

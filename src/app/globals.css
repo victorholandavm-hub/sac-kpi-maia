@@ -61,6 +61,11 @@
   --status-warning: #fab219;
   --status-serious: #ec835a;
   --status-critical: #d03b3b;
+  /* Estado intermediário "chegou, ainda não é o fim da linha" (ex.:
+     recebido_cd na Fila de Encomendas) -- precisava de um 5º tom de status
+     que não fosse nem o verde de "concluído" (--status-good) nem o azul já
+     usado por --series-5 em outro status da mesma tela. */
+  --status-info: #0e9488;
 
   --brand-green: #1b5e3c;
   --brand-green-ink: #ffffff;
@@ -179,6 +184,7 @@ html.dark {
   --status-warning: color-mix(in srgb, #fab219 30%, var(--text-secondary));
   --status-serious: color-mix(in srgb, #ec835a 30%, var(--text-secondary));
   --status-critical: color-mix(in srgb, #d03b3b 30%, var(--text-secondary));
+  --status-info: color-mix(in srgb, #0e9488 30%, var(--text-secondary));
 
   --brand-green: #2e8158;
   --brand-green-ink: #ffffff;

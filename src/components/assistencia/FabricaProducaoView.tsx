@@ -1,4 +1,5 @@
-import { groupByDeadline } from "@/lib/encomendaDeadline";
+import { groupByDeadline, NO_DEADLINE_KEY } from "@/lib/encomendaDeadline";
+import { prazoUrgencyStyle } from "@/lib/prazoStyle";
 import type { PedidoEncomendaSummary } from "@/lib/pedidosEncomenda";
 
 // Visão alternativa consolidada pra fábrica -- pedido do Victor 22/08/2026:
@@ -26,8 +27,25 @@ type AggregatedLine = {
 // schema agora), então dois itens só juntam no mesmo lote se o texto for
 // exatamente igual -- descrição digitada diferente não funde. É uma
 // limitação real do texto livre, não um bug daqui.
+// Normalização mais forte -- achado do diagnóstico de UX da Fila de
+// Encomendas (Victor 25-26/09/2026): espaço duplo, pontuação ou acentuação
+// digitados diferente entre dois pedidos do MESMO item (ex. "Suede
+// Caramelo" x "Suede  Caramelo." x "Suéde Caramelo") impedia os dois de
+// virarem um lote só na produção. Colapsa espaço em excesso e remove
+// acento -- continua puro texto livre (sem campo estruturado novo no
+// banco, mesma decisão de 22/08/2026 documentada abaixo), só mais
+// tolerante à variação real de digitação.
+function normalizeSpec(s: string): string {
+  return s
+    .trim()
+    .replace(/\s+/g, " ")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase();
+}
+
 function specKey(produtoCodigo: string | null, produtoDescricao: string): string {
-  return (produtoCodigo?.trim() || produtoDescricao.trim()).toUpperCase();
+  return normalizeSpec(produtoCodigo?.trim() || produtoDescricao);
 }
 
 function aggregateItemsBySpec(pedidos: PedidoEncomendaSummary[]): AggregatedLine[] {
@@ -54,6 +72,14 @@ export function FabricaProducaoView({ pedidos }: { pedidos: PedidoEncomendaSumma
     <div className="flex flex-col gap-3">
       {groups.map((group) => {
         const lines = aggregateItemsBySpec(group.pedidos);
+        // Cor por urgência de prazo, não mais laranja fixo pra todo grupo --
+        // achado do diagnóstico de UX da Fila de Encomendas (Victor
+        // 25-26/09/2026, confirmado no print do Carlos·Fábrica): um grupo de
+        // mais de um mês atrasado (12/08) e um recém-vencido (10/09) tinham
+        // exatamente a mesma cor. Mesma função já usada na visão "por
+        // pedido" (prazoUrgencyStyle, PedidoEncomendaFilaList.tsx) -- não dá
+        // pra chamar em "sem prazo definido" (não é uma data de verdade).
+        const urgencyColor = group.dateKey === NO_DEADLINE_KEY ? "var(--brand-orange)" : (prazoUrgencyStyle(group.dateKey).color as string);
         return (
           // Recolhido por padrão -- achado do Victor 24/08/2026: "toda vez
           // que eu entrar em qualquer tela, as demandas agrupadas precisam
@@ -63,6 +89,10 @@ export function FabricaProducaoView({ pedidos }: { pedidos: PedidoEncomendaSumma
               <span className="inline-block transition-transform group-open:rotate-90" style={{ color: "var(--text-muted)" }}>
                 ▶
               </span>
+              {/* Dot de urgência visível mesmo com o grupo recolhido -- o
+                  ponto inteiro de colorir por prazo é bater o olho sem
+                  precisar abrir cada grupo. */}
+              <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: urgencyColor }} aria-hidden="true" />
               <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                 {group.label}
               </span>
@@ -70,8 +100,8 @@ export function FabricaProducaoView({ pedidos }: { pedidos: PedidoEncomendaSumma
                 ({lines.length} {lines.length === 1 ? "item" : "itens"} · {group.pedidos.length} {group.pedidos.length === 1 ? "pedido" : "pedidos"})
               </span>
             </summary>
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: "2px solid var(--brand-orange)" }}>
-              <div className="divide-y" style={{ borderColor: "var(--brand-orange)" }}>
+            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface-1)", border: `2px solid ${urgencyColor}` }}>
+              <div className="divide-y" style={{ borderColor: urgencyColor }}>
                 {lines.map((line) => (
                   <div key={line.key} className="flex items-center gap-4 p-4 flex-wrap">
                     {/* Destaque técnico -- pedido do Victor 22/08/2026:

@@ -71,11 +71,19 @@ export async function cdSignIn(_state: CdFormState, formData: FormData): Promise
 
 export async function cdSignOut() {
   const cookieStore = await cookies();
-  // Apaga nos dois paths -- sessões antigas (de antes do path mudar pra
-  // "/assistencia") ainda podem existir no navegador de quem já estava
-  // logado; sem isso o cookie velho, mais específico, ficava esquecido.
+  // Só UM path -- achado do Victor 26/09/2026 (via print do Network tab,
+  // header Set-Cookie real da resposta): a API cookies() do Next guarda as
+  // mutações pendentes num Map por NOME de cookie, não por nome+path --
+  // chamar .delete() duas vezes pro mesmo nome (mesmo com paths
+  // diferentes) faz a segunda sobrescrever a primeira, e só UM
+  // Set-Cookie sai na resposta de verdade (o da última chamada). O
+  // comentário antigo aqui pedia os dois paths "por segurança", mas isso
+  // fazia o path novo ("/assistencia", onde o cookie de verdade mora desde
+  // 11/08/2026) nunca ser apagado -- só o path antigo, morto, saía.
+  // Path antigo removido de vez: CD_SESSION_MAX_AGE é 30 dias e a migração
+  // foi há mais de 30 dias, então nenhum cookie legítimo pode mais estar
+  // lá.
   cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia" });
-  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia/encomendas" });
   redirect("/assistencia/encomendas/cd/login");
 }
 

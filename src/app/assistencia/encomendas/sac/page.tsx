@@ -22,8 +22,24 @@ import { StatTile } from "@/components/StatTile";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
+import { StatusStepper } from "@/components/assistencia/StatusStepper";
+import { CopyPedidoButton } from "@/components/assistencia/CopyPedidoButton";
+import { SearchShortcutFocus } from "@/components/assistencia/SearchShortcutFocus";
 import { bucketByScheduledDate, type DateBucketKey } from "@/lib/dateBuckets";
-import { PEDIDO_ENCOMENDA_STATUS_LABELS } from "@/lib/assistenciaLabels";
+import { PEDIDO_ENCOMENDA_STATUS_LABELS, PEDIDO_ENCOMENDA_STATUS_STEPS } from "@/lib/assistenciaLabels";
+
+// Status que não são progresso, são saída -- StatusStepper não faz sentido
+// pra eles (não tem "passo seguinte"). recebido_cd é um estado real de
+// progresso mas não está em PEDIDO_ENCOMENDA_STATUS_STEPS (ramo lateral,
+// "recebido no CD / em estoque" -- ver DeadlineCell em
+// PedidoEncomendaFilaList.tsx); mapeado pra a mesma posição de "em_carga"
+// só pro stepper (já chegou no CD, é a etapa mais próxima da sequência
+// principal), sem mudar o status de verdade nem a lista compartilhada de
+// steps usada em outro lugar.
+const STEPPER_TERMINAL_STATUSES = new Set(["cancelado", "negado"]);
+function stepperKeyFor(status: string): string {
+  return status === "recebido_cd" ? "em_carga" : status;
+}
 
 // Precisa refletir os pedidos em aberto em tempo real — nunca gerar estático.
 export const dynamic = "force-dynamic";
@@ -172,16 +188,27 @@ export default async function EncomendasSacPage({
               options={PEDIDO_ENCOMENDA_STATUSES.map((s) => ({ value: s, label: PEDIDO_ENCOMENDA_STATUS_LABELS[s] }))}
             />
             <form action="/assistencia/encomendas/sac" method="GET" className="flex items-center gap-2 flex-1 min-w-[240px]">
+              <SearchShortcutFocus inputId="sac-busca-encomendas" />
               <input type="hidden" name="view" value="todas" />
               {store ? <input type="hidden" name="store" value={store} /> : null}
               {status ? <input type="hidden" name="status" value={status} /> : null}
-              <input
-                type="search"
-                name="q"
-                defaultValue={q ?? ""}
-                placeholder="Buscar por nº do pedido, cliente ou produto…"
-                className="rounded-lg border border-gray-200 dark:border-gray-600 px-3 py-2 text-sm flex-1"
-              />
+              <div className="relative flex-1">
+                <input
+                  id="sac-busca-encomendas"
+                  type="search"
+                  name="q"
+                  defaultValue={q ?? ""}
+                  placeholder="Buscar por nº do pedido, código do cliente ou produto…"
+                  className="rounded-lg border border-gray-200 dark:border-gray-600 pl-3 pr-9 py-2 text-sm w-full"
+                />
+                {/* Dica do atalho "/" -- some assim que o campo tem algo digitado,
+                    pra não competir com o texto de verdade. */}
+                {!q ? (
+                  <kbd className="hidden sm:flex absolute right-2.5 top-1/2 -translate-y-1/2 items-center justify-center text-[10px] font-semibold rounded border px-1.5 py-0.5 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-600 pointer-events-none">
+                    /
+                  </kbd>
+                ) : null}
+              </div>
               <button type="submit" className="text-sm px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-100">
                 Buscar
               </button>
@@ -276,9 +303,16 @@ function PedidosDetailGroup({
             <summary className="flex items-start gap-2 cursor-pointer list-none">
               <div className="flex items-center justify-center w-9 shrink-0 pt-0.5">
                 {queuePosition.get(p.id) ? (
+                  // Cor neutra (não mais verde da marca) -- achado do Victor
+                  // 26/09/2026: posição na fila é uma informação neutra
+                  // (ordem, não status), verde lia como "concluído/sucesso"
+                  // por engano. --series-5 já é a cor certa pra isso: azul
+                  // no tema claro, cinza neutro no escuro (mesma regra que
+                  // já desliga o matiz das --series-* no escuro, ver
+                  // globals.css).
                   <div
                     className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none"
-                    style={{ background: "var(--brand-green)", color: "#fff" }}
+                    style={{ background: "var(--series-5)", color: "#fff" }}
                   >
                     <span className="text-sm font-bold">{queuePosition.get(p.id)}º</span>
                     <span className="text-[7px] font-semibold uppercase tracking-wide">na fila</span>
@@ -286,13 +320,26 @@ function PedidosDetailGroup({
                 ) : null}
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-1 min-w-0">
-                <div className="flex flex-col gap-1 min-w-0">
+                <div className="flex flex-col gap-1.5 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono font-semibold text-gray-500 dark:text-gray-400">#{p.pedidoNumber}</span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-xs font-mono font-semibold text-gray-500 dark:text-gray-400">#{p.pedidoNumber}</span>
+                      <CopyPedidoButton pedidoNumber={p.pedidoNumber} />
+                    </span>
                     <PedidoEncomendaStatusBadge status={p.status} />
                     <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{p.storeName}</span>
                   </div>
                   <p className="text-sm text-gray-800 dark:text-gray-100">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
+                  {/* Linha do tempo simplificada -- pedido do Victor
+                      26/09/2026 (redesign "Minhas encomendas" do SAC): o
+                      atendente precisa ver "onde está" de relance, sem abrir
+                      o card. PedidoEncomendaTimeline (abaixo, dentro do
+                      &lt;details&gt;) continua existindo pra quem quer o
+                      histórico completo de eventos -- esse aqui é só a
+                      versão compacta de 6 passos, sempre visível. */}
+                  {!STEPPER_TERMINAL_STATUSES.has(p.status) ? (
+                    <StatusStepper steps={PEDIDO_ENCOMENDA_STATUS_STEPS} currentKey={stepperKeyFor(p.status)} compact />
+                  ) : null}
                 </div>
                 <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
                   <span className="text-xs font-bold whitespace-nowrap text-gray-500 dark:text-gray-400">
