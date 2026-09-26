@@ -23,7 +23,12 @@ export async function switchRafaelToFabrica() {
   }
 
   const cookieStore = await cookies();
-  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia/encomendas" });
+  // Só o path novo -- ver comentário em cd-actions.ts (cdSignOut):
+  // cookies() do Next só emite UM Set-Cookie por nome de cookie por
+  // resposta, chamar .delete() duas vezes pro mesmo nome faz a segunda
+  // sobrescrever a primeira (era exatamente esse o motivo do Rafael
+  // continuar resolvendo como "cd" depois de trocar pra fábrica).
+  cookieStore.delete({ name: CD_COOKIE_NAME, path: "/assistencia" });
   cookieStore.set(FABRICA_COOKIE_NAME, signFabricaSession(cdName), {
     httpOnly: true,
     secure: true,
@@ -43,12 +48,16 @@ export async function switchRafaelToCd() {
 
   const cookieStore = await cookies();
   cookieStore.delete({ name: FABRICA_COOKIE_NAME, path: "/assistencia/encomendas" });
+  // path "/assistencia" -- mesmo motivo do cd-actions.ts (cdSignIn):
+  // /assistencia/fornecedores também lê essa sessão, e um path estreito não
+  // chega lá. Esse switcher setava no path antigo ("/assistencia/encomendas"),
+  // então o CD do Rafael por aqui nunca alcançava fornecedores.
   cookieStore.set(CD_COOKIE_NAME, signCdSession(fabricaName), {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
     maxAge: CD_SESSION_MAX_AGE,
-    path: "/assistencia/encomendas",
+    path: "/assistencia",
   });
 
   redirect("/assistencia/encomendas/fila");

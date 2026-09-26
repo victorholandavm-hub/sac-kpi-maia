@@ -13,6 +13,7 @@ import {
 } from "@/lib/pedidosEncomenda";
 import { listEncomendaPhotosForPedidos } from "@/lib/pedidoEncomendaPhotos";
 import { PedidoEncomendaStatusBadge } from "@/components/assistencia/PedidoEncomendaStatusBadge";
+import { ItemsCell } from "@/components/assistencia/PedidoEncomendaFilaList";
 import { PedidoEncomendaTimeline } from "@/components/assistencia/PedidoEncomendaTimeline";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { StatTile } from "@/components/StatTile";
@@ -98,7 +99,11 @@ export default async function EncomendasCaixaPage({
         title={`Encomendas — ${storeLabel}`}
         subtitle="Acompanhamento em tempo real com o CD e a fábrica"
       >
-        <div className="flex items-center gap-3">
+        {/* flex-wrap -- achado do diagnóstico de UX da Fila de Encomendas
+            (Victor 25-26/09/2026): sino + Novo pedido + Estornos + Sair
+            numa linha só sem quebra, sem problema visível no print
+            (desktop), mas sem rede de segurança em celular. */}
+        <div className="flex items-center gap-3 flex-wrap">
           <NotificationBell fetchAction={listLojaNotificationsAction} storageKey="loja" />
           <Link
             href="/assistencia/encomendas/solicitar"
@@ -163,9 +168,13 @@ export default async function EncomendasCaixaPage({
                       da fila, sem depender de ler o resto do texto. */}
                   <div className="flex items-center justify-center w-9 shrink-0 pt-0.5">
                     {queuePosition.get(p.id) ? (
+                      // --series-5 em vez do verde da marca -- ver comentário
+                      // em PedidoEncomendaFilaList.tsx (mesmo achado do
+                      // Victor 26/09/2026: posição na fila é neutra, não é
+                      // "concluído").
                       <div
                         className="rounded flex flex-col items-center justify-center px-1 py-0.5 shrink-0 leading-none"
-                        style={{ background: "var(--brand-green)", color: "#fff" }}
+                        style={{ background: "var(--series-5)", color: "#fff" }}
                       >
                         <span className="text-sm font-bold">{queuePosition.get(p.id)}º</span>
                         <span className="text-[7px] font-semibold uppercase tracking-wide">na fila</span>
@@ -178,7 +187,13 @@ export default async function EncomendasCaixaPage({
                       <span className="text-xs font-mono font-semibold text-gray-500 dark:text-gray-400">#{p.pedidoNumber}</span>
                       <PedidoEncomendaStatusBadge status={p.status} />
                     </div>
-                    <p className="text-sm text-gray-800 dark:text-gray-100">{p.items.map((i) => `${i.quantidade}x ${i.produtoDescricao}`).join(", ")}</p>
+                    {/* ItemsCell (badge de qtd + nome, um item por linha) em
+                        vez do `.join(", ")` antigo -- achado do diagnóstico
+                        de UX da Fila de Encomendas (Victor 25-26/09/2026):
+                        pedido com vários itens virava um parágrafo corrido,
+                        sem a separação visual que a tabela de CD/Fábrica já
+                        tinha. Mesmo componente das duas telas agora. */}
+                    <ItemsCell items={p.items} />
                   </div>
                   <div className="flex flex-row sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
                     <span className="text-xs font-bold whitespace-nowrap text-gray-500 dark:text-gray-400">
