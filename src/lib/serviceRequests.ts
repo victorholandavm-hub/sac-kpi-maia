@@ -72,6 +72,31 @@ export function isMostruarioRequest(orderCode: string | null | undefined, client
   return !orderCode && (clientName ?? "").startsWith("Mostruário — ");
 }
 
+// Telefone "placeholder" digitado em vez de deixado vazio (ex.:
+// "00000000000") -- achado do Victor 26/09/2026: um chamado de "LOJA
+// BAYEUX" (registro interno da própria loja, mas sem cair no padrão
+// "Mostruário — " nem em "Loja 216" acima) tinha esse telefone e recebeu
+// uma pesquisa de NPS de verdade, pra um número que não existe. Checagem
+// própria (não estendida pra isMostruarioRequest) porque o problema aqui é
+// o DADO (telefone claramente falso), não o tipo de registro -- um dígito
+// só repetido não é telefone de ninguém de verdade, não importa quantos
+// dígitos tenha nem qual o nome do cliente.
+export function isPlaceholderPhone(phone: string | null | undefined): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, "");
+  return digits.length > 0 && new Set(digits).size === 1;
+}
+
+// client_phone às vezes carrega dois números separados por "/" (telefone
+// principal e recado, ex.: "83 999968493/ 991010518") -- achado do Victor
+// 26/09/2026: a API de contatos do GHL espera um único número, mandar os
+// dois concatenados falhava silenciosamente (upsertGhlContact retornando
+// null, sem enviar a pesquisa de NPS pra um cliente de verdade). Pega só o
+// primeiro -- é o mesmo que qualquer atendente humano faria ao discar.
+export function firstPhone(phone: string): string {
+  return phone.split("/")[0].trim();
+}
+
 export function isRequestStatus(value: string | undefined | null): value is RequestStatus {
   return !!value && (REQUEST_STATUSES as string[]).includes(value);
 }

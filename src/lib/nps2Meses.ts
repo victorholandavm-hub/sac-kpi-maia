@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { isMostruarioRequest } from "./serviceRequests";
+import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
 import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages } from "./ghlClient";
@@ -134,12 +134,12 @@ export async function enrollPendingCompraNps(): Promise<{ enrolled: number; semT
   let semTelefone = 0;
   for (const candidate of eligible) {
     const phone = phoneByClientId.get(candidate.client_id as string);
-    if (!phone) {
+    if (!phone || isPlaceholderPhone(phone)) {
       semTelefone++;
       continue;
     }
 
-    const contactId = await upsertGhlContact(phone, candidate.client_name);
+    const contactId = await upsertGhlContact(firstPhone(phone), candidate.client_name);
     if (!contactId) {
       errors.push(`compra-nps ${candidate.id}: não achou/criou contato no GHL`);
       continue;
