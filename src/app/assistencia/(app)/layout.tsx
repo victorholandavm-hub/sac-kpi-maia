@@ -86,6 +86,11 @@ export default async function AssistenciaAppLayout({
                   Estornos
                 </Link>
               ) : null}
+              {isAdmin ? (
+                <Link href="/assistencia/reclamacoes" className="text-sm font-semibold" style={{ color: "var(--brand-orange)" }}>
+                  Reclamações
+                </Link>
+              ) : null}
               <form action={signOut}>
                 <button type="submit" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
                   Sair
