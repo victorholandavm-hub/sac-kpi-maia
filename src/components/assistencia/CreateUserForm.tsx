@@ -51,6 +51,7 @@ export function CreateUserForm() {
         <option value="assistencia">Assistência</option>
         <option value="admin">Admin</option>
         <option value="sac">SAC</option>
+        <option value="supervisao">Supervisão (leitura -- Estornos, Notificação, Visitas, Reclamações)</option>
       </select>
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>

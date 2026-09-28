@@ -136,6 +136,13 @@ export async function signIn(_state: FormState, formData: FormData): Promise<For
     return { error: "E-mail ou senha inválidos." };
   }
 
+  // Supervisão (ver dal.ts/Role) não tem nada a ver no dashboard geral --
+  // manda direto pra 1ª das 4 telas que ela acessa. O resto de (app)
+  // continua barrado por SupervisaoGuard mesmo se ela tentar voltar pro
+  // /inicio pela URL.
+  const profile = await getProfile();
+  if (profile.role === "supervisao") redirect("/assistencia/financeiro");
+
   redirect("/assistencia/inicio");
 }
 

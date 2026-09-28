@@ -10,6 +10,7 @@ import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { MobileNav } from "@/components/assistencia/MobileNav";
 import { NotificationBell } from "@/components/assistencia/NotificationBell";
 import { listAssistenciaTeamNotificationsAction } from "@/app/assistencia/notifications-actions";
+import { SupervisaoGuard } from "@/components/assistencia/SupervisaoGuard";
 
 export default async function AssistenciaAppLayout({
   children,
@@ -19,6 +20,7 @@ export default async function AssistenciaAppLayout({
   const profile = await getProfile();
   const isAdmin = profile.role === "admin";
   const isSac = profile.role === "sac";
+  const isSupervisao = profile.role === "supervisao";
   // Sino de "precisa remarcar" (e outros alertas de admin, ex.: falha de
   // sync) -- antes só admin via, mas o alerta de remarcação também precisa
   // chegar pro resto da equipe assistência (role "assistencia"), não só
@@ -37,7 +39,7 @@ export default async function AssistenciaAppLayout({
   // entrega/notificação de assistência, que não tem nada a ver com essa
   // aba (mora em /assistencia/sac/notificacoes ou na aba Entregas).
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
-  const [solicitacoesAbertas, pedidosSolicitados] = isSac
+  const [solicitacoesAbertas, pedidosSolicitados] = isSac || isSupervisao
     ? [0, 0]
     : await Promise.all([countVisitasOpenNoContact(excludeOwnAssemblerStoreIds), countPedidosEncomendaSolicitados()]);
   const counts = {
@@ -102,15 +104,20 @@ export default async function AssistenciaAppLayout({
             <Link href="/assistencia/sac" className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
               ← Voltar pro SAC
             </Link>
-          ) : (
+          ) : isSupervisao ? null : ( // Ela acessa 2 rotas dentro do grupo (app) -- fila/page.tsx e
+            // reclamacoes/page.tsx -- e cada uma já renderiza seu próprio
+            // <SupervisaoTabs active="..."/> (mesmo padrão do SacTabs, que
+            // também não mora num layout compartilhado). Nada pra mostrar
+            // aqui.
             <div className="hidden sm:block">
               <AssistenciaNav counts={counts} />
             </div>
           )}
         </div>
+        {isSupervisao ? <SupervisaoGuard /> : null}
         {children}
       </div>
-      {isSac ? null : (
+      {isSac || isSupervisao ? null : (
         <div className="print:hidden">
           <MobileNav counts={counts} />
         </div>

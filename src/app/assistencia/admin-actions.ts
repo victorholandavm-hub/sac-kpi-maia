@@ -50,7 +50,7 @@ export async function createAssistenciaUser(_state: FormState, formData: FormDat
   if (!fullName) return { error: "Informe o nome." };
   if (!email) return { error: "Informe o e-mail." };
   if (password.length < 6) return { error: "A senha precisa ter pelo menos 6 caracteres." };
-  if (role !== "assistencia" && role !== "admin" && role !== "sac") return { error: "Papel inválido." };
+  if (role !== "assistencia" && role !== "admin" && role !== "sac" && role !== "supervisao") return { error: "Papel inválido." };
 
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.auth.admin.createUser({
