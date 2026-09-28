@@ -8,6 +8,7 @@ import { UnderlineTab } from "@/components/UnderlineTab";
 import { StatTile } from "@/components/StatTile";
 import { EstornoStatusBadge } from "@/components/assistencia/EstornoStatusBadge";
 import { EstornoFinanceiroActions } from "@/components/assistencia/EstornoFinanceiroActions";
+import { SacTabs } from "@/components/assistencia/SacTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -44,14 +45,20 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 // MESMA rota como fallback -- pedido do Victor 23/09/2026: "Admin deve
 // poder continuar vendo tudo também". Mesmo fallback de
 // lojaApproveMontagemConclusion (loja-actions.ts), só que aqui é a rota
-// inteira, não uma ação isolada.
+// inteira, não uma ação isolada. SAC também acessa (pedido do Victor
+// 28/09/2026), mas só pra visualizar -- concluir/recusar continua
+// travado por resolveFinanceiroOrAdminName (financeiro-estornos-actions.ts),
+// que não reconhece SAC, então os botões de ação nem aparecem pra esse
+// papel (ver isReadOnly abaixo).
 export default async function FinanceiroPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const financeiroName = await getFinanceiroSession();
   const profile = financeiroName ? null : await getOptionalProfile();
   const isAdmin = !!profile && profile.role === "admin";
-  if (!financeiroName && !isAdmin) {
+  const isSac = !!profile && profile.role === "sac";
+  if (!financeiroName && !isAdmin && !isSac) {
     redirect("/assistencia/financeiro/login");
   }
+  const isReadOnly = isSac;
 
   const { view } = await searchParams;
   const current = STATUS_VIEWS.find((v) => v.view === view) ?? STATUS_VIEWS[0];
@@ -61,7 +68,13 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
     <div className="w-full max-w-[1600px] mx-auto p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader
         title="Financeiro — Estornos"
-        subtitle={isAdmin ? `${profile!.fullName} (admin) · todas as lojas` : `${financeiroName} · todas as lojas`}
+        subtitle={
+          isAdmin
+            ? `${profile!.fullName} (admin) · todas as lojas`
+            : isSac
+              ? `${profile!.fullName} (SAC) · somente visualização`
+              : `${financeiroName} · todas as lojas`
+        }
       >
         {financeiroName ? (
           <form action={financeiroSignOut}>
@@ -69,6 +82,10 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
               Sair
             </button>
           </form>
+        ) : isSac ? (
+          <Link href="/assistencia/sac" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+            ← Voltar pro SAC
+          </Link>
         ) : (
           // "/assistencia" é a tela de escolha de papel (cards de login) --
           // achado do Victor 24/09/2026: parecia "voltar pro login" em vez
@@ -78,6 +95,8 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
           </Link>
         )}
       </AssistenciaHeader>
+
+      {isSac ? <SacTabs active="estornos" /> : null}
 
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatTile label="Pendentes" value={summary.pendente} accent="var(--brand-orange)" />
@@ -177,7 +196,9 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                     Recusado por {r.recusadoPor}: {r.motivoRecusa}
                   </p>
                 ) : null}
-                {r.status === "pendente" || r.status === "concluido" ? <EstornoFinanceiroActions requestId={r.id} status={r.status} /> : null}
+                {!isReadOnly && (r.status === "pendente" || r.status === "concluido") ? (
+                  <EstornoFinanceiroActions requestId={r.id} status={r.status} />
+                ) : null}
               </div>
             </details>
           ))}
