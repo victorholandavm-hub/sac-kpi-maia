@@ -49,14 +49,15 @@ function metaColor(npsIndex: number | null, meta: MetaRange): string {
 // primeira aba seja desse resumo de avaliações de todas as fases. Hoje só
 // temos do SAC, aí você coloca do sac e as outras fases você deixa com um
 // traço". São 5 fases no total: SAC (dado real) + pós-entrega/pós-montagem/
-// pós-assistência técnica/2 meses pós-recebimento (as 4 já calculam
+// pós-assistência técnica/20 dias pós-recebimento (as 4 já calculam
 // sozinhas -- ver getNpsResumoPorFaseAdicional em npsDetratores.ts pras 3
 // primeiras e getCompraNpsResumo em nps2Meses.ts pra última -- e mostram
 // "—" com 0 respostas, sem precisar de código novo quando os templates do
-// WhatsApp forem aprovados e começarem a responder de verdade). "2 meses
-// pós-recebimento" (não "1 mês" -- correção do Victor 09/09/2026) é a
-// última a ganhar fonte de dado real, feita adiantando os gatilhos que
-// faltavam antes da aprovação dos templates.
+// WhatsApp forem aprovados e começarem a responder de verdade). Essa
+// última fase (tabela compra_nps, origem "compra") já se chamou "1 mês"
+// e depois "2 meses pós-recebimento" -- virou "20 dias" em 28/09/2026,
+// pedido do Victor (ver TARGET_DAYS_AGO em nps2Meses.ts); nome interno da
+// tabela/origem ficou igual, só o rótulo e o gatilho de dias mudaram.
 // Clicável -- pedido do Victor 28/09/2026: "ver o nome das pessoas que
 // avaliaram com algum tipo de dado delas, cpf, nome e a nota". Abre
 // NpsRespostasModal com a lista de quem respondeu ESSA fase (busca sob
@@ -147,7 +148,7 @@ export function AvaliacoesResumo({
             onClick={() => setOpenOrigem("assistencia_tecnica")}
           />
           <FaseCard
-            label="2 meses pós-recebimento"
+            label="20 dias pós-recebimento"
             npsIndex={resumoFasesAdicionais.compra.npsIndex}
             responseCount={resumoFasesAdicionais.compra.responseCount}
             meta={METAS.compra}

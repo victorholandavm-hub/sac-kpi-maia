@@ -813,7 +813,7 @@ export type RecompraNaoContatar = {
   criadoEm: string;
 };
 
-// Exportada (09/09/2026) pro NPS de 2 meses pós-recebimento (nps2Meses.ts)
+// Exportada (09/09/2026) pro NPS de 20 dias pós-recebimento (nps2Meses.ts)
 // reaproveitar -- mesma lista de opt-out ("legítimo interesse" pede opção
 // de não ser mais contatado, ver migration do Motor de Recompra), não faz
 // sentido duplicar por fonte de contato proativo diferente.

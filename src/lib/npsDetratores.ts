@@ -18,7 +18,7 @@ export const NPS_DETRATOR_ORIGEM_LABELS: Record<NpsDetratorOrigem, string> = {
   montagem: "Pós-montagem",
   assistencia_tecnica: "Pós-assistência técnica",
   entrega: "Pós-entrega",
-  compra: "2 meses pós-recebimento",
+  compra: "20 dias pós-recebimento",
 };
 
 // Tag do GHL que dispara o Workflow de cada pesquisa -- pedido do Victor

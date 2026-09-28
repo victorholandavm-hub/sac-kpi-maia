@@ -6,14 +6,19 @@ import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessage
 import { NPS_GHL_TAG, NPS_1_5_PATTERN, type NpsFaseResumo } from "./npsDetratores";
 import { backfillClientCodes } from "./totvsSync";
 
-// NPS "2 meses pós-recebimento" -- pedido do Victor 09/09/2026: "Cliente so
+// NPS "20 dias pós-recebimento" -- pedido do Victor 09/09/2026: "Cliente so
 // pode receber uma a cada 90 dias. Gatilho é a data de entrega, e coloque 2
-// meses apos o recebimento e nao um [mês]". Diferente de montagem/
-// assistência técnica (service_request_nps, um chamado de assistência por
-// trás): esse é por PEDIDO de venda (totvs_orders), sem chamado nenhum
-// envolvido -- mesmo espírito de "Pós-entrega" (entregaNps.ts, tabela
-// própria pelo mesmo motivo), só que com uma janela bem mais larga (2
-// meses em vez de dias).
+// meses apos o recebimento e nao um [mês]". Janela encurtada de 2 meses (60
+// dias) pra 20 dias em 28/09/2026, mesmo pedido do Victor -- o nome
+// interno da tabela (compra_nps) e da origem ("compra", ver
+// npsDetratores.ts) ficaram como estavam, só o rótulo visível e
+// TARGET_DAYS_AGO abaixo mudaram; o limite de 90 dias por cliente (linha
+// acima) continua igual, não tem relação com o gatilho de dias. Diferente
+// de montagem/assistência técnica (service_request_nps, um chamado de
+// assistência por trás): esse é por PEDIDO de venda (totvs_orders), sem
+// chamado nenhum envolvido -- mesmo espírito de "Pós-entrega"
+// (entregaNps.ts, tabela própria pelo mesmo motivo), só com uma janela
+// mais larga.
 //
 // Volume bem maior que os outros 3 juntos (~7.600 pedidos/mês contra ~450)
 // -- por isso o limite de 90 dias por cliente (não manda de novo pra quem
@@ -33,7 +38,7 @@ const BACKFILL_MAX_CODES_PER_RUN = 20;
 // entrado na janela nesse meio tempo. Mesmo espírito do "catch up" que a
 // task agendada do totvs-sync já tem (StartWhenAvailable).
 const WINDOW_DAYS = 7;
-const TARGET_DAYS_AGO = 60;
+const TARGET_DAYS_AGO = 20;
 
 type CargaRow = { nota_fiscal: string | null; serie: string | null };
 type OrderRow = { id: string; invoice: string | null; serie: string | null; client_id: string | null; client_name: string | null };
@@ -208,7 +213,7 @@ export async function detectPendingCompraNpsResponses(): Promise<number> {
 
 // Resumo (NPS clássico: %promotores - %detratores, adaptado pra escala 1-5
 // -- promotor 4-5, detrator 1-2, mesmo critério de buildNpsSummary/kpi.ts)
-// pro card "2 meses pós-recebimento" do Resumo de /avaliacoes -- mesmo
+// pro card "20 dias pós-recebimento" do Resumo de /avaliacoes -- mesmo
 // formato de getNpsResumoPorFaseAdicional (npsDetratores.ts), função
 // própria porque compra_nps é tabela separada (sem chamado de assistência
 // por trás).
