@@ -387,7 +387,8 @@ async function runSync() {
   errors.push(...npsEnrollErrors);
   const montagemAssistNpsAnswered = await detectPendingNpsResponses(supabase);
 
-  // NPS "2 meses pós-recebimento" -- pedido do Victor 09/09/2026. Fonte de
+  // NPS "20 dias pós-recebimento" -- pedido do Victor 09/09/2026 (janela
+  // encurtada de 2 meses pra 20 dias em 28/09/2026). Fonte de
   // dado (totvs_orders/totvs_delivery_cargas) e destinatário (client_id,
   // não requestId) diferentes dos 3 tipos acima, por isso função própria
   // em nps2Meses.ts em vez de mais um `if` aqui.

@@ -8,11 +8,12 @@ import { backfillClientCodes } from "./totvsSync";
 
 // NPS "Pós-entrega" -- pedido do Victor 22/09/2026: pergunta sobre a
 // entrega ORIGINAL da compra (o caminhão leva o móvel pela primeira vez),
-// não um chamado de assistência -- mesmo mecanismo de "2 meses
-// pós-recebimento" (nps2Meses.ts/compra_nps), copiado quase igual daqui
-// (mesma fonte totvs_delivery_cargas/totvs_orders, mesmo cruzamento por
-// nota fiscal + série), só com uma janela bem mais curta -- pergunta logo
-// depois da entrega, não 2 meses depois. Sem o limite de 90 dias por
+// não um chamado de assistência -- mesmo mecanismo de "20 dias
+// pós-recebimento" (nps2Meses.ts/compra_nps, TARGET_DAYS_AGO=20 desde
+// 28/09/2026), copiado quase igual daqui (mesma fonte
+// totvs_delivery_cargas/totvs_orders, mesmo cruzamento por nota fiscal +
+// série), só com uma janela bem mais curta -- pergunta logo depois da
+// entrega, não semanas depois. Sem o limite de 90 dias por
 // cliente que a Compra tem (pergunta diferente, sobre uma entrega
 // específica, não sobre a experiência geral -- um cliente com 2 entregas
 // na mesma semana pode legitimamente receber as duas pesquisas).
