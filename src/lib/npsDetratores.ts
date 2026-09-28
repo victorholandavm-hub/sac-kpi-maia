@@ -289,6 +289,130 @@ export async function listNpsDetratores(): Promise<NpsDetrator[]> {
   return [...sac, ...req, ...compra, ...entrega].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
 }
 
+export type NpsResposta = {
+  origemId: string;
+  score: number;
+  respondidoEm: string;
+  clientName: string | null;
+  // null quando a fonte não tem CPF nenhum (sac -- conversa do GHL, sem
+  // venda por trás). montagem/assistência técnica vêm de
+  // service_requests.client_cpf; compra/entrega vêm de
+  // totvs_orders.client_cpf_cnpj.
+  clientCpf: string | null;
+  clientPhone: string | null;
+};
+
+// Lista TODAS as respostas de UMA fase (não só detratores, diferente de
+// listNpsDetratores acima) -- pedido do Victor 28/09/2026: card clicável no
+// Resumo (AvaliacoesResumo.tsx) mostrando quem respondeu, com nome + CPF/
+// telefone + nota. Busca só a fase pedida (não as 5 juntas) -- chamada sob
+// demanda quando o card é aberto, não precarrega nada na tela de Resumo.
+export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit = 300): Promise<NpsResposta[]> {
+  const admin = getSupabaseAdmin();
+
+  if (origem === "sac") {
+    const { data, error } = await admin
+      .from("conversations")
+      .select("id, nps_score, nps_answered_at, contact_id")
+      .not("nps_score", "is", null)
+      .not("nps_answered_at", "is", null)
+      .order("nps_answered_at", { ascending: false })
+      .limit(limit);
+    if (error) throw new Error(error.message);
+
+    const contactIds = [...new Set((data ?? []).map((r) => r.contact_id).filter((id): id is string => !!id))];
+    const contactsById = new Map<string, { name: string | null; phone: string | null }>();
+    if (contactIds.length > 0) {
+      const { data: contactRows, error: contactsError } = await admin.from("contacts").select("id, name, phone").in("id", contactIds);
+      if (contactsError) throw new Error(contactsError.message);
+      for (const c of contactRows ?? []) contactsById.set(c.id, { name: c.name, phone: c.phone });
+    }
+    return (data ?? []).map((r) => {
+      const contact = r.contact_id ? contactsById.get(r.contact_id) : null;
+      return {
+        origemId: r.id as string,
+        score: r.nps_score as number,
+        respondidoEm: r.nps_answered_at as string,
+        clientName: contact?.name ?? null,
+        clientCpf: null,
+        clientPhone: contact?.phone ?? null,
+      };
+    });
+  }
+
+  if (origem === "montagem" || origem === "assistencia_tecnica") {
+    const { data, error } = await admin
+      .from("service_request_nps")
+      .select("request_id, score, respondido_em, service_requests(client_name, client_phone, client_cpf)")
+      .eq("tipo", origem)
+      .not("score", "is", null)
+      .order("respondido_em", { ascending: false })
+      .limit(limit);
+    if (error) throw new Error(error.message);
+
+    type Row = {
+      request_id: string;
+      score: number;
+      respondido_em: string;
+      service_requests:
+        | { client_name: string | null; client_phone: string | null; client_cpf: string | null }
+        | { client_name: string | null; client_phone: string | null; client_cpf: string | null }[]
+        | null;
+    };
+    return ((data ?? []) as unknown as Row[]).map((r) => {
+      const sr = Array.isArray(r.service_requests) ? r.service_requests[0] : r.service_requests;
+      return {
+        origemId: r.request_id,
+        score: r.score,
+        respondidoEm: r.respondido_em,
+        clientName: sr?.client_name ?? null,
+        clientCpf: sr?.client_cpf ?? null,
+        clientPhone: sr?.client_phone ?? null,
+      };
+    });
+  }
+
+  // "compra" e "entrega" -- mesma forma (por pedido de venda, não por
+  // chamado), só a tabela muda.
+  const table = origem === "compra" ? "compra_nps" : "entrega_nps";
+  const { data, error } = await admin
+    .from(table)
+    .select("order_id, client_id, score, respondido_em, totvs_orders(client_name, client_cpf_cnpj)")
+    .not("score", "is", null)
+    .order("respondido_em", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+
+  type Row = {
+    order_id: string;
+    client_id: string;
+    score: number;
+    respondido_em: string;
+    totvs_orders: { client_name: string | null; client_cpf_cnpj: string | null } | { client_name: string | null; client_cpf_cnpj: string | null }[] | null;
+  };
+  const rows = (data ?? []) as unknown as Row[];
+  // Telefone só de reforço (nem sempre tem CPF sincronizado) -- mesmo join
+  // client_id = protheus_code de listNpsDetratores acima.
+  const clientIds = [...new Set(rows.map((r) => r.client_id))];
+  const phoneByClientId = new Map<string, string | null>();
+  if (clientIds.length > 0) {
+    const { data: clienteRows, error: clientesError } = await admin.from("totvs_clientes").select("protheus_code, phone1").in("protheus_code", clientIds);
+    if (clientesError) throw new Error(clientesError.message);
+    for (const c of clienteRows ?? []) phoneByClientId.set(c.protheus_code as string, c.phone1 as string | null);
+  }
+  return rows.map((r) => {
+    const order = Array.isArray(r.totvs_orders) ? r.totvs_orders[0] : r.totvs_orders;
+    return {
+      origemId: r.order_id,
+      score: r.score,
+      respondidoEm: r.respondido_em,
+      clientName: order?.client_name ?? null,
+      clientCpf: order?.client_cpf_cnpj ?? null,
+      clientPhone: phoneByClientId.get(r.client_id) ?? null,
+    };
+  });
+}
+
 export type NpsFaseResumo = { npsIndex: number | null; responseCount: number };
 
 // Resumo (NPS clássico: %promotores - %detratores) pras fases que ainda não

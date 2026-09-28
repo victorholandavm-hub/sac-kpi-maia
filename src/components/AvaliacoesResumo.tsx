@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import type { NpsSummary } from "@/lib/kpi";
-import type { NpsDetrator, NpsFaseResumo } from "@/lib/npsDetratores";
+import type { NpsDetrator, NpsFaseResumo, NpsDetratorOrigem } from "@/lib/npsDetratores";
 import { NpsDetratoresTable } from "./NpsDetratoresTable";
+import { NpsRespostasModal } from "./NpsRespostasModal";
 
 // Metas sugeridas por fase -- pedido do Victor 24/09/2026, passou uma
 // tabela pronta de referência de mercado pra varejo/móveis. `max: null` =
@@ -56,9 +57,32 @@ function metaColor(npsIndex: number | null, meta: MetaRange): string {
 // pós-recebimento" (não "1 mês" -- correção do Victor 09/09/2026) é a
 // última a ganhar fonte de dado real, feita adiantando os gatilhos que
 // faltavam antes da aprovação dos templates.
-function FaseCard({ label, npsIndex, responseCount, meta }: { label: string; npsIndex: number | null; responseCount: number; meta: MetaRange }) {
+// Clicável -- pedido do Victor 28/09/2026: "ver o nome das pessoas que
+// avaliaram com algum tipo de dado delas, cpf, nome e a nota". Abre
+// NpsRespostasModal com a lista de quem respondeu ESSA fase (busca sob
+// demanda no clique, não precarrega nada aqui). Continua clicável mesmo
+// com responseCount 0 -- é o próprio modal que mostra "nenhuma resposta
+// ainda" nesse caso, sem precisar de um estado disabled separado.
+function FaseCard({
+  label,
+  npsIndex,
+  responseCount,
+  meta,
+  onClick,
+}: {
+  label: string;
+  npsIndex: number | null;
+  responseCount: number;
+  meta: MetaRange;
+  onClick: () => void;
+}) {
   return (
-    <div className="rounded-lg border p-4 flex flex-col gap-1" style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}>
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-lg border p-4 flex flex-col gap-1 text-left hover:shadow-md transition-shadow duration-150"
+      style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
+    >
       <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
         {label}
       </span>
@@ -71,7 +95,7 @@ function FaseCard({ label, npsIndex, responseCount, meta }: { label: string; nps
       <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
         {metaLabel(meta)}
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -85,6 +109,7 @@ export function AvaliacoesResumo({
   npsDetratores: NpsDetrator[];
 }) {
   const [showDetratores, setShowDetratores] = useState(false);
+  const [openOrigem, setOpenOrigem] = useState<NpsDetratorOrigem | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -93,33 +118,45 @@ export function AvaliacoesResumo({
           NPS por fase
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <FaseCard label="Atendimento (SAC)" npsIndex={npsSummary.npsIndex} responseCount={npsSummary.responseCount} meta={METAS.sac} />
+          <FaseCard
+            label="Atendimento (SAC)"
+            npsIndex={npsSummary.npsIndex}
+            responseCount={npsSummary.responseCount}
+            meta={METAS.sac}
+            onClick={() => setOpenOrigem("sac")}
+          />
           <FaseCard
             label="Pós-entrega"
             npsIndex={resumoFasesAdicionais.entrega.npsIndex}
             responseCount={resumoFasesAdicionais.entrega.responseCount}
             meta={METAS.entrega}
+            onClick={() => setOpenOrigem("entrega")}
           />
           <FaseCard
             label="Pós-montagem"
             npsIndex={resumoFasesAdicionais.montagem.npsIndex}
             responseCount={resumoFasesAdicionais.montagem.responseCount}
             meta={METAS.montagem}
+            onClick={() => setOpenOrigem("montagem")}
           />
           <FaseCard
             label="Pós-assistência técnica"
             npsIndex={resumoFasesAdicionais.assistencia_tecnica.npsIndex}
             responseCount={resumoFasesAdicionais.assistencia_tecnica.responseCount}
             meta={METAS.assistencia_tecnica}
+            onClick={() => setOpenOrigem("assistencia_tecnica")}
           />
           <FaseCard
             label="2 meses pós-recebimento"
             npsIndex={resumoFasesAdicionais.compra.npsIndex}
             responseCount={resumoFasesAdicionais.compra.responseCount}
             meta={METAS.compra}
+            onClick={() => setOpenOrigem("compra")}
           />
         </div>
       </div>
+
+      {openOrigem ? <NpsRespostasModal origem={openOrigem} onClose={() => setOpenOrigem(null)} /> : null}
 
       <div>
         <button

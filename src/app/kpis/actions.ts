@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
-import { registrarStatusDetrator, isNpsDetratorStatus, type NpsDetratorOrigem } from "@/lib/npsDetratores";
+import { registrarStatusDetrator, isNpsDetratorStatus, listNpsRespostasPorFase, type NpsDetratorOrigem, type NpsResposta } from "@/lib/npsDetratores";
 
 // Avaliações do Google -- puxadas manualmente uma vez por semana (ver
 // src/lib/googleReviews.ts). O painel de KPIs do SAC usa login próprio
@@ -66,4 +66,12 @@ export async function setNpsDetratorStatusAction(origem: NpsDetratorOrigem, orig
 
   await registrarStatusDetrator(origem, origemId, { status, motivo: motivo.trim() || null });
   revalidatePath("/avaliacoes");
+}
+
+// Card clicável no Resumo (AvaliacoesResumo.tsx) -- pedido do Victor
+// 28/09/2026: "ver o nome das pessoas que avaliaram com algum tipo de
+// dado delas... CPF e o nome e a nota". Mesmo login do resto desta tela.
+export async function listNpsRespostasPorFaseAction(origem: NpsDetratorOrigem): Promise<NpsResposta[]> {
+  await requireDashboardAuth();
+  return listNpsRespostasPorFase(origem);
 }
