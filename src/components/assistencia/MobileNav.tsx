@@ -82,12 +82,11 @@ const PRIMARY_TABS = [
   { label: "Controle", href: "/assistencia/pecas", icon: BoxIcon, matches: ["/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
 ];
 
-// Prazos de produtos entrou aqui 27/08/2026 -- tinha ficado de fora
-// quando a aba nasceu (AssistenciaNav.tsx já tinha, esse menu não).
+// "Prazos de produtos" inativada (tirada de exibição) -- pedido do Victor
+// 28/09/2026, mesmo motivo de AssistenciaNav.tsx/SacTabs.tsx.
 const MORE_TABS = [
   { label: "Encomendas", href: "/assistencia/encomendas/fila" },
   { label: "Pagamentos", href: "/assistencia/pagamentos" },
-  { label: "Prazos de produtos", href: "/assistencia/prazos-produtos" },
   { label: "Relatórios", href: "/assistencia/relatorios" },
 ];
 

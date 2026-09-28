@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Users, TrendingUp, SquareStar } from "lucide-react";
+import { BarChart3, Users, SquareStar } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 
@@ -21,13 +21,6 @@ const AREAS = [
     color: "var(--brand-green)",
     title: "Clientes",
     description: "Gestão e perfil de relacionamento de clientes ativos e inativos.",
-  },
-  {
-    href: "/vendas",
-    icon: TrendingUp,
-    color: "var(--brand-orange)",
-    title: "Vendas",
-    description: "Análise da curva de vendas, ranking de faturamento e categorias de produtos.",
   },
   {
     href: "/avaliacoes",
