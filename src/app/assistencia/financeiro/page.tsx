@@ -106,11 +106,22 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
       {isSac ? <SacTabs active="estornos" /> : null}
       {isSupervisao ? <SupervisaoTabs active="estornos" /> : null}
 
+      {/* Pendentes/Concluídos/Recusados clicáveis -- pedido do Victor
+          28/09/2026: atalho direto pro filtro correspondente, mesmo
+          destino das abas UnderlineTab logo abaixo (só um jeito a mais de
+          chegar lá). "Valor pendente" fica de fora -- não é status, é o
+          mesmo filtro de "Pendentes" já coberto pelo card ao lado. */}
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatTile label="Pendentes" value={summary.pendente} accent="var(--brand-orange)" />
+        <Link href="/assistencia/financeiro?view=pendentes" className="block rounded-lg transition-shadow duration-150 hover:shadow-md">
+          <StatTile label="Pendentes" value={summary.pendente} accent="var(--brand-orange)" />
+        </Link>
         <StatTile label="Valor pendente" value={formatMoney(summary.valorPendente)} accent="var(--brand-orange)" />
-        <StatTile label="Concluídos" value={summary.concluido} accent="var(--status-good)" />
-        <StatTile label="Recusados" value={summary.recusado} accent="var(--status-critical)" />
+        <Link href="/assistencia/financeiro?view=concluidos" className="block rounded-lg transition-shadow duration-150 hover:shadow-md">
+          <StatTile label="Concluídos" value={summary.concluido} accent="var(--status-good)" />
+        </Link>
+        <Link href="/assistencia/financeiro?view=recusados" className="block rounded-lg transition-shadow duration-150 hover:shadow-md">
+          <StatTile label="Recusados" value={summary.recusado} accent="var(--status-critical)" />
+        </Link>
       </section>
 
       <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
