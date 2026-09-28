@@ -12,11 +12,13 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 // outra aba Assistencia") -- virou sub-aba de "KPIs" (KpisSectionTabs.tsx,
 // dentro de /kpis e /kpis-assistencia), não item solto aqui. `pathname.
 // startsWith("/kpis")` já cobre as duas rotas de propósito (mesmo prefixo).
+// "Vendas" inativada (tirada de exibição) -- pedido do Victor 28/09/2026.
+// A rota /vendas continua existindo, só não aparece mais aqui nem no card
+// da tela inicial (ver page.tsx).
 const TABS = [
   { key: "home", label: "Início", href: "/" },
   { key: "kpis", label: "KPIs", href: "/kpis" },
   { key: "clientes", label: "Clientes", href: "/clientes" },
-  { key: "vendas", label: "Vendas", href: "/vendas" },
   { key: "avaliacoes", label: "Avaliações", href: "/avaliacoes" },
 ];
 

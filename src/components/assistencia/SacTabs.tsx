@@ -9,8 +9,13 @@ const TABS = [
   { key: "notificacoes", label: "Notificação de Assistência", href: "/assistencia/sac/notificacoes" },
   { key: "encomendas", label: "Minhas encomendas", href: "/assistencia/encomendas/sac" },
   { key: "montagens", label: "Montagens e serviços", href: "/assistencia/sac/montagens" },
-  { key: "cargas", label: "Cargas", href: "/assistencia/sac/cargas" },
-  { key: "prazos-produtos", label: "Prazos de produtos", href: "/assistencia/prazos-produtos" },
+  // Inativadas (tiradas de exibição) -- pedido do Victor 28/09/2026. A
+  // rota/página continua existindo (não removida do código), só não
+  // aparece mais nessa fileira de abas. `hidden: true` em vez de apagar a
+  // entrada -- as próprias páginas (cargas/page.tsx, prazos-produtos/
+  // page.tsx) ainda se identificam com essas chaves via `active`.
+  { key: "cargas", label: "Cargas", href: "/assistencia/sac/cargas", hidden: true },
+  { key: "prazos-produtos", label: "Prazos de produtos", href: "/assistencia/prazos-produtos", hidden: true },
   // Só visualização (ver financeiro/page.tsx) -- pedido do Victor
   // 28/09/2026: "a tela de estornos também deve ficar disponível para o
   // sac ver". Concluir/recusar continua exclusivo de financeiro/admin.
@@ -27,7 +32,7 @@ export type SacTabKey = (typeof TABS)[number]["key"];
 export function SacTabs({ active }: { active: SacTabKey }) {
   return (
     <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-600 overflow-x-auto">
-      {TABS.map((tab) => {
+      {TABS.filter((tab) => !("hidden" in tab && tab.hidden)).map((tab) => {
         const isActive = tab.key === active;
         return (
           <Link
