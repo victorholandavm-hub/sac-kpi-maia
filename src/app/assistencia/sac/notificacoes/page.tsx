@@ -7,6 +7,7 @@ import { getRotaWeekOverview, startOfRotaWeek, addDays, ROTA_CITY, JP_DEFAULT_DR
 import { ROLE_LABELS } from "@/lib/assistenciaLabels";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
+import { SupervisaoTabs } from "@/components/assistencia/SupervisaoTabs";
 import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -94,9 +95,14 @@ export default async function SacNotificacoesPage({
   }>;
 }) {
   const profile = await getProfile();
-  if (profile.role !== "sac" && profile.role !== "admin") {
+  if (profile.role !== "sac" && profile.role !== "admin" && profile.role !== "supervisao") {
     redirect("/assistencia/inicio");
   }
+  // Papel "supervisao" (Akyla Thais, pedido do Victor 28/09/2026): acessa
+  // essa fila só pra acompanhar -- sem "+ Nova solicitação" nem o botão de
+  // gestão de motoristas (RotaMotoristaDoDia, é ação de mudar rota do dia,
+  // não tem modo leitura).
+  const readOnly = profile.role === "supervisao";
 
   const { status, q, store, from, to, origem, atendente, sched, city, urgente, semrota } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
@@ -200,7 +206,7 @@ export default async function SacNotificacoesPage({
 
       <AssistenciaHeader title="Notificação de Assistência" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`} />
 
-      <SacTabs active="notificacoes" />
+      {readOnly ? <SupervisaoTabs active="notificacoes" /> : <SacTabs active="notificacoes" />}
 
       {/* Título + descrição + CTA no canto direito -- pedido do Victor
           25/08/2026 ("guia de padronização"), mesmo padrão de
@@ -210,13 +216,15 @@ export default async function SacNotificacoesPage({
         title="Entregas"
         description="Rotas de motorista -- troca, entrega e recolhimento de produto, envio e recolhimento de peça."
         cta={
-          <Link
-            href="/assistencia/sac/nova"
-            className="inline-flex items-center gap-1.5 text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
-            style={{ background: "var(--brand-orange)" }}
-          >
-            + Nova solicitação
-          </Link>
+          readOnly ? undefined : (
+            <Link
+              href="/assistencia/sac/nova"
+              className="inline-flex items-center gap-1.5 text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
+              style={{ background: "var(--brand-orange)" }}
+            >
+              + Nova solicitação
+            </Link>
+          )
         }
       />
 
@@ -426,7 +434,9 @@ export default async function SacNotificacoesPage({
                 today={today}
                 routesOverview={entregasRoutesOverview}
                 motoristaAction={
-                  <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+                  readOnly ? undefined : (
+                    <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+                  )
                 }
               />
               {!hasActiveFilter ? <EntregasFlatList items={restGroups.flatMap((g) => g.items)} /> : null}
@@ -439,7 +449,9 @@ export default async function SacNotificacoesPage({
             // de nenhum estado desse ramo (é sempre a semana + seguinte,
             // com "Mostrar mais dias"), só falta continuar visível.
             <>
-              <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+              {readOnly ? null : (
+                <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+              )}
               <EntregasFlatList items={requests} />
             </>
           )}

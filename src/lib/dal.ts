@@ -10,7 +10,13 @@ import {
   PAYMENTS_CONTROLLER_NAME,
 } from "./assistenciaLabels";
 
-export type Role = "assistencia" | "admin" | "sac";
+// "supervisao" -- pedido do Victor 28/09/2026 (conta da Akyla Thais):
+// acesso só de leitura a 4 telas específicas (Estornos, Notificação de
+// Assistência, Visitas, Reclamações), nada mais. Feito sob medida pra
+// esse caso (não é um sistema geral de permissões por tela) -- ver
+// SupervisaoGuard.tsx (bloqueio client-side de qualquer outra rota dentro
+// de (app)) e os `isSupervisao`/`readOnly` espalhados pelas 4 páginas.
+export type Role = "assistencia" | "admin" | "sac" | "supervisao";
 
 export type Profile = {
   id: string;

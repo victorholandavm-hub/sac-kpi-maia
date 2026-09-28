@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { StatTile } from "@/components/StatTile";
 import { BarRanking } from "@/components/BarRanking";
+import { SupervisaoTabs } from "@/components/assistencia/SupervisaoTabs";
 
 function buildHref(params: { status?: string; q?: string }) {
   const sp = new URLSearchParams();
@@ -35,9 +36,14 @@ export default async function ReclamacoesPage({
   const { status, q } = await searchParams;
   const profile = await getProfile();
 
-  if (profile.role !== "admin") {
+  // Papel "supervisao" (Akyla Thais, pedido do Victor 28/09/2026): vê essa
+  // tela, mas só leitura -- sem "+ Nova reclamação" nem link pra editar
+  // (ver readOnly abaixo). /nova e /[id]/editar continuam travadas pra
+  // admin só (ela nunca chega lá, nem pela URL direta).
+  if (profile.role !== "admin" && profile.role !== "supervisao") {
     return <p className="text-sm text-gray-400 dark:text-gray-500">Acesso restrito ao admin.</p>;
   }
+  const readOnly = profile.role === "supervisao";
 
   const reclamacoes = await listReclamacoes();
   const summary = buildReclamacoesSummary(reclamacoes);
@@ -52,17 +58,20 @@ export default async function ReclamacoesPage({
 
   return (
     <div className="flex flex-col gap-6">
+      {readOnly ? <SupervisaoTabs active="reclamacoes" /> : null}
       <PageHeader
         title="Reclamações"
         description="Procon, Reclame Aqui e processos judiciais"
         cta={
-          <Link
-            href="/assistencia/reclamacoes/nova"
-            className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white"
-            style={{ background: "#1B5E3C" }}
-          >
-            + Nova reclamação
-          </Link>
+          readOnly ? undefined : (
+            <Link
+              href="/assistencia/reclamacoes/nova"
+              className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white"
+              style={{ background: "#1B5E3C" }}
+            >
+              + Nova reclamação
+            </Link>
+          )
         }
       />
 
@@ -81,9 +90,15 @@ export default async function ReclamacoesPage({
           <ul className="flex flex-col gap-1.5">
             {proximasAudiencias.map((r) => (
               <li key={r.id} className="text-sm flex items-center justify-between gap-2 flex-wrap">
-                <Link href={`/assistencia/reclamacoes/${r.id}/editar`} className="underline" style={{ color: "var(--text-primary)" }}>
-                  {r.nome} <span style={{ color: "var(--text-muted)" }}>({r.orgao})</span>
-                </Link>
+                {readOnly ? (
+                  <span style={{ color: "var(--text-primary)" }}>
+                    {r.nome} <span style={{ color: "var(--text-muted)" }}>({r.orgao})</span>
+                  </span>
+                ) : (
+                  <Link href={`/assistencia/reclamacoes/${r.id}/editar`} className="underline" style={{ color: "var(--text-primary)" }}>
+                    {r.nome} <span style={{ color: "var(--text-muted)" }}>({r.orgao})</span>
+                  </Link>
+                )}
                 <span className="tabular-nums font-medium" style={{ color: "var(--brand-orange)" }}>
                   {formatAudiencia(r.dataAudiencia!)}
                 </span>
@@ -143,9 +158,13 @@ export default async function ReclamacoesPage({
                 filtered.map((r) => (
                   <tr key={r.id} className="border-t" style={{ borderColor: "var(--border)" }}>
                     <td className="px-3 py-2">
-                      <Link href={`/assistencia/reclamacoes/${r.id}/editar`} className="underline" style={{ color: "var(--text-primary)" }}>
-                        {r.nome}
-                      </Link>
+                      {readOnly ? (
+                        <span style={{ color: "var(--text-primary)" }}>{r.nome}</span>
+                      ) : (
+                        <Link href={`/assistencia/reclamacoes/${r.id}/editar`} className="underline" style={{ color: "var(--text-primary)" }}>
+                          {r.nome}
+                        </Link>
+                      )}
                       {r.cpf ? (
                         <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
                           {r.cpf}

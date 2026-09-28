@@ -138,6 +138,7 @@ export const ROLE_LABELS: Record<string, string> = {
   assistencia: "Assistência",
   admin: "Administrador",
   sac: "SAC",
+  supervisao: "Supervisão (leitura)",
   cd: "CD",
   fabrica: "Fábrica",
   loja: "Loja",

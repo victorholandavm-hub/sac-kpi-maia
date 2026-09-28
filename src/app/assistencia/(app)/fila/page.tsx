@@ -24,6 +24,7 @@ import { RotaMotoristaDoDia } from "@/components/assistencia/RotaMotoristaDoDia"
 import { JuniorTruckModalButton } from "@/components/assistencia/JuniorTruckModalButton";
 import { NovaEntregaShortcut } from "@/components/assistencia/NovaEntregaShortcut";
 import { PageHeader } from "@/components/assistencia/PageHeader";
+import { SupervisaoTabs } from "@/components/assistencia/SupervisaoTabs";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { UnderlineTab } from "@/components/UnderlineTab";
 import { DateRangeQuickFilter } from "@/components/assistencia/DateRangeQuickFilter";
@@ -182,6 +183,13 @@ export default async function AssistenciaQueuePage({
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
+  // Papel "supervisao" (Akyla Thais, pedido do Victor 28/09/2026): acessa
+  // essa fila só pra acompanhar, sem criar nada -- esconde os CTAs de
+  // "+ Nova visita"/"+ Nova entrega" abaixo. O resto da tela (filtros,
+  // lista, detalhe do chamado) já é somente leitura pra ela de qualquer
+  // jeito, porque `canManage`/`canEdit` nas telas de detalhe (ver
+  // RequestDetailContent.tsx) só reconhece admin/assistencia/sac.
+  const readOnly = profile.role === "supervisao";
   const {
     status,
     q,
@@ -559,6 +567,10 @@ export default async function AssistenciaQueuePage({
   return (
     <div className="flex flex-col gap-4">
       <RealtimeQueueRefresher notifyOnInsert="Nova solicitação recebida!" />
+      {/* Layout.tsx não mostra nada pro papel supervisao aqui (ver
+          comentário lá) -- essa página renderiza a própria navegação,
+          mesmo padrão do SacTabs em telas fora do grupo (app). */}
+      {readOnly ? <SupervisaoTabs active="visitas" /> : null}
 
       {/* Título + descrição + CTA no canto direito -- pedido do Victor
           25/08/2026 ("guia de padronização"): "Todas as telas devem
@@ -575,28 +587,30 @@ export default async function AssistenciaQueuePage({
             : "Chamados de montagem, desmontagem, vistoria e troca de peça -- triagem de clientes e mostruário. Não inclui o Manoel -- as visitas dele ficam na Agenda."
         }
         cta={
-          <div className="flex items-center gap-2">
-            {/* Contraste maior + atalho Alt+N só na aba Entregas -- pedido
-                do Victor 21/08/2026: "Aumente o contraste visual do botão
-                + Nova entrega no topo da página e adicione o atalho de
-                teclado Alt + N". Visitas continua com o botão de sempre. */}
-            {showPecas ? <NovaEntregaShortcut href="/assistencia/nova-entrega" /> : null}
-            {/* Primário -- Guia de Componentes Maia (Design System,
-                01/09/2026): cantos suaves, sombra discreta, brightness no
-                hover. Entregas mantém laranja (contraste extra pedido pelo
-                Victor 21/08/2026 pra essa ação específica, mais urgente
-                por natureza -- roteirização do dia); Visitas usa o verde
-                primário padrão. */}
-            <Link
-              href={showPecas ? "/assistencia/nova-entrega" : "/assistencia/nova-rapida"}
-              className="inline-flex items-center gap-1.5 text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
-              style={{ background: showPecas ? "var(--brand-orange)" : "var(--brand-green)" }}
-              title={showPecas ? "Atalho: Alt + N" : undefined}
-            >
-              + Nova {showPecas ? "entrega" : "visita"}
-              {showPecas ? <span className="text-xs font-normal opacity-80">(Alt+N)</span> : null}
-            </Link>
-          </div>
+          readOnly ? null : (
+            <div className="flex items-center gap-2">
+              {/* Contraste maior + atalho Alt+N só na aba Entregas -- pedido
+                  do Victor 21/08/2026: "Aumente o contraste visual do botão
+                  + Nova entrega no topo da página e adicione o atalho de
+                  teclado Alt + N". Visitas continua com o botão de sempre. */}
+              {showPecas ? <NovaEntregaShortcut href="/assistencia/nova-entrega" /> : null}
+              {/* Primário -- Guia de Componentes Maia (Design System,
+                  01/09/2026): cantos suaves, sombra discreta, brightness no
+                  hover. Entregas mantém laranja (contraste extra pedido pelo
+                  Victor 21/08/2026 pra essa ação específica, mais urgente
+                  por natureza -- roteirização do dia); Visitas usa o verde
+                  primário padrão. */}
+              <Link
+                href={showPecas ? "/assistencia/nova-entrega" : "/assistencia/nova-rapida"}
+                className="inline-flex items-center gap-1.5 text-sm px-4 py-2.5 rounded-lg font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
+                style={{ background: showPecas ? "var(--brand-orange)" : "var(--brand-green)" }}
+                title={showPecas ? "Atalho: Alt + N" : undefined}
+              >
+                + Nova {showPecas ? "entrega" : "visita"}
+                {showPecas ? <span className="text-xs font-normal opacity-80">(Alt+N)</span> : null}
+              </Link>
+            </div>
+          )
         }
       />
 
@@ -988,10 +1002,12 @@ export default async function AssistenciaQueuePage({
                 today={today}
                 routesOverview={entregasRoutesOverview}
                 motoristaAction={
-                  <>
-                    <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
-                    {isJuniorTruckManager ? <JuniorTruckModalButton initialEntries={juniorTruckEntries} /> : null}
-                  </>
+                  readOnly ? undefined : (
+                    <>
+                      <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+                      {isJuniorTruckManager ? <JuniorTruckModalButton initialEntries={juniorTruckEntries} /> : null}
+                    </>
+                  )
                 }
               />
               {/* Isolando "Hoje" (isHojePresetOnly) não mostra o resto --
@@ -1009,7 +1025,9 @@ export default async function AssistenciaQueuePage({
             // nenhum estado desse ramo -- só falta o botão continuar
             // visível mesmo com outro filtro ativo.
             <>
-              <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+              {readOnly ? null : (
+                <RotaMotoristaDoDia today={today} initialOverview={rotaOverview} drivers={drivers} defaultDriver={JP_DEFAULT_DRIVER} buttonOnly isAdmin={profile.role === "admin"} />
+              )}
               <EntregasFlatList items={requests} />
             </>
           )}

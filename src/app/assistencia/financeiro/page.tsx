@@ -9,6 +9,7 @@ import { StatTile } from "@/components/StatTile";
 import { EstornoStatusBadge } from "@/components/assistencia/EstornoStatusBadge";
 import { EstornoFinanceiroActions } from "@/components/assistencia/EstornoFinanceiroActions";
 import { SacTabs } from "@/components/assistencia/SacTabs";
+import { SupervisaoTabs } from "@/components/assistencia/SupervisaoTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -48,17 +49,19 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 // inteira, não uma ação isolada. SAC também acessa (pedido do Victor
 // 28/09/2026), mas só pra visualizar -- concluir/recusar continua
 // travado por resolveFinanceiroOrAdminName (financeiro-estornos-actions.ts),
-// que não reconhece SAC, então os botões de ação nem aparecem pra esse
-// papel (ver isReadOnly abaixo).
+// que não reconhece SAC nem supervisao, então os botões de ação nem
+// aparecem pra esses papéis (ver isReadOnly abaixo). "supervisao" (Akyla
+// Thais, mesmo pedido do dia) entra pelo mesmo motivo de SAC, só leitura.
 export default async function FinanceiroPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const financeiroName = await getFinanceiroSession();
   const profile = financeiroName ? null : await getOptionalProfile();
   const isAdmin = !!profile && profile.role === "admin";
   const isSac = !!profile && profile.role === "sac";
-  if (!financeiroName && !isAdmin && !isSac) {
+  const isSupervisao = !!profile && profile.role === "supervisao";
+  if (!financeiroName && !isAdmin && !isSac && !isSupervisao) {
     redirect("/assistencia/financeiro/login");
   }
-  const isReadOnly = isSac;
+  const isReadOnly = isSac || isSupervisao;
 
   const { view } = await searchParams;
   const current = STATUS_VIEWS.find((v) => v.view === view) ?? STATUS_VIEWS[0];
@@ -73,7 +76,9 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
             ? `${profile!.fullName} (admin) · todas as lojas`
             : isSac
               ? `${profile!.fullName} (SAC) · somente visualização`
-              : `${financeiroName} · todas as lojas`
+              : isSupervisao
+                ? `${profile!.fullName} (Supervisão) · somente visualização`
+                : `${financeiroName} · todas as lojas`
         }
       >
         {financeiroName ? (
@@ -86,7 +91,9 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
           <Link href="/assistencia/sac" className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             ← Voltar pro SAC
           </Link>
-        ) : (
+        ) : isSupervisao ? null : ( // Essa é a "casa" dela (1ª tela depois do login, ver actions.ts/signIn)
+          // -- sem link de "voltar", não tem outro lugar padrão pra
+          // mandar (o resto do (app) é barrado por SupervisaoGuard).
           // "/assistencia" é a tela de escolha de papel (cards de login) --
           // achado do Victor 24/09/2026: parecia "voltar pro login" em vez
           // de voltar pro painel. Admin volta pra própria tela de início.
@@ -97,6 +104,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
       </AssistenciaHeader>
 
       {isSac ? <SacTabs active="estornos" /> : null}
+      {isSupervisao ? <SupervisaoTabs active="estornos" /> : null}
 
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatTile label="Pendentes" value={summary.pendente} accent="var(--brand-orange)" />
