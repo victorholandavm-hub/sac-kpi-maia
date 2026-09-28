@@ -17,12 +17,36 @@ export type PagedQueryResult<T> = { data: T[] | null; error: { message: string }
 
 const DEFAULT_PAGE_SIZE = 1000;
 
+// Disparar dezenas de páginas em paralelo (ver comentário acima) significa
+// dezenas de conexões simultâneas ao Supabase -- uma falha de rede
+// transitória numa única página (TypeError: fetch failed, achado
+// 28/09/2026 investigando "Minified React error #441" em /kpis, digest
+// 1801967253) derrubava a promise inteira do Promise.all, sem chance de
+// recuperação, e o erro cru (fetch() rejeitado, nem chega a virar
+// PagedQueryResult.error) subia até estourar o boundary de erro do React.
+// 1 nova tentativa (com um pequeno atraso) cobre o caso comum de blip de
+// rede sem esconder um erro persistente de verdade (esse continua
+// propagando depois da 2ª falha).
+async function fetchPageWithRetry<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<PagedQueryResult<T>>,
+  from: number,
+  to: number
+): Promise<PagedQueryResult<T>> {
+  try {
+    return await fetchPage(from, to);
+  } catch (err) {
+    if (!(err instanceof TypeError) || !/fetch/i.test(err.message)) throw err;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return await fetchPage(from, to);
+  }
+}
+
 export async function fetchAllPagesParallel<T>(
   fetchPage: (from: number, to: number) => PromiseLike<PagedQueryResult<T>>,
   opts: { pageSize?: number } = {}
 ): Promise<T[]> {
   const pageSize = opts.pageSize ?? DEFAULT_PAGE_SIZE;
-  const first = await fetchPage(0, pageSize - 1);
+  const first = await fetchPageWithRetry(fetchPage, 0, pageSize - 1);
   if (first.error) throw new Error(first.error.message);
   const firstRows = (first.data ?? []) as T[];
 
@@ -36,7 +60,7 @@ export async function fetchAllPagesParallel<T>(
   const restResults = await Promise.all(
     Array.from({ length: totalPages - 1 }, (_, i) => {
       const from = (i + 1) * pageSize;
-      return fetchPage(from, from + pageSize - 1);
+      return fetchPageWithRetry(fetchPage, from, from + pageSize - 1);
     })
   );
 
