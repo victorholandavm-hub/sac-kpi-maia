@@ -11,6 +11,10 @@ const TABS = [
   { key: "montagens", label: "Montagens e serviços", href: "/assistencia/sac/montagens" },
   { key: "cargas", label: "Cargas", href: "/assistencia/sac/cargas" },
   { key: "prazos-produtos", label: "Prazos de produtos", href: "/assistencia/prazos-produtos" },
+  // Só visualização (ver financeiro/page.tsx) -- pedido do Victor
+  // 28/09/2026: "a tela de estornos também deve ficar disponível para o
+  // sac ver". Concluir/recusar continua exclusivo de financeiro/admin.
+  { key: "estornos", label: "Estornos", href: "/assistencia/financeiro" },
 ] as const;
 
 export type SacTabKey = (typeof TABS)[number]["key"];
