@@ -50,11 +50,30 @@ import Link from "next/link";
 // var(--border) + texto na cor de identidade (`color`). É literalmente a
 // MESMA receita de Dashboard.tsx (só parametrizada aqui por `color` em vez
 // de var(--brand-green) fixo).
-export function UnderlineTab({ href, label, active, color = "var(--brand-green)" }: { href: string; label: string; active: boolean; color?: string }) {
+// `count` opcional -- pedido do Victor 29/09/2026 (abas de Reclamações por
+// órgão): badge redondo com fundo soft ao lado do rótulo, mesmo espírito do
+// NavBadge (AssistenciaNav.tsx), só que "soft" (color-mix com a própria
+// `color` da aba) em vez de preenchimento sólido -- combina melhor com o
+// fundo var(--surface-1)/borda fina dessa aba do que o laranja sólido do
+// menu principal. `undefined`/0 esconde o badge (mesmo comportamento de
+// NavBadge pra contagem zerada).
+export function UnderlineTab({
+  href,
+  label,
+  active,
+  color = "var(--brand-green)",
+  count,
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  color?: string;
+  count?: number;
+}) {
   return (
     <Link
       href={href}
-      className="text-sm font-medium px-4 py-2 -mb-px rounded-t-lg border border-b-0 transition-colors duration-200"
+      className="text-sm font-medium px-4 py-2 -mb-px rounded-t-lg border border-b-0 transition-colors duration-200 flex items-center gap-1.5"
       style={{
         color: active ? color : "var(--text-secondary)",
         background: active ? "var(--surface-1)" : "transparent",
@@ -62,6 +81,14 @@ export function UnderlineTab({ href, label, active, color = "var(--brand-green)"
       }}
     >
       {label}
+      {count ? (
+        <span
+          className="text-[10px] font-bold rounded-full min-w-[1.1rem] h-[1.1rem] px-1 flex items-center justify-center"
+          style={{ background: `color-mix(in srgb, ${color} 20%, transparent)`, color }}
+        >
+          {count > 99 ? "99+" : count}
+        </span>
+      ) : null}
     </Link>
   );
 }
