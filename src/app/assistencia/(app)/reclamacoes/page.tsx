@@ -1,16 +1,20 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { listReclamacoes, buildReclamacoesSummary, listProximasAudiencias } from "@/lib/reclamacoes";
-import { STATUS_INTERNO_OPTIONS } from "@/lib/reclamacoesLabels";
+import { STATUS_INTERNO_OPTIONS, ORGAO_GRUPO_LABELS, orgaoGrupo, isStatusInternoResolvido, type OrgaoGrupo } from "@/lib/reclamacoesLabels";
 import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { StatTile } from "@/components/StatTile";
 import { BarRanking } from "@/components/BarRanking";
 import { SupervisaoTabs } from "@/components/assistencia/SupervisaoTabs";
 import { ReclamacaoTableRow } from "@/components/assistencia/ReclamacaoTableRow";
+import { UnderlineTab } from "@/components/UnderlineTab";
 
-function buildHref(params: { status?: string; q?: string }) {
+const ORGAO_GRUPOS: OrgaoGrupo[] = ["procon", "judicial", "reclame_aqui"];
+
+function buildHref(params: { org?: string; status?: string; q?: string }) {
   const sp = new URLSearchParams();
+  if (params.org) sp.set("org", params.org);
   if (params.status) sp.set("status", params.status);
   if (params.q) sp.set("q", params.q);
   const qs = sp.toString();
@@ -32,9 +36,14 @@ function formatAudiencia(iso: string): string {
 export default async function ReclamacoesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ org?: string; status?: string; q?: string }>;
 }) {
-  const { status, q } = await searchParams;
+  const { org, status, q } = await searchParams;
+  // Procon (todos os 4 municípios/estadual juntos) é a aba padrão -- ver
+  // orgaoGrupo/ORGAO_GRUPOS em reclamacoesLabels.ts. Diferente do filtro de
+  // status (que tem "Todos" de verdade), aqui sempre tem uma das 3 abas
+  // ativa -- pedido do Victor 29/09/2026.
+  const grupo: OrgaoGrupo = org === "judicial" || org === "reclame_aqui" ? org : "procon";
   const profile = await getProfile();
 
   // Papel "supervisao" (Akyla Thais, pedido do Victor 28/09/2026): vê essa
@@ -52,10 +61,15 @@ export default async function ReclamacoesPage({
 
   const needle = q?.trim().toLowerCase();
   const filtered = reclamacoes.filter((r) => {
+    if (orgaoGrupo(r.orgao) !== grupo) return false;
     if (status && r.statusInterno !== status) return false;
     if (needle && !r.nome.toLowerCase().includes(needle) && !(r.cpf ?? "").includes(needle)) return false;
     return true;
   });
+
+  const pendentesPorGrupo = Object.fromEntries(
+    ORGAO_GRUPOS.map((g) => [g, reclamacoes.filter((r) => orgaoGrupo(r.orgao) === g && !isStatusInternoResolvido(r.statusInterno)).length])
+  ) as Record<OrgaoGrupo, number>;
 
   return (
     <div className="flex flex-col gap-6">
@@ -109,20 +123,28 @@ export default async function ReclamacoesPage({
         </div>
       ) : null}
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <BarRanking title="Por órgão" data={summary.porOrgao.map((o) => ({ label: o.label, count: o.count }))} />
-        <BarRanking title="Por status" data={summary.porStatus.map((s) => ({ label: s.label, count: s.count }))} />
+      <div className="flex items-center gap-1 border-b overflow-x-auto" style={{ borderColor: "var(--border)" }}>
+        {ORGAO_GRUPOS.map((g) => (
+          <UnderlineTab
+            key={g}
+            href={buildHref({ org: g === "procon" ? undefined : g, q })}
+            label={ORGAO_GRUPO_LABELS[g]}
+            active={grupo === g}
+            count={pendentesPorGrupo[g]}
+          />
+        ))}
       </div>
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          <FilterPill href={buildHref({ q })} label="Todos" selected={!status} />
+          <FilterPill href={buildHref({ org, q })} label="Todos" selected={!status} />
           {STATUS_INTERNO_OPTIONS.map((s) => (
-            <FilterPill key={s} href={buildHref({ status: s, q })} label={s} selected={status === s} />
+            <FilterPill key={s} href={buildHref({ org, status: s, q })} label={s} selected={status === s} />
           ))}
         </div>
 
         <form action="/assistencia/reclamacoes" method="get" className="flex items-center gap-2">
+          {org ? <input type="hidden" name="org" value={org} /> : null}
           {status ? <input type="hidden" name="status" value={status} /> : null}
           <input
             type="text"
@@ -161,6 +183,17 @@ export default async function ReclamacoesPage({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Gráficos no final da tela -- pedido do Victor 29/09/2026: o
+          resumo (StatTile) e o alerta de audiências continuam no topo (é
+          o que muda de urgente pra urgente), os rankings ficam de apoio
+          depois da lista de verdade. Sempre com o total geral (não
+          filtrado pela aba/busca de cima) -- é visão consolidada, não
+          repete o recorte da tabela. */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <BarRanking title="Por órgão" data={summary.porOrgao.map((o) => ({ label: o.label, count: o.count }))} />
+        <BarRanking title="Por status" data={summary.porStatus.map((s) => ({ label: s.label, count: s.count }))} />
       </div>
     </div>
   );

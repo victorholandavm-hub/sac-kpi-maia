@@ -36,3 +36,23 @@ export const STATUS_INTERNO_OPTIONS = [
 export function isStatusInternoResolvido(status: string): boolean {
   return status.trim().toLowerCase() === "resolvido";
 }
+
+// Agrupamento por órgão pras abas da tela (pedido do Victor 29/09/2026) --
+// os 4 Procons (municipais + estadual) viram uma aba só ("Procon"), já que
+// separar cidade por cidade numa aba pra cada uma criaria mais abas do que
+// casos por aba na maioria dos meses. Judicial/Reclame Aqui já são um
+// órgão só cada, ficam com aba própria.
+export type OrgaoGrupo = "procon" | "judicial" | "reclame_aqui";
+
+export const ORGAO_GRUPO_LABELS: Record<OrgaoGrupo, string> = {
+  procon: "Procon (todos)",
+  judicial: "Judicial",
+  reclame_aqui: "Reclame Aqui",
+};
+
+export function orgaoGrupo(orgao: string): OrgaoGrupo {
+  const normalized = orgao.trim().toLowerCase();
+  if (normalized === "judicial") return "judicial";
+  if (normalized === "reclame aqui") return "reclame_aqui";
+  return "procon";
+}
