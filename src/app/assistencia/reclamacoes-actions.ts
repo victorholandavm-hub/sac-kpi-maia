@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getProfile, requireRole } from "@/lib/dal";
-import { createReclamacao, updateReclamacao, type ReclamacaoInput } from "@/lib/reclamacoes";
+import { createReclamacao, updateReclamacao, patchReclamacaoField, type ReclamacaoInput, type ReclamacaoInlineField } from "@/lib/reclamacoes";
 
 export type ReclamacaoFormState = { error?: string } | undefined;
 
@@ -76,4 +76,27 @@ export async function updateReclamacaoAction(id: string, _state: ReclamacaoFormS
   revalidatePath("/assistencia/reclamacoes");
   revalidatePath(`/assistencia/reclamacoes/${id}/editar`);
   redirect("/assistencia/reclamacoes?salvo=1");
+}
+
+// Edição inline na tabela (pedido do Victor 29/09/2026) -- chamada direto
+// do client (onChange, sem form/useActionState) pelos 3 campos que valem a
+// pena mudar sem abrir o formulário inteiro: Status, Status externo e
+// Audiência. `value` já chega pronto pro banco (a página monta a string
+// "-03:00" da audiência, mesmo formato de parseAudiencia acima -- feito no
+// client porque o valor bruto do <input type="datetime-local"> muda por
+// campo, não por FormData).
+export async function updateReclamacaoFieldAction(id: string, field: ReclamacaoInlineField, value: string | null): Promise<{ error?: string }> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+
+  if (field === "statusInterno" && !value?.trim()) return { error: "Informe o status." };
+
+  try {
+    await patchReclamacaoField(id, field, value);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível salvar." };
+  }
+
+  revalidatePath("/assistencia/reclamacoes");
+  return {};
 }

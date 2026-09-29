@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { getProfile } from "@/lib/dal";
 import { listReclamacoes, buildReclamacoesSummary, listProximasAudiencias } from "@/lib/reclamacoes";
-import { isStatusInternoResolvido, STATUS_INTERNO_OPTIONS } from "@/lib/reclamacoesLabels";
+import { STATUS_INTERNO_OPTIONS } from "@/lib/reclamacoesLabels";
 import { PageHeader } from "@/components/assistencia/PageHeader";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { StatTile } from "@/components/StatTile";
 import { BarRanking } from "@/components/BarRanking";
 import { SupervisaoTabs } from "@/components/assistencia/SupervisaoTabs";
+import { ReclamacaoTableRow } from "@/components/assistencia/ReclamacaoTableRow";
 
 function buildHref(params: { status?: string; q?: string }) {
   const sp = new URLSearchParams();
@@ -155,44 +156,7 @@ export default async function ReclamacoesPage({
                   </td>
                 </tr>
               ) : (
-                filtered.map((r) => (
-                  <tr key={r.id} className="border-t" style={{ borderColor: "var(--border)" }}>
-                    <td className="px-3 py-2">
-                      {readOnly ? (
-                        <span style={{ color: "var(--text-primary)" }}>{r.nome}</span>
-                      ) : (
-                        <Link href={`/assistencia/reclamacoes/${r.id}/editar`} className="underline" style={{ color: "var(--text-primary)" }}>
-                          {r.nome}
-                        </Link>
-                      )}
-                      {r.cpf ? (
-                        <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
-                          {r.cpf}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-2" style={{ color: "var(--text-secondary)" }}>
-                      {r.orgao}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className="text-xs font-medium rounded-full px-2 py-0.5"
-                        style={{
-                          background: isStatusInternoResolvido(r.statusInterno) ? "var(--status-good)" : "var(--brand-orange)",
-                          color: "#fff",
-                        }}
-                      >
-                        {r.statusInterno}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 max-w-xs" style={{ color: "var(--text-secondary)" }}>
-                      {r.statusExterno ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums" style={{ color: "var(--text-secondary)" }}>
-                      {r.dataAudiencia ? formatAudiencia(r.dataAudiencia) : "—"}
-                    </td>
-                  </tr>
-                ))
+                filtered.map((r) => <ReclamacaoTableRow key={r.id} reclamacao={r} readOnly={readOnly} />)
               )}
             </tbody>
           </table>
