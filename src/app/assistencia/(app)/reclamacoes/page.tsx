@@ -60,12 +60,18 @@ export default async function ReclamacoesPage({
   const proximasAudiencias = listProximasAudiencias(reclamacoes);
 
   const needle = q?.trim().toLowerCase();
-  const filtered = reclamacoes.filter((r) => {
-    if (orgaoGrupo(r.orgao) !== grupo) return false;
-    if (status && r.statusInterno !== status) return false;
-    if (needle && !r.nome.toLowerCase().includes(needle) && !(r.cpf ?? "").includes(needle)) return false;
-    return true;
-  });
+  // Não resolvido primeiro, resolvido no final -- pedido do Victor
+  // 29/09/2026, dentro de cada uma das 3 abas. `.sort` é estável (mesma
+  // ordem relativa entre casos com o mesmo status, não embaralha o que já
+  // vinha ordenado por created_at em listReclamacoes).
+  const filtered = reclamacoes
+    .filter((r) => {
+      if (orgaoGrupo(r.orgao) !== grupo) return false;
+      if (status && r.statusInterno !== status) return false;
+      if (needle && !r.nome.toLowerCase().includes(needle) && !(r.cpf ?? "").includes(needle)) return false;
+      return true;
+    })
+    .sort((a, b) => Number(isStatusInternoResolvido(a.statusInterno)) - Number(isStatusInternoResolvido(b.statusInterno)));
 
   const pendentesPorGrupo = Object.fromEntries(
     ORGAO_GRUPOS.map((g) => [g, reclamacoes.filter((r) => orgaoGrupo(r.orgao) === g && !isStatusInternoResolvido(r.statusInterno)).length])
