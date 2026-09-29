@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
+import { writeBackupFile, listBackupFiles, deleteBackupFiles } from "@/lib/localBackupStorage";
 
-const BUCKET = "system-backups";
 const KEEP_DAYS = 14;
 const PAGE_SIZE = 1000;
 
@@ -18,9 +18,13 @@ const MIN_INTERVAL_HOURS = 72;
 
 // Todas as tabelas do módulo de assistência — transacionais (chamados, peças,
 // fornecedor, estoque) e de cadastro (lojas, contas, montadores,
-// fornecedores). O plano Free do Supabase não tem backup automático, então
-// isso é o que garante um ponto de restauração caso algo seja apagado ou
-// corrompido sem querer dentro do próprio app.
+// fornecedores). Supabase self-hosted (migração 29/09/2026) não tem backup
+// gerenciado nenhum -- isso é o que garante um ponto de restauração caso
+// algo seja apagado ou corrompido sem querer dentro do próprio app. Escreve
+// em disco local (ver localBackupStorage.ts, mesmo motivo/padrão das fotos
+// em localPhotoStorage.ts) -- complementa (não substitui) o pg_dump completo
+// agendado direto no Postgres, que cobre schema inteiro + todas as tabelas,
+// não só essas 11.
 const TABLES = [
   "service_requests",
   "service_request_items",
@@ -64,7 +68,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true, reason: `último backup com sucesso há menos de ${MIN_INTERVAL_HOURS}h`, lastRunAt });
     }
 
-    const admin = getSupabaseAdmin();
     const dump: Record<string, unknown[]> = {};
     for (const table of TABLES) {
       dump[table] = await dumpTable(table);
@@ -74,20 +77,19 @@ export async function GET(req: NextRequest) {
     const path = `${today}.json`;
     const body = JSON.stringify({ createdAt: new Date().toISOString(), tables: dump });
 
-    const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, body, {
-      contentType: "application/json",
-      upsert: true,
-    });
-    if (uploadError) {
-      await recordSyncRun("backup", false, {}, [uploadError.message]);
-      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    try {
+      await writeBackupFile(path, body);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Não foi possível gravar o backup em disco.";
+      await recordSyncRun("backup", false, {}, [message]);
+      return NextResponse.json({ error: message }, { status: 500 });
     }
 
-    const { data: files } = await admin.storage.from(BUCKET).list("");
+    const files = await listBackupFiles();
     const cutoff = new Date(Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const toRemove = (files ?? []).map((f) => f.name).filter((name) => name.endsWith(".json") && name.slice(0, 10) < cutoff);
+    const toRemove = files.filter((name) => name.endsWith(".json") && name.slice(0, 10) < cutoff);
     if (toRemove.length > 0) {
-      await admin.storage.from(BUCKET).remove(toRemove);
+      await deleteBackupFiles(toRemove);
     }
 
     const rowCounts = Object.fromEntries(Object.entries(dump).map(([t, rows]) => [t, rows.length]));
