@@ -287,6 +287,24 @@ export async function updatePartOrder(id: string, _state: PartOrderFormState, fo
     return { error: `Não foi possível salvar: ${error.message}` };
   }
 
+  // Anexo (foto da peça avariada, PDF) -- pedido do Victor 29/09/2026: a
+  // tela de edição não tinha esse campo, só a de criação (ver
+  // createPartOrder acima). Mesmo padrão -- opcional, sobrescreve o anexo
+  // anterior se já tinha um (não é galeria, é 1 por pedido, ver migration
+  // 0136).
+  const attachmentFile = formData.get("attachment");
+  if (attachmentFile instanceof File && attachmentFile.size > 0) {
+    try {
+      const attachmentPath = await uploadPartOrderAttachment(id, attachmentFile);
+      const { error: attachError } = await admin.from("part_orders").update({ attachment_path: attachmentPath }).eq("id", id);
+      if (attachError) {
+        return { error: `Salvo, mas não foi possível salvar o anexo: ${attachError.message}` };
+      }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Não foi possível salvar o anexo." };
+    }
+  }
+
   revalidatePecasPaths(id);
   // Volta pra rota de quem editou -- rota própria da equipe técnica desde
   // 14/09/2026 (ver revalidatePecasPaths acima).

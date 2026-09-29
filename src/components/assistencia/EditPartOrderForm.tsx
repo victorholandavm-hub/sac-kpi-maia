@@ -152,6 +152,20 @@ export function EditPartOrderForm({
         <input name="invoice_number" defaultValue={order.invoiceNumber ?? ""} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
+      <Field label="Anexo (foto da peça avariada, em PDF)">
+        {/* Pedido do Victor 29/09/2026: essa tela de edição não tinha esse
+            campo, só a de criação (NewPartOrderForm.tsx) -- mesmo padrão
+            (um anexo só por pedido, escolher um arquivo novo substitui o
+            atual). Link pro anexo já salvo, se tiver -- sem isso não dava
+            pra saber se já existia um antes de decidir trocar. */}
+        {order.attachmentUrl ? (
+          <a href={order.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline self-start" style={{ color: "var(--brand-green)" }}>
+            Ver anexo atual
+          </a>
+        ) : null}
+        <input name="attachment" type="file" accept="application/pdf" className="rounded border px-3 py-2" style={inputStyle} />
+      </Field>
+
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>
           {state.error}
