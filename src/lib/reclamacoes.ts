@@ -131,6 +131,30 @@ export async function updateReclamacao(id: string, input: ReclamacaoInput): Prom
   if (error) throw new Error(error.message);
 }
 
+export type ReclamacaoInlineField = "statusInterno" | "statusExterno" | "dataAudiencia";
+
+const INLINE_FIELD_COLUMN: Record<ReclamacaoInlineField, string> = {
+  statusInterno: "status_interno",
+  statusExterno: "status_externo",
+  dataAudiencia: "data_audiencia",
+};
+
+// Edição inline na tabela (pedido do Victor 29/09/2026) -- só os 3 campos
+// que fazem sentido mudar direto na linha, sem abrir o formulário inteiro
+// (ReclamacaoForm.tsx continua sendo o caminho pra editar o resto). Salva
+// automático a cada troca, um campo por vez -- update() com uma coluna só
+// evita reenviar (e sobrescrever com valor desatualizado) os outros campos
+// que a linha nem mostra.
+export async function patchReclamacaoField(id: string, field: ReclamacaoInlineField, value: string | null): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const column = INLINE_FIELD_COLUMN[field];
+  const { error } = await admin
+    .from("reclamacoes")
+    .update({ [column]: value, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export type ReclamacoesSummary = {
   total: number;
   emAberto: number;
