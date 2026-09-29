@@ -46,14 +46,17 @@ export default async function ReclamacoesPage({
   const grupo: OrgaoGrupo = org === "judicial" || org === "reclame_aqui" ? org : "procon";
   const profile = await getProfile();
 
-  // Papel "supervisao" (Akyla Thais, pedido do Victor 28/09/2026): vê essa
-  // tela, mas só leitura -- sem "+ Nova reclamação" nem link pra editar
-  // (ver readOnly abaixo). /nova e /[id]/editar continuam travadas pra
-  // admin só (ela nunca chega lá, nem pela URL direta).
+  // Papel "supervisao" (Akyla Thais): a partir de 29/09/2026 tem edição
+  // TOTAL em Reclamações (pedido do Victor, substitui o "só leitura"
+  // original de 28/09/2026) -- cria, edita inline e edita pelo formulário
+  // completo igual admin (ver reclamacoes-actions.ts/nova/[id]/editar).
+  // `isSupervisao` aqui só decide qual barra de navegação mostrar
+  // (SupervisaoTabs, ela só enxerga 4 telas -- ver SupervisaoGuard.tsx),
+  // não é mais permissão de leitura/escrita.
   if (profile.role !== "admin" && profile.role !== "supervisao") {
     return <p className="text-sm text-gray-400 dark:text-gray-500">Acesso restrito ao admin.</p>;
   }
-  const readOnly = profile.role === "supervisao";
+  const isSupervisao = profile.role === "supervisao";
 
   const reclamacoes = await listReclamacoes();
   const summary = buildReclamacoesSummary(reclamacoes);
@@ -79,20 +82,18 @@ export default async function ReclamacoesPage({
 
   return (
     <div className="flex flex-col gap-6">
-      {readOnly ? <SupervisaoTabs active="reclamacoes" /> : null}
+      {isSupervisao ? <SupervisaoTabs active="reclamacoes" /> : null}
       <PageHeader
         title="Reclamações"
         description="Procon, Reclame Aqui e processos judiciais"
         cta={
-          readOnly ? undefined : (
-            <Link
-              href="/assistencia/reclamacoes/nova"
-              className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white"
-              style={{ background: "#1B5E3C" }}
-            >
-              + Nova reclamação
-            </Link>
-          )
+          <Link
+            href="/assistencia/reclamacoes/nova"
+            className="text-sm px-4 py-2.5 rounded-lg font-semibold text-white"
+            style={{ background: "#1B5E3C" }}
+          >
+            + Nova reclamação
+          </Link>
         }
       />
 
@@ -111,15 +112,9 @@ export default async function ReclamacoesPage({
           <ul className="flex flex-col gap-1.5">
             {proximasAudiencias.map((r) => (
               <li key={r.id} className="text-sm flex items-center justify-between gap-2 flex-wrap">
-                {readOnly ? (
-                  <span style={{ color: "var(--text-primary)" }}>
-                    {r.nome} <span style={{ color: "var(--text-muted)" }}>({r.orgao})</span>
-                  </span>
-                ) : (
-                  <Link href={`/assistencia/reclamacoes/${r.id}/editar`} className="underline" style={{ color: "var(--text-primary)" }}>
-                    {r.nome} <span style={{ color: "var(--text-muted)" }}>({r.orgao})</span>
-                  </Link>
-                )}
+                <Link href={`/assistencia/reclamacoes/${r.id}/editar`} className="underline" style={{ color: "var(--text-primary)" }}>
+                  {r.nome} <span style={{ color: "var(--text-muted)" }}>({r.orgao})</span>
+                </Link>
                 <span className="tabular-nums font-medium" style={{ color: "var(--brand-orange)" }}>
                   {formatAudiencia(r.dataAudiencia!)}
                 </span>
@@ -184,7 +179,7 @@ export default async function ReclamacoesPage({
                   </td>
                 </tr>
               ) : (
-                filtered.map((r) => <ReclamacaoTableRow key={r.id} reclamacao={r} readOnly={readOnly} />)
+                filtered.map((r) => <ReclamacaoTableRow key={r.id} reclamacao={r} />)
               )}
             </tbody>
           </table>

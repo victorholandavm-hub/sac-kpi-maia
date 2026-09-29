@@ -5,7 +5,7 @@ import { ReclamacaoForm } from "@/components/assistencia/ReclamacaoForm";
 export default async function NovaReclamacaoPage() {
   const profile = await getProfile();
 
-  if (profile.role !== "admin") {
+  if (profile.role !== "admin" && profile.role !== "supervisao") {
     return <p className="text-sm text-gray-400 dark:text-gray-500">Acesso restrito ao admin.</p>;
   }
 
