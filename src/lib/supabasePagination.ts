@@ -22,12 +22,58 @@ const DEFAULT_PAGE_SIZE = 1000;
 // transitória numa única página (TypeError: fetch failed, achado
 // 28/09/2026 investigando "Minified React error #441" em /kpis, digest
 // 1801967253) derrubava a promise inteira do Promise.all, sem chance de
-// recuperação, e o erro cru (fetch() rejeitado, nem chega a virar
-// PagedQueryResult.error) subia até estourar o boundary de erro do React.
-// 1 nova tentativa (com um pequeno atraso) cobre o caso comum de blip de
-// rede sem esconder um erro persistente de verdade (esse continua
-// propagando depois da 2ª falha).
-async function fetchPageWithRetry<T>(
+// recuperação.
+//
+// Limite GLOBAL de conexões simultâneas (não por chamada de
+// fetchAllPagesParallel) -- achado 30/09/2026 (Victor: "ta dando erro no
+// painel de kpis quando tento ir para a aba de assistencia", 2ª causa
+// depois do fix do payload > 2MB): mesmo com o pool do PostgREST
+// triplicado e a MESMA query respondendo em 16ms via curl direto contra o
+// gateway (confirmado que o servidor não é o gargalo), a página seguia
+// derrubando. Causa real: computeAssistenciaKpiData dispara ~7
+// fetchAllPagesParallel em paralelo via Promise.all, cada um com suas
+// próprias páginas paralelas por cima -- uma rajada de dezenas de
+// conexões de uma vez só, do MESMO processo Node, que algo na cadeia
+// Node -> Envoy (gateway self-hosted) não aguenta em rajada mesmo com
+// espaço de sobra em cada ponta isoladamente. Um semáforo simples aqui
+// (nível mais baixo, cobre TODA fetchAllPagesParallel do app, não só
+// desta tela) limita quantas páginas ficam EM VOO ao mesmo tempo, sem
+// reintroduzir cache nenhum.
+const MAX_CONCURRENT_FETCHES = 8;
+let activeFetches = 0;
+const fetchQueue: (() => void)[] = [];
+
+function acquireFetchSlot(): Promise<void> {
+  if (activeFetches < MAX_CONCURRENT_FETCHES) {
+    activeFetches++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => fetchQueue.push(resolve));
+}
+
+function releaseFetchSlot(): void {
+  activeFetches--;
+  const next = fetchQueue.shift();
+  if (next) {
+    activeFetches++;
+    next();
+  }
+}
+
+// supabase-js NÃO deixa "TypeError: fetch failed" escapar como exceção --
+// ele captura por dentro e devolve como PagedQueryResult.error normal
+// (`{ data: null, error: { message: "TypeError: fetch failed" } }`).
+// Achado 30/09/2026 investigando por que o retry abaixo nunca disparava
+// (diagnóstico com console.error no catch nunca imprimia nada -- prova de
+// que a exceção nunca chegava a esse catch pra começo de conversa): o
+// `catch (err)` só cobre o caso raro de o fetch() rejeitar de verdade
+// (síncrono/aborto), não o caso comum aqui, onde a Promise RESOLVE
+// normalmente com um erro dentro. Os dois casos precisam do mesmo retry.
+function isFetchFailureMessage(message: string): boolean {
+  return /fetch failed/i.test(message);
+}
+
+async function attemptFetch<T>(
   fetchPage: (from: number, to: number) => PromiseLike<PagedQueryResult<T>>,
   from: number,
   to: number
@@ -35,9 +81,24 @@ async function fetchPageWithRetry<T>(
   try {
     return await fetchPage(from, to);
   } catch (err) {
-    if (!(err instanceof TypeError) || !/fetch/i.test(err.message)) throw err;
+    if (!(err instanceof TypeError) || !isFetchFailureMessage(err.message)) throw err;
+    return { data: null, error: { message: err.message } };
+  }
+}
+
+async function fetchPageWithRetry<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<PagedQueryResult<T>>,
+  from: number,
+  to: number
+): Promise<PagedQueryResult<T>> {
+  await acquireFetchSlot();
+  try {
+    const first = await attemptFetch(fetchPage, from, to);
+    if (!first.error || !isFetchFailureMessage(first.error.message)) return first;
     await new Promise((resolve) => setTimeout(resolve, 300));
-    return await fetchPage(from, to);
+    return await attemptFetch(fetchPage, from, to);
+  } finally {
+    releaseFetchSlot();
   }
 }
 
