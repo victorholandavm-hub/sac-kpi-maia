@@ -3,7 +3,6 @@ import { getProfile, redirectIfSac, canSeeOwnAssemblerStoreRequests } from "@/li
 import { countRequestsOverview } from "@/lib/serviceRequests";
 import { countPartOrdersOverview } from "@/lib/partOrders";
 import { countPendingPayments } from "@/lib/payments";
-import { countSupplierReturnsOverview } from "@/lib/supplierReturns";
 import { OWN_ASSEMBLER_STORE_IDS } from "@/lib/assistenciaLabels";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
 
@@ -70,11 +69,10 @@ export default async function InicioPage() {
   redirectIfSac(profile);
   // Ver OWN_ASSEMBLER_STORE_IDS -- mesma exclusão da aba Solicitações.
   const excludeOwnAssemblerStoreIds = canSeeOwnAssemblerStoreRequests(profile) ? undefined : [...OWN_ASSEMBLER_STORE_IDS];
-  const [requests, parts, pendingPayments, supplierReturns] = await Promise.all([
+  const [requests, parts, pendingPayments] = await Promise.all([
     countRequestsOverview(excludeOwnAssemblerStoreIds),
     countPartOrdersOverview(),
     countPendingPayments(),
-    countSupplierReturnsOverview(),
   ]);
 
   return (
@@ -106,10 +104,10 @@ export default async function InicioPage() {
           <Stat label="Prontas para enviar" value={parts.readyToSend} />
         </Card>
 
-        <Card href="/assistencia/fornecedores" title="Fornecedores" description="Remessas de peça defeituosa para conserto/reembolso." accent="var(--series-6)">
-          <Stat label="Em aberto" value={supplierReturns.open} />
-          <Stat label="Atrasadas" value={supplierReturns.overdue} warn />
-        </Card>
+        {/* "Fornecedores" inativada (tirada de exibição) -- pedido do Victor
+            30/09/2026, mesmo padrão de Cargas/Prazos de produtos. Rota
+            continua existindo, só não tem mais entrada de card aqui nem
+            aba em pecas/estoque/fornecedores (ver lá). */}
 
         {/* --series-4 (violeta) -- mesma cor do card "Total a pagar a
             montadores" em relatorios/page.tsx (KpiCardWhite), pra manter
