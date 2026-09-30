@@ -27,17 +27,58 @@ const DEFAULT_PAGE_SIZE = 1000;
 // 1 nova tentativa (com um pequeno atraso) cobre o caso comum de blip de
 // rede sem esconder um erro persistente de verdade (esse continua
 // propagando depois da 2ª falha).
+// Limite GLOBAL de conexões simultâneas (não por chamada de
+// fetchAllPagesParallel) -- achado 30/09/2026 (Victor: "ta dando erro no
+// painel de kpis quando tento ir para a aba de assistencia", 2ª causa
+// depois do fix do payload > 2MB): mesmo com o pool do PostgREST
+// triplicado e a MESMA query respondendo em 16ms via curl direto contra o
+// gateway (confirmado que o servidor não é o gargalo), a página seguia
+// derrubando com "TypeError: fetch failed". Causa real: computeAssistenciaKpiData
+// dispara ~7 fetchAllPagesParallel em paralelo via Promise.all, cada um
+// com suas próprias páginas paralelas por cima -- uma rajada de dezenas
+// de conexões de uma vez só, do MESMO processo Node, que algo na cadeia
+// Node -> Envoy (gateway self-hosted) não aguenta em rajada mesmo com
+// espaço de sobra em cada ponta isoladamente. Um semáforo simples aqui
+// (nível mais baixo, cobre TODA fetchAllPagesParallel do app, não só
+// desta tela) limita quantas págimas ficam EM VOO ao mesmo tempo,
+// sem reintroduzir cache nenhum.
+const MAX_CONCURRENT_FETCHES = 8;
+let activeFetches = 0;
+const fetchQueue: (() => void)[] = [];
+
+function acquireFetchSlot(): Promise<void> {
+  if (activeFetches < MAX_CONCURRENT_FETCHES) {
+    activeFetches++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => fetchQueue.push(resolve));
+}
+
+function releaseFetchSlot(): void {
+  activeFetches--;
+  const next = fetchQueue.shift();
+  if (next) {
+    activeFetches++;
+    next();
+  }
+}
+
 async function fetchPageWithRetry<T>(
   fetchPage: (from: number, to: number) => PromiseLike<PagedQueryResult<T>>,
   from: number,
   to: number
 ): Promise<PagedQueryResult<T>> {
+  await acquireFetchSlot();
   try {
-    return await fetchPage(from, to);
-  } catch (err) {
-    if (!(err instanceof TypeError) || !/fetch/i.test(err.message)) throw err;
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    return await fetchPage(from, to);
+    try {
+      return await fetchPage(from, to);
+    } catch (err) {
+      if (!(err instanceof TypeError) || !/fetch/i.test(err.message)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return await fetchPage(from, to);
+    }
+  } finally {
+    releaseFetchSlot();
   }
 }
 
