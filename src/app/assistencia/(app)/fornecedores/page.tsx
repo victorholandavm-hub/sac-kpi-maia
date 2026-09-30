@@ -74,7 +74,9 @@ export default async function FornecedoresPage({
           racional de pecas/page.tsx, ver lá). */}
       <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
         <UnderlineTab href="/assistencia/pecas" label="Peças" active={false} />
-        <UnderlineTab href="/assistencia/fornecedores" label="Fornecedores" active />
+        {/* "Fornecedores" inativada -- ver pecas/page.tsx. Rota continua
+            acessível direto (ex.: alguém com o link salvo), só não aparece
+            mais nessa fileira -- por isso não se autodestaca aqui também. */}
         <UnderlineTab href="/assistencia/estoque" label="Estoque" active={false} />
       </div>
 

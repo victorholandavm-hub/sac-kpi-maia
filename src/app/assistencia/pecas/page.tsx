@@ -66,7 +66,10 @@ export default async function PecasQueuePage({
           14/09/2026 (/assistencia/tecnico/pecas). */}
       <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
         <UnderlineTab href="/assistencia/pecas" label="Peças" active />
-        <UnderlineTab href="/assistencia/fornecedores" label="Fornecedores" active={false} />
+        {/* "Fornecedores" inativada (tirada de exibição) -- pedido do Victor
+            30/09/2026, mesmo padrão de Cargas/Prazos de produtos
+            (SacTabs.tsx/AssistenciaNav.tsx): rota continua existindo, só
+            sem link nessa fileira. */}
         <UnderlineTab href="/assistencia/estoque" label="Estoque" active={false} />
       </div>
 

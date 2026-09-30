@@ -104,7 +104,7 @@ export default async function EstoquePage({
           racional de pecas/page.tsx, ver lá). */}
       <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
         <UnderlineTab href="/assistencia/pecas" label="Peças" active={false} />
-        <UnderlineTab href="/assistencia/fornecedores" label="Fornecedores" active={false} />
+        {/* "Fornecedores" inativada -- ver pecas/page.tsx. */}
         <UnderlineTab href="/assistencia/estoque" label="Estoque" active />
       </div>
 
