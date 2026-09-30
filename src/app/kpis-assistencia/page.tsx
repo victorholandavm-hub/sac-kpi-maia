@@ -6,7 +6,15 @@ import { RangePicker } from "@/components/RangePicker";
 import { KpisAssistenciaView } from "@/components/KpisAssistenciaView";
 import { MonthlyEvolutionTable } from "@/components/MonthlyEvolutionTable";
 
-export const revalidate = 60;
+// SEM `export const revalidate` aqui -- achado 30/09/2026 (continuação do
+// fix em kpiAssistencia.ts): não é só getAssistenciaKpiData que passava
+// pelo teto de 2MB do Next.js Data Cache -- o Full Route Cache dessa
+// página (habilitado por `revalidate = 60`, mesmo mecanismo de cache por
+// trás, ver pm2 logs sac) tentava cachear a página INTEIRA já renderizada
+// e batia no mesmo limite, quebrando a página mesmo depois do cache de
+// dados virar memória. O cache em memória de getAssistenciaKpiData já dá
+// o ganho de performance que essa rota precisava (achado 21/09/2026) --
+// não precisa do Full Route Cache por cima disso.
 
 // Sub-aba "Assistência" de KPIs -- pedido do Victor 27/08/2026: "os kpis
 // da aba de entregas/notificação de assistencia precisa ir mesmo lá para
