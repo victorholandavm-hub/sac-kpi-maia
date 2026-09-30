@@ -1,9 +1,9 @@
-import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
 import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "./assistenciaLabels";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
+import { memoizeWithTtl } from "./memoCache";
 
 export type RequestType =
   | "montagem"
@@ -150,16 +150,12 @@ export type Store = { id: string; name: string };
 // 60s é curto o bastante pra uma loja nova aparecer quase na hora em
 // qualquer lugar que a use, mas já evita repetir a mesma consulta em toda
 // troca de tela.
-export const listStores = unstable_cache(
-  async (): Promise<Store[]> => {
-    const admin = getSupabaseAdmin();
-    const { data, error } = await admin.from("stores").select("id, name").order("id");
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  },
-  ["list-stores"],
-  { revalidate: 60 }
-);
+export const listStores = memoizeWithTtl(async (): Promise<Store[]> => {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("stores").select("id, name").order("id");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}, 60_000);
 
 export type ItemAction = "montar" | "desmontar";
 
