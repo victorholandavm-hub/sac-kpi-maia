@@ -472,8 +472,8 @@ const VENDA_VS_ASSISTENCIA_TYPES = ALL_REQUEST_TYPES.filter((t) => t !== "montag
 // (custo/vendas por produto) pro Prejuízo Estimado, sem cache nenhum --
 // refeita do zero em TODA navegação pra /kpis-assistencia, mesmo pedindo o
 // mesmo período de segundos atrás. Mesmo remédio já aplicado em kpi.ts
-// (getKpiData) 17/09/2026 pro mesmo sintoma em /kpis: unstable_cache com
-// chave "baldeada" de 5 min (range.to muda a cada milissegundo, só o balde
+// (getKpiData) 17/09/2026 pro mesmo sintoma em /kpis: cache com chave
+// "baldeada" de 5 min (range.to muda a cada milissegundo, só o balde
 // garante cache hit).
 const ASSISTENCIA_CACHE_BUCKET_MS = 5 * 60 * 1000;
 
@@ -482,8 +482,38 @@ export async function getAssistenciaKpiData(range: DateRange): Promise<Assistenc
   return getAssistenciaKpiDataCached(range.preset, range.from ? range.from.toISOString() : null, bucketedTo.toISOString());
 }
 
-const getAssistenciaKpiDataCached = unstable_cache(
-  async (preset: RangePreset | "custom", fromIso: string | null, toIso: string): Promise<AssistenciaKpiData> => {
+// Cache em MEMÓRIA (Map por processo), não unstable_cache -- achado
+// 30/09/2026 (pedido do Victor: "ta dando erro no painel de kpis quando
+// tento ir para a aba de assistencia"): o Next.js Data Cache
+// (unstable_cache) recusa gravar qualquer entrada acima de 2MB
+// ("items over 2MB can not be cached"), e essa recusa vinha derrubando a
+// página inteira (React error #441, "erro em Server Component" -- ver pm2
+// logs sac). `ticketsByTag` (drill-down completo por chamado, repetido em
+// cada dimensão -- rota/causa raiz/loja/conferente/etc.) já passa de 2MB
+// com o volume atual de chamados, e só cresce. Map em memória não tem
+// esse teto -- mesmo balde de 5min de sempre, só a implementação mudou.
+type AssistenciaKpiCacheEntry = { value: AssistenciaKpiData; expiresAt: number };
+const assistenciaKpiMemoryCache = new Map<string, AssistenciaKpiCacheEntry>();
+
+async function getAssistenciaKpiDataCached(preset: RangePreset | "custom", fromIso: string | null, toIso: string): Promise<AssistenciaKpiData> {
+  const cacheKey = `${preset}|${fromIso ?? ""}|${toIso}`;
+  const now = Date.now();
+  const cached = assistenciaKpiMemoryCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const value = await computeAssistenciaKpiData(preset, fromIso, toIso);
+
+  // Limpa entradas vencidas ao gravar -- poucas chaves distintas na
+  // prática (um punhado de presets x balde de 5min), mas sem isso o Map
+  // cresceria pra sempre enquanto o processo ficar de pé.
+  for (const [key, entry] of assistenciaKpiMemoryCache) {
+    if (entry.expiresAt <= now) assistenciaKpiMemoryCache.delete(key);
+  }
+  assistenciaKpiMemoryCache.set(cacheKey, { value, expiresAt: now + ASSISTENCIA_CACHE_BUCKET_MS });
+  return value;
+}
+
+async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso: string | null, toIso: string): Promise<AssistenciaKpiData> {
   const range: DateRange = { preset, from: fromIso ? new Date(fromIso) : null, to: new Date(toIso) };
   const admin = getSupabaseAdmin();
 
@@ -1079,10 +1109,7 @@ const getAssistenciaKpiDataCached = unstable_cache(
     byStoreVendaVsAssistencia,
     ticketsByTag,
   };
-  },
-  ["assistencia-kpi-data"],
-  { revalidate: 300 }
-);
+}
 
 export type AssistenciaMonthlyEvolutionRow = {
   monthKey: string;
