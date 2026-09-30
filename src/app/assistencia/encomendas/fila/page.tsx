@@ -190,7 +190,7 @@ export default async function EncomendasQueuePage({
           {actor.role === "cd" || actor.role === "fabrica" ? (
             <NotificationBell fetchAction={listFabricaOuCdNotificationsAction} storageKey={`${actor.role}-${actor.fabricaId ?? ""}`} />
           ) : null}
-          {actor.role === "cd" || actor.role === "fabrica" ? (
+          {actor.role === "cd" || actor.role === "fabrica" || actor.role === "assistencia" ? (
             <Link href="/assistencia/encomendas/solicitar" className="text-sm underline" style={{ color: "var(--brand-green)" }}>
               + Novo pedido
             </Link>

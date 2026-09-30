@@ -37,7 +37,7 @@ export default async function EditarPedidoEncomendaPage({
 
   const { pedido } = result;
   const voltarHref =
-    requester.kind === "cd" || requester.kind === "fabrica"
+    requester.kind === "cd" || requester.kind === "fabrica" || requester.kind === "assistencia"
       ? "/assistencia/encomendas/fila"
       : requester.kind === "sac"
         ? "/assistencia/encomendas/sac"
