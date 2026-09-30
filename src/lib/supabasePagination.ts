@@ -132,3 +132,33 @@ export async function fetchAllPagesParallel<T>(
   }
   return rows;
 }
+
+// Causa raiz REAL do "fetch failed" persistente em /kpis-assistencia --
+// achado 30/09/2026 via diagnóstico temporário interceptando o fetch cru
+// do supabase-js (ver supabaseAdmin.ts, já removido): um `.in("request_id",
+// ids)` com CENTENAS de UUIDs (452 num dia normal, filtro
+// VENDA_VS_ASSISTENCIA_TYPES do mês inteiro) gera uma URL de ~17-20KB --
+// estourando o limite padrão de tamanho de header HTTP do Node
+// (--max-http-header-size, 16KB por padrão). Isso não é sobre concorrência
+// nem sobre o servidor (confirmado: a mesma query pequena respondia em
+// 16-56ms via curl direto) -- é sobre o TAMANHO da URL de uma única
+// requisição. Divide o filtro `.in()` em lotes pequenos o bastante pra
+// nunca chegar perto desse teto, busca cada lote em paralelo (cada um já
+// paginado por fetchAllPagesParallel) e junta o resultado.
+const MAX_IDS_PER_IN_FILTER = 150;
+
+export async function fetchAllPagesForIds<T, Id extends string>(
+  ids: Id[],
+  fetchPageForChunk: (chunk: Id[], from: number, to: number) => PromiseLike<PagedQueryResult<T>>,
+  opts: { pageSize?: number; chunkSize?: number } = {}
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+  const chunkSize = opts.chunkSize ?? MAX_IDS_PER_IN_FILTER;
+  const chunks: Id[][] = [];
+  for (let i = 0; i < ids.length; i += chunkSize) chunks.push(ids.slice(i, i + chunkSize));
+
+  const results = await Promise.all(
+    chunks.map((chunk) => fetchAllPagesParallel<T>((from, to) => fetchPageForChunk(chunk, from, to), opts))
+  );
+  return results.flat();
+}

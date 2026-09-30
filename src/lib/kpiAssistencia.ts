@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
+import { fetchAllPagesParallel, fetchAllPagesForIds, type PagedQueryResult } from "./supabasePagination";
 import type { DateRange, RangePreset } from "./dateRange";
 import type { Count, Coverage, DayCount } from "./kpi";
 import { REQUEST_TYPE_LABELS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES, ALL_REQUEST_TYPES } from "./assistenciaLabels";
@@ -547,18 +547,16 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   // ver comentário em resolverCustoUnitarioItem/fatorProporcaoPeca acima),
   // usado pra classificar Peça Estrutural vs Componente Menor.
   type ItemRow = { request_id: string; product: string | null; part_code: string | null; part_name: string | null; quantity: number | null };
-  const items =
-    ids.length === 0
-      ? []
-      : await fetchAllPagesParallel<ItemRow>(
-          (from, to) =>
-            admin
-              .from("service_request_items")
-              .select("request_id, product, part_code, part_name, quantity", { count: "exact" })
-              .in("request_id", ids)
-              .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemRow>>,
-          { pageSize: PAGE_SIZE }
-        );
+  const items = await fetchAllPagesForIds<ItemRow, string>(
+    ids,
+    (chunk, from, to) =>
+      admin
+        .from("service_request_items")
+        .select("request_id, product, part_code, part_name, quantity", { count: "exact" })
+        .in("request_id", chunk)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<ItemRow>>,
+    { pageSize: PAGE_SIZE }
+  );
 
   const rowById = new Map(rows.map((r) => [r.id, r]));
   const ticketsByTag: Record<string, ReportRowItem[]> = {};
@@ -874,18 +872,16 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   // diferente, ver comentário em chamadosFromIso/chamadosToIso) --
   // `chamadosTodosTiposRows` é um conjunto de chamados independente.
   const chamadoVendaIds = chamadosTodosTiposRows.map((r) => r.id);
-  const chamadoVendaItems =
-    chamadoVendaIds.length === 0
-      ? []
-      : await fetchAllPagesParallel<{ request_id: string; product: string | null; quantity: number | null }>(
-          (from, to) =>
-            admin
-              .from("service_request_items")
-              .select("request_id, product, quantity", { count: "exact" })
-              .in("request_id", chamadoVendaIds)
-              .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ request_id: string; product: string | null; quantity: number | null }>>,
-          { pageSize: PAGE_SIZE }
-        );
+  const chamadoVendaItems = await fetchAllPagesForIds<{ request_id: string; product: string | null; quantity: number | null }, string>(
+    chamadoVendaIds,
+    (chunk, from, to) =>
+      admin
+        .from("service_request_items")
+        .select("request_id, product, quantity", { count: "exact" })
+        .in("request_id", chunk)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ request_id: string; product: string | null; quantity: number | null }>>,
+    { pageSize: PAGE_SIZE }
+  );
   const produtosPorChamadoVenda = new Map<string, string>();
   {
     const itensPorChamado = new Map<string, string[]>();
