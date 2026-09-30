@@ -726,6 +726,15 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   // diferentes de chamado pra chamado, e a descrição exibida aqui é só a
   // PRIMEIRA vista (rótulo, não chave de agrupamento).
   const codigoPorChamado = new Set<string>();
+  // codigo -> Set de request_id -- achado 30/09/2026 (Victor: "Como assim
+  // 101%?"): chamadosComCustoExato somava entry.count por CÓDIGO, e um
+  // MESMO chamado com 2 peças de códigos diferentes (os dois com custo
+  // exato) contava 2x nesse numerador -- passando de rows.length
+  // (denominador, 1 linha por CHAMADO) e estourando 100%. Guardado aqui
+  // pra, depois de saber quais códigos têm custo exato (só após o
+  // Promise.all mais abaixo), montar o Set de CHAMADOS distintos (não soma
+  // de códigos) -- ver uso logo abaixo de byProductBreakageAll.
+  const chamadosPorCodigo = new Map<string, Set<string>>();
   const breakagePorCodigo = new Map<
     string,
     {
@@ -791,6 +800,9 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     if (!codigoPorChamado.has(codigoDedupeKey)) {
       codigoPorChamado.add(codigoDedupeKey);
       breakageEntry.count += 1;
+      const chamadosDoCodigo = chamadosPorCodigo.get(codigo) ?? new Set<string>();
+      chamadosDoCodigo.add(item.request_id);
+      chamadosPorCodigo.set(codigo, chamadosDoCodigo);
       // Custo operacional do TIPO do chamado, já com o multiplicador de
       // volume se aplicável (ver custoOperacionalDoChamado acima) --
       // atribuído à linha desse código (ver nota de possível sobreposição
@@ -1015,44 +1027,95 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   // não a estimativa por categoria/produto pai abaixo -- é o que
   // prejuizoCobertura (badge "X% com custo de produto rastreado") mede,
   // pra continuar avisando quanto do total é dado real vs. estimado.
-  let chamadosComCustoExato = 0;
-  const byProductBreakageAll: ProductBreakageStat[] = [...breakagePorCodigo.entries()].map(([codigo, entry]) => {
+  // Set de request_id (não soma de entry.count por código) -- ver comentário
+  // em chamadosPorCodigo acima: um chamado com 2+ códigos de custo exato
+  // só conta 1 vez aqui, senão o % passa de rows.length (100%).
+  const chamadosComCustoExatoIds = new Set<string>();
+
+  // Agrupa por nome-base (sem cor, ver baseProductLabel) -- pedido do
+  // Victor 30/09/2026, 2ª rodada ("sofá conceito pallace está separado,
+  // não está agrupado como eu te pedi"): o 1º agrupamento (PR anterior)
+  // tinha ido pro campo errado (byProduct, que nem aparece na tela) --
+  // esse aqui É a "Taxa de quebra por produto" de verdade. Cada código
+  // Protheus (cor/variante) vira sua própria linha em breakagePorCodigo;
+  // aqui somamos as linhas do MESMO modelo antes de montar o ranking --
+  // soma vendaQtd/itensQuantidade/custos dos códigos do grupo, e `count`
+  // (chamados) via união de chamadosPorCodigo (não soma -- um chamado com
+  // 2 cores do mesmo modelo não pode contar 2x). "Não identificados"
+  // nunca agrupa com nada (sem descrição de produto pra agrupar por).
+  type BreakageGrupo = {
+    label: string;
+    itensQuantidade: number;
+    custoOperacionalEstimado: number;
+    prejuizoEstoqueEstimado: number;
+    custoUnitarioSomaPeso: number;
+    custoUnitarioPesoTotal: number;
+    vendaQtd: number;
+    temCustoExato: boolean;
+    chamadoIds: Set<string>;
+    tickets: ReportRowItem[];
+  };
+  const breakagePorGrupo = new Map<string, BreakageGrupo>();
+  for (const [codigo, entry] of breakagePorCodigo.entries()) {
     const isNaoIdentificado = codigo === CODIGO_NAO_IDENTIFICADO;
-    const vendaQtd = isNaoIdentificado ? 0 : (vendaQtdPorCodigo.get(codigo) ?? 0);
-    const custoExato = isNaoIdentificado ? null : (custoPorCodigo.get(codigo) ?? null);
+    const grupoKey = isNaoIdentificado ? codigo : baseProductLabel(entry.label);
+    const grupo = breakagePorGrupo.get(grupoKey) ?? {
+      label: isNaoIdentificado ? LABEL_NAO_IDENTIFICADO : grupoKey,
+      itensQuantidade: 0,
+      custoOperacionalEstimado: 0,
+      prejuizoEstoqueEstimado: 0,
+      custoUnitarioSomaPeso: 0,
+      custoUnitarioPesoTotal: 0,
+      vendaQtd: 0,
+      temCustoExato: false,
+      chamadoIds: new Set<string>(),
+      tickets: [],
+    };
+    grupo.itensQuantidade += entry.itensQuantidade;
+    grupo.custoOperacionalEstimado += entry.custoOperacionalEstimado;
+    grupo.prejuizoEstoqueEstimado += entry.prejuizoEstoqueEstimado;
+    grupo.custoUnitarioSomaPeso += entry.custoUnitarioSomaPeso;
+    grupo.custoUnitarioPesoTotal += entry.custoUnitarioPesoTotal;
+    grupo.vendaQtd += isNaoIdentificado ? 0 : (vendaQtdPorCodigo.get(codigo) ?? 0);
+    if (!isNaoIdentificado && custoPorCodigo.get(codigo) != null) grupo.temCustoExato = true;
+    for (const requestId of chamadosPorCodigo.get(codigo) ?? []) grupo.chamadoIds.add(requestId);
+    grupo.tickets.push(...(ticketsByTag[`produto_quebra:${codigo}`] ?? []));
+    breakagePorGrupo.set(grupoKey, grupo);
+  }
+
+  const byProductBreakageAll: ProductBreakageStat[] = [...breakagePorGrupo.entries()].map(([grupoKey, grupo]) => {
+    const isNaoIdentificado = grupoKey === CODIGO_NAO_IDENTIFICADO;
+    const count = grupo.chamadoIds.size;
     // Custo unitário exibido = média ponderada (por quantidade crua) dos
-    // custos por item resolvidos no 2º passe acima -- ver comentário na
-    // declaração de breakagePorCodigo. null só quando NENHUM item do
-    // código conseguiu resolver custo nenhum (nem exato, nem produto pai,
-    // nem categoria).
-    const custoUnitario = entry.custoUnitarioPesoTotal > 0 ? entry.custoUnitarioSomaPeso / entry.custoUnitarioPesoTotal : null;
+    // custos por item resolvidos no 2º passe acima, agora somada por
+    // TODOS os códigos do grupo -- ver comentário em breakagePorGrupo.
+    // null só quando NENHUM item do grupo conseguiu resolver custo nenhum.
+    const custoUnitario = grupo.custoUnitarioPesoTotal > 0 ? grupo.custoUnitarioSomaPeso / grupo.custoUnitarioPesoTotal : null;
     // N/A (não 0%) quando: sem código, sem venda no período, ou venda
     // abaixo de MIN_VENDA_PARA_TAXA (ruído de baixo volume) -- ver
     // comentário em ProductBreakageStat/MIN_VENDA_PARA_TAXA acima.
-    const taxaQuebraPct = !isNaoIdentificado && vendaQtd >= MIN_VENDA_PARA_TAXA ? (entry.count / vendaQtd) * 100 : null;
-    // Já vem pronto do 2º passe acima -- soma por item, cada um já com o
-    // Fator de Recuperação de Ativo do TIPO daquele chamado aplicado (0
-    // pra entrega_produto, 0,7 pra troca/recolhimento de produto, 1 pro
-    // resto -- ver PRODUCT_COST_MULTIPLIER_POR_TIPO).
-    const prejuizoEstoque = custoUnitario != null ? entry.prejuizoEstoqueEstimado : null;
+    const taxaQuebraPct = !isNaoIdentificado && grupo.vendaQtd >= MIN_VENDA_PARA_TAXA ? (count / grupo.vendaQtd) * 100 : null;
+    const prejuizoEstoque = custoUnitario != null ? grupo.prejuizoEstoqueEstimado : null;
     if (prejuizoEstoque != null) {
       prejuizoEstoqueTotal += prejuizoEstoque;
     }
-    if (custoExato != null) {
-      chamadosComCustoExato += entry.count;
+    if (grupo.temCustoExato) {
+      for (const requestId of grupo.chamadoIds) chamadosComCustoExatoIds.add(requestId);
     }
+    const tag = `produto_quebra_grupo:${grupoKey}`;
+    ticketsByTag[tag] = grupo.tickets;
     return {
-      label: entry.label,
-      count: entry.count,
-      tag: `produto_quebra:${codigo}`,
-      partCode: codigo,
-      itensQuantidade: entry.itensQuantidade,
-      vendaQtd,
+      label: grupo.label,
+      count,
+      tag,
+      partCode: isNaoIdentificado ? grupoKey : "",
+      itensQuantidade: grupo.itensQuantidade,
+      vendaQtd: grupo.vendaQtd,
       taxaQuebraPct,
       custoUnitario,
       prejuizoEstoque,
-      custoOperacionalEstimado: entry.custoOperacionalEstimado,
-      prejuizoEstimado: (prejuizoEstoque ?? 0) + entry.custoOperacionalEstimado,
+      custoOperacionalEstimado: grupo.custoOperacionalEstimado,
+      prejuizoEstimado: (prejuizoEstoque ?? 0) + grupo.custoOperacionalEstimado,
     };
   });
   // Custo operacional TOTAL (e por tipo) -- calculado direto de `rows` (1
@@ -1119,6 +1182,7 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
   // categoria, ver bloco acima) -- do contrário essa cobertura bateria
   // perto de 100% sempre (quase todo código cai numa categoria com média),
   // escondendo justamente o que é dado real do Protheus vs. estimativa.
+  const chamadosComCustoExato = chamadosComCustoExatoIds.size;
   const prejuizoCobertura: Coverage = {
     withValue: chamadosComCustoExato,
     total: rows.length,
