@@ -364,39 +364,46 @@ type OrderWithItemsRow = {
   items: { product: string | null; description: string | null; quantity: number; total: number }[];
 };
 
-export const fetchItensDoPeriodo = unstable_cache(
-  async (range: DateRange): Promise<ItemRankingRow[]> => {
-    const admin = getSupabaseAdmin();
+// Cache em memória, não unstable_cache -- achado 30/09/2026 (trace
+// completo via `next dev`, ver kpiAssistencia.ts): ESSE era o
+// unstable_cache que derrubava /kpis-assistencia (React error #441,
+// "items over 2MB can not be cached"), chamado por
+// getVendaQuantidadePorCodigoNoPeriodo abaixo -- retorna TODO item de
+// TODA venda do período (produto/descrição/quantidade/total por linha),
+// fácil de passar de 2MB num mês cheio. Não aparecia na lista de imports
+// diretos de kpiAssistencia.ts (só getVendaQuantidadePorCodigoNoPeriodo
+// aparecia lá) -- por isso os 5 fixes anteriores (#521-#526), que só
+// mexeram no que kpiAssistencia.ts importa DIRETO, não pegaram essa
+// chamada indireta.
+export const fetchItensDoPeriodo = memoizeWithTtl(async (range: DateRange): Promise<ItemRankingRow[]> => {
+  const admin = getSupabaseAdmin();
 
-    const orders = await fetchAllPagesParallel<OrderWithItemsRow>(
-      (from, to) =>
-        admin
-          .from("totvs_orders")
-          .select("issue_date, items:totvs_order_items(product, description, quantity, total)", { count: "exact" })
-          .gte("issue_date", range.from)
-          .lte("issue_date", range.to)
-          .range(from, to) as unknown as PromiseLike<PagedQueryResult<OrderWithItemsRow>>,
-      { pageSize: RANKING_PAGE_SIZE }
-    );
+  const orders = await fetchAllPagesParallel<OrderWithItemsRow>(
+    (from, to) =>
+      admin
+        .from("totvs_orders")
+        .select("issue_date, items:totvs_order_items(product, description, quantity, total)", { count: "exact" })
+        .gte("issue_date", range.from)
+        .lte("issue_date", range.to)
+        .range(from, to) as unknown as PromiseLike<PagedQueryResult<OrderWithItemsRow>>,
+    { pageSize: RANKING_PAGE_SIZE }
+  );
 
-    const result: ItemRankingRow[] = [];
-    for (const order of orders) {
-      for (const item of order.items) {
-        if (!item.product) continue;
-        result.push({
-          product: item.product,
-          description: item.description,
-          quantity: item.quantity,
-          total: item.total,
-          totvs_orders: { issue_date: order.issue_date },
-        });
-      }
+  const result: ItemRankingRow[] = [];
+  for (const order of orders) {
+    for (const item of order.items) {
+      if (!item.product) continue;
+      result.push({
+        product: item.product,
+        description: item.description,
+        quantity: item.quantity,
+        total: item.total,
+        totvs_orders: { issue_date: order.issue_date },
+      });
     }
-    return result;
-  },
-  ["fetch-itens-periodo"],
-  { revalidate: VENDAS_CACHE_REVALIDATE_SECONDS }
-);
+  }
+  return result;
+}, VENDAS_CACHE_REVALIDATE_SECONDS * 1000);
 
 // categoria opcional -- quando informada, filtra o ranking só pra produtos
 // classificados nela (ver classificarProduto). Extraída de listRankingProdutos
