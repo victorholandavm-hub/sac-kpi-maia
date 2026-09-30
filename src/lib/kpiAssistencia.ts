@@ -1,4 +1,3 @@
-import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import type { DateRange, RangePreset } from "./dateRange";
@@ -1131,8 +1130,32 @@ const MONTH_LABELS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago",
 // sempre a mesma janela, é uma tendência ao longo do tempo). Só contagem
 // (count:exact,head:true) em vez de buscar as linhas inteiras -- muito
 // mais barato pra um número por mês, sem precisar de fetchAllPagesParallel.
-export const getAssistenciaMonthlyEvolution = unstable_cache(
-  async (monthsBack: number = 12): Promise<AssistenciaMonthlyEvolutionRow[]> => {
+//
+// Cache em memória, não unstable_cache -- mesmo motivo de
+// getAssistenciaKpiDataCached acima: era o ÚLTIMO unstable_cache ainda
+// alcançável por /kpis-assistencia, e o erro (React #441, payload > 2MB
+// no Next.js Data Cache) continuou batendo nessa rota até esse também
+// sair -- fetches feitos DENTRO de um unstable_cache entram na mesma
+// entrada de cache que ele, então mesmo esse retorno pequeno (poucas
+// linhas de contagem por mês) contribuía pro mesmo teto.
+type AssistenciaMonthlyEvolutionCacheEntry = { value: AssistenciaMonthlyEvolutionRow[]; expiresAt: number };
+const assistenciaMonthlyEvolutionCache = new Map<number, AssistenciaMonthlyEvolutionCacheEntry>();
+
+export async function getAssistenciaMonthlyEvolution(monthsBack: number = 12): Promise<AssistenciaMonthlyEvolutionRow[]> {
+  const now = Date.now();
+  const cached = assistenciaMonthlyEvolutionCache.get(monthsBack);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const value = await computeAssistenciaMonthlyEvolution(monthsBack);
+
+  for (const [key, entry] of assistenciaMonthlyEvolutionCache) {
+    if (entry.expiresAt <= now) assistenciaMonthlyEvolutionCache.delete(key);
+  }
+  assistenciaMonthlyEvolutionCache.set(monthsBack, { value, expiresAt: now + ASSISTENCIA_CACHE_BUCKET_MS });
+  return value;
+}
+
+async function computeAssistenciaMonthlyEvolution(monthsBack: number): Promise<AssistenciaMonthlyEvolutionRow[]> {
   const admin = getSupabaseAdmin();
   const now = new Date();
   // Corta meses anteriores ao início do sync de vendas do TOTVS -- senão um
@@ -1181,7 +1204,4 @@ export const getAssistenciaMonthlyEvolution = unstable_cache(
       };
     })
   );
-  },
-  ["assistencia-monthly-evolution"],
-  { revalidate: 300 }
-);
+}
