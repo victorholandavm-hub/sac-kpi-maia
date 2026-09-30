@@ -1,10 +1,10 @@
-import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import type { DateRange, RangePreset } from "./dateRange";
 import { fetchInBatches } from "./supabaseBatch";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { categoryLabel, storeLabel } from "./labels";
 import { getVendasCountTotal, getEarliestSyncedOrderDate } from "./vendasProduto";
+import { memoizeWithTtl } from "./memoCache";
 
 export type TicketRow = {
   conversation_id: string;
@@ -1020,7 +1020,18 @@ export async function getKpiData(range: DateRange): Promise<KpiData> {
   return getKpiDataCached(range.preset, range.from ? range.from.toISOString() : null, bucketedTo.toISOString());
 }
 
-const getKpiDataCached = unstable_cache(
+// Cache em memória, não unstable_cache -- achado 30/09/2026 (Victor: "ta
+// dando erro no painel de kpis quando tento ir para a aba de
+// assistencia"): o Next.js prefetch automático de <Link href="/kpis">
+// (aba "SAC" em KpisSectionTabs.tsx, visível em /kpis-assistencia)
+// disparava essa função em segundo plano -- payload grande o bastante
+// (v_ticket_enriched + conversations inteiros, filtrados em memória
+// depois, ver comentário acima) pra passar do teto de 2MB do Next.js
+// Data Cache, derrubando a página com React error #441 mesmo depois de
+// zerar TODO unstable_cache alcançável direto por kpiAssistencia.ts
+// (ver PRs #521-#524 -- esse aqui só apareceu pelo prefetch da aba
+// vizinha, não pela navegação direta pra /kpis-assistencia).
+const getKpiDataCached = memoizeWithTtl(
   async (preset: RangePreset | "custom", fromIso: string | null, toIso: string): Promise<KpiData> => {
     const range: DateRange = { preset, from: fromIso ? new Date(fromIso) : null, to: new Date(toIso) };
     const supabase = getSupabaseAdmin();
@@ -1334,8 +1345,8 @@ const getKpiDataCached = unstable_cache(
     agentDrilldown,
   };
   },
-  ["kpi-data"],
-  { revalidate: 300 }
+  300_000,
+  (preset, fromIso, toIso) => `${preset}|${fromIso ?? ""}|${toIso}`
 );
 
 export type KpiMonthlyEvolutionRow = {
