@@ -74,8 +74,16 @@ async function fetchPageWithRetry<T>(
       return await fetchPage(from, to);
     } catch (err) {
       if (!(err instanceof TypeError) || !/fetch/i.test(err.message)) throw err;
+      // DIAGNÓSTICO TEMPORÁRIO 30/09/2026 -- remover depois de achar a causa
+      // raiz do "fetch failed" persistente em /kpis-assistencia.
+      console.error("[fetchPageWithRetry] fetch failed (1ª tentativa), cause:", (err as { cause?: unknown }).cause);
       await new Promise((resolve) => setTimeout(resolve, 300));
-      return await fetchPage(from, to);
+      try {
+        return await fetchPage(from, to);
+      } catch (err2) {
+        console.error("[fetchPageWithRetry] fetch failed (retry também falhou), cause:", (err2 as { cause?: unknown }).cause);
+        throw err2;
+      }
     }
   } finally {
     releaseFetchSlot();
