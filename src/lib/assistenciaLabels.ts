@@ -532,6 +532,32 @@ export const CAUSA_RAIZ_LABELS: Record<string, string> = {
 // foi salvo e deixou de ser oferecido como opção nova.
 export const CAUSA_RAIZ_ALL_VALUES: string[] = Object.keys(CAUSA_RAIZ_LABELS);
 
+// Destino do produto recolhido -- pedido do Victor 30/09/2026: "quando o
+// atendente marcar que será uma troca de produto ou um recolhimento de
+// produto, ele, obrigatoriamente, terá que responder... O produto
+// recolhido irá para onde: Estoque CD, Avaria CD, LOJA". Só existe pros 2
+// tipos que recolhem PRODUTO de verdade (troca_produto/recolhimento_produto,
+// ver PICKUP_DESTINATION_TYPES em SacCreateRequestForm.tsx) -- quando é
+// "loja", é sempre a mesma loja já escolhida em store_id (a loja do
+// cliente), não existe coluna própria de loja de destino (ver migration
+// 0142_pickup_destination.sql).
+export const PICKUP_DESTINATION_OPTIONS = ["estoque_cd", "avaria_cd", "loja"] as const;
+export type PickupDestination = (typeof PICKUP_DESTINATION_OPTIONS)[number];
+
+export const PICKUP_DESTINATION_LABELS: Record<PickupDestination, string> = {
+  estoque_cd: "Estoque CD",
+  avaria_cd: "Avaria CD",
+  loja: "Loja",
+};
+
+// "Loja" sozinho não diz qual -- sempre a própria loja do chamado (ver
+// comentário em PICKUP_DESTINATION_OPTIONS acima), então o rótulo já
+// entrega o nome dela direto, sem precisar abrir o chamado pra saber.
+export function pickupDestinationLabel(destination: string, storeName: string | null): string {
+  const label = PICKUP_DESTINATION_LABELS[destination as PickupDestination] ?? destination;
+  return destination === "loja" && storeName ? `Loja (${storeName})` : label;
+}
+
 // Causas que são retrabalho interno (alguém do time errou), em vez de algo
 // externo (transporte, fábrica) ou uma decisão legítima do cliente -- pedido
 // do Victor 22/08/2026: "Destaque os erros operacionais internos... com

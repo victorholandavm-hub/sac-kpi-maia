@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { formatFullAddress, type ServiceRequestDetail } from "@/lib/serviceRequests";
 import { formatDateOnlyBr } from "@/lib/formatDateTime";
-import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, pickupDestinationLabel } from "@/lib/assistenciaLabels";
 import type { RequestPhoto } from "@/lib/servicePhotos";
 
 // scheduledDate é "YYYY-MM-DD" puro (sem hora/fuso) -- new Date(iso) via
@@ -267,6 +267,20 @@ export function DespachoCard({ request, invoicePhoto }: { request: ServiceReques
         <Field label="Autorizado por" value={request.authorizedBy} />
         <Field label="Problema" value={request.reason} />
         <Field label="Observação" value={request.restrictionNote || request.notes} />
+        {/* Destino do produto recolhido em destaque -- pedido do Victor
+            30/09/2026: "na notificação essa informação tem que aparecer em
+            destaque nas observações, num retangulo de pontas
+            arredondadas". Mesmo padrão visual do retângulo de pontas
+            arredondadas do tipo do chamado, lá em cima (borda, sem fundo,
+            pra não competir com o URGENTE!). */}
+        {request.pickupDestination ? (
+          <div
+            className="self-start px-3 py-1.5 rounded-lg border-2 text-sm font-bold"
+            style={{ color: "#000", borderColor: "#000" }}
+          >
+            Produto recolhido vai pra: {pickupDestinationLabel(request.pickupDestination, request.storeName)}
+          </div>
+        ) : null}
       </div>
 
       <SectionTitle>Relatório logístico</SectionTitle>

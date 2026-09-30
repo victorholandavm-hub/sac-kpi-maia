@@ -17,6 +17,8 @@ import {
   CAUSA_RAIZ_OPTIONS,
   CAUSA_RAIZ_LABELS,
   SHIFT_LABELS,
+  PICKUP_DESTINATION_OPTIONS,
+  PICKUP_DESTINATION_LABELS,
 } from "@/lib/assistenciaLabels";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, SHIFTS, type Store } from "@/lib/serviceRequests";
 import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type RotaCity } from "@/lib/rotas";
@@ -40,6 +42,12 @@ type SacType = "troca_produto" | "entrega_produto" | "envio_peca" | "recolhiment
 // recolhimento embutido no mesmo chamado (recolhimento_produto é só
 // recolher, sem entregar nada -- já é auto-explicativo pelos itens listados).
 const DELIVERY_TYPES: SacType[] = ["troca_produto", "entrega_produto", "envio_peca", "recolhimento_produto"];
+
+// "Pra onde vai o produto recolhido" -- pedido do Victor 30/09/2026, só pros
+// 2 tipos que recolhem PRODUTO de verdade (envio_peca/entrega_produto não
+// recolhem nada do cliente). Última pergunta do formulário, obrigatória --
+// ver PICKUP_DESTINATION_OPTIONS em assistenciaLabels.ts.
+const PICKUP_DESTINATION_TYPES: SacType[] = ["troca_produto", "recolhimento_produto"];
 
 const ALL_SAC_TYPE_OPTIONS: { value: SacType; label: string }[] = [
   { value: "troca_produto", label: `${REQUEST_TYPE_LABELS.troca_produto} (recolher + entregar)` },
@@ -260,6 +268,16 @@ export function SacCreateRequestForm({
   const [type, setType] = useState<SacType>(typeOptions[0]?.value ?? "troca_produto");
   const isDelivery = DELIVERY_TYPES.includes(type);
   const showProduct = isDelivery;
+  const showPickupDestination = PICKUP_DESTINATION_TYPES.includes(type);
+  const [pickupDestination, setPickupDestination] = useState("");
+  // Só pra mostrar de qual loja se trata quando o destino é "loja" -- o
+  // select de baixo (store_id, Seção 1) é a fonte de verdade de verdade,
+  // esse estado só espelha a escolha pra confirmar na tela (pedido do
+  // Victor: "quando for loja, tem que ser a loja que foi marcada lá em
+  // cima, que é a loja do cliente" -- por isso não existe um 2º seletor de
+  // loja aqui, só essa confirmação).
+  const [storeId, setStoreId] = useState("");
+  const selectedStoreName = stores.find((s) => s.id === storeId)?.name ?? null;
   // Só existe pra troca_produto -- controla se carga/conferente aparecem
   // como obrigatórios (ver "Detalhes" abaixo e a validação espelhada em
   // createSacRequest).
@@ -418,7 +436,14 @@ export function SacCreateRequestForm({
         </Field>
 
         <Field label="Loja *">
-          <select name="store_id" required defaultValue="" className="rounded border px-3 py-2" style={inputStyle}>
+          <select
+            name="store_id"
+            required
+            value={storeId}
+            onChange={(e) => setStoreId(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          >
             <option value="" disabled>
               Selecione…
             </option>
@@ -973,6 +998,41 @@ export function SacCreateRequestForm({
               className="rounded border px-3 py-2"
               style={inputStyle}
             />
+          </Field>
+        ) : null}
+
+        {/* Última pergunta, obrigatória -- pedido do Victor 30/09/2026: "o
+            produto recolhido irá para onde: Estoque CD, Avaria CD, LOJA".
+            Só troca_produto/recolhimento_produto recolhem PRODUTO de
+            verdade do cliente (ver PICKUP_DESTINATION_TYPES acima) -- os
+            outros tipos de entrega não têm recolhimento nenhum pra ter
+            destino. Quando é "loja", é sempre a loja já escolhida na
+            Seção 1 (client_protheus_code/store_id) -- não existe um 2º
+            seletor de loja aqui de propósito, só a confirmação abaixo. */}
+        {showPickupDestination ? (
+          <Field label="O produto recolhido irá para onde? *">
+            <select
+              name="pickup_destination"
+              required
+              value={pickupDestination}
+              onChange={(e) => setPickupDestination(e.target.value)}
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            >
+              <option value="" disabled>
+                Selecione…
+              </option>
+              {PICKUP_DESTINATION_OPTIONS.map((d) => (
+                <option key={d} value={d}>
+                  {PICKUP_DESTINATION_LABELS[d]}
+                </option>
+              ))}
+            </select>
+            {pickupDestination === "loja" ? (
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                {selectedStoreName ? `Vai pra ${selectedStoreName} (a loja do cliente, escolhida lá em cima).` : "Escolha a loja lá em cima (Seção 1) primeiro."}
+              </span>
+            ) : null}
           </Field>
         ) : null}
 

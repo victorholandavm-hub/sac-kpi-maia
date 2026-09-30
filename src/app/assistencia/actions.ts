@@ -23,6 +23,7 @@ import {
   CAUSA_RAIZ_OPTIONS,
   CAUSA_RAIZ_ALL_VALUES,
   PAYMENTS_CONTROLLER_NAME,
+  PICKUP_DESTINATION_OPTIONS,
 } from "@/lib/assistenciaLabels";
 import { notifyLoja } from "@/lib/notifications";
 import { notifyTelegramNewRequest, notifyTelegramStatusChange, notifyTelegramAssemblerAssigned } from "@/lib/telegram";
@@ -2138,6 +2139,20 @@ export async function updateRequestDetails(
     return { error: "Informe o vendedor(a) (erro do vendedor precisa registrar quem foi)." };
   }
 
+  // Destino do produto recolhido -- pedido do Victor 30/09/2026, mesma
+  // validação condicional de createSacRequest (aqui reage ao TIPO NOVO,
+  // não ao antigo: trocar o tipo pra fora de troca_produto/
+  // recolhimento_produto limpa o campo, igual já acontece com causaRaiz
+  // acima quando !isDelivery).
+  const showPickupDestination = type === "troca_produto" || type === "recolhimento_produto";
+  let pickupDestination: string | null = null;
+  if (showPickupDestination) {
+    pickupDestination = String(formData.get("pickup_destination") ?? "").trim();
+    if (!(PICKUP_DESTINATION_OPTIONS as readonly string[]).includes(pickupDestination)) {
+      return { error: "Selecione pra onde vai o produto recolhido (Estoque CD, Avaria CD ou Loja)." };
+    }
+  }
+
   const { error } = await admin
     .from("service_requests")
     .update({
@@ -2160,6 +2175,7 @@ export async function updateRequestDetails(
       causa_carga: causaCarga,
       causa_conferente: causaConferente,
       causa_raiz_detalhe: causaRaizDetalhe,
+      pickup_destination: pickupDestination,
       montador_instruction: emptyToNull(formData.get("montador_instruction")),
       restriction_note: emptyToNull(formData.get("restriction_note")),
       client_time_restriction: emptyToNull(formData.get("client_time_restriction")),
@@ -2743,6 +2759,19 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     }
   }
 
+  // Destino do produto recolhido -- pedido do Victor 30/09/2026, só
+  // obrigatório pros 2 tipos que recolhem PRODUTO de verdade do cliente
+  // (ver PICKUP_DESTINATION_TYPES em SacCreateRequestForm.tsx). Quando é
+  // "loja", não existe um segundo campo de loja -- é sempre a mesma
+  // `storeId` já validada acima (a loja do cliente).
+  let pickupDestination: string | null = null;
+  if (type === "troca_produto" || type === "recolhimento_produto") {
+    pickupDestination = String(formData.get("pickup_destination") ?? "").trim();
+    if (!(PICKUP_DESTINATION_OPTIONS as readonly string[]).includes(pickupDestination)) {
+      return { error: "Selecione pra onde vai o produto recolhido (Estoque CD, Avaria CD ou Loja)." };
+    }
+  }
+
   const scheduledDate = String(formData.get("scheduled_date") ?? "").trim();
   const scheduledTime = String(formData.get("scheduled_time") ?? "").trim();
   // Id da atribuição, não a rota crua -- mesmo motivo de
@@ -2927,6 +2956,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       causa_raiz_detalhe: causaRaizDetalhe,
       seller_name: sellerNameForError,
       combo_montagem_desmontagem: comboMontagemDesmontagem,
+      pickup_destination: pickupDestination,
       // Criado direto pelo SAC, não pela loja — não há prazo pra aprovar.
       deadline_status: "aprovado",
     })

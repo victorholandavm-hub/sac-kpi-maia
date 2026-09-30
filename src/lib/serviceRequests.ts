@@ -622,6 +622,11 @@ export type ServiceRequestDetail = ServiceRequestSummary & {
   // cria o chamado (não é o requestedByName, que é quem criou o chamado no
   // sistema, ver serviceRequests.ts). Só relevante pra DELIVERY_REQUEST_TYPES.
   authorizedBy: string | null;
+  // Pra onde vai o produto recolhido (Estoque CD/Avaria CD/Loja) -- pedido
+  // do Victor 30/09/2026, só preenchido em troca_produto/recolhimento_produto
+  // (ver PICKUP_DESTINATION_OPTIONS em assistenciaLabels.ts). "Loja" é
+  // sempre a própria storeId do chamado, sem campo próprio de loja.
+  pickupDestination: string | null;
   // Cadeia de trocas ligadas (ver createExchangeChild em actions.ts e
   // 0090_exchange_parent_request.sql) -- parentExchange é a troca de onde
   // esse chamado nasceu (null se for a 1ª troca); childExchange é a próxima
@@ -664,6 +669,7 @@ type DetailRow = SummaryRow & {
   resolution_rating: number | null;
   authorized_by: string | null;
   parent_request_id: string | null;
+  pickup_destination: string | null;
 };
 
 type EventRow = {
@@ -689,7 +695,7 @@ const DETAIL_COLUMNS =
   // ao dar suporte pra editar causa raiz depois de criado (ver
   // EditRequestForm.tsx): sem essa coluna, o texto de "Outro" digitado na
   // criação nunca aparecia de volta no formulário de correção.
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, pickup_destination, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
 
 export async function getRequestDetail(
   id: string
@@ -750,6 +756,7 @@ export async function getRequestDetail(
     restrictionNote: row.restriction_note,
     notes: row.notes,
     authorizedBy: row.authorized_by,
+    pickupDestination: row.pickup_destination,
     deliveryRating: row.delivery_rating,
     resolutionRating: row.resolution_rating,
     parentExchange,
@@ -1266,6 +1273,10 @@ export type DriverRequestView = {
   restrictionNote: string | null;
   clientTimeRestriction: string | null;
   pickupCompleted: boolean;
+  // Pra onde vai o produto recolhido -- pedido do Victor 30/09/2026, ver
+  // mesmo campo em ServiceRequestDetail acima. Motorista precisa saber
+  // (troca_produto/recolhimento_produto), não só quem processa o chamado.
+  pickupDestination: string | null;
   scheduledDate: string | null;
   scheduledTime: string | null;
   shift: Shift | null;
@@ -1294,7 +1305,7 @@ export type DriverRequestView = {
 
 const DRIVER_VIEW_LIMIT = 200;
 const DRIVER_VIEW_COLUMNS =
-  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, client_time_restriction, pickup_completed, scheduled_date, scheduled_time, shift, urgent, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, authorized_by, requested_by_name, stores(name), requester:profiles!requested_by(full_name), items:service_request_items(product, is_pickup)";
+  "id, ticket_number, type, status, client_name, client_phone, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, restriction_note, client_time_restriction, pickup_completed, pickup_destination, scheduled_date, scheduled_time, shift, urgent, requested_deadline, approved_deadline, created_at, completed_at, rota, rota_exception_note, driver_order, delivery_rating, driver_name, exchange_round, authorized_by, requested_by_name, stores(name), requester:profiles!requested_by(full_name), items:service_request_items(product, is_pickup)";
 
 type DriverViewRow = {
   id: string;
@@ -1312,6 +1323,7 @@ type DriverViewRow = {
   restriction_note: string | null;
   client_time_restriction: string | null;
   pickup_completed: boolean;
+  pickup_destination: string | null;
   scheduled_date: string | null;
   scheduled_time: string | null;
   shift: Shift | null;
@@ -1356,6 +1368,7 @@ function toDriverView(row: DriverViewRow): DriverRequestView {
     restrictionNote: row.restriction_note,
     clientTimeRestriction: row.client_time_restriction,
     pickupCompleted: row.pickup_completed,
+    pickupDestination: row.pickup_destination,
     scheduledDate: row.scheduled_date,
     scheduledTime: row.scheduled_time,
     shift: row.shift,

@@ -10,6 +10,7 @@ import {
   ASSISTENCIA_ALSO_MANAGED_TYPES,
   DELIVERY_REQUEST_TYPES,
   CAUSA_RAIZ_LABELS,
+  pickupDestinationLabel,
 } from "@/lib/assistenciaLabels";
 import { DeliveryStatusBadge, isDeliveryScheduled } from "./DeliveryStatusBadge";
 import { StatusStepper } from "./StatusStepper";
@@ -365,6 +366,21 @@ export function DeliveryRequestDetailContent({
               <Row label="Restrição / observação" value={request.restrictionNote} />
               <Row label="Restrição de horário do cliente" value={request.clientTimeRestriction} />
               <Row label="Observações" value={request.notes} />
+              {/* Destino do produto recolhido em destaque -- pedido do
+                  Victor 30/09/2026: "na notificação essa informação tem
+                  que aparecer em destaque nas observações, num retangulo
+                  de pontas arredondadas". */}
+              {request.pickupDestination ? (
+                <div className="sm:col-span-2 flex flex-col gap-1">
+                  <span className="text-xs text-gray-400 dark:text-gray-500">Destino do produto recolhido</span>
+                  <span
+                    className="self-start px-3 py-1.5 rounded-lg text-sm font-bold"
+                    style={{ background: "color-mix(in srgb, var(--brand-orange) 16%, var(--surface-1))", color: "var(--brand-orange)" }}
+                  >
+                    {pickupDestinationLabel(request.pickupDestination, request.storeName)}
+                  </span>
+                </div>
+              ) : null}
               {request.type === "troca_produto" || request.type === "envio_recolhimento_peca" ? (
                 <Row
                   label={request.type === "envio_recolhimento_peca" ? "Peça recolhida?" : "Produto recolhido?"}
