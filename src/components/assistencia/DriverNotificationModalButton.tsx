@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { formatFullAddress, type DriverRequestView } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS, pickupDestinationLabel } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
 
 function formatDateOnly(value: string | null): string | null {
@@ -114,6 +114,22 @@ export function DriverNotificationModalButton({ item }: { item: DriverRequestVie
               <Row label="Motivo" value={item.reason} />
               <Row label="Restrição / observação" value={item.restrictionNote} />
               <Row label="Restrição de horário do cliente" value={item.clientTimeRestriction} />
+              {/* Destino do produto recolhido em destaque -- pedido do
+                  Victor 30/09/2026, mesmo padrão de
+                  DeliveryRequestDetailContent.tsx/DespachoCard.tsx. */}
+              {item.pickupDestination ? (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    Destino do produto recolhido
+                  </span>
+                  <span
+                    className="self-start px-3 py-1.5 rounded-lg text-sm font-bold"
+                    style={{ background: "color-mix(in srgb, var(--brand-orange) 16%, var(--surface-1))", color: "var(--brand-orange)" }}
+                  >
+                    {pickupDestinationLabel(item.pickupDestination, item.storeName)}
+                  </span>
+                </div>
+              ) : null}
               <Row label="Autorizado por" value={item.authorizedBy} />
               <Row label="Criado por" value={item.requestedByName} />
             </div>

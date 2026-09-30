@@ -3,7 +3,14 @@
 import { useActionState, useState } from "react";
 import { updateRequestDetails, type FormState } from "@/app/assistencia/actions";
 import { ADDRESS_NUMBER_REQUIRED_TYPES, type ServiceRequestDetail, type Store } from "@/lib/serviceRequests";
-import { REQUEST_TYPE_LABELS, DELIVERY_REQUEST_TYPES, CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS } from "@/lib/assistenciaLabels";
+import {
+  REQUEST_TYPE_LABELS,
+  DELIVERY_REQUEST_TYPES,
+  CAUSA_RAIZ_OPTIONS,
+  CAUSA_RAIZ_LABELS,
+  PICKUP_DESTINATION_OPTIONS,
+  PICKUP_DESTINATION_LABELS,
+} from "@/lib/assistenciaLabels";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -39,6 +46,15 @@ export function EditRequestForm({
   const [type, setType] = useState<string>(request.type);
   const showAddressNumber = (ADDRESS_NUMBER_REQUIRED_TYPES as readonly string[]).includes(type);
   const [isApartment, setIsApartment] = useState(request.clientIsApartment);
+  // Destino do produto recolhido -- pedido do Victor 30/09/2026, mesmo
+  // campo/padrão de SacCreateRequestForm.tsx. storeId aqui é controlado
+  // (era defaultValue) só pra dar pra mostrar o nome da loja quando o
+  // destino é "loja" -- a loja em si continua vindo do próprio select,
+  // sem um 2º seletor.
+  const showPickupDestination = type === "troca_produto" || type === "recolhimento_produto";
+  const [pickupDestination, setPickupDestination] = useState(request.pickupDestination ?? "");
+  const [storeId, setStoreId] = useState(request.storeId);
+  const selectedStoreName = stores.find((s) => s.id === storeId)?.name ?? null;
   // Só tipos que passam por montador/técnico -- os 4 tipos de entrega
   // (troca/entrega de produto, envio/recolhimento de peça) são sempre
   // motorista, sem montador pra instruir, e notificação externa não tem
@@ -85,7 +101,14 @@ export function EditRequestForm({
       )}
 
       <Field label="Loja *">
-        <select name="store_id" defaultValue={request.storeId} required className="rounded border px-3 py-2" style={inputStyle}>
+        <select
+          name="store_id"
+          value={storeId}
+          onChange={(e) => setStoreId(e.target.value)}
+          required
+          className="rounded border px-3 py-2"
+          style={inputStyle}
+        >
           {stores.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -348,6 +371,35 @@ export function EditRequestForm({
       <Field label="Observações">
         <textarea name="notes" defaultValue={request.notes ?? ""} rows={3} className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
+
+      {/* Última pergunta, obrigatória -- pedido do Victor 30/09/2026, mesmo
+          campo/padrão de SacCreateRequestForm.tsx. */}
+      {showPickupDestination ? (
+        <Field label="O produto recolhido irá para onde? *">
+          <select
+            name="pickup_destination"
+            required
+            value={pickupDestination}
+            onChange={(e) => setPickupDestination(e.target.value)}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          >
+            <option value="" disabled>
+              Selecione…
+            </option>
+            {PICKUP_DESTINATION_OPTIONS.map((d) => (
+              <option key={d} value={d}>
+                {PICKUP_DESTINATION_LABELS[d]}
+              </option>
+            ))}
+          </select>
+          {pickupDestination === "loja" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {selectedStoreName ? `Vai pra ${selectedStoreName} (a loja do cliente, escolhida lá em cima).` : "Escolha a loja lá em cima primeiro."}
+            </span>
+          ) : null}
+        </Field>
+      ) : null}
 
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>
