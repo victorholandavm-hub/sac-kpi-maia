@@ -103,6 +103,47 @@ function titleCase(s: string): string {
     .join("");
 }
 
+// Palavras de cor/acabamento/tecido reconhecidas -- lista curada (não é
+// NLP) a partir do catálogo real visto em service_request_items.product,
+// pra agrupar "CADEIRA HELENA LINHO BEGE" e "CADEIRA HELENA LINHO CINZA"
+// como um produto só. Pedido do Victor 30/09/2026: "classificado por
+// exemplo: cadeira helena, cadeira heloisa, sofa paris... sem distinção de
+// cor, só por grupo mesmo" (achado no ranking "Chamados por produto").
+const COR_ACABAMENTO_PALAVRAS = new Set([
+  "BEGE", "CINZA", "CARAMELO", "CHUMBO", "CACAU", "CAFE", "CAFÉ", "MARROM", "PRETO", "PRETA", "BRANCO", "BRANCA",
+  "AZUL", "VERDE", "AMARELO", "VINHO", "ROSA", "DOURADO", "PRATA", "TITANIUM", "GRAFITE", "OFF", "CLARO", "CLARA",
+  "ESCURO", "ESCURA", "CORINO", "KORINO", "COURO", "LINHO", "SUEDE", "SUED", "VELUDO", "JEANS", "NATURAL", "MEL",
+  "IMBUIA", "FREIJO", "AMÊNDOA", "AMENDOA", "NOGAL", "CEREJEIRA", "CRISTAL", "TOPAZIO", "TOPÁZIO", "SKIN",
+  "CINAMOMO", "PEROLA", "PÉROLA", "CONHAQUE", "CAPUCCINO", "AREIA", "GELO", "MOSTARDA", "TERRACOTA", "CHOCOLATE",
+]);
+
+// Sufixo de marca/fabricante ("- AIAM", "- MGM", "- CIN/OFF"...) e
+// anotações tipo "(UNIDADE)" -- não fazem parte do nome do modelo, só
+// ruído de cadastro do Protheus. `replaceAll` (não só 1x) porque algumas
+// descrições empilham mais de um sufixo (ex.: "... - CIN/OFF - MGM").
+// Removidos ANTES de cortar cor (senão a cor antes do traço nunca seria a
+// última palavra).
+function baseProductLabel(description: string): string {
+  let text = description
+    .toUpperCase()
+    .replace(/\([^)]*\)/g, " ") // "(UNIDADE)", "(LA)" etc.
+    .replace(/\s+/g, " ")
+    .trim();
+  let stripped: string;
+  do {
+    stripped = text.replace(/\s-\s*[A-ZÀ-Ú/]+\s*$/, "").trim();
+    if (stripped === text) break;
+    text = stripped;
+  } while (text.length > 0);
+
+  const words = text.split(" ");
+  while (words.length > 1 && COR_ACABAMENTO_PALAVRAS.has(words[words.length - 1])) {
+    words.pop();
+  }
+  const base = words.join(" ").trim();
+  return base || description.toUpperCase().trim();
+}
+
 // Apelido/variação do mesmo conferente que a normalização de caixa acima
 // não resolve sozinha (texto genuinamente diferente, não só maiúscula/
 // minúscula) -- pedido do Victor 28/08/2026: "vinicius jp e vinicios sao
@@ -715,11 +756,16 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     const parentRow = rowById.get(item.request_id);
     if (!parentRow) continue;
 
-    const dedupeKey = `${item.request_id}::${item.product}`;
+    // Nome-base (sem cor/acabamento, ver baseProductLabel acima) -- chave
+    // de agrupamento do ranking por produto. Dedupe também usa o nome-base:
+    // um chamado com 2 unidades da MESMA cadeira em cores diferentes conta
+    // 1 vez no grupo (2 unidades da mesma cor já contava 1 vez antes).
+    const baseLabel = baseProductLabel(item.product);
+    const dedupeKey = `${item.request_id}::${baseLabel}`;
     if (!produtoPorChamado.has(dedupeKey)) {
       produtoPorChamado.add(dedupeKey);
-      produtoCount.set(item.product, (produtoCount.get(item.product) ?? 0) + 1);
-      const produtoTag = `produto:${item.product}`;
+      produtoCount.set(baseLabel, (produtoCount.get(baseLabel) ?? 0) + 1);
+      const produtoTag = `produto:${baseLabel}`;
       (ticketsByTag[produtoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
     }
 
@@ -758,8 +804,8 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
 
     if (parentRow.causa_raiz === "defeito_fabricacao" && !produtoDefeitoPorChamado.has(dedupeKey)) {
       produtoDefeitoPorChamado.add(dedupeKey);
-      produtoDefeitoCount.set(item.product, (produtoDefeitoCount.get(item.product) ?? 0) + 1);
-      const produtoDefeitoTag = `produto_defeito:${item.product}`;
+      produtoDefeitoCount.set(baseLabel, (produtoDefeitoCount.get(baseLabel) ?? 0) + 1);
+      const produtoDefeitoTag = `produto_defeito:${baseLabel}`;
       (ticketsByTag[produtoDefeitoTag] ??= []).push(toReportRowItem(parentRow, produtosPorChamado.get(parentRow.id)));
     }
 
