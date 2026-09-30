@@ -39,7 +39,10 @@ function BreakageTooltip({ active, payload }: { active?: boolean; payload?: { pa
       style={{ background: "var(--surface-1)", borderColor: "var(--border)", color: "var(--text-primary)" }}
     >
       <span className="font-semibold">{d.label}</span>
-      {!isNaoIdentificado ? <span style={{ color: "var(--text-muted)" }}>Código: {d.partCode}</span> : null}
+      {/* Agrupado por modelo (sem cor) desde 30/09/2026 -- um grupo pode
+          somar vários códigos Protheus (uma cor cada), não faz mais
+          sentido mostrar 1 código só. partCode só vem preenchido pro
+          bucket "Não identificados" agora. */}
       <span>Chamados: {d.count}</span>
       <span>Unidades trocadas/enviadas: {d.itensQuantidade}</span>
       {!isNaoIdentificado ? <span>Vendas no período: {d.vendaQtd}</span> : null}

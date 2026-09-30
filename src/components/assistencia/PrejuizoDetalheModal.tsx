@@ -119,7 +119,10 @@ export function PrejuizoDetalheModal({
                     <tr key={p.tag}>
                       <td className="px-2 py-1.5" style={{ color: "var(--text-primary)" }}>
                         {p.label}
-                        {p.partCode !== "9999" ? <span style={{ color: "var(--text-muted)" }}> · {p.partCode}</span> : null}
+                        {/* Agrupado por modelo (sem cor) desde 30/09/2026 -- um
+                            grupo pode somar vários códigos, partCode só vem
+                            preenchido pro bucket "Não identificados" agora. */}
+                        {p.partCode ? <span style={{ color: "var(--text-muted)" }}> · {p.partCode}</span> : null}
                       </td>
                       <td className="text-right px-2 py-1.5" style={{ color: "var(--text-secondary)" }}>
                         {p.prejuizoEstoque != null ? formatBRL(p.prejuizoEstoque) : "—"}
