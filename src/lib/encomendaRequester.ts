@@ -12,19 +12,24 @@ export type EncomendaRequester =
   | { kind: "gerente"; storeIds: string[]; name: string }
   | { kind: "cd"; name: string }
   | { kind: "fabrica"; name: string; fabricaId: string | null }
-  | { kind: "sac"; name: string };
+  | { kind: "sac"; name: string }
+  | { kind: "assistencia"; name: string };
 
 // Quem pode lançar/ver encomenda de uma loja: caixa (PIN por pessoa, 1 loja),
 // gerente (login que ele já usa em /assistencia/loja, cookie com path
 // /assistencia então já chega aqui sem logar de novo), CD/fábrica (que não
 // têm loja fixa — escolhem a loja na hora de lançar o pedido, ver
-// createPedidoEncomendaAction), ou SAC (sessão Supabase Auth de verdade,
-// mesmo login por PIN de src/app/assistencia/actions.ts -- também sem loja
-// fixa, escolhe na hora igual CD/fábrica). Vendedor não tem acesso nenhum a
-// esse sistema — só é citado como texto livre no campo "Vendedor
-// responsável" pelo requester real. Tenta cada sessão em sequência, mesmo
-// padrão de requireEncomendaActor (src/lib/encomendaAuth.ts) só que pro lado
-// de quem solicita, não de quem processa.
+// createPedidoEncomendaAction), ou SAC/assistência (sessão Supabase Auth de
+// verdade, mesmo login por PIN de src/app/assistencia/actions.ts -- também
+// sem loja fixa, escolhe na hora igual CD/fábrica). "assistencia" -- pedido
+// do Victor 30/09/2026 (Iasmyn e Luis, role assistencia): já processavam
+// qualquer pedido pela fila interna (ver requireEncomendaActor acima), mas
+// não conseguiam LANÇAR um pedido novo -- essa função só reconhecia role
+// "sac" como solicitante autenticado. Vendedor não tem acesso nenhum a esse
+// sistema — só é citado como texto livre no campo "Vendedor responsável"
+// pelo requester real. Tenta cada sessão em sequência, mesmo padrão de
+// requireEncomendaActor (src/lib/encomendaAuth.ts) só que pro lado de quem
+// solicita, não de quem processa.
 //
 // Gerente vem antes de caixa: os cookies têm paths diferentes (gerente em
 // /assistencia, caixa só em /assistencia/encomendas) e podem coexistir no
@@ -63,6 +68,9 @@ export async function resolveEncomendaRequester(): Promise<EncomendaRequester | 
     const { data } = await admin.from("profiles").select("full_name, role").eq("id", user.id).maybeSingle();
     if (data && data.role === "sac") {
       return { kind: "sac", name: data.full_name };
+    }
+    if (data && data.role === "assistencia") {
+      return { kind: "assistencia", name: data.full_name };
     }
   }
 

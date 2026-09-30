@@ -21,7 +21,8 @@ export default async function SolicitarEncomendaPage({
 
   const admin = getSupabaseAdmin();
 
-  const noFixedStore = requester.kind === "cd" || requester.kind === "fabrica" || requester.kind === "sac";
+  const noFixedStore =
+    requester.kind === "cd" || requester.kind === "fabrica" || requester.kind === "sac" || requester.kind === "assistencia";
 
   let fixedStoreName: string | undefined;
   let storeOptions: { id: string; name: string }[] | undefined;
@@ -39,7 +40,7 @@ export default async function SolicitarEncomendaPage({
   }
 
   const voltarHref =
-    requester.kind === "cd" || requester.kind === "fabrica"
+    requester.kind === "cd" || requester.kind === "fabrica" || requester.kind === "assistencia"
       ? "/assistencia/encomendas/fila"
       : requester.kind === "sac"
         ? "/assistencia/encomendas/sac"

@@ -37,9 +37,10 @@ export default async function EncomendasCaixaPage({
   if (!requester) {
     redirect("/assistencia/encomendas");
   }
-  // CD/fábrica não têm loja fixa pra acompanhar aqui — a fila interna
-  // (requireEncomendaActor) já mostra os pedidos de todas as lojas pra eles.
-  if (requester.kind === "cd" || requester.kind === "fabrica") {
+  // CD/fábrica/assistência não têm loja fixa pra acompanhar aqui — a fila
+  // interna (requireEncomendaActor) já mostra os pedidos de todas as lojas
+  // pra eles.
+  if (requester.kind === "cd" || requester.kind === "fabrica" || requester.kind === "assistencia") {
     redirect("/assistencia/encomendas/fila");
   }
   // SAC também não tem loja fixa, mas não tem acesso à fila interna (essa é
