@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { sanitizeOrFilterValue } from "./searchFilter";
+import { memoizeWithTtl } from "./memoCache";
 
 // Cache de 5 min pras consultas pesadas desta tela -- pedido do Victor
 // 17/09/2026: "a mudança entre as páginas seja mais rápida" (kpis -> clientes
@@ -171,16 +172,12 @@ export function familiaLogisticaDaCategoria(key: ProdutoCategoriaKey): FamiliaLo
 // usuário), mas essa checagem fica de proteção permanente: se o sync algum
 // dia atrasar nesse cursor de novo, a tela avisa em vez de mentir um número
 // baixo.
-export const getEarliestSyncedOrderDate = unstable_cache(
-  async (): Promise<string | null> => {
-    const admin = getSupabaseAdmin();
-    const { data, error } = await admin.from("totvs_orders").select("issue_date").order("issue_date", { ascending: true }).limit(1).maybeSingle();
-    if (error) throw new Error(error.message);
-    return data?.issue_date ?? null;
-  },
-  ["earliest-synced-order-date"],
-  { revalidate: VENDAS_CACHE_REVALIDATE_SECONDS }
-);
+export const getEarliestSyncedOrderDate = memoizeWithTtl(async (): Promise<string | null> => {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("totvs_orders").select("issue_date").order("issue_date", { ascending: true }).limit(1).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.issue_date ?? null;
+}, VENDAS_CACHE_REVALIDATE_SECONDS * 1000);
 
 export type ProdutoSugestao = { productCode: string; description: string | null };
 
@@ -577,29 +574,25 @@ export async function getCustoUnitarioPorDescricaoProduto(descricoes: string[]):
 // o código específico que faltou custo. Record (não Map) de propósito --
 // unstable_cache serializa o retorno em JSON, e Map vira "{}" silenciosamente
 // (achado já documentado em outras funções desta sessão).
-export const getCustoMedioPorCategoria = unstable_cache(
-  async (): Promise<Record<string, number>> => {
-    const admin = getSupabaseAdmin();
-    const { data, error } = await admin.from("totvs_stock").select("description, unit_cost");
-    if (error) throw new Error(error.message);
+export const getCustoMedioPorCategoria = memoizeWithTtl(async (): Promise<Record<string, number>> => {
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.from("totvs_stock").select("description, unit_cost");
+  if (error) throw new Error(error.message);
 
-    const somaPorCategoria = new Map<string, number>();
-    const countPorCategoria = new Map<string, number>();
-    for (const row of data ?? []) {
-      if (row.unit_cost == null) continue;
-      const categoria = classificarProdutoAssistencia(row.description);
-      somaPorCategoria.set(categoria.key, (somaPorCategoria.get(categoria.key) ?? 0) + (Number(row.unit_cost) || 0));
-      countPorCategoria.set(categoria.key, (countPorCategoria.get(categoria.key) ?? 0) + 1);
-    }
-    const resultado: Record<string, number> = {};
-    for (const [categoria, soma] of somaPorCategoria) {
-      resultado[categoria] = soma / (countPorCategoria.get(categoria) ?? 1);
-    }
-    return resultado;
-  },
-  ["custo-medio-por-categoria"],
-  { revalidate: VENDAS_CACHE_REVALIDATE_SECONDS }
-);
+  const somaPorCategoria = new Map<string, number>();
+  const countPorCategoria = new Map<string, number>();
+  for (const row of data ?? []) {
+    if (row.unit_cost == null) continue;
+    const categoria = classificarProdutoAssistencia(row.description);
+    somaPorCategoria.set(categoria.key, (somaPorCategoria.get(categoria.key) ?? 0) + (Number(row.unit_cost) || 0));
+    countPorCategoria.set(categoria.key, (countPorCategoria.get(categoria.key) ?? 0) + 1);
+  }
+  const resultado: Record<string, number> = {};
+  for (const [categoria, soma] of somaPorCategoria) {
+    resultado[categoria] = soma / (countPorCategoria.get(categoria) ?? 1);
+  }
+  return resultado;
+}, VENDAS_CACHE_REVALIDATE_SECONDS * 1000);
 
 export type ProdutoSaldoEstoque = {
   // "o que tem em estoque" -- saldo físico no CD (current_balance),
