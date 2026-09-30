@@ -11,11 +11,13 @@ import {
 } from "./assistenciaLabels";
 
 // "supervisao" -- pedido do Victor 28/09/2026 (conta da Akyla Thais):
-// acesso só de leitura a 4 telas específicas (Estornos, Notificação de
-// Assistência, Visitas, Reclamações), nada mais. Feito sob medida pra
-// esse caso (não é um sistema geral de permissões por tela) -- ver
-// SupervisaoGuard.tsx (bloqueio client-side de qualquer outra rota dentro
-// de (app)) e os `isSupervisao`/`readOnly` espalhados pelas 4 páginas.
+// acesso a 4 telas específicas (Estornos, Notificação de Assistência,
+// Visitas, Reclamações), nada mais. Feito sob medida pra esse caso (não é
+// um sistema geral de permissões por tela) -- ver SupervisaoGuard.tsx
+// (bloqueio client-side de qualquer outra rota dentro de (app)). Estornos/
+// Notificação/Visitas continuam só leitura (`readOnly` em cada página);
+// Reclamações é a exceção -- ganhou edição TOTAL em 29/09/2026 (pedido do
+// Victor), ver reclamacoes-actions.ts/reclamacoes/page.tsx.
 export type Role = "assistencia" | "admin" | "sac" | "supervisao";
 
 export type Profile = {

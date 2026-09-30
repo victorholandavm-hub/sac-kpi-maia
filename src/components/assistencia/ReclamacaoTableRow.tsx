@@ -8,10 +8,6 @@ import type { Reclamacao } from "@/lib/reclamacoes";
 
 const inputStyle = { borderColor: "var(--border)" };
 
-function formatAudiencia(iso: string): string {
-  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
 // timestamptz (UTC) -> valor de <input type="datetime-local"> em horário de
 // Brasília -- mesmo espelhamento de toDatetimeLocalValue em ReclamacaoForm.tsx.
 function toDatetimeLocalValue(iso: string): string {
@@ -36,8 +32,10 @@ function SaveIndicator({ state }: { state: SaveState }) {
 // Audiência mudam direto na linha, com salvamento automático -- sem abrir
 // o formulário inteiro (ReclamacaoForm.tsx) só pra isso. Nome/Órgão/CPF
 // continuam só leitura aqui (mudam raramente, e errar o nome de alguém sem
-// confirmação é mais arriscado que errar um status).
-export function ReclamacaoTableRow({ reclamacao, readOnly }: { reclamacao: Reclamacao; readOnly: boolean }) {
+// confirmação é mais arriscado que errar um status). Sem branch read-only
+// -- admin e supervisao (Akyla Thais, edição total a partir de 29/09/2026)
+// usam a mesma linha editável.
+export function ReclamacaoTableRow({ reclamacao }: { reclamacao: Reclamacao }) {
   const [statusInterno, setStatusInterno] = useState(reclamacao.statusInterno);
   const [statusExterno, setStatusExterno] = useState(reclamacao.statusExterno ?? "");
   const [dataAudiencia, setDataAudiencia] = useState(reclamacao.dataAudiencia ? toDatetimeLocalValue(reclamacao.dataAudiencia) : "");
@@ -51,38 +49,6 @@ export function ReclamacaoTableRow({ reclamacao, readOnly }: { reclamacao: Recla
     const result = await updateReclamacaoFieldAction(reclamacao.id, field, value);
     setState(result.error ? "error" : "saved");
     setTimeout(() => setState("idle"), FEEDBACK_MS);
-  }
-
-  if (readOnly) {
-    return (
-      <tr className="border-t" style={{ borderColor: "var(--border)" }}>
-        <td className="px-3 py-2">
-          <span style={{ color: "var(--text-primary)" }}>{reclamacao.nome}</span>
-          {reclamacao.cpf ? (
-            <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
-              {reclamacao.cpf}
-            </span>
-          ) : null}
-        </td>
-        <td className="px-3 py-2" style={{ color: "var(--text-secondary)" }}>
-          {reclamacao.orgao}
-        </td>
-        <td className="px-3 py-2">
-          <span
-            className="text-xs font-medium rounded-full px-2 py-0.5"
-            style={{ background: isStatusInternoResolvido(reclamacao.statusInterno) ? "var(--status-good)" : "var(--brand-orange)", color: "#fff" }}
-          >
-            {reclamacao.statusInterno}
-          </span>
-        </td>
-        <td className="px-3 py-2 max-w-xs" style={{ color: "var(--text-secondary)" }}>
-          {reclamacao.statusExterno ?? "—"}
-        </td>
-        <td className="px-3 py-2 tabular-nums" style={{ color: "var(--text-secondary)" }}>
-          {reclamacao.dataAudiencia ? formatAudiencia(reclamacao.dataAudiencia) : "—"}
-        </td>
-      </tr>
-    );
   }
 
   return (

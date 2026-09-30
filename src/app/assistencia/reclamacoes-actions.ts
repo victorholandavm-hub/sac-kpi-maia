@@ -45,7 +45,9 @@ function readInput(formData: FormData): ReclamacaoInput | { error: string } {
 
 export async function createReclamacaoAction(_state: ReclamacaoFormState, formData: FormData): Promise<ReclamacaoFormState> {
   const profile = await getProfile();
-  requireRole(profile, "admin");
+  // supervisao (Akyla Thais) ganhou edição total em Reclamações -- pedido
+  // do Victor 29/09/2026, substitui o "só leitura" original de 28/09/2026.
+  requireRole(profile, "admin", "supervisao");
 
   const input = readInput(formData);
   if ("error" in input) return input;
@@ -62,7 +64,7 @@ export async function createReclamacaoAction(_state: ReclamacaoFormState, formDa
 
 export async function updateReclamacaoAction(id: string, _state: ReclamacaoFormState, formData: FormData): Promise<ReclamacaoFormState> {
   const profile = await getProfile();
-  requireRole(profile, "admin");
+  requireRole(profile, "admin", "supervisao");
 
   const input = readInput(formData);
   if ("error" in input) return input;
@@ -87,7 +89,7 @@ export async function updateReclamacaoAction(id: string, _state: ReclamacaoFormS
 // campo, não por FormData).
 export async function updateReclamacaoFieldAction(id: string, field: ReclamacaoInlineField, value: string | null): Promise<{ error?: string }> {
   const profile = await getProfile();
-  requireRole(profile, "admin");
+  requireRole(profile, "admin", "supervisao");
 
   if (field === "statusInterno" && !value?.trim()) return { error: "Informe o status." };
 

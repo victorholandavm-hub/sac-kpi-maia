@@ -8,7 +8,7 @@ export default async function EditarReclamacaoPage({ params }: { params: Promise
   const { id } = await params;
   const profile = await getProfile();
 
-  if (profile.role !== "admin") {
+  if (profile.role !== "admin" && profile.role !== "supervisao") {
     return <p className="text-sm text-gray-400 dark:text-gray-500">Acesso restrito ao admin.</p>;
   }
 
