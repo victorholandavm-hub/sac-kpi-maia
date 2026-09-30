@@ -15,6 +15,21 @@ import { MonthlyEvolutionTable } from "@/components/MonthlyEvolutionTable";
 // dados virar memória. O cache em memória de getAssistenciaKpiData já dá
 // o ganho de performance que essa rota precisava (achado 21/09/2026) --
 // não precisa do Full Route Cache por cima disso.
+//
+// `dynamic`/`fetchCache` force-no-store -- achado 30/09/2026 (2ª rodada):
+// o erro (mesmo "Failed to set Next.js data cache... items over 2MB",
+// mesmos 2189648 bytes) continuou batendo mesmo depois de tirar TODO
+// unstable_cache alcançável por essa rota (kpiAssistencia.ts +
+// vendasProduto.ts + serviceRequests.ts, ver memoCache.ts). Causa real:
+// o Next.js também tenta cachear automaticamente as respostas de
+// fetch() que o supabase-js faz por baixo dos panos, mesmo sem nenhum
+// unstable_cache explícito envolvido -- a mensagem de erro usa o nome
+// "unstable_cache" pro mecanismo de cache inteiro, não só pra chamadas
+// explícitas dessa API. Essas 2 flags desligam esse cache de fetch por
+// completo pra essa rota (documentado pelo Next.js pra isso), sem
+// depender de nenhuma lib de terceiro cooperar.
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 // Sub-aba "Assistência" de KPIs -- pedido do Victor 27/08/2026: "os kpis
 // da aba de entregas/notificação de assistencia precisa ir mesmo lá para
