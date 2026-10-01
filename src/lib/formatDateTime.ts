@@ -34,3 +34,17 @@ export function formatDateOnlyBr(iso: string): string {
     year: "numeric",
   });
 }
+
+// Só a hora, sem data -- achado do Victor 01/10/2026 (matriz do Cronograma
+// do SAC, cronograma/page.tsx): mostrava `completedAt.slice(11, 16)` direto
+// na string ISO (UTC), 3h adiantado do horário real de João Pessoa. Mesmo
+// motivo/correção das outras funções deste arquivo -- nunca fatiar um ISO
+// timestamp cru pra exibir hora, sempre converter de verdade com
+// toLocaleString + timeZone.
+export function formatTimeOnlyBr(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", {
+    timeZone: "America/Fortaleza",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

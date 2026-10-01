@@ -13,7 +13,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { CronogramaChecklist } from "@/components/assistencia/CronogramaChecklist";
-import { formatDateTimeShortBr } from "@/lib/formatDateTime";
+import { formatDateTimeShortBr, formatTimeOnlyBr } from "@/lib/formatDateTime";
 
 export const dynamic = "force-dynamic";
 
@@ -103,7 +103,7 @@ async function AdminView({ data }: { data: string }) {
                     <td key={cel.itemId} className="text-center px-3 py-2">
                       {cel.completedAt ? (
                         <span title={formatDateTimeShortBr(cel.completedAt)} style={{ color: "var(--status-good)" }}>
-                          ✅ {cel.completedAt.slice(11, 16)}
+                          ✅ {formatTimeOnlyBr(cel.completedAt)}
                         </span>
                       ) : cel.atrasado ? (
                         <span className="font-semibold" style={{ color: "var(--status-critical)" }}>
