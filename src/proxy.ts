@@ -19,6 +19,13 @@ const PASSTHROUGH_PREFIXES = [
   // pega em /api/assistencia/log-print, 16/09/2026 -- aprendida a lição
   // dessa vez, adicionado já na criação da rota).
   "/api/reconcile-tags",
+  // Alerta de atraso do Cronograma Diário do SAC (ver
+  // .github/workflows/sac-cronograma-cron.yml) -- mesmo motivo exato de
+  // /api/reconcile-tags acima: não começa com /api/sync nem /assistencia,
+  // caiu direto no redirect de auth do painel de KPIs (confirmado em
+  // produção 01/10/2026 -- curl na rota devolvia 307 pra /login em vez de
+  // rodar o GET, então o cron de 15min nunca executava nada de verdade).
+  "/api/sac-cronograma-check",
   "/api/montador/upload-photo",
   "/api/motorista/upload-photo",
   // Upload do comprovante de estorno pelo financeiro -- mesmo motivo dos
