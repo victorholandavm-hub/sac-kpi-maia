@@ -21,7 +21,11 @@ import { usePathname } from "next/navigation";
 const BASE_TABS = [
   { label: "Início", href: "/assistencia/inicio" },
   { label: "Solicitações", href: "/assistencia/fila", matches: ["/assistencia/fila", "/assistencia/agenda"] },
-  { label: "Controle Assistência", href: "/assistencia/pecas", matches: ["/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
+  // "Cadastros" entrou 01/10/2026 (pedido do Victor) como PRIMEIRA aba do
+  // grupo -- href do item de menu aponta pra ela agora (era /pecas),
+  // `matches` ganhou a rota nova pra continuar destacando o item em
+  // qualquer uma das 4.
+  { label: "Controle Assistência", href: "/assistencia/cadastros", matches: ["/assistencia/cadastros", "/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
   { label: "Encomendas", href: "/assistencia/encomendas/fila" },
   // "Cargas" e "Prazos de produtos" inativadas (tiradas de exibição) --
   // pedido do Victor 28/09/2026. As rotas continuam existindo, só não têm

@@ -65,6 +65,9 @@ export default async function PecasQueuePage({
           assistência/admin -- equipe técnica tem sua própria desde
           14/09/2026 (/assistencia/tecnico/pecas). */}
       <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+        {/* "Cadastros" entrou 01/10/2026 (pedido do Victor) -- primeira
+            aba do grupo, ver AssistenciaNav.tsx. */}
+        <UnderlineTab href="/assistencia/cadastros" label="Cadastros" active={false} />
         <UnderlineTab href="/assistencia/pecas" label="Peças" active />
         {/* "Fornecedores" inativada (tirada de exibição) -- pedido do Victor
             30/09/2026, mesmo padrão de Cargas/Prazos de produtos
