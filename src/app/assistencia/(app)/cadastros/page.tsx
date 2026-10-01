@@ -281,8 +281,6 @@ export default async function CadastrosPage({
         {status ? <input type="hidden" name="status" value={status} /> : null}
         {loja ? <input type="hidden" name="loja" value={loja} /> : null}
         {solicitante ? <input type="hidden" name="solicitante" value={solicitante} /> : null}
-        {from ? <input type="hidden" name="from" value={from} /> : null}
-        {to ? <input type="hidden" name="to" value={to} /> : null}
         <input
           type="search"
           name="q"
@@ -291,12 +289,23 @@ export default async function CadastrosPage({
           className="rounded-lg border px-3 py-2 text-sm flex-1 min-w-[260px]"
           style={{ borderColor: "var(--border)" }}
         />
+        {/* Período manual (data de abertura) -- complementa os atalhos do
+            DateRangeQuickFilter acima, mesmo padrão de De/Até usado em
+            fila/page.tsx. */}
+        <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+          De
+          <input type="date" name="from" defaultValue={from ?? ""} className="rounded-lg border px-2 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+          Até
+          <input type="date" name="to" defaultValue={to ?? ""} className="rounded-lg border px-2 py-2 text-sm" style={{ borderColor: "var(--border)" }} />
+        </label>
         <button type="submit" className="text-sm px-4 py-2 rounded-lg border font-medium" style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}>
           Buscar
         </button>
-        {q ? (
-          <Link href={buildHref({ filtro, status, loja, solicitante, from, to })} className="text-xs underline" style={{ color: "var(--text-muted)" }}>
-            Limpar busca
+        {q || from || to ? (
+          <Link href={buildHref({ filtro, status, loja, solicitante })} className="text-xs underline" style={{ color: "var(--text-muted)" }}>
+            Limpar busca/período
           </Link>
         ) : null}
       </form>
