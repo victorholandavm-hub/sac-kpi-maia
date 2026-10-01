@@ -38,6 +38,7 @@ const TIPO_PILLS: { key: Filtro; label: string }[] = [
   { key: "TROCA", label: "Trocas" },
   { key: "ERROS", label: "Erros de Entrega/Faturamento" },
   { key: "MONTAGEM", label: "Montagens" },
+  { key: "SAC", label: "SAC" },
   { key: "HISTORICO", label: "Histórico" },
 ];
 
