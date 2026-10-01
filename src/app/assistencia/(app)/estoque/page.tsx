@@ -103,6 +103,8 @@ export default async function EstoquePage({
       {/* Estilo trocado pra aba sublinhada 15/09/2026 (mesmo pedido/
           racional de pecas/page.tsx, ver lá). */}
       <div className="flex items-center gap-2 border-b" style={{ borderColor: "var(--border)" }}>
+        {/* "Cadastros" entrou 01/10/2026 -- ver pecas/page.tsx. */}
+        <UnderlineTab href="/assistencia/cadastros" label="Cadastros" active={false} />
         <UnderlineTab href="/assistencia/pecas" label="Peças" active={false} />
         {/* "Fornecedores" inativada -- ver pecas/page.tsx. */}
         <UnderlineTab href="/assistencia/estoque" label="Estoque" active />

@@ -79,7 +79,9 @@ function PlusIcon() {
 const PRIMARY_TABS = [
   { label: "Início", href: "/assistencia/inicio", icon: HomeIcon },
   { label: "Fila", href: "/assistencia/fila", icon: ClipboardIcon, matches: ["/assistencia/fila", "/assistencia/agenda"] },
-  { label: "Controle", href: "/assistencia/pecas", icon: BoxIcon, matches: ["/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
+  // "Cadastros" entrou 01/10/2026 como 1ª aba -- href aponta pra ela
+  // agora (era /pecas), mesmo motivo de AssistenciaNav.tsx.
+  { label: "Controle", href: "/assistencia/cadastros", icon: BoxIcon, matches: ["/assistencia/cadastros", "/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
 ];
 
 // "Prazos de produtos" inativada (tirada de exibição) -- pedido do Victor
