@@ -141,6 +141,19 @@ export function filterSemRotaOpen(requests: ServiceRequestSummary[]): ServiceReq
   return requests.filter((r) => r.status === "aberta" && r.rota === null);
 }
 
+// Pedido do Victor 01/10/2026: "preciso de um filtro de Entrar em
+// contato" -- motorista marcou "Não concluída" (status 'remarcar', ver
+// driverReportIssue em driver-actions.ts) e ninguém ainda registrou que
+// entrou em contato com o cliente (ver markRemarcarContacted, actions.ts,
+// e RemarcarContactBadge, DeliveryStatusBadge.tsx -- mesmo critério,
+// reaproveitado aqui pro pill/contador em vez de só a badge por linha).
+// Mesmo padrão de filterOverdueOpen/filterSemRotaOpen acima -- usado tanto
+// pro número do pill quanto pra filtrar a lista quando ele é clicado,
+// compartilhado entre fila/page.tsx (aba Entregas) e sac/notificacoes/page.tsx.
+export function filterPendingContato(requests: ServiceRequestSummary[]): ServiceRequestSummary[] {
+  return requests.filter((r) => r.status === "remarcar" && !r.remarcarContactedAt);
+}
+
 // Tira os grupos "sem rota" do meio do feed ordenado por data e coloca
 // primeiro -- mesmo pedido do Victor acima. groupByRota já calcula
 // `isSemRota` por grupo (ver abaixo); aqui só reordena o array que ele
