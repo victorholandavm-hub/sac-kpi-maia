@@ -25,6 +25,7 @@ export type EstornoRequest = {
   motivo: string | null;
   produto: string | null;
   autorizadoPor: string | null;
+  autorizadoGerencia: boolean;
   anexoSolicitacaoUrl: string;
   status: EstornoRequestStatus;
   anexoComprovanteUrl: string | null;
@@ -37,7 +38,7 @@ export type EstornoRequest = {
 };
 
 const COLUMNS =
-  "id, store_id, stores(name), requester_role, requester_name, cliente_nome, cpf, codigo_cliente, nf_entrada, nf_devolucao, valor_reembolso, data_venda, forma_pagamento, motivo, produto, autorizado_por, anexo_solicitacao_path, status, anexo_comprovante_path, concluido_por, concluido_em, recusado_por, recusado_em, motivo_recusa, created_at";
+  "id, store_id, stores(name), requester_role, requester_name, cliente_nome, cpf, codigo_cliente, nf_entrada, nf_devolucao, valor_reembolso, data_venda, forma_pagamento, motivo, produto, autorizado_por, autorizado_gerencia, anexo_solicitacao_path, status, anexo_comprovante_path, concluido_por, concluido_em, recusado_por, recusado_em, motivo_recusa, created_at";
 
 type Row = {
   id: string;
@@ -56,6 +57,7 @@ type Row = {
   motivo: string | null;
   produto: string | null;
   autorizado_por: string | null;
+  autorizado_gerencia: boolean;
   anexo_solicitacao_path: string;
   status: EstornoRequestStatus;
   anexo_comprovante_path: string | null;
@@ -85,6 +87,7 @@ function toEstornoRequest(row: Row): EstornoRequest {
     motivo: row.motivo,
     produto: row.produto,
     autorizadoPor: row.autorizado_por,
+    autorizadoGerencia: row.autorizado_gerencia,
     anexoSolicitacaoUrl: photoPublicUrl(row.anexo_solicitacao_path),
     status: row.status,
     anexoComprovanteUrl: row.anexo_comprovante_path ? photoPublicUrl(row.anexo_comprovante_path) : null,
@@ -143,6 +146,7 @@ export type NewEstornoRequestInput = {
   motivo: string | null;
   produto: string | null;
   autorizadoPor: string | null;
+  autorizadoGerencia: boolean;
   anexoSolicitacaoPath: string;
 };
 
@@ -168,6 +172,7 @@ export async function createEstornoRequest(id: string, input: NewEstornoRequestI
     motivo: input.motivo,
     produto: input.produto,
     autorizado_por: input.autorizadoPor,
+    autorizado_gerencia: input.autorizadoGerencia,
     anexo_solicitacao_path: input.anexoSolicitacaoPath,
   });
   if (error) throw new Error(error.message);

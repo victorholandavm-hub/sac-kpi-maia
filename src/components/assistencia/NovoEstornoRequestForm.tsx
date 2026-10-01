@@ -390,6 +390,18 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
       <Field label="Autorizado por">
         <input name="autorizado_por" type="text" className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
+      <Field label="Estorno autorizado pela gerência?" required>
+        <div className="flex items-center gap-4 pt-1">
+          <label className="flex items-center gap-1.5 text-sm" style={{ color: "var(--text-primary)" }}>
+            <input type="radio" name="autorizado_gerencia" value="sim" required />
+            Sim
+          </label>
+          <label className="flex items-center gap-1.5 text-sm" style={{ color: "var(--text-primary)" }}>
+            <input type="radio" name="autorizado_gerencia" value="nao" required />
+            Não
+          </label>
+        </div>
+      </Field>
 
       <Field label="Comprovante da venda (foto ou PDF)" required>
         <input name="anexo" type="file" accept="image/*,application/pdf" required className="rounded border px-3 py-2" style={inputStyle} />

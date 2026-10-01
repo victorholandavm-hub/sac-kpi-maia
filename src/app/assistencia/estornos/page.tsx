@@ -85,6 +85,7 @@ export default async function EstornosPage({ searchParams }: { searchParams: Pro
                   {r.produto ? <p>Produto: {r.produto}</p> : null}
                   {r.motivo ? <p>Motivo: {r.motivo}</p> : null}
                   {r.autorizadoPor ? <p>Autorizado por: {r.autorizadoPor}</p> : null}
+                  <p>Autorizado pela gerência: {r.autorizadoGerencia ? "Sim" : "Não"}</p>
                   <a href={r.anexoSolicitacaoUrl} target="_blank" rel="noopener noreferrer" className="underline self-start" style={{ color: "var(--brand-green)" }}>
                     Ver comprovante da venda
                   </a>

@@ -52,6 +52,12 @@ export async function createEstornoRequestAction(_state: EstornoFormState, formD
   const valorReembolso = Number(valorRaw);
   if (!Number.isFinite(valorReembolso) || valorReembolso <= 0) return { error: "Informe um valor de reembolso válido." };
 
+  const autorizadoGerenciaRaw = String(formData.get("autorizado_gerencia") ?? "");
+  if (autorizadoGerenciaRaw !== "sim" && autorizadoGerenciaRaw !== "nao") {
+    return { error: "Informe se o estorno foi autorizado pela gerência." };
+  }
+  const autorizadoGerencia = autorizadoGerenciaRaw === "sim";
+
   const file = formData.get("anexo");
   if (!(file instanceof File) || file.size === 0) return { error: "Anexe uma foto ou PDF do comprovante da venda." };
 
@@ -79,6 +85,7 @@ export async function createEstornoRequestAction(_state: EstornoFormState, formD
       motivo: emptyToNull(formData.get("motivo")),
       produto: emptyToNull(formData.get("produto")),
       autorizadoPor: emptyToNull(formData.get("autorizado_por")),
+      autorizadoGerencia,
       anexoSolicitacaoPath: anexoPath,
     });
   } catch (err) {

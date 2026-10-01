@@ -178,6 +178,10 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                   <InfoItem label="Forma de pagamento" value={r.formaPagamento ?? ""} />
                   <InfoItem label="Produto" value={r.produto ?? ""} />
                   <InfoItem label="Autorizado por" value={r.autorizadoPor ?? ""} />
+                  <InfoItem
+                    label="Autorizado pela gerência?"
+                    value={r.autorizadoGerencia ? "Sim" : "Não"}
+                  />
                 </div>
                 {r.motivo ? (
                   <div>
