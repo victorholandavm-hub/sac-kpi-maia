@@ -38,6 +38,32 @@ function maskPhone(value: string): string {
   return d.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d{1,4})$/, "$1-$2");
 }
 
+// CNPJ fixo por filial -- pedido do Victor 01/10/2026 ("colocar automático
+// assim que colocar a filial já ir o CNPJ fixo da filial"), lista de
+// referência que ele passou por print. As 3 linhas de Mangabeira têm CNPJ
+// diferente cada uma (empresas/filiais distintas no mesmo bairro) -- por
+// isso o rótulo entre parênteses, senão ficaria ambíguo qual delas
+// escolher.
+const LOJA_CNPJ: { label: string; cnpj: string }[] = [
+  { label: "Bayeux", cnpj: "39.537.682/0001-01" },
+  { label: "Santa Rita", cnpj: "39.537.682/0002-92" },
+  { label: "Santo Elias", cnpj: "39.537.682/0005-35" },
+  { label: "Tambaú", cnpj: "39.537.682/0007-05" },
+  { label: "Mangabeira (Líder 1)", cnpj: "39.537.682/0010-00" },
+  { label: "Mangabeira (Maia 2)", cnpj: "39.537.682/0006-16" },
+  { label: "Mangabeira (Maia 3)", cnpj: "39.537.682/0003-73" },
+  { label: "GL", cnpj: "39.537.682/0004-54" },
+  { label: "Pluma", cnpj: "39.537.682/0008-88" },
+  { label: "Cabedelo", cnpj: "39.537.682/0009-69" },
+  { label: "Barão do Triunfo", cnpj: "39.537.682/0011-83" },
+  { label: "Shopping M", cnpj: "39.537.682/0012-64" },
+  { label: "CD", cnpj: "39.537.682/0013-45" },
+  { label: "Mamanguape", cnpj: "39.537.682/0014-26" },
+  { label: "Manaíra", cnpj: "39.537.682/0015-07" },
+  { label: "Campina Grande", cnpj: "39.537.682/0016-98" },
+];
+const OUTRA_LOJA = "__outra__";
+
 // Gaveta lateral (não modal central) pra lançar um cadastro novo direto
 // pelo sistema -- pedido do Victor 01/10/2026, mesmo desenho do protótipo
 // aprovado em Artifact (17 campos em 4 seções, ficaria apertado demais
@@ -53,6 +79,8 @@ export function NovoCadastroDrawer() {
   const [cpf, setCpf] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [lojaSelect, setLojaSelect] = useState("");
+  const [lojaCustom, setLojaCustom] = useState("");
 
   useEffect(() => {
     if (!pending && submittedRef.current && !state?.error) {
@@ -62,6 +90,8 @@ export function NovoCadastroDrawer() {
       setCpf("");
       setCnpj("");
       setTelefone("");
+      setLojaSelect("");
+      setLojaCustom("");
     }
   }, [pending, state]);
 
@@ -145,7 +175,41 @@ export function NovoCadastroDrawer() {
                   <input name="vendedora" className="rounded border px-3 py-2" style={inputStyle} />
                 </Field>
                 <Field label="Loja">
-                  <input name="loja" className="rounded border px-3 py-2" style={inputStyle} />
+                  <select
+                    value={lojaSelect}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setLojaSelect(value);
+                      if (value === OUTRA_LOJA) {
+                        setCnpj("");
+                        return;
+                      }
+                      const match = LOJA_CNPJ.find((l) => l.label === value);
+                      setCnpj(match?.cnpj ?? "");
+                    }}
+                    className="rounded border px-3 py-2"
+                    style={inputStyle}
+                  >
+                    <option value="">Selecione a filial</option>
+                    {LOJA_CNPJ.map((l) => (
+                      <option key={l.label} value={l.label}>
+                        {l.label}
+                      </option>
+                    ))}
+                    <option value={OUTRA_LOJA}>Outra (não listada)</option>
+                  </select>
+                  {lojaSelect === OUTRA_LOJA ? (
+                    <input
+                      name="loja"
+                      value={lojaCustom}
+                      onChange={(e) => setLojaCustom(e.target.value)}
+                      placeholder="Nome da filial"
+                      className="rounded border px-3 py-2 mt-1.5"
+                      style={inputStyle}
+                    />
+                  ) : (
+                    <input type="hidden" name="loja" value={lojaSelect} />
+                  )}
                 </Field>
                 <Field label="CNPJ">
                   <input

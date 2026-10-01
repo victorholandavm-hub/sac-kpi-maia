@@ -9,7 +9,7 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 // IMPORTADAS (inferidos a partir de uma planilha sem essas colunas prontas)
 // -- um cadastro novo já nasce com essa informação de verdade, sem precisar
 // inferir nada.
-export const CADASTRO_TIPOS = ["ASSISTENCIA", "TROCA", "ERRO_ENTREGA", "ERRO_FATURAMENTO", "MONTAGEM", "HISTORICO"] as const;
+export const CADASTRO_TIPOS = ["ASSISTENCIA", "TROCA", "ERRO_ENTREGA", "ERRO_FATURAMENTO", "MONTAGEM", "HISTORICO", "SAC"] as const;
 export type CadastroTipo = (typeof CADASTRO_TIPOS)[number];
 
 export const CADASTRO_TIPO_LABELS: Record<CadastroTipo, string> = {
@@ -19,6 +19,7 @@ export const CADASTRO_TIPO_LABELS: Record<CadastroTipo, string> = {
   ERRO_FATURAMENTO: "Erro de faturamento",
   MONTAGEM: "Montagem",
   HISTORICO: "Histórico (sem tipo na planilha original)",
+  SAC: "SAC",
 };
 
 // Cor por tipo -- mesma família de badge colorida que o resto do sistema
@@ -30,6 +31,7 @@ export const CADASTRO_TIPO_COLORS: Record<CadastroTipo, string> = {
   ERRO_FATURAMENTO: "#B91C1C",
   MONTAGEM: "#16A34A",
   HISTORICO: "#6B7280",
+  SAC: "#0891B2",
 };
 
 export const CADASTRO_STATUSES = ["PROGRAMADO", "CONCLUIDO", "CANCELADO"] as const;
