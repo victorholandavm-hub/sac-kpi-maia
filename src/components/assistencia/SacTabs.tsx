@@ -9,6 +9,10 @@ const TABS = [
   { key: "notificacoes", label: "Notificação de Assistência", href: "/assistencia/sac/notificacoes" },
   { key: "encomendas", label: "Minhas encomendas", href: "/assistencia/encomendas/sac" },
   { key: "montagens", label: "Montagens e serviços", href: "/assistencia/sac/montagens" },
+  // Pedido do Victor 01/10/2026: "quero que todos os atendentes fossem
+  // colocando como feito, diariamente" -- checklist pessoal do atendente
+  // (ou matriz de controle, se admin, ver cronograma/page.tsx).
+  { key: "cronograma", label: "Cronograma", href: "/assistencia/sac/cronograma" },
   // Inativadas (tiradas de exibição) -- pedido do Victor 28/09/2026. A
   // rota/página continua existindo (não removida do código), só não
   // aparece mais nessa fileira de abas. `hidden: true` em vez de apagar a
