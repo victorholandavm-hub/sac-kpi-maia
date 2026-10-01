@@ -2,7 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { ROLE_LABELS } from "@/lib/assistenciaLabels";
-import { getCronogramaDia, getCronogramaMatrizDia, getCronogramaTaxaCumprimento, todayFortaleza } from "@/lib/cronogramaSac";
+import {
+  getCronogramaDia,
+  getCronogramaMatrizDia,
+  getCronogramaTaxaCumprimento,
+  getCronogramaAtendenteConfig,
+  todayFortaleza,
+} from "@/lib/cronogramaSac";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { SacTabs } from "@/components/assistencia/SacTabs";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
@@ -86,6 +92,12 @@ async function AdminView({ data }: { data: string }) {
                 <tr key={at.profileId} className="border-b" style={{ borderColor: "var(--border)" }}>
                   <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
                     {at.fullName}
+                    {at.offsetMinutos > 0 ? (
+                      <span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>
+                        {" "}
+                        (+{at.offsetMinutos}min)
+                      </span>
+                    ) : null}
                   </td>
                   {at.celulas.map((cel) => (
                     <td key={cel.itemId} className="text-center px-3 py-2">
@@ -172,7 +184,11 @@ export default async function CronogramaPage({ searchParams }: { searchParams: P
   const selectedDate = data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : today;
   const isAdminView = profile.role === "admin";
 
-  const personalItens = isAdminView ? null : await getCronogramaDia(profile.id, today);
+  // Pedido do Victor 01/10/2026: "joab e luisa nao precisam entrar nesse
+  // cronograma" -- em vez de checklist vazio/confuso, mostra que esse
+  // cronograma não se aplica a essa pessoa.
+  const personalConfig = isAdminView ? null : await getCronogramaAtendenteConfig(profile.id);
+  const personalItens = isAdminView || !personalConfig?.participa ? null : await getCronogramaDia(profile.id, today);
 
   return (
     <ToastProvider>
@@ -182,6 +198,10 @@ export default async function CronogramaPage({ searchParams }: { searchParams: P
 
         {isAdminView ? (
           <AdminView data={selectedDate} />
+        ) : !personalConfig?.participa ? (
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Esse cronograma não se aplica a você.
+          </p>
         ) : (
           <div className="flex flex-col gap-3 max-w-xl">
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>

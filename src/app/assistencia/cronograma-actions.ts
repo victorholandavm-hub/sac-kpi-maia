@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { getProfile, requireRole } from "@/lib/dal";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { addCronogramaItem, setCronogramaItemAtivo, todayFortaleza } from "@/lib/cronogramaSac";
+import {
+  addCronogramaItem,
+  setCronogramaItemAtivo,
+  getCronogramaAtendenteConfig,
+  setCronogramaAtendenteConfig,
+  todayFortaleza,
+} from "@/lib/cronogramaSac";
 
 export type FormState = { error?: string } | undefined;
 
@@ -16,6 +22,11 @@ export type FormState = { error?: string } | undefined;
 export async function markCronogramaItemDone(itemId: string): Promise<void> {
   const profile = await getProfile();
   requireRole(profile, "sac");
+  // Defesa a mais -- a tela já esconde o checklist de quem não participa
+  // (ver CronogramaAtendenteConfig/page.tsx), isso aqui é só o servidor
+  // nunca confiando só no que o cliente escondeu.
+  const config = await getCronogramaAtendenteConfig(profile.id);
+  if (!config.participa) throw new Error("Esse cronograma não se aplica a você.");
 
   const admin = getSupabaseAdmin();
   const { error } = await admin
@@ -71,6 +82,23 @@ export async function toggleCronogramaItemAtivoAction(id: string, ativo: boolean
   const profile = await getProfile();
   requireRole(profile, "admin");
   await setCronogramaItemAtivo(id, ativo);
+  revalidatePath("/assistencia/admin");
+  revalidatePath("/assistencia/sac/cronograma");
+}
+
+// Exceção por atendente -- pedido do Victor 01/10/2026: "joab e luisa nao
+// precisam entrar nesse cronograma e alynne só pega a partir da 9h".
+export async function setCronogramaAtendenteConfigAction(
+  profileId: string,
+  participa: boolean,
+  offsetMinutos: number
+): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "admin");
+  if (!Number.isInteger(offsetMinutos) || offsetMinutos < 0 || offsetMinutos > 12 * 60) {
+    throw new Error("Atraso inválido (use minutos entre 0 e 720).");
+  }
+  await setCronogramaAtendenteConfig(profileId, { participa, offsetMinutos });
   revalidatePath("/assistencia/admin");
   revalidatePath("/assistencia/sac/cronograma");
 }

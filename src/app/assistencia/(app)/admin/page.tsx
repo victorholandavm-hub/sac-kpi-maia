@@ -29,8 +29,9 @@ import { RotaWeekdaySelect } from "@/components/assistencia/RotaWeekdaySelect";
 import { RotaHolidaysManager } from "@/components/assistencia/RotaHolidaysManager";
 import { getRotaWeekdayConfig, listRotaHolidays } from "@/lib/rotas";
 import { listLatestSyncRuns, type SyncJob } from "@/lib/syncRuns";
-import { listCronogramaItens } from "@/lib/cronogramaSac";
+import { listCronogramaItens, listCronogramaAtendentesComConfig } from "@/lib/cronogramaSac";
 import { CronogramaItemAdmin } from "@/components/assistencia/CronogramaItemAdmin";
+import { CronogramaAtendenteAdmin } from "@/components/assistencia/CronogramaAtendenteAdmin";
 
 const SYNC_JOB_LABELS: Record<SyncJob, string> = {
   totvs: "TOTVS (clientes, pedidos, entregas)",
@@ -93,6 +94,7 @@ export default async function AdminPage() {
     syncRuns,
     financeiros,
     cronogramaItens,
+    cronogramaAtendentes,
   ] = await Promise.all([
     listStores(),
     listGerentesWithPinStatus(),
@@ -110,6 +112,7 @@ export default async function AdminPage() {
     listLatestSyncRuns(),
     listFinanceirosWithPinStatus(),
     listCronogramaItens(),
+    listCronogramaAtendentesComConfig(),
   ]);
   const syncByJob = new Map(syncRuns.map((r) => [r.job, r]));
 
@@ -244,6 +247,12 @@ export default async function AdminPage() {
           marcou esse item em dias anteriores.
         </p>
         <CronogramaItemAdmin itens={cronogramaItens} />
+
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+          Atendentes — desmarque quem não precisa participar, ou defina um atraso (em minutos) pra quem entra depois
+          do horário normal (desloca TODO item do cronograma pra frente, só pra essa pessoa).
+        </p>
+        <CronogramaAtendenteAdmin atendentes={cronogramaAtendentes} />
       </AdminSection>
 
       <AdminSection title="Catálogo de produtos — Encomendas" count={produtosEncomenda.length}>
