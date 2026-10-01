@@ -21,6 +21,7 @@ import {
   groupByRota,
   filterOverdueOpen,
   filterSemRotaOpen,
+  filterPendingContato,
   pinSemRotaFirst,
   ENTREGA_FILTERS,
   ORIGEM_FILTERS,
@@ -45,6 +46,7 @@ function buildHref(params: {
   city?: string;
   urgente?: string;
   semrota?: string;
+  contato?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -58,6 +60,7 @@ function buildHref(params: {
   if (params.city) sp.set("city", params.city);
   if (params.urgente) sp.set("urgente", params.urgente);
   if (params.semrota) sp.set("semrota", params.semrota);
+  if (params.contato) sp.set("contato", params.contato);
   const qs = sp.toString();
   return qs ? `/assistencia/sac/notificacoes?${qs}` : "/assistencia/sac/notificacoes";
 }
@@ -92,6 +95,7 @@ export default async function SacNotificacoesPage({
     city?: string;
     urgente?: string;
     semrota?: string;
+    contato?: string;
   }>;
 }) {
   const profile = await getProfile();
@@ -104,7 +108,7 @@ export default async function SacNotificacoesPage({
   // não tem modo leitura).
   const readOnly = profile.role === "supervisao";
 
-  const { status, q, store, from, to, origem, atendente, sched, city, urgente, semrota } = await searchParams;
+  const { status, q, store, from, to, origem, atendente, sched, city, urgente, semrota, contato } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const dateFrom = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined;
   const dateTo = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : undefined;
@@ -125,6 +129,9 @@ export default async function SacNotificacoesPage({
   const filterUrgente = urgente === "1";
   // Pill "sem rota" -- mesmo padrão de fila/page.tsx (ver lá).
   const filterSemRota = semrota === "1";
+  // Pill "Entrar em contato" -- pedido do Victor 01/10/2026, mesmo padrão
+  // de fila/page.tsx (ver lá).
+  const filterContato = contato === "1";
   const types = filterOrigem === "sac" ? ENTREGA_TYPES_SAC : filterOrigem === "assistencia" ? ENTREGA_TYPES_ASSISTENCIA : ENTREGA_TYPES;
   // Ver ASSISTENCIA_ORIGEM_REQUESTERS, entregaQueueGrouping.ts -- filtro
   // "Atendente" (um nome só) tem prioridade sobre esse padrão de
@@ -167,10 +174,13 @@ export default async function SacNotificacoesPage({
   // filtro de status/programado (mesmo raciocínio de fila/page.tsx).
   const overdueCount = filterOverdueOpen(rawRequests).length;
   const semRotaCount = filterSemRotaOpen(rawRequests).length;
+  const contatoCount = filterPendingContato(rawRequests).length;
   if (filterUrgente) {
     requests = filterOverdueOpen(rawRequests);
   } else if (filterSemRota) {
     requests = filterSemRotaOpen(rawRequests);
+  } else if (filterContato) {
+    requests = filterPendingContato(rawRequests);
   }
   const groups = pinSemRotaFirst(groupByRota(requests));
   // Kanban só pra hoje -- mesmo motivo/desenho de fila/page.tsx (ver lá).
@@ -179,6 +189,7 @@ export default async function SacNotificacoesPage({
   // sendo a exceção (cai pro comportamento antigo).
   let todayRequests = filterCity !== undefined ? todayRequestsFull.filter((r) => r.rota !== null && ROTA_CITY[r.rota] === filterCity) : todayRequestsFull;
   if (filterSemRota) todayRequests = todayRequests.filter((r) => r.rota === null);
+  if (filterContato) todayRequests = filterPendingContato(todayRequests);
   const todayGroups = q ? groups.filter((g) => g.dateBucket === "hoje") : pinSemRotaFirst(groupByRota(todayRequests));
   const restGroups = groups.filter((g) => g.dateBucket !== "hoje");
   const todayOverview = rotaOverview.find((d) => d.date === today) ?? null;
@@ -186,12 +197,12 @@ export default async function SacNotificacoesPage({
   // qualquer filtro ativo, "Hoje" some e sobra só a lista achatada com o
   // resultado do filtro inteiro.
   const hasActiveFilter =
-    !!(filterStatus || filterOrigem || filterAtendente || filterSched !== undefined || filterCity || filterUrgente || filterSemRota || q || store || dateFrom || dateTo);
+    !!(filterStatus || filterOrigem || filterAtendente || filterSched !== undefined || filterCity || filterUrgente || filterSemRota || filterContato || q || store || dateFrom || dateTo);
   // Exceção "Hoje" sozinho -- mesmo raciocínio/pedido de fila/page.tsx
   // (03/09/2026, ver lá): mostra o board completo (cards de rota + abas),
   // sem a lista achatada do resto embaixo.
   const isHojePresetOnly =
-    dateFrom === today && dateTo === today && !filterStatus && !filterOrigem && filterSched === undefined && !filterCity && !filterUrgente && !filterSemRota && !q && !store;
+    dateFrom === today && dateTo === today && !filterStatus && !filterOrigem && filterSched === undefined && !filterCity && !filterUrgente && !filterSemRota && !filterContato && !q && !store;
   // Achado do Victor 07/09/2026 (mesmo de fila/page.tsx, ver lá): clicar em
   // "Hoje" num dia sem NENHUM chamado (feriado) caía no "Nenhuma solicitação
   // encontrada." genérico logo abaixo (`requests.length === 0`), antes de
@@ -299,6 +310,25 @@ export default async function SacNotificacoesPage({
             🧭 {semRotaCount} sem rota
           </Link>
         ) : null}
+        {/* Pill "Entrar em contato" -- pedido do Victor 01/10/2026, mesmo
+            desenho/motivo de fila/page.tsx (ver lá). */}
+        {contatoCount > 0 || filterContato ? (
+          <Link
+            href={
+              filterContato
+                ? buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, atendente: filterAtendente, city: filterCity })
+                : buildHref({ store, from: dateFrom, to: dateTo, origem: filterOrigem, atendente: filterAtendente, city: filterCity, contato: "1" })
+            }
+            className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold transition-colors duration-150"
+            style={{
+              color: "light-dark(#fff, color-mix(in srgb, var(--status-warning) 88%, var(--foreground)))",
+              background: "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))",
+              border: `2px solid ${filterContato ? "var(--foreground)" : "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))"}`,
+            }}
+          >
+            📞 {contatoCount} entrar em contato
+          </Link>
+        ) : null}
       </div>
 
       <p className="text-xs text-gray-400 dark:text-gray-500">
@@ -345,6 +375,7 @@ export default async function SacNotificacoesPage({
             city: filterCity,
             urgente: filterUrgente ? "1" : undefined,
             semrota: filterSemRota ? "1" : undefined,
+            contato: filterContato ? "1" : undefined,
             from: range.from,
             to: range.to,
           })
@@ -360,6 +391,7 @@ export default async function SacNotificacoesPage({
         {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
         {filterUrgente ? <input type="hidden" name="urgente" value="1" /> : null}
         {filterSemRota ? <input type="hidden" name="semrota" value="1" /> : null}
+        {filterContato ? <input type="hidden" name="contato" value="1" /> : null}
         {/* Ícone de lupa -- mesmo padrão de fila/page.tsx (ver lá). */}
         <div className="relative flex-1 min-w-[240px]">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 dark:text-gray-500" aria-hidden="true">
@@ -399,7 +431,7 @@ export default async function SacNotificacoesPage({
         </button>
         {q || dateFrom || dateTo ? (
           <Link
-            href={buildHref({ status: filterStatus, store, origem: filterOrigem, atendente: filterAtendente, sched: schedParam, city: filterCity, urgente: filterUrgente ? "1" : undefined, semrota: filterSemRota ? "1" : undefined })}
+            href={buildHref({ status: filterStatus, store, origem: filterOrigem, atendente: filterAtendente, sched: schedParam, city: filterCity, urgente: filterUrgente ? "1" : undefined, semrota: filterSemRota ? "1" : undefined, contato: filterContato ? "1" : undefined })}
             className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
           >
             Limpar busca/data

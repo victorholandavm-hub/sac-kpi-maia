@@ -35,6 +35,7 @@ import {
   sortGroupItems,
   filterOverdueOpen,
   filterSemRotaOpen,
+  filterPendingContato,
   pinSemRotaFirst,
   type QueueGroup,
   ENTREGA_FILTERS,
@@ -95,6 +96,7 @@ function buildHref(params: {
   semrota?: string;
   semmontador?: string;
   atrasado?: string;
+  contato?: string;
 }) {
   const sp = new URLSearchParams();
   if (params.status) sp.set("status", params.status);
@@ -113,6 +115,7 @@ function buildHref(params: {
   if (params.urgente) sp.set("urgente", params.urgente);
   if (params.atrasado) sp.set("atrasado", params.atrasado);
   if (params.semrota) sp.set("semrota", params.semrota);
+  if (params.contato) sp.set("contato", params.contato);
   if (params.page && params.page > 1) sp.set("page", String(params.page));
   const qs = sp.toString();
   return qs ? `/assistencia/fila?${qs}` : "/assistencia/fila";
@@ -179,6 +182,7 @@ export default async function AssistenciaQueuePage({
     semrota?: string;
     semmontador?: string;
     atrasado?: string;
+    contato?: string;
   }>;
 }) {
   const profile = await getProfile();
@@ -208,6 +212,7 @@ export default async function AssistenciaQueuePage({
     semrota,
     semmontador,
     atrasado,
+    contato,
   } = await searchParams;
   const filterStatus = isRequestStatus(status) ? status : undefined;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
@@ -278,6 +283,10 @@ export default async function AssistenciaQueuePage({
   // ficar perdidos no meio do feed de datas". Mesmo padrão de
   // filterUrgente acima -- só existe na aba Entregas.
   const filterSemRota = showPecas && semrota === "1";
+  // Pill "Entrar em contato" (ver filterPendingContato) -- pedido do Victor
+  // 01/10/2026: "preciso de um filtro de Entrar em contato". Mesmo padrão
+  // de filterUrgente/filterSemRota acima -- só existe na aba Entregas.
+  const filterContato = showPecas && contato === "1";
   const types = showPecas
     ? filterOrigem === "sac"
       ? ENTREGA_TYPES_SAC
@@ -417,6 +426,8 @@ export default async function AssistenciaQueuePage({
   const overdueCount = showPecas ? filterOverdueOpen(rawRequests).length : 0;
   // Mesmo raciocínio do overdueCount acima, pro pill "sem rota".
   const semRotaCount = showPecas ? filterSemRotaOpen(rawRequests).length : 0;
+  // Mesmo raciocínio, pro pill "Entrar em contato".
+  const contatoCount = showPecas ? filterPendingContato(rawRequests).length : 0;
   // Banner "você tem X visitas pendentes atrasadas" (ver filterAtrasado) --
   // exclui o Manoel do total, mesma exclusão de `requests` acima (a
   // Agenda dele já conta as próprias). Respeita loja/montador já
@@ -436,6 +447,8 @@ export default async function AssistenciaQueuePage({
     requests = filterOverdueOpen(rawRequests);
   } else if (filterSemRota) {
     requests = filterSemRotaOpen(rawRequests);
+  } else if (filterContato) {
+    requests = filterPendingContato(rawRequests);
   } else if (filterAtrasado) {
     // Substitui a lista inteira pelas atrasadas (mesmo critério da
     // Agenda -- scheduled_date/approved_deadline no passado, ainda aberta),
@@ -452,6 +465,7 @@ export default async function AssistenciaQueuePage({
     filterCity !== undefined ||
     filterUrgente ||
     filterSemRota ||
+    filterContato ||
     filterSemMontador ||
     filterAtrasado ||
     !showPecas;
@@ -793,6 +807,28 @@ export default async function AssistenciaQueuePage({
             🧭 {semRotaCount} sem rota
           </Link>
         ) : null}
+        {/* Pill "Entrar em contato" -- pedido do Victor 01/10/2026:
+            "preciso de um filtro de Entrar em contato". Mesmo desenho dos
+            pills "pra remarcar"/"sem rota" acima -- cor de atenção, mesma
+            família da badge RemarcarContactBadge por linha
+            (DeliveryStatusBadge.tsx). */}
+        {showPecas && (contatoCount > 0 || filterContato) ? (
+          <Link
+            href={
+              filterContato
+                ? buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, atendente: filterAtendente, city: filterCity })
+                : buildHref({ store, from: dateFrom, to: dateTo, tab: "pecas", origem: filterOrigem, atendente: filterAtendente, city: filterCity, contato: "1" })
+            }
+            className="text-sm px-3.5 py-1.5 rounded-full whitespace-nowrap shrink-0 font-semibold transition-colors duration-150"
+            style={{
+              color: "light-dark(#fff, color-mix(in srgb, var(--status-warning) 88%, var(--foreground)))",
+              background: "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))",
+              border: `2px solid ${filterContato ? "var(--foreground)" : "light-dark(var(--status-warning), color-mix(in srgb, var(--status-warning) 26%, var(--surface-1)))"}`,
+            }}
+          >
+            📞 {contatoCount} entrar em contato
+          </Link>
+        ) : null}
       </div>
 
       {/* Clientes x Mostruário -- só na aba Visitas -- pedido do Victor
@@ -891,6 +927,7 @@ export default async function AssistenciaQueuePage({
             city: filterCity,
             urgente: filterUrgente ? "1" : undefined,
             semrota: filterSemRota ? "1" : undefined,
+            contato: filterContato ? "1" : undefined,
             from: range.from,
             to: range.to,
           })
@@ -909,6 +946,7 @@ export default async function AssistenciaQueuePage({
         {filterCity ? <input type="hidden" name="city" value={filterCity} /> : null}
         {filterUrgente ? <input type="hidden" name="urgente" value="1" /> : null}
         {filterSemRota ? <input type="hidden" name="semrota" value="1" /> : null}
+        {filterContato ? <input type="hidden" name="contato" value="1" /> : null}
         {/* Ícone de lupa -- pedido do Victor 25/08/2026 ("guia de
             padronização"): "Input de Busca por texto largo com ícone de
             lupa". `pointer-events-none` no ícone -- sem isso o clique nele
@@ -966,6 +1004,7 @@ export default async function AssistenciaQueuePage({
               city: filterCity,
               urgente: filterUrgente ? "1" : undefined,
               semrota: filterSemRota ? "1" : undefined,
+              contato: filterContato ? "1" : undefined,
             })}
             className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
           >
