@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
+import { DeliveryStatusBadge, RemarcarContactBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
 import { BulkRotaBar } from "./NotificacoesList";
@@ -349,6 +349,7 @@ function TodayRow({ row, selected, onToggleSelected }: { row: FlatRow; selected:
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5 flex-wrap">
           <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+          {r.status === "remarcar" ? <RemarcarContactBadge contactedAt={r.remarcarContactedAt} /> : null}
           {/* Horário agendado -- também tinha sumido na reformulação,
               restaurado (o card antigo mostrava "🕐 HH:MM"). */}
           {r.scheduledTime ? <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap">🕐 {r.scheduledTime.slice(0, 5)}</span> : null}

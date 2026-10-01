@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { setAssistenciaOrderAction } from "@/app/assistencia/actions";
 import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { StatusBadge } from "./StatusBadge";
-import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
+import { DeliveryStatusBadge, RemarcarContactBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
 import { BulkRotaBar } from "./NotificacoesList";
@@ -215,8 +215,9 @@ function EntregaCardRow({
               selo de rodada também não trava mais nesse tipo. */}
           {r.exchangeRound > 1 ? ` · ${r.exchangeRound}ª` : ""}
         </span>
-        <div className="mt-1">
+        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
           <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+          {r.status === "remarcar" ? <RemarcarContactBadge contactedAt={r.remarcarContactedAt} /> : null}
         </div>
       </td>
 

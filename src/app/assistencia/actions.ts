@@ -1054,9 +1054,16 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
       ? { deadline_status: "aprovado" as const, approved_deadline: (completedAt as string).slice(0, 10) }
       : {};
 
+  // Mesmo reset de driverReportIssue (driver-actions.ts) -- "entrou em
+  // contato" (ver markRemarcarContacted abaixo) é por RODADA de remarcação,
+  // não vale pra sempre: entrando em "remarcar" de novo (mesmo manualmente,
+  // pelo botão "Remarcar" de DeliveryRequestActions.tsx), o atendente
+  // precisa ser avisado de novo.
+  const remarcarFields = newStatus === "remarcar" ? { remarcar_contact_attempted_at: null, remarcar_contact_attempted_by: null } : {};
+
   const { data: updated, error } = await admin
     .from("service_requests")
-    .update({ status: newStatus, completed_at: completedAt, ...deadlineFields })
+    .update({ status: newStatus, completed_at: completedAt, ...deadlineFields, ...remarcarFields })
     .eq("id", requestId)
     .eq("status", current.status)
     .select("id")
@@ -1095,6 +1102,47 @@ export async function updateStatus(requestId: string, newStatus: string, note?: 
 
   revalidatePath("/assistencia/fila");
   revalidatePath(`/assistencia/${requestId}`);
+}
+
+// Atendente confirma que já entrou em contato com o cliente pra remarcar --
+// pedido do Victor 01/10/2026: até aqui, "Não concluída" (status 'remarcar')
+// só avisava no Telegram/badge, sem nenhum jeito de registrar quem já tratou
+// e quem ainda está pendente. Só vale enquanto o chamado ainda está
+// 'remarcar' -- setSchedule/driverBulkSetRota (actions.ts/driver-actions.ts)
+// já tiram desse status assim que uma data nova é definida, nesse ponto o
+// badge "Entrar em contato" nem aparece mais (ver RemarcarContactBadge).
+export async function markRemarcarContacted(requestId: string): Promise<void> {
+  const profile = await getProfile();
+  requireRole(profile, "assistencia", "admin", "sac");
+
+  const admin = getSupabaseAdmin();
+  const { data: current, error: fetchError } = await admin
+    .from("service_requests")
+    .select("status, type")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (fetchError || !current) throw new Error("Solicitação não encontrada.");
+  requireManageAccess(profile, current.type);
+  if (current.status !== "remarcar") {
+    throw new Error('Esse chamado não está "Não concluída" no momento.');
+  }
+
+  const { error } = await admin
+    .from("service_requests")
+    .update({ remarcar_contact_attempted_at: new Date().toISOString(), remarcar_contact_attempted_by: profile.fullName })
+    .eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  await admin.from("service_request_events").insert({
+    request_id: requestId,
+    actor_id: profile.id,
+    event_type: "note_added",
+    note: `${profile.fullName} entrou em contato com o cliente pra marcar nova data.`,
+  });
+
+  revalidatePath("/assistencia/fila");
+  revalidatePath(`/assistencia/${requestId}`);
+  revalidatePath("/assistencia/sac/notificacoes");
 }
 
 // Produto trocado pode vir errado/avariado de novo -- em vez de reabrir o

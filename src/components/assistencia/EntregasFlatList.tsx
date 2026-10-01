@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DeliveryStatusBadge } from "./DeliveryStatusBadge";
+import { DeliveryStatusBadge, RemarcarContactBadge } from "./DeliveryStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
 import { ProductsModalButton } from "./ProductsModalButton";
 import { BulkRotaBar } from "./NotificacoesList";
@@ -95,6 +95,7 @@ function EntregaFlatRow({ r, selected, onToggleSelected }: { r: ServiceRequestSu
       <td className="px-4 py-3 align-top">
         <div className="flex items-center gap-1.5 flex-wrap">
           <DeliveryStatusBadge status={r.status} scheduledDate={r.scheduledDate} rota={r.rota} />
+          {r.status === "remarcar" ? <RemarcarContactBadge contactedAt={r.remarcarContactedAt} /> : null}
           {r.urgent ? (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap text-white" style={{ background: "var(--status-critical)" }}>
               URGENTE

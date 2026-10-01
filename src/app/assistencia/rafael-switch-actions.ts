@@ -6,19 +6,24 @@ import { getCdSession } from "./cd-actions";
 import { getFabricaSession } from "./fabrica-actions";
 import { CD_COOKIE_NAME, CD_SESSION_MAX_AGE, signCdSession } from "@/lib/cdAuth";
 import { FABRICA_COOKIE_NAME, FABRICA_SESSION_MAX_AGE, signFabricaSession } from "@/lib/fabricaAuth";
+import { DUAL_ROLE_NAMES } from "@/lib/assistenciaLabels";
 
-// Rafael é hoje o único que acumula os dois papéis (CD cobre fornecedor
-// externo, fábrica cobre a produção própria -- ver dal.ts/admin). Trocar de
-// papel normalmente exige sair e logar de novo com o PIN do outro lado; pra
-// ele isso vira dois cliques porque a identidade já foi provada nessa mesma
-// sessão -- assina a sessão do papel de destino direto, sem pedir PIN de
-// novo. Restrito só ao nome dele por enquanto (não é uma troca-de-papel
-// genérica): qualquer outro nome nessas duas sessões é ignorado.
-const RAFAEL_NAME = "rafael";
+// Rafael e Eduardo acumulam os dois papéis (CD cobre fornecedor externo,
+// fábrica cobre a produção própria -- ver dal.ts/admin) -- pedido do Victor
+// 01/10/2026: "o acesso de Eduardo do CD, tenha as mesmas permissões do
+// acesso de Rafael, para poder acessar a fabrica tambem", mesmo esquema que
+// o Rafael já tinha. Trocar de papel normalmente exige sair e logar de novo
+// com o PIN do outro lado; pra quem está nessa lista isso vira dois
+// cliques, porque a identidade já foi provada nessa mesma sessão -- assina
+// a sessão do papel de destino direto, sem pedir PIN de novo. Restrito a
+// essa lista por nome (não é uma troca-de-papel genérica pra todo mundo):
+// qualquer outro nome nessas duas sessões é ignorado. DUAL_ROLE_NAMES mora
+// em assistenciaLabels.ts (não aqui) -- esse arquivo é "use server", e esse
+// tipo de arquivo só pode exportar funções async (um array quebra o build).
 
 export async function switchRafaelToFabrica() {
   const cdName = await getCdSession();
-  if (!cdName || cdName.toLowerCase() !== RAFAEL_NAME) {
+  if (!cdName || !DUAL_ROLE_NAMES.includes(cdName.toLowerCase())) {
     redirect("/assistencia/encomendas");
   }
 
@@ -42,7 +47,7 @@ export async function switchRafaelToFabrica() {
 
 export async function switchRafaelToCd() {
   const fabricaName = await getFabricaSession();
-  if (!fabricaName || fabricaName.toLowerCase() !== RAFAEL_NAME) {
+  if (!fabricaName || !DUAL_ROLE_NAMES.includes(fabricaName.toLowerCase())) {
     redirect("/assistencia/encomendas");
   }
 
