@@ -110,7 +110,7 @@ export default async function AssistenciaAppLayout({
             // também não mora num layout compartilhado). Nada pra mostrar
             // aqui.
             <div className="hidden sm:block">
-              <AssistenciaNav counts={counts} />
+              <AssistenciaNav counts={counts} showCronograma={isAdmin} />
             </div>
           )}
         </div>
@@ -119,7 +119,7 @@ export default async function AssistenciaAppLayout({
       </div>
       {isSac || isSupervisao ? null : (
         <div className="print:hidden">
-          <MobileNav counts={counts} />
+          <MobileNav counts={counts} showCronograma={isAdmin} />
         </div>
       )}
     </ToastProvider>

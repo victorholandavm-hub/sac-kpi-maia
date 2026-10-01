@@ -11,7 +11,14 @@ import { usePathname } from "next/navigation";
 // controle assistencia"): as 3 continuam rotas próprias, só a ENTRADA no
 // menu de cima virou uma só -- `matches` cobre as 3 pra essa aba
 // continuar "ativa" (destacada) em qualquer uma delas, não só na 1ª.
-const TABS = [
+// "Cronograma Sac" entra condicionalmente, só pro admin (ver showCronograma
+// abaixo) -- pedido do Victor 01/10/2026: "preciso que para mim apareça
+// entre inicio e solicitações... pra eu acompanhar". Não é pra Iasmyn/Luis
+// (role assistencia, também usam esse nav) -- a tela em si
+// (/assistencia/sac/cronograma) só reconhece role "sac" (checklist
+// pessoal) ou "admin" (matriz de controle); quem é "assistencia" cairia no
+// redirect pra /assistencia/inicio se clicasse.
+const BASE_TABS = [
   { label: "Início", href: "/assistencia/inicio" },
   { label: "Solicitações", href: "/assistencia/fila", matches: ["/assistencia/fila", "/assistencia/agenda"] },
   { label: "Controle Assistência", href: "/assistencia/pecas", matches: ["/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
@@ -37,8 +44,10 @@ function NavBadge({ count, active }: { count: number; active: boolean }) {
 
 export function AssistenciaNav({
   counts,
+  showCronograma = false,
 }: {
   counts?: { solicitacoes?: number; encomendas?: number };
+  showCronograma?: boolean;
 }) {
   const pathname = usePathname();
   // "Vendas" (curva de venda por produto + ranking) saiu daqui 18/08/2026 --
@@ -47,7 +56,9 @@ export function AssistenciaNav({
   // "Admin" NÃO entra mais aqui -- virou link fixo no cabeçalho (ver
   // layout.tsx), porque ficava perdido no fim de uma fileira que rola sem
   // indicação visual nenhuma de que tem mais coisa pra ver.
-  const tabs = TABS;
+  const tabs = showCronograma
+    ? [BASE_TABS[0], { label: "Cronograma Sac", href: "/assistencia/sac/cronograma" }, ...BASE_TABS.slice(1)]
+    : BASE_TABS;
 
   function badgeCountFor(label: string): number {
     if (label === "Solicitações") return counts?.solicitacoes ?? 0;
