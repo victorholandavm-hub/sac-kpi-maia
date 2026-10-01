@@ -270,6 +270,16 @@ export type ServiceRequestSummary = {
   causaCarga: string | null;
   causaConferente: string | null;
   causaRaizDetalhe: string | null;
+  // Motorista marcou "Não concluída" (status 'remarcar', ver
+  // driverReportIssue em driver-actions.ts) -- pedido do Victor 01/10/2026:
+  // o atendente responsável precisa marcar que já entrou em contato com o
+  // cliente pra remarcar, senão o chamado fica invisível como "ainda
+  // pendente de contato" em meio aos outros não concluídos. Null = ainda
+  // não contatado (badge "Entrar em contato" aparece, ver
+  // DeliveryStatusBadge.tsx/RemarcarContactBadge); zerado de novo a cada
+  // vez que o motorista marca remarcar outra vez (ver driverReportIssue).
+  remarcarContactedAt: string | null;
+  remarcarContactedBy: string | null;
 };
 
 type SummaryRow = {
@@ -312,6 +322,8 @@ type SummaryRow = {
   causa_carga: string | null;
   causa_conferente: string | null;
   causa_raiz_detalhe: string | null;
+  remarcar_contact_attempted_at: string | null;
+  remarcar_contact_attempted_by: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -323,7 +335,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, remarcar_contact_attempted_at, remarcar_contact_attempted_by, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -384,6 +396,8 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     causaCarga: row.causa_carga,
     causaConferente: row.causa_conferente,
     causaRaizDetalhe: row.causa_raiz_detalhe,
+    remarcarContactedAt: row.remarcar_contact_attempted_at,
+    remarcarContactedBy: row.remarcar_contact_attempted_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     completedAt: row.completed_at,
@@ -695,7 +709,7 @@ const DETAIL_COLUMNS =
   // ao dar suporte pra editar causa raiz depois de criado (ver
   // EditRequestForm.tsx): sem essa coluna, o texto de "Outro" digitado na
   // criação nunca aparecia de volta no formulário de correção.
-  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, pickup_destination, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, order_code, client_name, client_phone, client_cpf, client_address, client_address_number, client_is_apartment, client_address_complement, client_neighborhood, reason, authorized_by, restriction_note, notes, montador_instruction, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, pickup_destination, delivery_rating, resolution_rating, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, remarcar_contact_attempted_at, remarcar_contact_attempted_by, parent_request_id, created_at, updated_at, completed_at, assigned_to, stores(name), requester:profiles!requested_by(full_name), assigned:profiles!assigned_to(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
 
 export async function getRequestDetail(
   id: string

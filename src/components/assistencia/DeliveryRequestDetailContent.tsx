@@ -12,7 +12,7 @@ import {
   CAUSA_RAIZ_LABELS,
   pickupDestinationLabel,
 } from "@/lib/assistenciaLabels";
-import { DeliveryStatusBadge, isDeliveryScheduled } from "./DeliveryStatusBadge";
+import { DeliveryStatusBadge, RemarcarContactBadge, isDeliveryScheduled } from "./DeliveryStatusBadge";
 import { StatusStepper } from "./StatusStepper";
 import { DeliveryRequestActions } from "./DeliveryRequestActions";
 import { MobileActionSheet } from "./MobileActionSheet";
@@ -179,6 +179,7 @@ export function DeliveryRequestDetailContent({
         <div className="flex items-center gap-2.5 flex-wrap">
           <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100 whitespace-nowrap">Chamado #{request.ticketNumber}</h1>
           <DeliveryStatusBadge status={request.status} scheduledDate={request.scheduledDate} rota={request.rota} />
+          {request.status === "remarcar" ? <RemarcarContactBadge contactedAt={request.remarcarContactedAt} /> : null}
           <NeutralBadge>{REQUEST_TYPE_LABELS[request.type] ?? request.type}</NeutralBadge>
           <NeutralBadge icon="🏬">{request.storeName}</NeutralBadge>
           {/* Generalizado 03/09/2026 -- "nova troca" não é mais só de
@@ -416,6 +417,7 @@ export function DeliveryRequestDetailContent({
                 requestType={request.type}
                 status={request.status}
                 hasChildExchange={!!request.childExchange}
+                remarcarContactedAt={request.remarcarContactedAt}
               />
             </MobileActionSheet>
           ) : null}

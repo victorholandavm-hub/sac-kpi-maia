@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateStatus, addNote, createExchangeChild } from "@/app/assistencia/actions";
+import { updateStatus, addNote, createExchangeChild, markRemarcarContacted } from "@/app/assistencia/actions";
 import { useQuickAction } from "./useQuickAction";
 import { CAUSA_RAIZ_OPTIONS, CAUSA_RAIZ_LABELS, DELIVERY_REQUEST_TYPES, DELIVERY_ITEM_NOUN } from "@/lib/assistenciaLabels";
 
@@ -27,11 +27,16 @@ export function DeliveryRequestActions({
   requestType,
   status,
   hasChildExchange = false,
+  remarcarContactedAt = null,
 }: {
   requestId: string;
   requestType: string;
   status: string;
   hasChildExchange?: boolean;
+  // Pedido do Victor 01/10/2026: botão só aparece enquanto 'remarcar' E
+  // ainda sem contato registrado -- ver RemarcarContactBadge
+  // (DeliveryStatusBadge.tsx), mesmo campo.
+  remarcarContactedAt?: string | null;
 }) {
   const router = useRouter();
   const { pending, run, showToast } = useQuickAction();
@@ -137,6 +142,20 @@ export function DeliveryRequestActions({
       <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Ações rápidas</h3>
 
       <div className="flex flex-col gap-2">
+        {/* Pedido do Victor 01/10/2026: "o atendente responsavel tem que
+            marcar de alguma forma que entrou em contato" -- só aparece
+            enquanto 'remarcar' ainda não foi contatado (badge some junto,
+            ver RemarcarContactBadge). */}
+        {status === "remarcar" && !remarcarContactedAt ? (
+          <button
+            disabled={pending}
+            onClick={() => run(() => markRemarcarContacted(requestId), "Contato registrado.")}
+            className="text-sm rounded-lg px-3.5 py-2.5 font-medium border-2 transition-colors duration-150 disabled:opacity-60"
+            style={{ borderColor: "var(--status-warning)", color: "#8a5a00" }}
+          >
+            📞 Marcar que entrei em contato
+          </button>
+        ) : null}
         {!isFinal ? (
           <>
             <button

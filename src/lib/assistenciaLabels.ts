@@ -380,6 +380,13 @@ export const MANOEL_ONLY_ASSEMBLER = "Manoel";
 // Everton") -- mesma lista, mesmas regras, sem distinção entre os dois.
 export const DISPATCH_SUPERVISOR_DRIVERS = ["Everton", "Samuel"];
 
+// CD que também acumula fábrica (botão "Trocar pra Fábrica"/"Trocar pra
+// CD" na fila de encomendas, sem pedir PIN de novo -- ver
+// rafael-switch-actions.ts) -- pedido do Victor 01/10/2026: "o acesso de
+// Eduardo do CD, tenha as mesmas permissões do acesso de Rafael". Nomes em
+// minúsculo (comparado via .toLowerCase() em quem usa isso).
+export const DUAL_ROLE_NAMES = ["rafael", "eduardo"];
+
 // Definir valor unitário, autorizar e liberar pagamento de montagem,
 // desmontagem, vistoria e afins é exclusivo dessa pessoa -- nem outro admin
 // consegue, por pedido explícito do Victor (dono do sistema).

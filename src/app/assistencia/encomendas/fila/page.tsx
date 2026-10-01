@@ -10,7 +10,7 @@ import {
 } from "@/lib/pedidosEncomenda";
 import { encomendaCanAdvance, nextQuickAdvance } from "@/lib/dal";
 import { INTERNAL_FABRICAS } from "@/lib/fabricas";
-import { ROLE_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS } from "@/lib/assistenciaLabels";
+import { ROLE_LABELS, PEDIDO_ENCOMENDA_STATUS_COLORS, DUAL_ROLE_NAMES } from "@/lib/assistenciaLabels";
 import { PedidoEncomendaFilaList } from "@/components/assistencia/PedidoEncomendaFilaList";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { FabricaProducaoView } from "@/components/assistencia/FabricaProducaoView";
@@ -155,7 +155,9 @@ export default async function EncomendasQueuePage({
   const showFornecedorFilter = actor.role === "cd" || actor.role === "admin" || actor.role === "assistencia";
 
   const signOutAction = actor.role === "cd" ? cdSignOut : actor.role === "fabrica" ? fabricaSignOut : signOut;
-  const isRafael = actor.name.toLowerCase() === "rafael";
+  // Rafael e Eduardo (DUAL_ROLE_NAMES, rafael-switch-actions.ts) acumulam
+  // CD + fábrica -- pedido do Victor 01/10/2026.
+  const isRafael = DUAL_ROLE_NAMES.includes(actor.name.toLowerCase());
 
   return (
     <ToastProvider>

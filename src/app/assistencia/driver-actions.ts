@@ -285,7 +285,11 @@ export async function driverReportIssue(requestId: string, reason: string): Prom
 
   const { data: updated, error: updateError } = await admin
     .from("service_requests")
-    .update({ status: "remarcar" })
+    // Zera o "entrou em contato" de uma rodada anterior -- pedido do Victor
+    // 01/10/2026: se esse chamado já foi remarcado, contatado e falhou de
+    // novo, o atendente precisa ser avisado outra vez (badge "Entrar em
+    // contato" volta a aparecer, ver RemarcarContactBadge).
+    .update({ status: "remarcar", remarcar_contact_attempted_at: null, remarcar_contact_attempted_by: null })
     .eq("id", requestId)
     .eq("status", request.status)
     .select("id")

@@ -165,6 +165,10 @@ export function notifyTelegramStatusChange(params: RequestNotifyParams & { newSt
   const statusLabel = STATUS_LABELS[params.newStatus] ?? params.newStatus;
   const emoji = params.newStatus === "concluida" ? "✅" : params.newStatus === "cancelada" ? "❌" : params.newStatus === "remarcar" ? "🔁" : "⏳";
   const lines = [`${emoji} #${params.ticketNumber} (${label}) → ${statusLabel}`, ...requestNotifyLines(params)];
+  // Pedido do Victor 01/10/2026: motorista marcando "Não concluída" precisa
+  // vir com instrução clara de ação, não só o aviso de status -- quem lê no
+  // Telegram já sabe o que fazer sem abrir o sistema.
+  if (params.newStatus === "remarcar") lines.push("📞 Entrar em contato e marcar nova data.");
   const text = lines.join("\n");
 
   const sends = [sendTelegramMessage(text)];

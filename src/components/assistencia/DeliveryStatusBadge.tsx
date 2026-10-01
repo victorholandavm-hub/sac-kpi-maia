@@ -89,3 +89,21 @@ export function DeliveryStatusBadge({
     </span>
   );
 }
+
+// Pedido do Victor 01/10/2026: "no sistema, precisa aparecer com uma badge
+// de entrar em contato e o atendente responsavel tem que marcar de alguma
+// forma que entrou em contato". Badge SEPARADA do "Não concluída" acima
+// (não embutida em DeliveryStatusBadge) -- só os 3-4 lugares que o
+// atendente de fato monitora (EntregasFlatList/EntregasKanbanHoje/
+// AssistenciaQueueGroup/DeliveryRequestDetailContent) renderizam ela junto,
+// nunca as telas do motorista (ele não é quem precisa agir aqui). Null em
+// contactedAt = ainda não contatado -- a própria ausência do badge quando
+// já tem valor já comunica "resolvido", sem precisar de um 2º estado visual.
+export function RemarcarContactBadge({ contactedAt }: { contactedAt: string | null }) {
+  if (contactedAt) return null;
+  return (
+    <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ color: "#fff", background: "var(--status-warning)" }}>
+      📞 Entrar em contato
+    </span>
+  );
+}
