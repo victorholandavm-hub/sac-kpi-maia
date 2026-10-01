@@ -104,8 +104,10 @@ function NavDot({ count }: { count: number }) {
 
 export function MobileNav({
   counts,
+  showCronograma = false,
 }: {
   counts?: { solicitacoes?: number; encomendas?: number };
+  showCronograma?: boolean;
 }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -113,7 +115,11 @@ export function MobileNav({
   // -- agora mora no painel de KPIs (/vendas). "Admin" não entra mais aqui --
   // virou link fixo no cabeçalho (layout.tsx), visível em mobile também (o
   // cabeçalho não é escondido em telas pequenas).
-  const moreTabs = MORE_TABS;
+  // "Cronograma Sac" (ver mesmo pedido/motivo em AssistenciaNav.tsx) entra
+  // no "Mais" aqui -- sem espaço pra um 4º ícone primário sem redesenhar a
+  // fileira inteira, e esse menu já existe exatamente pra esse tipo de aba
+  // secundária.
+  const moreTabs = showCronograma ? [...MORE_TABS, { label: "Cronograma Sac", href: "/assistencia/sac/cronograma" }] : MORE_TABS;
   const moreActive = moreTabs.some((t) => pathname.startsWith(t.href));
   const solicitacoesCount = counts?.solicitacoes ?? 0;
   const encomendasCount = counts?.encomendas ?? 0;
