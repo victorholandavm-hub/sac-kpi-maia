@@ -29,6 +29,8 @@ import { RotaWeekdaySelect } from "@/components/assistencia/RotaWeekdaySelect";
 import { RotaHolidaysManager } from "@/components/assistencia/RotaHolidaysManager";
 import { getRotaWeekdayConfig, listRotaHolidays } from "@/lib/rotas";
 import { listLatestSyncRuns, type SyncJob } from "@/lib/syncRuns";
+import { listCronogramaItens } from "@/lib/cronogramaSac";
+import { CronogramaItemAdmin } from "@/components/assistencia/CronogramaItemAdmin";
 
 const SYNC_JOB_LABELS: Record<SyncJob, string> = {
   totvs: "TOTVS (clientes, pedidos, entregas)",
@@ -36,6 +38,7 @@ const SYNC_JOB_LABELS: Record<SyncJob, string> = {
   backup: "Backup diário do Supabase",
   "ai-classify": "Classificação por IA (categoria/produto/loja do SAC)",
   "reconcile-tags": "Reconciliação de tags do GHL (rede de segurança do webhook)",
+  "sac-cronograma-check": "Alerta de atraso — Cronograma do SAC",
 };
 
 // Sem casa decimal nem "há 0h" logo depois de rodar -- minuto é preciso o
@@ -89,6 +92,7 @@ export default async function AdminPage() {
     rotaHolidays,
     syncRuns,
     financeiros,
+    cronogramaItens,
   ] = await Promise.all([
     listStores(),
     listGerentesWithPinStatus(),
@@ -105,6 +109,7 @@ export default async function AdminPage() {
     listRotaHolidays(),
     listLatestSyncRuns(),
     listFinanceirosWithPinStatus(),
+    listCronogramaItens(),
   ]);
   const syncByJob = new Map(syncRuns.map((r) => [r.job, r]));
 
@@ -230,6 +235,15 @@ export default async function AdminPage() {
           ))}
         </ul>
         <AddGerenteForm stores={stores} />
+      </AdminSection>
+
+      <AdminSection title="Cronograma do SAC" count={cronogramaItens.length}>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Itens que cada atendente do SAC confirma todo dia em{" "}
+          <span className="font-mono">/assistencia/sac/cronograma</span>. Desativar não apaga o histórico de quem já
+          marcou esse item em dias anteriores.
+        </p>
+        <CronogramaItemAdmin itens={cronogramaItens} />
       </AdminSection>
 
       <AdminSection title="Catálogo de produtos — Encomendas" count={produtosEncomenda.length}>

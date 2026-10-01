@@ -188,3 +188,19 @@ export function notifyTelegramAssemblerAssigned(params: RequestNotifyParams): Pr
   const lines = [`🔧 Montador definido: ${label}`, `#${params.ticketNumber}`, ...requestNotifyLines(params)];
   return sendTelegramMessage(lines.join("\n"), "TELEGRAM_BOT_TOKEN_MONTAGEM", "TELEGRAM_CHAT_IDS_MONTAGEM");
 }
+
+// Cronograma Diário do SAC -- pedido do Victor 01/10/2026: "Alerta
+// automático no Telegram quando alguém atrasa um item". Disparado pelo
+// cron de /api/sac-cronograma-check (a cada 15min, ver
+// .github/workflows/sac-cronograma-cron.yml), 1 mensagem por atendente x
+// item atrasado (listCronogramaAtrasosNaoAlertados, cronogramaSac.ts, já
+// garante que cada combinação só dispara uma vez por dia). Bot principal
+// (mesmo TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_IDS de status-chave) -- é um
+// alerta de gestão, não é da aba Visitas.
+export function notifyTelegramCronogramaAtraso(params: { atendenteName: string; horario: string; descricao: string }): Promise<void> {
+  const lines = [
+    "⏰ Cronograma do SAC atrasado",
+    `${params.atendenteName} ainda não marcou "${params.descricao}" (${params.horario}).`,
+  ];
+  return sendTelegramMessage(lines.join("\n"));
+}

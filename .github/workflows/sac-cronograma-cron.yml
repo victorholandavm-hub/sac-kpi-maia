@@ -1,0 +1,20 @@
+name: Alerta de atraso - Cronograma do SAC (a cada 15min)
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+# Separado de sync-cron.yml (que roda a cada 2h) de propósito -- pedido do
+# Victor 01/10/2026: o item mais próximo do Cronograma Diário do SAC tem só
+# 30min pro próximo (08:00 -> 08:30), então o alerta de atraso precisa de
+# uma cadência bem mais apertada que o resto do sync pra avisar "na hora".
+# Mesmo padrão de CRON_SECRET/curl de sync-cron.yml.
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar /api/sac-cronograma-check
+        run: |
+          curl -sf --max-time 60 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://sac.lojasmaia.com.br/api/sac-cronograma-check"
