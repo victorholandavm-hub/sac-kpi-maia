@@ -5,6 +5,7 @@ import { FilterPill } from "@/components/assistencia/FilterPill";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { DateRangeQuickFilter } from "@/components/assistencia/DateRangeQuickFilter";
 import { CadastroDetalheModal } from "@/components/assistencia/CadastroDetalheModal";
+import { NovoCadastroDrawer } from "@/components/assistencia/NovoCadastroDrawer";
 import {
   listCadastros,
   getCadastroPillCounts,
@@ -218,6 +219,14 @@ export default async function CadastrosPage({
         <UnderlineTab href="/assistencia/cadastros" label="Cadastros" active />
         <UnderlineTab href="/assistencia/pecas" label="Peças" active={false} />
         <UnderlineTab href="/assistencia/estoque" label="Estoque" active={false} />
+      </div>
+
+      {/* Botão "+ Adicionar novo cadastro" -- pedido do Victor 01/10/2026,
+          depois de aprovar o protótipo em Artifact. Lança direto nessa
+          mesma tabela (assistencia_cadastros_historico), ver
+          cadastros-actions.ts/NovoCadastroDrawer.tsx. */}
+      <div className="flex items-center justify-end">
+        <NovoCadastroDrawer />
       </div>
 
       <div className="flex items-center gap-2 overflow-x-auto flex-nowrap -mx-1 px-1">

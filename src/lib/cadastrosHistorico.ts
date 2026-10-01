@@ -2,10 +2,13 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 
 // Cadastros -- histórico de assistência pré-sistema (planilha "Solicitações
 // de Assistência", Dez/2024-Out/2026, importada uma única vez em
-// 0146_assistencia_cadastros_historico.sql). Só leitura -- sem action de
-// criar/editar/apagar aqui, é registro histórico congelado, não fila de
-// trabalho. Ver comentário completo da migration pra entender tipo/status/
-// prazo (inferidos a partir de uma planilha sem essas colunas prontas).
+// 0146_assistencia_cadastros_historico.sql) + cadastros novos lançados daqui
+// pra frente direto pelo sistema (ver addCadastroHistorico abaixo, pedido do
+// Victor 01/10/2026 depois de aprovar o protótipo em Artifact). Ver
+// comentário completo da migration pra entender tipo/status/prazo das linhas
+// IMPORTADAS (inferidos a partir de uma planilha sem essas colunas prontas)
+// -- um cadastro novo já nasce com essa informação de verdade, sem precisar
+// inferir nada.
 export const CADASTRO_TIPOS = ["ASSISTENCIA", "TROCA", "ERRO_ENTREGA", "ERRO_FATURAMENTO", "MONTAGEM", "HISTORICO"] as const;
 export type CadastroTipo = (typeof CADASTRO_TIPOS)[number];
 
@@ -261,4 +264,74 @@ export async function getCadastrosResumoPorSolicitante(): Promise<CadastroResumo
     byName.set(name, entry);
   }
   return [...byName.values()].sort((a, b) => b.total - a.total);
+}
+
+export type NewCadastroInput = {
+  tipo: CadastroTipo;
+  codigo: string | null;
+  produto: string;
+  descricao: string | null;
+  nf: string | null;
+  vendedora: string | null;
+  loja: string | null;
+  cnpj: string | null;
+  cliente: string;
+  endereco: string | null;
+  cpf: string | null;
+  telefone: string | null;
+  dataAbertura: string | null;
+  solicitante: string | null;
+  // Prazo digitado no formulário -- null quando o atendente deixou em
+  // branco, aí vira a mesma regra das linhas importadas (data_abertura +
+  // 30 dias, prazo_calculado=true). Nunca vira prazo_nota aqui -- texto
+  // livre ali só existe pra preservar o que já estava escrito na
+  // planilha original, não faz sentido pra um cadastro novo.
+  prazoData: string | null;
+  quemMontou: string | null;
+  obs: string | null;
+};
+
+// Lançar um cadastro novo direto pelo sistema -- pedido do Victor
+// 01/10/2026, depois de aprovar o protótipo em Artifact (ver
+// NovoCadastroDrawer.tsx). Mesma tabela das linhas importadas da planilha
+// -- `origem_planilha` marca "Sistema" em vez do nome da aba, pra
+// distinguir uma entrada nova de uma herdada da planilha, e `status`
+// sempre nasce PROGRAMADO (acabou de ser aberto, não tem como já ter
+// status diferente).
+export async function addCadastroHistorico(input: NewCadastroInput): Promise<void> {
+  const admin = getSupabaseAdmin();
+  let prazoData = input.prazoData;
+  let prazoCalculado = false;
+  if (!prazoData && input.dataAbertura) {
+    const d = new Date(`${input.dataAbertura}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 30);
+    prazoData = d.toISOString().slice(0, 10);
+    prazoCalculado = true;
+  }
+
+  const { error } = await admin.from("assistencia_cadastros_historico").insert({
+    tipo: input.tipo,
+    tipo_original: null,
+    codigo: input.codigo,
+    produto: input.produto,
+    descricao: input.descricao,
+    nf: input.nf,
+    vendedora: input.vendedora,
+    loja: input.loja,
+    cnpj: input.cnpj,
+    cliente: input.cliente,
+    endereco: input.endereco,
+    cpf: input.cpf,
+    telefone: input.telefone,
+    data_abertura: input.dataAbertura,
+    solicitante: input.solicitante,
+    prazo_data: prazoData,
+    prazo_calculado: prazoCalculado,
+    prazo_nota: null,
+    quem_montou: input.quemMontou,
+    obs: input.obs,
+    status: "PROGRAMADO",
+    origem_planilha: "Sistema",
+  });
+  if (error) throw new Error(error.message);
 }
