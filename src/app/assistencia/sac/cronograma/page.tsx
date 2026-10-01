@@ -70,50 +70,66 @@ async function AdminView({ data }: { data: string }) {
           {itens.length === 0 ? "Nenhum item ativo no cronograma." : "Nenhum atendente do SAC cadastrado ainda."}
         </p>
       ) : (
+        // Itens em LINHA, atendentes em COLUNA (nome na vertical) -- pedido
+        // do Victor 01/10/2026: a versão anterior (atendente em linha, item
+        // em coluna) obrigava rolar muito pra direita pra ver os últimos
+        // itens, cortando a descrição no meio ("Verificar not..."). Com
+        // só ~6-8 atendentes (bem menos que itens, numa equipe que cresce
+        // aos poucos) e descrição de item sendo texto mais longo, inverter
+        // deixa a descrição inteira numa linha larga e os nomes cabem
+        // girados verticalmente, sem cortar nada.
         <div className="rounded-xl border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
                 <th className="text-left px-3 py-2 font-semibold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                  Atendente
+                  Item
                 </th>
-                {itens.map((item) => (
-                  <th key={item.id} className="text-center px-3 py-2 font-semibold whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
-                    <div className="font-mono text-xs">{item.horario}</div>
-                    <div className="text-[11px] font-normal max-w-[140px]" style={{ color: "var(--text-muted)" }} title={item.descricao}>
-                      {item.descricao.length > 36 ? `${item.descricao.slice(0, 36)}…` : item.descricao}
+                {atendentes.map((at) => (
+                  <th key={at.profileId} className="px-2 py-2 font-semibold align-bottom" style={{ color: "var(--text-secondary)" }}>
+                    <div
+                      className="whitespace-nowrap"
+                      style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", margin: "0 auto" }}
+                    >
+                      {at.fullName}
+                      {at.offsetMinutos > 0 ? (
+                        <span className="font-normal" style={{ color: "var(--text-muted)" }}>
+                          {" "}
+                          (+{at.offsetMinutos}min)
+                        </span>
+                      ) : null}
                     </div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {atendentes.map((at) => (
-                <tr key={at.profileId} className="border-b" style={{ borderColor: "var(--border)" }}>
-                  <td className="px-3 py-2 font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>
-                    {at.fullName}
-                    {at.offsetMinutos > 0 ? (
-                      <span className="text-xs font-normal" style={{ color: "var(--text-muted)" }}>
-                        {" "}
-                        (+{at.offsetMinutos}min)
-                      </span>
-                    ) : null}
+              {itens.map((item, itemIndex) => (
+                <tr key={item.id} className="border-b" style={{ borderColor: "var(--border)" }}>
+                  <td className="px-3 py-2 min-w-[220px]" style={{ color: "var(--text-primary)" }}>
+                    <div className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                      {item.horario}
+                    </div>
+                    <div>{item.descricao}</div>
                   </td>
-                  {at.celulas.map((cel) => (
-                    <td key={cel.itemId} className="text-center px-3 py-2">
-                      {cel.completedAt ? (
-                        <span title={formatDateTimeShortBr(cel.completedAt)} style={{ color: "var(--status-good)" }}>
-                          ✅ {formatTimeOnlyBr(cel.completedAt)}
-                        </span>
-                      ) : cel.atrasado ? (
-                        <span className="font-semibold" style={{ color: "var(--status-critical)" }}>
-                          🔴 atrasado
-                        </span>
-                      ) : (
-                        <span style={{ color: "var(--text-muted)" }}>⚪</span>
-                      )}
-                    </td>
-                  ))}
+                  {atendentes.map((at) => {
+                    const cel = at.celulas[itemIndex];
+                    return (
+                      <td key={at.profileId} className="text-center px-2 py-2 whitespace-nowrap">
+                        {cel.completedAt ? (
+                          <span title={formatDateTimeShortBr(cel.completedAt)} style={{ color: "var(--status-good)" }}>
+                            ✅ {formatTimeOnlyBr(cel.completedAt)}
+                          </span>
+                        ) : cel.atrasado ? (
+                          <span className="font-semibold" style={{ color: "var(--status-critical)" }}>
+                            🔴 atrasado
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)" }}>⚪</span>
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
