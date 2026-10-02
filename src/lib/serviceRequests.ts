@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
-import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES, MANOEL_ONLY_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "./assistenciaLabels";
+import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES, EQUIPE_INTERNA_ONLY_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "./assistenciaLabels";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { memoizeWithTtl } from "./memoCache";
 
@@ -1666,15 +1666,16 @@ export async function countMontagensOverview(excludeOwnAssemblerStoreIds?: strin
 // fila/page.tsx (VISITA_REQUEST_TYPES), só que contando "aberta" (sem
 // contato ainda) em vez de "não concluída/cancelada".
 //
-// MANOEL_ONLY_TYPES (vistoria/troca de peça) excluído daqui -- pedido do
-// Victor 24/09/2026: esses tipos são sempre do Manoel (só ele tem a
-// qualificação, ver MANOEL_ONLY_TYPES em assistenciaLabels.ts), "já estão
+// EQUIPE_INTERNA_ONLY_TYPES (vistoria/troca de peça) excluído daqui --
+// pedido do Victor 24/09/2026: esses tipos eram sempre do Manoel (só ele
+// tinha a qualificação; Adriel CD passou a dividir a função 02/10/2026,
+// ver EQUIPE_INTERNA_ONLY_TYPES em assistenciaLabels.ts), "já estão
 // automaticamente em andamento com a gente" -- não existe "assumir o
 // caso" de verdade neles como existe pra montagem/desmontagem, que vão
 // pra terceirizados de fora. Contar como "aberta" misturava os dois e
 // inflava o badge com casos que não estavam realmente esperando alguém
 // pegar.
-const VISITA_TYPES_COM_ASSUMIR = VISITA_REQUEST_TYPES.filter((t) => !(MANOEL_ONLY_TYPES as readonly string[]).includes(t));
+const VISITA_TYPES_COM_ASSUMIR = VISITA_REQUEST_TYPES.filter((t) => !(EQUIPE_INTERNA_ONLY_TYPES as readonly string[]).includes(t));
 
 export async function countVisitasOpenNoContact(excludeOwnAssemblerStoreIds?: string[]): Promise<number> {
   const admin = getSupabaseAdmin();

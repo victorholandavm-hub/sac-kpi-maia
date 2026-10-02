@@ -13,8 +13,8 @@ import {
   SAC_MANAGED_TYPES,
   ASSISTENCIA_ALSO_MANAGED_TYPES,
   ASSISTENCIA_CAN_CREATE_SAC_TYPES,
-  MANOEL_ONLY_TYPES,
-  MANOEL_ONLY_ASSEMBLER,
+  EQUIPE_INTERNA_ONLY_TYPES,
+  EQUIPE_INTERNA_ASSEMBLERS,
   REQUEST_TYPE_LABELS,
   STATUS_LABELS,
   DELIVERY_REQUEST_TYPES,
@@ -1437,8 +1437,10 @@ export async function setAssemblerName(requestId: string, assemblerName: string)
     .single();
   if (!current) throw new Error("Solicitação não encontrada.");
   requireManageAccess(profile, current.type);
-  if ((MANOEL_ONLY_TYPES as readonly string[]).includes(current.type) && trimmed !== MANOEL_ONLY_ASSEMBLER) {
-    throw new Error(`Só ${MANOEL_ONLY_ASSEMBLER} pode ser responsável por ${REQUEST_TYPE_LABELS[current.type]?.toLowerCase() ?? current.type}.`);
+  if ((EQUIPE_INTERNA_ONLY_TYPES as readonly string[]).includes(current.type) && !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(trimmed)) {
+    throw new Error(
+      `Só ${EQUIPE_INTERNA_ASSEMBLERS.join(" ou ")} pode${EQUIPE_INTERNA_ASSEMBLERS.length > 1 ? "m" : ""} ser responsável por ${REQUEST_TYPE_LABELS[current.type]?.toLowerCase() ?? current.type}.`
+    );
   }
 
   await admin.from("assemblers").upsert({ name: trimmed }, { onConflict: "name" });
@@ -2120,16 +2122,17 @@ export async function updateRequestDetails(
   const typeChanged = type !== currentRequest.type;
   if (typeChanged) requireManageAccess(profile, type);
 
-  // Vistoria/troca de peça exigem o Manoel (ver MANOEL_ONLY_TYPES) -- se o
-  // chamado tinha outro montador definido e o tipo virou um desses, esse
-  // montador some da lista de destino, então a atribuição atual viraria
-  // inválida silenciosamente. Mais seguro limpar e deixar quem editou
-  // reatribuir do que manter um estado que os pagamentos não reconhecem.
+  // Vistoria/troca de peça exigem Manoel ou Adriel CD (ver
+  // EQUIPE_INTERNA_ONLY_TYPES) -- se o chamado tinha outro montador
+  // definido e o tipo virou um desses, esse montador some da lista de
+  // destino, então a atribuição atual viraria inválida silenciosamente.
+  // Mais seguro limpar e deixar quem editou reatribuir do que manter um
+  // estado que os pagamentos não reconhecem.
   const assemblerNowInvalid =
     typeChanged &&
-    (MANOEL_ONLY_TYPES as readonly string[]).includes(type) &&
+    (EQUIPE_INTERNA_ONLY_TYPES as readonly string[]).includes(type) &&
     !!currentRequest.assembler_name &&
-    currentRequest.assembler_name !== MANOEL_ONLY_ASSEMBLER;
+    !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(currentRequest.assembler_name);
 
   const addressNumberFields = readAddressNumberFields(formData, type);
   if (addressNumberFields.error) return { error: addressNumberFields.error };
@@ -2314,8 +2317,10 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   const urgent = formData.get("urgent") === "on";
 
   const assemblerName = emptyToNull(formData.get("assembler_name"));
-  if (assemblerName && (MANOEL_ONLY_TYPES as readonly string[]).includes(type) && assemblerName !== MANOEL_ONLY_ASSEMBLER) {
-    return { error: `Só ${MANOEL_ONLY_ASSEMBLER} pode ser responsável por ${REQUEST_TYPE_LABELS[type]?.toLowerCase() ?? type}.` };
+  if (assemblerName && (EQUIPE_INTERNA_ONLY_TYPES as readonly string[]).includes(type) && !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(assemblerName)) {
+    return {
+      error: `Só ${EQUIPE_INTERNA_ASSEMBLERS.join(" ou ")} pode${EQUIPE_INTERNA_ASSEMBLERS.length > 1 ? "m" : ""} ser responsável por ${REQUEST_TYPE_LABELS[type]?.toLowerCase() ?? type}.`,
+    };
   }
 
   // Recolhimento de peça é o único tipo de entrega (usa motorista/rota, não

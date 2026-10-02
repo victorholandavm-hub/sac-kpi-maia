@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { setAssemblerName } from "@/app/assistencia/actions";
-import { MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
+import { EQUIPE_INTERNA_ONLY_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "@/lib/assistenciaLabels";
 import { useQuickAction } from "./useQuickAction";
 
 export function AssemblerNameField({
@@ -17,9 +17,12 @@ export function AssemblerNameField({
   assemblers: string[];
 }) {
   const { pending, run } = useQuickAction();
-  const isManoelOnly = (MANOEL_ONLY_TYPES as readonly string[]).includes(requestType);
+  // Vistoria/troca de peça -- restrito à equipe interna (Manoel e Adriel
+  // CD dividem a função desde 02/10/2026, antes só o Manoel), nunca um
+  // terceirizado.
+  const isEquipeInternaOnly = (EQUIPE_INTERNA_ONLY_TYPES as readonly string[]).includes(requestType);
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(value ?? (isManoelOnly ? MANOEL_ONLY_ASSEMBLER : ""));
+  const [name, setName] = useState(value ?? (isEquipeInternaOnly ? EQUIPE_INTERNA_ASSEMBLERS[0] : ""));
 
   if (!editing) {
     if (!value) {
@@ -76,10 +79,19 @@ export function AssemblerNameField({
         Nome do montador
       </span>
       <div className="flex items-center gap-2">
-        {isManoelOnly ? (
-          <span className="rounded border px-2 py-1 text-sm" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
-            {MANOEL_ONLY_ASSEMBLER}
-          </span>
+        {isEquipeInternaOnly ? (
+          <select
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="rounded border px-2 py-1 text-sm"
+            style={{ borderColor: "var(--border)" }}
+          >
+            {EQUIPE_INTERNA_ASSEMBLERS.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
         ) : (
           <>
             <input

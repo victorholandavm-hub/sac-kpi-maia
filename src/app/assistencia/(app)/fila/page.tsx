@@ -392,7 +392,7 @@ export default async function AssistenciaQueuePage({
   let requests = filterSched === undefined ? rawRequests : rawRequests.filter((r) => isDeliveryScheduled(r.scheduledDate, r.rota) === filterSched);
   // Manoel saiu da aba Visitas -- pedido do Victor 04/09/2026: "todos os
   // montadores dentro de visitas e só manoel em agenda". As visitas dele
-  // (vistoria/troca_peca, ver MANOEL_ONLY_TYPES) ficam exclusivas da
+  // (vistoria/troca_peca, ver EQUIPE_INTERNA_ONLY_TYPES) ficam exclusivas da
   // Agenda agora (ver agenda/page.tsx) -- incondicional, não depende de
   // nenhum filtro escolhido. Adriel CD entrou 02/10/2026 no mesmo "nível"
   // (ver EQUIPE_INTERNA_ASSEMBLERS, assistenciaLabels.ts). Sem efeito na
