@@ -18,6 +18,7 @@ import { CITY_LABELS, ROTA_CITY, labelAvailableRota, type AvailableRota, type Ro
 import type { PartOrderLinkMatch } from "@/lib/partOrders";
 import { FormSection } from "./FormSection";
 import { useFormDraft } from "./useFormDraft";
+import { useFormPrefill } from "./useFormPrefill";
 
 const inputStyle = { borderColor: "var(--border)" };
 
@@ -212,10 +213,14 @@ export function NovaEntregaAssistenciaForm({
   stores,
   drivers,
   cargas,
+  initial,
 }: {
   stores: Store[];
   drivers: string[];
   cargas: { carga: string; label: string }[];
+  // Vindo de um cadastro (Controle Assistência -> Cadastros, "Criar nova
+  // entrega") -- ver nova-entrega/page.tsx e useFormPrefill.ts.
+  initial?: Record<string, string>;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createQuickRequest, undefined);
   const formRef = useRef<HTMLFormElement>(null);
@@ -412,6 +417,10 @@ export function NovaEntregaAssistenciaForm({
   // selectPartOrder acima), não faz sentido "restaurar" um vínculo antigo
   // por engano.
   useFormDraft(formRef, "draft:nova-entrega-assistencia", ["part_order_id"]);
+  // Dados puxados de um cadastro -- pedido do Victor 02/10/2026 (ver
+  // useFormPrefill.ts). Chamado DEPOIS de useFormDraft de propósito: vence
+  // um rascunho velho que porventura exista.
+  useFormPrefill(formRef, initial ?? {});
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-4 max-w-xl">

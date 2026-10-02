@@ -37,8 +37,11 @@ export const CADASTRO_TIPO_COLORS: Record<CadastroTipo, string> = {
 export const CADASTRO_STATUSES = ["PROGRAMADO", "CONCLUIDO", "CANCELADO"] as const;
 export type CadastroStatus = (typeof CADASTRO_STATUSES)[number];
 
+// "Em processo" -- pedido do Victor 02/10/2026 ("altera programado para
+// 'em processo'"). O valor interno continua "PROGRAMADO" (coluna `status`
+// no banco, sem migration) -- só o rótulo exibido muda.
 export const CADASTRO_STATUS_LABELS: Record<CadastroStatus, string> = {
-  PROGRAMADO: "Programado",
+  PROGRAMADO: "Em processo",
   CONCLUIDO: "Concluído",
   CANCELADO: "Não concluído",
 };

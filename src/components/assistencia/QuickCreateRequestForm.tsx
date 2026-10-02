@@ -16,6 +16,7 @@ import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } f
 import type { PartOrderLinkMatch } from "@/lib/partOrders";
 import { FormSection } from "./FormSection";
 import { useFormDraft } from "./useFormDraft";
+import { useFormPrefill } from "./useFormPrefill";
 
 // "Nova visita" -- só os tipos de montador de verdade (pedido do Victor
 // 18/08/2026: "hoje temos uma aba de visitas e uma aba de entregas, tem que
@@ -167,10 +168,14 @@ export function QuickCreateRequestForm({
   stores,
   assemblers,
   includeSacTypes,
+  initial,
 }: {
   stores: Store[];
   assemblers: { name: string; storeId: string | null }[];
   includeSacTypes: boolean;
+  // Vindo de um cadastro (Controle Assistência -> Cadastros, "Criar nova
+  // visita") -- ver nova-rapida/page.tsx e useFormPrefill.ts.
+  initial?: Record<string, string>;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createQuickRequest, undefined);
   const formRef = useRef<HTMLFormElement>(null);
@@ -389,6 +394,10 @@ export function QuickCreateRequestForm({
   // Rascunho em localStorage -- pedido do Victor 15/09/2026, mesmo
   // racional de NovaEntregaAssistenciaForm.tsx (ver useFormDraft.ts).
   useFormDraft(formRef, "draft:nova-visita", ["part_order_id"]);
+  // Dados puxados de um cadastro -- pedido do Victor 02/10/2026 (ver
+  // useFormPrefill.ts). Chamado DEPOIS de useFormDraft de propósito: vence
+  // um rascunho velho que porventura exista.
+  useFormPrefill(formRef, initial ?? {});
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-4 max-w-xl">
