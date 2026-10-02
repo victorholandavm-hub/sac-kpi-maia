@@ -162,6 +162,17 @@ export default async function AgendaPage({
     groups = groups.filter((g) => !(g.dateKey < todayKey && !hasPendingItems(g.items)));
   }
 
+  // Vistoria/troca de peça por pessoa da equipe interna -- pedido do
+  // Victor 03/10/2026 ("tem o número de vistorias e troca de peças feitas
+  // por manoel e agora adriel CD?" / "pode ser na aba agenda e na aba
+  // relatorio, nos dois"). Conta direto de `requests` (já filtrado pelos
+  // filtros ativos da página -- range/rota/loja/busca), sem busca extra.
+  const visitasPorPessoa = EQUIPE_INTERNA_ASSEMBLERS.map((name) => ({
+    name,
+    vistoria: requests.filter((r) => r.assemblerName === name && r.type === "vistoria").length,
+    trocaPeca: requests.filter((r) => r.assemblerName === name && r.type === "troca_peca").length,
+  }));
+
   // Paginação por MÊS -- pedido do Victor 01/09/2026 (mesma regra de
   // fila/page.tsx, ver paginateMonths/weekGrouping.ts): um mês por
   // página. Só entra em jogo em "Tudo" -- Atrasado/Hoje/Semana já são
@@ -215,6 +226,26 @@ export default async function AgendaPage({
         <UnderlineTab href="/assistencia/fila" label="Visitas" active={false} />
         <UnderlineTab href="/assistencia/fila?tab=pecas" label="Entregas" active={false} />
         <UnderlineTab href="/assistencia/agenda" label="Agenda" active />
+      </div>
+
+      {/* Vistoria/troca de peça por pessoa -- pedido do Victor 03/10/2026.
+          Reflete os mesmos filtros já aplicados na lista abaixo (range/
+          rota/loja/busca). */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {visitasPorPessoa.map((p) => (
+          <div
+            key={p.name}
+            className="flex items-center gap-3 rounded-xl border px-4 py-2.5"
+            style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              {p.name}
+            </span>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {p.vistoria} vistoria{p.vistoria === 1 ? "" : "s"} · {p.trocaPeca} troca{p.trocaPeca === 1 ? "" : "s"} de peça
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* Alerta de atrasadas -- pedido do Victor 25/08/2026: "Visitas
