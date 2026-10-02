@@ -176,18 +176,23 @@ export const PEDIDO_ENCOMENDA_STATUS_STEPS: { key: string; label: string }[] = [
   { key: "entregue", label: "Entregue" },
 ];
 
-// pronto_para_expedicao e recebido_cd tinham a mesma cor de em_carga/entregue
-// (respectivamente) -- achado do diagnóstico de UX da Fila de Encomendas
-// (Victor, 25-26/09/2026): o dot do badge não diferenciava esses pares. Tom
-// próprio pros dois: pronto_para_expedicao fica entre o amarelo de
+// pronto_para_expedicao tinha a mesma cor de em_carga -- achado do
+// diagnóstico de UX da Fila de Encomendas (Victor, 25-26/09/2026): o dot do
+// badge não diferenciava o par. Tom próprio: fica entre o amarelo de
 // "solicitado" e o laranja de "em_carga" (--status-serious, coral -- ainda
-// em trânsito, não chegou de verdade no CD); recebido_cd usa o novo
-// --status-info (globals.css) em vez do verde puro de "entregue" -- chegou,
-// mas ainda não é o fim da linha. Não usei --series-7 aqui de propósito: os
-// tokens --series-* viram todos a mesma cor neutra no tema escuro (ver
-// comentário em globals.css, 03/09/2026 -- "servem só de etiqueta, não de
-// status de verdade"), o que ia colidir com "cancelado" (--text-muted, já
-// neutro) bem no tema onde eu mais precisava da diferença.
+// em trânsito, não chegou de verdade no CD). Não usei --series-7 aqui de
+// propósito: os tokens --series-* viram todos a mesma cor neutra no tema
+// escuro (ver comentário em globals.css, 03/09/2026 -- "servem só de
+// etiqueta, não de status de verdade"), o que ia colidir com "cancelado"
+// (--text-muted, já neutro) bem no tema onde eu mais precisava da diferença.
+//
+// recebido_cd usava --status-info (azul), separado do verde de "entregue",
+// pela leitura de que "chegou no CD" ainda não era "o fim da linha". Victor
+// corrigiu isso 02/10/2026: "entregue" só existe pro fluxo que passa pela
+// loja (em_carga → faturado → entregue) -- a maioria dos pedidos vai direto
+// do CD pro cliente de caminhão, sem passar pela loja nenhuma, e pra esses
+// "recebido_cd" JÁ é o fim da linha de verdade. Por isso o mesmo verde de
+// "entregue", não um tom à parte.
 export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
   solicitado: "var(--status-warning)",
   em_producao: "var(--series-5)",
@@ -197,7 +202,7 @@ export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
   entregue: "var(--status-good)",
   cancelado: "var(--text-muted)",
   negado: "var(--status-critical)",
-  recebido_cd: "var(--status-info)",
+  recebido_cd: "var(--status-good)",
 };
 
 export const PEDIDO_FORNECEDOR_STATUS_LABELS: Record<string, string> = {
