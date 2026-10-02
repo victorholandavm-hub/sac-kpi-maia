@@ -6,6 +6,7 @@ import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { DateRangeQuickFilter } from "@/components/assistencia/DateRangeQuickFilter";
 import { CadastroDetalheModal } from "@/components/assistencia/CadastroDetalheModal";
 import { NovoCadastroDrawer } from "@/components/assistencia/NovoCadastroDrawer";
+import { EditarCadastroDrawer } from "@/components/assistencia/EditarCadastroDrawer";
 import {
   listCadastros,
   getCadastroPillCounts,
@@ -27,9 +28,10 @@ export const dynamic = "force-dynamic";
 // pré-sistema (planilha "Solicitações de Assistência", ~3.244 linhas,
 // Dez/2024-Out/2026), importado uma vez (ver 0146_assistencia_
 // cadastros_historico.sql) e exibido aqui seguindo o mesmo padrão visual
-// das outras telas de operação (pills/filtros/tabela). Só leitura -- é
-// registro histórico, não fila de trabalho: sem criar/editar/concluir
-// nada por aqui.
+// das outras telas de operação (pills/filtros/tabela). Começou só leitura,
+// depois ganhou criação (NovoCadastroDrawer) e, 02/10/2026, edição
+// (EditarCadastroDrawer) -- vale tanto pras linhas importadas quanto pras
+// lançadas pelo sistema, mesma tabela.
 
 type Filtro = CadastroTipo | "ERROS" | "volta_caixa" | "esperar_fabrica";
 
@@ -160,7 +162,10 @@ function CadastroRow({ cadastro }: { cadastro: Cadastro }) {
         )}
       </td>
       <td className="px-3 py-2.5 text-right">
-        <CadastroDetalheModal cadastro={cadastro} />
+        <div className="flex items-center justify-end gap-1.5">
+          <CadastroDetalheModal cadastro={cadastro} />
+          <EditarCadastroDrawer cadastro={cadastro} />
+        </div>
       </td>
     </tr>
   );
