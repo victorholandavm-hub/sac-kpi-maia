@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   CADASTRO_TIPOS,
   CADASTRO_TIPO_LABELS,
@@ -48,6 +48,33 @@ export function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
   if (d.length <= 10) return d.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d{1,4})$/, "$1-$2");
   return d.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d{1,4})$/, "$1-$2");
+}
+
+export type ProdutoItem = { id: number; codigo: string; produto: string };
+
+// Mais de um produto no mesmo chamado -- pedido do Victor 03/10/2026
+// ("coloca a opção no cadastro de acrescentar outro produto no mesmo
+// chamado"). Mesmo padrão de lista repetível já usado em NovoEstornoRequestForm/
+// NovaEntregaAssistenciaForm (ItemsFields/ProdutoRow) -- sem mudar o
+// schema, junta tudo em "; " nos campos codigo/produto de sempre (1
+// cadastro continua sendo 1 linha no banco). `descricao` fica de fora
+// dessa lista de propósito -- é "o que aconteceu" do chamado inteiro, não
+// por produto.
+function splitProdutos(codigo: string | undefined, produto: string | undefined): ProdutoItem[] {
+  const codigos = (codigo ?? "").split(";").map((s) => s.trim());
+  const produtos = (produto ?? "").split(";").map((s) => s.trim());
+  const len = Math.max(codigos.length, produtos.length, 1);
+  const items: ProdutoItem[] = [];
+  for (let i = 0; i < len; i++) {
+    items.push({ id: i, codigo: codigos[i] ?? "", produto: produtos[i] ?? "" });
+  }
+  return items;
+}
+function joinProdutos(items: ProdutoItem[], field: "codigo" | "produto"): string {
+  return items
+    .map((p) => p[field].trim())
+    .filter(Boolean)
+    .join("; ");
 }
 
 // CNPJ fixo por filial -- pedido do Victor 01/10/2026 ("colocar automático
@@ -147,6 +174,19 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
   );
   const [quemMontouIndicadoNome, setQuemMontouIndicadoNome] = useState(d.quemMontou && !quemMontouParticular ? d.quemMontou : "");
 
+  const initialProdutos = splitProdutos(d.codigo, d.produto);
+  const produtoIdSeq = useRef(initialProdutos.length);
+  const [produtos, setProdutos] = useState<ProdutoItem[]>(initialProdutos);
+  function addProduto() {
+    setProdutos((prev) => [...prev, { id: produtoIdSeq.current++, codigo: "", produto: "" }]);
+  }
+  function removeProduto(id: number) {
+    setProdutos((prev) => prev.filter((p) => p.id !== id));
+  }
+  function updateProduto(id: number, patch: Partial<ProdutoItem>) {
+    setProdutos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }
+
   return (
     <>
       <FormSection title="Informações do produto" number={1}>
@@ -159,12 +199,45 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
             ))}
           </select>
         </Field>
-        <Field label="Código produto">
-          <input name="codigo" defaultValue={d.codigo} className="rounded border px-3 py-2" style={inputStyle} />
-        </Field>
-        <Field label="Produto" required>
-          <input name="produto" required defaultValue={d.produto} className="rounded border px-3 py-2" style={inputStyle} />
-        </Field>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+            Produto
+            <span style={{ color: "var(--status-critical)" }}> *</span>
+          </span>
+          {produtos.map((p) => (
+            <div key={p.id} className="flex items-center gap-2 flex-wrap">
+              <input
+                value={p.codigo}
+                onChange={(e) => updateProduto(p.id, { codigo: e.target.value })}
+                placeholder="Código do produto"
+                className="w-32 rounded border px-3 py-2"
+                style={inputStyle}
+              />
+              <input
+                value={p.produto}
+                onChange={(e) => updateProduto(p.id, { produto: e.target.value })}
+                placeholder="Nome do produto"
+                className="flex-1 min-w-[160px] rounded border px-3 py-2"
+                style={inputStyle}
+              />
+              {produtos.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => removeProduto(p.id)}
+                  className="text-xs underline shrink-0"
+                  style={{ color: "var(--status-critical)" }}
+                >
+                  remover
+                </button>
+              ) : null}
+            </div>
+          ))}
+          <button type="button" onClick={addProduto} className="text-xs underline self-start" style={{ color: "var(--brand-green)" }}>
+            + Adicionar produto
+          </button>
+          <input type="hidden" name="codigo" value={joinProdutos(produtos, "codigo")} />
+          <input type="hidden" name="produto" value={joinProdutos(produtos, "produto")} />
+        </div>
         <Field label="Descrição">
           <textarea
             name="descricao"

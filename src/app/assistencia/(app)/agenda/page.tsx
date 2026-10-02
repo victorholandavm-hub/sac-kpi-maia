@@ -70,7 +70,17 @@ const FILTERS: { label: string; value: AgendaRange | null }[] = [
   { label: "Próximos 7 dias", value: "semana" },
 ];
 
-function buildHref(params: { range?: string; rota?: string; view?: string; page?: number; showPast?: string; store?: string; q?: string }) {
+function buildHref(params: {
+  range?: string;
+  rota?: string;
+  view?: string;
+  page?: number;
+  showPast?: string;
+  store?: string;
+  q?: string;
+  from?: string;
+  to?: string;
+}) {
   const sp = new URLSearchParams();
   if (params.range) sp.set("range", params.range);
   if (params.rota) sp.set("rota", params.rota);
@@ -79,6 +89,8 @@ function buildHref(params: { range?: string; rota?: string; view?: string; page?
   if (params.showPast) sp.set("showPast", params.showPast);
   if (params.store) sp.set("store", params.store);
   if (params.q) sp.set("q", params.q);
+  if (params.from) sp.set("from", params.from);
+  if (params.to) sp.set("to", params.to);
   const qs = sp.toString();
   return qs ? `/assistencia/agenda?${qs}` : "/assistencia/agenda";
 }
@@ -98,10 +110,20 @@ function matchesQuery(r: ServiceRequestSummary, q: string): boolean {
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; rota?: string; view?: string; page?: string; showPast?: string; store?: string; q?: string }>;
+  searchParams: Promise<{
+    range?: string;
+    rota?: string;
+    view?: string;
+    page?: string;
+    showPast?: string;
+    store?: string;
+    q?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
   redirectIfSac(await getProfile());
-  const { range, rota, view, page: pageParam, showPast, store, q } = await searchParams;
+  const { range, rota, view, page: pageParam, showPast, store, q, from, to } = await searchParams;
   const filterRange = (["atrasado", "hoje", "semana"] as const).includes(range as AgendaRange)
     ? (range as AgendaRange)
     : undefined;
@@ -139,11 +161,22 @@ export default async function AgendaPage({
   // incondicional -- não depende mais do filtro "assembler" da URL
   // (removido do formulário, ver abaixo), até porque não faria sentido
   // filtrar essa agenda por outro montador terceirizado.
+  // Período manual (De/Até) -- pedido do Victor 03/10/2026: "preciso que
+  // na aba de agenda tenha a seleção por período, para que quando eu
+  // selecionar o periodo, apareça tudo, inclusive esses números de manoel
+  // e adriel cd" (ver visitasPorPessoa abaixo). Filtro independente dos
+  // atalhos de range (Atrasado/Hoje/Semana/Tudo) -- `requests` já traz o
+  // histórico inteiro quando nenhum atalho está selecionado (ver
+  // comentário de `allRequests` acima), então um De/Até aqui não precisa
+  // de busca nova nenhuma, só mais um filtro em JS por cima do que já
+  // existe.
   const requests = allRequests
     .filter((r) => (EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? ""))
     .filter((r) => !filterRota || r.rota === filterRota)
     .filter((r) => !store || r.storeId === store)
-    .filter((r) => !filterQ || matchesQuery(r, filterQ));
+    .filter((r) => !filterQ || matchesQuery(r, filterQ))
+    .filter((r) => !from || (agendaEffectiveDate(r) ?? "") >= from)
+    .filter((r) => !to || (agendaEffectiveDate(r) ?? "") <= to);
   const overdueCount = (overdueRaw ?? requests)
     .filter((r) => (EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? ""))
     .filter((r) => !filterRota || r.rota === filterRota)
@@ -175,28 +208,32 @@ export default async function AgendaPage({
 
   // Paginação por MÊS -- pedido do Victor 01/09/2026 (mesma regra de
   // fila/page.tsx, ver paginateMonths/weekGrouping.ts): um mês por
-  // página. Só entra em jogo em "Tudo" -- Atrasado/Hoje/Semana já são
-  // recortes de data próprios, não fazem sentido fatiados por mês (mesmo
-  // critério de `postFiltered` em fila/page.tsx). Sem página explícita
-  // na URL, abre direto na página que contém o mês corrente (equivalente
-  // ao "mês corrente por padrão" de antes).
-  const allMonths = !filterRange ? groupIntoMonths(groups, (g) => g.dateKey) : [];
+  // página. Só entra em jogo em "Tudo" sem período manual -- Atrasado/
+  // Hoje/Semana já são recortes de data próprios (mesmo critério de
+  // `postFiltered` em fila/page.tsx), e um De/Até escolhido à mão (pedido
+  // do Victor 03/10/2026) também já É um recorte fechado -- paginar por
+  // cima dele escondia resultado sem motivo. Sem página explícita na URL,
+  // abre direto na página que contém o mês corrente (equivalente ao "mês
+  // corrente por padrão" de antes).
+  const hasCustomRange = !!(from || to);
+  const bypassPagination = filterRange || hasCustomRange;
+  const allMonths = !bypassPagination ? groupIntoMonths(groups, (g) => g.dateKey) : [];
   const requestedPage = /^\d+$/.test(pageParam ?? "") ? parseInt(pageParam!, 10) : undefined;
   const defaultPage = pageContainingMonth(allMonths, currentMonthKey());
-  const { pageMonths, totalPages } = !filterRange ? paginateMonths(allMonths, requestedPage ?? defaultPage) : { pageMonths: [], totalPages: 1 };
+  const { pageMonths, totalPages } = !bypassPagination ? paginateMonths(allMonths, requestedPage ?? defaultPage) : { pageMonths: [], totalPages: 1 };
   const currentPage = Math.min(Math.max(1, requestedPage ?? defaultPage), totalPages);
-  const pageGroups = filterRange ? groups : pageMonths.flatMap((m) => m.weeks.flatMap((w) => w.days));
+  const pageGroups = bypassPagination ? groups : pageMonths.flatMap((m) => m.weeks.flatMap((w) => w.days));
   // Kanban por montador segue o mesmo recorte de página -- sem isso,
   // "Tudo" + Kanban mostraria todo o histórico de uma vez, sem relação
   // com o que a visão "Por dia" ao lado está mostrando.
-  const pageRequests = filterRange ? requests : pageGroups.flatMap((g) => g.items);
+  const pageRequests = bypassPagination ? requests : pageGroups.flatMap((g) => g.items);
 
   // Repassado em praticamente todo buildHref abaixo -- rota já fazia isso
   // individualmente; loja/busca (novos) entram do mesmo jeito. "assembler"
   // saiu daqui 04/09/2026 -- Agenda virou a agenda exclusiva da equipe
   // interna (ver filtro incondicional em `requests`/`overdueCount` acima),
   // não faz mais sentido filtrar por outro montador terceirizado.
-  const commonParams = { rota: filterRota, store, q };
+  const commonParams = { rota: filterRota, store, q, from, to };
 
   return (
     <div className="flex flex-col gap-4">
@@ -286,8 +323,13 @@ export default async function AgendaPage({
           <FilterPill
             key={f.label}
             label={f.label}
-            selected={(f.value ?? undefined) === filterRange}
-            href={buildHref({ range: f.value ?? undefined, ...commonParams, view: showKanban ? "montador" : undefined })}
+            // Clicar num atalho pronto larga um De/Até manual que porventura
+            // esteja ativo (sem from/to aqui, de propósito) -- os dois são
+            // formas diferentes de escolher "qual período", não fazem
+            // sentido compostos (ex.: "Hoje" + "01/09 a 30/09" não mostra
+            // nada).
+            selected={!hasCustomRange && (f.value ?? undefined) === filterRange}
+            href={buildHref({ range: f.value ?? undefined, rota: filterRota, store, q, view: showKanban ? "montador" : undefined })}
           />
         ))}
         {/* Atalho "hoje" -- só faz sentido em "Tudo" (Atrasado/Hoje/Semana
@@ -340,6 +382,30 @@ export default async function AgendaPage({
         {store ? <input type="hidden" name="store" value={store} /> : null}
         {showKanban ? <input type="hidden" name="view" value="montador" /> : null}
         {showPastResolved ? <input type="hidden" name="showPast" value="1" /> : null}
+        {/* Período manual (De/Até) -- pedido do Victor 03/10/2026: "preciso
+            que na aba de agenda tenha a seleção por período, para que
+            quando eu selecionar o periodo, apareça tudo, inclusive esses
+            números de manoel e adriel cd". Mesmo padrão de De/Até usado em
+            fila/page.tsx -- filtra por `agendaEffectiveDate` (ver `requests`
+            acima), independente dos atalhos Atrasado/Hoje/Semana/Tudo. */}
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          De
+          <input
+            type="date"
+            name="from"
+            defaultValue={from ?? ""}
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-2 text-sm text-gray-800 dark:text-gray-100"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          Até
+          <input
+            type="date"
+            name="to"
+            defaultValue={to ?? ""}
+            className="rounded-lg border border-gray-200 dark:border-gray-600 px-2 py-2 text-sm text-gray-800 dark:text-gray-100"
+          />
+        </label>
         {/* Ícone de lupa -- mesmo padrão de fila/page.tsx/notificacoes
             (ver lá). Só cobre cliente/telefone/nº do chamado/loja (ver
             matchesQuery acima) -- mais limitado que a busca de
@@ -362,12 +428,12 @@ export default async function AgendaPage({
         >
           Buscar
         </button>
-        {q ? (
+        {q || from || to ? (
           <Link
             href={buildHref({ range: filterRange, rota: filterRota, store, view: showKanban ? "montador" : undefined, showPast: showPastResolved ? "1" : undefined })}
             className="text-xs font-medium text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-150"
           >
-            Limpar busca
+            Limpar busca/período
           </Link>
         ) : null}
       </form>
@@ -411,7 +477,7 @@ export default async function AgendaPage({
 
       {requests.length === 0 ? (
         <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
-          <p className="text-sm text-gray-400 dark:text-gray-500">{filterRange ? "Nenhuma visita nesse período." : "Nenhuma visita agendada."}</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">{bypassPagination ? "Nenhuma visita nesse período." : "Nenhuma visita agendada."}</p>
         </div>
       ) : !showKanban && groups.length === 0 ? (
         <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
