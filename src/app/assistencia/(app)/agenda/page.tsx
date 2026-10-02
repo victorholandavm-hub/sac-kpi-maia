@@ -200,11 +200,24 @@ export default async function AgendaPage({
   // por manoel e agora adriel CD?" / "pode ser na aba agenda e na aba
   // relatorio, nos dois"). Conta direto de `requests` (já filtrado pelos
   // filtros ativos da página -- range/rota/loja/busca), sem busca extra.
-  const visitasPorPessoa = EQUIPE_INTERNA_ASSEMBLERS.map((name) => ({
-    name,
-    vistoria: requests.filter((r) => r.assemblerName === name && r.type === "vistoria").length,
-    trocaPeca: requests.filter((r) => r.assemblerName === name && r.type === "troca_peca").length,
-  }));
+  // trocaPecaChamados = nº de chamados (tickets) de troca_peca; trocaPecaPecas
+  // = soma das peças (quantity de cada item) dentro desses chamados --
+  // pedido do Victor 03/10/2026: "creio que ele as vezes troca mais de uma
+  // peça por chamado" -- confirmado (um chamado de troca_peca pode ter
+  // vários itens, ver QuickCreateRequestForm). Sem item nenhum registrado
+  // no chamado, conta 1 peça (o chamado em si já representa a troca).
+  const visitasPorPessoa = EQUIPE_INTERNA_ASSEMBLERS.map((name) => {
+    const trocaPecaRequests = requests.filter((r) => r.assemblerName === name && r.type === "troca_peca");
+    return {
+      name,
+      vistoria: requests.filter((r) => r.assemblerName === name && r.type === "vistoria").length,
+      trocaPecaChamados: trocaPecaRequests.length,
+      trocaPecaPecas: trocaPecaRequests.reduce(
+        (sum, r) => sum + (r.items.length > 0 ? r.items.reduce((s, i) => s + i.quantity, 0) : 1),
+        0
+      ),
+    };
+  });
 
   // Paginação por MÊS -- pedido do Victor 01/09/2026 (mesma regra de
   // fila/page.tsx, ver paginateMonths/weekGrouping.ts): um mês por
@@ -436,7 +449,8 @@ export default async function AgendaPage({
               {p.name}
             </span>
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {p.vistoria} vistoria{p.vistoria === 1 ? "" : "s"} · {p.trocaPeca} troca{p.trocaPeca === 1 ? "" : "s"} de peça
+              {p.vistoria} vistoria{p.vistoria === 1 ? "" : "s"} · {p.trocaPecaChamados} chamado{p.trocaPecaChamados === 1 ? "" : "s"} de troca de peça
+              {p.trocaPecaPecas !== p.trocaPecaChamados ? ` (${p.trocaPecaPecas} peças)` : ""}
             </span>
           </div>
         ))}
