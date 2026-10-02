@@ -9,7 +9,7 @@ import { recordFailedPinAttempt, resetPinAttempts } from "@/lib/pinLockout";
 import { checkIpRateLimit, getClientIp, recordFailedIpAttempt } from "@/lib/ipRateLimit";
 import { isValidLoginPinFormat } from "@/lib/pinConfig";
 import { notifyLoja, notifyAssistencia } from "@/lib/notifications";
-import { MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
+import { EQUIPE_INTERNA_ASSEMBLERS } from "@/lib/assistenciaLabels";
 import { notifyTelegramStatusChange } from "@/lib/telegram";
 import {
   MONTADOR_COOKIE_NAME,
@@ -137,12 +137,13 @@ export async function montadorDeletePhoto(photoId: string): Promise<void> {
 // concluída, sem essa fase nem exigência de foto -- não fazem parte do
 // pedido.
 //
-// Manoel (MANOEL_ONLY_ASSEMBLER) fica de fora dessa mudança inteira --
-// pedido do Victor 31/08/2026: "aquelas mudanças não devem servir para
-// manoel, apenas para os terceirizados". Ele é da equipe interna, não
-// terceirizado pago por peça (mesma distinção já usada em payments.ts/
-// relatorios/page.tsx) -- continua concluindo direto, sem foto por item
-// nem aprovação da loja, exatamente como era antes desse pedido.
+// Equipe interna (EQUIPE_INTERNA_ASSEMBLERS: Manoel, + Adriel CD desde
+// 02/10/2026) fica de fora dessa mudança inteira -- pedido do Victor
+// 31/08/2026: "aquelas mudanças não devem servir para manoel, apenas para
+// os terceirizados". São da equipe interna, não terceirizados pagos por
+// peça (mesma distinção já usada em payments.ts/relatorios/page.tsx) --
+// continuam concluindo direto, sem foto por item nem aprovação da loja,
+// exatamente como era antes desse pedido.
 export async function montadorCompleteRequest(requestId: string): Promise<void> {
   const assemblerName = await getMontadorSession();
   if (!assemblerName) throw new Error("Sessão expirada. Faça login de novo.");
@@ -163,7 +164,8 @@ export async function montadorCompleteRequest(requestId: string): Promise<void> 
   }
 
   const needsApproval =
-    (request.type === "montagem" || request.type === "desmontagem") && assemblerName !== MANOEL_ONLY_ASSEMBLER;
+    (request.type === "montagem" || request.type === "desmontagem") &&
+    !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(assemblerName);
 
   const { data: items, error: itemsError } = await admin.from("service_request_items").select("id").eq("request_id", requestId);
   if (itemsError) throw new Error(itemsError.message);
@@ -356,7 +358,9 @@ export async function montadorCompletePartially(requestId: string, completedItem
     throw new Error("Esse chamado já foi encerrado.");
   }
 
-  const needsApproval = (request.type === "montagem" || request.type === "desmontagem") && assemblerName !== MANOEL_ONLY_ASSEMBLER;
+  const needsApproval =
+    (request.type === "montagem" || request.type === "desmontagem") &&
+    !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(assemblerName);
 
   // Foto obrigatória por item também aqui -- pedido do Victor 31/08/2026,
   // mesmo recorte de montadorCompleteRequest.

@@ -8,7 +8,7 @@ import { UnderlineTab } from "@/components/UnderlineTab";
 import { AgendaDayGroups } from "@/components/assistencia/AgendaDayGroups";
 import { AgendaKanbanBoard } from "@/components/assistencia/AgendaKanbanBoard";
 import { JP_PRIMARY_ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
-import { DELIVERY_REQUEST_TYPES, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
+import { DELIVERY_REQUEST_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "@/lib/assistenciaLabels";
 import { groupIntoMonths, paginateMonths, pageContainingMonth } from "@/lib/weekGrouping";
 
 // Mês corrente -- usado só pra saber em qual PÁGINA (ver paginateMonths/
@@ -131,20 +131,21 @@ export default async function AgendaPage({
   // Busca". `listScheduledRequests` já busca o mês/período inteiro pro
   // client-side (rota/montador já filtravam assim), então loja/busca
   // seguem o mesmo caminho em vez de crescer a query no servidor.
-  // Agenda virou a agenda EXCLUSIVA do Manoel -- pedido do Victor
-  // 04/09/2026: "todos os montadores dentro de visitas e só manoel em
-  // agenda" (o resto dos montadores terceirizados/próprios de loja tem seu
-  // próprio alerta de atrasadas na aba Visitas agora, ver fila/page.tsx).
-  // Trava incondicional -- não depende mais do filtro "assembler" da URL
+  // Agenda virou a agenda EXCLUSIVA da equipe interna (Manoel -- pedido do
+  // Victor 04/09/2026: "todos os montadores dentro de visitas e só manoel
+  // em agenda" -- + Adriel CD, que entrou 02/10/2026 no mesmo "nível": o
+  // resto dos montadores terceirizados/próprios de loja tem seu próprio
+  // alerta de atrasadas na aba Visitas agora, ver fila/page.tsx). Trava
+  // incondicional -- não depende mais do filtro "assembler" da URL
   // (removido do formulário, ver abaixo), até porque não faria sentido
-  // filtrar "Agenda do Manoel" por outro montador.
+  // filtrar essa agenda por outro montador terceirizado.
   const requests = allRequests
-    .filter((r) => r.assemblerName === MANOEL_ONLY_ASSEMBLER)
+    .filter((r) => (EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? ""))
     .filter((r) => !filterRota || r.rota === filterRota)
     .filter((r) => !store || r.storeId === store)
     .filter((r) => !filterQ || matchesQuery(r, filterQ));
   const overdueCount = (overdueRaw ?? requests)
-    .filter((r) => r.assemblerName === MANOEL_ONLY_ASSEMBLER)
+    .filter((r) => (EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? ""))
     .filter((r) => !filterRota || r.rota === filterRota)
     .filter((r) => !store || r.storeId === store)
     .filter((r) => !filterQ || matchesQuery(r, filterQ)).length;
@@ -181,9 +182,9 @@ export default async function AgendaPage({
 
   // Repassado em praticamente todo buildHref abaixo -- rota já fazia isso
   // individualmente; loja/busca (novos) entram do mesmo jeito. "assembler"
-  // saiu daqui 04/09/2026 -- Agenda virou a agenda exclusiva do Manoel (ver
-  // filtro incondicional em `requests`/`overdueCount` acima), não faz mais
-  // sentido filtrar por outro montador.
+  // saiu daqui 04/09/2026 -- Agenda virou a agenda exclusiva da equipe
+  // interna (ver filtro incondicional em `requests`/`overdueCount` acima),
+  // não faz mais sentido filtrar por outro montador terceirizado.
   const commonParams = { rota: filterRota, store, q };
 
   return (
@@ -193,7 +194,7 @@ export default async function AgendaPage({
           telas (fila/page.tsx, sac/notificacoes/page.tsx). */}
       <PageHeader
         title="Agenda"
-        description="Visitas técnicas do Manoel com data marcada -- troca de peça, vistoria, montagem e desmontagem na casa do cliente. Os outros montadores ficam na aba Visitas."
+        description="Visitas técnicas da equipe interna (Manoel, Adriel CD) com data marcada -- troca de peça, vistoria, montagem e desmontagem na casa do cliente. Os outros montadores ficam na aba Visitas."
         cta={
           <Link
             href="/assistencia/nova-rapida"
@@ -295,9 +296,9 @@ export default async function AgendaPage({
           | Cidade/Região | Técnico/Motorista". Cidade não entra aqui --
           Agenda é visita técnica, não tem rota de Campina Grande (só
           entrega/carga tem, ver comentário acima). O select de Técnico/
-          Montador saiu 04/09/2026 -- Agenda virou a agenda exclusiva do
-          Manoel (ver filtro incondicional acima), não faz mais sentido
-          filtrar por outro montador aqui. */}
+          Montador saiu 04/09/2026 -- Agenda virou a agenda exclusiva da
+          equipe interna (ver filtro incondicional acima), não faz mais
+          sentido filtrar por outro montador terceirizado aqui. */}
       <div className="flex items-center gap-2 flex-wrap">
         <FilterSelect name="store" placeholder="Todas as lojas" options={stores.map((s) => ({ value: s.id, label: s.name }))} />
       </div>
@@ -393,17 +394,18 @@ export default async function AgendaPage({
         </div>
       ) : showKanban ? (
         <div className="hidden sm:block">
-          {/* Kanban por dia do Manoel -- exclui os tipos que saem de
-              motorista (troca/entrega de produto, envio de peça): esse
+          {/* Kanban por dia da equipe interna -- exclui os tipos que saem
+              de motorista (troca/entrega de produto, envio de peça): esse
               Kanban arrasta pra reatribuir MONTADOR (setAssemblerName), não
-              faz sentido um chamado de motorista aparecer aqui. Só uma
-              coluna (Manoel) desde 04/09/2026 -- Agenda virou a agenda
-              exclusiva dele (ver filtro incondicional acima). `pageRequests`
-              (não `requests`) -- segue o mesmo recorte de página que "Por
-              dia" ao lado, ver pageRequests acima. */}
+              faz sentido um chamado de motorista aparecer aqui. Só as
+              colunas da equipe interna (Manoel desde 04/09/2026, + Adriel
+              CD desde 02/10/2026) -- Agenda virou a agenda exclusiva deles
+              (ver filtro incondicional acima). `pageRequests` (não
+              `requests`) -- segue o mesmo recorte de página que "Por dia"
+              ao lado, ver pageRequests acima. */}
           <AgendaKanbanBoard
             requests={pageRequests.filter((r) => !(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type))}
-            assemblers={[MANOEL_ONLY_ASSEMBLER]}
+            assemblers={[...EQUIPE_INTERNA_ASSEMBLERS]}
           />
         </div>
       ) : (

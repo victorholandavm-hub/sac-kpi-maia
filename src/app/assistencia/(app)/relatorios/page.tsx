@@ -10,7 +10,7 @@ import {
   STATUS_LABELS,
   STATUS_COLORS,
   SUPPLIER_RETURN_STATUS_LABELS,
-  MANOEL_ONLY_ASSEMBLER,
+  EQUIPE_INTERNA_ASSEMBLERS,
 } from "@/lib/assistenciaLabels";
 import { CausaRaizDonutChart } from "@/components/CausaRaizDonutChart";
 import { RelatorioExportButton } from "@/components/assistencia/RelatorioExportButton";
@@ -117,16 +117,17 @@ function formatDateBr(iso: string): string {
 }
 
 // Manoel é o único montador funcionário nosso (o resto é terceirizado, ver
-// MANOEL_ONLY_ASSEMBLER/MANOEL_ONLY_TYPES em assistenciaLabels.ts) --
+// EQUIPE_INTERNA_ASSEMBLERS/MANOEL_ONLY_TYPES em assistenciaLabels.ts) --
 // pedido do Victor 21/08/2026: "Colocar Manoel pra baixo na lista de
 // montadores pois ele é o único que é funcionário nosso e não
-// terceirizado". Não muda a ordenação por total (continua maior pro
-// menor) -- só empurra a linha do Manoel pro final da lista, mesmo que o
-// total dele fosse alto o bastante pra aparecer no meio.
+// terceirizado". Adriel CD entrou 02/10/2026 no mesmo "nível". Não muda a
+// ordenação por total (continua maior pro menor) -- só empurra a linha da
+// equipe interna pro final da lista, mesmo que o total desse alto o
+// bastante pra aparecer no meio.
 function sortManoelLast<T>(rows: T[], nameOf: (r: T) => string): T[] {
-  const rest = rows.filter((r) => nameOf(r) !== MANOEL_ONLY_ASSEMBLER);
-  const manoel = rows.filter((r) => nameOf(r) === MANOEL_ONLY_ASSEMBLER);
-  return [...rest, ...manoel];
+  const rest = rows.filter((r) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(nameOf(r)));
+  const equipeInterna = rows.filter((r) => (EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(nameOf(r)));
+  return [...rest, ...equipeInterna];
 }
 
 // Monta o href preservando TODOS os filtros da página -- data (agora
@@ -476,18 +477,18 @@ export default async function RelatoriosPage({
   // Pagamentos (ver pagamentos/page.tsx). "Pago" é só o que já foi
   // liberado.
   //
-  // Manoel continua aparecendo como linha própria em "Pagamento por
-  // montador" (sortManoelLast só reordena, não remove) -- mas NÃO entra
-  // nos 3 cards de KPI acima da tabela. Achado 29/08/2026 (revisão pedida
-  // pelo Victor): esses cards não excluíam Manoel, ao contrário do
-  // Relatório de montagem detalhado (pedido explícito: "manoel nao entra
-  // nessa conta, pois é de casa"). Hoje não muda nenhum número (Manoel não
-  // tem item com valor definido ainda), mas sem essa exclusão os dois
-  // relatórios divergiriam silenciosamente no dia que algum item dele
-  // ganhasse valor, sem nenhum painel de reconciliação avisando (esse
-  // painel, ver montagem-detalhado/page.tsx, só compara "Solicitações",
-  // não "Total a pagar").
-  const paymentEntriesExcludingManoel = assemblerRows.filter(([name]) => name !== MANOEL_ONLY_ASSEMBLER);
+  // Equipe interna (Manoel, + Adriel CD desde 02/10/2026) continua
+  // aparecendo como linha própria em "Pagamento por montador" (sortManoelLast
+  // só reordena, não remove) -- mas NÃO entra nos 3 cards de KPI acima da
+  // tabela. Achado 29/08/2026 (revisão pedida pelo Victor): esses cards não
+  // excluíam Manoel, ao contrário do Relatório de montagem detalhado
+  // (pedido explícito: "manoel nao entra nessa conta, pois é de casa").
+  // Hoje não muda nenhum número (equipe interna não tem item com valor
+  // definido ainda), mas sem essa exclusão os dois relatórios divergiriam
+  // silenciosamente no dia que algum item dela ganhasse valor, sem nenhum
+  // painel de reconciliação avisando (esse painel, ver montagem-detalhado/
+  // page.tsx, só compara "Solicitações", não "Total a pagar").
+  const paymentEntriesExcludingManoel = assemblerRows.filter(([name]) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(name));
   const paymentTotal = paymentEntriesExcludingManoel.reduce((sum, [, v]) => sum + v.total, 0);
   const paymentPending = paymentEntriesExcludingManoel.reduce((sum, [, v]) => sum + v.pendente, 0);
   const paymentPaid = paymentEntriesExcludingManoel.reduce((sum, [, v]) => sum + v.pago, 0);

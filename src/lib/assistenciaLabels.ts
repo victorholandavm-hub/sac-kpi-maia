@@ -366,9 +366,23 @@ export const VISITA_REQUEST_TYPES = ASSISTENCIA_MANAGED_TYPES.filter(
 
 // Vistoria e troca de peça exigem confiança/qualificação que só um
 // funcionário de verdade tem — hoje só o Manoel; os outros montadores são
-// terceirizados só pra montagem/desmontagem/recolhimento.
+// terceirizados só pra montagem/desmontagem/recolhimento. Não confundir com
+// EQUIPE_INTERNA_ASSEMBLERS abaixo: isso aqui é qualificação PESSOAL do
+// Manoel, não vínculo empregatício -- Adriel CD é equipe interna também,
+// mas não assume vistoria/troca de peça.
 export const MANOEL_ONLY_TYPES = ["vistoria", "troca_peca"] as const;
 export const MANOEL_ONLY_ASSEMBLER = "Manoel";
+
+// Montadores da CASA (funcionários, não terceirizados pagos por peça) --
+// Adriel CD entrou 02/10/2026 (pedido do Victor: "ele vai ficar junto com
+// Manoel em Agenda, e não deve entrar nos pagamentos, é um nível de usuário
+// igual ao Manoel"), mesmo "nível" que o Manoel já tinha: agenda própria
+// (fora da aba Visitas), fora dos relatórios de pagamento por peça, e sem a
+// exigência de foto por item + aprovação da loja que os terceirizados têm
+// (ver montador-actions.ts). Lista explícita por nome (não existe uma
+// coluna "é funcionário" na tabela assemblers) -- mesmo padrão que o
+// Manoel sozinho já usava antes disso, só generalizado pra mais de um nome.
+export const EQUIPE_INTERNA_ASSEMBLERS = [MANOEL_ONLY_ASSEMBLER, "Adriel CD"] as const;
 
 // Everton manda na expedição dos carros/produtos -- pedido do Victor
 // 18/08/2026: login de motorista dele vê TODAS as rotas/solicitações

@@ -12,7 +12,7 @@ import {
 } from "@/lib/serviceRequests";
 import { listAssemblers, listDrivers } from "@/lib/payments";
 import { getRotaWeekOverview, startOfRotaWeek, addDays, ROTA_CITY, JP_DEFAULT_DRIVER } from "@/lib/rotas";
-import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES, MANOEL_ONLY_ASSEMBLER, JUNIOR_TRUCK_LOG_MANAGER_NAME } from "@/lib/assistenciaLabels";
+import { STATUS_COLORS, OWN_ASSEMBLER_STORE_IDS, VISITA_REQUEST_TYPES, EQUIPE_INTERNA_ASSEMBLERS, JUNIOR_TRUCK_LOG_MANAGER_NAME } from "@/lib/assistenciaLabels";
 import { listJuniorTruckEntries } from "@/lib/juniorTruck";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { RealtimeQueueRefresher } from "@/components/assistencia/RealtimeQueueRefresher";
@@ -394,10 +394,11 @@ export default async function AssistenciaQueuePage({
   // montadores dentro de visitas e só manoel em agenda". As visitas dele
   // (vistoria/troca_peca, ver MANOEL_ONLY_TYPES) ficam exclusivas da
   // Agenda agora (ver agenda/page.tsx) -- incondicional, não depende de
-  // nenhum filtro escolhido. Sem efeito na aba Entregas (Manoel nunca tem
-  // chamado de entrega/motorista).
+  // nenhum filtro escolhido. Adriel CD entrou 02/10/2026 no mesmo "nível"
+  // (ver EQUIPE_INTERNA_ASSEMBLERS, assistenciaLabels.ts). Sem efeito na
+  // aba Entregas (equipe interna nunca tem chamado de entrega/motorista).
   if (!showPecas) {
-    requests = requests.filter((r) => r.assemblerName !== MANOEL_ONLY_ASSEMBLER);
+    requests = requests.filter((r) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? ""));
   }
   // Mesmo raciocínio do filterSched acima -- "mostruário" não é uma coluna
   // no banco, é uma heurística sobre order_code/client_name (ver
@@ -429,13 +430,13 @@ export default async function AssistenciaQueuePage({
   // Mesmo raciocínio, pro pill "Entrar em contato".
   const contatoCount = showPecas ? filterPendingContato(rawRequests).length : 0;
   // Banner "você tem X visitas pendentes atrasadas" (ver filterAtrasado) --
-  // exclui o Manoel do total, mesma exclusão de `requests` acima (a
-  // Agenda dele já conta as próprias). Respeita loja/montador já
+  // exclui a equipe interna do total, mesma exclusão de `requests` acima (a
+  // Agenda deles já conta as próprias). Respeita loja/montador já
   // escolhidos (mesmo padrão do overdueCount da Agenda), pra não mostrar
   // um número maior do que o que a tela já está filtrando.
   const visitasAtrasadasCount = !showPecas
     ? visitasAtrasadasRaw
-        .filter((r) => r.assemblerName !== MANOEL_ONLY_ASSEMBLER)
+        .filter((r) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? ""))
         .filter((r) => !store || r.storeId === store)
         .filter((r) => !effectiveAssembler || r.assemblerName === effectiveAssembler).length
     : 0;
@@ -455,7 +456,7 @@ export default async function AssistenciaQueuePage({
     // igual o clique no banner da Agenda faz com `range=atrasado` lá.
     // Mesmos filtros de loja/montador de visitasAtrasadasCount acima.
     requests = visitasAtrasadasRaw
-      .filter((r) => r.assemblerName !== MANOEL_ONLY_ASSEMBLER)
+      .filter((r) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? ""))
       .filter((r) => !store || r.storeId === store)
       .filter((r) => !effectiveAssembler || r.assemblerName === effectiveAssembler);
   }
@@ -894,14 +895,15 @@ export default async function AssistenciaQueuePage({
         ) : null}
         {/* Filtro de montador não existe na aba de entrega de peça -- lá é
             motorista, não montador (ver Motorista/Montador em
-            AssistenciaQueueGroup.tsx). Manoel saiu da lista 04/09/2026 --
-            a Visitas dele mora só na Agenda agora (ver filtro incondicional
-            de `requests` acima). */}
+            AssistenciaQueueGroup.tsx). Equipe interna (Manoel, + Adriel CD
+            desde 02/10/2026) saiu da lista 04/09/2026 -- as visitas deles
+            moram só na Agenda agora (ver filtro incondicional de
+            `requests` acima). */}
         {showPecas ? null : (
           <FilterSelect
             name="assembler"
             placeholder="Todos os montadores"
-            options={assemblers.filter((a) => a !== MANOEL_ONLY_ASSEMBLER)}
+            options={assemblers.filter((a) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(a))}
           />
         )}
       </div>

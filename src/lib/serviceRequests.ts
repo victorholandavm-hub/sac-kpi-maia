@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
-import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES, MANOEL_ONLY_TYPES, MANOEL_ONLY_ASSEMBLER } from "./assistenciaLabels";
+import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES, MANOEL_ONLY_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "./assistenciaLabels";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { memoizeWithTtl } from "./memoCache";
 
@@ -1980,9 +1980,12 @@ export async function getMontagemReconciliation(opts: {
     ? allRows.filter((r) => isMostruarioRequest(r.order_code, r.client_name) === (opts.alvo === "mostruario"))
     : allRows;
 
-  const manoelRequests = rows.filter((r) => r.assembler_name === MANOEL_ONLY_ASSEMBLER).length;
+  // Nome do campo ficou "manoelRequests" por histórico (era só ele) -- hoje
+  // conta toda a equipe interna (Manoel + Adriel CD, ver
+  // EQUIPE_INTERNA_ASSEMBLERS).
+  const manoelRequests = rows.filter((r) => (EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assembler_name ?? "")).length;
   const emptyRequests: ReportRowItem[] = rows
-    .filter((r) => r.assembler_name !== MANOEL_ONLY_ASSEMBLER && r.service_request_items.length === 0)
+    .filter((r) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assembler_name ?? "") && r.service_request_items.length === 0)
     .map((r) => ({
       id: r.id,
       ticketNumber: r.ticket_number,
