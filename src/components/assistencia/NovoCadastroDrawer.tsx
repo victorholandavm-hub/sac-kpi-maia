@@ -2,67 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { addCadastroHistoricoAction, type FormState } from "@/app/assistencia/cadastros-actions";
-import { CADASTRO_TIPOS, CADASTRO_TIPO_LABELS } from "@/lib/cadastrosHistorico";
-import { FormSection } from "./FormSection";
-
-const inputStyle = { borderColor: "var(--border)" };
-
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1 text-sm" style={{ color: "var(--text-primary)" }}>
-      {label}
-      {required ? <span style={{ color: "var(--status-critical)" }}> *</span> : null}
-      {children}
-    </label>
-  );
-}
-
-// Mesma máscara do protótipo aprovado (Artifact, 01/10/2026) -- aplicada
-// no onChange, nunca trava digitação (sempre aceita o que a pessoa
-// digitou, só reformata).
-function maskCPF(value: string): string {
-  const d = value.replace(/\D/g, "").slice(0, 11);
-  return d.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-}
-function maskCNPJ(value: string): string {
-  const d = value.replace(/\D/g, "").slice(0, 14);
-  return d
-    .replace(/(\d{2})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d)/, "$1.$2")
-    .replace(/(\d{3})(\d)/, "$1/$2")
-    .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
-}
-function maskPhone(value: string): string {
-  const d = value.replace(/\D/g, "").slice(0, 11);
-  if (d.length <= 10) return d.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d{1,4})$/, "$1-$2");
-  return d.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d{1,4})$/, "$1-$2");
-}
-
-// CNPJ fixo por filial -- pedido do Victor 01/10/2026 ("colocar automático
-// assim que colocar a filial já ir o CNPJ fixo da filial"), lista de
-// referência que ele passou por print. As 3 linhas de Mangabeira têm CNPJ
-// diferente cada uma (empresas/filiais distintas no mesmo bairro) -- por
-// isso o rótulo entre parênteses, senão ficaria ambíguo qual delas
-// escolher.
-const LOJA_CNPJ: { label: string; cnpj: string }[] = [
-  { label: "Bayeux", cnpj: "39.537.682/0001-01" },
-  { label: "Santa Rita", cnpj: "39.537.682/0002-92" },
-  { label: "Santo Elias", cnpj: "39.537.682/0005-35" },
-  { label: "Tambaú", cnpj: "39.537.682/0007-05" },
-  { label: "Mangabeira (Líder 1)", cnpj: "39.537.682/0010-00" },
-  { label: "Mangabeira (Maia 2)", cnpj: "39.537.682/0006-16" },
-  { label: "Mangabeira (Maia 3)", cnpj: "39.537.682/0003-73" },
-  { label: "GL", cnpj: "39.537.682/0004-54" },
-  { label: "Pluma", cnpj: "39.537.682/0008-88" },
-  { label: "Cabedelo", cnpj: "39.537.682/0009-69" },
-  { label: "Barão do Triunfo", cnpj: "39.537.682/0011-83" },
-  { label: "Shopping M", cnpj: "39.537.682/0012-64" },
-  { label: "CD", cnpj: "39.537.682/0013-45" },
-  { label: "Mamanguape", cnpj: "39.537.682/0014-26" },
-  { label: "Manaíra", cnpj: "39.537.682/0015-07" },
-  { label: "Campina Grande", cnpj: "39.537.682/0016-98" },
-];
-const OUTRA_LOJA = "__outra__";
+import { CadastroFormFields } from "./cadastroFormShared";
 
 // Gaveta lateral (não modal central) pra lançar um cadastro novo direto
 // pelo sistema -- pedido do Victor 01/10/2026, mesmo desenho do protótipo
@@ -70,28 +10,19 @@ const OUTRA_LOJA = "__outra__";
 // num modal central). addCadastroHistoricoAction só revalida a página
 // (sem redirect) -- fecha a gaveta sozinho só depois de uma submissão
 // real sem erro (ref evita fechar no primeiro render, antes de qualquer
-// clique em "Salvar").
+// clique em "Salvar"). Os campos em si moram em cadastroFormShared.tsx,
+// compartilhados com EditarCadastroDrawer.tsx -- fechar a gaveta desmonta
+// o form inteiro, então reabrir já volta com os campos zerados de graça.
 export function NovoCadastroDrawer() {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<FormState, FormData>(addCadastroHistoricoAction, undefined);
   const formRef = useRef<HTMLFormElement>(null);
   const submittedRef = useRef(false);
-  const [cpf, setCpf] = useState("");
-  const [cnpj, setCnpj] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [lojaSelect, setLojaSelect] = useState("");
-  const [lojaCustom, setLojaCustom] = useState("");
 
   useEffect(() => {
     if (!pending && submittedRef.current && !state?.error) {
       submittedRef.current = false;
       setOpen(false);
-      formRef.current?.reset();
-      setCpf("");
-      setCnpj("");
-      setTelefone("");
-      setLojaSelect("");
-      setLojaCustom("");
     }
   }, [pending, state]);
 
@@ -146,137 +77,7 @@ export function NovoCadastroDrawer() {
               }}
               className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4"
             >
-              <FormSection title="Informações do produto" number={1}>
-                <Field label="Solicitação" required>
-                  <select name="tipo" required defaultValue="ASSISTENCIA" className="rounded border px-3 py-2" style={inputStyle}>
-                    {CADASTRO_TIPOS.filter((t) => t !== "HISTORICO").map((t) => (
-                      <option key={t} value={t}>
-                        {CADASTRO_TIPO_LABELS[t]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Código produto">
-                  <input name="codigo" className="rounded border px-3 py-2" style={inputStyle} />
-                </Field>
-                <Field label="Produto" required>
-                  <input name="produto" required className="rounded border px-3 py-2" style={inputStyle} />
-                </Field>
-                <Field label="Descrição">
-                  <textarea name="descricao" rows={2} placeholder="O que aconteceu, especificamente" className="rounded border px-3 py-2" style={inputStyle} />
-                </Field>
-              </FormSection>
-
-              <FormSection title="Detalhes da venda" number={2}>
-                <Field label="NF (nota fiscal)">
-                  <input name="nf" className="rounded border px-3 py-2" style={inputStyle} />
-                </Field>
-                <Field label="Vendedor(a)">
-                  <input name="vendedora" className="rounded border px-3 py-2" style={inputStyle} />
-                </Field>
-                <Field label="Loja">
-                  <select
-                    value={lojaSelect}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setLojaSelect(value);
-                      if (value === OUTRA_LOJA) {
-                        setCnpj("");
-                        return;
-                      }
-                      const match = LOJA_CNPJ.find((l) => l.label === value);
-                      setCnpj(match?.cnpj ?? "");
-                    }}
-                    className="rounded border px-3 py-2"
-                    style={inputStyle}
-                  >
-                    <option value="">Selecione a filial</option>
-                    {LOJA_CNPJ.map((l) => (
-                      <option key={l.label} value={l.label}>
-                        {l.label}
-                      </option>
-                    ))}
-                    <option value={OUTRA_LOJA}>Outra (não listada)</option>
-                  </select>
-                  {lojaSelect === OUTRA_LOJA ? (
-                    <input
-                      name="loja"
-                      value={lojaCustom}
-                      onChange={(e) => setLojaCustom(e.target.value)}
-                      placeholder="Nome da filial"
-                      className="rounded border px-3 py-2 mt-1.5"
-                      style={inputStyle}
-                    />
-                  ) : (
-                    <input type="hidden" name="loja" value={lojaSelect} />
-                  )}
-                </Field>
-                <Field label="CNPJ">
-                  <input
-                    name="cnpj"
-                    value={cnpj}
-                    onChange={(e) => setCnpj(maskCNPJ(e.target.value))}
-                    placeholder="00.000.000/0000-00"
-                    inputMode="numeric"
-                    className="rounded border px-3 py-2"
-                    style={inputStyle}
-                  />
-                </Field>
-              </FormSection>
-
-              <FormSection title="Dados do cliente" number={3}>
-                <Field label="Cliente" required>
-                  <input name="cliente" required className="rounded border px-3 py-2" style={inputStyle} />
-                </Field>
-                <Field label="CPF">
-                  <input
-                    name="cpf"
-                    value={cpf}
-                    onChange={(e) => setCpf(maskCPF(e.target.value))}
-                    placeholder="000.000.000-00"
-                    inputMode="numeric"
-                    className="rounded border px-3 py-2"
-                    style={inputStyle}
-                  />
-                </Field>
-                <Field label="Telefone">
-                  <input
-                    name="telefone"
-                    value={telefone}
-                    onChange={(e) => setTelefone(maskPhone(e.target.value))}
-                    placeholder="(00) 00000-0000"
-                    inputMode="numeric"
-                    className="rounded border px-3 py-2"
-                    style={inputStyle}
-                  />
-                </Field>
-                <Field label="Endereço">
-                  <input name="endereco" className="rounded border px-3 py-2" style={inputStyle} />
-                </Field>
-              </FormSection>
-
-              <FormSection title="Logística de montagem" number={4}>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <Field label="Data">
-                    <input name="data" type="date" className="rounded border px-3 py-2" style={inputStyle} />
-                  </Field>
-                  <Field label="Prazo">
-                    <input name="prazo" type="date" className="rounded border px-3 py-2" style={inputStyle} />
-                  </Field>
-                </div>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Prazo em branco vira 30 dias a partir da Data automaticamente.
-                </p>
-                <Field label="Solicitante / Montador">
-                  <input name="solicitante" placeholder="Em branco = você mesmo" className="rounded border px-3 py-2" style={inputStyle} />
-                </Field>
-                <Field label="Quem montou">
-                  <input name="quemMontou" placeholder="Preenchido depois da visita" className="rounded border px-3 py-2" style={inputStyle} />
-                </Field>
-                <Field label="OBS">
-                  <textarea name="obs" rows={3} className="rounded border px-3 py-2" style={inputStyle} />
-                </Field>
-              </FormSection>
+              <CadastroFormFields />
 
               {state?.error ? (
                 <p className="text-sm" style={{ color: "var(--status-critical)" }}>

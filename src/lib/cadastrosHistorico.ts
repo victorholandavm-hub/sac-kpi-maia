@@ -53,6 +53,7 @@ export type Cadastro = {
   nf: string | null;
   vendedora: string | null;
   loja: string | null;
+  cnpj: string | null;
   cliente: string | null;
   endereco: string | null;
   cpf: string | null;
@@ -78,6 +79,7 @@ type Row = {
   nf: string | null;
   vendedora: string | null;
   loja: string | null;
+  cnpj: string | null;
   cliente: string | null;
   endereco: string | null;
   cpf: string | null;
@@ -94,7 +96,7 @@ type Row = {
 };
 
 const COLUMNS =
-  "id, tipo, tipo_original, codigo, produto, descricao, nf, vendedora, loja, cliente, endereco, cpf, telefone, data_abertura, solicitante, prazo_data, prazo_calculado, prazo_nota, quem_montou, obs, status, origem_planilha";
+  "id, tipo, tipo_original, codigo, produto, descricao, nf, vendedora, loja, cnpj, cliente, endereco, cpf, telefone, data_abertura, solicitante, prazo_data, prazo_calculado, prazo_nota, quem_montou, obs, status, origem_planilha";
 
 function toCadastro(row: Row): Cadastro {
   return {
@@ -107,6 +109,7 @@ function toCadastro(row: Row): Cadastro {
     nf: row.nf,
     vendedora: row.vendedora,
     loja: row.loja,
+    cnpj: row.cnpj,
     cliente: row.cliente,
     endereco: row.endereco,
     cpf: row.cpf,
@@ -335,5 +338,69 @@ export async function addCadastroHistorico(input: NewCadastroInput): Promise<voi
     status: "PROGRAMADO",
     origem_planilha: "Sistema",
   });
+  if (error) throw new Error(error.message);
+}
+
+export type UpdateCadastroInput = {
+  tipo: CadastroTipo;
+  codigo: string | null;
+  produto: string;
+  descricao: string | null;
+  nf: string | null;
+  vendedora: string | null;
+  loja: string | null;
+  cnpj: string | null;
+  cliente: string;
+  endereco: string | null;
+  cpf: string | null;
+  telefone: string | null;
+  dataAbertura: string | null;
+  solicitante: string | null;
+  // null (campo deixado em branco no formulário) == "não mexe no prazo" --
+  // diferente de addCadastroHistorico (onde branco sempre vira data+30),
+  // porque aqui já pode existir um prazo_nota de texto livre herdado da
+  // planilha original (ex.: "peça chegou / volta p caixa") que não dá pra
+  // reconstruir a partir de um <input type="date"> vazio. Só sobrescreve
+  // quando a pessoa realmente digita uma data nova.
+  prazoData: string | null;
+  quemMontou: string | null;
+  obs: string | null;
+  status: CadastroStatus;
+};
+
+// Editar um cadastro existente (importado da planilha OU lançado pelo
+// sistema) -- pedido do Victor 02/10/2026 ("preciso que haja um botão de
+// editar nos cadastros que foram importados e nos próximos que foram
+// cadastrados"). Mesmos campos de addCadastroHistorico, + status (só
+// editar permite corrigir pra Concluído/Não concluído -- criar sempre
+// nasce Programado).
+export async function updateCadastroHistorico(id: string, input: UpdateCadastroInput): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const update: Record<string, unknown> = {
+    tipo: input.tipo,
+    codigo: input.codigo,
+    produto: input.produto,
+    descricao: input.descricao,
+    nf: input.nf,
+    vendedora: input.vendedora,
+    loja: input.loja,
+    cnpj: input.cnpj,
+    cliente: input.cliente,
+    endereco: input.endereco,
+    cpf: input.cpf,
+    telefone: input.telefone,
+    data_abertura: input.dataAbertura,
+    solicitante: input.solicitante,
+    quem_montou: input.quemMontou,
+    obs: input.obs,
+    status: input.status,
+  };
+  if (input.prazoData) {
+    update.prazo_data = input.prazoData;
+    update.prazo_calculado = false;
+    update.prazo_nota = null;
+  }
+
+  const { error } = await admin.from("assistencia_cadastros_historico").update(update).eq("id", id);
   if (error) throw new Error(error.message);
 }
