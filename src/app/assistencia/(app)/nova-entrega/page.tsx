@@ -6,11 +6,26 @@ import { listCargasRecentes } from "@/lib/cargas";
 import { NovaEntregaAssistenciaForm } from "@/components/assistencia/NovaEntregaAssistenciaForm";
 import { ASSISTENCIA_CAN_CREATE_SAC_TYPES } from "@/lib/assistenciaLabels";
 
-export default async function NovaEntregaPage() {
+// Campos aceitos pra pré-preencher a partir de um cadastro (Controle
+// Assistência -> Cadastros, "Criar nova entrega" -- ver CadastroDetalheModal.tsx
+// e useFormPrefill.ts). "type" não entra aqui -- os tipos de entrega
+// (recolhimento/envio de peça) não têm equivalente direto no tipo do
+// cadastro, melhor deixar a pessoa escolher do que presumir errado.
+const PREFILL_FIELDS = ["client_cpf", "client_name", "client_phone", "client_address", "reason"] as const;
+
+export default async function NovaEntregaPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const profile = await getProfile();
   redirectIfSac(profile);
   const podeCriarTipoSac = (ASSISTENCIA_CAN_CREATE_SAC_TYPES as readonly string[]).includes(profile.fullName);
-  const [stores, drivers, cargasRecentes] = await Promise.all([listStores(), listDrivers(), listCargasRecentes()]);
+  const [stores, drivers, cargasRecentes, sp] = await Promise.all([listStores(), listDrivers(), listCargasRecentes(), searchParams]);
+  const initial: Record<string, string> = {};
+  for (const field of PREFILL_FIELDS) {
+    if (sp[field]) initial[field] = sp[field]!;
+  }
   // Mesmo resumo de sac/nova/page.tsx -- só o código da carga + um resumo
   // curto pra reconhecer qual é qual (ver Quem errou/erro_motorista no form).
   const cargas = cargasRecentes.map((c) => ({
@@ -46,7 +61,7 @@ export default async function NovaEntregaPage() {
           </Link>
         ) : null}
       </div>
-      <NovaEntregaAssistenciaForm stores={stores} drivers={drivers} cargas={cargas} />
+      <NovaEntregaAssistenciaForm stores={stores} drivers={drivers} cargas={cargas} initial={initial} />
     </div>
   );
 }

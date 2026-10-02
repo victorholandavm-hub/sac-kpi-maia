@@ -393,7 +393,7 @@ export default async function CadastrosPage({
                 Equipe {r.solicitante}
               </span>
               <div className="flex items-center gap-2 text-xs flex-wrap">
-                <span style={{ color: "var(--text-muted)" }}>{r.programado} programado</span>
+                <span style={{ color: "var(--text-muted)" }}>{r.programado} em processo</span>
                 <span style={{ color: "var(--status-good)" }}>{r.concluido} concluído</span>
                 <span style={{ color: "var(--status-critical)" }}>{r.cancelado} não concl.</span>
               </div>
