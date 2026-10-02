@@ -58,6 +58,7 @@ export type Cadastro = {
   loja: string | null;
   cnpj: string | null;
   cliente: string | null;
+  codigoCliente: string | null;
   endereco: string | null;
   cpf: string | null;
   telefone: string | null;
@@ -84,6 +85,7 @@ type Row = {
   loja: string | null;
   cnpj: string | null;
   cliente: string | null;
+  codigo_cliente: string | null;
   endereco: string | null;
   cpf: string | null;
   telefone: string | null;
@@ -99,7 +101,7 @@ type Row = {
 };
 
 const COLUMNS =
-  "id, tipo, tipo_original, codigo, produto, descricao, nf, vendedora, loja, cnpj, cliente, endereco, cpf, telefone, data_abertura, solicitante, prazo_data, prazo_calculado, prazo_nota, quem_montou, obs, status, origem_planilha";
+  "id, tipo, tipo_original, codigo, produto, descricao, nf, vendedora, loja, cnpj, cliente, codigo_cliente, endereco, cpf, telefone, data_abertura, solicitante, prazo_data, prazo_calculado, prazo_nota, quem_montou, obs, status, origem_planilha";
 
 function toCadastro(row: Row): Cadastro {
   return {
@@ -114,6 +116,7 @@ function toCadastro(row: Row): Cadastro {
     loja: row.loja,
     cnpj: row.cnpj,
     cliente: row.cliente,
+    codigoCliente: row.codigo_cliente,
     endereco: row.endereco,
     cpf: row.cpf,
     telefone: row.telefone,
@@ -295,6 +298,7 @@ export type NewCadastroInput = {
   loja: string | null;
   cnpj: string | null;
   cliente: string;
+  codigoCliente: string | null;
   endereco: string | null;
   cpf: string | null;
   telefone: string | null;
@@ -339,6 +343,7 @@ export async function addCadastroHistorico(input: NewCadastroInput): Promise<voi
     loja: input.loja,
     cnpj: input.cnpj,
     cliente: input.cliente,
+    codigo_cliente: input.codigoCliente,
     endereco: input.endereco,
     cpf: input.cpf,
     telefone: input.telefone,
@@ -365,6 +370,7 @@ export type UpdateCadastroInput = {
   loja: string | null;
   cnpj: string | null;
   cliente: string;
+  codigoCliente: string | null;
   endereco: string | null;
   cpf: string | null;
   telefone: string | null;
@@ -400,6 +406,7 @@ export async function updateCadastroHistorico(id: string, input: UpdateCadastroI
     loja: input.loja,
     cnpj: input.cnpj,
     cliente: input.cliente,
+    codigo_cliente: input.codigoCliente,
     endereco: input.endereco,
     cpf: input.cpf,
     telefone: input.telefone,

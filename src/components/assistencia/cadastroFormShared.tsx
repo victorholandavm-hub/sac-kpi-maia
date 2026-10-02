@@ -109,6 +109,7 @@ export type CadastroFormDefaults = {
   loja: string;
   cnpj: string;
   cliente: string;
+  codigoCliente: string;
   cpf: string;
   telefone: string;
   endereco: string;
@@ -236,6 +237,12 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
       <FormSection title="Dados do cliente" number={3}>
         <Field label="Cliente" required>
           <input name="cliente" required defaultValue={d.cliente} className="rounded border px-3 py-2" style={inputStyle} />
+        </Field>
+        {/* Código do cliente (TOTVS) -- pedido do Victor 03/10/2026: aparecer
+            nos detalhes e alimentar o lookup automático (nome/CPF/telefone/
+            endereço reais) ao "Criar nova visita/entrega" a partir daqui. */}
+        <Field label="Código do cliente">
+          <input name="codigoCliente" defaultValue={d.codigoCliente} className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
         <Field label="CPF">
           <input

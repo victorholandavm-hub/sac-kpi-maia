@@ -11,7 +11,10 @@ import { ASSISTENCIA_CAN_CREATE_SAC_TYPES } from "@/lib/assistenciaLabels";
 // e useFormPrefill.ts). "type" não entra aqui -- os tipos de entrega
 // (recolhimento/envio de peça) não têm equivalente direto no tipo do
 // cadastro, melhor deixar a pessoa escolher do que presumir errado.
-const PREFILL_FIELDS = ["client_cpf", "client_name", "client_phone", "client_address", "reason"] as const;
+// "reason" ("O que precisa ser feito") também fica de fora de propósito --
+// pedido do Victor 03/10/2026 ("precisa ficar vazio"), quem abre o
+// formulário escreve com as próprias palavras.
+const PREFILL_FIELDS = ["client_protheus_code", "client_cpf", "client_name", "client_phone", "client_address", "client_neighborhood"] as const;
 
 export default async function NovaEntregaPage({
   searchParams,
