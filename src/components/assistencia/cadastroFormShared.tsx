@@ -6,6 +6,7 @@ import {
   CADASTRO_TIPO_LABELS,
   CADASTRO_STATUSES,
   CADASTRO_STATUS_LABELS,
+  CADASTRO_SOLICITANTES_ATIVOS,
   type CadastroTipo,
   type CadastroStatus,
 } from "@/lib/cadastrosHistorico";
@@ -77,14 +78,15 @@ export const OUTRA_LOJA = "__outra__";
 
 // Solicitante -- pedido do Victor 02/10/2026: "na planilha tem solicitante
 // como eu e victor e michel que é os que estão com o caso, então coloca
-// apenas esses 3 nomes". É quem está com o caso internamente (equipe
-// pequena, lança direto pelo sistema), diferente de "Quem montou" (o
-// montador de verdade, particular ou indicado) logo abaixo. "Outro" cobre
-// edição de registro antigo importado da planilha, onde o solicitante
-// pode ser qualquer um dos nomes que apareciam lá antes (Luisa, Mayara,
-// Kelly etc.) -- não faz sentido travar edição de dado histórico numa
-// lista que só vale daqui pra frente.
-export const SOLICITANTE_OPTIONS = ["Iasmyn", "Victor", "Michel"] as const;
+// apenas esses 3 nomes" (lista real em CADASTRO_SOLICITANTES_ATIVOS,
+// cadastrosHistorico.ts -- compartilhada com os cards "Equipe X" da
+// listagem). É quem está com o caso internamente (equipe pequena, lança
+// direto pelo sistema), diferente de "Quem montou" (o montador de
+// verdade, particular ou indicado) logo abaixo. "Outro" cobre edição de
+// registro antigo importado da planilha, onde o solicitante pode ser
+// qualquer um dos nomes que apareciam lá antes (Luisa, Mayara, Kelly
+// etc.) -- não faz sentido travar edição de dado histórico numa lista que
+// só vale daqui pra frente.
 export const OUTRO_SOLICITANTE = "__outro_solicitante__";
 
 // Quem montou -- pedido do Victor 02/10/2026: "o de baixo que realmente é
@@ -134,7 +136,7 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
   const [lojaSelect, setLojaSelect] = useState(d.loja ? (lojaJaMapeada ? d.loja : OUTRA_LOJA) : "");
   const [lojaCustom, setLojaCustom] = useState(d.loja && !lojaJaMapeada ? d.loja : "");
 
-  const solicitanteJaMapeado = d.solicitante ? (SOLICITANTE_OPTIONS as readonly string[]).includes(d.solicitante) : false;
+  const solicitanteJaMapeado = d.solicitante ? (CADASTRO_SOLICITANTES_ATIVOS as readonly string[]).includes(d.solicitante) : false;
   const [solicitanteSelect, setSolicitanteSelect] = useState(d.solicitante ? (solicitanteJaMapeado ? d.solicitante : OUTRO_SOLICITANTE) : "");
   const [solicitanteCustom, setSolicitanteCustom] = useState(d.solicitante && !solicitanteJaMapeado ? d.solicitante : "");
 
@@ -298,7 +300,7 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
             style={inputStyle}
           >
             <option value="">Em branco = você mesmo</option>
-            {SOLICITANTE_OPTIONS.map((s) => (
+            {CADASTRO_SOLICITANTES_ATIVOS.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
