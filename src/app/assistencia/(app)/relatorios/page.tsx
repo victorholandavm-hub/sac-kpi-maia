@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
-import { getRequestsReport, getServiceTypeIndicators, type ReportRow, type ReportRowItem, type IndicatorItem, type RequestType } from "@/lib/serviceRequests";
+import {
+  getRequestsReport,
+  getServiceTypeIndicators,
+  getEquipeInternaVisitasCount,
+  type ReportRow,
+  type ReportRowItem,
+  type IndicatorItem,
+  type RequestType,
+} from "@/lib/serviceRequests";
 import { listPaymentItems, paymentStage, type PaymentItem } from "@/lib/payments";
 import { getSupplierReconciliation, type SupplierReconciliationItem } from "@/lib/supplierReturns";
 import {
@@ -424,7 +432,7 @@ export default async function RelatoriosPage({
   const indicatorTypeKey = resolveIndicatorTypeKey(tipo);
   const indicatorTypes = indicatorTypesFor(indicatorTypeKey);
 
-  const [report, paymentItems, supplierReconciliation, indicators] = await Promise.all([
+  const [report, paymentItems, supplierReconciliation, indicators, equipeInternaVisitas] = await Promise.all([
     getRequestsReport({ dateFrom, dateTo, alvo: filterAlvo, types: [...REQUEST_REPORT_TYPES] }),
     // Filtro mostruário x cliente também vale pro pagamento de montador --
     // achado do Victor 24/08/2026: "quando filtrar, o numero de
@@ -450,6 +458,11 @@ export default async function RelatoriosPage({
     // Victor 27/08/2026. Data agora é a mesma `dateFrom`/`dateTo` do
     // resto da página (ver comentário acima).
     getServiceTypeIndicators(indicatorTypes, { dateFrom, dateTo, alvo: filterAlvo }),
+    // Vistoria/troca de peça da equipe interna -- pedido do Victor
+    // 03/10/2026, fora do escopo de montagem/desmontagem do resto da
+    // página (ver getEquipeInternaVisitasCount, serviceRequests.ts).
+    // Mesmo período global da página.
+    getEquipeInternaVisitasCount({ dateFrom, dateTo }),
   ]);
 
   // Mesmo critério de "precisa de atenção do Antônio" da aba Pagamentos
@@ -544,6 +557,26 @@ export default async function RelatoriosPage({
             Aplicar
           </button>
         </form>
+      </div>
+
+      {/* Vistoria/troca de peça por pessoa da equipe interna -- pedido do
+          Victor 03/10/2026 ("tem o número de vistorias e troca de peças
+          feitas por manoel e agora adriel CD?"). Fora do escopo de
+          montagem/desmontagem do resto da página -- mesmo período
+          (dateFrom/dateTo) de tudo aqui, mesmo widget visual do card
+          equivalente em Agenda (agenda/page.tsx). */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {equipeInternaVisitas.map((p) => (
+          <div
+            key={p.assemblerName}
+            className="flex items-center gap-3 rounded-xl border px-4 py-2.5 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600"
+          >
+            <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{p.assemblerName}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {p.vistoria} vistoria{p.vistoria === 1 ? "" : "s"} · {p.trocaPeca} troca{p.trocaPeca === 1 ? "" : "s"} de peça
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* Cards de KPI -- redesign pedido do Victor 28/08/2026: fundo
