@@ -25,12 +25,34 @@ import { useEffect } from "react";
 //   -- não recria linhas extras que o usuário tinha adicionado.
 // - Arquivos (input type="file", ex. nota fiscal do SAC) nunca entram --
 //   FormData nem devolve o conteúdo do arquivo de um jeito serializável.
-export function useFormDraft(formRef: React.RefObject<HTMLFormElement | null>, storageKey: string, skip: readonly string[] = []) {
+export function useFormDraft(
+  formRef: React.RefObject<HTMLFormElement | null>,
+  storageKey: string,
+  skip: readonly string[] = [],
+  // false quando o formulário já chegou com dados de outro lugar (ver
+  // useFormPrefill.ts, "Criar nova visita/entrega" a partir de um
+  // cadastro) -- pedido do Victor 03/10/2026: um rascunho velho (de antes
+  // do campo "reason" parar de ser pré-preenchido) estava "ressuscitando"
+  // texto que não devia mais aparecer, porque nada no prefill novo
+  // sobrescrevia um campo que ele não preenche mais. Restaurar o rascunho
+  // antigo nesse caso é sempre errado -- a pessoa chegou aqui de propósito
+  // com dados de um cadastro específico, não voltando de uma navegação
+  // acidental. Limpa o rascunho velho (não só ignora) pra não voltar a
+  // assombrar numa visita futura sem prefill nenhum.
+  enabled: boolean = true
+) {
   useEffect(() => {
     const form = formRef.current;
     if (!form) return;
 
+    if (!enabled) {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {}
+    }
+
     function applyDraft() {
+      if (!enabled) return;
       let raw: string | null;
       try {
         raw = localStorage.getItem(storageKey);
@@ -115,7 +137,8 @@ export function useFormDraft(formRef: React.RefObject<HTMLFormElement | null>, s
       form!.removeEventListener("submit", onSubmit);
     };
     // formRef é estável (mesmo objeto ref durante a vida do componente) --
-    // só storageKey/skip precisam disparar de novo se mudarem de verdade.
+    // só storageKey/skip/enabled precisam disparar de novo se mudarem de
+    // verdade.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageKey, skip.join(",")]);
+  }, [storageKey, skip.join(","), enabled]);
 }

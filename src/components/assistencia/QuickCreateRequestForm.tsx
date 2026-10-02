@@ -392,8 +392,12 @@ export function QuickCreateRequestForm({
   }
 
   // Rascunho em localStorage -- pedido do Victor 15/09/2026, mesmo
-  // racional de NovaEntregaAssistenciaForm.tsx (ver useFormDraft.ts).
-  useFormDraft(formRef, "draft:nova-visita", ["part_order_id"]);
+  // racional de NovaEntregaAssistenciaForm.tsx (ver useFormDraft.ts). Só
+  // restaura quando NÃO veio de um cadastro -- achado do Victor
+  // 03/10/2026: um rascunho velho "ressuscitava" texto que o prefill novo
+  // não preenche mais (ver useFormDraft.ts).
+  const hasPrefill = Object.values(initial ?? {}).some(Boolean);
+  useFormDraft(formRef, "draft:nova-visita", ["part_order_id"], !hasPrefill);
   // Dados puxados de um cadastro -- pedido do Victor 02/10/2026 (ver
   // useFormPrefill.ts). Chamado DEPOIS de useFormDraft de propósito: vence
   // um rascunho velho que porventura exista.

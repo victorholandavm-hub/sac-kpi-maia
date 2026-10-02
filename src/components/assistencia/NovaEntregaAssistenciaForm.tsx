@@ -416,7 +416,11 @@ export function NovaEntregaAssistenciaForm({
   // -- é o hidden field do vínculo com o pedido de peça (ver
   // selectPartOrder acima), não faz sentido "restaurar" um vínculo antigo
   // por engano.
-  useFormDraft(formRef, "draft:nova-entrega-assistencia", ["part_order_id"]);
+  // Só restaura quando NÃO veio de um cadastro -- achado do Victor
+  // 03/10/2026: um rascunho velho "ressuscitava" texto que o prefill novo
+  // não preenche mais (ver useFormDraft.ts).
+  const hasPrefill = Object.values(initial ?? {}).some(Boolean);
+  useFormDraft(formRef, "draft:nova-entrega-assistencia", ["part_order_id"], !hasPrefill);
   // Dados puxados de um cadastro -- pedido do Victor 02/10/2026 (ver
   // useFormPrefill.ts). Chamado DEPOIS de useFormDraft de propósito: vence
   // um rascunho velho que porventura exista.
