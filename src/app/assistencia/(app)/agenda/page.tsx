@@ -265,26 +265,6 @@ export default async function AgendaPage({
         <UnderlineTab href="/assistencia/agenda" label="Agenda" active />
       </div>
 
-      {/* Vistoria/troca de peça por pessoa -- pedido do Victor 03/10/2026.
-          Reflete os mesmos filtros já aplicados na lista abaixo (range/
-          rota/loja/busca). */}
-      <div className="flex items-center gap-3 flex-wrap">
-        {visitasPorPessoa.map((p) => (
-          <div
-            key={p.name}
-            className="flex items-center gap-3 rounded-xl border px-4 py-2.5"
-            style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
-          >
-            <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-              {p.name}
-            </span>
-            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {p.vistoria} vistoria{p.vistoria === 1 ? "" : "s"} · {p.trocaPeca} troca{p.trocaPeca === 1 ? "" : "s"} de peça
-            </span>
-          </div>
-        ))}
-      </div>
-
       {/* Alerta de atrasadas -- pedido do Victor 25/08/2026: "Visitas
           pendentes de datas passadas não deveriam ficar espalhadas em suas
           respectivas datas antigas. É melhor criar um Alerta/Card no topo
@@ -439,6 +419,28 @@ export default async function AgendaPage({
       </form>
       </div>
       {/* fecha o retângulo de filtros aberto acima */}
+
+      {/* Vistoria/troca de peça por pessoa -- pedido do Victor 03/10/2026,
+          logo abaixo do filtro por período (03/10/2026, pedido seguinte:
+          "deixe os numeros de manoel e adriel cd com esse mesmo layout
+          logo abaixo do filtro por período") -- reflete os mesmos filtros
+          já aplicados na lista abaixo (range/rota/loja/busca/De-Até). */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {visitasPorPessoa.map((p) => (
+          <div
+            key={p.name}
+            className="flex items-center gap-3 rounded-xl border px-4 py-2.5"
+            style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              {p.name}
+            </span>
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {p.vistoria} vistoria{p.vistoria === 1 ? "" : "s"} · {p.trocaPeca} troca{p.trocaPeca === 1 ? "" : "s"} de peça
+            </span>
+          </div>
+        ))}
+      </div>
 
       {/* Kanban por montador só faz sentido com mouse/teclado pra arrastar
           -- desktop only, mesmo padrão de MobileActionSheet/AgendaDayGroups
