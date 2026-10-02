@@ -32,7 +32,7 @@ const NEXT_STEP: Record<string, NextStep | undefined> = {
   // só nesse status -- ver comentário no JSX.
   pronto_para_expedicao: { toStatus: "em_carga", label: "Marcar como enviado para a loja", needsPrazoCdLoja: true },
   em_carga: { toStatus: "faturado", label: "Informar NF-e e faturar", needsNfE: true },
-  faturado: { toStatus: "entregue", label: "Marcar entregue" },
+  faturado: { toStatus: "entregue", label: "Marcar entregue à loja" },
 };
 
 // "Solicitado" é o único passo que muda de dono conforme o fornecedor:

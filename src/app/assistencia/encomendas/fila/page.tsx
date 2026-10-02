@@ -59,7 +59,7 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Recebido no CD", value: "recebido_cd" },
   { label: "Em carga", value: "em_carga" },
   { label: "Faturado", value: "faturado" },
-  { label: "Entregue", value: "entregue" },
+  { label: "Entregue à Loja", value: "entregue" },
   { label: "Cancelado", value: "cancelado" },
   { label: "Negado", value: "negado" },
 ];

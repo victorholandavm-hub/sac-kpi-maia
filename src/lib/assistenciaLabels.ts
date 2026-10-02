@@ -159,7 +159,12 @@ export const PEDIDO_ENCOMENDA_STATUS_LABELS: Record<string, string> = {
   pronto_para_expedicao: "Enviado para o CD",
   em_carga: "Em carga",
   faturado: "Faturado",
-  entregue: "Entregue",
+  // "à Loja" -- pedido do Victor 02/10/2026, pra não confundir com entrega
+  // ao cliente: esse status só existe no fluxo que passa pela loja
+  // (em_carga → faturado → entregue). O pedido que vai direto do CD pro
+  // cliente de caminhão (a maioria) encerra em "recebido_cd", não aqui --
+  // ver cor desse status logo abaixo.
+  entregue: "Entregue à Loja",
   cancelado: "Cancelado",
   negado: "Negado",
   recebido_cd: "Recebido pelo CD / Em estoque",
@@ -173,7 +178,7 @@ export const PEDIDO_ENCOMENDA_STATUS_STEPS: { key: string; label: string }[] = [
   { key: "pronto_para_expedicao", label: "Enviado CD" },
   { key: "em_carga", label: "Em carga" },
   { key: "faturado", label: "Faturado" },
-  { key: "entregue", label: "Entregue" },
+  { key: "entregue", label: "Entregue à Loja" },
 ];
 
 // pronto_para_expedicao tinha a mesma cor de em_carga -- achado do
