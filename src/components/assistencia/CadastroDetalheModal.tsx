@@ -129,9 +129,13 @@ export function CadastroDetalheModal({ cadastro }: { cadastro: Cadastro }) {
               <Row label="Descrição / problema" value={cadastro.descricao} />
               <Row label="NF" value={cadastro.nf} />
               <Row label="Código" value={cadastro.codigo} />
+              {/* Logo abaixo do Código (produto) -- pedido do Victor
+                  03/10/2026. Mesma coluna do grid de 2 (Código é a 2ª
+                  posição da linha, "Vendedora" entra antes pra Código do
+                  cliente cair bem embaixo dele, não do lado). */}
               <Row label="Vendedora" value={cadastro.vendedora} />
-              <Row label="Loja" value={cadastro.loja} />
               <Row label="Código do cliente" value={cadastro.codigoCliente} />
+              <Row label="Loja" value={cadastro.loja} />
               <Row label="CPF" value={cadastro.cpf} />
               <Row label="Telefone" value={cadastro.telefone} />
               <Row label="Endereço" value={cadastro.endereco} />
