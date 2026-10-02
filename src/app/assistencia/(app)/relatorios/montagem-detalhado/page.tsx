@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPaymentItems, paymentStage, type PaymentItem } from "@/lib/payments";
 import { getMontagemReconciliation } from "@/lib/serviceRequests";
-import { MANOEL_ONLY_ASSEMBLER, STATUS_LABELS } from "@/lib/assistenciaLabels";
+import { EQUIPE_INTERNA_ASSEMBLERS, STATUS_LABELS } from "@/lib/assistenciaLabels";
 import { MontagemDetalhadoExportButton } from "@/components/assistencia/MontagemDetalhadoExportButton";
 
 export const dynamic = "force-dynamic";
@@ -199,12 +199,13 @@ export default async function RelatorioMontagemDetalhadoPage({
   const allItems = rawItems.filter((i) => i.type === "montagem" || i.type === "desmontagem");
 
   // Manoel é o único montador funcionário nosso, não terceirizado (ver
-  // MANOEL_ONLY_ASSEMBLER/MANOEL_ONLY_TYPES, assistenciaLabels.ts) --
+  // EQUIPE_INTERNA_ASSEMBLERS/EQUIPE_INTERNA_ONLY_TYPES, assistenciaLabels.ts) --
   // pedido explícito: "lembre que manoel nao entra nessa conta, pois é
-  // de casa, tudo o que for dele, você coloca a parte". Fora da soma
-  // principal, numa seção própria lá embaixo.
-  const manoelItems = allItems.filter((i) => i.assemblerName === MANOEL_ONLY_ASSEMBLER);
-  const items = allItems.filter((i) => i.assemblerName !== MANOEL_ONLY_ASSEMBLER);
+  // de casa, tudo o que for dele, você coloca a parte". Adriel CD entrou
+  // 02/10/2026 no mesmo "nível". Fora da soma principal, numa seção
+  // própria lá embaixo.
+  const manoelItems = allItems.filter((i) => (EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(i.assemblerName ?? ""));
+  const items = allItems.filter((i) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(i.assemblerName ?? ""));
 
   const groups = groupByAssembler(items);
   const totalValue = items.reduce((sum, i) => sum + itemTotal(i), 0);
@@ -229,7 +230,7 @@ export default async function RelatorioMontagemDetalhadoPage({
         <div>
           <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">Relatório de montagem detalhado</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Todo produto de toda montagem/desmontagem no período, um por um -- pra conferir o valor certinho. Manoel (equipe interna) fica separado embaixo.
+            Todo produto de toda montagem/desmontagem no período, um por um -- pra conferir o valor certinho. Equipe interna (Manoel, Adriel CD) fica separada embaixo.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -299,7 +300,7 @@ export default async function RelatorioMontagemDetalhadoPage({
             </div>
             {reconciliation.manoelRequests > 0 ? (
               <div className="flex justify-between gap-4">
-                <span>(−) Manoel (equipe interna, não entra aqui)</span>
+                <span>(−) Equipe interna (Manoel, Adriel CD -- não entra aqui)</span>
                 <span className="font-medium text-gray-800 dark:text-gray-100">{reconciliation.manoelRequests}</span>
               </div>
             ) : null}
@@ -340,9 +341,9 @@ export default async function RelatorioMontagemDetalhadoPage({
       {manoelItems.length > 0 ? (
         <div className="flex flex-col gap-3 pt-2 border-t-2 border-dashed border-gray-200 dark:border-gray-600">
           <div>
-            <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">Manoel (equipe interna)</h2>
+            <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">Equipe interna (Manoel, Adriel CD)</h2>
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              Funcionário da casa, não terceirizado -- não entra em nenhum dos números acima, só listado aqui por registro.
+              Funcionários da casa, não terceirizados -- não entram em nenhum dos números acima, só listados aqui por registro.
             </p>
           </div>
           {manoelGroups.map((group) => (

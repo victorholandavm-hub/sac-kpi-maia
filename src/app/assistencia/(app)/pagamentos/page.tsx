@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getProfile, redirectIfSac } from "@/lib/dal";
 import { listPaymentItems, listAssemblers, paymentStage, type PaymentItem } from "@/lib/payments";
-import { PAYMENTS_CONTROLLER_NAME, MANOEL_ONLY_ASSEMBLER } from "@/lib/assistenciaLabels";
+import { PAYMENTS_CONTROLLER_NAME, EQUIPE_INTERNA_ASSEMBLERS } from "@/lib/assistenciaLabels";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { FilterPill } from "@/components/assistencia/FilterPill";
 import { PaymentsExportButton } from "@/components/assistencia/PaymentsExportButton";
@@ -75,12 +75,13 @@ export default async function PagamentosPage({
   // corrigido pra ficar consistente com o Relatório de montagem
   // detalhado, que já excluía ("manoel nao entra nessa conta, pois é de
   // casa", ver relatorios/page.tsx): ele é o único montador funcionário
-  // nosso (MANOEL_ONLY_ASSEMBLER), não item de pagamento a terceiro --
-  // sem essa exclusão aqui, o dia que algum item dele ganhasse valor
+  // nosso, não item de pagamento a terceiro. Adriel CD entrou 02/10/2026
+  // no mesmo "nível" (ver EQUIPE_INTERNA_ASSEMBLERS) -- sem essa exclusão
+  // aqui, o dia que algum item de qualquer um dos dois ganhasse valor
   // inflaria o "Total a pagar a montadores" em silêncio, sem aparecer em
   // lugar nenhum da tela pra explicar por quê.
-  const visibleGroups = groups.filter((g) => g.assemblerName !== MANOEL_ONLY_ASSEMBLER);
-  const itemsForTotals = items.filter((i) => i.assemblerName !== MANOEL_ONLY_ASSEMBLER);
+  const visibleGroups = groups.filter((g) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(g.assemblerName));
+  const itemsForTotals = items.filter((i) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(i.assemblerName ?? ""));
   const grandTotal = itemsForTotals.reduce((sum, i) => sum + (i.unitValue ?? 0) * i.quantity, 0);
   const pendingTotal = itemsForTotals
     .filter((i) => paymentStage(i.requestStatus, i.paymentReleased) === "pendente")

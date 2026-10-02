@@ -375,10 +375,29 @@ export const VISITA_REQUEST_TYPES = ASSISTENCIA_MANAGED_TYPES.filter(
 );
 
 // Vistoria e troca de peça exigem confiança/qualificação que só um
-// funcionário de verdade tem — hoje só o Manoel; os outros montadores são
-// terceirizados só pra montagem/desmontagem/recolhimento.
-export const MANOEL_ONLY_TYPES = ["vistoria", "troca_peca"] as const;
+// funcionário de verdade tem -- até 01/10/2026 só o Manoel; Adriel CD
+// entrou 02/10/2026 (pedido do Victor: "agora manoel e adriel cd podem ser
+// responsaveis por vistori/troca de peça... eles vao dividir a mesma
+// função") -- os outros montadores continuam terceirizados só pra
+// montagem/desmontagem/recolhimento. Mesmo elenco de EQUIPE_INTERNA_ASSEMBLERS
+// abaixo (coincidência de propósito, não duplicação por acaso -- os dois
+// conceitos convergiram pro mesmo grupo de pessoas).
+export const EQUIPE_INTERNA_ONLY_TYPES = ["vistoria", "troca_peca"] as const;
 export const MANOEL_ONLY_ASSEMBLER = "Manoel";
+
+// Montadores da CASA (funcionários, não terceirizados pagos por peça) --
+// Adriel CD entrou 02/10/2026 (pedido do Victor: "ele vai ficar junto com
+// Manoel em Agenda, e não deve entrar nos pagamentos, é um nível de usuário
+// igual ao Manoel"), mesmo "nível" que o Manoel já tinha: agenda própria
+// (fora da aba Visitas), fora dos relatórios de pagamento por peça, sem a
+// exigência de foto por item + aprovação da loja que os terceirizados têm
+// (ver montador-actions.ts), e (desde o mesmo pedido, complementado no
+// mesmo dia) os dois dividem a responsabilidade por vistoria/troca de peça
+// (ver EQUIPE_INTERNA_ONLY_TYPES acima). Lista explícita por nome (não
+// existe uma coluna "é funcionário" na tabela assemblers) -- mesmo padrão
+// que o Manoel sozinho já usava antes disso, só generalizado pra mais de
+// um nome.
+export const EQUIPE_INTERNA_ASSEMBLERS = [MANOEL_ONLY_ASSEMBLER, "Adriel CD"] as const;
 
 // Everton manda na expedição dos carros/produtos -- pedido do Victor
 // 18/08/2026: login de motorista dele vê TODAS as rotas/solicitações
@@ -417,8 +436,8 @@ export const JUNIOR_TRUCK_LOG_MANAGER_NAME = "Victor";
 // dal.ts) devem ver esses chamados -- nem outras lojas, nem o resto da
 // assistência central enxergam. Pedido do Victor, 14/08/2026.
 // Recolhimento/troca de peça/envio de peça ficam de fora -- continuam
-// sendo atendimento central (ver MANOEL_ONLY_TYPES), não passam pelo
-// montador da loja.
+// sendo atendimento central (ver EQUIPE_INTERNA_ONLY_TYPES), não passam
+// pelo montador da loja.
 export const OWN_ASSEMBLER_STORE_IDS = ["214", "216"] as const;
 export const OWN_ASSEMBLER_RESTRICTED_TYPES = ["montagem", "desmontagem", "vistoria"] as const;
 

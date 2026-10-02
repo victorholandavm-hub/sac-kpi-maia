@@ -19,9 +19,10 @@ function formatDate(value: string): string {
 // padrão de PaymentsExportButton.tsx (aba Pagamentos), só que com Chamado
 // e Data também (esse relatório é pensado pra conferência linha por linha,
 // ver AssemblerDetailTable acima -- essas duas colunas são o que dá pra
-// achar o chamado de volta a partir da planilha). Terceirizados + Manoel
-// juntos num arquivo só (o nome do montador já distingue quem é quem, sem
-// precisar de coluna extra) -- mais simples que dois downloads separados.
+// achar o chamado de volta a partir da planilha). Terceirizados + equipe
+// interna (Manoel, Adriel CD) juntos num arquivo só (o nome do montador já
+// distingue quem é quem, sem precisar de coluna extra) -- mais simples que
+// dois downloads separados.
 export function MontagemDetalhadoExportButton({ items }: { items: PaymentItem[] }) {
   function handleExport() {
     const header = ["Montador", "Chamado", "Data", "Loja", "Cliente", "Produto", "Quantidade", "Valor unitário", "Valor total", "Status"];
