@@ -233,6 +233,15 @@ export async function listCadastroLojas(): Promise<string[]> {
   return [...new Set((data ?? []).map((r) => r.loja as string))].sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
+// Quem hoje está de fato com o caso (lança cadastro pelo sistema, toma as
+// solicitações) -- pedido do Victor 02/10/2026, primeiro pro campo
+// "Solicitante" do formulário (ver cadastroFormShared.tsx), depois pros
+// cards "Equipe X" ("deixa apenas os que estão em atendimento, iasmyn,
+// victor e michael"). Nomes antigos da planilha (Luisa, Mayara, Kelly,
+// Lucas, Janielle etc.) continuam nos registros históricos -- só saem
+// desses dois lugares específicos, não dos dados em si.
+export const CADASTRO_SOLICITANTES_ATIVOS = ["Iasmyn", "Victor", "Michael"] as const;
+
 export type CadastroResumoSolicitante = { solicitante: string; programado: number; concluido: number; cancelado: number; total: number };
 
 // Cards "Equipe X" -- agrupado por solicitante (quem registrou o chamado
@@ -268,7 +277,9 @@ export async function getCadastrosResumoPorSolicitante(): Promise<CadastroResumo
     else entry.programado++;
     byName.set(name, entry);
   }
-  return [...byName.values()].sort((a, b) => b.total - a.total);
+  return [...byName.values()]
+    .filter((r) => (CADASTRO_SOLICITANTES_ATIVOS as readonly string[]).includes(r.solicitante))
+    .sort((a, b) => b.total - a.total);
 }
 
 export type NewCadastroInput = {

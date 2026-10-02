@@ -6,6 +6,7 @@ import {
   CADASTRO_TIPO_LABELS,
   CADASTRO_STATUSES,
   CADASTRO_STATUS_LABELS,
+  CADASTRO_SOLICITANTES_ATIVOS,
   type CadastroTipo,
   type CadastroStatus,
 } from "@/lib/cadastrosHistorico";
@@ -75,6 +76,29 @@ export const LOJA_CNPJ: { label: string; cnpj: string }[] = [
 ];
 export const OUTRA_LOJA = "__outra__";
 
+// Solicitante -- pedido do Victor 02/10/2026: "na planilha tem solicitante
+// como eu e victor e michel que é os que estão com o caso, então coloca
+// apenas esses 3 nomes" (lista real em CADASTRO_SOLICITANTES_ATIVOS,
+// cadastrosHistorico.ts -- compartilhada com os cards "Equipe X" da
+// listagem). É quem está com o caso internamente (equipe pequena, lança
+// direto pelo sistema), diferente de "Quem montou" (o montador de
+// verdade, particular ou indicado) logo abaixo. "Outro" cobre edição de
+// registro antigo importado da planilha, onde o solicitante pode ser
+// qualquer um dos nomes que apareciam lá antes (Luisa, Mayara, Kelly
+// etc.) -- não faz sentido travar edição de dado histórico numa lista que
+// só vale daqui pra frente.
+export const OUTRO_SOLICITANTE = "__outro_solicitante__";
+
+// Quem montou -- pedido do Victor 02/10/2026: "o de baixo que realmente é
+// o montador se foi particular ou algum indicado, caso seja indicado
+// coloca para colocar o nome do indicado". Particular = cliente contratou
+// por fora, sem envolvimento da Maia; Indicado = montador que a Maia
+// indicou, nesse caso pede o nome dele (histórico tem muito "INDICADO"
+// escrito literal em vez do nome de verdade -- essa UI evita repetir
+// isso).
+export const QUEM_MONTOU_PARTICULAR = "Particular";
+export const QUEM_MONTOU_INDICADO = "__indicado__";
+
 export type CadastroFormDefaults = {
   tipo: CadastroTipo;
   codigo: string;
@@ -111,6 +135,16 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
   const lojaJaMapeada = d.loja ? LOJA_CNPJ.some((l) => l.label === d.loja) : false;
   const [lojaSelect, setLojaSelect] = useState(d.loja ? (lojaJaMapeada ? d.loja : OUTRA_LOJA) : "");
   const [lojaCustom, setLojaCustom] = useState(d.loja && !lojaJaMapeada ? d.loja : "");
+
+  const solicitanteJaMapeado = d.solicitante ? (CADASTRO_SOLICITANTES_ATIVOS as readonly string[]).includes(d.solicitante) : false;
+  const [solicitanteSelect, setSolicitanteSelect] = useState(d.solicitante ? (solicitanteJaMapeado ? d.solicitante : OUTRO_SOLICITANTE) : "");
+  const [solicitanteCustom, setSolicitanteCustom] = useState(d.solicitante && !solicitanteJaMapeado ? d.solicitante : "");
+
+  const quemMontouParticular = (d.quemMontou ?? "").trim().toLowerCase() === "particular";
+  const [quemMontouTipo, setQuemMontouTipo] = useState(
+    d.quemMontou ? (quemMontouParticular ? QUEM_MONTOU_PARTICULAR : QUEM_MONTOU_INDICADO) : ""
+  );
+  const [quemMontouIndicadoNome, setQuemMontouIndicadoNome] = useState(d.quemMontou && !quemMontouParticular ? d.quemMontou : "");
 
   return (
     <>
@@ -254,23 +288,65 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
             Prazo em branco vira 30 dias a partir da Data automaticamente.
           </p>
         )}
-        <Field label="Solicitante / Montador">
-          <input
-            name="solicitante"
-            defaultValue={d.solicitante}
-            placeholder="Em branco = você mesmo"
+        <Field label="Solicitante">
+          <select
+            value={solicitanteSelect}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSolicitanteSelect(value);
+              if (value !== OUTRO_SOLICITANTE) setSolicitanteCustom("");
+            }}
             className="rounded border px-3 py-2"
             style={inputStyle}
-          />
+          >
+            <option value="">Em branco = você mesmo</option>
+            {CADASTRO_SOLICITANTES_ATIVOS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+            <option value={OUTRO_SOLICITANTE}>Outro</option>
+          </select>
+          {solicitanteSelect === OUTRO_SOLICITANTE ? (
+            <input
+              name="solicitante"
+              value={solicitanteCustom}
+              onChange={(e) => setSolicitanteCustom(e.target.value)}
+              placeholder="Nome do solicitante"
+              className="rounded border px-3 py-2 mt-1.5"
+              style={inputStyle}
+            />
+          ) : (
+            <input type="hidden" name="solicitante" value={solicitanteSelect} />
+          )}
         </Field>
         <Field label="Quem montou">
-          <input
-            name="quemMontou"
-            defaultValue={d.quemMontou}
-            placeholder="Preenchido depois da visita"
+          <select
+            value={quemMontouTipo}
+            onChange={(e) => {
+              const value = e.target.value;
+              setQuemMontouTipo(value);
+              if (value !== QUEM_MONTOU_INDICADO) setQuemMontouIndicadoNome("");
+            }}
             className="rounded border px-3 py-2"
             style={inputStyle}
-          />
+          >
+            <option value="">Preenchido depois da visita</option>
+            <option value={QUEM_MONTOU_PARTICULAR}>Particular (cliente contratou por fora)</option>
+            <option value={QUEM_MONTOU_INDICADO}>Indicado pela Maia</option>
+          </select>
+          {quemMontouTipo === QUEM_MONTOU_INDICADO ? (
+            <input
+              name="quemMontou"
+              value={quemMontouIndicadoNome}
+              onChange={(e) => setQuemMontouIndicadoNome(e.target.value)}
+              placeholder="Nome do indicado"
+              className="rounded border px-3 py-2 mt-1.5"
+              style={inputStyle}
+            />
+          ) : (
+            <input type="hidden" name="quemMontou" value={quemMontouTipo === QUEM_MONTOU_PARTICULAR ? QUEM_MONTOU_PARTICULAR : ""} />
+          )}
         </Field>
         <Field label="OBS">
           <textarea name="obs" rows={3} defaultValue={d.obs} className="rounded border px-3 py-2" style={inputStyle} />

@@ -374,9 +374,13 @@ export default async function CadastrosPage({
       </form>
 
       {/* Cards "Equipe X" -- agrupado por solicitante, pedido do Victor
-          01/10/2026. Top 12 por volume -- a lista completa de
-          solicitantes passa de 30 nomes (muitos com 1-2 registros só),
-          mostrar todos viraria ruído sem ajudar em nada. */}
+          01/10/2026. Só quem está de fato em atendimento hoje (Iasmyn,
+          Victor, Michael -- ver CADASTRO_SOLICITANTES_ATIVOS,
+          cadastrosHistorico.ts), filtrado em getCadastrosResumoPorSolicitante
+          -- pedido do Victor 02/10/2026: "deixa apenas os que estão em
+          atendimento". Nomes antigos da planilha (Luisa, Mayara, Kelly
+          etc.) continuam nos registros, só saem desses cards. `.slice(0,
+          12)` é só uma trava de segurança agora (nunca passa de 3). */}
       {resumo.length > 0 ? (
         <div className="flex items-center gap-3 overflow-x-auto pb-1">
           {resumo.slice(0, 12).map((r) => (
