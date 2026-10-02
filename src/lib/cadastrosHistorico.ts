@@ -169,7 +169,19 @@ function applyFilters<T>(query: T, opts: ListCadastrosOpts): T {
   if (opts.loja) q = q.eq("loja", opts.loja);
   if (opts.solicitante) q = q.eq("solicitante", opts.solicitante);
   if (opts.dateFrom) q = q.gte("data_abertura", opts.dateFrom);
-  if (opts.dateTo) q = q.lte("data_abertura", opts.dateTo);
+  // "Até" sozinho (sem "De") -- pills "Antes de 2026" e Até-sem-De do
+  // formulário manual -- também inclui `data_abertura` nulo. Achado do
+  // Victor 03/10/2026 ("tem dados do mês passado que não estão no
+  // sistema"): a linha estava importada certinho (conferido 1 a 1 por NF
+  // contra a planilha), só ficava invisível em QUALQUER pill de mês
+  // (inclusive "Antes de 2026") porque a célula "Data" da planilha
+  // original estava em branco pra ela -- `lte`/`gte` nunca batem com
+  // NULL em SQL. Só entra nessa regra quando NÃO tem `dateFrom` (um
+  // intervalo fechado De+Até continua exigindo data real -- não faz
+  // sentido um registro sem data nenhuma "cair" dentro de um intervalo
+  // específico escolhido à mão).
+  if (opts.dateTo && !opts.dateFrom) q = q.or(`data_abertura.lte.${opts.dateTo},data_abertura.is.null`);
+  else if (opts.dateTo) q = q.lte("data_abertura", opts.dateTo);
   if (opts.especial === "volta_caixa") {
     q = q.or(`obs.ilike.${VOLTA_CAIXA_PATTERN},prazo_nota.ilike.${VOLTA_CAIXA_PATTERN}`);
   } else if (opts.especial === "esperar_fabrica") {
