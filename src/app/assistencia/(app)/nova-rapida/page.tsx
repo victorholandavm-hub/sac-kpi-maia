@@ -7,8 +7,18 @@ import { QuickCreateRequestForm } from "@/components/assistencia/QuickCreateRequ
 // Campos aceitos pra pré-preencher a partir de um cadastro (Controle
 // Assistência -> Cadastros, "Criar nova visita" -- ver CadastroDetalheModal.tsx
 // e useFormPrefill.ts). Mesmo nome dos campos do formulário, repassados
-// direto sem transformação.
-const PREFILL_FIELDS = ["type", "client_cpf", "client_name", "client_phone", "client_address", "reason"] as const;
+// direto sem transformação. "reason" ("O que precisa ser feito") fica de
+// fora de propósito -- pedido do Victor 03/10/2026 ("precisa ficar
+// vazio"), quem abre o formulário escreve com as próprias palavras.
+const PREFILL_FIELDS = [
+  "type",
+  "client_protheus_code",
+  "client_cpf",
+  "client_name",
+  "client_phone",
+  "client_address",
+  "client_neighborhood",
+] as const;
 
 export default async function NovaRapidaPage({
   searchParams,

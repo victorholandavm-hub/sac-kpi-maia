@@ -18,28 +18,42 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   );
 }
 
+// Endereço importado é um campo só, mas em boa parte dos registros segue o
+// padrão "rua + número, complemento - bairro" (ex.: "RUA JOAO ALVES
+// RODRIGUES 72, CASA - VALENTINA DE FIGUEIREDO") -- separa pelo último " - "
+// quando existe, pra não jogar o bairro dentro do campo de endereço no
+// formulário de destino. Heurística, não garantia -- quando não bate o
+// padrão, devolve tudo como endereço e bairro vazio (mesmo que digitar à
+// mão de novo, não pior do que estava).
+function splitEnderecoBairro(endereco: string): { address: string; neighborhood: string } {
+  const idx = endereco.lastIndexOf(" - ");
+  if (idx === -1) return { address: endereco, neighborhood: "" };
+  return { address: endereco.slice(0, idx).trim(), neighborhood: endereco.slice(idx + 3).trim() };
+}
+
 // "Criar nova visita/entrega" -- pedido do Victor 02/10/2026: "coloca uma
 // opção para no cadastro conseguirmos puxar os dados já para uma entrega
 // ou montagem/vistoria/troca de peça". Monta a query string que
 // nova-rapida/nova-entrega leem pra pré-preencher o formulário (ver
 // useFormPrefill.ts) -- mesmo nome de campo dos dois lados, sem
-// transformação. Loja/NF não têm campo próprio nos dois formulários (loja
-// aqui é texto livre, lá é um select de loja de verdade -- não dá pra
-// mapear um pro outro sem risco de escolher a loja errada), então entram
-// como contexto dentro do próprio "reason".
+// transformação. `client_protheus_code` é o pulo do gato: ao preenchê-lo,
+// o próprio formulário de destino já dispara a busca TOTVS que ele sempre
+// teve (debounce de 400ms), então nome/CPF/telefone/endereço/bairro podem
+// vir atualizados de lá, não só do que o cadastro tinha registrado.
+// "O que precisa ser feito" fica de propósito FORA daqui -- pedido do
+// Victor 03/10/2026 ("precisa ficar vazio"), quem abre o formulário
+// escreve com as próprias palavras.
 function buildPrefillQuery(cadastro: Cadastro, type?: string): string {
-  const reasonParts = [cadastro.produto, cadastro.descricao].filter(Boolean);
-  let reason = reasonParts.join(" — ");
-  const contexto = [cadastro.loja ? `Loja: ${cadastro.loja}` : null, cadastro.nf ? `NF: ${cadastro.nf}` : null].filter(Boolean);
-  if (contexto.length > 0) reason = reason ? `${reason} (${contexto.join(" · ")})` : `(${contexto.join(" · ")})`;
+  const { address, neighborhood } = cadastro.endereco ? splitEnderecoBairro(cadastro.endereco) : { address: "", neighborhood: "" };
 
   const sp = new URLSearchParams();
   if (type) sp.set("type", type);
+  if (cadastro.codigoCliente) sp.set("client_protheus_code", cadastro.codigoCliente);
   if (cadastro.cpf) sp.set("client_cpf", cadastro.cpf);
   if (cadastro.cliente) sp.set("client_name", cadastro.cliente);
   if (cadastro.telefone) sp.set("client_phone", cadastro.telefone);
-  if (cadastro.endereco) sp.set("client_address", cadastro.endereco);
-  if (reason) sp.set("reason", reason);
+  if (address) sp.set("client_address", address);
+  if (neighborhood) sp.set("client_neighborhood", neighborhood);
   return sp.toString();
 }
 
@@ -117,6 +131,7 @@ export function CadastroDetalheModal({ cadastro }: { cadastro: Cadastro }) {
               <Row label="Código" value={cadastro.codigo} />
               <Row label="Vendedora" value={cadastro.vendedora} />
               <Row label="Loja" value={cadastro.loja} />
+              <Row label="Código do cliente" value={cadastro.codigoCliente} />
               <Row label="CPF" value={cadastro.cpf} />
               <Row label="Telefone" value={cadastro.telefone} />
               <Row label="Endereço" value={cadastro.endereco} />

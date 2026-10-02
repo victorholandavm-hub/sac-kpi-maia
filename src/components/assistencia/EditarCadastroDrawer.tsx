@@ -104,6 +104,7 @@ export function EditarCadastroDrawer({ cadastro }: { cadastro: Cadastro }) {
                   loja: cadastro.loja ?? "",
                   cnpj: cadastro.cnpj ?? "",
                   cliente: cadastro.cliente ?? "",
+                  codigoCliente: cadastro.codigoCliente ?? "",
                   cpf: cadastro.cpf ?? "",
                   telefone: cadastro.telefone ?? "",
                   endereco: cadastro.endereco ?? "",
