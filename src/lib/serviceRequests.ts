@@ -2148,36 +2148,3 @@ export async function getServiceTypeIndicators(
   };
 }
 
-export type EquipeInternaVisitasCount = { assemblerName: string; vistoria: number; trocaPeca: number };
-
-// Vistoria/troca de peça por pessoa da equipe interna (Manoel, Adriel CD)
-// -- pedido do Victor 03/10/2026 ("tem o número de vistorias e troca de
-// peças feitas por manoel e agora adriel CD?"). Fora do escopo de
-// getServiceTypeIndicators/getRequestsReport de propósito -- aqueles são
-// explicitamente só montagem/desmontagem (ver REQUEST_TYPES, relatorios/
-// page.tsx), vistoria/troca_peca nunca entraram ali. Sempre inclui as
-// duas pessoas, mesmo com 0 -- pra não sumir alguém do card por falta de
-// chamado no período.
-export async function getEquipeInternaVisitasCount(opts: { dateFrom?: string; dateTo?: string } = {}): Promise<EquipeInternaVisitasCount[]> {
-  const admin = getSupabaseAdmin();
-  let query = admin
-    .from("service_requests")
-    .select("assembler_name, type")
-    .in("type", ["vistoria", "troca_peca"])
-    .in("assembler_name", [...EQUIPE_INTERNA_ASSEMBLERS]);
-  if (opts.dateFrom) query = query.gte("created_at", opts.dateFrom);
-  if (opts.dateTo) query = query.lte("created_at", `${opts.dateTo}T23:59:59`);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  const counts = new Map<string, EquipeInternaVisitasCount>(
-    EQUIPE_INTERNA_ASSEMBLERS.map((name) => [name, { assemblerName: name, vistoria: 0, trocaPeca: 0 }])
-  );
-  for (const row of data ?? []) {
-    const entry = counts.get(row.assembler_name as string);
-    if (!entry) continue;
-    if (row.type === "vistoria") entry.vistoria++;
-    else if (row.type === "troca_peca") entry.trocaPeca++;
-  }
-  return [...counts.values()];
-}
