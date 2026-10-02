@@ -67,6 +67,36 @@ function buildHref(params: {
   return qs ? `/assistencia/cadastros?${qs}` : "/assistencia/cadastros";
 }
 
+const PT_MONTHS_ABBR = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+// Pills por mês -- pedido do Victor 02/10/2026: "separar por mês de janeiro
+// de 2026 até esse mês, e os de antes desse período ficar todos juntos
+// igual da planilha" -- mesma organização da planilha original importada
+// (uma aba por mês a partir de um certo ponto, tudo antes disso numa aba só,
+// ver 0146_assistencia_cadastros_historico.sql). Início fixo em
+// janeiro/2026 (pedido explícito, não "desde o dado mais antigo") -- fim é
+// sempre o mês corrente, calculado, não precisa mexer aqui mês que vem.
+function buildMonthFilters(): { label: string; from: string; to: string }[] {
+  const now = new Date();
+  const filters: { label: string; from: string; to: string }[] = [];
+  for (let year = 2026; year <= now.getFullYear(); year++) {
+    const endMonth = year === now.getFullYear() ? now.getMonth() : 11;
+    for (let m = 0; m <= endMonth; m++) {
+      const from = `${year}-${String(m + 1).padStart(2, "0")}-01`;
+      const lastDay = new Date(year, m + 1, 0).getDate();
+      const to = `${year}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      filters.push({ label: `${PT_MONTHS_ABBR[m]}/${String(year).slice(2)}`, from, to });
+    }
+  }
+  return filters;
+}
+const MONTH_FILTERS = buildMonthFilters();
+// Tudo antes de janeiro/2026 fica junto, igual a aba mais antiga da
+// planilha original (Dez/2024-Set/2025, sem coluna de tipo -- ver
+// comentário da migration 0146) -- só `to`, sem `from` (pega o registro
+// mais antigo de qualquer jeito).
+const ANTES_2026_TO = "2025-12-31";
+
 function formatDateBr(iso: string | null): string | null {
   if (!iso) return null;
   const [y, m, d] = iso.split("-");
@@ -281,6 +311,33 @@ export default async function CadastrosPage({
         dateTo={to}
         buildHref={(range) => buildHref({ filtro, status, loja, solicitante, q, from: range.from, to: range.to })}
       />
+
+      {/* Por mês, igual a planilha original -- pedido do Victor 02/10/2026,
+          print circulando a fileira de atalhos de período acima. Linha à
+          parte (não mexe no DateRangeQuickFilter, que é compartilhado com
+          outras telas) -- cada pill é um mês de verdade (01 a 28-31),
+          "Antes de 2026" cobre tudo que a planilha original já tinha
+          consolidado numa aba só. */}
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Por mês (igual à planilha original)
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <FilterPill
+            label="Antes de 2026"
+            href={buildHref({ filtro, status, loja, solicitante, q, to: ANTES_2026_TO })}
+            selected={!from && to === ANTES_2026_TO}
+          />
+          {MONTH_FILTERS.map((mf) => (
+            <FilterPill
+              key={mf.label}
+              label={mf.label}
+              href={buildHref({ filtro, status, loja, solicitante, q, from: mf.from, to: mf.to })}
+              selected={from === mf.from && to === mf.to}
+            />
+          ))}
+        </div>
+      </div>
 
       <form action="/assistencia/cadastros" method="GET" className="flex items-center gap-2 flex-wrap">
         {filtro ? <input type="hidden" name="filtro" value={filtro} /> : null}
