@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CADASTRO_TIPOS,
   CADASTRO_TIPO_LABELS,
@@ -10,6 +10,8 @@ import {
   type CadastroTipo,
   type CadastroStatus,
 } from "@/lib/cadastrosHistorico";
+import { lookupTotvsClientForTeam } from "@/app/assistencia/actions";
+import { withRetry } from "@/lib/retryLookup";
 import { FormSection } from "./FormSection";
 
 // Campos do formulário "Novo cadastro"/"Editar cadastro" -- extraído pra cá
@@ -160,6 +162,44 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
   const [cpf, setCpf] = useState(d.cpf ?? "");
   const [cnpj, setCnpj] = useState(d.cnpj ?? "");
   const [telefone, setTelefone] = useState(d.telefone ?? "");
+  const [cliente, setCliente] = useState(d.cliente ?? "");
+  const [codigoCliente, setCodigoCliente] = useState(d.codigoCliente ?? "");
+  const [endereco, setEndereco] = useState(d.endereco ?? "");
+  const [clienteLookupStatus, setClienteLookupStatus] = useState<"idle" | "loading" | "found" | "found_partial" | "not_found">("idle");
+  // Só dispara o lookup quando a pessoa digita um código -- em edição, o
+  // código que já está salvo não pode sobrescrever o cliente/endereço
+  // registrados (podem ser dado histórico da planilha).
+  const codigoClienteEditado = useRef(false);
+
+  function runClienteLookup(code: string) {
+    if (!code.trim()) {
+      setClienteLookupStatus("idle");
+      return;
+    }
+    setClienteLookupStatus("loading");
+    withRetry(() => lookupTotvsClientForTeam(code))
+      .then((match) => {
+        if (!match) {
+          setClienteLookupStatus("not_found");
+          return;
+        }
+        setCliente(match.name);
+        setCpf(maskCPF(match.cpfCnpj));
+        if (match.phone1) setTelefone(maskPhone(match.phone1));
+        const rua = [match.addressStreet, match.addressNumber, match.addressComplement].filter(Boolean).join(", ");
+        const enderecoCompleto = match.addressNeighborhood ? `${rua} - ${match.addressNeighborhood}` : rua;
+        if (enderecoCompleto) setEndereco(enderecoCompleto);
+        setClienteLookupStatus(match.phone1 || match.addressStreet ? "found" : "found_partial");
+      })
+      .catch(() => setClienteLookupStatus("not_found"));
+  }
+
+  useEffect(() => {
+    if (!codigoClienteEditado.current) return;
+    const timer = setTimeout(() => runClienteLookup(codigoCliente), 400);
+    return () => clearTimeout(timer);
+  }, [codigoCliente]);
+
   const lojaJaMapeada = d.loja ? LOJA_CNPJ.some((l) => l.label === d.loja) : false;
   const [lojaSelect, setLojaSelect] = useState(d.loja ? (lojaJaMapeada ? d.loja : OUTRA_LOJA) : "");
   const [lojaCustom, setLojaCustom] = useState(d.loja && !lojaJaMapeada ? d.loja : "");
@@ -309,13 +349,49 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
 
       <FormSection title="Dados do cliente" number={3}>
         <Field label="Cliente" required>
-          <input name="cliente" required defaultValue={d.cliente} className="rounded border px-3 py-2" style={inputStyle} />
+          <input name="cliente" required value={cliente} onChange={(e) => setCliente(e.target.value)} className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
         {/* Código do cliente (TOTVS) -- pedido do Victor 03/10/2026: aparecer
             nos detalhes e alimentar o lookup automático (nome/CPF/telefone/
-            endereço reais) ao "Criar nova visita/entrega" a partir daqui. */}
+            endereço reais) ao "Criar nova visita/entrega" a partir daqui. O
+            mesmo código também preenche o formulário sozinho ao digitar, como
+            nas outras telas de chamado. */}
         <Field label="Código do cliente">
-          <input name="codigoCliente" defaultValue={d.codigoCliente} className="rounded border px-3 py-2" style={inputStyle} />
+          <input
+            name="codigoCliente"
+            value={codigoCliente}
+            onChange={(e) => {
+              codigoClienteEditado.current = true;
+              setCodigoCliente(e.target.value);
+            }}
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          />
+          {clienteLookupStatus === "loading" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Buscando cliente…
+            </span>
+          ) : clienteLookupStatus === "found" ? (
+            <span className="text-xs" style={{ color: "var(--status-good)" }}>
+              Cliente encontrado.
+            </span>
+          ) : clienteLookupStatus === "found_partial" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Cliente encontrado, mas sem telefone/endereço no TOTVS — preencha à mão.
+            </span>
+          ) : clienteLookupStatus === "not_found" ? (
+            <span className="text-xs flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+              Código não encontrado.
+              <button
+                type="button"
+                onClick={() => runClienteLookup(codigoCliente)}
+                className="font-medium underline"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Tentar de novo
+              </button>
+            </span>
+          ) : null}
         </Field>
         <Field label="CPF">
           <input
@@ -340,7 +416,7 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
           />
         </Field>
         <Field label="Endereço">
-          <input name="endereco" defaultValue={d.endereco} className="rounded border px-3 py-2" style={inputStyle} />
+          <input name="endereco" value={endereco} onChange={(e) => setEndereco(e.target.value)} className="rounded border px-3 py-2" style={inputStyle} />
         </Field>
       </FormSection>
 
