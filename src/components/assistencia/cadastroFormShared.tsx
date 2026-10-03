@@ -10,8 +10,9 @@ import {
   type CadastroTipo,
   type CadastroStatus,
 } from "@/lib/cadastrosHistorico";
-import { lookupTotvsClientForTeam } from "@/app/assistencia/actions";
+import { lookupTotvsClientByCpfForTeam, lookupTotvsClientForTeam, lookupTotvsProductForTeam } from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
+import type { TotvsClientMatch } from "@/lib/totvsLookup";
 import { FormSection } from "./FormSection";
 
 // Campos do formulário "Novo cadastro"/"Editar cadastro" -- extraído pra cá
@@ -77,6 +78,94 @@ function joinProdutos(items: ProdutoItem[], field: "codigo" | "produto"): string
     .map((p) => p[field].trim())
     .filter(Boolean)
     .join("; ");
+}
+
+// Código digitado busca o nome do produto no TOTVS sozinho -- mesmo
+// comportamento de DeliveryItemsTable/QuickCreateRequestForm. Só dispara
+// quando a pessoa digita: em edição, o código já salvo não sobrescreve o
+// nome registrado.
+function ProdutoRow({
+  produto,
+  canRemove,
+  onChange,
+  onRemove,
+}: {
+  produto: ProdutoItem;
+  canRemove: boolean;
+  onChange: (patch: Partial<ProdutoItem>) => void;
+  onRemove: () => void;
+}) {
+  const codigoEditado = useRef(false);
+  const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  function runProdutoLookup(code: string) {
+    if (!code.trim()) {
+      setLookupStatus("idle");
+      return;
+    }
+    setLookupStatus("loading");
+    withRetry(() => lookupTotvsProductForTeam(code))
+      .then((match) => {
+        if (!match || !match.description) {
+          setLookupStatus("not_found");
+          return;
+        }
+        onChange({ produto: match.description });
+        setLookupStatus("found");
+      })
+      .catch(() => setLookupStatus("not_found"));
+  }
+
+  useEffect(() => {
+    if (!codigoEditado.current) return;
+    const timer = setTimeout(() => runProdutoLookup(produto.codigo), 400);
+    return () => clearTimeout(timer);
+  }, [produto.codigo]);
+
+  return (
+    <div className="flex items-start gap-2 flex-wrap">
+      <div className="flex flex-col gap-0.5">
+        <input
+          value={produto.codigo}
+          onChange={(e) => {
+            codigoEditado.current = true;
+            onChange({ codigo: e.target.value });
+          }}
+          placeholder="Código do produto"
+          className="w-32 rounded border px-3 py-2"
+          style={inputStyle}
+        />
+        {lookupStatus === "loading" ? (
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Buscando produto…
+          </span>
+        ) : lookupStatus === "found" ? (
+          <span className="text-xs" style={{ color: "var(--status-good)" }}>
+            Produto encontrado.
+          </span>
+        ) : lookupStatus === "not_found" ? (
+          <span className="text-xs flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+            Código não encontrado.
+            <button type="button" onClick={() => runProdutoLookup(produto.codigo)} className="font-medium underline" style={{ color: "var(--text-secondary)" }}>
+              Tentar de novo
+            </button>
+          </span>
+        ) : null}
+      </div>
+      <input
+        value={produto.produto}
+        onChange={(e) => onChange({ produto: e.target.value })}
+        placeholder="Nome do produto"
+        className="flex-1 min-w-[160px] rounded border px-3 py-2"
+        style={inputStyle}
+      />
+      {canRemove ? (
+        <button type="button" onClick={onRemove} className="text-xs underline shrink-0 pt-2" style={{ color: "var(--status-critical)" }}>
+          remover
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 // CNPJ fixo por filial -- pedido do Victor 01/10/2026 ("colocar automático
@@ -171,6 +260,16 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
   // registrados (podem ser dado histórico da planilha).
   const codigoClienteEditado = useRef(false);
 
+  function applyClienteMatch(match: TotvsClientMatch) {
+    setCliente(match.name);
+    const documento = match.cpfCnpj.replace(/\D/g, "");
+    setCpf(documento.length > 11 ? maskCNPJ(documento) : maskCPF(documento));
+    if (match.phone1) setTelefone(maskPhone(match.phone1));
+    const rua = [match.addressStreet, match.addressNumber, match.addressComplement].filter(Boolean).join(", ");
+    const enderecoCompleto = match.addressNeighborhood ? `${rua} - ${match.addressNeighborhood}` : rua;
+    if (enderecoCompleto) setEndereco(enderecoCompleto);
+  }
+
   function runClienteLookup(code: string) {
     if (!code.trim()) {
       setClienteLookupStatus("idle");
@@ -183,12 +282,7 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
           setClienteLookupStatus("not_found");
           return;
         }
-        setCliente(match.name);
-        setCpf(maskCPF(match.cpfCnpj));
-        if (match.phone1) setTelefone(maskPhone(match.phone1));
-        const rua = [match.addressStreet, match.addressNumber, match.addressComplement].filter(Boolean).join(", ");
-        const enderecoCompleto = match.addressNeighborhood ? `${rua} - ${match.addressNeighborhood}` : rua;
-        if (enderecoCompleto) setEndereco(enderecoCompleto);
+        applyClienteMatch(match);
         setClienteLookupStatus(match.phone1 || match.addressStreet ? "found" : "found_partial");
       })
       .catch(() => setClienteLookupStatus("not_found"));
@@ -199,6 +293,34 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
     const timer = setTimeout(() => runClienteLookup(codigoCliente), 400);
     return () => clearTimeout(timer);
   }, [codigoCliente]);
+
+  // CPF completo (11 dígitos) busca o cliente no TOTVS e também preenche o
+  // código do cliente.
+  const cpfEditado = useRef(false);
+  const [cpfLookupStatus, setCpfLookupStatus] = useState<"idle" | "loading" | "found" | "not_found">("idle");
+
+  function runCpfLookup(documento: string) {
+    setCpfLookupStatus("loading");
+    withRetry(() => lookupTotvsClientByCpfForTeam(documento))
+      .then((match) => {
+        if (!match) {
+          setCpfLookupStatus("not_found");
+          return;
+        }
+        applyClienteMatch(match);
+        setCodigoCliente(match.protheusCode);
+        setCpfLookupStatus("found");
+      })
+      .catch(() => setCpfLookupStatus("not_found"));
+  }
+
+  useEffect(() => {
+    if (!cpfEditado.current) return;
+    const digitos = cpf.replace(/\D/g, "");
+    if (digitos.length !== 11) return;
+    const timer = setTimeout(() => runCpfLookup(digitos), 400);
+    return () => clearTimeout(timer);
+  }, [cpf]);
 
   const lojaJaMapeada = d.loja ? LOJA_CNPJ.some((l) => l.label === d.loja) : false;
   const [lojaSelect, setLojaSelect] = useState(d.loja ? (lojaJaMapeada ? d.loja : OUTRA_LOJA) : "");
@@ -245,32 +367,13 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
             <span style={{ color: "var(--status-critical)" }}> *</span>
           </span>
           {produtos.map((p) => (
-            <div key={p.id} className="flex items-center gap-2 flex-wrap">
-              <input
-                value={p.codigo}
-                onChange={(e) => updateProduto(p.id, { codigo: e.target.value })}
-                placeholder="Código do produto"
-                className="w-32 rounded border px-3 py-2"
-                style={inputStyle}
-              />
-              <input
-                value={p.produto}
-                onChange={(e) => updateProduto(p.id, { produto: e.target.value })}
-                placeholder="Nome do produto"
-                className="flex-1 min-w-[160px] rounded border px-3 py-2"
-                style={inputStyle}
-              />
-              {produtos.length > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => removeProduto(p.id)}
-                  className="text-xs underline shrink-0"
-                  style={{ color: "var(--status-critical)" }}
-                >
-                  remover
-                </button>
-              ) : null}
-            </div>
+            <ProdutoRow
+              key={p.id}
+              produto={p}
+              canRemove={produtos.length > 1}
+              onChange={(patch) => updateProduto(p.id, patch)}
+              onRemove={() => removeProduto(p.id)}
+            />
           ))}
           <button type="button" onClick={addProduto} className="text-xs underline self-start" style={{ color: "var(--brand-green)" }}>
             + Adicionar produto
@@ -397,12 +500,30 @@ export function CadastroFormFields({ defaults, isEdit }: { defaults?: Partial<Ca
           <input
             name="cpf"
             value={cpf}
-            onChange={(e) => setCpf(maskCPF(e.target.value))}
+            onChange={(e) => {
+              cpfEditado.current = true;
+              const masked = maskCPF(e.target.value);
+              if (masked.replace(/\D/g, "").length !== 11) setCpfLookupStatus("idle");
+              setCpf(masked);
+            }}
             placeholder="000.000.000-00"
             inputMode="numeric"
             className="rounded border px-3 py-2"
             style={inputStyle}
           />
+          {cpfLookupStatus === "loading" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Buscando cliente…
+            </span>
+          ) : cpfLookupStatus === "found" ? (
+            <span className="text-xs" style={{ color: "var(--status-good)" }}>
+              Cliente encontrado pelo CPF.
+            </span>
+          ) : cpfLookupStatus === "not_found" ? (
+            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              CPF não encontrado no TOTVS — preencha à mão.
+            </span>
+          ) : null}
         </Field>
         <Field label="Telefone">
           <input
