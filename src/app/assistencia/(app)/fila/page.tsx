@@ -175,6 +175,7 @@ export default async function AssistenciaQueuePage({
     tab?: string;
     origem?: string;
     atendente?: string;
+    responsavel?: string;
     sched?: string;
     alvo?: string;
     city?: string;
@@ -205,6 +206,7 @@ export default async function AssistenciaQueuePage({
     tab,
     origem,
     atendente,
+    responsavel,
     sched,
     alvo,
     city,
@@ -460,7 +462,17 @@ export default async function AssistenciaQueuePage({
       .filter((r) => !store || r.storeId === store)
       .filter((r) => !effectiveAssembler || r.assemblerName === effectiveAssembler);
   }
+  // Responsável (assigned_to, o "Responsável" de cada card) -- pedido do Victor
+  // 05/10/2026, tela de "pra remarcar": filtrar as entregas por quem está
+  // cuidando de cada uma. Diferente de "Atendente" acima (quem abriu o
+  // chamado, requested_by) e disponível sem escolher Origem antes.
+  const responsaveis = showPecas ? [...new Set(rawRequests.map((r) => r.assignedToName).filter((n): n is string => !!n))].sort() : [];
+  const filterResponsavel = showPecas && responsavel && responsaveis.includes(responsavel) ? responsavel : undefined;
+  if (filterResponsavel !== undefined) {
+    requests = requests.filter((r) => r.assignedToName === filterResponsavel);
+  }
   const postFiltered =
+    filterResponsavel !== undefined ||
     filterSched !== undefined ||
     filterAlvo !== undefined ||
     filterCity !== undefined ||
@@ -886,6 +898,7 @@ export default async function AssistenciaQueuePage({
             dal.ts) -- sem Origem escolhida não dá pra saber qual das duas
             listas usar. */}
         {showPecas && filterOrigem ? <FilterSelect name="atendente" placeholder="Atendente: todos" options={atendentes} /> : null}
+        {showPecas ? <FilterSelect name="responsavel" placeholder="Responsável: todos" options={responsaveis} /> : null}
         {showPecas ? (
           <FilterSelect
             name="city"
@@ -942,6 +955,7 @@ export default async function AssistenciaQueuePage({
         {effectiveAssembler ? <input type="hidden" name="assembler" value={effectiveAssembler} /> : null}
         {showPecas ? <input type="hidden" name="tab" value="pecas" /> : null}
         {filterOrigem ? <input type="hidden" name="origem" value={filterOrigem} /> : null}
+        {filterResponsavel ? <input type="hidden" name="responsavel" value={filterResponsavel} /> : null}
         {filterAtendente ? <input type="hidden" name="atendente" value={filterAtendente} /> : null}
         {schedParam ? <input type="hidden" name="sched" value={schedParam} /> : null}
         {filterAlvo ? <input type="hidden" name="alvo" value={filterAlvo} /> : null}
