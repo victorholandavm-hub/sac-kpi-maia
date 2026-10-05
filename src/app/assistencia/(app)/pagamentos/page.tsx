@@ -38,7 +38,7 @@ function groupByAssembler(items: PaymentItem[]) {
 export default async function PagamentosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pendentes?: string; assembler?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ pendentes?: string; assembler?: string; from?: string; to?: string; abertos?: string }>;
 }) {
   const profile = await getProfile();
   redirectIfSac(profile);
@@ -46,7 +46,10 @@ export default async function PagamentosPage({
   // controla tanto o botão de exportar quanto a edição inline de valor/
   // aprovação/autorização aqui na tela.
   const canExport = profile.fullName === PAYMENTS_CONTROLLER_NAME;
-  const { pendentes, assembler, from, to } = await searchParams;
+  const { pendentes, assembler, from, to, abertos } = await searchParams;
+  // Montadores expandidos na tela (ver AssemblerPaymentGroup) -- ficam na URL
+  // pra "voltar" da solicitação reabrir do mesmo jeito, sem filtrar a lista.
+  const montadoresAbertos = new Set((abertos ?? "").split("|").filter(Boolean));
   // Filtra pela data da solicitação (quando a montagem foi pedida), não pela
   // data do pagamento -- decisão do usuário 13/08/2026: itens ainda não
   // pagos continuam aparecendo mesmo filtrando um período passado.
@@ -161,7 +164,7 @@ export default async function PagamentosPage({
               // filtro, ou quando é o único grupo na tela -- senão fica
               // recolhido, pra não ter que descer passando pelas montagens
               // de todo mundo só pra ver o próximo montador.
-              defaultOpen={group.assemblerName === assembler || visibleGroups.length === 1}
+              defaultOpen={group.assemblerName === assembler || montadoresAbertos.has(group.assemblerName) || visibleGroups.length === 1}
             />
           );
         })

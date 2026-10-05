@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { DeliveryStatusBadge, RemarcarContactBadge } from "./DeliveryStatusBadge";
@@ -450,7 +450,21 @@ export function EntregasKanbanHoje({
     ...Array.from({ length: 7 }, (_, i) => addDays(today, i + 1)),
   ];
 
-  async function selectDay(date: string) {
+  // Dia e rota ficam na URL (dia=, rota=) pra "voltar" de uma solicitação
+  // reabrir a mesma visão, não o "Hoje" padrão -- ver o efeito de restauração
+  // logo abaixo. replaceState (e não router.replace) pra não refazer a busca
+  // da página inteira a cada clique.
+  function syncRotaUrl(dia: string | null, rota: string | null) {
+    const sp = new URLSearchParams(window.location.search);
+    if (dia) sp.set("dia", dia);
+    else sp.delete("dia");
+    if (rota) sp.set("rota", rota);
+    else sp.delete("rota");
+    const qs = sp.toString();
+    window.history.replaceState(window.history.state, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+  }
+
+  async function selectDay(date: string, rotaInicial?: string | null) {
     if (viewDate === date) {
       // Clicar nele de novo -- mesmo padrão de "clicar de novo desmarca"
       // já usado pra rota (ver onToggle do RouteSummaryCard abaixo):
@@ -458,6 +472,7 @@ export function EntregasKanbanHoje({
       setViewDate(null);
       setSelectedRotaKey(defaultColumnKey);
       setTab("todos");
+      syncRotaUrl(null, null);
       return;
     }
     let dayGroups = dayGroupsCache[date];
@@ -474,11 +489,25 @@ export function EntregasKanbanHoje({
       }
     }
     const dayOverview = routesOverview?.find((d) => d.date === date) ?? null;
-    setSelectedRotaKey(defaultColumnKeyFor(buildColumns(dayGroups, dayOverview), dayOverview));
+    const rotaKey = rotaInicial ?? defaultColumnKeyFor(buildColumns(dayGroups, dayOverview), dayOverview);
+    setSelectedRotaKey(rotaKey);
     setTab("todos");
     setViewDate(date);
     setDayPickerOpen(false);
+    syncRotaUrl(date, rotaKey);
   }
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const dia = sp.get("dia");
+    const rota = sp.get("rota");
+    // Só na montagem: a restauração vem da URL que já existia quando a tela abriu.
+    void Promise.resolve().then(() => {
+      if (dia) return selectDay(dia, rota);
+      if (rota) setSelectedRotaKey(rota);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Imprimir em bloco -- ver toggleSelected/allSelected/toggleAll mais
   // abaixo (dependem de visibleRows, calculado depois do early-return logo
@@ -681,7 +710,11 @@ export function EntregasKanbanHoje({
             key={column.key}
             column={column}
             selected={selectedRotaKey === column.key}
-            onToggle={() => setSelectedRotaKey((prev) => (prev === column.key ? null : column.key))}
+            onToggle={() => {
+              const next = selectedRotaKey === column.key ? null : column.key;
+              setSelectedRotaKey(next);
+              syncRotaUrl(viewDate, next);
+            }}
           />
         ))}
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { PaymentItemEditor } from "./PaymentItemEditor";
 import { setItemPaymentReleased } from "@/app/assistencia/pagamentos-actions";
 import { useQuickAction } from "./useQuickAction";
@@ -63,6 +64,20 @@ export function AssemblerPaymentGroup({
   const [open, setOpen] = useState(defaultOpen);
   const [tab, setTab] = useState<Tab>("pendentes");
   const { pending, run } = useQuickAction();
+  const router = useRouter();
+
+  function toggleOpen() {
+    const next = !open;
+    setOpen(next);
+    const sp = new URLSearchParams(window.location.search);
+    const abertos = new Set((sp.get("abertos") ?? "").split("|").filter(Boolean));
+    if (next) abertos.add(assemblerName);
+    else abertos.delete(assemblerName);
+    if (abertos.size > 0) sp.set("abertos", [...abertos].join("|"));
+    else sp.delete("abertos");
+    const qs = sp.toString();
+    router.replace(qs ? `${window.location.pathname}?${qs}` : window.location.pathname, { scroll: false });
+  }
 
   const pendentesItems = items.filter((i) => !i.paymentReleased);
   const pagosItems = items.filter((i) => i.paymentReleased);
@@ -101,7 +116,7 @@ export function AssemblerPaymentGroup({
     <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleOpen}
         className={`flex items-center justify-between gap-3 px-4 py-3 w-full text-left ${open ? "border-b border-gray-100 dark:border-gray-700" : ""}`}
       >
         <span className="flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-100">
