@@ -139,6 +139,7 @@ export function CadastroDetalheModal({ cadastro }: { cadastro: Cadastro }) {
               <Row label="CPF" value={cadastro.cpf} />
               <Row label="Telefone" value={cadastro.telefone} />
               <Row label="Endereço" value={cadastro.endereco} />
+              <Row label="Data de abertura" value={cadastro.dataAbertura ? cadastro.dataAbertura.split("-").reverse().join("/") : null} />
               <Row label="Solicitante" value={cadastro.solicitante} />
               <Row label="Quem montou" value={cadastro.quemMontou} />
               <Row label="Origem (aba da planilha)" value={cadastro.origemPlanilha} />

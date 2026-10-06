@@ -174,6 +174,9 @@ function CadastroRow({ cadastro }: { cadastro: Cadastro }) {
       <td className="px-3 py-2.5 whitespace-nowrap">
         <StatusBadge status={cadastro.status} />
       </td>
+      <td className="px-3 py-2.5 whitespace-nowrap text-sm" style={{ color: "var(--text-secondary)" }}>
+        {formatDateBr(cadastro.dataAbertura) ?? "—"}
+      </td>
       <td className="px-3 py-2.5 whitespace-nowrap">
         {cadastro.prazoData ? (
           <span
@@ -239,7 +242,7 @@ export default async function CadastrosPage({
     }),
     getCadastroPillCounts(),
     listCadastroLojas(),
-    getCadastrosResumoPorSolicitante(),
+    getCadastrosResumoPorSolicitante({ dateFrom: from, dateTo: to }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / CADASTROS_PAGE_SIZE));
@@ -431,6 +434,9 @@ export default async function CadastrosPage({
                 </th>
                 <th className="text-left px-3 py-2 font-semibold" style={{ color: "var(--text-secondary)" }}>
                   Situação
+                </th>
+                <th className="text-left px-3 py-2 font-semibold" style={{ color: "var(--text-secondary)" }}>
+                  Data
                 </th>
                 <th className="text-left px-3 py-2 font-semibold" style={{ color: "var(--text-secondary)" }}>
                   Prazo
