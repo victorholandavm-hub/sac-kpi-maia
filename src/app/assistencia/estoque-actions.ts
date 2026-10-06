@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { getProfile, requireRole } from "@/lib/dal";
 import { isMovementType } from "@/lib/stockMovements";
 import { getTecnicoSession } from "@/app/assistencia/tecnico-actions";
+import { requirePecasActor } from "@/lib/pecasAccess";
 import { getProdutoNomePorCodigo } from "@/lib/vendasProduto";
 
 function emptyToNull(value: FormDataEntryValue | null): string | null {
@@ -18,8 +18,7 @@ export async function createStockMovement(
   _state: StockMovementFormState,
   formData: FormData
 ): Promise<StockMovementFormState> {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  const actor = await requirePecasActor();
 
   const movementType = String(formData.get("movement_type") ?? "");
   if (!isMovementType(movementType)) {
@@ -62,7 +61,7 @@ export async function createStockMovement(
     factory: factory || null,
     client_name: clientName,
     volume: emptyToNull(formData.get("volume")),
-    responsible: profile.fullName,
+    responsible: actor.name,
     movement_date: emptyToNull(formData.get("movement_date")),
     logged_date: emptyToNull(formData.get("logged_date")),
     notes: emptyToNull(formData.get("notes")),
@@ -83,8 +82,7 @@ export async function createStockMovement(
 // createStockMovement (server action é um endpoint próprio, não herda a
 // proteção da página).
 export async function lookupProductNameByCode(code: string): Promise<string | null> {
-  const profile = await getProfile();
-  requireRole(profile, "assistencia", "admin");
+  await requirePecasActor();
   return getProdutoNomePorCodigo(code);
 }
 

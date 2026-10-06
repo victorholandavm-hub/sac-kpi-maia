@@ -18,7 +18,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function NewStockMovementForm({ factories }: { factories: string[] }) {
+export function NewStockMovementForm({ factories, returnHref = "/assistencia/estoque" }: { factories: string[]; returnHref?: string }) {
   const [state, formAction, pending] = useActionState<StockMovementFormState, FormData>(createStockMovement, undefined);
   const [factory, setFactory] = useState("");
   const [typeValue, setTypeValue] = useState<(typeof TYPES)[number]>("retirado");
@@ -58,7 +58,7 @@ export function NewStockMovementForm({ factories }: { factories: string[] }) {
         <p className="text-sm font-medium" style={{ color: "var(--status-good)" }}>
           Movimentação registrada!
         </p>
-        <Link href="/assistencia/estoque" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
+        <Link href={returnHref} className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
           Voltar para a lista
         </Link>
       </div>
