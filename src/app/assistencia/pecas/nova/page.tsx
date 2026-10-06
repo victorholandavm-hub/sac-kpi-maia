@@ -7,9 +7,9 @@ import { NewPartOrderForm } from "@/components/assistencia/NewPartOrderForm";
 export default async function NovoPedidoPecaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ service_request_id?: string }>;
+  searchParams: Promise<{ service_request_id?: string; client_name?: string; client_cpf?: string; client_phone?: string; product?: string }>;
 }) {
-  const { service_request_id } = await searchParams;
+  const { service_request_id, client_name, client_cpf, client_phone, product } = await searchParams;
   const [suppliers, supplierContacts] = await Promise.all([listSuppliers(), listSupplierContacts()]);
 
   let defaultValues: {
@@ -31,6 +31,15 @@ export default async function NovoPedidoPecaPage({
         product: result.request.items[0]?.product,
       };
     }
+  } else if (client_name || client_cpf || client_phone || product) {
+    // Vindo do detalhe de um cadastro (Cadastros) -- não existe chamado de
+    // verdade ainda, só os dados do cliente/produto pra pré-preencher.
+    defaultValues = {
+      clientName: client_name || undefined,
+      clientCpf: client_cpf || undefined,
+      clientPhone: client_phone || undefined,
+      product: product || undefined,
+    };
   }
 
   return (
