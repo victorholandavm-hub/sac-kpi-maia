@@ -69,6 +69,14 @@ jobs:
         run: |
           curl -sf --max-time 170 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://sac.lojasmaia.com.br/api/sync-ai-classify"
+      # Atendimentos do SAC nas subcontas GHL Lojas Maia e GHL Líder (pedido do
+      # Victor 06/10/2026) -- ver src/lib/ghlSubcontas.ts. Só quantidade e tempo
+      # de resposta, sem texto de mensagem.
+      - name: Chamar /api/sync-subcontas
+        continue-on-error: true
+        run: |
+          curl -sf --max-time 290 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://sac.lojasmaia.com.br/api/sync-subcontas"
       # Rede de segurança pro /api/ghl-webhook (achado 17/09/2026: o
       # workflow do GHL ficou 3 semanas apontando pro domínio antigo da
       # Vercel sem ninguém perceber) -- confirma via API do GHL o estado
