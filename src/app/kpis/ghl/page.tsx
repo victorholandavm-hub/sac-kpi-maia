@@ -31,7 +31,7 @@ export default async function KpisGhlPage({ searchParams }: { searchParams: Prom
           ))}
         </div>
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Conversas atribuídas aos atendentes do SAC nos últimos 60 dias. Tempo medido até a primeira resposta do próprio atendente, em horário comercial.
+          Conversas atribuídas aos atendentes do SAC nos últimos 60 dias. Tempo medido da última mensagem do cliente até a primeira resposta do próprio atendente, em horário comercial. Respostas acima de 3 dias úteis ficam fora da média e aparecem à parte.
           {atualizadoEm ? ` Última atualização: ${new Date(atualizadoEm).toLocaleString("pt-BR", { timeZone: "America/Fortaleza" })}.` : " Ainda sem dados sincronizados."}
         </p>
         <div className="rounded-xl border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
@@ -50,6 +50,9 @@ export default async function KpisGhlPage({ searchParams }: { searchParams: Prom
                 <th className="text-right px-3 py-2 font-semibold" style={{ color: "var(--text-secondary)" }}>
                   Tempo médio 1ª resposta
                 </th>
+                <th className="text-right px-3 py-2 font-semibold" style={{ color: "var(--text-secondary)" }}>
+                  Acima de 3 dias úteis
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -61,6 +64,7 @@ export default async function KpisGhlPage({ searchParams }: { searchParams: Prom
                   <td className="px-3 py-2.5 text-right tabular-nums">{a.conversas}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{a.respondidas}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{formatMinutos(a.tempoMedioMin)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{a.acimaDoLimite}</td>
                 </tr>
               ))}
               <tr style={{ background: "var(--surface-2)" }}>
@@ -72,6 +76,7 @@ export default async function KpisGhlPage({ searchParams }: { searchParams: Prom
                 <td className="px-3 py-2.5 text-right" style={{ color: "var(--text-muted)" }}>
                   —
                 </td>
+                <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{porAtendente.reduce((sum, a) => sum + a.acimaDoLimite, 0)}</td>
               </tr>
             </tbody>
           </table>

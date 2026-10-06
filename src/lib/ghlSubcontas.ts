@@ -6,6 +6,8 @@ import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePaginati
 const BASE_URL = "https://services.leadconnectorhq.com";
 const JANELA_DIAS = 60;
 const MAX_MENSAGENS_POR_RODADA = 150;
+// Respostas acima de 3 dias úteis (10h por dia) ficam fora da média e aparecem à parte.
+export const LIMITE_CASO_A_PARTE_MIN = 3 * 10 * 60;
 
 export const SUBCONTAS = {
   lojas_maia: { label: "GHL Lojas Maia", locationId: "oODW71MWRSzUFTdVpDkw", tokenEnv: "GHL_TOKEN_LOJAS_MAIA" },
@@ -55,16 +57,24 @@ async function listarConversasDoAtendente(locationId: string, token: string, use
   return conversas.filter((c) => (c.lastMessageDate ?? c.dateUpdated ?? 0) >= sinceMs);
 }
 
-// Tempo até a primeira resposta do PRÓPRIO atendente, em minutos úteis.
-// Mensagem automática de recepção não conta (ver isHumanReply).
+// Tempo entre a mensagem do cliente à qual o PRÓPRIO atendente respondeu
+// primeiro e essa resposta, em minutos úteis. A API do GHL não informa quando
+// a conversa foi atribuída, então a última mensagem do cliente antes da
+// resposta é a referência mais próxima disso. Mensagem automática não conta
+// (ver isHumanReply).
 function primeiraRespostaMinutos(msgs: Awaited<ReturnType<typeof fetchGhlMessages>>, userId: string): number | null {
   if (!msgs) return null;
-  const entrada = msgs.find((m) => m.direction === "inbound");
+  const idxResposta = msgs.findIndex((m) => m.direction === "outbound" && isHumanReply(m) && m.userId === userId);
+  if (idxResposta === -1) return null;
+  const resposta = msgs[idxResposta];
+  let entrada: (typeof msgs)[number] | undefined;
+  for (let i = idxResposta - 1; i >= 0; i--) {
+    if (msgs[i].direction === "inbound") {
+      entrada = msgs[i];
+      break;
+    }
+  }
   if (!entrada) return null;
-  const resposta = msgs.find(
-    (m) => m.direction === "outbound" && m.dateAdded > entrada.dateAdded && isHumanReply(m) && m.userId === userId
-  );
-  if (!resposta) return null;
   const minutos = businessMinutesBetween(new Date(entrada.dateAdded), new Date(resposta.dateAdded));
   return Math.round(minutos * 10) / 10;
 }
@@ -143,6 +153,7 @@ export type ResumoAtendente = {
   conversas: number;
   respondidas: number;
   tempoMedioMin: number | null;
+  acimaDoLimite: number;
 };
 
 // Resumo da janela (60 dias) por atendente, pra tela de KPIs.
@@ -159,26 +170,34 @@ export async function resumoAtendimentos(key: SubcontaKey): Promise<{ porAtenden
         .range(from, to) as unknown as PromiseLike<PagedQueryResult<{ atendente_nome: string; primeira_resposta_min: number | null; atualizado_em: string }>>
   );
 
-  const porNome = new Map<string, { conversas: number; respondidas: number; soma: number }>();
+  const porNome = new Map<string, { conversas: number; respondidas: number; soma: number; somaSemExcesso: number; respondidasSemExcesso: number; acimaDoLimite: number }>();
   let atualizadoEm: string | null = null;
   for (const l of linhas) {
-    const acc = porNome.get(l.atendente_nome) ?? { conversas: 0, respondidas: 0, soma: 0 };
+    const acc = porNome.get(l.atendente_nome) ?? { conversas: 0, respondidas: 0, soma: 0, somaSemExcesso: 0, respondidasSemExcesso: 0, acimaDoLimite: 0 };
     acc.conversas++;
     if (l.primeira_resposta_min !== null) {
+      const minutos = Number(l.primeira_resposta_min);
       acc.respondidas++;
-      acc.soma += Number(l.primeira_resposta_min);
+      acc.soma += minutos;
+      if (minutos > LIMITE_CASO_A_PARTE_MIN) {
+        acc.acimaDoLimite++;
+      } else {
+        acc.somaSemExcesso += minutos;
+        acc.respondidasSemExcesso++;
+      }
     }
     porNome.set(l.atendente_nome, acc);
     if (!atualizadoEm || l.atualizado_em > atualizadoEm) atualizadoEm = l.atualizado_em;
   }
 
   const porAtendente = ATENDENTES_SAC.map((a) => {
-    const acc = porNome.get(a.nome) ?? { conversas: 0, respondidas: 0, soma: 0 };
+    const acc = porNome.get(a.nome) ?? { conversas: 0, respondidas: 0, soma: 0, somaSemExcesso: 0, respondidasSemExcesso: 0, acimaDoLimite: 0 };
     return {
       nome: a.nome,
       conversas: acc.conversas,
       respondidas: acc.respondidas,
-      tempoMedioMin: acc.respondidas > 0 ? Math.round((acc.soma / acc.respondidas) * 10) / 10 : null,
+      tempoMedioMin: acc.respondidasSemExcesso > 0 ? Math.round((acc.somaSemExcesso / acc.respondidasSemExcesso) * 10) / 10 : null,
+      acimaDoLimite: acc.acimaDoLimite,
     };
   });
   return { porAtendente, atualizadoEm };
