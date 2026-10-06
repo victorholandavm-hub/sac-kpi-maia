@@ -57,6 +57,18 @@ function buildPrefillQuery(cadastro: Cadastro, type?: string): string {
   return sp.toString();
 }
 
+// Pedido de peça usa só o primeiro produto (o formulário é de uma peça por
+// vez; quem tiver mais de um produto no cadastro escolhe os demais na mão).
+function buildPecaPrefillQuery(cadastro: Cadastro): string {
+  const sp = new URLSearchParams();
+  if (cadastro.cliente) sp.set("client_name", cadastro.cliente);
+  if (cadastro.cpf) sp.set("client_cpf", cadastro.cpf);
+  if (cadastro.telefone) sp.set("client_phone", cadastro.telefone);
+  const primeiroProduto = cadastro.produto?.split(";")[0]?.trim();
+  if (primeiroProduto) sp.set("product", primeiroProduto);
+  return sp.toString();
+}
+
 // MONTAGEM é o único tipo de cadastro com equivalente direto e inequívoco
 // no tipo de "Nova visita" -- os outros (Assistência, Troca, Erro de
 // entrega/faturamento, SAC) podem virar qualquer um dos 4 tipos de visita
@@ -165,6 +177,13 @@ export function CadastroDetalheModal({ cadastro }: { cadastro: Cadastro }) {
                 style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
               >
                 🚚 Criar nova entrega
+              </Link>
+              <Link
+                href={`/assistencia/pecas/nova?${buildPecaPrefillQuery(cadastro)}`}
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg border whitespace-nowrap"
+                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+              >
+                📦 Criar novo pedido de peça
               </Link>
             </div>
           </div>
