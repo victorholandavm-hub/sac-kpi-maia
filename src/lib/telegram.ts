@@ -160,12 +160,15 @@ export function notifyTelegramNewEncomenda(params: {
 // nada.
 const TELEGRAM_KEY_STATUSES = new Set(["concluida", "cancelada", "remarcar", "aguardando_aprovacao"]);
 
-export function notifyTelegramStatusChange(params: RequestNotifyParams & { newStatus: string }): Promise<void> {
+export function notifyTelegramStatusChange(
+  params: RequestNotifyParams & { newStatus: string; atualizadoPorName?: string | null }
+): Promise<void> {
   if (!TELEGRAM_KEY_STATUSES.has(params.newStatus)) return Promise.resolve();
   const label = REQUEST_TYPE_LABELS[params.type] ?? params.type;
   const statusLabel = STATUS_LABELS[params.newStatus] ?? params.newStatus;
   const emoji = params.newStatus === "concluida" ? "✅" : params.newStatus === "cancelada" ? "❌" : params.newStatus === "remarcar" ? "🔁" : "⏳";
   const lines = [`${emoji} #${params.ticketNumber} (${label}) → ${statusLabel}`, ...requestNotifyLines(params)];
+  if (params.atualizadoPorName) lines.push(`Atualizado por: ${params.atualizadoPorName}`);
   // Pedido do Victor 01/10/2026: motorista marcando "Não concluída" precisa
   // vir com instrução clara de ação, não só o aviso de status -- quem lê no
   // Telegram já sabe o que fazer sem abrir o sistema.
