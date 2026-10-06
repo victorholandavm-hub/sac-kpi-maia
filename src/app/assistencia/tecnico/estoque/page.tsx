@@ -105,6 +105,13 @@ export default async function TecnicoEstoquePage({
             {/* Ações do cabeçalho como pílulas ghost (vidro fosco) --
                 Guia de Componentes Maia (Design System, 01/09/2026). */}
             <div className="flex items-center gap-1 text-sm shrink-0">
+              <Link
+                href="/assistencia/tecnico/estoque/nova"
+                className="text-sm px-3 py-1.5 rounded-full font-semibold whitespace-nowrap"
+                style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}
+              >
+                + Nova movimentação
+              </Link>
               {/* Pedido do Victor 04/09/2026: "preciso de duas coisas na
                   tela da equipe tecnica: modo dark" -- mesmo motivo/
                   componente de tecnico/page.tsx, ver lá. */}
