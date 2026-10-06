@@ -3,6 +3,7 @@ import { UnderlineTab } from "./UnderlineTab";
 const TABS = [
   { key: "sac", label: "SAC", href: "/kpis" },
   { key: "assistencia", label: "Assistência", href: "/kpis-assistencia" },
+  { key: "ghl", label: "GHL", href: "/kpis/ghl" },
 ] as const;
 
 export type KpisSectionKey = (typeof TABS)[number]["key"];

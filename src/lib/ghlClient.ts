@@ -14,9 +14,9 @@ export type GhlMessage = {
   userId?: string;
 };
 
-function ghlHeaders() {
+function ghlHeaders(token: string | undefined = process.env.GHL_API_TOKEN) {
   return {
-    Authorization: `Bearer ${process.env.GHL_API_TOKEN}`,
+    Authorization: `Bearer ${token}`,
     Version: "2021-07-28",
     Accept: "application/json",
   };
@@ -25,14 +25,23 @@ function ghlHeaders() {
 // Extraído de api/sync/route.ts -- usado ali (1ª resposta/NPS) e também por
 // ticketClassification.ts (lê o texto da conversa pra classificar categoria
 // real / produto / loja). Mesma lógica, um lugar só.
-export async function fetchGhlMessages(ghlConversationId: string): Promise<GhlMessage[] | null> {
+export async function fetchGhlMessages(ghlConversationId: string, token?: string): Promise<GhlMessage[] | null> {
   const res = await fetch(`${BASE_URL}/conversations/${ghlConversationId}/messages?limit=100`, {
-    headers: ghlHeaders(),
+    headers: ghlHeaders(token),
   });
   if (!res.ok) return null;
   const data = await res.json();
   const msgs: GhlMessage[] = data.messages?.messages ?? [];
   return msgs.slice().sort((a, b) => (a.dateAdded || "").localeCompare(b.dateAdded || ""));
+}
+
+// Só conta como "resposta" mensagem de atendente humano de verdade
+// (`source: "app"` + `userId` preenchido) -- excluindo tanto a mensagem
+// automática de recepção (`source: "workflow"`) quanto eventos de sistema
+// do GHL (ex.: "Opportunity created"), que também chegam com
+// `direction: "outbound"` mas não são atendimento nenhum.
+export function isHumanReply(m: GhlMessage): boolean {
+  return m.source === "app" && Boolean(m.userId);
 }
 
 // NPS pós-montagem/pós-assistência técnica (pedido do Victor 07/09/2026) --

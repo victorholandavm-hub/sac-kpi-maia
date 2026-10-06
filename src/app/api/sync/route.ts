@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { businessMinutesBetween } from "@/lib/businessHours";
 import { recordSyncRun, getLastSuccessfulRunAt } from "@/lib/syncRuns";
-import { fetchGhlMessages, upsertGhlContact, addContactTag, findGhlConversationId, type GhlMessage } from "@/lib/ghlClient";
+import { fetchGhlMessages, upsertGhlContact, addContactTag, findGhlConversationId, isHumanReply } from "@/lib/ghlClient";
 import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "@/lib/serviceRequests";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "@/lib/npsDetratores";
 import { enrollPendingCompraNps, detectPendingCompraNpsResponses } from "@/lib/nps2Meses";
@@ -81,15 +81,6 @@ async function fetchRecentConversations(sinceMs: number): Promise<{ conversation
   }
 
   return { conversations: conversations.filter((c) => (c.dateUpdated ?? 0) >= sinceMs), error };
-}
-
-// Só conta como "resposta" mensagem de atendente humano de verdade
-// (`source: "app"` + `userId` preenchido) -- excluindo tanto a mensagem
-// automática de recepção (`source: "workflow"`) quanto eventos de sistema
-// do GHL (ex.: "Opportunity created"), que também chegam com
-// `direction: "outbound"` mas não são atendimento nenhum.
-function isHumanReply(m: GhlMessage): boolean {
-  return m.source === "app" && Boolean(m.userId);
 }
 
 async function firstResponseMinutes(ghlConversationId: string): Promise<number | null> {
