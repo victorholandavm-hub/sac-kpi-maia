@@ -315,7 +315,7 @@ export function NovaEntregaAssistenciaForm({
   // SacCreateRequestForm.tsx (rota extra genérica de JP pode repetir o
   // mesmo valor de `rota` em duas linhas do mesmo dia).
   const [selectedRotaId, setSelectedRotaId] = useState("");
-  const [clienteRetira, setClienteRetira] = useState(false);
+  const [retiradaEm, setRetiradaEm] = useState<"" | "loja" | "cd">("");
   const [availableRotas, setAvailableRotas] = useState<AvailableRota[]>([]);
   const [loadingRotas, setLoadingRotas] = useState(false);
   const hasDateContext = !!scheduledDate;
@@ -916,38 +916,30 @@ export function NovaEntregaAssistenciaForm({
           </div>
         </Field>
 
-        <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
-
-          <input
-
-            type="checkbox"
-
-            name="cliente_retira"
-
-            value="1"
-
-            checked={clienteRetira}
-
+        <Field label="Retirada">
+          <select
+            name="retirada_em"
+            value={retiradaEm}
             onChange={(e) => {
-
-              setClienteRetira(e.target.checked);
-
-              if (e.target.checked) setSelectedRotaId("");
-
+              const value = e.target.value as "" | "loja" | "cd";
+              setRetiradaEm(value);
+              if (value) setSelectedRotaId("");
             }}
-
-          />
-
-          Cliente retira na loja (não sai em rota)
-
-        </label>
+            className="rounded border px-3 py-2"
+            style={inputStyle}
+          >
+            <option value="">Sai em rota</option>
+            <option value="loja">Cliente retira na loja</option>
+            <option value="cd">Cliente retira no CD</option>
+          </select>
+        </Field>
 
         <Field label="Rota">
           <select
             name="rotaAssignmentId"
             value={selectedRotaId}
             onChange={(e) => setSelectedRotaId(e.target.value)}
-            disabled={clienteRetira || !scheduledDate || effectiveLoadingRotas}
+            disabled={retiradaEm !== "" || !scheduledDate || effectiveLoadingRotas}
             className="rounded border px-3 py-2 disabled:opacity-60"
             style={inputStyle}
           >

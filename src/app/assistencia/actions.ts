@@ -2382,11 +2382,12 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   // mesmo valor de `rota` ("extra"), só o `id` diferencia qual delas foi
   // escolhida no formulário (ver NovaEntregaAssistenciaForm.tsx).
   const rotaAssignmentIdInput = String(formData.get("rotaAssignmentId") ?? "").trim();
-  // Cliente retira na loja (migration 0151): não sai em rota, então ignora a rota escolhida.
-  const clienteRetira = isDelivery && formData.get("cliente_retira") === "1";
+  // Retirada na loja ou no CD (migration 0152): não sai em rota, então ignora a rota escolhida.
+  const retiradaEmRaw = formData.get("retirada_em");
+  const retiradaEm = isDelivery && (retiradaEmRaw === "loja" || retiradaEmRaw === "cd") ? retiradaEmRaw : null;
   let rotaValue: string | null = null;
   let driverNameForRota: string | null = null;
-  if (isDelivery && !clienteRetira && scheduledDateInput && rotaAssignmentIdInput) {
+  if (isDelivery && !retiradaEm && scheduledDateInput && rotaAssignmentIdInput) {
     const availableRotas = await getAvailableRotasForDate(scheduledDateInput);
     const match = availableRotas.find((r) => r.id === rotaAssignmentIdInput);
     if (!match) {
@@ -2558,7 +2559,7 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       authorized_by: emptyToNull(authorizedBy),
       driver_name: driverNameForError ?? driverNameForRota,
       rota: rotaValue,
-      cliente_retira: clienteRetira,
+      retirada_em: retiradaEm,
       causa_raiz: causaRaiz,
       causa_carga: causaCarga,
       causa_conferente: causaConferente,
@@ -2844,11 +2845,12 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   // junto da rota escolhida (mesmo pedido: "a rota e o motorista são
   // ligados um ao outro") -- null se aquela rota/data ainda não tem
   // motorista definido no painel "Motorista do dia".
-  // Cliente retira na loja (migration 0151): não sai em rota, então ignora a rota escolhida.
-  const clienteRetira = isDeliveryTypeCreate && formData.get("cliente_retira") === "1";
+  // Retirada na loja ou no CD (migration 0152): não sai em rota, então ignora a rota escolhida.
+  const retiradaEmRaw = formData.get("retirada_em");
+  const retiradaEm = isDeliveryTypeCreate && (retiradaEmRaw === "loja" || retiradaEmRaw === "cd") ? retiradaEmRaw : null;
   let rotaValue: string | null = null;
   let driverNameForRota: string | null = null;
-  if (!clienteRetira && scheduledDate && rotaAssignmentIdInput) {
+  if (!retiradaEm && scheduledDate && rotaAssignmentIdInput) {
     const availableRotas = await getAvailableRotasForDate(scheduledDate);
     const match = availableRotas.find((r) => r.id === rotaAssignmentIdInput);
     if (!match) {
@@ -3006,7 +3008,7 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       scheduled_date: scheduledDate || null,
       scheduled_time: scheduledTime || null,
       rota: rotaValue,
-      cliente_retira: clienteRetira,
+      retirada_em: retiradaEm,
       rota_exception_note: rotaExceptionNote,
       shift: shift || null,
       urgent,

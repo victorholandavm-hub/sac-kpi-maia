@@ -10,8 +10,9 @@ import { BulkRotaBar } from "./NotificacoesList";
 import { DELIVERY_TYPE_COLORS } from "./AssistenciaQueueGroup";
 import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 import { getDayRouteGroupsAction } from "@/app/assistencia/actions";
-import { driverNameForRota, addDays, JP_EXTRA_ROTA, WEEKDAY_LABELS, type Rota, type RotaDayOverview } from "@/lib/rotas";
+import { ROTAS, driverNameForRota, addDays, JP_EXTRA_ROTA, WEEKDAY_LABELS, type Rota, type RotaDayOverview } from "@/lib/rotas";
 import { ENTREGA_TYPES_SAC, ENTREGA_TYPES_ASSISTENCIA, ASSISTENCIA_ORIGEM_REQUESTERS, type QueueGroup } from "@/lib/entregaQueueGrouping";
+const isRotaKey = (key: string): key is Rota => (ROTAS as readonly string[]).includes(key);
 import type { ServiceRequestSummary } from "@/lib/serviceRequests";
 
 const WEEKDAY_SHORT = WEEKDAY_LABELS.map((w) => w.slice(0, 3));
@@ -48,7 +49,7 @@ type KanbanColumn = {
   // Rota "crua" por trás do card -- só serve pra achar a rota padrão do dia
   // (ver defaultRota em EntregasKanbanHoje) e pré-selecionar o card certo;
   // não aparece em nenhum texto (isso já é rotaLabel).
-  rotaKey?: Rota | "sem_rota" | "cliente_retira";
+  rotaKey?: Rota | "sem_rota" | "retira_loja" | "retira_cd";
 };
 
 // "Rota extra" genérica (ver JP_EXTRA_ROTA, rotas.ts) pode ter mais de um
@@ -96,7 +97,7 @@ function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | nul
         }));
     }
     const driverName =
-      todayOverview && group.rotaKey && group.rotaKey !== "sem_rota" && group.rotaKey !== "cliente_retira" ? driverNameForRota(todayOverview, group.rotaKey) : null;
+      todayOverview && group.rotaKey && isRotaKey(group.rotaKey) ? driverNameForRota(todayOverview, group.rotaKey) : null;
     return [
       {
         key: group.key,
