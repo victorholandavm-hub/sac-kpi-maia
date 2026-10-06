@@ -203,6 +203,8 @@ type ItemRow = {
   is_pickup: boolean;
 };
 
+export type RetiradaEm = "loja" | "cd";
+
 export type ServiceRequestSummary = {
   id: string;
   ticketNumber: number;
@@ -241,8 +243,8 @@ export type ServiceRequestSummary = {
   // manhã/tarde/dia; agora coexiste com qualquer turno escolhido.
   urgent: boolean;
   rota: Rota | null;
-  // Cliente retira na loja -- não sai em rota nem tem motorista (ver migration 0151).
-  clienteRetira: boolean;
+  // Cliente retira na loja ou no CD -- não sai em rota nem tem motorista (ver migration 0152).
+  retiradaEm: RetiradaEm | null;
   rotaExceptionNote: string | null;
   // Restrição de horário/turno do CLIENTE pra receber a entrega (ex.: "só de
   // manhã", "14h às 17h") -- pedido do Victor 19/08/2026. Separado de
@@ -288,7 +290,7 @@ type SummaryRow = {
   id: string;
   ticket_number: number;
   type: RequestType;
-  cliente_retira: boolean;
+  retirada_em: RetiradaEm | null;
   status: RequestStatus;
   store_id: string;
   order_code: string | null;
@@ -338,7 +340,7 @@ type SummaryRow = {
 };
 
 const SUMMARY_COLUMNS =
-  "id, ticket_number, type, status, store_id, cliente_retira, order_code, client_name, client_phone, client_cpf, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, remarcar_contact_attempted_at, remarcar_contact_attempted_by, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
+  "id, ticket_number, type, status, store_id, retirada_em, order_code, client_name, client_phone, client_cpf, client_neighborhood, reason, requested_by_name, requested_deadline, deadline_status, approved_deadline, assembler_name, driver_name, pickup_completed, scheduled_date, scheduled_time, shift, urgent, rota, rota_exception_note, client_time_restriction, seller_name, invoice_number, sac_category, protocol_number, legal_deadline, escalation_risk, combo_montagem_desmontagem, assistencia_order, montador_instruction, exchange_round, causa_raiz, causa_carga, causa_conferente, causa_raiz_detalhe, remarcar_contact_attempted_at, remarcar_contact_attempted_by, created_at, updated_at, completed_at, assigned_to, stores(name), assigned:profiles!assigned_to(full_name), requester:profiles!requested_by(full_name), items:service_request_items(id, product, part_code, part_name, quantity, unit_value, payment_released, payment_released_at, item_action, completed, is_pickup)";
 
 function toItem(row: ItemRow): RequestItem {
   return {
@@ -383,7 +385,7 @@ function toSummary(row: SummaryRow): ServiceRequestSummary {
     shift: row.shift,
     urgent: row.urgent,
     rota: row.rota,
-    clienteRetira: row.cliente_retira,
+    retiradaEm: row.retirada_em,
     rotaExceptionNote: row.rota_exception_note,
     clientTimeRestriction: row.client_time_restriction,
     sellerName: row.seller_name,
