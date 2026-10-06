@@ -138,7 +138,7 @@ export function filterOverdueOpen(requests: ServiceRequestSummary[]): ServiceReq
 // precisa de atenção de ninguém). Usado tanto pro contador do pill quanto
 // pra filtrar a lista quando ele é clicado.
 export function filterSemRotaOpen(requests: ServiceRequestSummary[]): ServiceRequestSummary[] {
-  return requests.filter((r) => r.status === "aberta" && r.rota === null);
+  return requests.filter((r) => r.status === "aberta" && r.rota === null && !r.clienteRetira);
 }
 
 // Pedido do Victor 01/10/2026: "preciso de um filtro de Entrar em
@@ -222,7 +222,7 @@ export type QueueGroup = {
   // toda coluna do mesmo dia) e precisa da chave crua pra buscar o nome
   // do motorista (driverNameForRota, rotas.ts). Só existe em groupByRota
   // -- groupByDate (Visitas) não agrupa por rota, não preenche.
-  rotaKey?: Rota | "sem_rota";
+  rotaKey?: Rota | "sem_rota" | "cliente_retira";
   rotaLabel?: string;
   // Data "crua" (YYYY-MM-DD) por trás do dateBucket -- null quando o grupo
   // é o pseudo-dia "sem data definida" (nenhum item com scheduledDate nem
@@ -250,7 +250,7 @@ export const DATE_BUCKET_TAG: Record<DateBucketKey, { label: string; bg: string 
 // por data (hoje, amanhã, depois, atrasado, sem_data) e só dentro de cada
 // data é que separa por rota.
 export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
-  const rotaOrder: (Omit<QueueGroup, "items" | "label" | "key" | "rotaKey" | "rotaLabel"> & { key: Rota | "sem_rota"; rotaLabel: string })[] = [
+  const rotaOrder: (Omit<QueueGroup, "items" | "label" | "key" | "rotaKey" | "rotaLabel"> & { key: Rota | "sem_rota" | "cliente_retira"; rotaLabel: string })[] = [
     ...ROTAS.map((r) => ({
       key: r,
       // "Rota extra" já é o nome inteiro (ver JP_EXTRA_ROTA em rotas.ts)
@@ -265,13 +265,14 @@ export function groupByRota(requests: ServiceRequestSummary[]): QueueGroup[] {
     // que precisa ser tratada, não deve se camuflar no meio dos grupos
     // normais (reforçado por pinSemRotaFirst, que também bota esses
     // grupos primeiro na lista).
+    { key: "cliente_retira", rotaLabel: "🏬 Cliente retira", headerBg: "var(--brand-green)", headerText: "#fff", borderColor: "var(--brand-green)" },
     { key: "sem_rota", rotaLabel: "⚠ Sem rota definida", headerBg: "var(--status-warning)", headerText: "#fff", borderColor: "var(--status-warning)" },
   ];
 
   const groups: QueueGroup[] = [];
   for (const dateGroup of groupByScheduledDate(requests)) {
     for (const rotaInfo of rotaOrder) {
-      const items = dateGroup.items.filter((r) => (r.rota ?? "sem_rota") === rotaInfo.key);
+      const items = dateGroup.items.filter((r) => (r.clienteRetira ? "cliente_retira" : (r.rota ?? "sem_rota")) === rotaInfo.key);
       if (items.length === 0) continue;
       const rawDateKey = dateGroup.dateKey === NO_SCHEDULED_DATE_KEY ? null : dateGroup.dateKey;
       groups.push({

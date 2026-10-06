@@ -48,7 +48,7 @@ type KanbanColumn = {
   // Rota "crua" por trás do card -- só serve pra achar a rota padrão do dia
   // (ver defaultRota em EntregasKanbanHoje) e pré-selecionar o card certo;
   // não aparece em nenhum texto (isso já é rotaLabel).
-  rotaKey?: Rota | "sem_rota";
+  rotaKey?: Rota | "sem_rota" | "cliente_retira";
 };
 
 // "Rota extra" genérica (ver JP_EXTRA_ROTA, rotas.ts) pode ter mais de um
@@ -96,7 +96,7 @@ function buildColumns(groups: QueueGroup[], todayOverview: RotaDayOverview | nul
         }));
     }
     const driverName =
-      todayOverview && group.rotaKey && group.rotaKey !== "sem_rota" ? driverNameForRota(todayOverview, group.rotaKey) : null;
+      todayOverview && group.rotaKey && group.rotaKey !== "sem_rota" && group.rotaKey !== "cliente_retira" ? driverNameForRota(todayOverview, group.rotaKey) : null;
     return [
       {
         key: group.key,
