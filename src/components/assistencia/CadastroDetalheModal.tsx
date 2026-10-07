@@ -3,6 +3,64 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Cadastro } from "@/lib/cadastrosHistorico";
+import { getHistoricoClienteAction } from "@/app/assistencia/cadastros-actions";
+import type { HistoricoClienteItem } from "@/lib/cadastrosHistorico";
+
+// "Histórico" -- pedido do Victor 07/10/2026: "ver o histórico do que fiz
+// com o cliente (se fiz uma entrega, uma visita, uma solicitação de peça)".
+// Recolhido por padrão, busca só ao expandir (ver getHistoricoClienteAction)
+// -- a lista de cadastros não precisa pagar essa consulta pra cada linha.
+function HistoricoCliente({ cpf, telefone }: { cpf: string | null; telefone: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<HistoricoClienteItem[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && items === null) {
+      setLoading(true);
+      try {
+        setItems(await getHistoricoClienteAction(cpf, telefone));
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
+  return (
+    <div className="pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+      <button type="button" onClick={toggle} className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}>
+        <span aria-hidden>{open ? "▾" : "▸"}</span>
+        Histórico
+      </button>
+      {open ? (
+        loading ? (
+          <p className="text-xs pt-2" style={{ color: "var(--text-muted)" }}>
+            Carregando…
+          </p>
+        ) : items && items.length > 0 ? (
+          <ul className="flex flex-col gap-1.5 pt-2">
+            {items.map((item) => (
+              <li key={item.id} className="text-xs flex items-center justify-between gap-2" style={{ color: "var(--text-secondary)" }}>
+                <span className="truncate">
+                  {item.kind === "peca" ? "📦" : "🛠️"} {item.label} <span style={{ color: "var(--text-muted)" }}>#{item.ticketNumber}</span>
+                </span>
+                <span className="shrink-0" style={{ color: "var(--text-muted)" }}>
+                  {item.statusLabel} · {new Date(item.createdAt).toLocaleDateString("pt-BR", { timeZone: "America/Fortaleza" })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs pt-2" style={{ color: "var(--text-muted)" }}>
+            Nenhum histórico encontrado pra esse CPF/telefone.
+          </p>
+        )
+      ) : null}
+    </div>
+  );
+}
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -186,6 +244,7 @@ export function CadastroDetalheModal({ cadastro }: { cadastro: Cadastro }) {
                 📦 Criar novo pedido de peça
               </Link>
             </div>
+            <HistoricoCliente cpf={cadastro.cpf} telefone={cadastro.telefone} />
           </div>
         </>
       ) : null}
