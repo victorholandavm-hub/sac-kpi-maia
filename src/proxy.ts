@@ -56,6 +56,9 @@ const PASSTHROUGH_PREFIXES = [
   // Storage que essa rota substituiu.
   "/api/photos",
   "/api/avaliar",
+  // API de logística (X-API-Key própria, ver src/lib/logisticaApi.ts): sem
+  // isso cairia no redirect de login do painel, como os crons acima.
+  "/api/logistica/v1",
   "/_next/static",
   "/_next/image",
   "/favicon.ico",
