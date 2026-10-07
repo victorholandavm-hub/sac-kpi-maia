@@ -5,23 +5,25 @@ import { useQuickAction } from "./useQuickAction";
 import { uploadPhotoRequest } from "@/lib/uploadPhotoClient";
 import { recusarEstornoAction, desfazerConclusaoEstornoAction } from "@/app/assistencia/financeiro-estornos-actions";
 
-// Modal de upload do comprovante -- pedido do Victor 23/09/2026: escolher o
-// arquivo, conferir, e só então clicar em "Enviar comprovante" (antes era
-// inline, sem confirmação separada). Mesmo padrão visual de
-// PrejuizoDetalheModal.tsx (overlay + painel central).
+// Modal de upload do(s) comprovante(s) -- pedido do Victor 23/09/2026:
+// escolher o(s) arquivo(s), conferir, e só então clicar em "Enviar" (antes
+// era inline, sem confirmação separada). Mesmo padrão visual de
+// PrejuizoDetalheModal.tsx (overlay + painel central). Vários arquivos de
+// uma vez -- pedido do Victor 07/10/2026 ("seja possível adicionar mais de
+// um comprovante... do financeiro").
 function ComprovanteModal({ requestId, onClose }: { requestId: string; onClose: () => void }) {
   const { pending, run } = useQuickAction();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
 
   function enviar() {
-    if (!file) return;
+    if (files.length === 0) return;
     run(async () => {
       const formData = new FormData();
-      formData.set("comprovante", file);
+      for (const file of files) formData.append("comprovante", file);
       formData.set("requestId", requestId);
       await uploadPhotoRequest("/api/financeiro/upload-comprovante", formData);
       onClose();
-    }, "Comprovante enviado.");
+    }, files.length > 1 ? "Comprovantes enviados." : "Comprovante enviado.");
   }
 
   return (
@@ -35,7 +37,7 @@ function ComprovanteModal({ requestId, onClose }: { requestId: string; onClose: 
       >
         <div className="flex items-center justify-between gap-4">
           <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-            Comprovante do estorno
+            Comprovante(s) do estorno
           </h3>
           <button aria-label="Fechar" onClick={onClose} className="text-xs px-2 py-1 rounded" style={{ color: "var(--text-muted)" }}>
             Fechar
@@ -47,27 +49,44 @@ function ComprovanteModal({ requestId, onClose }: { requestId: string; onClose: 
           style={{ border: "2px dashed var(--status-good)", color: "var(--status-good)" }}
         >
           <span className="text-2xl leading-none">📎</span>
-          {file ? file.name : "Selecionar foto ou PDF"}
-          <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          {files.length > 0 ? `${files.length} arquivo${files.length > 1 ? "s" : ""} selecionado${files.length > 1 ? "s" : ""}` : "Selecionar foto(s) ou PDF(s)"}
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+          />
         </label>
+        {files.length > 0 ? (
+          <ul className="text-xs flex flex-col gap-0.5 -mt-2" style={{ color: "var(--text-muted)" }}>
+            {files.map((f, i) => (
+              <li key={`${f.name}_${i}`} className="truncate">
+                {f.name}
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
         <button
-          disabled={!file || pending}
+          disabled={files.length === 0 || pending}
           onClick={enviar}
           className="rounded-lg px-3 py-2.5 font-semibold text-white disabled:opacity-60"
           style={{ background: "var(--status-good)" }}
         >
-          {pending ? "Enviando…" : "Enviar comprovante"}
+          {pending ? "Enviando…" : files.length > 1 ? "Enviar comprovantes" : "Enviar comprovante"}
         </button>
       </div>
     </>
   );
 }
 
-// Ações do financeiro/admin sobre uma solicitação: anexar comprovante (via
-// modal) pra concluir; depois de concluída, ainda dá pra "Alterar
-// comprovante" (reabre o mesmo modal, troca o arquivo) ou "Desfazer" (volta
-// pra pendente) -- pedido do Victor 23/09/2026, pro caso de ter mandado o
+// Ações do financeiro/admin sobre uma solicitação: anexar comprovante(s)
+// (via modal) pra concluir; depois de concluída, ainda dá pra "+ Adicionar
+// comprovante" (reabre o mesmo modal, ACRESCENTA mais arquivos -- pedido do
+// Victor 07/10/2026 -- não substitui os que já tinham sido enviados) ou
+// "Desfazer" (volta pra pendente, limpando todos os comprovantes dessa
+// rodada) -- pedido do Victor 23/09/2026, pro caso de ter mandado o
 // comprovante errado. Recusar continua só disponível enquanto pendente.
 export function EstornoFinanceiroActions({ requestId, status }: { requestId: string; status: "pendente" | "concluido" }) {
   const { pending, run } = useQuickAction();
@@ -84,7 +103,7 @@ export function EstornoFinanceiroActions({ requestId, status }: { requestId: str
           className="text-sm rounded-lg px-3 py-2 font-semibold disabled:opacity-60"
           style={{ border: "2px dashed var(--status-good)", color: "var(--status-good)" }}
         >
-          📎 {status === "concluido" ? "Alterar comprovante" : "Anexar comprovante"}
+          📎 {status === "concluido" ? "+ Adicionar comprovante" : "Anexar comprovante"}
         </button>
         {status === "concluido" ? (
           <button

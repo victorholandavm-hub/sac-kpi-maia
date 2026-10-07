@@ -8,6 +8,8 @@ import { photoPublicUrl } from "./localPhotoStorage";
 export type EstornoRequestStatus = "pendente" | "concluido" | "recusado";
 export type EstornoRequesterRole = "caixa" | "gerente";
 
+export type EstornoAnexo = { path: string; url: string; uploadedBy: string | null; createdAt: string };
+
 export type EstornoRequest = {
   id: string;
   storeId: string;
@@ -26,9 +28,9 @@ export type EstornoRequest = {
   produto: string | null;
   autorizadoPor: string | null;
   autorizadoGerencia: boolean;
-  anexoSolicitacaoUrl: string;
+  anexosSolicitacao: EstornoAnexo[];
   status: EstornoRequestStatus;
-  anexoComprovanteUrl: string | null;
+  anexosComprovante: EstornoAnexo[];
   concluidoPor: string | null;
   concluidoEm: string | null;
   recusadoPor: string | null;
@@ -69,7 +71,7 @@ type Row = {
   created_at: string;
 };
 
-function toEstornoRequest(row: Row): EstornoRequest {
+function toEstornoRequest(row: Row, anexos: { solicitacao: EstornoAnexo[]; comprovante: EstornoAnexo[] }): EstornoRequest {
   return {
     id: row.id,
     storeId: row.store_id,
@@ -88,9 +90,9 @@ function toEstornoRequest(row: Row): EstornoRequest {
     produto: row.produto,
     autorizadoPor: row.autorizado_por,
     autorizadoGerencia: row.autorizado_gerencia,
-    anexoSolicitacaoUrl: photoPublicUrl(row.anexo_solicitacao_path),
+    anexosSolicitacao: anexos.solicitacao,
     status: row.status,
-    anexoComprovanteUrl: row.anexo_comprovante_path ? photoPublicUrl(row.anexo_comprovante_path) : null,
+    anexosComprovante: anexos.comprovante,
     concluidoPor: row.concluido_por,
     concluidoEm: row.concluido_em,
     recusadoPor: row.recusado_por,
@@ -98,6 +100,30 @@ function toEstornoRequest(row: Row): EstornoRequest {
     motivoRecusa: row.motivo_recusa,
     createdAt: row.created_at,
   };
+}
+
+// Busca os anexos de um lote de solicitações de uma vez (1 query, não N+1) --
+// usado pelas 3 formas de ler estorno_requests abaixo.
+async function attachAnexos(rows: Row[]): Promise<EstornoRequest[]> {
+  if (rows.length === 0) return [];
+  const admin = getSupabaseAdmin();
+  const ids = rows.map((r) => r.id);
+  const { data: anexos, error } = await admin
+    .from("estorno_anexos")
+    .select("estorno_id, kind, path, uploaded_by, created_at")
+    .in("estorno_id", ids)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const porEstorno = new Map<string, { solicitacao: EstornoAnexo[]; comprovante: EstornoAnexo[] }>();
+  for (const a of anexos ?? []) {
+    const entry = porEstorno.get(a.estorno_id) ?? { solicitacao: [], comprovante: [] };
+    const item: EstornoAnexo = { path: a.path, url: photoPublicUrl(a.path), uploadedBy: a.uploaded_by, createdAt: a.created_at };
+    entry[a.kind as "solicitacao" | "comprovante"].push(item);
+    porEstorno.set(a.estorno_id, entry);
+  }
+
+  return rows.map((row) => toEstornoRequest(row, porEstorno.get(row.id) ?? { solicitacao: [], comprovante: [] }));
 }
 
 // Pro caixa/gerente -- só as solicitações das lojas dele.
@@ -111,7 +137,7 @@ export async function listEstornoRequestsForStores(storeIds: string[]): Promise<
     .order("created_at", { ascending: false })
     .returns<Row[]>();
   if (error) throw new Error(error.message);
-  return (data ?? []).map(toEstornoRequest);
+  return attachAnexos(data ?? []);
 }
 
 // Pro financeiro/admin -- todas as lojas, filtro opcional por status.
@@ -121,14 +147,16 @@ export async function listAllEstornoRequests(status?: EstornoRequestStatus): Pro
   if (status) query = query.eq("status", status);
   const { data, error } = await query.returns<Row[]>();
   if (error) throw new Error(error.message);
-  return (data ?? []).map(toEstornoRequest);
+  return attachAnexos(data ?? []);
 }
 
 export async function getEstornoRequestById(id: string): Promise<EstornoRequest | null> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.from("estorno_requests").select(COLUMNS).eq("id", id).maybeSingle().returns<Row>();
   if (error) throw new Error(error.message);
-  return data ? toEstornoRequest(data) : null;
+  if (!data) return null;
+  const [result] = await attachAnexos([data]);
+  return result;
 }
 
 export type NewEstornoRequestInput = {
@@ -147,7 +175,7 @@ export type NewEstornoRequestInput = {
   produto: string | null;
   autorizadoPor: string | null;
   autorizadoGerencia: boolean;
-  anexoSolicitacaoPath: string;
+  anexoSolicitacaoPaths: string[];
 };
 
 // `id` é gerado antes (crypto.randomUUID(), ver estornos-actions.ts) --
@@ -173,42 +201,56 @@ export async function createEstornoRequest(id: string, input: NewEstornoRequestI
     produto: input.produto,
     autorizado_por: input.autorizadoPor,
     autorizado_gerencia: input.autorizadoGerencia,
-    anexo_solicitacao_path: input.anexoSolicitacaoPath,
+    // 1º arquivo -- satisfaz a NOT NULL da coluna antiga. A lista completa
+    // (pode ter mais de um, ver estorno_anexos) entra logo abaixo.
+    anexo_solicitacao_path: input.anexoSolicitacaoPaths[0],
   });
   if (error) throw new Error(error.message);
+
+  const { error: anexoError } = await admin
+    .from("estorno_anexos")
+    .insert(input.anexoSolicitacaoPaths.map((path) => ({ estorno_id: id, kind: "solicitacao" as const, path, uploaded_by: input.requesterName })));
+  if (anexoError) throw new Error(anexoError.message);
 }
 
-// Upload do comprovante e conclusão são o mesmo passo pro financeiro (ver
-// /api/financeiro/upload-comprovante) -- só pendente pode ser concluída.
-export async function marcarEstornoConcluido(id: string, financeiroName: string, comprovantePath: string): Promise<void> {
+// Upload do(s) comprovante(s) e conclusão são o mesmo passo pro financeiro
+// (ver /api/financeiro/upload-comprovante) -- só pendente pode ser
+// concluída. Chamar de novo numa solicitação já concluída ADICIONA mais
+// comprovantes (pedido do Victor 07/10/2026: "seja possível adicionar mais
+// de um comprovante"), não substitui os que já tinham sido anexados.
+export async function marcarEstornoConcluido(id: string, financeiroName: string, comprovantePaths: string[]): Promise<void> {
   const admin = getSupabaseAdmin();
-  const { data: current } = await admin.from("estorno_requests").select("status").eq("id", id).maybeSingle();
+  const { data: current } = await admin.from("estorno_requests").select("status, anexo_comprovante_path").eq("id", id).maybeSingle();
   if (!current) throw new Error("Solicitação não encontrada.");
   // Recusado é terminal -- não dá pra "concluir por cima". Pendente (1ª vez)
-  // ou concluído (trocar o comprovante errado, pedido do Victor 23/09/2026)
-  // são os dois casos válidos aqui.
+  // ou concluído (adicionar mais comprovante) são os dois casos válidos aqui.
   if (current.status === "recusado") throw new Error("Essa solicitação foi recusada -- não dá pra concluir.");
 
-  const { error } = await admin
-    .from("estorno_requests")
-    .update({
-      status: "concluido",
-      anexo_comprovante_path: comprovantePath,
-      concluido_por: financeiroName,
-      concluido_em: new Date().toISOString(),
-    })
-    .eq("id", id);
+  const { error: anexoError } = await admin
+    .from("estorno_anexos")
+    .insert(comprovantePaths.map((path) => ({ estorno_id: id, kind: "comprovante" as const, path, uploaded_by: financeiroName })));
+  if (anexoError) throw new Error(anexoError.message);
+
+  const update: Record<string, unknown> = { status: "concluido", concluido_por: financeiroName, concluido_em: new Date().toISOString() };
+  // Coluna antiga só recebe o 1º comprovante de verdade -- chamadas
+  // seguintes (adicionando mais) não sobrescrevem ela.
+  if (!current.anexo_comprovante_path) update.anexo_comprovante_path = comprovantePaths[0];
+
+  const { error } = await admin.from("estorno_requests").update(update).eq("id", id);
   if (error) throw new Error(error.message);
 }
 
 // Desfaz a conclusão (comprovante errado, ou concluiu sem querer) -- volta
-// pra pendente, limpando o comprovante e quem concluiu. Pedido do Victor
-// 23/09/2026.
+// pra pendente, limpando TODOS os comprovantes anexados e quem concluiu.
+// Pedido do Victor 23/09/2026 (estendido 07/10/2026 pra múltiplos).
 export async function desfazerConclusaoEstorno(id: string): Promise<void> {
   const admin = getSupabaseAdmin();
   const { data: current } = await admin.from("estorno_requests").select("status").eq("id", id).maybeSingle();
   if (!current) throw new Error("Solicitação não encontrada.");
   if (current.status !== "concluido") throw new Error("Essa solicitação não está concluída.");
+
+  const { error: delError } = await admin.from("estorno_anexos").delete().eq("estorno_id", id).eq("kind", "comprovante");
+  if (delError) throw new Error(delError.message);
 
   const { error } = await admin
     .from("estorno_requests")

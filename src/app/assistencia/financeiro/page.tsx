@@ -194,21 +194,26 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                   </div>
                 ) : null}
 
-                <a
-                  href={r.anexoSolicitacaoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm underline self-start"
-                  style={{ color: "var(--brand-green)" }}
-                >
-                  Ver comprovante da venda
-                </a>
+                {r.anexosSolicitacao.map((a, i) => (
+                  <a
+                    key={a.path}
+                    href={a.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm underline self-start"
+                    style={{ color: "var(--brand-green)" }}
+                  >
+                    Ver comprovante da venda{r.anexosSolicitacao.length > 1 ? ` (${i + 1})` : ""}
+                  </a>
+                ))}
 
-                {r.status === "concluido" && r.anexoComprovanteUrl ? (
+                {r.status === "concluido" && r.anexosComprovante.length > 0 ? (
                   <div className="flex flex-col gap-1">
-                    <a href={r.anexoComprovanteUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline self-start" style={{ color: "var(--status-good)" }}>
-                      Ver comprovante do estorno
-                    </a>
+                    {r.anexosComprovante.map((a, i) => (
+                      <a key={a.path} href={a.url} target="_blank" rel="noopener noreferrer" className="text-sm underline self-start" style={{ color: "var(--status-good)" }}>
+                        Ver comprovante do estorno{r.anexosComprovante.length > 1 ? ` (${i + 1})` : ""}
+                      </a>
+                    ))}
                     <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                       Concluído por {r.concluidoPor} em {r.concluidoEm ? new Date(r.concluidoEm).toLocaleDateString("pt-BR") : "—"}
                     </span>

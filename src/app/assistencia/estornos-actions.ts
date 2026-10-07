@@ -32,9 +32,10 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
 }
 
 // Formulário de solicitação de estorno (caixa/gerente) -- campos do print
-// de referência do Victor (23/09/2026), + anexo obrigatório (foto ou PDF do
-// comprovante da venda). Anexo sobe ANTES da linha existir (mesmo padrão de
-// createSacRequest em servicePhotos.ts) -- se o upload falhar, nenhuma
+// de referência do Victor (23/09/2026), + anexo obrigatório (1 ou mais
+// fotos/PDFs do comprovante da venda, pedido do Victor 07/10/2026). Anexos
+// sobem ANTES da linha existir (mesmo padrão de createSacRequest em
+// servicePhotos.ts) -- se o upload falhar, nenhuma
 // solicitação chega a ser criada.
 export async function createEstornoRequestAction(_state: EstornoFormState, formData: FormData): Promise<EstornoFormState> {
   const requester = await resolveEstornoRequester();
@@ -58,13 +59,13 @@ export async function createEstornoRequestAction(_state: EstornoFormState, formD
   }
   const autorizadoGerencia = autorizadoGerenciaRaw === "sim";
 
-  const file = formData.get("anexo");
-  if (!(file instanceof File) || file.size === 0) return { error: "Anexe uma foto ou PDF do comprovante da venda." };
+  const files = formData.getAll("anexo").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) return { error: "Anexe ao menos uma foto ou PDF do comprovante da venda." };
 
   const id = randomUUID();
-  let anexoPath: string;
+  let anexoPaths: string[];
   try {
-    anexoPath = await uploadPendingRequestPhoto(id, file);
+    anexoPaths = await Promise.all(files.map((f) => uploadPendingRequestPhoto(id, f)));
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível enviar o anexo." };
   }
@@ -86,7 +87,7 @@ export async function createEstornoRequestAction(_state: EstornoFormState, formD
       produto: emptyToNull(formData.get("produto")),
       autorizadoPor: emptyToNull(formData.get("autorizado_por")),
       autorizadoGerencia,
-      anexoSolicitacaoPath: anexoPath,
+      anexoSolicitacaoPaths: anexoPaths,
     });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Não foi possível criar a solicitação." };
