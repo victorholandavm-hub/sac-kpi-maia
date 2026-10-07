@@ -211,9 +211,18 @@ type TotvsDeliveryMotorista = { codigo?: string; nome?: string };
 
 type TotvsDeliveryOcorrencia = { codigo?: string; descricao?: string; categoria?: string; nivel?: string };
 
-// itens[] existe no payload real mas é ignorado -- fora do escopo do MVP, a
-// regra de negócio é a nível de pedido/carga, não de item.
-//
+// itens[] (ZAI) passou a ser gravado em 07/10/2026, em totvs_delivery_carga_itens
+// (migration 0156), para o volume P/M/G por carga da tela de KPIs logísticos.
+type TotvsDeliveryItem = {
+  item?: string;
+  produto?: string;
+  descricao?: string;
+  quantidade?: number;
+  status?: string;
+  statusCodigo?: string;
+  ocorrencia?: { codigo?: string; descricao?: string; categoria?: string };
+};
+
 // CAMPOS RENOMEADOS EM RELAÇÃO A api-totvs.yaml: a resposta real (inspecionada
 // em 2026-07-30 via GET /rest/ai/deliveries) usa "invoice" onde a doc chama de
 // "notaFiscal" -- resto da carga bate com o documentado.
@@ -239,6 +248,7 @@ type TotvsDeliveryCarga = {
   dtRetorno?: string;
   hrRetorno?: string;
   ocorrencia?: TotvsDeliveryOcorrencia;
+  itens?: TotvsDeliveryItem[];
 };
 
 // CAMPOS RENOMEADOS EM RELAÇÃO A api-totvs.yaml: a doc chama de "pedido" e
@@ -976,6 +986,73 @@ export function detectDeliveryRiskTrigger(
   return null;
 }
 
+export type CargaItemRow = {
+  delivery_carga_id: string;
+  item: string;
+  produto: string;
+  descricao: string | null;
+  quantidade: number;
+  status_codigo: string | null;
+  ocorrencia_codigo: string | null;
+  ocorrencia_descricao: string | null;
+  updated_at: string;
+};
+
+// Item sem número ou sem produto não tem como virar linha (a chave é
+// delivery_carga_id + item, e o porte sai do produto) -- descartado. Item
+// repetido no payload fica com a última ocorrência, senão o upsert em lote
+// falha com "ON CONFLICT DO UPDATE command cannot affect row a second time".
+export function mapCargaItens(deliveryCargaId: string, itens: TotvsDeliveryItem[], now: string): CargaItemRow[] {
+  const byItem = new Map<string, CargaItemRow>();
+  for (const i of itens) {
+    const item = i.item?.trim();
+    const produto = i.produto?.trim();
+    if (!item || !produto) continue;
+    const quantidade = Number(i.quantidade);
+    byItem.set(item, {
+      delivery_carga_id: deliveryCargaId,
+      item,
+      produto,
+      descricao: i.descricao?.trim() || null,
+      quantidade: Number.isFinite(quantidade) ? quantidade : 0,
+      status_codigo: i.statusCodigo || null,
+      ocorrencia_codigo: i.ocorrencia?.codigo || null,
+      ocorrencia_descricao: i.ocorrencia?.descricao || null,
+      updated_at: now,
+    });
+  }
+  return [...byItem.values()];
+}
+
+// Espelha cargas[].itens: grava os que vieram e apaga os que sumiram. Sem o
+// campo itens no payload (undefined), não mexe -- só um array vazio explícito
+// significa "a carga não tem mais itens".
+async function syncCargaItens(
+  supabase: SupabaseAdmin,
+  deliveryCargaId: string,
+  itens: TotvsDeliveryItem[] | undefined,
+  context: string,
+  errors: string[]
+): Promise<void> {
+  if (!itens) return;
+  const rows = mapCargaItens(deliveryCargaId, itens, new Date().toISOString());
+
+  if (rows.length > 0) {
+    const { error } = await supabase.from("totvs_delivery_carga_itens").upsert(rows, { onConflict: "delivery_carga_id,item" });
+    if (error) {
+      errors.push(`${context} itens: ${error.message}`);
+      return;
+    }
+  }
+
+  let stale = supabase.from("totvs_delivery_carga_itens").delete().eq("delivery_carga_id", deliveryCargaId);
+  if (rows.length > 0) {
+    stale = stale.not("item", "in", `(${rows.map((r) => `"${r.item.replace(/"/g, '\\"')}"`).join(",")})`);
+  }
+  const { error: deleteError } = await stale;
+  if (deleteError) errors.push(`${context} remover itens antigos: ${deleteError.message}`);
+}
+
 async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, errors: string[]): Promise<boolean> {
   const { data: existingDelivery } = await supabase
     .from("totvs_deliveries")
@@ -1024,7 +1101,7 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
   const trigger = detectDeliveryRiskTrigger(existingCargas, d.cargas ?? []);
 
   for (const c of d.cargas ?? []) {
-    const { error: cargaError } = await supabase.from("totvs_delivery_cargas").upsert(
+    const { data: cargaRow, error: cargaError } = await supabase.from("totvs_delivery_cargas").upsert(
       {
         delivery_id: deliveryRow.id,
         carga: c.carga,
@@ -1053,8 +1130,14 @@ async function upsertDelivery(supabase: SupabaseAdmin, d: TotvsDeliveryOrder, er
         ocorrencia_nivel: c.ocorrencia?.nivel || null,
       },
       { onConflict: "delivery_id,carga" }
-    );
-    if (cargaError) errors.push(`delivery ${d.order} carga ${c.carga}: ${cargaError.message}`);
+    )
+      .select("id")
+      .single();
+    if (cargaError || !cargaRow) {
+      errors.push(`delivery ${d.order} carga ${c.carga}: ${cargaError?.message ?? "sem id retornado"}`);
+      continue;
+    }
+    await syncCargaItens(supabase, cargaRow.id, c.itens, `delivery ${d.order} carga ${c.carga}`, errors);
   }
 
   // Remove da tabela de junção qualquer carga que EXISTIA antes
