@@ -1,4 +1,7 @@
 import https from "node:https";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { randomUUID } from "node:crypto";
+import { hostname } from "node:os";
 import { getSupabaseAdmin } from "./supabaseAdmin.ts";
 import { recordSyncRun } from "./syncRuns.ts";
 
@@ -298,7 +301,76 @@ function delay(ms: number): Promise<void> {
 const RETRY_DELAYS_MS = [5_000, 10_000];
 const MAX_ATTEMPTS = RETRY_DELAYS_MS.length + 1;
 
+// Trava de execução única (migration 0155_sync_locks.sql) -- achado do
+// Victor 07/10/2026: o sync rodava ao mesmo tempo pela tarefa agendada do
+// PC (30 min), pelo GitHub Actions (2h) e pelo backfill do NPS em /api/sync,
+// passando do limite de 2 conexões da API do Protheus. Toda chamada passa
+// por fetchTotvs, que exige a trava -- sequencial debaixo de uma trava só,
+// nunca há mais de 1 conexão nossa aberta.
+//
+// AsyncLocalStorage em vez de variável de módulo: no Next, a mesma instância
+// atende várias requisições ao mesmo tempo, e uma variável global deixaria o
+// /api/sync "pegar carona" na trava de um /api/totvs-sync em andamento.
+//
+// TTL curto + renovação: se o processo morrer, a trava libera em até 10 min.
+// Uma chamada leva no pior caso ~150 s (45 s x 3 tentativas + 15 s de
+// espera), bem dentro da folga entre renovações.
+const TRAVA_JOB = "totvs";
+const TRAVA_TTL_SEGUNDOS = 600;
+const TRAVA_RENOVAR_APOS_MS = 120_000;
+
+type TravaTotvs = { supabase: SupabaseAdmin; dono: string; renovadaEm: number };
+const travaAtual = new AsyncLocalStorage<TravaTotvs>();
+
+export type TravaOcupada = { skipped: "em_execucao"; origem: string | null; desde: string | null };
+
+function descreverOrigem(origem: string): string {
+  // PM2 expõe o nome do app em `name` -- diferencia sac/assistencia/-ip.
+  return `${origem}@${process.env.name ?? hostname()}`;
+}
+
+async function comTravaTotvs<T>(supabase: SupabaseAdmin, origem: string, fn: () => Promise<T>): Promise<T | TravaOcupada> {
+  if (travaAtual.getStore()) return fn();
+
+  const dono = randomUUID();
+  const { data, error } = await supabase
+    .rpc("adquirir_trava", {
+      p_job: TRAVA_JOB,
+      p_dono: dono,
+      p_origem: descreverOrigem(origem),
+      p_ttl_segundos: TRAVA_TTL_SEGUNDOS,
+    })
+    .single<{ adquirida: boolean; origem: string | null; desde: string | null }>();
+  // Falha fechada: sem conseguir confirmar a trava, não chama o Protheus.
+  if (error || !data) throw new Error(`adquirir_trava: ${error?.message ?? "sem resposta"}`);
+  if (!data.adquirida) return { skipped: "em_execucao", origem: data.origem, desde: data.desde };
+
+  try {
+    return await travaAtual.run({ supabase, dono, renovadaEm: Date.now() }, fn);
+  } finally {
+    const { error: liberarError } = await supabase.rpc("liberar_trava", { p_job: TRAVA_JOB, p_dono: dono });
+    // Não derruba o resultado: no pior caso a trava expira sozinha pelo TTL.
+    if (liberarError) console.error("[totvsSync] liberar_trava:", liberarError.message);
+  }
+}
+
+async function garantirTravaTotvs(): Promise<void> {
+  const trava = travaAtual.getStore();
+  if (!trava) throw new Error("chamada ao Protheus fora da trava totvs");
+  if (Date.now() - trava.renovadaEm < TRAVA_RENOVAR_APOS_MS) return;
+
+  const { data, error } = await trava.supabase.rpc("renovar_trava", {
+    p_job: TRAVA_JOB,
+    p_dono: trava.dono,
+    p_ttl_segundos: TRAVA_TTL_SEGUNDOS,
+  });
+  if (error) throw new Error(`renovar_trava: ${error.message}`);
+  if (data !== true) throw new Error("trava totvs perdida para outra execução");
+  trava.renovadaEm = Date.now();
+}
+
 async function fetchTotvs<T>(url: string, attempt = 1): Promise<T> {
+  await garantirTravaTotvs();
   let res: { status: number; body: string };
   try {
     res = await getTotvs(url);
@@ -556,12 +628,25 @@ const BACKFILL_MAX_CODES = 80;
 // import sem extensão (ver comentário de RESOLVIDO_LABELS em
 // entregasRisco.ts) -- não é um problema pra quem importa DAQUI pra fora
 // (o sentido contrário é que quebraria `node scripts/totvs-sync.ts`).
+//
+// Chamado de fora (NPS em /api/sync), tenta a trava sem esperar: se o sync
+// estiver rodando, pula nesta rodada -- os códigos faltantes voltam na
+// próxima, e o próprio sync também faz backfill (backfillMissingClients).
 export async function backfillClientCodes(supabase: SupabaseAdmin, codes: Set<string>, maxCodes = BACKFILL_MAX_CODES): Promise<SyncResult> {
+  if (codes.size === 0) return { checked: 0, upserted: 0, errors: [] };
+  const result = await comTravaTotvs(supabase, "backfill-clientes", () => backfillClientCodesNaTrava(supabase, codes, maxCodes));
+  if ("skipped" in result) {
+    console.info(`[totvsSync] backfill de clientes pulado: trava com ${result.origem} desde ${result.desde}`);
+    return { checked: 0, upserted: 0, errors: [] };
+  }
+  return result;
+}
+
+async function backfillClientCodesNaTrava(supabase: SupabaseAdmin, codes: Set<string>, maxCodes: number): Promise<SyncResult> {
   const started = Date.now();
   const errors: string[] = [];
   let checked = 0;
   let upserted = 0;
-  if (codes.size === 0) return { checked, upserted, errors };
 
   const { data: existing } = await supabase.from("totvs_clientes").select("protheus_code").in("protheus_code", [...codes]);
   const existingCodes = new Set((existing ?? []).map((r) => r.protheus_code as string));
@@ -1189,11 +1274,17 @@ export type TotvsSyncSummary = {
   errors: string[];
 };
 
-export async function runTotvsSync(supabase: SupabaseAdmin): Promise<TotvsSyncSummary> {
+// Se outra execução já está com a trava, devolve TravaOcupada sem chamar o
+// Protheus e sem gravar em sync_runs -- pular não é falha, e gravar ok=false
+// dispararia o alerta do notifyAdmin a cada sobreposição.
+export async function runTotvsSync(supabase: SupabaseAdmin, origem: string): Promise<TotvsSyncSummary | TravaOcupada> {
   if (!BASE_URL || !process.env.TOTVS_API_KEY) {
     throw new Error("TOTVS_API_BASE_URL/TOTVS_API_KEY ausentes");
   }
+  return comTravaTotvs(supabase, origem, () => runTotvsSyncNaTrava(supabase));
+}
 
+async function runTotvsSyncNaTrava(supabase: SupabaseAdmin): Promise<TotvsSyncSummary> {
   const clients = await syncClients(supabase);
   const orders = await syncOrders(supabase);
   // Antes do scan sequencial: refresca com prioridade os pedidos não
