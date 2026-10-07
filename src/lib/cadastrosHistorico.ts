@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
+import { REQUEST_TYPE_LABELS, STATUS_LABELS, PART_ORDER_STATUS_LABELS } from "./assistenciaLabels";
 
 // Cadastros -- histórico de assistência pré-sistema (planilha "Solicitações
 // de Assistência", Dez/2024-Out/2026, importada uma única vez em
@@ -442,4 +443,67 @@ export async function updateCadastroHistorico(id: string, input: UpdateCadastroI
 
   const { error } = await admin.from("assistencia_cadastros_historico").update(update).eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+export type HistoricoClienteItem = {
+  id: string;
+  kind: "visita_entrega" | "peca";
+  ticketNumber: number;
+  label: string;
+  statusLabel: string;
+  createdAt: string;
+};
+
+// "Histórico" dentro de Ver detalhes (pedido do Victor 07/10/2026): o que já
+// foi feito com esse cliente -- visita/entrega (service_requests) e pedido de
+// peça (part_orders). Casa por CPF/telefone exatos -- "Criar nova visita/
+// entrega/pedido de peça" (CadastroDetalheModal.tsx) sempre copia o
+// cpf/telefone do cadastro pro chamado novo sem reformatar, então o match
+// exato cobre tudo que nasceu daqui. Não casa por nome (ambíguo demais) nem
+// por código do cliente (service_requests não tem essa coluna hoje).
+export async function listHistoricoCliente(cpf: string | null, telefone: string | null): Promise<HistoricoClienteItem[]> {
+  if (!cpf && !telefone) return [];
+  const admin = getSupabaseAdmin();
+
+  async function porCampo(table: "service_requests" | "part_orders", field: "client_cpf" | "client_phone", value: string | null) {
+    if (!value) return [];
+    const columns =
+      table === "service_requests"
+        ? "id, ticket_number, type, status, created_at"
+        : "id, ticket_number, product, part_name, status, created_at";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await admin.from(table).select(columns as any).eq(field, value).order("created_at", { ascending: false }).limit(20);
+    return (data ?? []) as unknown as Record<string, unknown>[];
+  }
+
+  const [reqPorCpf, reqPorTelefone, pecaPorCpf, pecaPorTelefone] = await Promise.all([
+    porCampo("service_requests", "client_cpf", cpf),
+    porCampo("service_requests", "client_phone", telefone),
+    porCampo("part_orders", "client_cpf", cpf),
+    porCampo("part_orders", "client_phone", telefone),
+  ]);
+
+  const items = new Map<string, HistoricoClienteItem>();
+  for (const row of [...reqPorCpf, ...reqPorTelefone]) {
+    items.set(`r_${row.id}`, {
+      id: `r_${row.id}`,
+      kind: "visita_entrega",
+      ticketNumber: row.ticket_number as number,
+      label: REQUEST_TYPE_LABELS[row.type as string] ?? (row.type as string),
+      statusLabel: STATUS_LABELS[row.status as string] ?? (row.status as string),
+      createdAt: row.created_at as string,
+    });
+  }
+  for (const row of [...pecaPorCpf, ...pecaPorTelefone]) {
+    items.set(`p_${row.id}`, {
+      id: `p_${row.id}`,
+      kind: "peca",
+      ticketNumber: row.ticket_number as number,
+      label: (row.part_name as string) || (row.product as string) || "Peça",
+      statusLabel: PART_ORDER_STATUS_LABELS[row.status as string] ?? (row.status as string),
+      createdAt: row.created_at as string,
+    });
+  }
+
+  return [...items.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 25);
 }

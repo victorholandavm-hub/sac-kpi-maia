@@ -117,17 +117,6 @@ export default async function TecnicoEstoquePage({
             {/* Ações do cabeçalho como pílulas ghost (vidro fosco) --
                 Guia de Componentes Maia (Design System, 01/09/2026). */}
             <div className="flex items-center gap-1 text-sm shrink-0">
-              {/* Pedido do Victor 07/10/2026: a pílula ghost ficava discreta
-                  demais no cabeçalho verde (Adriel não percebia que o botão
-                  existia) -- mesmo CTA laranja/sólido que a tela de
-                  assistência usa pro mesmo botão (ver estoque/page.tsx). */}
-              <Link
-                href="/assistencia/tecnico/estoque/nova"
-                className="text-sm px-4 py-2.5 rounded-lg font-bold shadow-md whitespace-nowrap"
-                style={{ background: "var(--brand-orange)", color: "#fff", border: "2px solid var(--brand-orange)" }}
-              >
-                + Nova movimentação
-              </Link>
               {/* Pedido do Victor 04/09/2026: "preciso de duas coisas na
                   tela da equipe tecnica: modo dark" -- mesmo motivo/
                   componente de tecnico/page.tsx, ver lá. */}
@@ -180,28 +169,40 @@ export default async function TecnicoEstoquePage({
           </div>
 
           {/* Segmented Control -- mesmo componente de tecnico/page.tsx
-              (Guia de Componentes Maia, Design System 01/09/2026): duas
-              opções trocando o contexto inteiro da tabela abaixo. */}
-          <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start">
-            {(
-              [
-                [undefined, "Pendentes de retirada", pendentes.length],
-                ["retiradas", "Confirmadas", historico.length],
-                ["devolvidas", "Devolvidas", devolvidas.length],
-                ["reparadas", "Reparadas", reparadas.length],
-              ] as const
-            ).map(([value, label, count]) => (
-              <Link
-                key={label}
-                href={buildHref({ view: value, q, factory })}
-                className={`px-3.5 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-all duration-200 ${
-                  (value ?? undefined) === view ? "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                }`}
-              >
-                {label}
-                <span className="text-xs font-mono text-gray-400 dark:text-gray-500">({count})</span>
-              </Link>
-            ))}
+              (Guia de Componentes Maia, Design System 01/09/2026): quatro
+              opções trocando o contexto inteiro da lista abaixo. Botão "+
+              Nova movimentação" nessa mesma linha (pedido do Victor
+              07/10/2026) -- saiu do cabeçalho verde, que não era o lugar
+              certo. */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="inline-flex items-center gap-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-1 self-start">
+              {(
+                [
+                  [undefined, "Pendentes de retirada", pendentes.length],
+                  ["retiradas", "Confirmadas", historico.length],
+                  ["devolvidas", "Devolvidas", devolvidas.length],
+                  ["reparadas", "Reparadas", reparadas.length],
+                ] as const
+              ).map(([value, label, count]) => (
+                <Link
+                  key={label}
+                  href={buildHref({ view: value, q, factory })}
+                  className={`px-3.5 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-all duration-200 ${
+                    (value ?? undefined) === view ? "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  }`}
+                >
+                  {label}
+                  <span className="text-xs font-mono text-gray-400 dark:text-gray-500">({count})</span>
+                </Link>
+              ))}
+            </div>
+            <Link
+              href="/assistencia/tecnico/estoque/nova"
+              className="text-sm px-4 py-2.5 rounded-lg font-bold shadow-md whitespace-nowrap shrink-0"
+              style={{ background: "var(--brand-orange)", color: "#fff", border: "2px solid var(--brand-orange)" }}
+            >
+              + Nova movimentação
+            </Link>
           </div>
 
           {movements.length === 0 ? (

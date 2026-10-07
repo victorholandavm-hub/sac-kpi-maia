@@ -5,10 +5,12 @@ import { getProfile, requireRole } from "@/lib/dal";
 import {
   addCadastroHistorico,
   updateCadastroHistorico,
+  listHistoricoCliente,
   CADASTRO_TIPOS,
   CADASTRO_STATUSES,
   type CadastroTipo,
   type CadastroStatus,
+  type HistoricoClienteItem,
 } from "@/lib/cadastrosHistorico";
 
 export type FormState = { error?: string } | undefined;
@@ -118,4 +120,15 @@ export async function updateCadastroHistoricoAction(_state: FormState, formData:
 
   revalidatePath("/assistencia/cadastros");
   return undefined;
+}
+
+// "Histórico" dentro de Ver detalhes -- pedido do Victor 07/10/2026: "ver o
+// histórico do que fiz com o cliente (se fiz uma entrega, uma visita, uma
+// solicitação de peça)". Busca sob demanda, só quando a pessoa expande a
+// seção (ver CadastroDetalheModal.tsx) -- lista inteira de cadastros não
+// precisa pagar o preço dessa consulta sempre.
+export async function getHistoricoClienteAction(cpf: string | null, telefone: string | null): Promise<HistoricoClienteItem[]> {
+  const profile = await getProfile();
+  requireRole(profile, "admin", "assistencia");
+  return listHistoricoCliente(cpf, telefone);
 }
