@@ -403,8 +403,8 @@ export function NovoEstornoRequestForm({ storeOptions }: { storeOptions?: { id: 
         </div>
       </Field>
 
-      <Field label="Comprovante da venda (foto ou PDF)" required>
-        <input name="anexo" type="file" accept="image/*,application/pdf" required className="rounded border px-3 py-2" style={inputStyle} />
+      <Field label="Comprovante(s) da venda (foto ou PDF)" required>
+        <input name="anexo" type="file" accept="image/*,application/pdf" required multiple className="rounded border px-3 py-2" style={inputStyle} />
       </Field>
 
       {state?.error ? (

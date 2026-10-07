@@ -86,14 +86,18 @@ export default async function EstornosPage({ searchParams }: { searchParams: Pro
                   {r.motivo ? <p>Motivo: {r.motivo}</p> : null}
                   {r.autorizadoPor ? <p>Autorizado por: {r.autorizadoPor}</p> : null}
                   <p>Autorizado pela gerência: {r.autorizadoGerencia ? "Sim" : "Não"}</p>
-                  <a href={r.anexoSolicitacaoUrl} target="_blank" rel="noopener noreferrer" className="underline self-start" style={{ color: "var(--brand-green)" }}>
-                    Ver comprovante da venda
-                  </a>
-                  {r.status === "concluido" && r.anexoComprovanteUrl ? (
-                    <a href={r.anexoComprovanteUrl} target="_blank" rel="noopener noreferrer" className="underline self-start" style={{ color: "var(--status-good)" }}>
-                      Ver comprovante do estorno
+                  {r.anexosSolicitacao.map((a, i) => (
+                    <a key={a.path} href={a.url} target="_blank" rel="noopener noreferrer" className="underline self-start" style={{ color: "var(--brand-green)" }}>
+                      Ver comprovante da venda{r.anexosSolicitacao.length > 1 ? ` (${i + 1})` : ""}
                     </a>
-                  ) : null}
+                  ))}
+                  {r.status === "concluido"
+                    ? r.anexosComprovante.map((a, i) => (
+                        <a key={a.path} href={a.url} target="_blank" rel="noopener noreferrer" className="underline self-start" style={{ color: "var(--status-good)" }}>
+                          Ver comprovante do estorno{r.anexosComprovante.length > 1 ? ` (${i + 1})` : ""}
+                        </a>
+                      ))
+                    : null}
                   {r.status === "recusado" && r.motivoRecusa ? (
                     <p style={{ color: "var(--status-critical)" }}>Motivo da recusa: {r.motivoRecusa}</p>
                   ) : null}

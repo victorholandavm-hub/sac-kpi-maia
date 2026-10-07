@@ -38,20 +38,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Solicitação inválida." }, { status: 400 });
     }
 
-    const file = formData.get("comprovante");
-    if (!(file instanceof File) || file.size === 0) {
-      return NextResponse.json({ error: "Selecione o comprovante do estorno." }, { status: 400 });
+    const files = formData.getAll("comprovante").filter((f): f is File => f instanceof File && f.size > 0);
+    if (files.length === 0) {
+      return NextResponse.json({ error: "Selecione ao menos um comprovante do estorno." }, { status: 400 });
     }
 
-    let comprovantePath: string;
+    let comprovantePaths: string[];
     try {
-      comprovantePath = await uploadPendingRequestPhoto(requestId, file);
+      comprovantePaths = await Promise.all(files.map((f) => uploadPendingRequestPhoto(requestId, f)));
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 400 });
     }
 
     try {
-      await marcarEstornoConcluido(requestId, actorName, comprovantePath);
+      await marcarEstornoConcluido(requestId, actorName, comprovantePaths);
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 400 });
     }
