@@ -12,8 +12,9 @@ import { runTotvsSync } from "../src/lib/totvsSync.ts";
 
 async function main() {
   const supabase = getSupabaseAdmin();
-  const summary = await runTotvsSync(supabase);
+  const summary = await runTotvsSync(supabase, "script");
   console.log(JSON.stringify(summary, null, 2));
+  if ("skipped" in summary) return;
   if (!summary.ok) process.exitCode = 1;
 }
 

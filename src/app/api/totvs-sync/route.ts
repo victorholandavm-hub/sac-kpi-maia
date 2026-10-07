@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const summary = await runTotvsSync(getSupabaseAdmin());
+    // Trava ocupada também sai com 200 ({ skipped: "em_execucao", ... }), para
+    // não marcar falha no GitHub Actions a cada sobreposição.
+    const summary = await runTotvsSync(getSupabaseAdmin(), "rota");
     return NextResponse.json(summary);
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
