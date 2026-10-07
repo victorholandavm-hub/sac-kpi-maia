@@ -7,6 +7,7 @@ import { listSuppliers } from "@/lib/partOrders";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { FilterSelect } from "@/components/assistencia/FilterSelect";
 import { WithdrawStockMovementButton } from "@/components/assistencia/WithdrawStockMovementButton";
+import { StockMovementCard } from "@/components/assistencia/StockMovementCard";
 import { TecnicoTabs } from "@/components/assistencia/TecnicoTabs";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -56,6 +57,15 @@ export default async function TecnicoEstoquePage({
 
   const { view, q, factory } = await searchParams;
   const showHistorico = view === "retiradas";
+  // Devolução/reparo -- pedido do Victor 07/10/2026: "ele precisa ter o
+  // mesmo nível de acesso... como adicionar peça e etc". A equipe técnica já
+  // criava esses dois tipos pelo "+ Nova movimentação" (ver estoque-actions.ts),
+  // mas essa tela só listava retirada/confirmação -- o registro ficava
+  // invisível pra quem criou. Reaproveita StockMovementCard (mesmo card da
+  // tela de assistência) em vez da tabela customizada abaixo, que foi
+  // desenhada só pro fluxo de retirada.
+  const showDevolvidas = view === "devolvidas";
+  const showReparadas = view === "reparadas";
 
   // Filtro por produto/código/cliente (q) e fábrica -- pedido do Victor
   // 31/08/2026: "ficou faltando os filtros na tela de estoque". Mesmos
@@ -66,16 +76,18 @@ export default async function TecnicoEstoquePage({
   // pendente agora"/"o que confirmei recentemente", não faz relatório por
   // período. Busca as duas listas (pendentes/histórico) em paralelo --
   // precisa das duas pra mostrar o contador de cada aba ao mesmo tempo.
-  const [pendentes, historico, suppliers] = await Promise.all([
+  const [pendentes, historico, devolvidas, reparadas, suppliers] = await Promise.all([
     listStockMovements({ onlyPendingWithdrawal: true, q, factory }),
     // Confirmada = `withdrawnBy` preenchido, não `movementDate` preenchido
     // (esclarecido 01/09/2026: ver isPendingWithdrawal em stockMovements.ts
     // -- `movementDate` pode já vir preenchido em registros antigos/importados
     // sem que a equipe técnica tenha realmente confirmado o lançamento).
     listStockMovements({ movementType: "retirado", q, factory }).then((rows) => rows.filter((m) => m.withdrawnBy)),
+    listStockMovements({ movementType: "devolvido", q, factory }),
+    listStockMovements({ movementType: "reparado", q, factory }),
     listSuppliers(),
   ]);
-  const movements = showHistorico ? historico : pendentes;
+  const movements = showDevolvidas ? devolvidas : showReparadas ? reparadas : showHistorico ? historico : pendentes;
 
   return (
     <ToastProvider>
@@ -171,6 +183,8 @@ export default async function TecnicoEstoquePage({
               [
                 [undefined, "Pendentes de retirada", pendentes.length],
                 ["retiradas", "Confirmadas", historico.length],
+                ["devolvidas", "Devolvidas", devolvidas.length],
+                ["reparadas", "Reparadas", reparadas.length],
               ] as const
             ).map(([value, label, count]) => (
               <Link
@@ -189,8 +203,20 @@ export default async function TecnicoEstoquePage({
           {movements.length === 0 ? (
             <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-6 text-center">
               <p className="text-sm text-gray-400 dark:text-gray-500">
-                {showHistorico ? "Nenhuma retirada confirmada ainda." : "Nenhuma retirada pendente no momento."}
+                {showDevolvidas
+                  ? "Nenhuma devolução registrada ainda."
+                  : showReparadas
+                    ? "Nenhum reparo registrado ainda."
+                    : showHistorico
+                      ? "Nenhuma retirada confirmada ainda."
+                      : "Nenhuma retirada pendente no momento."}
               </p>
+            </div>
+          ) : showDevolvidas || showReparadas ? (
+            <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-sm divide-y divide-gray-100 dark:divide-gray-700">
+              {movements.map((m) => (
+                <StockMovementCard key={m.id} m={m} />
+              ))}
             </div>
           ) : (
             // Grid horizontal puro, mesmo padrão de tecnico/page.tsx --
