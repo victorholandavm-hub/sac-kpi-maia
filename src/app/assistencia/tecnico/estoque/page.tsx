@@ -117,10 +117,14 @@ export default async function TecnicoEstoquePage({
             {/* Ações do cabeçalho como pílulas ghost (vidro fosco) --
                 Guia de Componentes Maia (Design System, 01/09/2026). */}
             <div className="flex items-center gap-1 text-sm shrink-0">
+              {/* Pedido do Victor 07/10/2026: a pílula ghost ficava discreta
+                  demais no cabeçalho verde (Adriel não percebia que o botão
+                  existia) -- mesmo CTA laranja/sólido que a tela de
+                  assistência usa pro mesmo botão (ver estoque/page.tsx). */}
               <Link
                 href="/assistencia/tecnico/estoque/nova"
-                className="text-sm px-3 py-1.5 rounded-full font-semibold whitespace-nowrap"
-                style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}
+                className="text-sm px-4 py-2.5 rounded-lg font-bold shadow-md whitespace-nowrap"
+                style={{ background: "var(--brand-orange)", color: "#fff", border: "2px solid var(--brand-orange)" }}
               >
                 + Nova movimentação
               </Link>
