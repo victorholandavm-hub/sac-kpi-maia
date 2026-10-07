@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ddmmyyyyToIso, isoDate, totvsHeaders, detectDeliveryRiskTrigger, nextOrdersCursor } from "./totvsSync";
+import { ddmmyyyyToIso, isoDate, totvsHeaders, detectDeliveryRiskTrigger, nextOrdersCursor, mapCargaItens } from "./totvsSync";
 
 describe("ddmmyyyyToIso", () => {
   it("converte DD/MM/YYYY pra YYYY-MM-DD", () => {
@@ -156,5 +156,64 @@ describe("detectDeliveryRiskTrigger", () => {
     ];
     const incoming = [{ carga: "C1", tentativa: 1, statusEntrega: "Entregue" }];
     expect(detectDeliveryRiskTrigger(existing, incoming)).toBeNull();
+  });
+});
+
+describe("mapCargaItens", () => {
+  const NOW = "2026-10-07T18:00:00.000Z";
+
+  it("mapeia os campos do item da API para a linha do banco", () => {
+    const rows = mapCargaItens(
+      "carga-1",
+      [
+        {
+          item: "01",
+          produto: "0000012345 ",
+          descricao: " GUARDA ROUPA 6P ",
+          quantidade: 2,
+          status: "Não Entregue",
+          statusCodigo: "2",
+          ocorrencia: { codigo: "1", descricao: "Recusa" },
+        },
+      ],
+      NOW
+    );
+    expect(rows).toEqual([
+      {
+        delivery_carga_id: "carga-1",
+        item: "01",
+        produto: "0000012345",
+        descricao: "GUARDA ROUPA 6P",
+        quantidade: 2,
+        status_codigo: "2",
+        ocorrencia_codigo: "1",
+        ocorrencia_descricao: "Recusa",
+        updated_at: NOW,
+      },
+    ]);
+  });
+
+  it("descarta item sem número ou sem produto", () => {
+    const rows = mapCargaItens("c", [{ item: "", produto: "X" }, { item: "02" }, { item: "03", produto: "Y" }], NOW);
+    expect(rows.map((r) => r.item)).toEqual(["03"]);
+  });
+
+  it("item repetido fica com a última ocorrência (upsert em lote não aceita conflito duplo)", () => {
+    const rows = mapCargaItens("c", [{ item: "01", produto: "A", quantidade: 1 }, { item: "01", produto: "A", quantidade: 3 }], NOW);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].quantidade).toBe(3);
+  });
+
+  it("quantidade ausente ou inválida vira 0; string numérica é aceita", () => {
+    const rows = mapCargaItens(
+      "c",
+      [
+        { item: "01", produto: "A" },
+        { item: "02", produto: "B", quantidade: Number.NaN },
+        { item: "03", produto: "C", quantidade: "1.5" as unknown as number },
+      ],
+      NOW
+    );
+    expect(rows.map((r) => r.quantidade)).toEqual([0, 0, 1.5]);
   });
 });
