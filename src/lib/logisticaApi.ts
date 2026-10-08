@@ -5,6 +5,8 @@ import { createHash, timingSafeEqual } from "crypto";
 
 export const JANELA_MAXIMA_DIAS = 92;
 export const TIPOS_CARGA = ["Entrega", "Express", "Retirada"] as const;
+// Carro = Fiat Strada (placas em veiculos_logistica, migração 0158).
+export const TIPOS_VEICULO = ["Carro", "Caminhão"] as const;
 
 export type ErroApi = { erro: string; mensagem: string };
 
@@ -30,7 +32,7 @@ function parseData(valor: string | null): Date | null {
   return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === valor ? data : null;
 }
 
-export type PeriodoKpis = { de: string; ate: string; tipo: string | null };
+export type PeriodoKpis = { de: string; ate: string; tipo: string | null; tipoVeiculo: string | null };
 
 export function parsePeriodoKpis(params: URLSearchParams): { ok: true; periodo: PeriodoKpis } | { ok: false; erro: ErroApi } {
   const de = params.get("de");
@@ -57,5 +59,12 @@ export function parsePeriodoKpis(params: URLSearchParams): { ok: true; periodo: 
       erro: { erro: "tipo_invalido", mensagem: `tipo deve ser um de: ${TIPOS_CARGA.join(", ")}.` },
     };
   }
-  return { ok: true, periodo: { de: de!, ate: ate!, tipo } };
+  const tipoVeiculo = params.get("tipoVeiculo");
+  if (tipoVeiculo !== null && !(TIPOS_VEICULO as readonly string[]).includes(tipoVeiculo)) {
+    return {
+      ok: false,
+      erro: { erro: "tipo_veiculo_invalido", mensagem: `tipoVeiculo deve ser um de: ${TIPOS_VEICULO.join(", ")}.` },
+    };
+  }
+  return { ok: true, periodo: { de: de!, ate: ate!, tipo, tipoVeiculo } };
 }

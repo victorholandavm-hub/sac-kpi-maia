@@ -20,7 +20,7 @@ describe("parsePeriodoKpis", () => {
   it("aceita período válido, com e sem tipo", () => {
     expect(parse("de=2026-09-07&ate=2026-10-06")).toEqual({
       ok: true,
-      periodo: { de: "2026-09-07", ate: "2026-10-06", tipo: null },
+      periodo: { de: "2026-09-07", ate: "2026-10-06", tipo: null, tipoVeiculo: null },
     });
     expect(parse("de=2026-10-01&ate=2026-10-01&tipo=Express")).toMatchObject({
       ok: true,
@@ -44,6 +44,17 @@ describe("parsePeriodoKpis", () => {
     expect(parse("de=2026-10-01&ate=2026-10-02&tipo=entrega")).toMatchObject({
       ok: false,
       erro: { erro: "tipo_invalido" },
+    });
+  });
+
+  it("aceita tipoVeiculo do contrato e recusa o resto", () => {
+    expect(parse("de=2026-10-01&ate=2026-10-02&tipoVeiculo=Caminh%C3%A3o")).toMatchObject({
+      ok: true,
+      periodo: { tipoVeiculo: "Caminhão" },
+    });
+    expect(parse("de=2026-10-01&ate=2026-10-02&tipoVeiculo=Strada")).toMatchObject({
+      ok: false,
+      erro: { erro: "tipo_veiculo_invalido" },
     });
   });
 });

@@ -11,6 +11,9 @@ export type CargaKpi = {
   dia: string;
   tipo: string | null;
   veiculo: string | null;
+  // "placa" | "motorista" (carga sem placa, motorista fixo de um Carro) | "padrao"
+  tipoVeiculo: string;
+  tipoVeiculoOrigem: string;
   motorista: { codigo: string; nome: string | null } | null;
   pedidos: number;
   entregues: number;
@@ -26,26 +29,35 @@ export type MotoristaVolta = {
   cargas: number;
   visitas: number;
   entregues: number;
+  entregasRealizadas: number;
   insucessos: { total: number; cliente: number; logistica: number; cd: number; outros: number };
   parciais: number;
   devolucoes: number;
   assistencias: { total: number; porCarga: number; porCpf: number; transporte: number };
+  pecas: { total: number; porNf: number; porCliente: number };
   indiceVolta: number | null;
   indiceVoltaLogistica: number | null;
+  indicePecas: number | null;
 };
 
 export type KpisLogistica = {
-  periodo: { de: string; ate: string; tipo: string | null };
+  periodo: { de: string; ate: string; tipo: string | null; tipoVeiculo: string | null };
   cargasPorDia: { dia: string; cargas: number; pedidos: number }[];
   cargas: CargaKpi[];
   motoristas: MotoristaVolta[];
+  pecasPeriodo: { total: number; vinculadas: number };
 };
 
 // Lida direto no servidor (tela /kpis/logistica e a rota da API) -- a
 // X-API-Key só protege a rota HTTP para consumidores de fora; aqui o
 // service_role já fica no servidor e nada chega ao navegador.
-export async function getKpisLogistica({ de, ate, tipo }: PeriodoKpis): Promise<KpisLogistica> {
-  const { data, error } = await getSupabaseAdmin().rpc("kpis_logistica", { p_de: de, p_ate: ate, p_tipo: tipo });
+export async function getKpisLogistica({ de, ate, tipo, tipoVeiculo }: PeriodoKpis): Promise<KpisLogistica> {
+  const { data, error } = await getSupabaseAdmin().rpc("kpis_logistica", {
+    p_de: de,
+    p_ate: ate,
+    p_tipo: tipo,
+    p_tipo_veiculo: tipoVeiculo,
+  });
   if (error) throw new Error(`kpis_logistica: ${error.message}`);
   return data as KpisLogistica;
 }
@@ -60,6 +72,9 @@ export type ResumoLogistica = {
   indiceVolta: number | null;
   indiceVoltaLogistica: number | null;
   insucessosCd: number;
+  entregasRealizadas: number;
+  pecas: number;
+  indicePecas: number | null;
 };
 
 export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
@@ -75,7 +90,11 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
   let voltas = 0;
   let voltasLogistica = 0;
   let insucessosCd = 0;
+  let entregasRealizadas = 0;
+  let pecas = 0;
   for (const m of k.motoristas) {
+    entregasRealizadas += m.entregasRealizadas;
+    pecas += m.pecas.total;
     visitas += m.visitas;
     entregues += m.entregues;
     voltas += m.insucessos.total + m.parciais + m.devolucoes + m.assistencias.total;
@@ -92,6 +111,9 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
     indiceVolta: visitas > 0 ? voltas / visitas : null,
     indiceVoltaLogistica: visitas > 0 ? voltasLogistica / visitas : null,
     insucessosCd,
+    entregasRealizadas,
+    pecas,
+    indicePecas: entregasRealizadas > 0 ? pecas / entregasRealizadas : null,
   };
 }
 
@@ -109,4 +131,26 @@ export function volumesPorDia(k: KpisLogistica): VolumeDia[] {
     porDia.set(c.dia, d);
   }
   return [...porDia.values()].sort((a, b) => a.dia.localeCompare(b.dia));
+}
+
+export type ResumoVeiculo = { tipoVeiculo: string; cargas: number; pedidos: number; pedidosPorCarga: number; unidadesPorCarga: number };
+
+export function resumoPorVeiculo(k: KpisLogistica): ResumoVeiculo[] {
+  const porTipo = new Map<string, { cargas: number; pedidos: number; unidades: number }>();
+  for (const c of k.cargas) {
+    const t = porTipo.get(c.tipoVeiculo) ?? { cargas: 0, pedidos: 0, unidades: 0 };
+    t.cargas += 1;
+    t.pedidos += c.pedidos;
+    t.unidades += c.volumes.P + c.volumes.M + c.volumes.G + c.volumes.naoClassificado;
+    porTipo.set(c.tipoVeiculo, t);
+  }
+  return [...porTipo.entries()]
+    .map(([tipoVeiculo, t]) => ({
+      tipoVeiculo,
+      cargas: t.cargas,
+      pedidos: t.pedidos,
+      pedidosPorCarga: t.pedidos / t.cargas,
+      unidadesPorCarga: t.unidades / t.cargas,
+    }))
+    .sort((a, b) => a.tipoVeiculo.localeCompare(b.tipoVeiculo, "pt-BR"));
 }
