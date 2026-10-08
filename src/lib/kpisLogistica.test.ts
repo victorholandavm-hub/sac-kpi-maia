@@ -16,7 +16,8 @@ function motorista(visitas: number, entregues: number, extra: Partial<MotoristaV
     parciais: 0, devolucoes: 0,
     assistencias: { total: 0, porCarga: 0, porCpf: 0, transporte: 0 },
     pecas: { total: 0, porNf: 0, porCliente: 0 },
-    indiceVolta: null, indiceVoltaLogistica: null, indicePecas: null,
+    posVenda: { total: 0, pecas: 0, trocaProduto: 0, recolhimento: 0, entregaProduto: 0, porCarga: 0, porNf: 0, porCliente: 0 },
+    indiceVolta: null, indiceVoltaLogistica: null, indicePecas: null, indiceAssistencia: null,
     ...extra,
   };
 }
@@ -31,10 +32,12 @@ const base: KpisLogistica = {
       parciais: 2, devolucoes: 3,
       assistencias: { total: 5, porCarga: 1, porCpf: 4, transporte: 1 },
       pecas: { total: 3, porNf: 2, porCliente: 1 },
+      posVenda: { total: 7, pecas: 3, trocaProduto: 2, recolhimento: 1, entregaProduto: 1, porCarga: 1, porNf: 2, porCliente: 4 },
     }),
     motorista(20, 20, { pecas: { total: 1, porNf: 1, porCliente: 0 } }),
   ],
   pecasPeriodo: { total: 6, vinculadas: 4 },
+  posVendaPeriodo: { total: 10, vinculadas: 7, pecas: 4, trocaProduto: 3, recolhimento: 2, entregaProduto: 1 },
 };
 
 describe("resumirLogistica", () => {
@@ -46,6 +49,8 @@ describe("resumirLogistica", () => {
     expect(r.indiceVoltaLogistica).toBeCloseTo(2 / 100);
     expect(r).toMatchObject({ entregasRealizadas: 80, pecas: 4 });
     expect(r.indicePecas).toBeCloseTo(4 / 80);
+    expect(r.posVenda).toEqual({ total: 7, pecas: 3, trocaProduto: 2, recolhimento: 1, entregaProduto: 1 });
+    expect(r.indiceAssistencia).toBeCloseTo(7 / 80);
   });
 
   it("sem visitas, índices nulos em vez de divisão por zero", () => {
@@ -53,6 +58,7 @@ describe("resumirLogistica", () => {
     expect(r.indiceVolta).toBeNull();
     expect(r.indiceVoltaLogistica).toBeNull();
     expect(r.indicePecas).toBeNull();
+    expect(r.indiceAssistencia).toBeNull();
   });
 });
 

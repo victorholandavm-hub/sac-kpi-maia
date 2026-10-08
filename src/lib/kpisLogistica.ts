@@ -35,10 +35,16 @@ export type MotoristaVolta = {
   devolucoes: number;
   assistencias: { total: number; porCarga: number; porCpf: number; transporte: number };
   pecas: { total: number; porNf: number; porCliente: number };
+  // Pós-venda consolidado (0159): peças, troca de produto, recolhimento e
+  // entrega de produto novo, cada ocorrência uma vez.
+  posVenda: PosVenda & { porCarga: number; porNf: number; porCliente: number };
   indiceVolta: number | null;
   indiceVoltaLogistica: number | null;
   indicePecas: number | null;
+  indiceAssistencia: number | null;
 };
+
+export type PosVenda = { total: number; pecas: number; trocaProduto: number; recolhimento: number; entregaProduto: number };
 
 export type KpisLogistica = {
   periodo: { de: string; ate: string; tipo: string | null; tipoVeiculo: string | null };
@@ -46,6 +52,7 @@ export type KpisLogistica = {
   cargas: CargaKpi[];
   motoristas: MotoristaVolta[];
   pecasPeriodo: { total: number; vinculadas: number };
+  posVendaPeriodo: PosVenda & { vinculadas: number };
 };
 
 // Lida direto no servidor (tela /kpis/logistica e a rota da API) -- a
@@ -75,6 +82,8 @@ export type ResumoLogistica = {
   entregasRealizadas: number;
   pecas: number;
   indicePecas: number | null;
+  posVenda: PosVenda;
+  indiceAssistencia: number | null;
 };
 
 export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
@@ -92,9 +101,15 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
   let insucessosCd = 0;
   let entregasRealizadas = 0;
   let pecas = 0;
+  const posVenda = { total: 0, pecas: 0, trocaProduto: 0, recolhimento: 0, entregaProduto: 0 };
   for (const m of k.motoristas) {
     entregasRealizadas += m.entregasRealizadas;
     pecas += m.pecas.total;
+    posVenda.total += m.posVenda.total;
+    posVenda.pecas += m.posVenda.pecas;
+    posVenda.trocaProduto += m.posVenda.trocaProduto;
+    posVenda.recolhimento += m.posVenda.recolhimento;
+    posVenda.entregaProduto += m.posVenda.entregaProduto;
     visitas += m.visitas;
     entregues += m.entregues;
     voltas += m.insucessos.total + m.parciais + m.devolucoes + m.assistencias.total;
@@ -114,6 +129,8 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
     entregasRealizadas,
     pecas,
     indicePecas: entregasRealizadas > 0 ? pecas / entregasRealizadas : null,
+    posVenda,
+    indiceAssistencia: entregasRealizadas > 0 ? posVenda.total / entregasRealizadas : null,
   };
 }
 
