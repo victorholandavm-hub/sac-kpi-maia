@@ -56,6 +56,11 @@
   --series-6: #e34948; /* vermelho */
   --series-7: #1baf7a; /* verde-agua */
   --series-8: #e87ba4; /* magenta */
+  /* Porte P/M/G da tela de KPIs logísticos: escala ordenada (tamanho), então
+     um tom só do verde da marca, claro -> escuro (não categórico). */
+  --porte-p: #9cc8af;
+  --porte-m: #4f8f6b;
+  --porte-g: #1b5e3c;
 
   --status-good: #0ca30c;
   --status-warning: #fab219;
@@ -179,6 +184,11 @@ html.dark {
   --series-6: var(--text-secondary);
   --series-7: var(--text-secondary);
   --series-8: var(--text-secondary);
+  /* Porte continua com cor no escuro: é escala (P < M < G), não etiqueta.
+     Invertida (maior = mais claro) para ler sobre o fundo escuro. */
+  --porte-p: #2f6b4c;
+  --porte-m: #4fa87a;
+  --porte-g: #9bdcb6;
 
   --status-good: color-mix(in srgb, #0ca30c 30%, var(--text-secondary));
   --status-warning: color-mix(in srgb, #fab219 30%, var(--text-secondary));
