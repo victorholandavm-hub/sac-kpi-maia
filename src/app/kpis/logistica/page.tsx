@@ -220,7 +220,7 @@ function TabelaMotoristas({ motoristas }: { motoristas: MotoristaVolta[] }) {
   );
 }
 
-function AvisoPecas() {
+function AvisoPosVenda() {
   return (
     <div
       className="flex items-start gap-3 rounded-lg px-4 py-3"
@@ -231,25 +231,27 @@ function AvisoPecas() {
         ⚠
       </span>
       <div className="text-sm" style={{ color: "var(--text-primary)" }}>
-        <p className="font-bold">Atribuição Estimada (vínculo por CPF e código do cliente)</p>
+        <p className="font-bold">Atribuição Estimada (vínculo por carga, NF, CPF e código do cliente)</p>
         <p style={{ color: "var(--text-secondary)" }}>
-          O pedido de peça da assistência não diz qual entrega levou o produto. Ele é ligado a uma entrega ao mesmo cliente (CPF ou código no Protheus):
-          a da nota fiscal de venda informada no pedido, quando bate; senão, a mais recente nos 180 dias anteriores. Pedido de peça sem CPF não entra.
-          Não separa defeito de fábrica de avaria no transporte, por isso fica fora do Índice de Volta.
+          Cada chamado de pós-venda (troca ou envio de peça, pedido da fila de peças, troca de produto, recolhimento e entrega de produto novo) é
+          ligado à entrega que levou o produto, nesta ordem: a carga informada no chamado; a entrega da nota fiscal de venda, quando bate com o mesmo
+          cliente; senão, a entrega mais recente ao mesmo cliente (CPF ou código no Protheus) nos 180 dias anteriores. Uma ocorrência conta uma vez:
+          rodadas repetidas do mesmo chamado e o pedido de peça do mesmo caso não somam de novo. Não separa defeito de fábrica de avaria no
+          transporte, por isso fica fora do Índice de Volta.
         </p>
       </div>
     </div>
   );
 }
 
-function TabelaPecas({ motoristas }: { motoristas: MotoristaVolta[] }) {
+function TabelaPosVenda({ motoristas }: { motoristas: MotoristaVolta[] }) {
   const linhas = motoristas
-    .filter((m) => m.entregasRealizadas > 0 || m.pecas.total > 0)
+    .filter((m) => m.entregasRealizadas > 0 || m.posVenda.total > 0)
     .sort((a, b) => {
       const poucasA = a.entregasRealizadas < VISITAS_MINIMAS;
       const poucasB = b.entregasRealizadas < VISITAS_MINIMAS;
       if (poucasA !== poucasB) return poucasA ? 1 : -1;
-      return (b.indicePecas ?? -1) - (a.indicePecas ?? -1) || b.pecas.total - a.pecas.total;
+      return (b.indiceAssistencia ?? -1) - (a.indiceAssistencia ?? -1) || b.posVenda.total - a.posVenda.total;
     });
   if (linhas.length === 0) {
     return (
@@ -269,17 +271,23 @@ function TabelaPecas({ motoristas }: { motoristas: MotoristaVolta[] }) {
             <th className={`${th} text-right`} style={thStyle} title="Visitas com o produto entregue (completa ou parcial)">
               Entregas
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Pedidos de peça ligados a uma entrega do motorista (ver aviso acima)">
-              ≈ Pedidos de peça
+            <th className={`${th} text-right`} style={thStyle} title="Troca e envio de peça, e pedidos da fila de peças">
+              Peças
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="A NF de venda do pedido de peça é a da carga">
-              pela NF
+            <th className={`${th} text-right`} style={thStyle}>
+              Troca de produto
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Sem NF que bata: entrega mais recente ao mesmo CPF / código do cliente">
-              pelo cliente
+            <th className={`${th} text-right`} style={thStyle}>
+              Recolhimento
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="pedidos de peça ÷ entregas">
-              Índice de peças
+            <th className={`${th} text-right`} style={thStyle} title="Entrega de produto novo decorrente de assistência">
+              Entrega de produto
+            </th>
+            <th className={`${th} text-right`} style={thStyle} title="Ocorrências ligadas a uma entrega do motorista (ver aviso acima)">
+              ≈ Total
+            </th>
+            <th className={`${th} text-right`} style={thStyle} title="ocorrências de pós-venda ÷ entregas">
+              Índice de Assistência
             </th>
           </tr>
         </thead>
@@ -298,11 +306,18 @@ function TabelaPecas({ motoristas }: { motoristas: MotoristaVolta[] }) {
                   </span>
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{m.entregasRealizadas}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.pecas.total}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.pecas.porNf}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.pecas.porCliente}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{m.posVenda.pecas}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{m.posVenda.trocaProduto}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{m.posVenda.recolhimento}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{m.posVenda.entregaProduto}</td>
+                <td
+                  className="px-3 py-2.5 text-right tabular-nums"
+                  title={`${m.posVenda.porCarga} pela carga do chamado · ${m.posVenda.porNf} pela NF · ${m.posVenda.porCliente} pelo cliente`}
+                >
+                  {m.posVenda.total}
+                </td>
                 <td className="px-3 py-2.5 text-right tabular-nums font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {pct(m.indicePecas)}
+                  {pct(m.indiceAssistencia)}
                 </td>
               </tr>
             );
@@ -451,10 +466,12 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
               </CardNota>
             </KpiCardShell>
             <KpiCardShell>
-              <CardTitulo>Assistência de Peças</CardTitulo>
-              <CardValor>{pct(resumo.indicePecas)}</CardValor>
+              <CardTitulo>Índice de Assistência</CardTitulo>
+              <CardValor>{pct(resumo.indiceAssistencia)}</CardValor>
               <CardNota>
-                ≈ {num(resumo.pecas)} pedido{resumo.pecas === 1 ? "" : "s"} de peça ÷ {num(resumo.entregasRealizadas)} entregas
+                ≈ {num(resumo.posVenda.total)} ocorrências de pós-venda ÷ {num(resumo.entregasRealizadas)} entregas · peças{" "}
+                {num(resumo.posVenda.pecas)} · trocas {num(resumo.posVenda.trocaProduto)} · recolhimentos {num(resumo.posVenda.recolhimento)} ·
+                entregas {num(resumo.posVenda.entregaProduto)}
               </CardNota>
             </KpiCardShell>
           </section>
@@ -520,13 +537,13 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
           </Bloco>
 
           <Bloco
-            titulo="Índice de Assistência de Peças por motorista"
-            subtitulo={`Pedidos de peça da assistência (fila de peças) criados no período, ligados ao motorista que fez a entrega original. ${num(
-              kpis.pecasPeriodo.vinculadas,
-            )} de ${num(kpis.pecasPeriodo.total)} pedidos de peça do período acharam a entrega.`}
+            titulo="Índice de Assistência por motorista"
+            subtitulo={`Ocorrências de pós-venda da assistência criadas no período, ligadas ao motorista que fez a entrega original. ${num(
+              kpis.posVendaPeriodo.vinculadas,
+            )} de ${num(kpis.posVendaPeriodo.total)} ocorrências do período acharam a entrega.`}
           >
-            <AvisoPecas />
-            <TabelaPecas motoristas={kpis.motoristas} />
+            <AvisoPosVenda />
+            <TabelaPosVenda motoristas={kpis.motoristas} />
           </Bloco>
         </>
       )}
