@@ -4,8 +4,8 @@ import { AppHeader } from "@/components/AppHeader";
 import { KpisSectionTabs } from "@/components/KpisSectionTabs";
 import { KpiCardShell } from "@/components/KpiCardShell";
 import { VolumePorteChart } from "@/components/logistica/VolumePorteChart";
-import { parsePeriodoKpis, TIPOS_CARGA } from "@/lib/logisticaApi";
-import { getKpisLogistica, resumirLogistica, volumesPorDia, type MotoristaVolta } from "@/lib/kpisLogistica";
+import { parsePeriodoKpis, TIPOS_CARGA, TIPOS_VEICULO } from "@/lib/logisticaApi";
+import { getKpisLogistica, resumirLogistica, resumoPorVeiculo, volumesPorDia, type MotoristaVolta } from "@/lib/kpisLogistica";
 
 export const dynamic = "force-dynamic";
 
@@ -30,17 +30,18 @@ function menosDias(dia: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-type Params = { periodo?: string; de?: string; ate?: string; tipo?: string };
+type Params = { periodo?: string; de?: string; ate?: string; tipo?: string; veiculo?: string };
 
 function resolverPeriodo(params: Params) {
   const hoje = hojeRecife();
   const tipo = params.tipo && (TIPOS_CARGA as readonly string[]).includes(params.tipo) ? params.tipo : undefined;
+  const veiculo = params.veiculo && (TIPOS_VEICULO as readonly string[]).includes(params.veiculo) ? params.veiculo : undefined;
   if (params.de || params.ate) {
-    return { preset: "custom", de: params.de ?? "", ate: params.ate ?? hoje, tipo };
+    return { preset: "custom", de: params.de ?? "", ate: params.ate ?? hoje, tipo, veiculo };
   }
   const preset = PRESETS.find((p) => p.key === params.periodo) ?? PRESETS[1];
   const de = preset.dias === null ? `${hoje.slice(0, 8)}01` : menosDias(hoje, preset.dias - 1);
-  return { preset: preset.key, de, ate: hoje, tipo };
+  return { preset: preset.key, de, ate: hoje, tipo, veiculo };
 }
 
 function href(base: Record<string, string | undefined>) {
@@ -219,6 +220,99 @@ function TabelaMotoristas({ motoristas }: { motoristas: MotoristaVolta[] }) {
   );
 }
 
+function AvisoPecas() {
+  return (
+    <div
+      className="flex items-start gap-3 rounded-lg px-4 py-3"
+      style={{ background: "var(--brand-orange-soft)", border: "1px solid var(--brand-orange)" }}
+      role="note"
+    >
+      <span aria-hidden className="text-lg leading-none" style={{ color: "var(--brand-orange)" }}>
+        ⚠
+      </span>
+      <div className="text-sm" style={{ color: "var(--text-primary)" }}>
+        <p className="font-bold">Atribuição Estimada (vínculo por CPF e código do cliente)</p>
+        <p style={{ color: "var(--text-secondary)" }}>
+          O pedido de peça da assistência não diz qual entrega levou o produto. Ele é ligado a uma entrega ao mesmo cliente (CPF ou código no Protheus):
+          a da nota fiscal de venda informada no pedido, quando bate; senão, a mais recente nos 180 dias anteriores. Pedido de peça sem CPF não entra.
+          Não separa defeito de fábrica de avaria no transporte, por isso fica fora do Índice de Volta.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function TabelaPecas({ motoristas }: { motoristas: MotoristaVolta[] }) {
+  const linhas = motoristas
+    .filter((m) => m.entregasRealizadas > 0 || m.pecas.total > 0)
+    .sort((a, b) => {
+      const poucasA = a.entregasRealizadas < VISITAS_MINIMAS;
+      const poucasB = b.entregasRealizadas < VISITAS_MINIMAS;
+      if (poucasA !== poucasB) return poucasA ? 1 : -1;
+      return (b.indicePecas ?? -1) - (a.indicePecas ?? -1) || b.pecas.total - a.pecas.total;
+    });
+  if (linhas.length === 0) {
+    return (
+      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+        Nenhuma entrega registrada no período.
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
+            <th className={`${th} text-left`} style={thStyle}>
+              Motorista
+            </th>
+            <th className={`${th} text-right`} style={thStyle} title="Visitas com o produto entregue (completa ou parcial)">
+              Entregas
+            </th>
+            <th className={`${th} text-right`} style={thStyle} title="Pedidos de peça ligados a uma entrega do motorista (ver aviso acima)">
+              ≈ Pedidos de peça
+            </th>
+            <th className={`${th} text-right`} style={thStyle} title="A NF de venda do pedido de peça é a da carga">
+              pela NF
+            </th>
+            <th className={`${th} text-right`} style={thStyle} title="Sem NF que bata: entrega mais recente ao mesmo CPF / código do cliente">
+              pelo cliente
+            </th>
+            <th className={`${th} text-right`} style={thStyle} title="pedidos de peça ÷ entregas">
+              Índice de peças
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map((m) => {
+            const poucas = m.entregasRealizadas < VISITAS_MINIMAS;
+            return (
+              <tr key={m.codigo} className="border-b" style={{ borderColor: "var(--border)", opacity: poucas ? 0.55 : 1 }}>
+                <td className="px-3 py-2.5">
+                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {m.nome ?? "Sem nome"}
+                  </span>
+                  <span className="ml-2 text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
+                    {m.codigo}
+                    {poucas ? " · poucas entregas" : ""}
+                  </span>
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{m.entregasRealizadas}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{m.pecas.total}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{m.pecas.porNf}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{m.pecas.porCliente}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {pct(m.indicePecas)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // Sub-aba "Logística" de KPIs (08/10/2026). Mesmos dados do
 // GET /api/logistica/v1/kpis/logistica, lidos direto no servidor (RPC
 // kpis_logistica) -- definições em lojas-maia-integracao/apis/logistica-v1/
@@ -227,12 +321,21 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   await requireDashboardAuth();
   const params = await searchParams;
   const sel = resolverPeriodo(params);
-  const parsed = parsePeriodoKpis(new URLSearchParams({ de: sel.de, ate: sel.ate, ...(sel.tipo ? { tipo: sel.tipo } : {}) }));
+  const parsed = parsePeriodoKpis(
+    new URLSearchParams({
+      de: sel.de,
+      ate: sel.ate,
+      ...(sel.tipo ? { tipo: sel.tipo } : {}),
+      ...(sel.veiculo ? { tipoVeiculo: sel.veiculo } : {}),
+    }),
+  );
   const base = sel.preset === "custom" ? { de: sel.de, ate: sel.ate } : { periodo: sel.preset };
 
   const kpis = parsed.ok ? await getKpisLogistica(parsed.periodo) : null;
   const resumo = kpis ? resumirLogistica(kpis) : null;
   const porDia = kpis ? volumesPorDia(kpis) : [];
+  const frota = kpis ? resumoPorVeiculo(kpis) : [];
+  const decimal = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
   const volumeClassificado = resumo ? resumo.volumes.total - resumo.volumes.naoClassificado : 0;
 
   return (
@@ -253,7 +356,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {PRESETS.map((p) => (
-            <Link key={p.key} href={href({ periodo: p.key, tipo: sel.tipo })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.preset === p.key)}>
+            <Link key={p.key} href={href({ periodo: p.key, tipo: sel.tipo, veiculo: sel.veiculo })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.preset === p.key)}>
               {p.label}
             </Link>
           ))}
@@ -274,6 +377,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
               style={{ border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}
             />
             {sel.tipo && <input type="hidden" name="tipo" value={sel.tipo} />}
+            {sel.veiculo && <input type="hidden" name="veiculo" value={sel.veiculo} />}
             <button type="submit" className="text-xs px-2 py-1 rounded" style={{ border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
               Aplicar
             </button>
@@ -282,8 +386,14 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
         <div className="flex flex-wrap items-center gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
           <span>Tipo:</span>
           {[undefined, ...TIPOS_CARGA.filter((t) => t !== "Retirada")].map((t) => (
-            <Link key={t ?? "todos"} href={href({ ...base, tipo: t })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.tipo === t)}>
+            <Link key={t ?? "todos"} href={href({ ...base, tipo: t, veiculo: sel.veiculo })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.tipo === t)}>
               {t ?? "Todos"}
+            </Link>
+          ))}
+          <span className="ml-3">Veículo:</span>
+          {[undefined, ...TIPOS_VEICULO].map((v) => (
+            <Link key={v ?? "todos"} href={href({ ...base, tipo: sel.tipo, veiculo: v })} className="text-sm px-3 py-1 rounded-full" style={pillStyle(sel.veiculo === v)}>
+              {v === "Carro" ? "Carro (Strada)" : (v ?? "Todos")}
             </Link>
           ))}
         </div>
@@ -298,14 +408,16 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
             {dataBr(kpis.periodo.de)} a {dataBr(kpis.periodo.ate)}
             {kpis.periodo.tipo ? ` · ${kpis.periodo.tipo}` : ""}
+            {kpis.periodo.tipoVeiculo ? ` · ${kpis.periodo.tipoVeiculo}` : ""}
           </p>
 
-          <section className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <section className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KpiCardShell>
               <CardTitulo>Cargas despachadas</CardTitulo>
               <CardValor>{num(resumo.cargas)}</CardValor>
               <CardNota>
                 {resumo.dias > 0 ? `${(resumo.cargas / resumo.dias).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} por dia com carga` : "—"}
+                {frota.length > 0 && ` · ${frota.map((f) => `${f.tipoVeiculo} ${num(f.cargas)}`).join(" · ")}`}
               </CardNota>
             </KpiCardShell>
             <KpiCardShell>
@@ -313,6 +425,7 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
               <CardValor>{num(resumo.pedidos)}</CardValor>
               <CardNota>
                 {pct(resumo.visitas > 0 ? resumo.entregues / resumo.visitas : null)} das visitas entregues por completo
+                {frota.length > 0 && ` · por carga: ${frota.map((f) => `${f.tipoVeiculo} ${decimal(f.pedidosPorCarga)}`).join(" · ")}`}
               </CardNota>
             </KpiCardShell>
             <KpiCardShell>
@@ -337,6 +450,13 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
                 {resumo.insucessosCd > 0 ? ` · ${resumo.insucessosCd} falha${resumo.insucessosCd === 1 ? "" : "s"} do CD (L06) à parte` : ""}
               </CardNota>
             </KpiCardShell>
+            <KpiCardShell>
+              <CardTitulo>Assistência de Peças</CardTitulo>
+              <CardValor>{pct(resumo.indicePecas)}</CardValor>
+              <CardNota>
+                ≈ {num(resumo.pecas)} pedido{resumo.pecas === 1 ? "" : "s"} de peça ÷ {num(resumo.entregasRealizadas)} entregas
+              </CardNota>
+            </KpiCardShell>
           </section>
 
           <Bloco
@@ -352,8 +472,8 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
-                      {["Dia", "Carga", "Tipo", "Motorista", "Pedidos", "P", "M", "G", "Sem classe"].map((h, i) => (
-                        <th key={h} className={`${th} ${i >= 4 ? "text-right" : "text-left"}`} style={thStyle}>
+                      {["Dia", "Carga", "Tipo", "Veículo", "Motorista", "Pedidos", "P", "M", "G", "Sem classe"].map((h, i) => (
+                        <th key={h} className={`${th} ${i >= 5 ? "text-right" : "text-left"}`} style={thStyle}>
                           {h}
                         </th>
                       ))}
@@ -367,6 +487,16 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
                           {c.carga}
                         </td>
                         <td className="px-3 py-2">{c.tipo ?? "—"}</td>
+                        <td
+                          className="px-3 py-2 whitespace-nowrap"
+                          title={c.tipoVeiculoOrigem === "motorista" ? "Carga sem placa: tipo pelo motorista fixo do carro" : undefined}
+                        >
+                          {c.tipoVeiculoOrigem === "motorista" ? "≈ " : ""}
+                          {c.tipoVeiculo}
+                          <span className="ml-1.5 text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
+                            {c.veiculo ?? ""}
+                          </span>
+                        </td>
                         <td className="px-3 py-2">{c.motorista?.nome ?? c.motorista?.codigo ?? "Sem motorista"}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{c.pedidos}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{num(c.volumes.P)}</td>
@@ -387,6 +517,16 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
           >
             <AvisoAtribuicao />
             <TabelaMotoristas motoristas={kpis.motoristas} />
+          </Bloco>
+
+          <Bloco
+            titulo="Índice de Assistência de Peças por motorista"
+            subtitulo={`Pedidos de peça da assistência (fila de peças) criados no período, ligados ao motorista que fez a entrega original. ${num(
+              kpis.pecasPeriodo.vinculadas,
+            )} de ${num(kpis.pecasPeriodo.total)} pedidos de peça do período acharam a entrega.`}
+          >
+            <AvisoPecas />
+            <TabelaPecas motoristas={kpis.motoristas} />
           </Bloco>
         </>
       )}
