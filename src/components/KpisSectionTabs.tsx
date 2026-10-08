@@ -4,6 +4,7 @@ const TABS = [
   { key: "sac", label: "SAC", href: "/kpis" },
   { key: "assistencia", label: "Assistência", href: "/kpis-assistencia" },
   { key: "ghl", label: "GHL", href: "/kpis/ghl" },
+  { key: "logistica", label: "Logística", href: "/kpis/logistica" },
 ] as const;
 
 export type KpisSectionKey = (typeof TABS)[number]["key"];

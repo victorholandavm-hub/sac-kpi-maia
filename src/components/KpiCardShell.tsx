@@ -35,7 +35,7 @@ export function KpiCardShell({
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
-      onKeyDown={handleKeyDown}
+      onKeyDown={onClick ? handleKeyDown : undefined}
       className={`rounded-xl bg-white dark:bg-gray-800 shadow-sm p-5 flex flex-col gap-3 min-w-0 h-full ${
         onClick ? "cursor-pointer hover:shadow-md transition-shadow duration-150" : ""
       }`}
