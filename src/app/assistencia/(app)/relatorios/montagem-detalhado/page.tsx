@@ -199,7 +199,7 @@ export default async function RelatorioMontagemDetalhadoPage({
   const allItems = rawItems.filter((i) => i.type === "montagem" || i.type === "desmontagem");
 
   // Manoel é o único montador funcionário nosso, não terceirizado (ver
-  // EQUIPE_INTERNA_ASSEMBLERS/EQUIPE_INTERNA_ONLY_TYPES, assistenciaLabels.ts) --
+  // EQUIPE_INTERNA_ASSEMBLERS, assistenciaLabels.ts) --
   // pedido explícito: "lembre que manoel nao entra nessa conta, pois é
   // de casa, tudo o que for dele, você coloca a parte". Adriel CD entrou
   // 02/10/2026 no mesmo "nível". Fora da soma principal, numa seção

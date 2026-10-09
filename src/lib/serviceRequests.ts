@@ -1,7 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { sanitizeOrFilterValue } from "./searchFilter";
 import type { Rota } from "./rotas";
-import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES, EQUIPE_INTERNA_ONLY_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "./assistenciaLabels";
+import { ASSISTENCIA_MANAGED_TYPES, DELIVERY_REQUEST_TYPES, OWN_ASSEMBLER_RESTRICTED_TYPES, VISITA_REQUEST_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "./assistenciaLabels";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 import { memoizeWithTtl } from "./memoCache";
 
@@ -1672,17 +1672,16 @@ export async function countMontagensOverview(excludeOwnAssemblerStoreIds?: strin
 // fila/page.tsx (VISITA_REQUEST_TYPES), só que contando "aberta" (sem
 // contato ainda) em vez de "não concluída/cancelada".
 //
-// EQUIPE_INTERNA_ONLY_TYPES (vistoria/troca de peça) excluído daqui --
-// pedido do Victor 24/09/2026: esses tipos eram sempre do Manoel (só ele
-// tinha a qualificação; Adriel CD passou a dividir a função 02/10/2026,
-// ver EQUIPE_INTERNA_ONLY_TYPES em assistenciaLabels.ts), "já estão
-// automaticamente em andamento com a gente" -- não existe "assumir o
-// caso" de verdade neles como existe pra montagem/desmontagem, que vão
-// pra terceirizados de fora. Contar como "aberta" misturava os dois e
-// inflava o badge com casos que não estavam realmente esperando alguém
-// pegar.
-const VISITA_TYPES_COM_ASSUMIR = VISITA_REQUEST_TYPES.filter((t) => !(EQUIPE_INTERNA_ONLY_TYPES as readonly string[]).includes(t));
-
+// Até 09/10/2026, vistoria/troca de peça eram sempre pré-atribuídas a
+// Manoel/Adriel CD na criação (select forçado, nunca ficavam sem montador de
+// verdade) -- "já estão automaticamente em andamento com a gente", por isso
+// ficavam de fora da conta de "aberta sem contato" (EQUIPE_INTERNA_ONLY_TYPES
+// em assistenciaLabels.ts). Desde que qualquer montador pode fazer os dois
+// tipos (pedido do Victor: "todos os montadores agora podem fazer troca de
+// peça e vistoria"), o campo virou texto livre igual montagem/desmontagem --
+// dá pra ficar "aberta" sem ninguém definido de verdade agora, então contam
+// aqui igual aos outros 2 tipos (mesmo escopo de VISITA_REQUEST_TYPES da aba
+// "Visitas" em fila/page.tsx).
 export async function countVisitasOpenNoContact(excludeOwnAssemblerStoreIds?: string[]): Promise<number> {
   const admin = getSupabaseAdmin();
   const query = applyOwnAssemblerStoreExclusion(
@@ -1690,7 +1689,7 @@ export async function countVisitasOpenNoContact(excludeOwnAssemblerStoreIds?: st
       .from("service_requests")
       .select("id", { count: "exact", head: true })
       .eq("status", "aberta")
-      .in("type", [...VISITA_TYPES_COM_ASSUMIR]),
+      .in("type", [...VISITA_REQUEST_TYPES]),
     excludeOwnAssemblerStoreIds
   );
   const { count, error } = await query;

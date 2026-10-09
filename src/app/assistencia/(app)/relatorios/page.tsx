@@ -124,7 +124,7 @@ function formatDateBr(iso: string): string {
 }
 
 // Manoel é o único montador funcionário nosso (o resto é terceirizado, ver
-// EQUIPE_INTERNA_ASSEMBLERS/EQUIPE_INTERNA_ONLY_TYPES em assistenciaLabels.ts) --
+// EQUIPE_INTERNA_ASSEMBLERS em assistenciaLabels.ts) --
 // pedido do Victor 21/08/2026: "Colocar Manoel pra baixo na lista de
 // montadores pois ele é o único que é funcionário nosso e não
 // terceirizado". Adriel CD entrou 02/10/2026 no mesmo "nível". Não muda a
