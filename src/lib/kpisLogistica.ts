@@ -205,3 +205,34 @@ export function resumoPorVeiculo(k: KpisLogistica): ResumoVeiculo[] {
     }))
     .sort((a, b) => a.tipoVeiculo.localeCompare(b.tipoVeiculo, "pt-BR"));
 }
+
+// Período imediatamente anterior, com a MESMA duração em dias do período
+// selecionado -- pedido do Victor 09/10/2026 ("ticker" com variação vs.
+// período anterior, estilo home broker). Ex.: de=01/10 ate=09/10 (9 dias)
+// -> anterior = de=22/09 ate=30/09 (também 9 dias, termina 1 dia antes do
+// início do período atual). Comparação só faz sentido com a mesma
+// duração -- 7 dias contra 30 dias distorceria qualquer variação.
+export function periodoAnterior(de: string, ate: string): { de: string; ate: string } {
+  const ini = new Date(`${de}T00:00:00Z`);
+  const fim = new Date(`${ate}T00:00:00Z`);
+  const dias = Math.round((fim.getTime() - ini.getTime()) / 86400000) + 1;
+  const anteriorFim = new Date(ini);
+  anteriorFim.setUTCDate(anteriorFim.getUTCDate() - 1);
+  const anteriorIni = new Date(anteriorFim);
+  anteriorIni.setUTCDate(anteriorIni.getUTCDate() - (dias - 1));
+  return { de: anteriorIni.toISOString().slice(0, 10), ate: anteriorFim.toISOString().slice(0, 10) };
+}
+
+// Variação de um indicador entre dois períodos -- "pp" (pontos
+// percentuais) pros índices (0-1), valor bruto pros outros. `null` quando
+// falta base de comparação (ex.: período anterior sem visita nenhuma).
+// `melhorou` só é computado quando `menorEhMelhor` é passado (índices de
+// volta/assistência) -- pra contagem bruta (cargas, pedidos, volume) não
+// existe "melhor/pior", só "mais/menos" (ver IndiceTicker.tsx).
+export type Variacao = { atual: number; anterior: number | null; delta: number | null; melhorou: boolean | null };
+
+export function calcularVariacao(atual: number, anterior: number | null, menorEhMelhor?: boolean): Variacao {
+  const delta = anterior === null ? null : atual - anterior;
+  const melhorou = delta === null || menorEhMelhor === undefined ? null : menorEhMelhor ? delta < 0 : delta > 0;
+  return { atual, anterior, delta, melhorou };
+}
