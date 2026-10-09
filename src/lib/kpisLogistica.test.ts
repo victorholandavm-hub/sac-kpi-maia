@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { resumirLogistica, resumoPorVeiculo, volumesPorDia, type CargaKpi, type KpisLogistica, type MotoristaVolta } from "./kpisLogistica";
+import {
+  calcularVariacao,
+  periodoAnterior,
+  resumirLogistica,
+  resumoPorVeiculo,
+  volumesPorDia,
+  type CargaKpi,
+  type KpisLogistica,
+  type MotoristaVolta,
+} from "./kpisLogistica";
 
 function carga(carga: string, dia: string, P: number, M: number, G: number, naoClassificado = 0, tipoVeiculo = "Caminhão"): CargaKpi {
   return {
@@ -51,6 +60,16 @@ describe("resumirLogistica", () => {
     expect(r.indicePecas).toBeCloseTo(4 / 80);
     expect(r.posVenda).toEqual({ total: 7, pecas: 3, trocaProduto: 2, recolhimento: 1, entregaProduto: 1 });
     expect(r.indiceAssistencia).toBeCloseTo(7 / 80);
+    // Soma das causas bate com o numerador de indiceVolta (20/100 acima).
+    expect(r.causasVolta).toEqual({
+      insucessoCliente: 7,
+      insucessoLogistica: 1,
+      insucessoCd: 2,
+      insucessoOutros: 0,
+      parciais: 2,
+      devolucoes: 3,
+      assistencias: 5,
+    });
   });
 
   it("sem visitas, índices nulos em vez de divisão por zero", () => {
@@ -68,6 +87,42 @@ describe("volumesPorDia", () => {
       { dia: "2026-10-01", cargas: 2, P: 2, M: 3, G: 2, naoClassificado: 1 },
       { dia: "2026-10-02", cargas: 1, P: 1, M: 0, G: 3, naoClassificado: 0 },
     ]);
+  });
+});
+
+describe("periodoAnterior", () => {
+  it("devolve o período imediatamente anterior, com a mesma duração", () => {
+    expect(periodoAnterior("2026-10-01", "2026-10-09")).toEqual({ de: "2026-09-22", ate: "2026-09-30" });
+  });
+
+  it("funciona pra 1 dia só", () => {
+    expect(periodoAnterior("2026-10-05", "2026-10-05")).toEqual({ de: "2026-10-04", ate: "2026-10-04" });
+  });
+
+  it("atravessa virada de mês/ano corretamente", () => {
+    expect(periodoAnterior("2026-01-01", "2026-01-03")).toEqual({ de: "2025-12-29", ate: "2025-12-31" });
+  });
+});
+
+describe("calcularVariacao", () => {
+  it("índice de volta caiu (menor é melhor) -- melhorou", () => {
+    const v = calcularVariacao(0.1, 0.15, true);
+    expect(v).toMatchObject({ atual: 0.1, anterior: 0.15, melhorou: true });
+    expect(v.delta).toBeCloseTo(-0.05);
+  });
+
+  it("índice de volta subiu (menor é melhor) -- piorou", () => {
+    const v = calcularVariacao(0.21, 0.19, true);
+    expect(v).toMatchObject({ atual: 0.21, anterior: 0.19, melhorou: false });
+    expect(v.delta).toBeCloseTo(0.02);
+  });
+
+  it("contagem bruta (cargas) sobe -- sem julgamento de melhor/pior", () => {
+    expect(calcularVariacao(296, 284)).toEqual({ atual: 296, anterior: 284, delta: 12, melhorou: null });
+  });
+
+  it("sem período anterior pra comparar -- delta e melhorou nulos", () => {
+    expect(calcularVariacao(0.1, null, true)).toEqual({ atual: 0.1, anterior: null, delta: null, melhorou: null });
   });
 });
 

@@ -1,19 +1,24 @@
 import Link from "next/link";
+import { RefreshCw } from "lucide-react";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { AppHeader } from "@/components/AppHeader";
 import { KpisSectionTabs } from "@/components/KpisSectionTabs";
-import { KpiCardShell } from "@/components/KpiCardShell";
-import { VolumePorteChart } from "@/components/logistica/VolumePorteChart";
+import { ThHint } from "@/components/logistica/ThHint";
+import { LogisticaTerminal } from "@/components/logistica/LogisticaTerminal";
+import { IndiceTicker, type TickerItem } from "@/components/logistica/IndiceTicker";
 import { parsePeriodoKpis, TIPOS_CARGA, TIPOS_VEICULO } from "@/lib/logisticaApi";
-import { getKpisLogistica, resumirLogistica, resumoPorVeiculo, volumesPorDia, type MotoristaVolta } from "@/lib/kpisLogistica";
+import { getKpisLogistica, resumirLogistica, volumesPorDia, periodoAnterior, calcularVariacao, type Variacao } from "@/lib/kpisLogistica";
+import { num, pct, dataBr, VISITAS_MINIMAS } from "@/lib/logisticaFormat";
 
 export const dynamic = "force-dynamic";
 
-// Motorista com menos visitas que isso tem índice instável (1 volta em 5
-// visitas = 20%) -- aparece na tabela, mas apagado.
-const VISITAS_MINIMAS = 20;
-
+// "Hoje"/"Ontem" -- pedido do Victor 09/10/2026 ("dinamismo de consulta
+// retroativa... Hoje, Ontem"): janela de 1 dia só, achado pelo mesmo
+// mecanismo de menosDias abaixo (n=0 pra hoje, aplicado nos dois limites
+// pra virar 1 dia só em vez de intervalo).
 const PRESETS = [
+  { key: "hoje", label: "Hoje", dias: 1 },
+  { key: "ontem", label: "Ontem", dias: 1, offsetDias: 1 },
   { key: "7", label: "7 dias", dias: 7 },
   { key: "30", label: "30 dias", dias: 30 },
   { key: "mes", label: "Este mês", dias: null },
@@ -39,9 +44,11 @@ function resolverPeriodo(params: Params) {
   if (params.de || params.ate) {
     return { preset: "custom", de: params.de ?? "", ate: params.ate ?? hoje, tipo, veiculo };
   }
-  const preset = PRESETS.find((p) => p.key === params.periodo) ?? PRESETS[1];
-  const de = preset.dias === null ? `${hoje.slice(0, 8)}01` : menosDias(hoje, preset.dias - 1);
-  return { preset: preset.key, de, ate: hoje, tipo, veiculo };
+  const preset = PRESETS.find((p) => p.key === params.periodo) ?? PRESETS.find((p) => p.key === "30")!;
+  const offsetDias = "offsetDias" in preset ? preset.offsetDias : 0;
+  const ate = offsetDias > 0 ? menosDias(hoje, offsetDias) : hoje;
+  const de = preset.dias === null ? `${hoje.slice(0, 8)}01` : menosDias(ate, preset.dias - 1);
+  return { preset: preset.key, de, ate, tipo, veiculo };
 }
 
 function href(base: Record<string, string | undefined>) {
@@ -58,193 +65,26 @@ function pillStyle(active: boolean) {
   };
 }
 
-const num = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
-const pct = (v: number | null, casas = 1) =>
-  v === null ? "—" : `${(v * 100).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas })}%`;
-const dataBr = (dia: string) => dia.split("-").reverse().join("/");
-
-function CardTitulo({ children }: { children: React.ReactNode }) {
+// Título com ícone "?" (ThHint) quando tem hint -- pedido do Victor
+// 09/10/2026, 2ª rodada de refino: "remova todo texto cinza explicativo
+// renderizado direto na tela". O antigo "AvisoPosVenda" (parágrafo fixo
+// sobre atribuição estimada) virou o hint do título dessa seção, mesmo
+// padrão de Secao em LogisticaTerminal.tsx.
+function Bloco({ titulo, hint, children }: { titulo: string; hint?: string; children: React.ReactNode }) {
   return (
-    <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-      {children}
-    </span>
-  );
-}
-
-function CardValor({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-4xl font-bold leading-none tabular-nums" style={{ color: "var(--text-primary)" }}>
-      {children}
-    </span>
-  );
-}
-
-function CardNota({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-      {children}
-    </span>
-  );
-}
-
-function Bloco({ titulo, subtitulo, children }: { titulo: string; subtitulo?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <section className="rounded-xl p-5 flex flex-col gap-4" style={{ border: "2px solid var(--brand-green)", background: "var(--surface-1)" }}>
-      <div>
-        <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
-          {titulo}
-        </h2>
-        {subtitulo && (
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            {subtitulo}
-          </p>
-        )}
-      </div>
+    <section className="rounded-xl p-3 flex flex-col gap-2" style={{ border: "2px solid var(--brand-green)", background: "var(--surface-1)" }}>
+      <h2 className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>
+        {hint ? <ThHint hint={hint}>{titulo}</ThHint> : titulo}
+      </h2>
       {children}
     </section>
   );
 }
 
-function AvisoAtribuicao() {
-  return (
-    <div
-      className="flex items-start gap-3 rounded-lg px-4 py-3"
-      style={{ background: "var(--brand-orange-soft)", border: "1px solid var(--brand-orange)" }}
-      role="note"
-    >
-      <span aria-hidden className="text-lg leading-none" style={{ color: "var(--brand-orange)" }}>
-        ⚠
-      </span>
-      <div className="text-sm" style={{ color: "var(--text-primary)" }}>
-        <p className="font-bold">Atribuição Estimada (vínculo por CPF)</p>
-        <p style={{ color: "var(--text-secondary)" }}>
-          Devoluções e assistências não dizem qual entrega originou o retorno. Elas são ligadas ao motorista da entrega mais recente ao mesmo CPF nos
-          30 dias anteriores, ou pela carga informada no chamado quando existe. Um cliente com duas entregas no mês cai na mais recente. As colunas
-          marcadas com <strong>≈</strong> usam essa estimativa; insucessos e parciais vêm direto da carga.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-const th = "px-3 py-2 font-semibold whitespace-nowrap";
+const th = "px-2 py-1.5 font-semibold whitespace-nowrap";
 const thStyle = { color: "var(--text-secondary)" };
 
-function TabelaMotoristas({ motoristas }: { motoristas: MotoristaVolta[] }) {
-  if (motoristas.length === 0) {
-    return (
-      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-        Nenhuma visita registrada no período.
-      </p>
-    );
-  }
-  return (
-    <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
-            <th className={`${th} text-left`} style={thStyle}>
-              Motorista
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              Cargas
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              Visitas
-            </th>
-            <th className={`${th} text-right`} style={thStyle} title="Cliente / logística / CD (L06, pedido não carregado) / outros">
-              Insucessos
-            </th>
-            <th className={`${th} text-right`} style={thStyle}>
-              Parciais
-            </th>
-            <th className={`${th} text-right`} style={thStyle} title="Estimado pelo CPF (ver aviso acima)">
-              ≈ Devoluções
-            </th>
-            <th className={`${th} text-right`} style={thStyle} title="Pela carga do chamado ou estimado pelo CPF (ver aviso acima)">
-              ≈ Assistências
-            </th>
-            <th className={`${th} text-right`} style={thStyle} title="(insucessos + parciais + devoluções + assistências) ÷ visitas">
-              Volta total
-            </th>
-            <th
-              className={`${th} text-right`}
-              style={thStyle}
-              title="(insucessos de logística, exceto L06 + assistências por erro do motorista ou avaria no transporte) ÷ visitas"
-            >
-              Volta logística
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {motoristas.map((m) => {
-            const poucas = m.visitas < VISITAS_MINIMAS;
-            return (
-              <tr key={m.codigo} className="border-b" style={{ borderColor: "var(--border)", opacity: poucas ? 0.55 : 1 }}>
-                <td className="px-3 py-2.5">
-                  <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {m.nome ?? "Sem nome"}
-                  </span>
-                  <span className="ml-2 text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
-                    {m.codigo}
-                    {poucas ? " · poucas visitas" : ""}
-                  </span>
-                </td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.cargas}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.visitas}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums" title={`Cliente ${m.insucessos.cliente} · logística ${m.insucessos.logistica} · CD ${m.insucessos.cd} · outros ${m.insucessos.outros}`}>
-                  {m.insucessos.total}
-                  {m.insucessos.cd > 0 && (
-                    <span className="ml-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                      ({m.insucessos.cd} CD)
-                    </span>
-                  )}
-                </td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.parciais}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.devolucoes}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums" title={`${m.assistencias.porCarga} pela carga do chamado · ${m.assistencias.porCpf} pelo CPF`}>
-                  {m.assistencias.total}
-                </td>
-                <td className="px-3 py-2.5 text-right tabular-nums font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {pct(m.indiceVolta)}
-                </td>
-                <td className="px-3 py-2.5 text-right tabular-nums font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {pct(m.indiceVoltaLogistica)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function AvisoPosVenda() {
-  return (
-    <div
-      className="flex items-start gap-3 rounded-lg px-4 py-3"
-      style={{ background: "var(--brand-orange-soft)", border: "1px solid var(--brand-orange)" }}
-      role="note"
-    >
-      <span aria-hidden className="text-lg leading-none" style={{ color: "var(--brand-orange)" }}>
-        ⚠
-      </span>
-      <div className="text-sm" style={{ color: "var(--text-primary)" }}>
-        <p className="font-bold">Atribuição Estimada (vínculo por carga, NF, CPF e código do cliente)</p>
-        <p style={{ color: "var(--text-secondary)" }}>
-          Cada chamado de pós-venda (troca ou envio de peça, pedido da fila de peças, troca de produto, recolhimento e entrega de produto novo) é
-          ligado à entrega que levou o produto, nesta ordem: a carga informada no chamado; a entrega da nota fiscal de venda, quando bate com o mesmo
-          cliente; senão, a entrega mais recente ao mesmo cliente (CPF ou código no Protheus) nos 180 dias anteriores. Uma ocorrência conta uma vez:
-          rodadas repetidas do mesmo chamado e o pedido de peça do mesmo caso não somam de novo. Não separa defeito de fábrica de avaria no
-          transporte, por isso fica fora do Índice de Volta.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function TabelaPosVenda({ motoristas }: { motoristas: MotoristaVolta[] }) {
+function TabelaPosVenda({ motoristas }: { motoristas: import("@/lib/kpisLogistica").MotoristaVolta[] }) {
   const linhas = motoristas
     .filter((m) => m.entregasRealizadas > 0 || m.posVenda.total > 0)
     .sort((a, b) => {
@@ -262,17 +102,17 @@ function TabelaPosVenda({ motoristas }: { motoristas: MotoristaVolta[] }) {
   }
   return (
     <div className="rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
-      <table className="w-full text-sm border-collapse">
+      <table className="w-full text-xs border-collapse">
         <thead>
           <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
             <th className={`${th} text-left`} style={thStyle}>
               Motorista
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Visitas com o produto entregue (completa ou parcial)">
-              Entregas
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Visitas com o produto entregue (completa ou parcial)">Entregas</ThHint>
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Troca e envio de peça, e pedidos da fila de peças">
-              Peças
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Troca e envio de peça, e pedidos da fila de peças">Peças</ThHint>
             </th>
             <th className={`${th} text-right`} style={thStyle}>
               Troca de produto
@@ -280,14 +120,14 @@ function TabelaPosVenda({ motoristas }: { motoristas: MotoristaVolta[] }) {
             <th className={`${th} text-right`} style={thStyle}>
               Recolhimento
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Entrega de produto novo decorrente de assistência">
-              Entrega de produto
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Entrega de produto novo decorrente de assistência">Entrega de produto</ThHint>
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Ocorrências ligadas a uma entrega do motorista (ver aviso acima)">
-              ≈ Total
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Ocorrências ligadas a uma entrega do motorista -- ver explicação no título da seção">≈ Total</ThHint>
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="ocorrências de pós-venda ÷ entregas">
-              Índice de Assistência
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="ocorrências de pós-venda ÷ entregas">Índice de Assistência</ThHint>
             </th>
           </tr>
         </thead>
@@ -296,27 +136,27 @@ function TabelaPosVenda({ motoristas }: { motoristas: MotoristaVolta[] }) {
             const poucas = m.entregasRealizadas < VISITAS_MINIMAS;
             return (
               <tr key={m.codigo} className="border-b" style={{ borderColor: "var(--border)", opacity: poucas ? 0.55 : 1 }}>
-                <td className="px-3 py-2.5">
+                <td className="px-2 py-1.5">
                   <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
                     {m.nome ?? "Sem nome"}
                   </span>
-                  <span className="ml-2 text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
+                  <span className="ml-2 tabular-nums" style={{ color: "var(--text-muted)" }}>
                     {m.codigo}
                     {poucas ? " · poucas entregas" : ""}
                   </span>
                 </td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.entregasRealizadas}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.posVenda.pecas}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.posVenda.trocaProduto}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.posVenda.recolhimento}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{m.posVenda.entregaProduto}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.entregasRealizadas}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.posVenda.pecas}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.posVenda.trocaProduto}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.posVenda.recolhimento}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{m.posVenda.entregaProduto}</td>
                 <td
-                  className="px-3 py-2.5 text-right tabular-nums"
+                  className="px-2 py-1.5 text-right tabular-nums font-semibold"
                   title={`${m.posVenda.porCarga} pela carga do chamado · ${m.posVenda.porNf} pela NF · ${m.posVenda.porCliente} pelo cliente`}
                 >
                   {m.posVenda.total}
                 </td>
-                <td className="px-3 py-2.5 text-right tabular-nums font-semibold" style={{ color: "var(--text-primary)" }}>
+                <td className="px-2 py-1.5 text-right tabular-nums font-bold" style={{ color: "var(--text-primary)" }}>
                   {pct(m.indiceAssistencia)}
                 </td>
               </tr>
@@ -328,10 +168,27 @@ function TabelaPosVenda({ motoristas }: { motoristas: MotoristaVolta[] }) {
   );
 }
 
-// Sub-aba "Logística" de KPIs (08/10/2026). Mesmos dados do
-// GET /api/logistica/v1/kpis/logistica, lidos direto no servidor (RPC
-// kpis_logistica) -- definições em lojas-maia-integracao/apis/logistica-v1/
-// kpis-logistica.md.
+function formatarDeltaPct(d: number): string {
+  return `${d >= 0 ? "+" : ""}${(d * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} pp`;
+}
+
+function formatarDeltaNum(d: number): string {
+  return `${d >= 0 ? "+" : ""}${num(d)}`;
+}
+
+// `atual` pode ser null (sem visita/entrega no período) -- calcularVariacao
+// exige número, então aqui vira "sem variação" direto, sem forçar 0 (0
+// seria uma mentira: não significa "zero", significa "não dá pra medir").
+function variar(atual: number | null, anterior: number | null, menorEhMelhor?: boolean): Variacao {
+  if (atual === null) return { atual: 0, anterior, delta: null, melhorou: null };
+  return calcularVariacao(atual, anterior, menorEhMelhor);
+}
+
+// Sub-aba "Logística" de KPIs (08/10/2026, redesenhada 09/10/2026 em 2
+// rodadas -- ver PR #584 e o "terminal" em LogisticaTerminal.tsx). Mesmos
+// dados do GET /api/logistica/v1/kpis/logistica, lidos direto no servidor
+// (RPC kpis_logistica) -- definições em lojas-maia-integracao/apis/
+// logistica-v1/kpis-logistica.md.
 export default async function KpisLogisticaPage({ searchParams }: { searchParams: Promise<Params> }) {
   await requireDashboardAuth();
   const params = await searchParams;
@@ -346,26 +203,100 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   );
   const base = sel.preset === "custom" ? { de: sel.de, ate: sel.ate } : { periodo: sel.preset };
 
-  const kpis = parsed.ok ? await getKpisLogistica(parsed.periodo) : null;
+  // Período anterior (mesma duração, ver periodoAnterior) buscado em
+  // paralelo, só pra alimentar o ticker de variação -- pedido do Victor
+  // 09/10/2026 ("estilo home broker", comparação com período anterior).
+  // Falha nessa busca extra não derruba a página (.catch(() => null)):
+  // sem período anterior, o ticker mostra "sem período anterior" em vez
+  // de erro.
+  const [kpis, kpisAnteriores] = parsed.ok
+    ? await Promise.all([
+        getKpisLogistica(parsed.periodo),
+        getKpisLogistica({ ...periodoAnterior(sel.de, sel.ate), tipo: parsed.periodo.tipo, tipoVeiculo: parsed.periodo.tipoVeiculo }).catch(
+          () => null,
+        ),
+      ])
+    : [null, null];
   const resumo = kpis ? resumirLogistica(kpis) : null;
+  const resumoAnterior = kpisAnteriores ? resumirLogistica(kpisAnteriores) : null;
   const porDia = kpis ? volumesPorDia(kpis) : [];
-  const frota = kpis ? resumoPorVeiculo(kpis) : [];
-  const decimal = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
-  const volumeClassificado = resumo ? resumo.volumes.total - resumo.volumes.naoClassificado : 0;
+
+  const tickerItems: TickerItem[] = resumo
+    ? [
+        {
+          key: "volta",
+          label: "Índice de Volta",
+          valor: pct(resumo.indiceVolta),
+          variacao: variar(resumo.indiceVolta, resumoAnterior?.indiceVolta ?? null, true),
+          formatarDelta: formatarDeltaPct,
+        },
+        {
+          key: "volta-logistica",
+          label: "Volta Logística",
+          valor: pct(resumo.indiceVoltaLogistica),
+          variacao: variar(resumo.indiceVoltaLogistica, resumoAnterior?.indiceVoltaLogistica ?? null, true),
+          formatarDelta: formatarDeltaPct,
+        },
+        {
+          key: "assistencia",
+          label: "Assistência",
+          valor: pct(resumo.indiceAssistencia),
+          variacao: variar(resumo.indiceAssistencia, resumoAnterior?.indiceAssistencia ?? null, true),
+          formatarDelta: formatarDeltaPct,
+        },
+        {
+          key: "cargas",
+          label: "Cargas",
+          valor: num(resumo.cargas),
+          variacao: variar(resumo.cargas, resumoAnterior?.cargas ?? null),
+          formatarDelta: formatarDeltaNum,
+        },
+        {
+          key: "pedidos",
+          label: "Pedidos",
+          valor: num(resumo.pedidos),
+          variacao: variar(resumo.pedidos, resumoAnterior?.pedidos ?? null),
+          formatarDelta: formatarDeltaNum,
+        },
+        {
+          key: "volume",
+          label: "Volume",
+          valor: num(resumo.volumes.total),
+          variacao: variar(resumo.volumes.total, resumoAnterior?.volumes.total ?? null),
+          formatarDelta: formatarDeltaNum,
+        },
+      ]
+    : [];
 
   return (
     <div className="max-w-6xl mx-auto px-6 pt-6 pb-10 flex flex-col gap-6">
       <AppHeader />
       <KpisSectionTabs active="logistica" />
 
-      <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
-          Logística
-        </h1>
-        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Cargas despachadas pelo CD, volume por porte e o Índice de Volta de cada motorista. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV).
-          A conta de treinamento (000058) fica fora.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+            Logística
+          </h1>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Cargas despachadas pelo CD, volume por porte e o Índice de Volta de cada motorista. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV).
+            A conta de treinamento (000058) fica fora.
+          </p>
+        </div>
+        {/* Página é force-dynamic (sem cache) -- esse horário é o do
+            render de verdade, não um placeholder. "Atualizar" é só
+            recarregar a mesma URL (mesmo filtro/período já aplicado),
+            pedido do Victor pra deixar explícito que os dados são ao
+            vivo em telas de TV/reunião. */}
+        <Link
+          href={href({ ...base, tipo: sel.tipo, veiculo: sel.veiculo })}
+          className="flex items-center gap-1.5 text-xs shrink-0 rounded-full px-3 py-1.5"
+          style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+        >
+          <RefreshCw aria-hidden size={13} />
+          Atualizado às{" "}
+          {new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Recife", hour: "2-digit", minute: "2-digit" }).format(new Date())}
+        </Link>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -426,123 +357,16 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
             {kpis.periodo.tipoVeiculo ? ` · ${kpis.periodo.tipoVeiculo}` : ""}
           </p>
 
-          <section className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <KpiCardShell>
-              <CardTitulo>Cargas despachadas</CardTitulo>
-              <CardValor>{num(resumo.cargas)}</CardValor>
-              <CardNota>
-                {resumo.dias > 0 ? `${(resumo.cargas / resumo.dias).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} por dia com carga` : "—"}
-                {frota.length > 0 && ` · ${frota.map((f) => `${f.tipoVeiculo} ${num(f.cargas)}`).join(" · ")}`}
-              </CardNota>
-            </KpiCardShell>
-            <KpiCardShell>
-              <CardTitulo>Pedidos nas cargas</CardTitulo>
-              <CardValor>{num(resumo.pedidos)}</CardValor>
-              <CardNota>
-                {pct(resumo.visitas > 0 ? resumo.entregues / resumo.visitas : null)} das visitas entregues por completo
-                {frota.length > 0 && ` · por carga: ${frota.map((f) => `${f.tipoVeiculo} ${decimal(f.pedidosPorCarga)}`).join(" · ")}`}
-              </CardNota>
-            </KpiCardShell>
-            <KpiCardShell>
-              <CardTitulo>Volume despachado</CardTitulo>
-              <CardValor>{num(resumo.volumes.total)}</CardValor>
-              <CardNota>
-                unidades · G {pct(volumeClassificado ? resumo.volumes.G / volumeClassificado : null, 0)} · M{" "}
-                {pct(volumeClassificado ? resumo.volumes.M / volumeClassificado : null, 0)} · P{" "}
-                {pct(volumeClassificado ? resumo.volumes.P / volumeClassificado : null, 0)}
-              </CardNota>
-            </KpiCardShell>
-            <KpiCardShell>
-              <CardTitulo>Índice de Volta</CardTitulo>
-              <CardValor>{pct(resumo.indiceVolta)}</CardValor>
-              <CardNota>retrabalho total por visita (≈ inclui estimativa por CPF)</CardNota>
-            </KpiCardShell>
-            <KpiCardShell>
-              <CardTitulo>Volta Logística</CardTitulo>
-              <CardValor>{pct(resumo.indiceVoltaLogistica)}</CardValor>
-              <CardNota>
-                só o que é do transporte
-                {resumo.insucessosCd > 0 ? ` · ${resumo.insucessosCd} falha${resumo.insucessosCd === 1 ? "" : "s"} do CD (L06) à parte` : ""}
-              </CardNota>
-            </KpiCardShell>
-            <KpiCardShell>
-              <CardTitulo>Índice de Assistência</CardTitulo>
-              <CardValor>{pct(resumo.indiceAssistencia)}</CardValor>
-              <CardNota>
-                ≈ {num(resumo.posVenda.total)} ocorrências de pós-venda ÷ {num(resumo.entregasRealizadas)} entregas · peças{" "}
-                {num(resumo.posVenda.pecas)} · trocas {num(resumo.posVenda.trocaProduto)} · recolhimentos {num(resumo.posVenda.recolhimento)} ·
-                entregas {num(resumo.posVenda.entregaProduto)}
-              </CardNota>
-            </KpiCardShell>
-          </section>
+          <IndiceTicker items={tickerItems} labelComparacao="período anterior" />
 
-          <Bloco
-            titulo="Volume por porte (P/M/G)"
-            subtitulo={`Unidades despachadas por dia. Porte pela descrição do produto; ${num(resumo.volumes.naoClassificado)} unidade(s) sem classe no período.`}
-          >
-            <VolumePorteChart data={porDia} />
-            <details>
-              <summary className="cursor-pointer text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                Ver as {resumo.cargas} cargas
-              </summary>
-              <div className="mt-3 rounded-lg border overflow-x-auto" style={{ borderColor: "var(--border)" }}>
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
-                      {["Dia", "Carga", "Tipo", "Veículo", "Motorista", "Pedidos", "P", "M", "G", "Sem classe"].map((h, i) => (
-                        <th key={h} className={`${th} ${i >= 5 ? "text-right" : "text-left"}`} style={thStyle}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {kpis.cargas.map((c) => (
-                      <tr key={c.carga} className="border-b" style={{ borderColor: "var(--border)" }}>
-                        <td className="px-3 py-2 tabular-nums">{dataBr(c.dia)}</td>
-                        <td className="px-3 py-2 tabular-nums font-medium" style={{ color: "var(--text-primary)" }}>
-                          {c.carga}
-                        </td>
-                        <td className="px-3 py-2">{c.tipo ?? "—"}</td>
-                        <td
-                          className="px-3 py-2 whitespace-nowrap"
-                          title={c.tipoVeiculoOrigem === "motorista" ? "Carga sem placa: tipo pelo motorista fixo do carro" : undefined}
-                        >
-                          {c.tipoVeiculoOrigem === "motorista" ? "≈ " : ""}
-                          {c.tipoVeiculo}
-                          <span className="ml-1.5 text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
-                            {c.veiculo ?? ""}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">{c.motorista?.nome ?? c.motorista?.codigo ?? "Sem motorista"}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{c.pedidos}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{num(c.volumes.P)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{num(c.volumes.M)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{num(c.volumes.G)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{num(c.volumes.naoClassificado)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </details>
-          </Bloco>
-
-          <Bloco
-            titulo="Índice de Volta por motorista"
-            subtitulo={`Denominador: visitas (cada passagem de um pedido numa carga com resultado). Motoristas com menos de ${VISITAS_MINIMAS} visitas aparecem apagados.`}
-          >
-            <AvisoAtribuicao />
-            <TabelaMotoristas motoristas={kpis.motoristas} />
-          </Bloco>
+          <LogisticaTerminal cargas={kpis.cargas} motoristas={kpis.motoristas} porDia={porDia} causasVolta={resumo.causasVolta} />
 
           <Bloco
             titulo="Índice de Assistência por motorista"
-            subtitulo={`Ocorrências de pós-venda da assistência criadas no período, ligadas ao motorista que fez a entrega original. ${num(
+            hint={`Ocorrências de pós-venda da assistência criadas no período, ligadas ao motorista que fez a entrega original (${num(
               kpis.posVendaPeriodo.vinculadas,
-            )} de ${num(kpis.posVendaPeriodo.total)} ocorrências do período acharam a entrega.`}
+            )} de ${num(kpis.posVendaPeriodo.total)} ocorrências do período acharam a entrega). Atribuição estimada: cada chamado de pós-venda é ligado à entrega que levou o produto, nesta ordem -- carga informada no chamado; entrega da NF de venda quando bate com o mesmo cliente; senão, a entrega mais recente ao mesmo cliente (CPF ou código no Protheus) nos 180 dias anteriores. Uma ocorrência conta uma vez só. Não separa defeito de fábrica de avaria no transporte, por isso fica fora do Índice de Volta.`}
           >
-            <AvisoPosVenda />
             <TabelaPosVenda motoristas={kpis.motoristas} />
           </Bloco>
         </>

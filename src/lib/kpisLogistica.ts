@@ -69,6 +69,22 @@ export async function getKpisLogistica({ de, ate, tipo, tipoVeiculo }: PeriodoKp
   return data as KpisLogistica;
 }
 
+// Quebra das causas que compõem o Índice de Volta (soma = numerador de
+// indiceVolta) -- pedido do Victor 09/10/2026: "detalhamento das causas da
+// volta" na tela. Cada chave já existia espalhada por motorista
+// (MotoristaVolta.insucessos/.parciais/.devolucoes/.assistencias); aqui é
+// só a soma agregada do período inteiro, pra alimentar o gráfico de
+// distribuição sem recalcular nada.
+export type CausasVolta = {
+  insucessoCliente: number;
+  insucessoLogistica: number;
+  insucessoCd: number;
+  insucessoOutros: number;
+  parciais: number;
+  devolucoes: number;
+  assistencias: number;
+};
+
 export type ResumoLogistica = {
   cargas: number;
   dias: number;
@@ -79,6 +95,7 @@ export type ResumoLogistica = {
   indiceVolta: number | null;
   indiceVoltaLogistica: number | null;
   insucessosCd: number;
+  causasVolta: CausasVolta;
   entregasRealizadas: number;
   pecas: number;
   indicePecas: number | null;
@@ -102,6 +119,15 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
   let entregasRealizadas = 0;
   let pecas = 0;
   const posVenda = { total: 0, pecas: 0, trocaProduto: 0, recolhimento: 0, entregaProduto: 0 };
+  const causasVolta: CausasVolta = {
+    insucessoCliente: 0,
+    insucessoLogistica: 0,
+    insucessoCd: 0,
+    insucessoOutros: 0,
+    parciais: 0,
+    devolucoes: 0,
+    assistencias: 0,
+  };
   for (const m of k.motoristas) {
     entregasRealizadas += m.entregasRealizadas;
     pecas += m.pecas.total;
@@ -115,6 +141,13 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
     voltas += m.insucessos.total + m.parciais + m.devolucoes + m.assistencias.total;
     voltasLogistica += m.insucessos.logistica + m.assistencias.transporte;
     insucessosCd += m.insucessos.cd;
+    causasVolta.insucessoCliente += m.insucessos.cliente;
+    causasVolta.insucessoLogistica += m.insucessos.logistica;
+    causasVolta.insucessoCd += m.insucessos.cd;
+    causasVolta.insucessoOutros += m.insucessos.outros;
+    causasVolta.parciais += m.parciais;
+    causasVolta.devolucoes += m.devolucoes;
+    causasVolta.assistencias += m.assistencias.total;
   }
   return {
     cargas: k.cargas.length,
@@ -126,6 +159,7 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
     indiceVolta: visitas > 0 ? voltas / visitas : null,
     indiceVoltaLogistica: visitas > 0 ? voltasLogistica / visitas : null,
     insucessosCd,
+    causasVolta,
     entregasRealizadas,
     pecas,
     indicePecas: entregasRealizadas > 0 ? pecas / entregasRealizadas : null,
@@ -170,4 +204,35 @@ export function resumoPorVeiculo(k: KpisLogistica): ResumoVeiculo[] {
       unidadesPorCarga: t.unidades / t.cargas,
     }))
     .sort((a, b) => a.tipoVeiculo.localeCompare(b.tipoVeiculo, "pt-BR"));
+}
+
+// Período imediatamente anterior, com a MESMA duração em dias do período
+// selecionado -- pedido do Victor 09/10/2026 ("ticker" com variação vs.
+// período anterior, estilo home broker). Ex.: de=01/10 ate=09/10 (9 dias)
+// -> anterior = de=22/09 ate=30/09 (também 9 dias, termina 1 dia antes do
+// início do período atual). Comparação só faz sentido com a mesma
+// duração -- 7 dias contra 30 dias distorceria qualquer variação.
+export function periodoAnterior(de: string, ate: string): { de: string; ate: string } {
+  const ini = new Date(`${de}T00:00:00Z`);
+  const fim = new Date(`${ate}T00:00:00Z`);
+  const dias = Math.round((fim.getTime() - ini.getTime()) / 86400000) + 1;
+  const anteriorFim = new Date(ini);
+  anteriorFim.setUTCDate(anteriorFim.getUTCDate() - 1);
+  const anteriorIni = new Date(anteriorFim);
+  anteriorIni.setUTCDate(anteriorIni.getUTCDate() - (dias - 1));
+  return { de: anteriorIni.toISOString().slice(0, 10), ate: anteriorFim.toISOString().slice(0, 10) };
+}
+
+// Variação de um indicador entre dois períodos -- "pp" (pontos
+// percentuais) pros índices (0-1), valor bruto pros outros. `null` quando
+// falta base de comparação (ex.: período anterior sem visita nenhuma).
+// `melhorou` só é computado quando `menorEhMelhor` é passado (índices de
+// volta/assistência) -- pra contagem bruta (cargas, pedidos, volume) não
+// existe "melhor/pior", só "mais/menos" (ver IndiceTicker.tsx).
+export type Variacao = { atual: number; anterior: number | null; delta: number | null; melhorou: boolean | null };
+
+export function calcularVariacao(atual: number, anterior: number | null, menorEhMelhor?: boolean): Variacao {
+  const delta = anterior === null ? null : atual - anterior;
+  const melhorou = delta === null || menorEhMelhor === undefined ? null : menorEhMelhor ? delta < 0 : delta > 0;
+  return { atual, anterior, delta, melhorou };
 }
