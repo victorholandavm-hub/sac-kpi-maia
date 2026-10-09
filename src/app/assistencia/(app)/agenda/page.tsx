@@ -8,7 +8,7 @@ import { UnderlineTab } from "@/components/UnderlineTab";
 import { AgendaDayGroups } from "@/components/assistencia/AgendaDayGroups";
 import { AgendaKanbanBoard } from "@/components/assistencia/AgendaKanbanBoard";
 import { JP_PRIMARY_ROTAS, ROTA_LABELS, isRota } from "@/lib/rotas";
-import { DELIVERY_REQUEST_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "@/lib/assistenciaLabels";
+import { AGENDA_ANY_ASSEMBLER_TYPES, DELIVERY_REQUEST_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "@/lib/assistenciaLabels";
 import { groupIntoMonths, paginateMonths, pageContainingMonth } from "@/lib/weekGrouping";
 
 // Mês corrente -- usado só pra saber em qual PÁGINA (ver paginateMonths/
@@ -107,6 +107,18 @@ function matchesQuery(r: ServiceRequestSummary, q: string): boolean {
   return haystack.includes(q);
 }
 
+// Quem entra na Agenda -- pedido do Victor 09/10/2026: equipe interna
+// (Manoel/Adriel CD) continua entrando com qualquer tipo de visita, e agora
+// troca de peça/vistoria de QUALQUER outro montador também entra (ver
+// AGENDA_ANY_ASSEMBLER_TYPES, assistenciaLabels.ts) -- sem sair de Visitas,
+// só passa a aparecer nas duas abas.
+function isAgendaRequest(r: ServiceRequestSummary): boolean {
+  return (
+    (EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? "") ||
+    (AGENDA_ANY_ASSEMBLER_TYPES as readonly string[]).includes(r.type)
+  );
+}
+
 export default async function AgendaPage({
   searchParams,
 }: {
@@ -153,14 +165,17 @@ export default async function AgendaPage({
   // Busca". `listScheduledRequests` já busca o mês/período inteiro pro
   // client-side (rota/montador já filtravam assim), então loja/busca
   // seguem o mesmo caminho em vez de crescer a query no servidor.
-  // Agenda virou a agenda EXCLUSIVA da equipe interna (Manoel -- pedido do
+  // Agenda era a agenda EXCLUSIVA da equipe interna (Manoel -- pedido do
   // Victor 04/09/2026: "todos os montadores dentro de visitas e só manoel
-  // em agenda" -- + Adriel CD, que entrou 02/10/2026 no mesmo "nível": o
-  // resto dos montadores terceirizados/próprios de loja tem seu próprio
-  // alerta de atrasadas na aba Visitas agora, ver fila/page.tsx). Trava
-  // incondicional -- não depende mais do filtro "assembler" da URL
-  // (removido do formulário, ver abaixo), até porque não faria sentido
-  // filtrar essa agenda por outro montador terceirizado.
+  // em agenda" -- + Adriel CD, que entrou 02/10/2026 no mesmo "nível") até
+  // 09/10/2026: a partir daí, troca de peça/vistoria de QUALQUER montador
+  // também entra aqui (ver isAgendaRequest acima) -- o resto dos tipos dos
+  // montadores terceirizados/próprios de loja continua só no alerta de
+  // atrasadas da aba Visitas, ver fila/page.tsx. Trava incondicional -- não
+  // depende mais do filtro "assembler" da URL (removido do formulário, ver
+  // abaixo), até porque não faria sentido filtrar essa agenda por um
+  // montador terceirizado especificamente (ela já traz todos quando o
+  // chamado é troca de peça/vistoria).
   // Período manual (De/Até) -- pedido do Victor 03/10/2026: "preciso que
   // na aba de agenda tenha a seleção por período, para que quando eu
   // selecionar o periodo, apareça tudo, inclusive esses números de manoel
@@ -171,14 +186,14 @@ export default async function AgendaPage({
   // de busca nova nenhuma, só mais um filtro em JS por cima do que já
   // existe.
   const requests = allRequests
-    .filter((r) => (EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? ""))
+    .filter(isAgendaRequest)
     .filter((r) => !filterRota || r.rota === filterRota)
     .filter((r) => !store || r.storeId === store)
     .filter((r) => !filterQ || matchesQuery(r, filterQ))
     .filter((r) => !from || (agendaEffectiveDate(r) ?? "") >= from)
     .filter((r) => !to || (agendaEffectiveDate(r) ?? "") <= to);
   const overdueCount = (overdueRaw ?? requests)
-    .filter((r) => (EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? ""))
+    .filter(isAgendaRequest)
     .filter((r) => !filterRota || r.rota === filterRota)
     .filter((r) => !store || r.storeId === store)
     .filter((r) => !filterQ || matchesQuery(r, filterQ)).length;
@@ -255,7 +270,7 @@ export default async function AgendaPage({
           telas (fila/page.tsx, sac/notificacoes/page.tsx). */}
       <PageHeader
         title="Agenda"
-        description="Visitas técnicas da equipe interna (Manoel, Adriel CD) com data marcada -- troca de peça, vistoria, montagem e desmontagem na casa do cliente. Os outros montadores ficam na aba Visitas."
+        description="Visitas técnicas da equipe interna (Manoel, Adriel CD) com data marcada -- montagem, desmontagem, troca de peça e vistoria na casa do cliente. Troca de peça e vistoria de qualquer outro montador, quando têm data marcada, também aparecem aqui (e continuam na aba Visitas); os demais tipos desses montadores ficam só em Visitas."
         cta={
           <Link
             href="/assistencia/nova-rapida"
@@ -507,15 +522,18 @@ export default async function AgendaPage({
         </div>
       ) : showKanban ? (
         <div className="hidden sm:block">
-          {/* Kanban por dia da equipe interna -- exclui os tipos que saem
-              de motorista (troca/entrega de produto, envio de peça): esse
-              Kanban arrasta pra reatribuir MONTADOR (setAssemblerName), não
-              faz sentido um chamado de motorista aparecer aqui. Só as
-              colunas da equipe interna (Manoel desde 04/09/2026, + Adriel
-              CD desde 02/10/2026) -- Agenda virou a agenda exclusiva deles
-              (ver filtro incondicional acima). `pageRequests` (não
-              `requests`) -- segue o mesmo recorte de página que "Por dia"
-              ao lado, ver pageRequests acima. */}
+          {/* Kanban por dia -- exclui os tipos que saem de motorista (troca/
+              entrega de produto, envio de peça): esse Kanban arrasta pra
+              reatribuir MONTADOR (setAssemblerName), não faz sentido um
+              chamado de motorista aparecer aqui. Colunas fixas da equipe
+              interna (Manoel desde 04/09/2026, + Adriel CD desde
+              02/10/2026) + qualquer outro montador que apareça em
+              `requests` (troca de peça/vistoria dele, ver isAgendaRequest
+              acima) -- AgendaKanbanBoard já monta coluna extra sozinho pra
+              nome fora da lista (ver columnNames lá), então não precisa
+              listar os terceirizados aqui. `pageRequests` (não `requests`)
+              -- segue o mesmo recorte de página que "Por dia" ao lado, ver
+              pageRequests acima. */}
           <AgendaKanbanBoard
             requests={pageRequests.filter((r) => !(DELIVERY_REQUEST_TYPES as readonly string[]).includes(r.type))}
             assemblers={[...EQUIPE_INTERNA_ASSEMBLERS]}

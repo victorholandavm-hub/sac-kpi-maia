@@ -382,10 +382,17 @@ export const MANOEL_ONLY_ASSEMBLER = "Manoel";
 // vistoria", então qualquer montador (inclusive terceirizado) pode ser
 // atribuído aos dois tipos agora, igual montagem/desmontagem. O que NÃO
 // mudou: Manoel/Adriel CD continuam de fora dos pagamentos/relatórios por
-// peça (EQUIPE_INTERNA_ASSEMBLERS abaixo) e só eles aparecem na Agenda em vez
-// da aba Visitas -- isso é sobre QUEM SÃO eles (funcionários da casa, não
-// terceirizados pagos por peça), não sobre QUE TIPO de visita cada um pode
-// fazer.
+// peça (EQUIPE_INTERNA_ASSEMBLERS abaixo) -- isso é sobre QUEM SÃO eles
+// (funcionários da casa, não terceirizados pagos por peça), não sobre QUE
+// TIPO de visita cada um pode fazer.
+//
+// Agenda deixou de ser 100% exclusiva da equipe interna no mesmo pedido:
+// "preciso que toda vez que for uma troca de peça ou vistoria, de qualquer
+// montador, fique na aba agenda" -- ver AGENDA_ANY_ASSEMBLER_TYPES abaixo e
+// o filtro em agenda/page.tsx. Continuam aparecendo também na aba Visitas
+// (não saem de lá) -- isso é só sobre QUAL ABA enxerga o chamado, Agenda
+// passou a ser "todo troca de peça/vistoria com data marcada, de qualquer
+// montador" + "qualquer visita da equipe interna", não mais só o segundo.
 //
 // Montadores da CASA (funcionários, não terceirizados pagos por peça) --
 // Adriel CD entrou 02/10/2026 (pedido do Victor: "ele vai ficar junto com
@@ -397,6 +404,14 @@ export const MANOEL_ONLY_ASSEMBLER = "Manoel";
 // "é funcionário" na tabela assemblers) -- mesmo padrão que o Manoel sozinho
 // já usava antes disso, só generalizado pra mais de um nome.
 export const EQUIPE_INTERNA_ASSEMBLERS = [MANOEL_ONLY_ASSEMBLER, "Adriel CD"] as const;
+
+// Entram na Agenda independente de quem seja o montador -- pedido do Victor
+// 09/10/2026 (ver comentário acima). Troca de peça/vistoria de um montador
+// terceirizado qualquer, com data marcada, agora aparece aqui também (além
+// de continuar em Visitas), do mesmo jeito que os chamados da equipe
+// interna. Os outros tipos (montagem/desmontagem) de um montador
+// terceirizado continuam só em Visitas.
+export const AGENDA_ANY_ASSEMBLER_TYPES = ["troca_peca", "vistoria"] as const;
 
 // Everton manda na expedição dos carros/produtos -- pedido do Victor
 // 18/08/2026: login de motorista dele vê TODAS as rotas/solicitações
