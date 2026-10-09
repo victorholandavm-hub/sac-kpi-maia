@@ -16,6 +16,7 @@ import {
   CADASTRO_TIPO_LABELS,
   CADASTRO_TIPO_COLORS,
   CADASTRO_STATUS_LABELS,
+  CADASTRO_SOLICITANTES_ATIVOS,
   CADASTROS_PAGE_SIZE,
   type CadastroTipo,
   type CadastroStatus,
@@ -307,6 +308,15 @@ export default async function CadastrosPage({
           placeholder="Situação: todas"
           options={(["PROGRAMADO", "CONCLUIDO", "CANCELADO"] as CadastroStatus[]).map((s) => ({ value: s, label: CADASTRO_STATUS_LABELS[s] }))}
         />
+        {/* Atendente -- pedido do Victor 09/10/2026: "precisa ter um filtro
+            por atendente, Iasmyn, Michael e Luis". Mesma lista de
+            CADASTRO_SOLICITANTES_ATIVOS (quem está de fato em atendimento
+            hoje) que já alimenta os cards "Equipe X" abaixo e o campo
+            "Solicitante" do formulário -- um lugar só pra manter os 3
+            sincronizados. `solicitante` já era aceito por listCadastros e
+            propagado em todo buildHref desde a criação da tela, só
+            faltava esse controle visível pra setar o filtro.  */}
+        <FilterSelect name="solicitante" placeholder="Atendente: todos" options={[...CADASTRO_SOLICITANTES_ATIVOS]} />
       </div>
 
       <DateRangeQuickFilter
@@ -383,25 +393,34 @@ export default async function CadastrosPage({
           -- pedido do Victor 02/10/2026: "deixa apenas os que estão em
           atendimento". Nomes antigos da planilha (Luisa, Mayara, Kelly
           etc.) continuam nos registros, só saem desses cards. `.slice(0,
-          12)` é só uma trava de segurança agora (nunca passa de 3). */}
+          12)` é só uma trava de segurança agora (nunca passa de 3). Virou
+          atalho clicável 09/10/2026 (mesmo pedido do filtro "Atendente"
+          acima): clicar filtra `solicitante` igual ao FilterSelect, de
+          novo no mesmo card desmarca -- `solicitante` já era aceito por
+          listCadastros/buildHref desde sempre, só faltava um jeito de
+          setar clicando. */}
       {resumo.length > 0 ? (
         <div className="flex items-center gap-3 overflow-x-auto pb-1">
-          {resumo.slice(0, 12).map((r) => (
-            <div
-              key={r.solicitante}
-              className="shrink-0 rounded-xl border p-3 flex flex-col gap-1.5 min-w-[160px]"
-              style={{ borderColor: "var(--border)", background: "var(--surface-1)" }}
-            >
-              <span className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-                Equipe {r.solicitante}
-              </span>
-              <div className="flex items-center gap-2 text-xs flex-wrap">
-                <span style={{ color: "var(--text-muted)" }}>{r.programado} em processo</span>
-                <span style={{ color: "var(--status-good)" }}>{r.concluido} concluído</span>
-                <span style={{ color: "var(--status-critical)" }}>{r.cancelado} não concl.</span>
-              </div>
-            </div>
-          ))}
+          {resumo.slice(0, 12).map((r) => {
+            const ativo = solicitante === r.solicitante;
+            return (
+              <Link
+                key={r.solicitante}
+                href={buildHref({ filtro, status, loja, solicitante: ativo ? undefined : r.solicitante, q, from, to })}
+                className="shrink-0 rounded-xl border p-3 flex flex-col gap-1.5 min-w-[160px] transition-colors duration-150"
+                style={{ borderColor: ativo ? "var(--brand-green)" : "var(--border)", background: ativo ? "var(--brand-green-soft)" : "var(--surface-1)" }}
+              >
+                <span className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+                  Equipe {r.solicitante}
+                </span>
+                <div className="flex items-center gap-2 text-xs flex-wrap">
+                  <span style={{ color: "var(--text-muted)" }}>{r.programado} em processo</span>
+                  <span style={{ color: "var(--status-good)" }}>{r.concluido} concluído</span>
+                  <span style={{ color: "var(--status-critical)" }}>{r.cancelado} não concl.</span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       ) : null}
 
