@@ -257,14 +257,15 @@ export async function listCadastroLojas(): Promise<string[]> {
 // solicitações) -- pedido do Victor 02/10/2026, primeiro pro campo
 // "Solicitante" do formulário (ver cadastroFormShared.tsx), depois pros
 // cards "Equipe X" ("deixa apenas os que estão em atendimento, iasmyn,
-// victor e michael"). Atualizado 09/10/2026 (pedido do Victor: "filtro
-// por atendente, Iasmyn, Michael e Luis") -- Luis entrou no lugar dele
-// nesse time (mesmo nome já usado em ASSISTENCIA_CAN_CREATE_SAC_TYPES,
-// assistenciaLabels.ts). Nomes antigos da planilha (Luisa, Mayara, Kelly,
-// Lucas, Janielle etc.) continuam nos registros históricos -- só saem
-// desses lugares específicos (formulário, cards, filtro), não dos dados
-// em si.
-export const CADASTRO_SOLICITANTES_ATIVOS = ["Iasmyn", "Michael", "Luis"] as const;
+// victor e michael"). 09/10/2026: pedido do filtro "Atendente" veio como
+// "Iasmyn, Michael e Luis" -- troquei achando que era o Luis de
+// ASSISTENCIA_CAN_CREATE_SAC_TYPES (assistenciaLabels.ts), mas era Luisa
+// (nome antigo da planilha, pessoa diferente) e o Victor pediu pra manter
+// como estava. De volta ao time original. Nomes antigos da planilha
+// (Luisa, Mayara, Kelly, Lucas, Janielle etc.) continuam nos registros
+// históricos -- só não entram nesses lugares específicos (formulário,
+// cards, filtro), não nos dados em si.
+export const CADASTRO_SOLICITANTES_ATIVOS = ["Iasmyn", "Victor", "Michael"] as const;
 
 export type CadastroResumoSolicitante = { solicitante: string; programado: number; concluido: number; cancelado: number; total: number };
 
