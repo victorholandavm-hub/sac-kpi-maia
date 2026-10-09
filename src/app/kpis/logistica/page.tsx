@@ -1,13 +1,29 @@
 import Link from "next/link";
+import { RefreshCw, HelpCircle } from "lucide-react";
 import { requireDashboardAuth } from "@/lib/dashboardSession";
 import { AppHeader } from "@/components/AppHeader";
 import { KpisSectionTabs } from "@/components/KpisSectionTabs";
-import { KpiCardShell } from "@/components/KpiCardShell";
+import { KpiCardShell, StatusPill } from "@/components/KpiCardShell";
 import { VolumePorteChart } from "@/components/logistica/VolumePorteChart";
+import { CausasVoltaChart } from "@/components/logistica/CausasVoltaChart";
 import { parsePeriodoKpis, TIPOS_CARGA, TIPOS_VEICULO } from "@/lib/logisticaApi";
 import { getKpisLogistica, resumirLogistica, resumoPorVeiculo, volumesPorDia, type MotoristaVolta } from "@/lib/kpisLogistica";
 
 export const dynamic = "force-dynamic";
+
+// Semáforo do Índice de Volta/Volta Logística -- pedido do Victor
+// 09/10/2026: verde até 5%, amarelo até 10%, vermelho acima disso (mesmas
+// faixas no card de topo e na coluna por motorista da tabela, pra não
+// contradizer visualmente). Ajustável aqui, num lugar só, se a meta mudar.
+const META_VOLTA_BOA = 0.05;
+const META_VOLTA_ALERTA = 0.1;
+
+function toneIndiceVolta(v: number | null): "good" | "warning" | "critical" | "neutral" {
+  if (v === null) return "neutral";
+  if (v <= META_VOLTA_BOA) return "good";
+  if (v <= META_VOLTA_ALERTA) return "warning";
+  return "critical";
+}
 
 // Motorista com menos visitas que isso tem índice instável (1 volta em 5
 // visitas = 20%) -- aparece na tabela, mas apagado.
@@ -71,9 +87,19 @@ function CardTitulo({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CardValor({ children }: { children: React.ReactNode }) {
+const TONE_COLOR: Record<"good" | "warning" | "critical" | "neutral", string> = {
+  good: "var(--status-good)",
+  warning: "var(--status-warning)",
+  critical: "var(--status-critical)",
+  neutral: "var(--text-primary)",
+};
+
+// `big` -- os 3 cards "termômetro" (Volta/Volta Logística/Assistência) em
+// fonte maior que os 3 de volume, pra ficarem dominantes numa TV de
+// reunião (pedido do Victor: "fontes grandes para visualização em TV").
+function CardValor({ children, tone = "neutral", big = false }: { children: React.ReactNode; tone?: "good" | "warning" | "critical" | "neutral"; big?: boolean }) {
   return (
-    <span className="text-4xl font-bold leading-none tabular-nums" style={{ color: "var(--text-primary)" }}>
+    <span className={`${big ? "text-5xl" : "text-4xl"} font-bold leading-none tabular-nums`} style={{ color: TONE_COLOR[tone] }}>
       {children}
     </span>
   );
@@ -130,6 +156,20 @@ function AvisoAtribuicao() {
 const th = "px-3 py-2 font-semibold whitespace-nowrap";
 const thStyle = { color: "var(--text-secondary)" };
 
+// Cabeçalho de coluna com explicação -- antes era só um `title` solto no
+// texto, sem nada indicando que tinha explicação pra ler (achado do
+// Victor 09/10/2026: "textos cinzas explicativos flutuando na tela").
+// Ícone "?" visível avisa que dá pra passar o mouse, mesmo tooltip nativo
+// de sempre por trás (sem JS novo, sem popover pra manter).
+function ThHint({ children, hint }: { children: React.ReactNode; hint: string }) {
+  return (
+    <span className="inline-flex items-center gap-1" title={hint}>
+      {children}
+      <HelpCircle aria-hidden className="shrink-0" size={13} style={{ color: "var(--text-muted)" }} />
+    </span>
+  );
+}
+
 function TabelaMotoristas({ motoristas }: { motoristas: MotoristaVolta[] }) {
   if (motoristas.length === 0) {
     return (
@@ -152,27 +192,25 @@ function TabelaMotoristas({ motoristas }: { motoristas: MotoristaVolta[] }) {
             <th className={`${th} text-right`} style={thStyle}>
               Visitas
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Cliente / logística / CD (L06, pedido não carregado) / outros">
-              Insucessos
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Cliente / logística / CD (L06, pedido não carregado) / outros">Insucessos</ThHint>
             </th>
             <th className={`${th} text-right`} style={thStyle}>
               Parciais
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Estimado pelo CPF (ver aviso acima)">
-              ≈ Devoluções
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Estimado pelo CPF (ver aviso acima)">≈ Devoluções</ThHint>
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Pela carga do chamado ou estimado pelo CPF (ver aviso acima)">
-              ≈ Assistências
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Pela carga do chamado ou estimado pelo CPF (ver aviso acima)">≈ Assistências</ThHint>
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="(insucessos + parciais + devoluções + assistências) ÷ visitas">
-              Volta total
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="(insucessos + parciais + devoluções + assistências) ÷ visitas">Volta total</ThHint>
             </th>
-            <th
-              className={`${th} text-right`}
-              style={thStyle}
-              title="(insucessos de logística, exceto L06 + assistências por erro do motorista ou avaria no transporte) ÷ visitas"
-            >
-              Volta logística
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="(insucessos de logística, exceto L06 + assistências por erro do motorista ou avaria no transporte) ÷ visitas">
+                Volta logística
+              </ThHint>
             </th>
           </tr>
         </thead>
@@ -205,11 +243,11 @@ function TabelaMotoristas({ motoristas }: { motoristas: MotoristaVolta[] }) {
                 <td className="px-3 py-2.5 text-right tabular-nums" title={`${m.assistencias.porCarga} pela carga do chamado · ${m.assistencias.porCpf} pelo CPF`}>
                   {m.assistencias.total}
                 </td>
-                <td className="px-3 py-2.5 text-right tabular-nums font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {pct(m.indiceVolta)}
+                <td className="px-3 py-2.5 text-right">
+                  <StatusPill label={pct(m.indiceVolta)} tone={toneIndiceVolta(m.indiceVolta)} />
                 </td>
-                <td className="px-3 py-2.5 text-right tabular-nums font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {pct(m.indiceVoltaLogistica)}
+                <td className="px-3 py-2.5 text-right">
+                  <StatusPill label={pct(m.indiceVoltaLogistica)} tone={toneIndiceVolta(m.indiceVoltaLogistica)} />
                 </td>
               </tr>
             );
@@ -268,11 +306,11 @@ function TabelaPosVenda({ motoristas }: { motoristas: MotoristaVolta[] }) {
             <th className={`${th} text-left`} style={thStyle}>
               Motorista
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Visitas com o produto entregue (completa ou parcial)">
-              Entregas
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Visitas com o produto entregue (completa ou parcial)">Entregas</ThHint>
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Troca e envio de peça, e pedidos da fila de peças">
-              Peças
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Troca e envio de peça, e pedidos da fila de peças">Peças</ThHint>
             </th>
             <th className={`${th} text-right`} style={thStyle}>
               Troca de produto
@@ -280,14 +318,14 @@ function TabelaPosVenda({ motoristas }: { motoristas: MotoristaVolta[] }) {
             <th className={`${th} text-right`} style={thStyle}>
               Recolhimento
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Entrega de produto novo decorrente de assistência">
-              Entrega de produto
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Entrega de produto novo decorrente de assistência">Entrega de produto</ThHint>
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="Ocorrências ligadas a uma entrega do motorista (ver aviso acima)">
-              ≈ Total
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="Ocorrências ligadas a uma entrega do motorista (ver aviso acima)">≈ Total</ThHint>
             </th>
-            <th className={`${th} text-right`} style={thStyle} title="ocorrências de pós-venda ÷ entregas">
-              Índice de Assistência
+            <th className={`${th} text-right`} style={thStyle}>
+              <ThHint hint="ocorrências de pós-venda ÷ entregas">Índice de Assistência</ThHint>
             </th>
           </tr>
         </thead>
@@ -358,14 +396,30 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
       <AppHeader />
       <KpisSectionTabs active="logistica" />
 
-      <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
-          Logística
-        </h1>
-        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Cargas despachadas pelo CD, volume por porte e o Índice de Volta de cada motorista. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV).
-          A conta de treinamento (000058) fica fora.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
+            Logística
+          </h1>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Cargas despachadas pelo CD, volume por porte e o Índice de Volta de cada motorista. O dia da carga é a previsão definida pelo CD (ZAG_DTPREV).
+            A conta de treinamento (000058) fica fora.
+          </p>
+        </div>
+        {/* Página é force-dynamic (sem cache) -- esse horário é o do
+            render de verdade, não um placeholder. "Atualizar" é só
+            recarregar a mesma URL (mesmo filtro/período já aplicado),
+            pedido do Victor pra deixar explícito que os dados são ao
+            vivo em telas de TV/reunião. */}
+        <Link
+          href={href({ ...base, tipo: sel.tipo, veiculo: sel.veiculo })}
+          className="flex items-center gap-1.5 text-xs shrink-0 rounded-full px-3 py-1.5"
+          style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+        >
+          <RefreshCw aria-hidden size={13} />
+          Atualizado às{" "}
+          {new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Recife", hour: "2-digit", minute: "2-digit" }).format(new Date())}
+        </Link>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -426,6 +480,58 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
             {kpis.periodo.tipoVeiculo ? ` · ${kpis.periodo.tipoVeiculo}` : ""}
           </p>
 
+          {/* "Termômetro" primeiro -- os 3 índices são o que importa pra
+              reunião/TV, fonte maior e com semáforo (pedido do Victor:
+              "fontes grandes para visualização em TV"). Volume (Cargas/
+              Pedidos/Volume despachado) é contexto de apoio, fileira menor
+              logo abaixo. */}
+          <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <KpiCardShell accentColor={TONE_COLOR[toneIndiceVolta(resumo.indiceVolta)]}>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitulo>Índice de Volta</CardTitulo>
+                <StatusPill
+                  label={toneIndiceVolta(resumo.indiceVolta) === "good" ? "Dentro da meta" : toneIndiceVolta(resumo.indiceVolta) === "warning" ? "Atenção" : "Crítico"}
+                  tone={toneIndiceVolta(resumo.indiceVolta)}
+                />
+              </div>
+              <CardValor big tone={toneIndiceVolta(resumo.indiceVolta)}>
+                {pct(resumo.indiceVolta)}
+              </CardValor>
+              <CardNota>retrabalho total por visita (≈ inclui estimativa por CPF) · meta até {pct(META_VOLTA_BOA, 0)}</CardNota>
+            </KpiCardShell>
+            <KpiCardShell accentColor={TONE_COLOR[toneIndiceVolta(resumo.indiceVoltaLogistica)]}>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitulo>Volta Logística</CardTitulo>
+                <StatusPill
+                  label={
+                    toneIndiceVolta(resumo.indiceVoltaLogistica) === "good"
+                      ? "Dentro da meta"
+                      : toneIndiceVolta(resumo.indiceVoltaLogistica) === "warning"
+                        ? "Atenção"
+                        : "Crítico"
+                  }
+                  tone={toneIndiceVolta(resumo.indiceVoltaLogistica)}
+                />
+              </div>
+              <CardValor big tone={toneIndiceVolta(resumo.indiceVoltaLogistica)}>
+                {pct(resumo.indiceVoltaLogistica)}
+              </CardValor>
+              <CardNota>
+                só o que é do transporte
+                {resumo.insucessosCd > 0 ? ` · ${resumo.insucessosCd} falha${resumo.insucessosCd === 1 ? "" : "s"} do CD (L06) à parte` : ""}
+              </CardNota>
+            </KpiCardShell>
+            <KpiCardShell>
+              <CardTitulo>Índice de Assistência</CardTitulo>
+              <CardValor big>{pct(resumo.indiceAssistencia)}</CardValor>
+              <CardNota>
+                ≈ {num(resumo.posVenda.total)} ocorrências de pós-venda ÷ {num(resumo.entregasRealizadas)} entregas · peças{" "}
+                {num(resumo.posVenda.pecas)} · trocas {num(resumo.posVenda.trocaProduto)} · recolhimentos {num(resumo.posVenda.recolhimento)} ·
+                entregas {num(resumo.posVenda.entregaProduto)}
+              </CardNota>
+            </KpiCardShell>
+          </section>
+
           <section className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <KpiCardShell>
               <CardTitulo>Cargas despachadas</CardTitulo>
@@ -452,29 +558,14 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
                 {pct(volumeClassificado ? resumo.volumes.P / volumeClassificado : null, 0)}
               </CardNota>
             </KpiCardShell>
-            <KpiCardShell>
-              <CardTitulo>Índice de Volta</CardTitulo>
-              <CardValor>{pct(resumo.indiceVolta)}</CardValor>
-              <CardNota>retrabalho total por visita (≈ inclui estimativa por CPF)</CardNota>
-            </KpiCardShell>
-            <KpiCardShell>
-              <CardTitulo>Volta Logística</CardTitulo>
-              <CardValor>{pct(resumo.indiceVoltaLogistica)}</CardValor>
-              <CardNota>
-                só o que é do transporte
-                {resumo.insucessosCd > 0 ? ` · ${resumo.insucessosCd} falha${resumo.insucessosCd === 1 ? "" : "s"} do CD (L06) à parte` : ""}
-              </CardNota>
-            </KpiCardShell>
-            <KpiCardShell>
-              <CardTitulo>Índice de Assistência</CardTitulo>
-              <CardValor>{pct(resumo.indiceAssistencia)}</CardValor>
-              <CardNota>
-                ≈ {num(resumo.posVenda.total)} ocorrências de pós-venda ÷ {num(resumo.entregasRealizadas)} entregas · peças{" "}
-                {num(resumo.posVenda.pecas)} · trocas {num(resumo.posVenda.trocaProduto)} · recolhimentos {num(resumo.posVenda.recolhimento)} ·
-                entregas {num(resumo.posVenda.entregaProduto)}
-              </CardNota>
-            </KpiCardShell>
           </section>
+
+          <Bloco
+            titulo="Causas da Volta"
+            subtitulo={`Distribuição do que compõe o Índice de Volta (${pct(resumo.indiceVolta)}) -- a soma das barras é o mesmo numerador, só detalhado por motivo.`}
+          >
+            <CausasVoltaChart causas={resumo.causasVolta} />
+          </Bloco>
 
           <Bloco
             titulo="Volume por porte (P/M/G)"

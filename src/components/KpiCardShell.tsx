@@ -59,11 +59,21 @@ export function StatusPill({
   icon,
 }: {
   label: string;
-  tone: "critical" | "good" | "neutral";
+  // "warning" adicionado 09/10/2026 (semáforo de 3 cores do Índice de
+  // Volta/Volta Logística na tela de KPIs de logística -- verde/amarelo/
+  // vermelho, não só "dentro"/"fora" da meta).
+  tone: "critical" | "warning" | "good" | "neutral";
   title?: string;
   icon?: ReactNode;
 }) {
-  const color = tone === "critical" ? "var(--status-critical)" : tone === "good" ? "var(--status-good)" : "var(--text-muted)";
+  const color =
+    tone === "critical"
+      ? "var(--status-critical)"
+      : tone === "warning"
+        ? "var(--status-warning)"
+        : tone === "good"
+          ? "var(--status-good)"
+          : "var(--text-muted)";
   return (
     <span
       title={title}

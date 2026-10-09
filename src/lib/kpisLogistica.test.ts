@@ -51,6 +51,16 @@ describe("resumirLogistica", () => {
     expect(r.indicePecas).toBeCloseTo(4 / 80);
     expect(r.posVenda).toEqual({ total: 7, pecas: 3, trocaProduto: 2, recolhimento: 1, entregaProduto: 1 });
     expect(r.indiceAssistencia).toBeCloseTo(7 / 80);
+    // Soma das causas bate com o numerador de indiceVolta (20/100 acima).
+    expect(r.causasVolta).toEqual({
+      insucessoCliente: 7,
+      insucessoLogistica: 1,
+      insucessoCd: 2,
+      insucessoOutros: 0,
+      parciais: 2,
+      devolucoes: 3,
+      assistencias: 5,
+    });
   });
 
   it("sem visitas, índices nulos em vez de divisão por zero", () => {

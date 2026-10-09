@@ -69,6 +69,22 @@ export async function getKpisLogistica({ de, ate, tipo, tipoVeiculo }: PeriodoKp
   return data as KpisLogistica;
 }
 
+// Quebra das causas que compõem o Índice de Volta (soma = numerador de
+// indiceVolta) -- pedido do Victor 09/10/2026: "detalhamento das causas da
+// volta" na tela. Cada chave já existia espalhada por motorista
+// (MotoristaVolta.insucessos/.parciais/.devolucoes/.assistencias); aqui é
+// só a soma agregada do período inteiro, pra alimentar o gráfico de
+// distribuição sem recalcular nada.
+export type CausasVolta = {
+  insucessoCliente: number;
+  insucessoLogistica: number;
+  insucessoCd: number;
+  insucessoOutros: number;
+  parciais: number;
+  devolucoes: number;
+  assistencias: number;
+};
+
 export type ResumoLogistica = {
   cargas: number;
   dias: number;
@@ -79,6 +95,7 @@ export type ResumoLogistica = {
   indiceVolta: number | null;
   indiceVoltaLogistica: number | null;
   insucessosCd: number;
+  causasVolta: CausasVolta;
   entregasRealizadas: number;
   pecas: number;
   indicePecas: number | null;
@@ -102,6 +119,15 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
   let entregasRealizadas = 0;
   let pecas = 0;
   const posVenda = { total: 0, pecas: 0, trocaProduto: 0, recolhimento: 0, entregaProduto: 0 };
+  const causasVolta: CausasVolta = {
+    insucessoCliente: 0,
+    insucessoLogistica: 0,
+    insucessoCd: 0,
+    insucessoOutros: 0,
+    parciais: 0,
+    devolucoes: 0,
+    assistencias: 0,
+  };
   for (const m of k.motoristas) {
     entregasRealizadas += m.entregasRealizadas;
     pecas += m.pecas.total;
@@ -115,6 +141,13 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
     voltas += m.insucessos.total + m.parciais + m.devolucoes + m.assistencias.total;
     voltasLogistica += m.insucessos.logistica + m.assistencias.transporte;
     insucessosCd += m.insucessos.cd;
+    causasVolta.insucessoCliente += m.insucessos.cliente;
+    causasVolta.insucessoLogistica += m.insucessos.logistica;
+    causasVolta.insucessoCd += m.insucessos.cd;
+    causasVolta.insucessoOutros += m.insucessos.outros;
+    causasVolta.parciais += m.parciais;
+    causasVolta.devolucoes += m.devolucoes;
+    causasVolta.assistencias += m.assistencias.total;
   }
   return {
     cargas: k.cargas.length,
@@ -126,6 +159,7 @@ export function resumirLogistica(k: KpisLogistica): ResumoLogistica {
     indiceVolta: visitas > 0 ? voltas / visitas : null,
     indiceVoltaLogistica: visitas > 0 ? voltasLogistica / visitas : null,
     insucessosCd,
+    causasVolta,
     entregasRealizadas,
     pecas,
     indicePecas: entregasRealizadas > 0 ? pecas / entregasRealizadas : null,
