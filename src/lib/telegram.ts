@@ -24,11 +24,10 @@ import { REQUEST_TYPE_LABELS, STATUS_LABELS, DELIVERY_REQUEST_TYPES, VISITA_REQU
 // assistencia escolher o montador para uma visita"). Token/chat ids
 // PRÓPRIOS (bot separado no Telegram, não reaproveita TELEGRAM_BOT_TOKEN),
 // mesmo padrão de "sem as duas env vars, não faz nada" do bot principal.
-// Escopo = VISITA_REQUEST_TYPES (montagem, desmontagem, troca_peca,
-// vistoria -- os 2 últimos são sempre Manoel ou Adriel CD,
-// EQUIPE_INTERNA_ONLY_TYPES em assistenciaLabels.ts) -- sem exclusão de
-// montador nenhuma, ao contrário da 1ª versão desse bot (que tirava o
-// Manoel de propósito).
+// Escopo = VISITA_REQUEST_TYPES (montagem, desmontagem, troca_peca, vistoria
+// -- desde 09/10/2026 qualquer montador pode fazer os 2 últimos, não só
+// Manoel/Adriel CD) -- sem exclusão de montador nenhuma, ao contrário da 1ª
+// versão desse bot (que tirava o Manoel de propósito).
 async function sendTelegramMessage(text: string, tokenEnvVar = "TELEGRAM_BOT_TOKEN", chatIdsEnvVar = "TELEGRAM_CHAT_IDS"): Promise<void> {
   const token = process.env[tokenEnvVar];
   const chatIds = (process.env[chatIdsEnvVar] ?? "")

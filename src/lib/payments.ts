@@ -162,6 +162,25 @@ export async function resolveDriverName(typedName: string): Promise<string> {
   return existing?.name ?? trimmed;
 }
 
+// Mesmo raciocínio de resolveDriverName acima, pro nome do montador --
+// achado 09/10/2026 revisando a aba de Pagamentos (pedido do Victor: "revise
+// e veja se não tem nada de errado"): o chamado #7547 tinha assembler_name
+// "manoel" (minúsculo), uma linha SEPARADA de "Manoel" na tabela assemblers
+// (nome é PK exata, sem normalização nenhuma antes de gravar). Como toda
+// exclusão do Manoel/Adriel CD da lista de pagamentos (EQUIPE_INTERNA_ASSEMBLERS,
+// assistenciaLabels.ts) compara string exata, essa variação de caixa fazia o
+// chamado dele aparecer como se fosse de um montador terceirizado comum --
+// e também sumia da Agenda dele (mesma comparação exata lá). Sem isso, digitar
+// "joão" quando já existe "João" (ou vice-versa) divide o mesmo montador em
+// dois grupos diferentes na tela de Pagamentos, sem nenhum aviso.
+export async function resolveAssemblerName(typedName: string): Promise<string> {
+  const trimmed = typedName.trim();
+  const admin = getSupabaseAdmin();
+  const { data } = await admin.from("assemblers").select("name");
+  const existing = (data ?? []).find((a) => (a.name as string).toLowerCase() === trimmed.toLowerCase());
+  return existing?.name ?? trimmed;
+}
+
 // Estágio do pagamento de um item — só vira "pendente" (esperando liberação
 // do gerente) depois que a montagem em si foi concluída; antes disso é só
 // "a_montar", mesmo que o valor já tenha sido definido antecipadamente.

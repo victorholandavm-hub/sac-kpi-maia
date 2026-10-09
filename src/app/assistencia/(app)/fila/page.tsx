@@ -394,11 +394,13 @@ export default async function AssistenciaQueuePage({
   let requests = filterSched === undefined ? rawRequests : rawRequests.filter((r) => isDeliveryScheduled(r.scheduledDate, r.rota) === filterSched);
   // Manoel saiu da aba Visitas -- pedido do Victor 04/09/2026: "todos os
   // montadores dentro de visitas e só manoel em agenda". As visitas dele
-  // (vistoria/troca_peca, ver EQUIPE_INTERNA_ONLY_TYPES) ficam exclusivas da
-  // Agenda agora (ver agenda/page.tsx) -- incondicional, não depende de
-  // nenhum filtro escolhido. Adriel CD entrou 02/10/2026 no mesmo "nível"
-  // (ver EQUIPE_INTERNA_ASSEMBLERS, assistenciaLabels.ts). Sem efeito na
-  // aba Entregas (equipe interna nunca tem chamado de entrega/motorista).
+  // ficam exclusivas da Agenda agora (ver agenda/page.tsx) -- incondicional,
+  // não depende de nenhum filtro escolhido, nem do TIPO da visita (desde
+  // 09/10/2026 qualquer montador pode fazer vistoria/troca de peça também --
+  // ver EQUIPE_INTERNA_ASSEMBLERS, assistenciaLabels.ts -- continua sendo
+  // sobre QUEM é o montador, não sobre o tipo). Adriel CD entrou 02/10/2026
+  // no mesmo "nível". Sem efeito na aba Entregas (equipe interna nunca tem
+  // chamado de entrega/motorista).
   if (!showPecas) {
     requests = requests.filter((r) => !(EQUIPE_INTERNA_ASSEMBLERS as readonly string[]).includes(r.assemblerName ?? ""));
   }

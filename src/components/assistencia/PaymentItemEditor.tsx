@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { setItemUnitValue, setItemPaymentReleased } from "@/app/assistencia/pagamentos-actions";
 import { useQuickAction } from "./useQuickAction";
+import { REQUEST_TYPE_LABELS, REQUEST_TYPE_COLORS } from "@/lib/assistenciaLabels";
 import type { PaymentItem } from "@/lib/payments";
 
 function formatBRL(value: number) {
@@ -181,6 +182,15 @@ export function PaymentItemEditor({
         </div>
       </div>
       <div className="flex items-center gap-2 flex-wrap text-xs text-gray-400 dark:text-gray-500">
+        <span
+          className="font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+          style={{
+            color: `color-mix(in srgb, ${REQUEST_TYPE_COLORS[item.type] ?? "#6B7280"} 70%, var(--foreground))`,
+            background: `color-mix(in srgb, ${REQUEST_TYPE_COLORS[item.type] ?? "#6B7280"} 14%, var(--surface-1))`,
+          }}
+        >
+          {REQUEST_TYPE_LABELS[item.type] ?? item.type}
+        </span>
         <span>
           {item.clientName ?? "Sem cliente"} · {item.storeName}
         </span>

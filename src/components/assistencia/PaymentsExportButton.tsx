@@ -2,6 +2,7 @@
 
 import type { PaymentItem } from "@/lib/payments";
 import { paymentStage } from "@/lib/payments";
+import { REQUEST_TYPE_LABELS } from "@/lib/assistenciaLabels";
 
 const STAGE_LABELS: Record<string, string> = { a_montar: "A montar", pendente: "Pendente", liberado: "Liberado" };
 
@@ -19,12 +20,13 @@ function formatDate(value: string | null): string {
 // ";" é o que abre corretamente sem precisar de import manual.
 export function PaymentsExportButton({ items }: { items: PaymentItem[] }) {
   function handleExport() {
-    const header = ["Montador", "Produto", "Quantidade", "Cliente", "Loja", "Valor unitário", "Valor total", "Status", "Liberado em"];
+    const header = ["Montador", "Tipo", "Produto", "Quantidade", "Cliente", "Loja", "Valor unitário", "Valor total", "Status", "Liberado em"];
     const rows = items.map((item) => {
       const stage = paymentStage(item.requestStatus, item.paymentReleased);
       const unitValue = item.unitValue ?? 0;
       return [
         item.assemblerName ?? "Sem montador definido",
+        REQUEST_TYPE_LABELS[item.type] ?? item.type,
         item.product,
         String(item.quantity),
         item.clientName ?? "",

@@ -349,7 +349,7 @@ export function RequestDetailContent({
           <Card title="Responsável pelo atendimento">
             {canManage ? (
               <>
-                <AssemblerNameField requestId={request.id} requestType={request.type} value={request.assemblerName} assemblers={assemblers} />
+                <AssemblerNameField requestId={request.id} value={request.assemblerName} assemblers={assemblers} />
                 <MontadorInstructionField requestId={request.id} value={request.montadorInstruction} />
               </>
             ) : (

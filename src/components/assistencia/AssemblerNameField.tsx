@@ -2,27 +2,20 @@
 
 import { useState } from "react";
 import { setAssemblerName } from "@/app/assistencia/actions";
-import { EQUIPE_INTERNA_ONLY_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "@/lib/assistenciaLabels";
 import { useQuickAction } from "./useQuickAction";
 
 export function AssemblerNameField({
   requestId,
-  requestType,
   value,
   assemblers,
 }: {
   requestId: string;
-  requestType: string;
   value: string | null;
   assemblers: string[];
 }) {
   const { pending, run } = useQuickAction();
-  // Vistoria/troca de peça -- restrito à equipe interna (Manoel e Adriel
-  // CD dividem a função desde 02/10/2026, antes só o Manoel), nunca um
-  // terceirizado.
-  const isEquipeInternaOnly = (EQUIPE_INTERNA_ONLY_TYPES as readonly string[]).includes(requestType);
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(value ?? (isEquipeInternaOnly ? EQUIPE_INTERNA_ASSEMBLERS[0] : ""));
+  const [name, setName] = useState(value ?? "");
 
   if (!editing) {
     if (!value) {
@@ -79,36 +72,19 @@ export function AssemblerNameField({
         Nome do montador
       </span>
       <div className="flex items-center gap-2">
-        {isEquipeInternaOnly ? (
-          <select
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="rounded border px-2 py-1 text-sm"
-            style={{ borderColor: "var(--border)" }}
-          >
-            {EQUIPE_INTERNA_ASSEMBLERS.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="rounded border px-2 py-1 text-sm"
-              style={{ borderColor: "var(--border)" }}
-              list={`assemblers-${requestId}`}
-              autoFocus
-            />
-            <datalist id={`assemblers-${requestId}`}>
-              {assemblers.map((a) => (
-                <option key={a} value={a} />
-              ))}
-            </datalist>
-          </>
-        )}
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="rounded border px-2 py-1 text-sm"
+          style={{ borderColor: "var(--border)" }}
+          list={`assemblers-${requestId}`}
+          autoFocus
+        />
+        <datalist id={`assemblers-${requestId}`}>
+          {assemblers.map((a) => (
+            <option key={a} value={a} />
+          ))}
+        </datalist>
         <button
           disabled={pending || !name.trim()}
           onClick={() =>

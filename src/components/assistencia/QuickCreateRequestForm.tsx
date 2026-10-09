@@ -11,7 +11,7 @@ import {
   type FormState,
 } from "@/app/assistencia/actions";
 import { withRetry } from "@/lib/retryLookup";
-import { REQUEST_TYPE_LABELS, SHIFT_LABELS, EQUIPE_INTERNA_ONLY_TYPES, EQUIPE_INTERNA_ASSEMBLERS } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, SHIFT_LABELS } from "@/lib/assistenciaLabels";
 import { SHIFTS, ADDRESS_NUMBER_REQUIRED_TYPES, type Store, type DayLoadItem } from "@/lib/serviceRequests";
 import type { PartOrderLinkMatch } from "@/lib/partOrders";
 import { FormSection } from "./FormSection";
@@ -182,10 +182,6 @@ export function QuickCreateRequestForm({
   const TYPES = includeSacTypes ? [...ASSISTENCIA_TYPES, SAC_TYPE] : ASSISTENCIA_TYPES;
   const [type, setType] = useState<string>("vistoria");
   const [storeId, setStoreId] = useState("");
-  // Vistoria/troca de peça -- restrito à equipe interna (Manoel e Adriel
-  // CD dividem a função desde 02/10/2026, antes só o Manoel), nunca um
-  // terceirizado.
-  const isEquipeInternaOnly = (EQUIPE_INTERNA_ONLY_TYPES as readonly string[]).includes(type);
   const showCombo = type === "montagem" || type === "desmontagem";
   // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
   // pra montagem/desmontagem -- validado de novo no servidor (ver
@@ -706,24 +702,12 @@ export function QuickCreateRequestForm({
           </Field>
           {showMontadorInstruction ? (
             <Field label="Técnico/montador">
-              {isEquipeInternaOnly ? (
-                <select name="assembler_name" defaultValue={EQUIPE_INTERNA_ASSEMBLERS[0]} className="rounded border px-3 py-2" style={inputStyle}>
-                  {EQUIPE_INTERNA_ASSEMBLERS.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <>
-                  <input name="assembler_name" list="quick-assemblers" className="rounded border px-3 py-2" style={inputStyle} />
-                  <datalist id="quick-assemblers">
-                    {visibleAssemblers.map((a) => (
-                      <option key={a.name} value={a.name} />
-                    ))}
-                  </datalist>
-                </>
-              )}
+              <input name="assembler_name" list="quick-assemblers" className="rounded border px-3 py-2" style={inputStyle} />
+              <datalist id="quick-assemblers">
+                {visibleAssemblers.map((a) => (
+                  <option key={a.name} value={a.name} />
+                ))}
+              </datalist>
             </Field>
           ) : null}
         </div>
