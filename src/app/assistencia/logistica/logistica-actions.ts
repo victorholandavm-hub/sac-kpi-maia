@@ -18,7 +18,13 @@ import {
   reordenarParadas,
   atenderSolicitacaoAbast,
   cancelarSolicitacaoAbast,
+  darEntradaCompra,
+  mudarPrevisaoCompra,
+  cancelarPedidoCompra,
+  buscarFornecedores,
+  criarPedidoCompra,
 } from "@/lib/odoo/logistica";
+import type { EntradaCompraResposta, FornecedorOdoo, PedidoCompra } from "@/lib/odoo/logistica";
 import { exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import type {
   AcaoCarga,
@@ -128,4 +134,39 @@ export async function atenderAbastAction(id: number, itens: { codigo: string; qt
 export async function cancelarAbastAction(id: number, motivo: string): Promise<ResultadoAcao<unknown>> {
   if (!motivo.trim()) return { ok: false, erro: "Escreva o motivo do cancelamento." };
   return executar((operador) => cancelarSolicitacaoAbast(id, operador, motivo.trim()), [`${BASE}/abastecimento`]);
+}
+
+// Compras do CD: entrada da nota contra o pedido, previsão, pedido novo.
+export async function entradaCompraAction(
+  recebimentoId: number,
+  input: { nf: string; serie: string; chave: string; itens: { codigo: string; qtd: number }[] },
+): Promise<ResultadoAcao<EntradaCompraResposta>> {
+  const itens = input.itens.filter((i) => Number(i.qtd) > 0);
+  if (!input.nf.trim()) return { ok: false, erro: "Informe o número da nota fiscal do fornecedor." };
+  if (!itens.length) return { ok: false, erro: "Informe quanto chegou de pelo menos um produto." };
+  return executar((operador) => darEntradaCompra(recebimentoId, { ...input, itens }, operador), [`${BASE}/compras`]);
+}
+
+export async function previsaoCompraAction(id: number, data: string): Promise<ResultadoAcao<unknown>> {
+  if (!data) return { ok: false, erro: "Escolha a nova data de chegada." };
+  return executar((operador) => mudarPrevisaoCompra(id, data, operador), [`${BASE}/compras`]);
+}
+
+export async function cancelarCompraAction(id: number, motivo: string): Promise<ResultadoAcao<unknown>> {
+  if (!motivo.trim()) return { ok: false, erro: "Escreva o motivo do cancelamento." };
+  return executar((operador) => cancelarPedidoCompra(id, motivo.trim(), operador), [`${BASE}/compras`]);
+}
+
+export async function buscarFornecedoresAction(q: string): Promise<ResultadoAcao<FornecedorOdoo[]>> {
+  if (q.trim().length < 2) return { ok: false, erro: "Digite pelo menos 2 letras do nome ou o CNPJ." };
+  return executar(() => buscarFornecedores(q.trim()));
+}
+
+export async function criarCompraAction(input: {
+  fornecedor_id: number; ref: string; obs: string; itens: { codigo: string; qtd: number; preco: number; previsao: string }[];
+}): Promise<ResultadoAcao<{ pedido: PedidoCompra }>> {
+  if (!input.fornecedor_id) return { ok: false, erro: "Escolha o fornecedor." };
+  const itens = input.itens.filter((i) => i.codigo.trim());
+  if (!itens.length) return { ok: false, erro: "Coloque pelo menos um produto." };
+  return executar((operador) => criarPedidoCompra({ ...input, itens }, operador), [`${BASE}/compras`]);
 }

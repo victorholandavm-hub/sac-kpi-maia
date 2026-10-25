@@ -323,3 +323,45 @@ export type KardexResposta = {
 export async function lerKardex(codigo: string, companyId: number, dias = 90): Promise<KardexResposta> {
   return json<KardexResposta>("/estoque/kardex", { perfil: "logistica", query: { codigo, company_id: companyId, dias } });
 }
+
+// ---- Compras do CD (25/10/2026, Rafael) ---------------------------------
+// Pedido de compra no Odoo = fonte da pré-venda (previsão de chegada) do
+// coach e do site. A previsão só baixa quando o CD dá ENTRADA da nota
+// contra o pedido (recebimento validado) -- por isso a entrada é feita aqui.
+export type ItemCompra = {
+  linha_id: number; codigo: string; nome: string; qtd: number; recebido: number; falta: number;
+  preco: number; previsao: string; vencida: boolean;
+};
+export type PedidoCompra = {
+  id: number; numero: string; fornecedor: string; fornecedor_id: number; cnpj: string; ref: string; origem: string;
+  estado: string; recebimento: string; previsao: string; vencida: boolean; total: number; criado: string; obs: string;
+  itens: ItemCompra[]; pendentes: number;
+  recebimentos: { id: number; numero: string; estado: string; concluido: string }[];
+};
+export type FornecedorOdoo = { id: number; nome: string; cnpj: string; cidade: string; ja_fornece: boolean };
+export type EntradaCompraResposta = { recebimento: string; nota: string; pendente: string[]; pedido: PedidoCompra | null };
+
+export async function listarPedidosCompra(estado: "abertos" | "todos" = "abertos", q = ""): Promise<{ hoje: string; pedidos: PedidoCompra[] }> {
+  const r = await json<{ hoje: string; pedidos: PedidoCompra[] }>("/compras/pedidos", { perfil: "logistica", query: { estado, q } });
+  return { hoje: r.hoje, pedidos: r.pedidos ?? [] };
+}
+export async function buscarFornecedores(q: string): Promise<FornecedorOdoo[]> {
+  const r = await json<{ fornecedores: FornecedorOdoo[] }>("/compras/fornecedores", { perfil: "logistica", query: { q } });
+  return r.fornecedores ?? [];
+}
+export async function criarPedidoCompra(input: {
+  fornecedor_id: number; ref: string; obs: string; itens: { codigo: string; qtd: number; preco: number; previsao: string }[];
+}, operador: string): Promise<{ pedido: PedidoCompra }> {
+  return json("/compras/pedido", { perfil: "logistica", metodo: "POST", corpo: { ...input, operador }, timeoutMs: 60_000 });
+}
+export async function mudarPrevisaoCompra(id: number, data: string, operador: string): Promise<{ pedido: PedidoCompra }> {
+  return json(`/compras/pedido/${id}/previsao`, { perfil: "logistica", metodo: "POST", corpo: { data, operador } });
+}
+export async function cancelarPedidoCompra(id: number, motivo: string, operador: string): Promise<unknown> {
+  return json(`/compras/pedido/${id}/cancelar`, { perfil: "logistica", metodo: "POST", corpo: { motivo, operador } });
+}
+export async function darEntradaCompra(recebimentoId: number, input: {
+  nf: string; serie: string; chave: string; itens: { codigo: string; qtd: number }[];
+}, operador: string): Promise<EntradaCompraResposta> {
+  return json(`/compras/receber/${recebimentoId}`, { perfil: "logistica", metodo: "POST", corpo: { ...input, operador }, timeoutMs: 60_000 });
+}
