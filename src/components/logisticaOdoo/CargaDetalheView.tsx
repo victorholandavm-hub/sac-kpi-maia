@@ -135,7 +135,7 @@ export function CargaDetalheView({
               <Chip>{TIPO_CARGA_LABELS[carga.tipo] ?? carga.tipo}</Chip>
             </h2>
             <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              {[carga.descricao, carga.transportadora, carga.data_prevista ? `sai ${formatarDiaIso(carga.data_prevista)}` : ""].filter(Boolean).join(" · ") || "sem descrição"}
+              {[carga.descricao, carga.transportadora, carga.data_prevista ? `programada ${formatarDiaIso(carga.data_prevista)}` : ""].filter(Boolean).join(" · ") || "sem descrição"}
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -153,7 +153,7 @@ export function CargaDetalheView({
             {editavel ? (
               <>
                 <button type="button" onClick={() => setEdicao({ campo: "programar", valor: carga.data_prevista || "" })} className={botaoClass} style={botaoStyle}>
-                  Saída prevista
+                  Data programada
                 </button>
                 <button type="button" onClick={() => setEdicao({ campo: "descricao", valor: carga.descricao })} className={botaoClass} style={botaoStyle}>
                   Descrição

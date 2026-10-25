@@ -172,11 +172,12 @@ export function ExpedicaoBoard({
         </div>
       </div>
 
-      {sel.size > 0 ? (
-        <div className="cartao p-4 flex flex-col gap-3" style={{ border: "2px solid var(--brand-orange)" }} onFocus={abrirMontar} onMouseEnter={abrirMontar}>
+      {/* 25/10 (Pedro): quadro de montar SEMPRE à vista — descrição e data programada visíveis antes de marcar */}
+      {sel.size >= 0 ? (
+        <div className="cartao p-4 flex flex-col gap-3" style={{ border: sel.size ? "2px solid var(--brand-orange)" : "1px solid var(--border)" }} onFocus={abrirMontar} onMouseEnter={abrirMontar}>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
-              Montar carga com {sel.size} saída(s)
+              {sel.size ? `Montar carga com ${sel.size} saída(s)` : "Montar carga — marque as saídas na lista abaixo"}
             </h3>
             <VolumesChips volumes={volsSel} />
           </div>
@@ -227,11 +228,11 @@ export function ExpedicaoBoard({
             <Campo rotulo="Transportadora">
               <input value={form.transportadora} onChange={(e) => setForm({ ...form, transportadora: e.target.value })} placeholder="ex.: Lojas Maia, D&A" className={inputClass} style={inputStyle} />
             </Campo>
-            <Campo rotulo="Saída prevista">
+            <Campo rotulo="Data programada (saída)">
               <input type="date" value={form.data_prevista} onChange={(e) => setForm({ ...form, data_prevista: e.target.value })} className={inputClass} style={inputStyle} />
             </Campo>
             <div className="flex items-end gap-2">
-              <button type="button" disabled={pending} onClick={montar} className={`${botaoClass} flex-1`} style={botaoLaranjaStyle}>
+              <button type="button" disabled={pending || sel.size === 0} onClick={montar} className={`${botaoClass} flex-1`} style={botaoLaranjaStyle}>
                 {pending ? "Montando no Odoo…" : "Montar carga"}
               </button>
               <button type="button" onClick={() => setSel(new Set())} className={botaoClass} style={botaoStyle}>
