@@ -7,6 +7,7 @@ const ABAS = [
   { href: "/assistencia/logistica/expedicao", label: "Expedição" },
   { href: "/assistencia/logistica/cargas", label: "Cargas" },
   { href: "/assistencia/logistica/abastecimento", label: "Pedidos das lojas" },
+  { href: "/assistencia/logistica/kardex", label: "Kardex" },
 ];
 
 export function LogisticaTabs() {

@@ -310,3 +310,16 @@ export async function atenderSolicitacaoAbast(
 export async function cancelarSolicitacaoAbast(id: number, operador: string, motivo: string): Promise<unknown> {
   return json(`/abastecimento/${id}/cancelar`, { perfil: "logistica", metodo: "POST", corpo: { operador, motivo } });
 }
+
+// ---- Kardex (25/10/2026, Rafael/CD) -------------------------------------
+export type MovimentoKardex = {
+  data: string; documento: string; origem: string; de: string; para: string; parceiro: string;
+  entrada: number; saida: number; saldo_apos: number;
+};
+export type KardexResposta = {
+  codigo: string; produto: string; company_id: number; saldo: number; reservado: number; disponivel: number;
+  saldo_inicial_periodo: number; movimentos: MovimentoKardex[];
+};
+export async function lerKardex(codigo: string, companyId: number, dias = 90): Promise<KardexResposta> {
+  return json<KardexResposta>("/estoque/kardex", { perfil: "logistica", query: { codigo, company_id: companyId, dias } });
+}
