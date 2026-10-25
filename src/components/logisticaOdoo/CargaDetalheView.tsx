@@ -205,7 +205,7 @@ export function CargaDetalheView({
         </div>
         <VolumesChips volumes={carga.volumes_por_categoria} />
 
-        {carga.estado === "conferida" || (editavel && carga.estado !== "liberada") ? (
+        {carga.estado === "conferida" || editavel ? (
           erroCatalogos ? (
             <ErroOdoo titulo="Cadastros de motorista/veículo indisponíveis" mensagem={erroCatalogos} />
           ) : catalogos ? (
@@ -233,6 +233,17 @@ export function CargaDetalheView({
                   ))}
                 </select>
               </label>
+              {carga.estado === "liberada" ? (
+                <button
+                  type="button"
+                  disabled={pending || (!motorista && !veiculo)}
+                  className={botaoClass}
+                  style={botaoPrimarioStyle}
+                  onClick={() => run(() => editarCargaAction(carga.carga_id, "motorista", `${motorista},${veiculo}`), "Motorista/veículo trocado.")}
+                >
+                  Trocar motorista/veículo
+                </button>
+              ) : null}
             </div>
           ) : null
         ) : null}

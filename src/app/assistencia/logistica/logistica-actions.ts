@@ -77,7 +77,7 @@ export async function reordenarParadasAction(cargaId: number, paradaIds: number[
 
 export async function editarCargaAction(
   cargaId: number,
-  campo: "programar" | "descricao" | "transportadora",
+  campo: "programar" | "descricao" | "transportadora" | "motorista",
   valor: string,
 ): Promise<ResultadoAcao<unknown>> {
   if (campo === "programar" && valor && !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return { ok: false, erro: "Data no formato AAAA-MM-DD." };
