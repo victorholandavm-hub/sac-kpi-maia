@@ -93,9 +93,13 @@ export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos }: { cargaI
     }
     setPreparandoFoto(true);
     try {
-      const blob = await reduzirFoto(file);
+      const red = await reduzirFoto(file);
+      // 25/10 (teste real): guardar o próprio File do input na fila (IndexedDB) chegava VAZIO no envio
+      // ("Selecione uma foto." -> baixa recusada). Sempre guarda uma CÓPIA em memória do conteúdo.
+      const blob = new Blob([await red.arrayBuffer()], { type: red.type || "image/jpeg" });
+      if (blob.size === 0) throw new Error("A foto veio vazia. Tire de novo.");
       if (blob.size > 10 * 1024 * 1024) throw new Error("Foto grande demais (máximo 10 MB).");
-      const nome = blob === file ? file.name || "comprovante.jpg" : "comprovante.jpg";
+      const nome = red === file ? file.name || "comprovante.jpg" : "comprovante.jpg";
       setFotos((f) => [...f, { id: novoEventoUid(), blob, nome, url: null, preview: URL.createObjectURL(blob) }]);
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Não foi possível usar a foto.", "error");
