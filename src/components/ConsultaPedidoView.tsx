@@ -1,4 +1,4 @@
-import { consultarPedidos, type PedidoConsulta, type TentativaConsulta, type ItemConsulta, type LogisticaPedido } from "@/lib/consultaPedido";
+import { consultarPedidos, type PedidoConsulta, type PedidoOdooConsulta, type TentativaConsulta, type ItemConsulta, type LogisticaPedido } from "@/lib/consultaPedido";
 import { STORE_LABELS } from "@/lib/labels";
 import { formatarDocumento } from "@/lib/rotasDoDiaCore";
 import { nomePedidoOdoo } from "@/lib/pedidoOdoo";
@@ -113,6 +113,34 @@ function BotoesNota({ pedido }: { pedido: string }) {
         🖨 Nota de entrega
       </a>
     </div>
+  );
+}
+
+function PedidoOdoo({ p }: { p: PedidoOdooConsulta }) {
+  return (
+    <li className="rounded-2xl p-4 sm:p-5 flex flex-col gap-3" style={{ background: "var(--surface-1)" }}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-base font-semibold tabular-nums" style={{ color: "var(--text-primary)" }}>
+            Pedido {p.pedido}
+          </span>
+          <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+            {p.cliente ?? "Cliente sem nome"}
+          </span>
+          {p.telefone ? (
+            <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
+              {p.telefone}
+            </span>
+          ) : null}
+        </div>
+        <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
+          {[p.nf5922 ? `NF venda ${p.nf5922}` : null, p.nf5117 ? `NF entrega ${p.nf5117}` : null].filter(Boolean).join(" · ") || "sem nota ainda"}
+          {p.legado ? " · venda do Protheus" : ""}
+        </span>
+      </div>
+      <Filiais l={p.logistica} />
+      <BotoesNota pedido={p.pedido} />
+    </li>
   );
 }
 
@@ -278,9 +306,9 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Digite pelo menos 3 letras do nome, ou o número completo.
         </p>
-      ) : r.clientes.length === 0 ? (
+      ) : r.clientes.length === 0 && !r.odoo?.length ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          Nada encontrado para “{r.busca}”.
+          Nada encontrado para “{r.busca}”.{r.tipo === "documento" ? " Cliente que só comprou no Odoo (a partir de 25/10) ainda não é achado pelo CPF: busque pelo nome ou pelo número do pedido." : ""}
         </p>
       ) : (
         <div className="flex flex-col gap-8">
@@ -306,6 +334,23 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
               </ul>
             </section>
           ))}
+          {r.odoo?.length ? (
+            <section className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-baseline gap-x-3">
+                <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+                  Pedidos do Odoo
+                </h2>
+                <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                  da expedição e das cargas (atualiza a cada 30 min)
+                </span>
+              </div>
+              <ul className="flex flex-col gap-3">
+                {r.odoo.map((p) => (
+                  <PedidoOdoo key={p.pedido} p={p} />
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       )}
     </div>

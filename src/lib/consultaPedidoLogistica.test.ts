@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("./supabaseAdmin", () => ({ getSupabaseAdmin: () => ({}) }));
-const { modoDoProtheus, logisticaDoOdoo } = await import("./consultaPedido");
+const { modoDoProtheus, logisticaDoOdoo, agruparPedidosOdoo } = await import("./consultaPedido");
 
 const linha = (o: Partial<Parameters<typeof logisticaDoOdoo>[1][number]>) => ({ pedido: "S01589", modo: null, expresso: null, filial_entrega: null, retira_em: null, empresa: null, ...o });
 
@@ -32,5 +32,21 @@ describe("logisticaDoOdoo", () => {
   });
   it("sem nada na expedição", () => {
     expect(logisticaDoOdoo("205", [])).toEqual({ filialVenda: "205", filialEntrega: null, modo: null, retiraEm: null });
+  });
+});
+
+describe("agruparPedidosOdoo", () => {
+  const l = (o: Record<string, unknown>) => ({ pedido: "S01720", cliente: null, telefone: null, empresa: null, nf5922: null, nf5117: null, legado: false, modo: null, expresso: null, filial_entrega: null, retira_em: null, ...o });
+  it("junta expedição e carga do mesmo pedido e pula o que já aparece pelo sync", () => {
+    const r = agruparPedidosOdoo(
+      [
+        l({ cliente: "ANA", empresa: "213 CD" }),
+        l({ cliente: "ANA", telefone: "83 9999", nf5922: "23787", modo: "retira_depois", retira_em: "205 Mangabeira 1", empresa: "205 Mangabeira 1" }),
+        l({ pedido: "S01589", cliente: "JOSE" }),
+      ],
+      new Set(["S01589"])
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ pedido: "S01720", cliente: "ANA", telefone: "83 9999", nf5922: "23787", logistica: { modo: "retira", retiraEm: "205 Mangabeira 1" } });
   });
 });

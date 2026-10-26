@@ -79,11 +79,73 @@ export type PedidoConsulta = {
 
 export type ClienteConsulta = { codigo: string; nome: string | null; documento: string | null; pedidos: PedidoConsulta[] };
 
-export type ResultadoConsulta = { busca: string; tipo: "documento" | "numero" | "nota" | "nome" | "curta"; clientes: ClienteConsulta[]; limitado: boolean };
+// Pedido do Odoo achado direto em odoo_expedicao (expedição + cargas) --
+// Victor 26/10/2026: venda nova do Odoo não chega em totvs_* (a compat só
+// traz entrega, 1x por dia), então a nota emitida no Odoo nunca aparecia.
+// Sem CPF (a expedição não traz): acha por nome, pedido S… ou nº da nota.
+export type PedidoOdooConsulta = {
+  pedido: string;
+  cliente: string | null;
+  telefone: string | null;
+  empresa: string | null;
+  nf5922: string | null;
+  nf5117: string | null;
+  legado: boolean;
+  logistica: LogisticaPedido;
+};
+
+export type ResultadoConsulta = {
+  busca: string;
+  tipo: "documento" | "numero" | "nota" | "nome" | "curta";
+  clientes: ClienteConsulta[];
+  limitado: boolean;
+  odoo?: PedidoOdooConsulta[];
+};
 
 const digitos = (s: string) => s.replace(/\D/g, "");
 
 type LinhaExpedicao = { pedido: string; modo: string | null; expresso: boolean | null; filial_entrega: string | null; retira_em: string | null; empresa: string | null };
+type LinhaExpedicaoCompleta = LinhaExpedicao & { cliente: string | null; telefone: string | null; nf5922: string | null; nf5117: string | null; legado: boolean };
+
+const MAX_PEDIDOS_ODOO = 20;
+
+export function agruparPedidosOdoo(linhas: LinhaExpedicaoCompleta[], jaMostrados: Set<string>): PedidoOdooConsulta[] {
+  const porPedido = new Map<string, LinhaExpedicaoCompleta[]>();
+  for (const l of linhas) {
+    if (jaMostrados.has(l.pedido)) continue;
+    porPedido.set(l.pedido, [...(porPedido.get(l.pedido) ?? []), l]);
+  }
+  return [...porPedido.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, MAX_PEDIDOS_ODOO)
+    .map(([pedido, ls]) => {
+      const com = <K extends keyof LinhaExpedicaoCompleta>(k: K) => ls.find((l) => l[k])?.[k] ?? null;
+      return {
+        pedido,
+        cliente: com("cliente") as string | null,
+        telefone: com("telefone") as string | null,
+        empresa: com("empresa") as string | null,
+        nf5922: com("nf5922") as string | null,
+        nf5117: com("nf5117") as string | null,
+        legado: ls.some((l) => l.legado),
+        logistica: logisticaDoOdoo(null, ls),
+      };
+    });
+}
+
+async function pedidosOdooDaBusca(q: string, tipo: ResultadoConsulta["tipo"], jaMostrados: Set<string>): Promise<PedidoOdooConsulta[]> {
+  const admin = getSupabaseAdmin();
+  const colunas = "pedido, cliente, telefone, empresa, nf5922, nf5117, legado, modo, expresso, filial_entrega, retira_em";
+  let consulta = admin.from("odoo_expedicao").select(colunas);
+  const nome = nomePedidoOdoo(q);
+  const d = digitos(q);
+  if (nome) consulta = consulta.eq("pedido", nome);
+  else if (tipo === "numero" || tipo === "nota") consulta = consulta.or(`nf5922.eq.${d},nf5117.eq.${d},nf5922.like.${d}/*,nf5117.like.${d}/*`);
+  else if (tipo === "nome") consulta = consulta.ilike("cliente", `%${q.replace(/[%_,()]/g, " ")}%`);
+  else return [];
+  const { data } = await consulta.order("pedido", { ascending: false }).limit(200).returns<LinhaExpedicaoCompleta[]>();
+  return agruparPedidosOdoo(data ?? [], jaMostrados);
+}
 
 export function modoDoProtheus(tipo: string | null | undefined): ModoEntrega | null {
   if (!tipo) return null;
@@ -255,6 +317,14 @@ function paraVenda(o: OrderRow): VendaConsulta {
 }
 
 export async function consultarPedidos(busca: string): Promise<ResultadoConsulta> {
+  const r = await consultarBase(busca);
+  if (r.tipo === "curta") return r;
+  const jaMostrados = new Set(r.clientes.flatMap((c) => c.pedidos.map((p) => (p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null)).filter((n): n is string => !!n)));
+  const odoo = await pedidosOdooDaBusca(busca.trim(), r.tipo, jaMostrados).catch(() => []);
+  return { ...r, odoo };
+}
+
+async function consultarBase(busca: string): Promise<ResultadoConsulta> {
   const q = busca.trim();
   const tipo = tipoDaBusca(q);
   if (tipo === "curta") return { busca: q, tipo, clientes: [], limitado: false };
