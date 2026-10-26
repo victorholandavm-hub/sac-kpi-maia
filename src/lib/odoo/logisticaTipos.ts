@@ -177,6 +177,8 @@ export type EventoCarga = {
 };
 
 export type CargaOdoo = {
+  company_id: number;
+  empresa?: string;
   carga_id: number;
   romaneio: string;
   tipo: TipoCarga;

@@ -14,14 +14,22 @@ export default async function CargasPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const empresa = empresaDaUrl(sp.empresa);
   const dias = JANELAS.includes(Number(sp.dias)) ? Number(sp.dias) : 30;
-  const [cargas, emps] = await Promise.allSettled([listarCargas(empresa, { dias }), listarEmpresas()]);
-  const empresas = emps.status === "fulfilled" ? emps.value : [];
+  // 26/10 (Pedro/Jhon: "as cargas de 27/10 não aparecem"): o CD opera as cargas de TODAS as lojas (as migradas do
+  // Protheus ficaram na empresa da loja). Sem ?empresa= na URL, junta todas as empresas 2xx; com ?empresa=, só aquela.
+  const todasEmpresas = !sp.empresa;
+  const empresasRes = await Promise.allSettled([listarEmpresas()]);
+  const empresas = empresasRes[0].status === "fulfilled" ? empresasRes[0].value : [];
+  const alvo = todasEmpresas ? empresas.filter((e) => /^2\d\d /.test(e.name)).map((e) => e.id) : [empresa];
+  const partes = await Promise.allSettled((alvo.length ? alvo : [empresa]).map((id) => listarCargas(id, { dias })));
+  const falhas = partes.filter((r) => r.status === "rejected");
+  const cargas: PromiseSettledResult<CargaOdoo[]> =
+    falhas.length === partes.length ? falhas[0] : { status: "fulfilled", value: partes.flatMap((r) => (r.status === "fulfilled" ? r.value : [])) };
 
   return (
     <div className="flex flex-col gap-4 min-w-0">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
-          Cargas · últimos {dias} dias
+          Cargas · últimos {dias} dias{todasEmpresas ? " · todas as lojas e o CD" : ""}
         </h2>
         <div className="flex items-center gap-3 flex-wrap">
           {JANELAS.map((d) => (
@@ -49,7 +57,7 @@ export default async function CargasPage({ searchParams }: { searchParams: Promi
                   {ESTADO_CARGA_LABELS[estado]} · {lista.length}
                 </h3>
                 {lista.map((c) => (
-                  <CartaoCarga key={c.carga_id} carga={c} empresa={empresa} />
+                  <CartaoCarga key={c.carga_id} carga={c} empresa={c.company_id} />
                 ))}
               </section>
             );
