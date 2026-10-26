@@ -11,13 +11,18 @@ function Produto({ p }: { p: EstoqueProduto }) {
   return (
     <li className="rounded-2xl p-4 sm:p-5 flex flex-col gap-3" style={{ background: "var(--surface-1)" }}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex flex-col gap-1">
           <p className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
             {p.descricao ?? "Produto sem descrição"}
           </p>
-          <p className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
-            {p.codigo}
-            {p.fabricante ? ` · ${p.fabricante}` : ""}
+          <p className="flex flex-wrap items-center gap-2 text-sm">
+            <span
+              className="rounded-md px-2 py-0.5 font-mono font-semibold tabular-nums select-all"
+              style={{ background: "color-mix(in srgb, var(--brand-green) 16%, transparent)", color: "var(--text-primary)" }}
+            >
+              Cód. {p.codigo}
+            </span>
+            {p.fabricante ? <span style={{ color: "var(--text-secondary)" }}>{p.fabricante}</span> : null}
           </p>
         </div>
         <p className="text-sm tabular-nums" style={{ color: "var(--text-primary)" }}>
