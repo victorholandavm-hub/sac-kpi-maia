@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function CdLoginPage() {
   const existingSession = await getCdSession();
   if (existingSession) {
-    redirect("/assistencia/encomendas/fila");
+    redirect("/assistencia/logistica/expedicao");
   }
 
   return (

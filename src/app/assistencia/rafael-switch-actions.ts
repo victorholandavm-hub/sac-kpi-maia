@@ -65,5 +65,5 @@ export async function switchRafaelToCd() {
     path: "/assistencia",
   });
 
-  redirect("/assistencia/encomendas/fila");
+  redirect("/assistencia/logistica/expedicao");
 }

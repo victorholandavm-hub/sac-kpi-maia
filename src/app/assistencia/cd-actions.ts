@@ -66,7 +66,7 @@ export async function cdSignIn(_state: CdFormState, formData: FormData): Promise
     path: "/assistencia",
   });
 
-  redirect("/assistencia/encomendas/fila");
+  redirect("/assistencia/logistica/expedicao");
 }
 
 export async function cdSignOut() {
