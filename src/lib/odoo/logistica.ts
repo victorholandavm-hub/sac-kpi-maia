@@ -380,7 +380,8 @@ export type PedidoCompra = {
   recebimentos: { id: number; numero: string; estado: string; concluido: string }[];
 };
 export type FornecedorOdoo = { id: number; nome: string; cnpj: string; cidade: string; ja_fornece: boolean };
-export type EntradaCompraResposta = { recebimento: string; nota: string; pendente: string[]; pedido: PedidoCompra | null   pagar?: { conta: string; estado: string; total: number; parcelas: { venc: string; valor: number }[] } | null;
+export type EntradaCompraResposta = { recebimento: string; nota: string; pendente: string[]; pedido: PedidoCompra | null;
+  pagar?: { conta: string; estado: string; total: number; parcelas: { venc: string; valor: number }[] } | null;
   aviso_pagar?: string | null;
 };
 
