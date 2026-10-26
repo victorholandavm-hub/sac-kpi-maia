@@ -12,7 +12,14 @@ import {
   separarPendencia,
   type ItemEntregaOdoo,
   acaoExtraCarga,
+  audAgrupado,
+  audGeral,
   audPedidos,
+  audRotatividade,
+  type AudFiltro2,
+  type AudGeralItem,
+  type AudGrupoLinha,
+  type AudRotLista,
   audPosicao,
   audReservas,
   audSefaz,
@@ -380,4 +387,13 @@ export async function audSefazAction(f: AudFiltro): Promise<ResultadoAcao<AudLis
 }
 export async function audPedidosAction(f: AudFiltro): Promise<ResultadoAcao<AudLista<AudPedidoItem>>> {
   return executar(() => audPedidos(f));
+}
+export async function audGeralAction(f: AudFiltro2): Promise<ResultadoAcao<AudLista<AudGeralItem>>> {
+  return executar(() => audGeral(f));
+}
+export async function audAgrupadoAction(f: AudFiltro2): Promise<ResultadoAcao<AudLista<AudGrupoLinha | AudGeralItem>>> {
+  return executar(() => audAgrupado(f));
+}
+export async function audRotatividadeAction(f: AudFiltro2): Promise<ResultadoAcao<AudRotLista>> {
+  return executar(() => audRotatividade(f));
 }

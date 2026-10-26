@@ -3,21 +3,33 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { EmpresaOdoo } from "@/lib/odoo/logisticaTipos";
-import type { AudFiltro, AudLista, AudPedidoItem, AudPosicaoItem, AudReservaItem, AudSefazItem } from "@/lib/odoo/logistica";
-import { audPedidosAction, audPosicaoAction, audReservasAction, audSefazAction } from "@/app/assistencia/logistica/logistica-actions";
+import type {
+  AudFaixa, AudFiltro2, AudGeralItem, AudGrupoLinha, AudLista, AudPedidoItem, AudPosicaoItem, AudReservaItem, AudRotItem, AudSefazItem,
+} from "@/lib/odoo/logistica";
+import {
+  audAgrupadoAction, audGeralAction, audPedidosAction, audPosicaoAction, audReservasAction, audRotatividadeAction, audSefazAction,
+} from "@/app/assistencia/logistica/logistica-actions";
 import { Kpi, botaoClass, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
-// 26/10 (Pedro via Antônio Costa — rotinas do Flávio, auditoria do CD). Sub-abas: Posição, Negativo, Reservas, Pedidos parados, SEFAZ.
-type Vis = "posicao" | "negativo" | "reservas" | "pedidos" | "sefaz";
+// 26/10 (Pedro via Antônio Costa — rotinas do Flávio, auditoria do CD). Relatórios que ele monitora de cada filial e do CD.
+type Vis = "posicao" | "geral" | "fornecedor" | "grupo" | "negativo" | "parado" | "giro" | "reservas" | "pedidos" | "sefaz";
 const VISOES: { id: Vis; rotulo: string }[] = [
   { id: "posicao", rotulo: "Posição de estoque" },
+  { id: "geral", rotulo: "Geral (com e sem saldo)" },
+  { id: "fornecedor", rotulo: "Por fornecedor" },
+  { id: "grupo", rotulo: "Por grupo" },
   { id: "negativo", rotulo: "Saldo negativo" },
+  { id: "parado", rotulo: "Dias sem rotatividade" },
+  { id: "giro", rotulo: "Dias com rotatividade" },
   { id: "reservas", rotulo: "Controle de reservas" },
   { id: "pedidos", rotulo: "Pedidos sem nota / sem entrega" },
   { id: "sefaz", rotulo: "SEFAZ (notas contra os CNPJs)" },
 ];
 const PAGINA = 200;
-type Item = AudPosicaoItem | AudReservaItem | AudSefazItem | AudPedidoItem;
+type Item = AudPosicaoItem | AudReservaItem | AudSefazItem | AudPedidoItem | AudGeralItem | AudGrupoLinha | AudRotItem;
+type Extra = { calculado_em?: string; protheus_em?: string; faixas?: AudFaixa[] };
+const COM_GRUPO: Vis[] = ["posicao", "negativo", "geral", "parado", "giro"];
+const COM_SALDO: Vis[] = ["geral", "fornecedor", "grupo"];
 
 const num = (v: number) => Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
 const brl = (v: number) => "R$ " + Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -29,6 +41,16 @@ function dia(s: string) {
   const z = (n: number) => String(n).padStart(2, "0");
   return `${z(d.getUTCDate())}/${z(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
 }
+
+function dataHora(s?: string) {
+  if (!s) return "—";
+  const t = Date.parse(s.slice(0, 19).replace(" ", "T") + "Z");
+  if (Number.isNaN(t)) return s;
+  const d = new Date(t - 3 * 36e5);
+  const z = (n: number) => String(n).padStart(2, "0");
+  return `${z(d.getUTCDate())}/${z(d.getUTCMonth() + 1)} ${z(d.getUTCHours())}:${z(d.getUTCMinutes())}`;
+}
+const LIM_FAIXA: Record<string, number> = { "até 29 dias": 0, "30 a 59": 30, "60 a 89": 60, "90 a 179": 90, "180 dias ou mais": 180, "sem registro de saída": 180 };
 
 function csv(linhas: Record<string, unknown>[], nome: string) {
   if (!linhas.length) return;
@@ -46,13 +68,18 @@ function csv(linhas: Record<string, unknown>[], nome: string) {
   URL.revokeObjectURL(url);
 }
 
-export function EstoqueBoard({ empresas, categorias }: { empresas: EmpresaOdoo[]; categorias: { id: number; nome: string }[] }) {
+export function EstoqueBoard({ empresas, grupos }: { empresas: EmpresaOdoo[]; grupos: string[] }) {
   const cd = empresas.find((e) => e.name.startsWith("213 "));
   const [vis, setVis] = useState<Vis>("posicao");
   const [empresa, setEmpresa] = useState<number>(cd?.id ?? 0);
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
-  const [categoria, setCategoria] = useState(0);
+  const [grupoNome, setGrupoNome] = useState("");
+  const [saldo, setSaldo] = useState<"com" | "sem" | "todos">("com");
+  const [diasMin, setDiasMin] = useState(0);
+  const [extra, setExtra] = useState<Extra>({});
+  const [aberto, setAberto] = useState<string | null>(null);
+  const [itensGrupo, setItensGrupo] = useState<AudGeralItem[]>([]);
   const [dias, setDias] = useState(60);
   const [situacao, setSituacao] = useState("todas");
   const [tipoPed, setTipoPed] = useState("");
@@ -61,17 +88,21 @@ export function EstoqueBoard({ empresas, categorias }: { empresas: EmpresaOdoo[]
   const [erro, setErro] = useState<string | null>(null);
 
   const filtro = useCallback(
-    (offset = 0, formato?: "csv"): AudFiltro => ({
-      company_id: empresa, q: buscaAplicada || undefined, categoria: categoria || undefined, negativo: vis === "negativo",
+    (offset = 0, formato?: "csv"): AudFiltro2 => ({
+      company_id: empresa, q: buscaAplicada || undefined, grupo_nome: COM_GRUPO.includes(vis) && grupoNome ? grupoNome : undefined, negativo: vis === "negativo",
       dias: vis === "sefaz" ? dias : undefined, situacao: vis === "sefaz" ? situacao : undefined, limit: PAGINA, offset, formato,
+      saldo: COM_SALDO.includes(vis) ? saldo : undefined, por: vis === "fornecedor" || vis === "grupo" ? vis : undefined,
+      modo: vis === "parado" ? "sem" : vis === "giro" ? "com" : undefined, dias_min: vis === "parado" ? diasMin : undefined,
     }),
-    [empresa, buscaAplicada, categoria, vis, dias, situacao],
+    [empresa, buscaAplicada, grupoNome, vis, dias, situacao, saldo, diasMin],
   );
 
   const chamar = useCallback(
-    (f: AudFiltro) =>
-      (vis === "reservas" ? audReservasAction(f) : vis === "sefaz" ? audSefazAction(f) : vis === "pedidos" ? audPedidosAction(f) : audPosicaoAction(f)) as Promise<
-        { ok: true; dados: AudLista<Item> } | { ok: false; erro: string }
+    (f: AudFiltro2) =>
+      (vis === "reservas" ? audReservasAction(f) : vis === "sefaz" ? audSefazAction(f) : vis === "pedidos" ? audPedidosAction(f)
+        : vis === "geral" ? audGeralAction(f) : vis === "fornecedor" || vis === "grupo" ? audAgrupadoAction(f)
+        : vis === "parado" || vis === "giro" ? audRotatividadeAction(f) : audPosicaoAction(f)) as Promise<
+        { ok: true; dados: AudLista<Item> & Extra } | { ok: false; erro: string }
       >,
     [vis],
   );
@@ -86,6 +117,7 @@ export function EstoqueBoard({ empresas, categorias }: { empresas: EmpresaOdoo[]
         setErro(r.erro);
         return;
       }
+      setExtra({ calculado_em: r.dados.calculado_em, protheus_em: r.dados.protheus_em, faixas: r.dados.faixas });
       setDados((d) => (mais && d ? { ...r.dados, itens: [...d.itens, ...r.dados.itens] } : r.dados));
     },
     [chamar, filtro, dados],
@@ -93,10 +125,25 @@ export function EstoqueBoard({ empresas, categorias }: { empresas: EmpresaOdoo[]
 
   // recarrega quando muda a visão ou um filtro aplicado (a busca só vale ao apertar Buscar/Enter)
   useEffect(() => {
-    const t = setTimeout(() => void carregar(false), 0);
+    const t = setTimeout(() => {
+      setAberto(null);
+      void carregar(false);
+    }, 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vis, empresa, buscaAplicada, categoria, dias, situacao]);
+  }, [vis, empresa, buscaAplicada, grupoNome, dias, situacao, saldo, diasMin]);
+
+  async function abrirGrupo(chave: string) {
+    if (aberto === chave) {
+      setAberto(null);
+      return;
+    }
+    setAberto(chave);
+    setItensGrupo([]);
+    const r = await audAgrupadoAction({ ...filtro(0), grupo: chave });
+    if (r.ok) setItensGrupo(r.dados.itens as AudGeralItem[]);
+    else setErro(r.erro);
+  }
 
   async function baixarCsv() {
     setCarregando(true);
@@ -112,7 +159,7 @@ export function EstoqueBoard({ empresas, categorias }: { empresas: EmpresaOdoo[]
 
   const T = dados?.totais ?? {};
   const itens = (dados?.itens ?? []).filter((i) => vis !== "pedidos" || !tipoPed || (i as AudPedidoItem).tipo === tipoPed);
-  const temMais = !!dados && vis !== "pedidos" && dados.total > dados.itens.length;
+  const temMais = !!dados && !["pedidos", "fornecedor", "grupo"].includes(vis) && dados.total > dados.itens.length;
 
   return (
     <div className="flex flex-col gap-3 min-w-0">
@@ -164,14 +211,36 @@ export function EstoqueBoard({ empresas, categorias }: { empresas: EmpresaOdoo[]
             </select>
           </label>
         )}
-        {vis === "posicao" || vis === "negativo" ? (
+        {COM_GRUPO.includes(vis) ? (
           <label className="flex flex-col text-sm" style={{ color: "var(--text-secondary)" }}>
-            Categoria
-            <select value={String(categoria)} onChange={(e) => setCategoria(Number(e.target.value))} className={inputClass} style={{ ...inputStyle, maxWidth: 280 }}>
-              <option value="0">Todas</option>
-              {categorias.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
+            Grupo
+            <select value={grupoNome} onChange={(e) => setGrupoNome(e.target.value)} className={inputClass} style={{ ...inputStyle, maxWidth: 280 }}>
+              <option value="">Todos</option>
+              {grupos.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {COM_SALDO.includes(vis) ? (
+          <label className="flex flex-col text-sm" style={{ color: "var(--text-secondary)" }}>
+            Saldo
+            <select value={saldo} onChange={(e) => setSaldo(e.target.value as "com" | "sem" | "todos")} className={inputClass} style={inputStyle}>
+              <option value="com">Com saldo</option>
+              <option value="sem">Sem saldo</option>
+              <option value="todos">Todos</option>
+            </select>
+          </label>
+        ) : null}
+        {vis === "parado" ? (
+          <label className="flex flex-col text-sm" style={{ color: "var(--text-secondary)" }}>
+            Sem saída há
+            <select value={String(diasMin)} onChange={(e) => setDiasMin(Number(e.target.value))} className={inputClass} style={inputStyle}>
+              {[0, 30, 60, 90, 180].map((d) => (
+                <option key={d} value={d}>
+                  {d ? `${d} dias ou mais` : "qualquer tempo"}
                 </option>
               ))}
             </select>
@@ -208,7 +277,29 @@ export function EstoqueBoard({ empresas, categorias }: { empresas: EmpresaOdoo[]
 
       {dados ? (
         <div className="grid gap-2 grid-cols-2 md:grid-cols-4 xl:grid-cols-6">
-          {vis === "posicao" || vis === "negativo" ? (
+          {vis === "geral" ? (
+            <>
+              <Kpi rotulo="Produtos" valor={num(T.produtos)} />
+              <Kpi rotulo="Com saldo" valor={num(T.com_saldo)} />
+              <Kpi rotulo="Sem saldo" valor={num(T.sem_saldo)} />
+              <Kpi rotulo="Quantidade" valor={num(T.fisico)} />
+              <Kpi rotulo="Valor (custo médio)" valor={brl(T.valor)} />
+            </>
+          ) : vis === "fornecedor" || vis === "grupo" ? (
+            <>
+              <Kpi rotulo={vis === "fornecedor" ? "Fornecedores" : "Grupos"} valor={num(T.grupos)} />
+              <Kpi rotulo="Produtos" valor={num(T.produtos)} />
+              <Kpi rotulo="Quantidade" valor={num(T.qtd)} />
+              <Kpi rotulo="Valor (custo médio)" valor={brl(T.valor)} />
+            </>
+          ) : vis === "parado" || vis === "giro" ? (
+            <>
+              <Kpi rotulo="Produtos" valor={num(T.produtos)} />
+              <Kpi rotulo="Quantidade" valor={num(T.qtd)} />
+              <Kpi rotulo={vis === "parado" ? "Valor parado (custo)" : "Valor em estoque"} valor={brl(T.valor)} />
+              <Kpi rotulo="Calculado em" valor={<span className="text-sm">{dataHora(extra.calculado_em)}</span>} detalhe="histórico antigo até 24/10 + sistema novo" />
+            </>
+          ) : vis === "posicao" || vis === "negativo" ? (
             <>
               <Kpi rotulo="Produtos" valor={num(T.produtos)} />
               <Kpi rotulo="Físico" valor={num(T.fisico)} />
@@ -216,6 +307,7 @@ export function EstoqueBoard({ empresas, categorias }: { empresas: EmpresaOdoo[]
               <Kpi rotulo="Disponível" valor={num(T.disponivel)} />
               <Kpi rotulo="Valor (custo médio)" valor={brl(T.valor)} />
               <Kpi rotulo="Negativos" valor={<span style={{ color: T.negativos ? "var(--status-critical)" : undefined }}>{num(T.negativos)}</span>} />
+              {vis === "posicao" ? <Kpi rotulo="Avaria / Assistência" valor={`${num(T.avaria)} / ${num(T.assistencia)}`} /> : null}
             </>
           ) : vis === "reservas" ? (
             <>
@@ -249,15 +341,27 @@ export function EstoqueBoard({ empresas, categorias }: { empresas: EmpresaOdoo[]
         </p>
       ) : null}
       {carregando && !dados ? <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Carregando…</p> : null}
+      {vis === "parado" && extra.faixas?.length ? (
+        <div className="flex gap-2 flex-wrap">
+          {extra.faixas.map((f) => (
+            <button key={f.faixa} type="button" className={botaoClass} style={diasMin === LIM_FAIXA[f.faixa] ? botaoPrimarioStyle : botaoStyle}
+              title="Mostrar a partir desta faixa" onClick={() => setDiasMin(LIM_FAIXA[f.faixa] ?? 0)}>
+              {f.faixa}: {num(f.produtos)} prod. · {brl(f.valor)}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {dados ? (
         <div className="cartao p-3 overflow-x-auto">
           <table className="w-full text-sm" style={{ color: "var(--text-primary)" }}>
             <Cabecalho vis={vis} todas={!empresa} />
             <tbody>
-              {itens.map((i, n) => (
-                <Linha key={n} vis={vis} item={i} todas={!empresa} />
-              ))}
+              {vis === "fornecedor" || vis === "grupo"
+                ? (itens as AudGrupoLinha[]).map((g) => (
+                    <GrupoLinha key={g.chave} g={g} aberto={aberto === g.chave} itens={aberto === g.chave ? itensGrupo : []} onAbrir={() => void abrirGrupo(g.chave)} />
+                  ))
+                : itens.map((i, n) => <Linha key={n} vis={vis} item={i} todas={!empresa} />)}
             </tbody>
           </table>
           {!itens.length ? <p className="text-sm py-3" style={{ color: "var(--text-secondary)" }}>{vis === "negativo" ? "Nenhum produto negativo." : "Nada encontrado."}</p> : null}
@@ -279,6 +383,53 @@ const thR = "text-right py-2 pr-3 font-semibold";
 
 function Cabecalho({ vis, todas }: { vis: Vis; todas: boolean }) {
   const c = { color: "var(--text-secondary)" };
+  if (vis === "fornecedor" || vis === "grupo")
+    return (
+      <thead>
+        <tr style={c}>
+          <th className={th}>{vis === "fornecedor" ? "Fornecedor" : "Grupo"}</th>
+          <th className={thR}>Produtos</th>
+          <th className={thR}>Com saldo</th>
+          <th className={thR}>Quantidade</th>
+          <th className={thR}>Valor (custo)</th>
+        </tr>
+      </thead>
+    );
+  if (vis === "geral")
+    return (
+      <thead>
+        <tr style={c}>
+          <th className={th}>Produto</th>
+          <th className={th}>Grupo / fornecedor</th>
+          <th className={thR}>Saldo</th>
+          <th className={thR}>Reservado</th>
+          <th className={thR}>Custo médio</th>
+          <th className={thR}>Valor</th>
+        </tr>
+      </thead>
+    );
+  if (vis === "parado" || vis === "giro")
+    return (
+      <thead>
+        <tr style={c}>
+          <th className={th}>Produto</th>
+          <th className={thR}>Saldo</th>
+          <th className={thR}>Valor</th>
+          <th className={thR}>Última saída</th>
+          <th className={thR}>Dias sem saída</th>
+          {vis === "giro" ? (
+            <>
+              <th className={thR}>Saídas 30 d</th>
+              <th className={thR}>Saídas 90 d</th>
+              <th className={thR}>Média/dia</th>
+              <th className={thR}>Cobertura</th>
+            </>
+          ) : (
+            <th className={th}>Faixa</th>
+          )}
+        </tr>
+      </thead>
+    );
   if (vis === "posicao" || vis === "negativo")
     return (
       <thead>
@@ -288,6 +439,12 @@ function Cabecalho({ vis, todas }: { vis: Vis; todas: boolean }) {
           <th className={thR}>Físico</th>
           <th className={thR}>Reservado</th>
           <th className={thR}>Disponível</th>
+          {vis === "posicao" ? (
+            <>
+              <th className={thR}>Avaria</th>
+              <th className={thR}>Assistência</th>
+            </>
+          ) : null}
           <th className={thR}>Custo médio</th>
           <th className={thR}>Valor</th>
         </tr>
@@ -342,6 +499,51 @@ function Linha({ vis, item, todas }: { vis: Vis; item: Item; todas: boolean }) {
   const tdR = "py-2 pr-3 align-top text-right";
   const muted = { color: "var(--text-secondary)" };
   const ruim = { color: "var(--status-critical)", fontWeight: 700 };
+  if (vis === "geral") {
+    const i = item as AudGeralItem;
+    return (
+      <tr style={borda}>
+        <td className={td}>
+          <b>{i.codigo}</b> {i.produto}
+        </td>
+        <td className={td}>
+          <div className="text-xs">{i.categoria}</div>
+          <div className="text-xs" style={muted}>{i.fornecedor}</div>
+        </td>
+        <td className={tdR} style={i.fisico < 0 ? ruim : undefined}>{num(i.fisico)}</td>
+        <td className={tdR}>{num(i.reservado)}</td>
+        <td className={tdR}>{i.custo_medio ? brl(i.custo_medio) : "—"}</td>
+        <td className={tdR}>{brl(i.valor)}</td>
+      </tr>
+    );
+  }
+  if (vis === "parado" || vis === "giro") {
+    const i = item as AudRotItem;
+    return (
+      <tr style={borda}>
+        <td className={td}>
+          <b>{i.codigo}</b> {i.produto}
+          <div className="text-xs" style={muted}>{i.categoria}</div>
+        </td>
+        <td className={tdR}>{num(i.fisico)}</td>
+        <td className={tdR}>{brl(i.valor)}</td>
+        <td className={tdR}>{i.ultima_saida ? dia(i.ultima_saida) : "—"}</td>
+        <td className={tdR} style={i.dias_sem_saida === null || i.dias_sem_saida >= 90 ? ruim : undefined}>
+          {i.dias_sem_saida === null ? "nunca saiu" : num(i.dias_sem_saida)}
+        </td>
+        {vis === "giro" ? (
+          <>
+            <td className={tdR}>{num(i.saidas_30)}</td>
+            <td className={tdR}>{num(i.saidas_90)}</td>
+            <td className={tdR}>{num(i.media_dia)}</td>
+            <td className={tdR}>{i.cobertura_dias === null ? "—" : `${num(i.cobertura_dias)} dias`}</td>
+          </>
+        ) : (
+          <td className={td}>{i.faixa}</td>
+        )}
+      </tr>
+    );
+  }
   if (vis === "posicao" || vis === "negativo") {
     const i = item as AudPosicaoItem;
     return (
@@ -354,6 +556,12 @@ function Linha({ vis, item, todas }: { vis: Vis; item: Item; todas: boolean }) {
         <td className={tdR} style={i.fisico < 0 ? ruim : undefined}>{num(i.fisico)}</td>
         <td className={tdR}>{num(i.reservado)}</td>
         <td className={tdR}><b>{num(i.disponivel)}</b></td>
+        {vis === "posicao" ? (
+          <>
+            <td className={tdR}>{i.avaria ? num(i.avaria) : "—"}</td>
+            <td className={tdR}>{i.assistencia ? num(i.assistencia) : "—"}</td>
+          </>
+        ) : null}
         <td className={tdR}>{brl(i.custo_medio)}</td>
         <td className={tdR}>{brl(i.valor)}</td>
       </tr>
@@ -442,5 +650,45 @@ function Linha({ vis, item, todas }: { vis: Vis; item: Item; todas: boolean }) {
         )}
       </td>
     </tr>
+  );
+}
+
+function GrupoLinha({ g, aberto, itens, onAbrir }: { g: AudGrupoLinha; aberto: boolean; itens: AudGeralItem[]; onAbrir: () => void }) {
+  const muted = { color: "var(--text-secondary)" };
+  return (
+    <>
+      <tr style={{ borderTop: "1px solid var(--border)", cursor: "pointer" }} onClick={onAbrir} title="Clique para ver os produtos">
+        <td className="py-2 pr-3">
+          {aberto ? "▾" : "▸"} <b>{g.nome}</b>
+        </td>
+        <td className="py-2 pr-3 text-right">{num(g.produtos)}</td>
+        <td className="py-2 pr-3 text-right">{num(g.com_saldo)}</td>
+        <td className="py-2 pr-3 text-right">{num(g.qtd)}</td>
+        <td className="py-2 pr-3 text-right"><b>{brl(g.valor)}</b></td>
+      </tr>
+      {aberto ? (
+        <tr>
+          <td colSpan={5} className="pb-3 pl-6">
+            {!itens.length ? (
+              <span className="text-xs" style={muted}>Carregando…</span>
+            ) : (
+              <table className="w-full text-xs">
+                <tbody>
+                  {itens.map((i) => (
+                    <tr key={i.product_id} style={{ borderTop: "1px dashed var(--border)" }}>
+                      <td className="py-1 pr-3"><b>{i.codigo}</b> {i.produto}</td>
+                      <td className="py-1 pr-3" style={muted}>{i.categoria} · {i.fornecedor}</td>
+                      <td className="py-1 pr-3 text-right">{num(i.fisico)}</td>
+                      <td className="py-1 pr-3 text-right">{i.custo_medio ? brl(i.custo_medio) : "—"}</td>
+                      <td className="py-1 pr-3 text-right">{brl(i.valor)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </td>
+        </tr>
+      ) : null}
+    </>
   );
 }

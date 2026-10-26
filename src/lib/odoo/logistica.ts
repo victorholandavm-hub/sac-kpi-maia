@@ -531,7 +531,7 @@ export function baixarDamdfePdf(cargaId: number): Promise<{ bytes: ArrayBuffer; 
 // ---- 26/10 (Pedro via Antônio Costa: rotinas da auditoria — Flávio): aba Estoque. Só leitura no Odoo.
 export type AudPosicaoItem = {
   product_id: number; codigo: string; produto: string; ean: string; categoria: string; categ_id: number;
-  company_id: number; loja: string; fisico: number; reservado: number; disponivel: number; custo_medio: number; valor: number;
+  company_id: number; loja: string; fisico: number; reservado: number; disponivel: number; custo_medio: number; valor: number; avaria?: number; assistencia?: number;
 };
 export type AudReservaItem = {
   codigo: string; produto: string; qtd: number; loja: string; company_id: number; documento: string; pedido: string;
@@ -590,4 +590,32 @@ export function transferirEstoques(
   operador: string,
 ): Promise<TransferenciaEstoques> {
   return json<TransferenciaEstoques>("/inventario/transferir", { perfil: "logistica", metodo: "POST", corpo: { ...input, operador }, timeoutMs: 120_000 });
+}
+
+// ---- 26/10 noite (seu Antônio): por fornecedor, por grupo, geral (com/sem saldo) e rotatividade
+export type AudGeralItem = AudPosicaoItem & { fornecedor: string; fornecedor_id: string };
+export type AudGrupoLinha = { chave: string; nome: string; produtos: number; com_saldo: number; qtd: number; valor: number };
+export type AudRotItem = AudGeralItem & {
+  ultima_saida: string; dias_sem_saida: number | null; saidas_30: number; saidas_90: number; media_dia: number;
+  cobertura_dias: number | null; faixa: string;
+};
+export type AudFaixa = { faixa: string; produtos: number; qtd: number; valor: number };
+export type AudRotLista = AudLista<AudRotItem> & { calculado_em: string; protheus_em: string; faixas: AudFaixa[] };
+export type AudFiltro2 = AudFiltro & { saldo?: "com" | "sem" | "todos"; por?: "fornecedor" | "grupo"; grupo?: string; grupo_nome?: string; modo?: "sem" | "com"; dias_min?: number };
+
+function audQuery2(f: AudFiltro2): Record<string, string | number | undefined> {
+  return { ...audQuery(f), saldo: f.saldo, por: f.por, grupo: f.grupo, grupo_nome: f.grupo_nome, modo: f.modo, dias_min: f.dias_min };
+}
+export function audGeral(f: AudFiltro2): Promise<AudLista<AudGeralItem>> {
+  return json("/auditoria/geral", { perfil: "logistica", query: audQuery2(f), timeoutMs: 90_000 });
+}
+export function audAgrupado(f: AudFiltro2): Promise<AudLista<AudGrupoLinha | AudGeralItem>> {
+  return json("/auditoria/agrupado", { perfil: "logistica", query: audQuery2(f), timeoutMs: 90_000 });
+}
+export function audRotatividade(f: AudFiltro2): Promise<AudRotLista> {
+  return json("/auditoria/rotatividade", { perfil: "logistica", query: audQuery2(f), timeoutMs: 90_000 });
+}
+export async function audGrupos(): Promise<string[]> {
+  const r = await json<{ itens: string[] }>("/auditoria/grupos", { perfil: "logistica" });
+  return r.itens;
 }
