@@ -9,8 +9,10 @@ import { Chip, ErroOdoo, VolumesChips } from "@/components/logisticaOdoo/ui";
 export const dynamic = "force-dynamic";
 
 const JANELAS = [7, 30, 90];
+// 26/10 (Pedro): a coluna Finalizada mostra só as 20 últimas; o resto carrega no link do fim da coluna.
+const LIMITE_FINALIZADAS = 20;
 
-export default async function CargasPage({ searchParams }: { searchParams: Promise<{ empresa?: string; dias?: string }> }) {
+export default async function CargasPage({ searchParams }: { searchParams: Promise<{ empresa?: string; dias?: string; finalizadas?: string }> }) {
   const sp = await searchParams;
   const empresa = empresaDaUrl(sp.empresa);
   const dias = JANELAS.includes(Number(sp.dias)) ? Number(sp.dias) : 30;
@@ -50,15 +52,27 @@ export default async function CargasPage({ searchParams }: { searchParams: Promi
       ) : (
         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {ESTADOS_CARGA.map((estado) => {
-            const lista = cargas.value.filter((c) => c.estado === estado);
+            const todas = cargas.value.filter((c) => c.estado === estado);
+            const limitar = estado === "finalizada" && sp.finalizadas !== "todas";
+            const lista = limitar ? [...todas].sort((a, b) => b.carga_id - a.carga_id).slice(0, LIMITE_FINALIZADAS) : todas;
+            const escondidas = todas.length - lista.length;
             return (
               <section key={estado} className="rounded-xl p-2.5 flex flex-col gap-2 min-h-[140px]" style={{ background: "var(--surface-2)" }}>
                 <h3 className="text-xs font-bold uppercase tracking-wide px-1" style={{ color: "var(--text-muted)" }}>
-                  {ESTADO_CARGA_LABELS[estado]} · {lista.length}
+                  {ESTADO_CARGA_LABELS[estado]} · {todas.length}
                 </h3>
                 {lista.map((c) => (
                   <CartaoCarga key={c.carga_id} carga={c} empresa={c.company_id} />
                 ))}
+                {escondidas > 0 ? (
+                  <Link
+                    href={`/assistencia/logistica/cargas?${sp.empresa ? `empresa=${empresa}&` : ""}dias=${dias}&finalizadas=todas`}
+                    className="text-xs text-center px-3 py-2 rounded-lg border"
+                    style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  >
+                    Ver mais {escondidas} finalizada{escondidas > 1 ? "s" : ""} (mais antigas)
+                  </Link>
+                ) : null}
               </section>
             );
           })}
