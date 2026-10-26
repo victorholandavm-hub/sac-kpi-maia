@@ -12,6 +12,7 @@ import {
   previsaoCompraAction,
 } from "@/app/assistencia/logistica/logistica-actions";
 import { useAcaoOdoo } from "./useAcaoOdoo";
+import { EntradaSemPedido } from "./EntradaSemPedido";
 import { Chip, botaoClass, botaoPerigoStyle, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -359,6 +360,7 @@ export function ComprasBoard({ pedidos, hoje, estado, q }: { pedidos: PedidoComp
     <div className="flex flex-col gap-3">
       <div className="flex gap-2 flex-wrap items-center">
         <NovoPedido hoje={hoje} />
+        <EntradaSemPedido />
         <form className="flex gap-2 flex-wrap" action="/assistencia/logistica/compras">
           <input name="q" defaultValue={q} className={inputClass} style={{ ...inputStyle, maxWidth: 260 }} placeholder="Buscar: P00070, fornecedor, código" />
           <select name="estado" defaultValue={estado} className={inputClass} style={{ ...inputStyle, maxWidth: 170 }}>

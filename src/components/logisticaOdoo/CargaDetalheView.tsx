@@ -167,6 +167,10 @@ export function CargaDetalheView({
             <a href={`/assistencia/logistica/pdf/romaneio/${carga.carga_id}`} target="_blank" rel="noopener noreferrer" className={botaoClass} style={botaoStyle}>
               Romaneio (PDF)
             </a>
+            <a href={`/assistencia/logistica/pdf/danfes/${carga.carga_id}`} target="_blank" rel="noopener noreferrer" className={botaoClass} style={botaoLaranjaStyle}
+              title="Um PDF só com a transferência (5152), a nota de cada cliente e as notas de entrega">
+              🖨 Imprimir todas as notas (transferência + clientes)
+            </a>
             <button type="button" disabled={pending} onClick={carregarDanfes} className={botaoClass} style={botaoStyle}>
               DANFEs
             </button>
@@ -304,7 +308,18 @@ export function CargaDetalheView({
             ) : null}
           </div>
           {danfes.length === 0 ? <p className="text-sm">Sem pedidos nesta carga.</p> : null}
-          {danfes.map((d) => (
+          {danfes.map((d, i) => d.tipo ? (
+            <div key={`x${i}`} className="flex items-center justify-between gap-2 text-sm py-1" style={{ borderBottom: "1px solid var(--border)" }}>
+              <span>
+                <b>{d.tipo === "5152" ? "Transferência 5152" : "Nota do cliente 5922"}</b> · {d.cliente}{d.pedido ? ` · ${d.pedido}` : ""} · {d.nf5117}{d.estado === "protheus" ? " (sistema antigo)" : ""}
+              </span>
+              {d.chave ? (
+                <a href={`/assistencia/logistica/pdf/nota/${d.chave}`} target="_blank" rel="noopener noreferrer" className={botaoClass} style={botaoStyle}>
+                  Imprimir
+                </a>
+              ) : null}
+            </div>
+          ) : (
             <div key={d.pedido_id} className="flex items-center justify-between gap-2 text-sm py-1" style={{ borderBottom: "1px solid var(--border)" }}>
               <span>
                 <b>{d.cliente}</b> · {d.pedido} · 5117 {d.nf5117 || "—"}{d.estado === "sem nota" ? "" : ` · ${d.estado}`}

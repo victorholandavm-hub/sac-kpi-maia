@@ -252,6 +252,8 @@ export type DanfeCarga = {
   nf5117: string;
   estado: string;
   tem_pdf: boolean;
+  tipo?: string; // 26/10: "5152" (transferência) | "5922" (nota do cliente) | ausente = 5117
+  chave?: string;
 };
 
 export type HistoricoEntrega = {

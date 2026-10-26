@@ -420,6 +420,28 @@ export async function cancelarPedidoCompra(id: number, motivo: string, operador:
   return json(`/compras/pedido/${id}/cancelar`, { perfil: "logistica", metodo: "POST", corpo: { motivo, operador } });
 }
 // 26/10 (Pedro: "não é para usar o Odoo"): cadastro de produto e preço (tabela 087) pela aba Produtos
+// 26/10 (Pedro/Eduardo): entrada de nota de fornecedor SEM pedido de compra no CD (ponte /entrada/cd/*, empresa fixa 213)
+export type ItemNfFornecedor = { cprod: string; ean: string; nome: string; un: string; qtd: number; preco: number;
+  produto: { id: number; codigo: string; nome: string } | null; casado_por?: string };
+export type NfFornecedor = { achou: boolean; chave: string; numero: string; serie: string; emissao?: string; total?: number;
+  fornecedor?: { id: number | false; cnpj: string; nome: string; novo: boolean }; itens?: ItemNfFornecedor[]; parcelas?: ParcelaPagar[];
+  sem_produto?: number; aviso?: string };
+export type EntradaSemPedidoResposta = { pedido: string; msg: string;
+  pagar?: { conta: string; estado: string; total: number; parcelas: { venc: string; valor: number }[] } | null; aviso_pagar?: string | null };
+export function lerNfCdPorChave(chave: string): Promise<NfFornecedor> {
+  return json<NfFornecedor>("/entrada/cd/nf", { perfil: "logistica", query: { chave } });
+}
+export function lerNfCdPorXml(xml: string): Promise<NfFornecedor> {
+  return json<NfFornecedor>("/entrada/cd/nf/xml", { perfil: "logistica", metodo: "POST", corpo: { xml } });
+}
+export function darEntradaSemPedidoCd(input: {
+  chave: string; nf: string; serie: string; emissao: string; fornecedor: { id: number | false; cnpj: string; nome: string };
+  itens: { product_id?: number; codigo?: string; qtd: number; preco: number; cprod: string; nome: string }[];
+  lancar_pagar: boolean; parcelas: ParcelaPagar[];
+}, operador: string): Promise<EntradaSemPedidoResposta> {
+  return json<EntradaSemPedidoResposta>("/entrada/cd/fornecedor", { perfil: "logistica", metodo: "POST", corpo: { ...input, operador }, timeoutMs: 120_000 });
+}
+
 export type ProdutoCadastro = { id: number; codigo: string; nome: string; preco: number; custo: number; ncm: string; ean: string;
   ativo: boolean; vende: boolean; estocavel: boolean; estoque_cd: number; alterado: string; reservado_cd?: number; disponivel_cd?: number };
 export type EstoqueLoja = { loja: string; saldo: number; reservado: number; disponivel: number };
@@ -467,4 +489,26 @@ export async function inventarioAplicar(companyId: number, itens: { codigo: stri
 // 26/10 (Pedro, igual ao uMov "A caminho da entrega"): motorista registra que chegou no cliente (GPS + hora)
 export function registrarChegadaParada(paradaId: number, geo_lat: number | null, geo_lng: number | null, motorista_id: number | null): Promise<{ ok: true; parada_id: number; ja_registrada?: boolean; em?: string }> {
   return json(`/logistica/parada/${int(paradaId)}/chegada`, { perfil: "motorista", metodo: "POST", corpo: { geo_lat, geo_lng, motorista_id, origem: "app" } });
+}
+
+
+// ---- Manifesto (MDF-e) das cargas (26/10/2026, Pedro) -------------------
+export type NotaCarga = { tipo: "5152" | "5922" | "5117"; titulo: string; numero: string; serie: string; chave: string; pedido: string; cliente: string; legado?: boolean };
+export type MdfeCarga = { numero: string; serie: string; chave: string; estado: string } | null;
+export type CargaManifesto = {
+  carga_id: number; romaneio: string; tipo: string; estado: string; motorista: string; veiculo: string;
+  notas: NotaCarga[] | null; mdfe: MdfeCarga; faltas: string[]; criada_em?: string;
+};
+export async function listarManifesto(companyId: number, dias = 7): Promise<CargaManifesto[]> {
+  const r = await json<{ cargas: CargaManifesto[] }>("/logistica/manifesto", { perfil: "logistica", query: { company_id: companyId, dias }, timeoutMs: 120_000 });
+  return r.cargas ?? [];
+}
+export function notasDaCarga(cargaId: number): Promise<{ romaneio: string; notas: NotaCarga[]; mdfe: MdfeCarga; faltas: string[] }> {
+  return json(`/logistica/carga/${int(cargaId)}/notas`, { perfil: "logistica", timeoutMs: 120_000 });
+}
+export function acaoMdfe(cargaId: number, acao: "emitir" | "encerrar" | "consultar", operador: string): Promise<Record<string, unknown>> {
+  return json(`/logistica/carga/${int(cargaId)}/mdfe/${acao}`, { perfil: "logistica", metodo: "POST", corpo: { operador }, timeoutMs: 180_000 });
+}
+export function baixarDamdfePdf(cargaId: number): Promise<{ bytes: ArrayBuffer; nome: string }> {
+  return pdf(`/logistica/carga/${int(cargaId)}/mdfe/damdfe`, { perfil: "logistica", metodo: "POST", corpo: {}, timeoutMs: 120_000 });
 }

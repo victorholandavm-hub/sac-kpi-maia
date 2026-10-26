@@ -12,8 +12,19 @@ import {
   separarPendencia,
   type ItemEntregaOdoo,
   acaoExtraCarga,
+  listarManifesto,
+  notasDaCarga,
+  acaoMdfe,
+  type CargaManifesto,
+  type NotaCarga,
+  type MdfeCarga,
   alterarProdutoCadastro,
   buscarProdutosCadastro,
+  darEntradaSemPedidoCd,
+  lerNfCdPorChave,
+  lerNfCdPorXml,
+  type EntradaSemPedidoResposta,
+  type NfFornecedor,
   lojasProdutoCadastro,
   type EstoqueLoja,
   criarProdutoCadastro,
@@ -245,6 +256,23 @@ export async function lojasProdutoAction(id: number): Promise<ResultadoAcao<{ lo
   return executar(() => lojasProdutoCadastro(id));
 }
 
+export async function lerNfCdAction(chave: string): Promise<ResultadoAcao<NfFornecedor>> {
+  const c = String(chave || "").replace(/\D/g, "");
+  if (c.length !== 44) return { ok: false, erro: "A chave tem 44 números." };
+  return executar(() => lerNfCdPorChave(c));
+}
+export async function lerNfCdXmlAction(xml: string): Promise<ResultadoAcao<NfFornecedor>> {
+  if (!xml || xml.length < 200) return { ok: false, erro: "Arquivo XML inválido." };
+  return executar(() => lerNfCdPorXml(xml));
+}
+export async function entradaSemPedidoAction(input: Parameters<typeof darEntradaSemPedidoCd>[0]): Promise<ResultadoAcao<EntradaSemPedidoResposta>> {
+  if (!input.itens.length) return { ok: false, erro: "Nenhum item com quantidade." };
+  if (input.itens.some((i) => !i.product_id && !i.codigo)) return { ok: false, erro: "Escolha o nosso produto para todos os itens." };
+  if (input.lancar_pagar && input.parcelas.some((p) => !/^\d{4}-\d{2}-\d{2}$/.test(p.venc) || !(Number(p.valor) > 0)))
+    return { ok: false, erro: "Confira os boletos: cada um precisa de vencimento e valor." };
+  return executar((operador) => darEntradaSemPedidoCd(input, operador), [`${BASE}/compras`]);
+}
+
 export async function buscarProdutosAction(q: string): Promise<ResultadoAcao<ProdutoCadastro[]>> {
   if (String(q || "").trim().length < 2) return { ok: false, erro: "Digite pelo menos 2 letras ou o código." };
   return executar(() => buscarProdutosCadastro(q.trim()));
@@ -293,4 +321,17 @@ export async function inventarioAplicarAction(companyId: number, itens: { codigo
   const lista = itens.filter((i) => i.codigo.trim() && Number.isFinite(i.contado) && i.contado >= 0);
   if (!lista.length) return { ok: false, erro: "Nenhuma contagem válida para aplicar." };
   return executar((operador) => inventarioAplicar(companyId, lista, operador, motivo.trim()), [`${BASE}/inventario`, `${BASE}/kardex`]);
+}
+
+
+// 26/10/2026 (Pedro): aba Manifesto — MDF-e da carga (transferência 5152 + notas dos clientes)
+export async function listarManifestoAction(companyId: number): Promise<ResultadoAcao<CargaManifesto[]>> {
+  return executar(() => listarManifesto(companyId));
+}
+export async function notasDaCargaAction(cargaId: number): Promise<ResultadoAcao<{ romaneio: string; notas: NotaCarga[]; mdfe: MdfeCarga; faltas: string[] }>> {
+  return executar(() => notasDaCarga(cargaId));
+}
+export async function acaoMdfeAction(cargaId: number, acao: "emitir" | "encerrar" | "consultar"): Promise<ResultadoAcao<Record<string, unknown>>> {
+  if (!["emitir", "encerrar", "consultar"].includes(acao)) return { ok: false, erro: "Ação inválida." };
+  return executar((operador) => acaoMdfe(cargaId, acao, operador), [`${BASE}/manifesto`]);
 }

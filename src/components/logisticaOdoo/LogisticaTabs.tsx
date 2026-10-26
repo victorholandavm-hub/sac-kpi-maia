@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 const ABAS = [
   { href: "/assistencia/logistica/expedicao", label: "Expedição" },
   { href: "/assistencia/logistica/cargas", label: "Cargas" },
+  { href: "/assistencia/logistica/manifesto", label: "Manifesto" },
   { href: "/assistencia/logistica/abastecimento", label: "Pedidos das lojas" },
   { href: "/assistencia/logistica/compras", label: "Compras" },
   { href: "/assistencia/logistica/produtos", label: "Produtos" },
