@@ -1,5 +1,6 @@
 import { consultarPedidos, type PedidoConsulta, type TentativaConsulta, type ItemConsulta } from "@/lib/consultaPedido";
 import { formatarDocumento } from "@/lib/rotasDoDiaCore";
+import { nomePedidoOdoo } from "@/lib/pedidoOdoo";
 
 // Consulta de pedido -- pedido do Victor 26/10/2026 ("onde eu vejo as vendas
 // e os status dos pedidos"; no mesmo dia, "onde o sac consulta os
@@ -67,6 +68,21 @@ function Rotulo({ children }: { children: React.ReactNode }) {
   );
 }
 
+// DANFE pela ponte do Odoo (rota /assistencia/nota) -- Victor 26/10/2026.
+function BotoesNota({ pedido }: { pedido: string }) {
+  const estilo = { background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" };
+  return (
+    <div className="flex flex-wrap gap-2 -mt-1">
+      <a href={`/assistencia/nota/${pedido}?doc=5922`} target="_blank" rel="noopener" className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={estilo}>
+        🖨 Nota de venda
+      </a>
+      <a href={`/assistencia/nota/${pedido}?doc=5117`} target="_blank" rel="noopener" className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={estilo}>
+        🖨 Nota de entrega
+      </a>
+    </div>
+  );
+}
+
 function Pedido({ p, busca }: { p: PedidoConsulta; busca: string }) {
   const v = p.venda;
   const e = p.entrega;
@@ -89,6 +105,7 @@ function Pedido({ p, busca }: { p: PedidoConsulta; busca: string }) {
         </div>
         {e ? <Selo texto={e.statusAtual ?? "Sem status"} tom={tomStatusAtual(e.statusAtual)} /> : <Selo texto="Sem entrega" tom="neutro" />}
       </div>
+      {e && nomePedidoOdoo(e.pedido) ? <BotoesNota pedido={nomePedidoOdoo(e.pedido)!} /> : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-5">
         <div className="flex flex-col gap-2">

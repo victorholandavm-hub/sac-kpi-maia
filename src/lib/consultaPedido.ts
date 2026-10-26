@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchInBatches } from "./supabaseBatch";
 import { vendasDasEntregas } from "./vendaDaEntrega";
 import type { FotoEntrega } from "./fotosEntregaOdoo";
+import { nomePedidoOdoo } from "./pedidoOdoo";
 
 // Consulta de pedido (pedido do Victor 26/10/2026: "onde eu vejo as vendas e
 // os status dos pedidos"): por CPF/CNPJ, número do pedido, nota da venda ou
@@ -153,6 +154,10 @@ async function clientesDaBusca(q: string, tipo: ResultadoConsulta["tipo"]): Prom
     ]);
     juntar(b.data);
     juntar(a.data);
+  } else if (tipo === "nome" && nomePedidoOdoo(q)) {
+    // Pedido do Odoo (S01589): a camada compat grava "ODOO-S01589".
+    const { data } = await admin.from("totvs_deliveries").select("client_id").eq("pedido", `ODOO-${nomePedidoOdoo(q)}`).limit(20);
+    juntar(data);
   } else if (tipo === "nome") {
     const termo = `%${q.trim().replace(/[%_,()]/g, " ")}%`;
     const [a, b] = await Promise.all([
