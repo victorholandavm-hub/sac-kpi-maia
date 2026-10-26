@@ -101,6 +101,29 @@ function Filiais({ l }: { l: LogisticaPedido }) {
   );
 }
 
+// Nota do Protheus: sem XML não há DANFE; a chave é o que dá pra entregar.
+function ChaveNota({ chave }: { chave: string }) {
+  return (
+    <div className="flex flex-col gap-1 pt-1">
+      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+        Chave de acesso da nota
+      </span>
+      <span className="font-mono text-xs break-all select-all rounded-md px-2 py-1" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
+        {chave.replace(/(\d{4})(?=\d)/g, "$1 ")}
+      </span>
+      <a
+        href="https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx?tipoConsulta=resumo&tipoConteudo=7PhJ+gAVw2g="
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs underline self-start"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        Consultar na SEFAZ (cole a chave)
+      </a>
+    </div>
+  );
+}
+
 // DANFE pela ponte do Odoo (rota /assistencia/nota) -- Victor 26/10/2026.
 function BotoesNota({ pedido }: { pedido: string }) {
   const estilo = { background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" };
@@ -181,6 +204,7 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
                 {v.formaPagamento ? ` · ${v.formaPagamento}` : ""}
               </p>
               <Itens itens={v.itens} />
+              {v.chave ? <ChaveNota chave={v.chave} /> : null}
             </>
           ) : (
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -306,9 +330,28 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Digite pelo menos 3 letras do nome, ou o número completo.
         </p>
-      ) : r.clientes.length === 0 && !r.odoo?.length ? (
+      ) : null}
+
+      {r?.cadastro?.length ? (
+        <div className="rounded-xl px-4 py-3 text-sm flex flex-col gap-0.5" style={{ background: "color-mix(in srgb, var(--status-warning) 14%, transparent)", color: "var(--text-primary)" }}>
+          <span>
+            CPF/CNPJ achado no cadastro de clientes: <b>{r.cadastro[0].nome}</b>
+            {r.cadastro[0].telefone ? ` · ${r.cadastro[0].telefone}` : ""}
+            {r.cadastro[0].ultimaCompra ? ` · última compra ${r.cadastro[0].ultimaCompra}` : ""}
+          </span>
+          <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            Ele não estava na nossa base de vendas; os pedidos abaixo foram procurados pelo nome. Venda do Protheus que falta aqui não chegou na nossa base.
+          </span>
+        </div>
+      ) : r?.erroCadastro ? (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Não consegui consultar o cadastro de clientes agora ({r.erroCadastro}). Tente pelo nome.
+        </p>
+      ) : null}
+
+      {carga || !r || r.tipo === "curta" ? null : r.clientes.length === 0 && !r.odoo?.length ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          Nada encontrado para “{r.busca}”.{r.tipo === "documento" ? " Cliente que só comprou no Odoo (a partir de 25/10) ainda não é achado pelo CPF: busque pelo nome ou pelo número do pedido." : ""}
+          Nada encontrado para “{r.busca}”.{r.tipo === "documento" && r.cadastro ? " Esse CPF/CNPJ também não está no cadastro de clientes." : ""}{r.tipo === "documento" && r.cadastro?.length ? " Busque pelo número do pedido ou da nota." : ""}
         </p>
       ) : (
         <div className="flex flex-col gap-8">

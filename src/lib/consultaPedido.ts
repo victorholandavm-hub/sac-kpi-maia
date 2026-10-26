@@ -3,6 +3,7 @@ import { fetchInBatches } from "./supabaseBatch";
 import { vendasDasEntregas } from "./vendaDaEntrega";
 import type { FotoEntrega } from "./fotosEntregaOdoo";
 import { nomePedidoOdoo } from "./pedidoOdoo";
+import { clientesDoCadastro, type ClienteCadastro } from "./clienteCadastro";
 import { fotosDoPedidoNaCarga, numeroDaCarga } from "./consultaCarga";
 
 // Consulta de pedido (pedido do Victor 26/10/2026: "onde eu vejo as vendas e
@@ -29,6 +30,9 @@ export type VendaConsulta = {
   formaPagamento: string | null;
   valor: number;
   itens: ItemConsulta[];
+  // Chave de acesso da NF-e (44 dígitos): a DANFE do Protheus não dá pra
+  // gerar sem o XML, mas a chave o atendente passa ao cliente ou consulta na SEFAZ.
+  chave: string | null;
 };
 
 export type TentativaConsulta = {
@@ -100,6 +104,10 @@ export type ResultadoConsulta = {
   clientes: ClienteConsulta[];
   limitado: boolean;
   odoo?: PedidoOdooConsulta[];
+  // CPF que não estava na nossa base: achado no cadastro (clienteCadastro.ts)
+  // e procurado pelo nome.
+  cadastro?: ClienteCadastro[];
+  erroCadastro?: string;
 };
 
 const digitos = (s: string) => s.replace(/\D/g, "");
@@ -216,6 +224,7 @@ type OrderRow = {
   seller_name: string | null;
   payment_method: string | null;
   invoice_total: number | null;
+  nfe_key: string | null;
   client_id: string | null;
   client_name: string | null;
   client_cpf_cnpj: string | null;
@@ -226,7 +235,7 @@ const DELIVERY_SELECT =
   "id, pedido, filial_venda, loja, client_id, client_name, client_cpf_cnpj, client_neighborhood, client_city, status_atual, first_seen_at, " +
   "totvs_delivery_cargas(carga, tentativa, dt_previsao, tipo_entrega, status_carga, status_carga_codigo, status_entrega_codigo, status_origem, motorista_nome, veiculo, transportadora, dt_retorno, hr_retorno, ocorrencia_descricao, totvs_delivery_carga_itens(produto, descricao, quantidade))";
 const ORDER_SELECT =
-  "id, invoice, serie, branch, issue_date, seller_name, payment_method, invoice_total, client_id, client_name, client_cpf_cnpj, totvs_order_items(product, description, quantity)";
+  "id, invoice, serie, branch, issue_date, seller_name, payment_method, invoice_total, nfe_key, client_id, client_name, client_cpf_cnpj, totvs_order_items(product, description, quantity)";
 
 async function clientesDaBusca(q: string, tipo: ResultadoConsulta["tipo"]): Promise<string[]> {
   const admin = getSupabaseAdmin();
@@ -312,6 +321,7 @@ function paraVenda(o: OrderRow): VendaConsulta {
     vendedor: o.seller_name,
     formaPagamento: o.payment_method,
     valor: Number(o.invoice_total ?? 0),
+    chave: o.nfe_key && o.nfe_key.replace(/\D/g, "").length === 44 ? o.nfe_key.replace(/\D/g, "") : null,
     itens: (o.totvs_order_items ?? []).map((i) => ({ codigo: i.product, descricao: i.description, quantidade: Number(i.quantity ?? 0) })),
   };
 }
@@ -319,9 +329,27 @@ function paraVenda(o: OrderRow): VendaConsulta {
 export async function consultarPedidos(busca: string): Promise<ResultadoConsulta> {
   const r = await consultarBase(busca);
   if (r.tipo === "curta") return r;
+  if (r.tipo === "documento" && r.clientes.length === 0) return consultarPeloCadastro(busca.trim());
   const jaMostrados = new Set(r.clientes.flatMap((c) => c.pedidos.map((p) => (p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null)).filter((n): n is string => !!n)));
   const odoo = await pedidosOdooDaBusca(busca.trim(), r.tipo, jaMostrados).catch(() => []);
   return { ...r, odoo };
+}
+
+async function consultarPeloCadastro(q: string): Promise<ResultadoConsulta> {
+  let cadastro: ClienteCadastro[];
+  try {
+    cadastro = await clientesDoCadastro(q);
+  } catch (err) {
+    return { busca: q, tipo: "documento", clientes: [], limitado: false, odoo: [], erroCadastro: (err as Error).message };
+  }
+  if (cadastro.length === 0) return { busca: q, tipo: "documento", clientes: [], limitado: false, odoo: [], cadastro };
+  const nome = cadastro[0].nome;
+  const porNome = await consultarBase(nome);
+  // Homônimo: só fica o cliente com esse documento ou sem documento na nossa base.
+  const clientes = porNome.clientes.filter((c) => !c.documento || c.documento.replace(/\D/g, "") === cadastro[0].documento);
+  const jaMostrados = new Set(clientes.flatMap((c) => c.pedidos.map((p) => (p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null)).filter((n): n is string => !!n)));
+  const odoo = await pedidosOdooDaBusca(nome, "nome", jaMostrados).catch(() => []);
+  return { busca: q, tipo: "documento", clientes, limitado: false, odoo, cadastro };
 }
 
 async function consultarBase(busca: string): Promise<ResultadoConsulta> {
