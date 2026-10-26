@@ -1,4 +1,4 @@
-import { lerKardex, listarEmpresas, mensagemDeErro } from "@/lib/odoo/logistica";
+import { buscarProdutosCadastro, lerKardex, listarEmpresas, mensagemDeErro, type ProdutoCadastro } from "@/lib/odoo/logistica";
 import { empresaDaUrl } from "@/lib/odoo/logisticaAuth";
 import { ErroOdoo } from "@/components/logisticaOdoo/ui";
 
@@ -18,7 +18,13 @@ export default async function KardexPage({ searchParams }: { searchParams: Promi
   const dias = Math.min(Math.max(Number(sp.dias) || 90, 1), 400);
   const empresas = await listarEmpresas().catch(() => []);
   let dados = null, erro = "";
-  if (codigo) {
+  // 26/10 (Flávio): busca também pelo NOME -- sem cara de código, lista os produtos para escolher
+  const ehCodigo = /^[A-Z]{0,3}\d{3,}[A-Z0-9-]*$/.test(codigo);
+  let achados: ProdutoCadastro[] = [];
+  if (codigo && !ehCodigo) {
+    try { achados = await buscarProdutosCadastro(codigo); } catch (e) { erro = mensagemDeErro(e); }
+    if (achados.length === 1) { try { dados = await lerKardex(achados[0].codigo, empresa, dias); achados = []; } catch (e) { erro = mensagemDeErro(e); } }
+  } else if (codigo) {
     try { dados = await lerKardex(codigo, empresa, dias); } catch (e) { erro = mensagemDeErro(e); }
   }
   const cell = "px-2 py-1 border-b text-sm";
@@ -26,8 +32,8 @@ export default async function KardexPage({ searchParams }: { searchParams: Promi
     <div className="flex flex-col gap-4 min-w-0">
       <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>Kardex do produto</h2>
       <form className="flex gap-2 flex-wrap items-end" method="get">
-        <label className="flex flex-col text-sm" style={{ color: "var(--text-secondary)" }}>Código
-          <input name="codigo" defaultValue={codigo} placeholder="ex.: 071351" className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }} />
+        <label className="flex flex-col text-sm" style={{ color: "var(--text-secondary)" }}>Código ou nome
+          <input name="codigo" defaultValue={codigo} placeholder="ex.: 071351 ou guarda roupa vitória" className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }} />
         </label>
         <label className="flex flex-col text-sm" style={{ color: "var(--text-secondary)" }}>Loja
           <select name="empresa" defaultValue={String(empresa)} className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}>
@@ -40,6 +46,18 @@ export default async function KardexPage({ searchParams }: { searchParams: Promi
         <button className="text-sm font-semibold rounded-lg px-4 py-2 border" style={{ borderColor: "var(--brand-green)", background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>Consultar</button>
       </form>
       {erro ? <ErroOdoo titulo="Não consegui ler o Kardex" mensagem={erro} /> : null}
+      {codigo && !ehCodigo && !dados && !erro ? (
+        <div className="cartao p-4 flex flex-col gap-1 min-w-0">
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            {achados.length ? `${achados.length} produto(s) com "${codigo}". Clique no produto:` : `Nenhum produto com "${codigo}". Tente outra palavra ou o código.`}
+          </p>
+          {achados.map((a) => (
+            <a key={a.id} href={`?codigo=${encodeURIComponent(a.codigo)}&empresa=${empresa}&dias=${dias}`} className="text-sm underline" style={{ color: "var(--text-primary)" }}>
+              <b>{a.codigo}</b> {a.nome}{a.ativo ? "" : " (bloqueado)"}
+            </a>
+          ))}
+        </div>
+      ) : null}
       {dados ? (
         <div className="cartao p-4 flex flex-col gap-3 min-w-0">
           <div style={{ color: "var(--text-primary)" }}><b>{dados.codigo}</b> {dados.produto}</div>
