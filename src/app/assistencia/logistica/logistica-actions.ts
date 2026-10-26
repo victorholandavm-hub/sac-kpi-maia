@@ -60,6 +60,13 @@ export async function montarCargaAction(input: Omit<MontarCargaInput, "operador"
   return executar((operador) => montarCarga({ ...input, operador }), [`${BASE}/expedicao`, `${BASE}/cargas`]);
 }
 
+// 26/10 (Jhon): além de "Montar carga", incluir as saídas marcadas numa carga que ainda não saiu
+export async function incluirNaCargaAction(cargaId: number, pickingIds: number[]): Promise<ResultadoAcao<CargaDetalhe>> {
+  if (!(cargaId > 0)) return { ok: false, erro: "Escolha a carga." };
+  if (!pickingIds.length) return { ok: false, erro: "Marque pelo menos uma saída." };
+  return executar((operador) => acaoExtraCarga(cargaId, "adicionar", pickingIds, operador) as Promise<CargaDetalhe>, [`${BASE}/expedicao`, `${BASE}/cargas`, `${BASE}/cargas/${cargaId}`]);
+}
+
 export async function acaoCargaAction(
   cargaId: number,
   acao: AcaoCarga,

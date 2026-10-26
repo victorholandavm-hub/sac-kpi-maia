@@ -212,7 +212,7 @@ type ExtraSemArquivo = Exclude<AcaoCargaExtra, "romaneio" | "danfes">;
 export function acaoExtraCarga(
   cargaId: number,
   acao: ExtraSemArquivo,
-  valor: string | number | null,
+  valor: string | number | number[] | null,
   operador: string,
 ): Promise<CargaDetalhe | { carga: string; excluida: true; entregas_liberadas: number }> {
   return json(`/logistica/carga/${int(cargaId)}/extra/${acao}`, { perfil: "logistica", metodo: "POST", corpo: { valor, operador } });

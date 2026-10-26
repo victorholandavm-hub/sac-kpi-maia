@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { montarCargaAction } from "@/app/assistencia/logistica/logistica-actions";
+import { incluirNaCargaAction, montarCargaAction } from "@/app/assistencia/logistica/logistica-actions";
 import {
   CATEGORIA_LABELS,
   MODO_LABELS,
@@ -12,7 +12,9 @@ import {
   formatarDiaIso,
   somarVolumes,
   zonaUnica,
+  ESTADO_CARGA_LABELS,
   type AcaoEntrega,
+  type CargaOdoo,
   type CatalogosOdoo,
   type EmpresaOdoo,
   type EntregaOdoo,
@@ -34,11 +36,13 @@ export function ExpedicaoBoard({
   expedicao,
   catalogos,
   empresas,
+  cargasAbertas = [],
 }: {
   companyId: number;
   expedicao: ExpedicaoResposta;
   catalogos: CatalogosOdoo;
   empresas: EmpresaOdoo[];
+  cargasAbertas?: CargaOdoo[];
 }) {
   const router = useRouter();
   const { pending, run } = useAcaoOdoo();
@@ -48,6 +52,7 @@ export function ExpedicaoBoard({
   const [busca, setBusca] = useState("");
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [alvo, setAlvo] = useState<AlvoEntrega | null>(null);
+  const [cargaDestino, setCargaDestino] = useState("");
   const [form, setForm] = useState({ tipo: "entrega", zona_id: "", motorista_id: "", veiculo_id: "", descricao: "", transportadora: "", data_prevista: "" });
 
   const todas = useMemo(() => [...expedicao.entregas, ...expedicao.pendencias], [expedicao]);
@@ -100,6 +105,19 @@ export function ExpedicaoBoard({
       (c) => {
         setSel(new Set());
         router.push(`/assistencia/logistica/cargas/${c.carga_id}?empresa=${companyId}`);
+      },
+    );
+  }
+
+  // 26/10 (Jhon): "deveria dar a opção (montar carga) ou (mover para existente)"
+  function incluirExistente() {
+    const c = cargasAbertas.find((x) => String(x.carga_id) === cargaDestino);
+    run(
+      () => incluirNaCargaAction(Number(cargaDestino), [...sel]),
+      (r) => `${sel.size} saída(s) incluída(s) na carga ${r.romaneio ?? c?.romaneio ?? ""}.`,
+      () => {
+        setSel(new Set());
+        router.push(`/assistencia/logistica/cargas/${cargaDestino}?empresa=${companyId}`);
       },
     );
   }
@@ -244,6 +262,25 @@ export function ExpedicaoBoard({
               </button>
             </div>
           </div>
+          <div className="flex items-end gap-2 flex-wrap" style={{ borderTop: "1px dashed var(--border)", paddingTop: 8 }}>
+            <Campo rotulo="…ou incluir as saídas marcadas numa carga que ainda não saiu">
+              <select value={cargaDestino} onChange={(e) => setCargaDestino(e.target.value)} className={inputClass} style={{ ...inputStyle, minWidth: 320 }} aria-label="Carga existente">
+                <option value="">— escolher a carga —</option>
+                {cargasAbertas.map((c) => (
+                  <option key={c.carga_id} value={c.carga_id}>
+                    {c.romaneio} · {ESTADO_CARGA_LABELS[c.estado] ?? c.estado}
+                    {c.zona ? ` · ${c.zona}` : ""}
+                    {c.descricao ? ` · ${c.descricao}` : ""}
+                    {c.data_prevista ? ` · ${formatarDiaIso(c.data_prevista)}` : ""}
+                    {c.motorista ? ` · ${c.motorista}` : ""} ({c.qtd_pedidos} pedidos)
+                  </option>
+                ))}
+              </select>
+            </Campo>
+            <button type="button" disabled={pending || sel.size === 0 || !cargaDestino} onClick={incluirExistente} className={botaoClass} style={botaoStyle}>
+              {pending ? "Incluindo…" : "Incluir na carga existente"}
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -299,7 +336,7 @@ export function ExpedicaoBoard({
                   </td>
                   <td className="p-2 align-top">
                     {e.zona ? <Chip forte>{e.zona}</Chip> : <Chip>sem região</Chip>}
-                    {e.filial_entrega ? <Chip cor="var(--status-info)">entrega: {e.filial_entrega}</Chip> : null}
+                    {e.filial_entrega ? <Chip cor="var(--status-info)">vendida na {e.nome.split(" ")[0]} · entrega {e.filial_entrega}</Chip> : null}
                     {e.retira_em ? <Chip cor="var(--brand-orange)">retira na loja {e.retira_em}</Chip> : null}
                     {e.expresso ? <Chip cor="var(--status-serious)">EXPRESS</Chip> : null}
                     <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>

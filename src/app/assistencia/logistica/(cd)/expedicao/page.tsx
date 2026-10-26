@@ -1,4 +1,5 @@
-import { lerCatalogos, lerExpedicao, listarEmpresas, mensagemDeErro } from "@/lib/odoo/logistica";
+import { lerCatalogos, lerExpedicao, listarCargas, listarEmpresas, mensagemDeErro } from "@/lib/odoo/logistica";
+import { ESTADOS_EDITAVEIS } from "@/lib/odoo/logisticaTipos";
 import { empresaDaUrl } from "@/lib/odoo/logisticaAuth";
 import { ExpedicaoBoard } from "@/components/logisticaOdoo/ExpedicaoBoard";
 import { EmpresaSelect } from "@/components/logisticaOdoo/EmpresaSelect";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ExpedicaoPage({ searchParams }: { searchParams: Promise<{ empresa?: string }> }) {
   const empresa = empresaDaUrl((await searchParams).empresa);
-  const [exp, cat, emps] = await Promise.allSettled([lerExpedicao(empresa), lerCatalogos(empresa), listarEmpresas()]);
+  const [exp, cat, emps, abertas] = await Promise.allSettled([lerExpedicao(empresa), lerCatalogos(empresa), listarEmpresas(), listarCargas(empresa, { estados: ESTADOS_EDITAVEIS, dias: 60 })]);
   const empresas = emps.status === "fulfilled" ? emps.value : [];
   return (
     <div className="flex flex-col gap-4 min-w-0">
@@ -27,7 +28,7 @@ export default async function ExpedicaoPage({ searchParams }: { searchParams: Pr
       ) : cat.status === "rejected" ? (
         <ErroOdoo titulo="Não consegui ler os cadastros (regiões, motoristas, veículos)" mensagem={mensagemDeErro(cat.reason)} />
       ) : (
-        <ExpedicaoBoard companyId={empresa} expedicao={exp.value} catalogos={cat.value} empresas={empresas} />
+        <ExpedicaoBoard companyId={empresa} expedicao={exp.value} catalogos={cat.value} empresas={empresas} cargasAbertas={abertas.status === "fulfilled" ? abertas.value.filter((c) => !c.cancelada) : []} />
       )}
     </div>
   );

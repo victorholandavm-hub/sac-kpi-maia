@@ -66,7 +66,7 @@ export const PROXIMA_ACAO: Record<EstadoCarga, { acao: AcaoCarga; label: string 
 // excluir, descrição/transportadora/data).
 export const ESTADOS_EDITAVEIS: EstadoCarga[] = ["montagem", "separacao", "conferida", "liberada"];
 
-export type AcaoCargaExtra = "motorista" | "programar" | "descricao" | "transportadora" | "excluir" | "romaneio" | "danfes" | "baixar_entrega";
+export type AcaoCargaExtra = "motorista" | "programar" | "descricao" | "transportadora" | "excluir" | "romaneio" | "danfes" | "baixar_entrega" | "adicionar";
 export type AcaoEntrega =
   | "pendencia"
   | "fila"
