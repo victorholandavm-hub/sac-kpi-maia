@@ -300,7 +300,7 @@ export function CargaDetalheView({
           {danfes.map((d) => (
             <div key={d.pedido_id} className="flex items-center justify-between gap-2 text-sm py-1" style={{ borderBottom: "1px solid var(--border)" }}>
               <span>
-                <b>{d.cliente}</b> · {d.pedido} · 5117 {d.nf5117 || "—"} · {d.estado}
+                <b>{d.cliente}</b> · {d.pedido} · 5117 {d.nf5117 || "—"}{d.estado === "sem nota" ? "" : ` · ${d.estado}`}
               </span>
               {d.tem_pdf ? (
                 <a href={`/assistencia/logistica/pdf/danfe/${d.pedido_id}?doc=5117`} target="_blank" rel="noopener noreferrer" className={botaoClass} style={botaoStyle}>
@@ -308,7 +308,7 @@ export function CargaDetalheView({
                 </a>
               ) : (
                 <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  {d.estado === "protheus" ? "nota do Protheus" : "sem nota"}
+                  {d.estado === "protheus" ? "nota do Protheus" : "a 5117 sai no Sair em rota"}
                 </span>
               )}
             </div>
