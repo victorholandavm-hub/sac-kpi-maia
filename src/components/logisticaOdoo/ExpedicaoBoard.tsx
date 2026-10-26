@@ -51,7 +51,11 @@ export function ExpedicaoBoard({
   const [form, setForm] = useState({ tipo: "entrega", zona_id: "", motorista_id: "", veiculo_id: "", descricao: "", transportadora: "", data_prevista: "" });
 
   const todas = useMemo(() => [...expedicao.entregas, ...expedicao.pendencias], [expedicao]);
-  const modos = useMemo(() => [...new Set(todas.map((e) => e.modo).filter(Boolean))].sort(), [todas]);
+  const modos = useMemo(() => {
+    const m = [...new Set(todas.map((e) => e.modo).filter(Boolean))].sort();
+    if (todas.some((e) => e.expresso)) m.push("expresso");
+    return m;
+  }, [todas]);
   const temRetornoNoOdoo = todas.some((e) => typeof e.retorno === "boolean");
   const lista = filtrarExpedicao(expedicao.entregas, expedicao.pendencias, { visao, zona, modo, busca });
   const vols = somarVolumes(lista);
@@ -296,6 +300,8 @@ export function ExpedicaoBoard({
                   <td className="p-2 align-top">
                     {e.zona ? <Chip forte>{e.zona}</Chip> : <Chip>sem região</Chip>}
                     {e.filial_entrega ? <Chip cor="var(--status-info)">entrega: {e.filial_entrega}</Chip> : null}
+                    {e.retira_em ? <Chip cor="var(--brand-orange)">retira na loja {e.retira_em}</Chip> : null}
+                    {e.expresso ? <Chip cor="var(--status-serious)">EXPRESS</Chip> : null}
                     <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
                       {e.endereco}
                     </div>

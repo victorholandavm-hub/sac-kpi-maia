@@ -38,6 +38,7 @@ export const TIPO_CARGA_LABELS: Record<string, string> = {
 
 export const MODO_LABELS: Record<string, string> = {
   entrega: "Entrega",
+  expresso: "Expresso",
   retira_depois: "Retira depois (ABA/CD)",
   na_hora: "Levou na hora",
 };
@@ -74,6 +75,7 @@ export type AcaoEntrega =
   | "anotar"
   | "historico"
   | "remover_da_carga"
+  | "mover_carga"
   | "estornar";
 
 export const ACAO_ENTREGA_LABELS: Record<AcaoEntrega, string> = {
@@ -84,6 +86,7 @@ export const ACAO_ENTREGA_LABELS: Record<AcaoEntrega, string> = {
   anotar: "Anotação",
   historico: "Histórico",
   remover_da_carga: "Remover da carga",
+  mover_carga: "Transferir para outra carga",
   estornar: "Estornar entrega",
 };
 
@@ -132,6 +135,11 @@ export type EntregaOdoo = {
   // voltou de uma tentativa sem sucesso. A tela já filtra por ele quando
   // existir.
   retorno?: boolean;
+  // 26/10: ABA = loja onde o cliente retira (Rafael não achava a filial de destino)
+  retira_em?: string;
+  abastece?: string;
+  // 26/10: venda EXPRESS (filtro "Entrega" não pode misturar)
+  expresso?: boolean;
 };
 
 export type ExpedicaoResposta = {
@@ -335,10 +343,16 @@ export function filtrarExpedicao(fila: EntregaOdoo[], pendencias: EntregaOdoo[],
   const origem = f.visao === "pendencias" ? pendencias : f.visao === "retornos" ? [...fila, ...pendencias].filter((e) => e.retorno) : fila;
   const q = normalizar(f.busca);
   return origem.filter((e) => {
-    if (f.modo && e.modo !== f.modo) return false;
+    // 26/10 (Jhon): "Entrega" não mistura o Expresso; "Expresso" só o Expresso
+    if (f.modo === "expresso") {
+      if (!e.expresso) return false;
+    } else if (f.modo) {
+      if (e.modo !== f.modo) return false;
+      if (f.modo === "entrega" && e.expresso) return false;
+    }
     if (f.zona === SEM_ZONA ? !!e.zona : f.zona && e.zona !== f.zona) return false;
     if (!q) return true;
-    const alvo = normalizar([e.cliente, e.pedido, e.endereco, e.cep, e.nf5922, e.nf5117, e.origem, e.nome, e.telefone].join(" "));
+    const alvo = normalizar([e.cliente, e.pedido, e.endereco, e.cep, e.nf5922, e.nf5117, e.origem, e.nome, e.telefone, e.expresso ? "express expresso" : "", e.retira_em ? "retira " + e.retira_em : ""].join(" "));
     return alvo.includes(q);
   });
 }

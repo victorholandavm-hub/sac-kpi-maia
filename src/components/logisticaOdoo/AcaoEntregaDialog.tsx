@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { acaoEntregaAction, estornarEntregaAction, historicoEntregaAction } from "@/app/assistencia/logistica/logistica-actions";
-import { ACAO_ENTREGA_LABELS, formatarDataHoraOdoo, type AcaoEntrega, type EmpresaOdoo, type HistoricoEntrega } from "@/lib/odoo/logisticaTipos";
+import { ACAO_ENTREGA_LABELS, ESTADO_CARGA_LABELS, formatarDataHoraOdoo, formatarDiaIso, type AcaoEntrega, type CargaOdoo, type EmpresaOdoo, type HistoricoEntrega } from "@/lib/odoo/logisticaTipos";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { botaoClass, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
@@ -13,12 +13,12 @@ export type AlvoEntrega = { pickingId: number; nome: string; cliente: string; ac
 // motivo (pendência), data (programar), filial (transferir), texto
 // (anotação), confirmação (fila, remover da carga, estornar) ou só lê
 // (histórico).
-export function AcaoEntregaDialog({ alvo, empresas, onFechar }: { alvo: AlvoEntrega | null; empresas: EmpresaOdoo[]; onFechar: () => void }) {
+export function AcaoEntregaDialog({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega | null; empresas: EmpresaOdoo[]; cargas?: CargaOdoo[]; onFechar: () => void }) {
   if (!alvo) return null;
-  return <Dialogo key={`${alvo.pickingId}-${alvo.acao}`} alvo={alvo} empresas={empresas} onFechar={onFechar} />;
+  return <Dialogo key={`${alvo.pickingId}-${alvo.acao}`} alvo={alvo} empresas={empresas} cargas={cargas ?? []} onFechar={onFechar} />;
 }
 
-function Dialogo({ alvo, empresas, onFechar }: { alvo: AlvoEntrega; empresas: EmpresaOdoo[]; onFechar: () => void }) {
+function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empresas: EmpresaOdoo[]; cargas: CargaOdoo[]; onFechar: () => void }) {
   const { pending, run } = useAcaoOdoo();
   const [valor, setValor] = useState(() => (alvo.acao === "programar" ? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) : ""));
   const [hist, setHist] = useState<HistoricoEntrega | null>(null);
@@ -48,7 +48,7 @@ function Dialogo({ alvo, empresas, onFechar }: { alvo: AlvoEntrega; empresas: Em
       return;
     }
     if (alvo.acao === "historico") return;
-    const v = alvo.acao === "transferir_filial" ? Number(valor) : alvo.acao === "fila" || alvo.acao === "remover_da_carga" ? null : valor;
+    const v = alvo.acao === "transferir_filial" || alvo.acao === "mover_carga" ? Number(valor) : alvo.acao === "fila" || alvo.acao === "remover_da_carga" ? null : valor;
     run(() => acaoEntregaAction(alvo.pickingId, alvo.acao as Exclude<AcaoEntrega, "historico" | "estornar">, v, alvo.cargaId), "Feito.", onFechar);
   }
 
@@ -95,6 +95,30 @@ function Dialogo({ alvo, empresas, onFechar }: { alvo: AlvoEntrega; empresas: Em
               </option>
             ))}
           </select>
+        ) : null}
+        {alvo.acao === "mover_carga" ? (
+          <>
+            <p className="text-sm">O pedido sai desta carga e entra na carga escolhida (só cargas que ainda não saíram).</p>
+            <select value={valor} onChange={(e) => setValor(e.target.value)} className={inputClass} style={inputStyle} aria-label="Carga de destino">
+              <option value="">Carga de destino…</option>
+              {cargas
+                .filter((c) => c.carga_id !== alvo.cargaId)
+                .map((c) => (
+                  <option key={c.carga_id} value={c.carga_id}>
+                    {c.romaneio} · {ESTADO_CARGA_LABELS[c.estado] ?? c.estado}
+                    {c.zona ? ` · ${c.zona}` : ""}
+                    {c.descricao ? ` · ${c.descricao}` : ""}
+                    {c.data_prevista ? ` · ${formatarDiaIso(c.data_prevista)}` : ""}
+                    {c.motorista ? ` · ${c.motorista}` : ""} ({c.qtd_pedidos} pedidos)
+                  </option>
+                ))}
+            </select>
+            {cargas.length === 0 ? (
+              <p className="text-xs" style={{ color: "var(--status-critical)" }}>
+                Nenhuma outra carga aberta. Monte a carga nova na Expedição primeiro.
+              </p>
+            ) : null}
+          </>
         ) : null}
         {alvo.acao === "fila" ? <p className="text-sm">A entrega sai da pendência e volta para a fila de expedição.</p> : null}
         {alvo.acao === "remover_da_carga" ? <p className="text-sm">A entrega sai da carga e volta para a fila de expedição.</p> : null}

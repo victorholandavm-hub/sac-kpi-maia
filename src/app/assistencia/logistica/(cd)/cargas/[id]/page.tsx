@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { lerCarga, lerCatalogos, listarEmpresas, mensagemDeErro } from "@/lib/odoo/logistica";
+import { lerCarga, lerCatalogos, listarCargas, listarEmpresas, mensagemDeErro } from "@/lib/odoo/logistica";
+import { ESTADOS_EDITAVEIS } from "@/lib/odoo/logisticaTipos";
 import { empresaDaUrl } from "@/lib/odoo/logisticaAuth";
 import { CargaDetalheView } from "@/components/logisticaOdoo/CargaDetalheView";
 import { ErroOdoo } from "@/components/logisticaOdoo/ui";
@@ -15,7 +16,7 @@ export default async function CargaPage({ params, searchParams }: { params: Prom
   const cargaId = Number(id);
   if (!Number.isInteger(cargaId) || cargaId <= 0) notFound();
   const empresa = empresaDaUrl((await searchParams).empresa);
-  const [carga, cat, emps] = await Promise.allSettled([lerCarga(cargaId), lerCatalogos(empresa), listarEmpresas()]);
+  const [carga, cat, emps, abertas] = await Promise.allSettled([lerCarga(cargaId), lerCatalogos(empresa), listarEmpresas(), listarCargas(empresa, { estados: ESTADOS_EDITAVEIS, dias: 60 })]);
 
   return (
     <div className="flex flex-col gap-4 min-w-0">
@@ -30,6 +31,7 @@ export default async function CargaPage({ params, searchParams }: { params: Prom
           catalogos={cat.status === "fulfilled" ? cat.value : null}
           erroCatalogos={cat.status === "rejected" ? mensagemDeErro(cat.reason) : null}
           empresas={emps.status === "fulfilled" ? emps.value : []}
+          cargasAbertas={abertas.status === "fulfilled" ? abertas.value.filter((c) => c.carga_id !== cargaId && !c.cancelada) : []}
         />
       )}
     </div>

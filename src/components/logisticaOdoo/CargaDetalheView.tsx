@@ -20,6 +20,7 @@ import {
   formatarDiaIso,
   moverItem,
   type CargaDetalhe,
+  type CargaOdoo,
   type CatalogosOdoo,
   type DanfeCarga,
   type EmpresaOdoo,
@@ -55,8 +56,10 @@ export function CargaDetalheView({
   catalogos,
   erroCatalogos,
   empresas,
+  cargasAbertas = [],
 }: {
   carga: CargaDetalhe;
+  cargasAbertas?: CargaOdoo[];
   catalogos: CatalogosOdoo | null;
   erroCatalogos: string | null;
   empresas: EmpresaOdoo[];
@@ -359,6 +362,7 @@ export function CargaDetalheView({
                         <option value="">⋯</option>
                         <option value="historico">Histórico</option>
                         <option value="anotar">Anotação</option>
+                        {editavel ? <option value="mover_carga">Transferir para outra carga</option> : null}
                         {editavel ? <option value="remover_da_carga">Remover da carga</option> : null}
                         {editavel ? <option value="pendencia">Enviar para pendência</option> : null}
                         {pk.estado === "done" ? <option value="estornar">Estornar entrega</option> : null}
@@ -439,7 +443,7 @@ export function CargaDetalheView({
         </div>
       </div>
 
-      <AcaoEntregaDialog alvo={alvo} empresas={empresas} onFechar={() => setAlvo(null)} />
+      <AcaoEntregaDialog alvo={alvo} empresas={empresas} cargas={cargasAbertas} onFechar={() => setAlvo(null)} />
     </div>
   );
 }

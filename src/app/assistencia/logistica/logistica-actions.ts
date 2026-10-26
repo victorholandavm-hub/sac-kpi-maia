@@ -100,7 +100,7 @@ export async function listarDanfesAction(cargaId: number): Promise<ResultadoAcao
 }
 
 type AcaoEntregaSimples = Exclude<AcaoEntrega, "historico" | "estornar">;
-const ACOES_ENTREGA: AcaoEntregaSimples[] = ["pendencia", "fila", "transferir_filial", "programar", "anotar", "remover_da_carga"];
+const ACOES_ENTREGA: AcaoEntregaSimples[] = ["pendencia", "fila", "transferir_filial", "programar", "anotar", "remover_da_carga", "mover_carga"];
 
 export async function acaoEntregaAction(
   pickingId: number,
@@ -112,6 +112,7 @@ export async function acaoEntregaAction(
   if ((acao === "pendencia" || acao === "anotar") && !String(valor ?? "").trim()) return { ok: false, erro: "Escreva o texto." };
   if (acao === "programar" && !/^\d{4}-\d{2}-\d{2}$/.test(String(valor ?? ""))) return { ok: false, erro: "Data no formato AAAA-MM-DD." };
   if (acao === "transferir_filial" && !(Number(valor) > 0)) return { ok: false, erro: "Escolha a filial." };
+  if (acao === "mover_carga" && !(Number(valor) > 0)) return { ok: false, erro: "Escolha a carga de destino." };
   const revalidar = [`${BASE}/expedicao`];
   if (cargaId) revalidar.push(`${BASE}/cargas/${cargaId}`);
   return executar((operador) => acaoEntrega(pickingId, acao, valor, operador), revalidar);

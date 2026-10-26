@@ -4,10 +4,35 @@ import { useState } from "react";
 import type { SolicitacaoAbast } from "@/lib/odoo/logisticaTipos";
 import { atenderAbastAction, cancelarAbastAction } from "@/app/assistencia/logistica/logistica-actions";
 import { useAcaoOdoo } from "./useAcaoOdoo";
-import { botaoClass, botaoPerigoStyle, botaoPrimarioStyle, inputClass, inputStyle } from "./ui";
+import { botaoClass, botaoPerigoStyle, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
 function semHtml(s: string): string {
   return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+// 26/10 (Carlos Gabriel): romaneio/lista de separação do pedido da loja, para imprimir antes de carregar
+function imprimirSeparacao(s: SolicitacaoAbast, qtd: Record<string, number>) {
+  const linhas = s.itens
+    .map(
+      (i) =>
+        `<tr><td>${i.codigo}</td><td>${i.nome}</td><td style="text-align:center">${i.qtd}</td><td style="text-align:center">${i.saldo_cd}</td><td style="text-align:center;font-weight:700">${qtd[i.codigo] ?? 0}</td><td style="width:60px;border-bottom:1px solid #000"></td></tr>`,
+    )
+    .join("");
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Separação ${s.nome}</title>
+<style>body{font-family:Arial,sans-serif;font-size:13px;margin:18px}h1{font-size:18px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:10px}th,td{border:1px solid #999;padding:5px 6px}th{background:#eee;text-align:left}.m{color:#444;margin:2px 0}@media print{button{display:none}}</style></head><body>
+<h1>Lista de separação — abastecimento ${s.loja}</h1>
+<p class="m">Pedido ${s.nome} · aberto em ${s.criado.slice(0, 16)} UTC por ${s.solicitante}</p>
+${s.obs ? `<p class="m">Obs.: ${s.obs.replace(/<[^>]+>/g, " ")}</p>` : ""}
+<table><thead><tr><th>Código</th><th>Produto</th><th>Pedido</th><th>CD tem</th><th>Vai no caminhão</th><th>Conferido</th></tr></thead><tbody>${linhas}</tbody></table>
+<p class="m" style="margin-top:18px">Separado por: ______________________ &nbsp; Conferido por: ______________________ &nbsp; Motorista: ______________________</p>
+<button onclick="window.print()">Imprimir</button><script>setTimeout(function(){window.print()},300)</script></body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("O navegador bloqueou a janela de impressão. Libere pop-ups para este site.");
+    return;
+  }
+  w.document.write(html);
+  w.document.close();
 }
 
 function Cartao({ s }: { s: SolicitacaoAbast }) {
@@ -70,6 +95,9 @@ function Cartao({ s }: { s: SolicitacaoAbast }) {
         </table>
       </div>
       <div className="flex gap-2 flex-wrap">
+        <button type="button" className={botaoClass} style={botaoStyle} onClick={() => imprimirSeparacao(s, qtd)}>
+          🖨️ Imprimir lista de separação
+        </button>
         <button
           type="button"
           className={botaoClass}
