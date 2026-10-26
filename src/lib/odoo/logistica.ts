@@ -510,6 +510,14 @@ export function notasDaCarga(cargaId: number): Promise<{ romaneio: string; notas
 // 26/10 (Pedro: "a gente não sabe qual nota está faturando"): andamento da emissão das notas da carga
 export type ProgressoItem = { pedido: string; cliente: string; estado: "aguardando" | "emitindo" | "ok" | "erro" | string; nf: string; sefaz: string };
 export type ProgressoCarga = { carga: string; estado: string; total: number; feitos: number; erros: number; itens: ProgressoItem[] };
+// 26/10 (Victor): saída do CD para o estoque da assistência (local 213 C/AT, fora do estoque de venda) -- ponte /inventario/transferir
+export type TransferenciaAt = { ok: boolean; picking: string; estado: string; qtd: number; msg: string };
+export function transferirCdAt(input: { codigo: string; qtd: number; motivo: string }, operador: string): Promise<TransferenciaAt> {
+  return json<TransferenciaAt>("/inventario/transferir", {
+    perfil: "logistica", metodo: "POST", corpo: { ...input, origem: "CD", destino: "AT", operador }, timeoutMs: 60_000,
+  });
+}
+
 export function progressoCarga(cargaId: number): Promise<ProgressoCarga> {
   return json<ProgressoCarga>(`/logistica/carga/${int(cargaId)}/progresso`, { perfil: "logistica", timeoutMs: 15_000 });
 }

@@ -68,7 +68,7 @@ export function TransferirParaAt({
         <input name="obs" placeholder="Motivo, chamado, peça que vai ser usada…" className="rounded-lg px-3 py-2 text-sm" style={inputStyle} />
       </label>
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-        Fica como retirada pendente no estoque da assistência até a equipe técnica dar a baixa (saída lançada no Odoo).
+        A saída do CD é lançada no Odoo na hora; fica como retirada pendente no estoque da assistência até a equipe técnica dar a baixa.
       </p>
       {state?.error ? (
         <p className="text-sm" style={{ color: "var(--status-critical)" }}>

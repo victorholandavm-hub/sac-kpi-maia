@@ -67,6 +67,7 @@ import {
 import type { EntradaCompraResposta, FornecedorOdoo, PedidoCompra, ItemInventarioSaldo, ItemInventarioAjuste } from "@/lib/odoo/logistica";
 import { inventarioAplicar, inventarioSaldo } from "@/lib/odoo/logistica";
 import { exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import type {
   AcaoCarga,
   AcaoCargaResposta,
@@ -141,9 +142,24 @@ export async function acaoCargaAction(
 ): Promise<ResultadoAcao<AcaoCargaResposta>> {
   if (!ACOES_CARGA.includes(acao)) return { ok: false, erro: `Ação inválida: ${acao}` };
   return executar(
-    (operador) => executarAcaoCarga(cargaId, acao, { operador, motorista_id: extra.motorista_id, veiculo_id: extra.veiculo_id, parciais: extra.parciais ?? null }),
+    async (operador) => {
+      const r = await executarAcaoCarga(cargaId, acao, { operador, motorista_id: extra.motorista_id, veiculo_id: extra.veiculo_id, parciais: extra.parciais ?? null });
+      await registrarAcaoCarga(cargaId, r?.romaneio ?? null, acao, r?.estado ?? null, operador);
+      return r;
+    },
     [`${BASE}/cargas`, `${BASE}/cargas/${cargaId}`],
   );
+}
+
+// 26/10 (Victor: "quem conferiu" nos eventos da carga): grava quem fez cada passo (tabela odoo_carga_acoes, 0206).
+// Nunca derruba a ação: o Odoo já aceitou; se o banco falhar, só fica no log.
+async function registrarAcaoCarga(cargaId: number, romaneio: string | null, acao: string, estado: string | null, operador: string) {
+  try {
+    const { error } = await getSupabaseAdmin().from("odoo_carga_acoes").insert({ carga_id: cargaId, romaneio, acao, estado, operador });
+    if (error) console.error("[logistica-odoo] registrar ação da carga", cargaId, acao, error.message);
+  } catch (err) {
+    console.error("[logistica-odoo] registrar ação da carga", cargaId, acao, err);
+  }
 }
 
 export async function reordenarParadasAction(cargaId: number, paradaIds: number[]): Promise<ResultadoAcao<CargaDetalhe>> {
