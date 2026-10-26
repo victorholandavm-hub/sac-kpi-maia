@@ -89,6 +89,7 @@ const PRIMARY_TABS = [
 const MORE_TABS = [
   { label: "Encomendas", href: "/assistencia/encomendas/fila" },
   { label: "Pedidos", href: "/assistencia/pedidos" },
+  { label: "Estoque lojas", href: "/assistencia/lojas-estoque" },
   { label: "Pagamentos", href: "/assistencia/pagamentos" },
   { label: "Relatórios", href: "/assistencia/relatorios" },
 ];

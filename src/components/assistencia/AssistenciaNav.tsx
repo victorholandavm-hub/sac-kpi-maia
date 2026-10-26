@@ -29,6 +29,8 @@ const BASE_TABS = [
   { label: "Encomendas", href: "/assistencia/encomendas/fila" },
   // Consulta de pedido (venda + carga + entrega + status) -- 26/10/2026.
   { label: "Pedidos", href: "/assistencia/pedidos" },
+  // Estoque das lojas/CD (Odoo) -- não confundir com o estoque de peças.
+  { label: "Estoque lojas", href: "/assistencia/lojas-estoque" },
   { label: "Suprimentos", href: "/assistencia/suprimentos/fila" },
   // "Cargas" e "Prazos de produtos" inativadas (tiradas de exibição) --
   // pedido do Victor 28/09/2026. As rotas continuam existindo, só não têm

@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchInBatches } from "./supabaseBatch";
 import { vendasDasEntregas } from "./vendaDaEntrega";
+import type { FotoEntrega } from "./fotosEntregaOdoo";
 
 // Consulta de pedido (pedido do Victor 26/10/2026: "onde eu vejo as vendas e
 // os status dos pedidos"): por CPF/CNPJ, número do pedido, nota da venda ou
@@ -43,6 +44,8 @@ export type TentativaConsulta = {
   baixaHora: string | null;
   ocorrencia: string | null;
   itens: ItemConsulta[];
+  // Fotos da baixa (só entrega do Odoo -- as do Protheus ficaram no uMov).
+  fotos?: FotoEntrega[];
 };
 
 export type EntregaConsulta = {

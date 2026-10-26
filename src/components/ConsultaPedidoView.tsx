@@ -139,6 +139,21 @@ function Pedido({ p, busca }: { p: PedidoConsulta; busca: string }) {
                       {[t.tipo, t.motorista ?? "sem motorista", t.veiculo, t.transportadora].filter(Boolean).join(" · ")}
                       {t.baixaDia ? ` · baixa ${dataBr(t.baixaDia)}${t.baixaHora ? ` ${t.baixaHora}` : ""}` : ""}
                     </p>
+                    {t.fotos && t.fotos.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {t.fotos.map((f) => (
+                          <a key={f.url} href={f.url} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-0.5" title="Abrir a foto">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- foto do disco local, sem otimização do Next */}
+                            <img src={f.url} alt={f.tipo ? `Foto: ${f.tipo}` : "Foto da entrega"} loading="lazy" className="w-20 h-20 object-cover rounded-lg" style={{ background: "var(--surface-1)" }} />
+                            {f.tipo ? (
+                              <span className="text-[10px] capitalize" style={{ color: "var(--text-muted)" }}>
+                                {f.tipo}
+                              </span>
+                            ) : null}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                     {t.ocorrencia && t.resultadoCodigo !== "1" ? (
                       <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
                         Motivo: {t.ocorrencia}

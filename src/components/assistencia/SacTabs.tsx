@@ -13,6 +13,8 @@ const TABS = [
   // 26/10/2026: "onde o sac consulta os pedidos?". Mesma tela do painel
   // (/pedidos, ConsultaPedidoView), com o login de cada atendente.
   { key: "pedidos", label: "Consulta de pedido", href: "/assistencia/sac/pedidos" },
+  // Estoque por loja/CD (Odoo) -- 26/10/2026, mesmo pedido.
+  { key: "estoque", label: "Estoque", href: "/assistencia/sac/estoque" },
   // Pedido do Victor 01/10/2026: "quero que todos os atendentes fossem
   // colocando como feito, diariamente" -- checklist pessoal do atendente
   // (ou matriz de controle, se admin, ver cronograma/page.tsx).
