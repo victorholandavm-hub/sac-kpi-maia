@@ -246,6 +246,18 @@ export function baixarRomaneioPdf(cargaId: number, operador: string): Promise<{ 
 }
 
 // 26/10 (Eduardo, CD): DANFE da NF 5152 do abastecimento, que não tem pedido de venda -> pela chave
+// 26/10 (Pedro): "Abrir todas" abria só 1 (navegador bloqueia várias janelas) -> PDF único da carga
+export function baixarDanfesCargaPdf(cargaId: number, perfil: PerfilOdoo = "logistica") {
+  return pdf(`/logistica/carga/${int(cargaId)}/danfes.pdf`, { perfil, timeoutMs: 180_000 });
+}
+
+export type TransferenciaEmitida = { numero: string; serie: string; data: string; loja: string; valor: number; estado: string; chave: string };
+// 26/10 (Eduardo): notas 5152 já emitidas (o pedido atendido sai da lista; a nota tem que continuar à mão)
+export async function listarTransferencias(dias = 7): Promise<TransferenciaEmitida[]> {
+  const r = await json<{ notas: TransferenciaEmitida[] }>("/logistica/transferencias", { perfil: "logistica", query: { dias } });
+  return r.notas ?? [];
+}
+
 export function baixarDanfeChavePdf(chave: string, perfil: PerfilOdoo = "logistica") {
   const c = String(chave).replace(/\D/g, "");
   if (c.length !== 44) throw new Error("Chave da nota inválida.");

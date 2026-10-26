@@ -1,4 +1,4 @@
-import { listarSolicitacoesAbast, mensagemDeErro } from "@/lib/odoo/logistica";
+import { listarSolicitacoesAbast, listarTransferencias, mensagemDeErro, type TransferenciaEmitida } from "@/lib/odoo/logistica";
 import { AbastecimentoBoard } from "@/components/logisticaOdoo/AbastecimentoBoard";
 import { ErroOdoo } from "@/components/logisticaOdoo/ui";
 
@@ -10,6 +10,12 @@ export const dynamic = "force-dynamic";
 
 export default async function AbastecimentoPage() {
   let lista;
+  let notas: TransferenciaEmitida[] = [];
+  try {
+    notas = await listarTransferencias(7);
+  } catch {
+    notas = [];
+  }
   try {
     lista = await listarSolicitacoesAbast();
   } catch (err) {
@@ -24,6 +30,25 @@ export default async function AbastecimentoPage() {
         A loja pede pelo caixa. Ajuste o que vai no caminhão e clique em Atender: sai a nota de transferência do CD para a loja.
       </p>
       <AbastecimentoBoard solicitacoes={lista} />
+      <div className="cartao p-4 flex flex-col gap-2">
+        <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
+          Notas de transferência emitidas (últimos 7 dias)
+        </h3>
+        {notas.length === 0 ? <p className="text-sm" style={{ color: "var(--text-muted)" }}>Nenhuma nota de transferência nos últimos 7 dias.</p> : null}
+        {notas.map((n) => (
+          <div key={n.chave || n.numero} className="flex items-center justify-between gap-2 text-sm py-1" style={{ borderBottom: "1px solid var(--border)" }}>
+            <span>
+              <b>NF 5152 nº {n.numero}</b> · {n.loja} · {new Date(n.data.replace(" ", "T") + "Z").toLocaleString("pt-BR", { timeZone: "America/Recife" })} ·{" "}
+              {n.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} · {n.estado}
+            </span>
+            {n.chave ? (
+              <a href={`/assistencia/logistica/pdf/nota/${n.chave}`} target="_blank" rel="noopener noreferrer" className="text-sm underline">
+                🖨 DANFE
+              </a>
+            ) : null}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

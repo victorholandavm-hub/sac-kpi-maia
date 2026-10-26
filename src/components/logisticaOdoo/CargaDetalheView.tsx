@@ -290,9 +290,9 @@ export function CargaDetalheView({
                 type="button"
                 className={botaoClass}
                 style={botaoStyle}
-                onClick={() => danfes.filter((d) => d.tem_pdf).forEach((d) => window.open(`/assistencia/logistica/pdf/danfe/${d.pedido_id}?doc=5117`, "_blank"))}
+                onClick={() => window.open(`/assistencia/logistica/pdf/danfes/${carga.carga_id}`, "_blank")}
               >
-                Abrir todas ({danfes.filter((d) => d.tem_pdf).length})
+                🖨 Imprimir todas ({danfes.filter((d) => d.tem_pdf).length}) num PDF só
               </button>
             ) : null}
           </div>
