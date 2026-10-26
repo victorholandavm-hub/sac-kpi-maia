@@ -12,6 +12,16 @@ import {
   separarPendencia,
   type ItemEntregaOdoo,
   acaoExtraCarga,
+  audPedidos,
+  audPosicao,
+  audReservas,
+  audSefaz,
+  type AudFiltro,
+  type AudLista,
+  type AudPedidoItem,
+  type AudPosicaoItem,
+  type AudReservaItem,
+  type AudSefazItem,
   listarManifesto,
   notasDaCarga,
   acaoMdfe,
@@ -340,4 +350,18 @@ export async function progressoCargaAction(cargaId: number): Promise<ResultadoAc
 export async function acaoMdfeAction(cargaId: number, acao: "emitir" | "encerrar" | "consultar"): Promise<ResultadoAcao<Record<string, unknown>>> {
   if (!["emitir", "encerrar", "consultar"].includes(acao)) return { ok: false, erro: "Ação inválida." };
   return executar((operador) => acaoMdfe(cargaId, acao, operador), [`${BASE}/manifesto`]);
+}
+
+// 26/10 (auditoria do CD — Flávio): aba Estoque (só leitura)
+export async function audPosicaoAction(f: AudFiltro): Promise<ResultadoAcao<AudLista<AudPosicaoItem>>> {
+  return executar(() => audPosicao(f));
+}
+export async function audReservasAction(f: AudFiltro): Promise<ResultadoAcao<AudLista<AudReservaItem>>> {
+  return executar(() => audReservas(f));
+}
+export async function audSefazAction(f: AudFiltro): Promise<ResultadoAcao<AudLista<AudSefazItem>>> {
+  return executar(() => audSefaz(f));
+}
+export async function audPedidosAction(f: AudFiltro): Promise<ResultadoAcao<AudLista<AudPedidoItem>>> {
+  return executar(() => audPedidos(f));
 }

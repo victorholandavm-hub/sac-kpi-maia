@@ -519,3 +519,47 @@ export function acaoMdfe(cargaId: number, acao: "emitir" | "encerrar" | "consult
 export function baixarDamdfePdf(cargaId: number): Promise<{ bytes: ArrayBuffer; nome: string }> {
   return pdf(`/logistica/carga/${int(cargaId)}/mdfe/damdfe`, { perfil: "logistica", metodo: "POST", corpo: {}, timeoutMs: 120_000 });
 }
+
+// ---- 26/10 (Pedro via Antônio Costa: rotinas da auditoria — Flávio): aba Estoque. Só leitura no Odoo.
+export type AudPosicaoItem = {
+  product_id: number; codigo: string; produto: string; ean: string; categoria: string; categ_id: number;
+  company_id: number; loja: string; fisico: number; reservado: number; disponivel: number; custo_medio: number; valor: number;
+};
+export type AudReservaItem = {
+  codigo: string; produto: string; qtd: number; loja: string; company_id: number; documento: string; pedido: string;
+  origem: string; cliente: string; tipo: string; desde: string; dias: number; previsto: string;
+};
+export type AudSefazItem = {
+  id: number; chave: string; numero: string; serie: string; emitente: string; cnpj: string; transferencia: boolean; valor: number;
+  emissao: string; company_id: number | null; loja: string; manifestacao: string; xml: boolean; entrada: boolean;
+};
+export type AudPedidoItem = {
+  pedido_id: number; pedido: string; cliente: string; valor: number; data: string; dias: number; vendedor: string; loja: string;
+  company_id: number; retira_em: string; estado: string; tipo: string; situacao: string; pago: boolean; pago_caixa: boolean;
+  pagto_vendedor: string; nf5922: string; reservado: number; saidas: string[]; pode_excluir: boolean; motivo_bloqueio: string;
+};
+export type AudLista<T> = { totais: Record<string, number>; total: number; itens: T[]; ms?: number };
+export type AudFiltro = { company_id?: number; q?: string; categoria?: number; negativo?: boolean; dias?: number; situacao?: string; limit?: number; offset?: number; formato?: "csv" };
+
+function audQuery(f: AudFiltro): Record<string, string | number | undefined> {
+  return {
+    company_id: f.company_id ?? 0, q: f.q || undefined, categoria: f.categoria || undefined, negativo: f.negativo ? 1 : undefined,
+    dias: f.dias, situacao: f.situacao, limit: f.limit, offset: f.offset, formato: f.formato,
+  };
+}
+export function audPosicao(f: AudFiltro): Promise<AudLista<AudPosicaoItem>> {
+  return json("/auditoria/posicao", { perfil: "logistica", query: audQuery(f), timeoutMs: 60_000 });
+}
+export function audReservas(f: AudFiltro): Promise<AudLista<AudReservaItem>> {
+  return json("/auditoria/reservas", { perfil: "logistica", query: audQuery(f), timeoutMs: 60_000 });
+}
+export function audSefaz(f: AudFiltro): Promise<AudLista<AudSefazItem>> {
+  return json("/auditoria/sefaz", { perfil: "logistica", query: audQuery(f), timeoutMs: 60_000 });
+}
+export function audPedidos(f: AudFiltro): Promise<AudLista<AudPedidoItem>> {
+  return json("/auditoria/pedidos", { perfil: "logistica", query: audQuery(f), timeoutMs: 60_000 });
+}
+export async function audCategorias(): Promise<{ id: number; nome: string }[]> {
+  const r = await json<{ itens: { id: number; nome: string }[] }>("/auditoria/categorias", { perfil: "logistica" });
+  return r.itens;
+}
