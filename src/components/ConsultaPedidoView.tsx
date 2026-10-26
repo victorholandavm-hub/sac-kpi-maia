@@ -1,6 +1,8 @@
 import { consultarPedidos, type PedidoConsulta, type TentativaConsulta, type ItemConsulta } from "@/lib/consultaPedido";
 import { formatarDocumento } from "@/lib/rotasDoDiaCore";
 import { nomePedidoOdoo } from "@/lib/pedidoOdoo";
+import { numeroDaCarga } from "@/lib/consultaCarga";
+import { ConsultaCargaView } from "@/components/ConsultaCargaView";
 
 // Consulta de pedido -- pedido do Victor 26/10/2026 ("onde eu vejo as vendas
 // e os status dos pedidos"; no mesmo dia, "onde o sac consulta os
@@ -83,7 +85,7 @@ function BotoesNota({ pedido }: { pedido: string }) {
   );
 }
 
-function Pedido({ p, busca }: { p: PedidoConsulta; busca: string }) {
+function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: string }) {
   const v = p.venda;
   const e = p.entrega;
   const destaque =
@@ -146,7 +148,13 @@ function Pedido({ p, busca }: { p: PedidoConsulta; busca: string }) {
                   <li key={`${t.carga}-${t.tentativa}`} className="rounded-xl px-3 py-2.5 flex flex-col gap-1" style={{ background: "var(--surface-2)" }}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-sm tabular-nums" style={{ color: "var(--text-primary)" }}>
-                        Carga #{t.carga}
+                        {numeroDaCarga(t.carga) ? (
+                          <a href={`${acao}?q=${encodeURIComponent(t.carga)}`} className="underline font-medium" title="Ver a carga: motorista, ajudantes, histórico e paradas">
+                            Carga {t.carga}
+                          </a>
+                        ) : (
+                          `Carga #${t.carga}`
+                        )}
                         {t.tentativa ? ` · ${t.tentativa}ª tentativa` : ""}
                         <span style={{ color: "var(--text-secondary)" }}> · previsão {dataBr(t.previsao)}</span>
                       </span>
@@ -187,7 +195,7 @@ function Pedido({ p, busca }: { p: PedidoConsulta; busca: string }) {
   );
 }
 
-const EXEMPLOS = "CPF/CNPJ, número do pedido (ex.: 062427 ou S01589), nota da venda ou nome do cliente";
+const EXEMPLOS = "CPF/CNPJ, número do pedido (ex.: 062427 ou S01589), nota da venda, nome do cliente ou carga (ex.: ROM/2026/00058)";
 
 // Tela inteira da consulta (título, busca e resultado) -- usada no painel
 // (/pedidos) e no sistema da assistência (SAC e assistência), cada um com o
@@ -195,7 +203,8 @@ const EXEMPLOS = "CPF/CNPJ, número do pedido (ex.: 062427 ou S01589), nota da v
 // `embutida`: dentro de uma página que já tem título e abas (SAC/assistência)
 // -- sem o título e sem a margem da página do painel.
 export async function ConsultaPedidoView({ busca, acao, embutida = false }: { busca: string; acao: string; embutida?: boolean }) {
-  const r = busca ? await consultarPedidos(busca) : null;
+  const carga = busca ? numeroDaCarga(busca) : null;
+  const r = busca && !carga ? await consultarPedidos(busca) : null;
 
   return (
     <div className={embutida ? "flex flex-col gap-6 min-w-0" : "max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-10 flex flex-col gap-6"}>
@@ -228,7 +237,9 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
         </button>
       </form>
 
-      {!r ? (
+      {carga ? (
+        <ConsultaCargaView busca={busca} />
+      ) : !r ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Busque por {EXEMPLOS}.
         </p>
@@ -259,7 +270,7 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
               </div>
               <ul className="flex flex-col gap-3">
                 {c.pedidos.map((p) => (
-                  <Pedido key={`${p.entrega?.pedido ?? ""}-${p.entrega?.filial ?? ""}-${p.venda?.id ?? ""}`} p={p} busca={r.busca} />
+                  <Pedido key={`${p.entrega?.pedido ?? ""}-${p.entrega?.filial ?? ""}-${p.venda?.id ?? ""}`} p={p} busca={r.busca} acao={acao} />
                 ))}
               </ul>
             </section>

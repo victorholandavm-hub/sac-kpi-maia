@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { runTotvsSync } from "@/lib/totvsSync";
 import { expirarVouchers } from "@/lib/vouchers";
-import { sincronizarExpedicaoOdoo } from "@/lib/odooExpedicaoSync";
 
 // Histórico: não estava no cron do Vercel (vercel.json) porque o firewall do
 // Protheus derrubava (timeout) o IP de nuvem do Vercel -- o sync real rodava
@@ -32,13 +31,8 @@ export async function GET(req: NextRequest) {
     // Vouchers vencidos viram "expirado" aqui (cron da VPS, a cada 30 min).
     // A baixa já recusa vencido sozinha: falha aqui não derruba o sync.
     const vouchersExpirados = await expirarVouchers().catch(() => null);
-    // Expedição do Odoo (odooExpedicaoSync.ts): ponte do Pedro, não o
-    // Protheus -- roda junto e falha sem derrubar o sync.
-    const [summary, expedicaoOdoo] = await Promise.all([
-      runTotvsSync(getSupabaseAdmin(), "rota"),
-      sincronizarExpedicaoOdoo().catch((err: Error) => ({ erro: err.message })),
-    ]);
-    return NextResponse.json({ ...summary, vouchersExpirados, expedicaoOdoo });
+    const summary = await runTotvsSync(getSupabaseAdmin(), "rota");
+    return NextResponse.json({ ...summary, vouchersExpirados });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }

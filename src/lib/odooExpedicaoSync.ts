@@ -6,8 +6,8 @@ import { nomePedidoOdoo } from "./pedidoOdoo";
 
 // Retrato da expedição do Odoo em odoo_expedicao (0203) -- Victor 26/10/2026:
 // dá o id numérico do pedido no Odoo pra imprimir a nota pela ponte, sem
-// depender de rota nova do Pedro. Roda junto do cron do /api/totvs-sync
-// (30 min): 16 empresas, 2 de cada vez (~4 s cada no CD).
+// depender de rota nova do Pedro. Cron próprio (/api/sync-odoo-expedicao,
+// 30 min): 16 empresas, 2 de cada vez (~4 s cada no CD).
 
 const SIMULTANEAS = 2;
 
