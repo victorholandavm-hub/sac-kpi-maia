@@ -9,6 +9,10 @@ import { revalidatePath } from "next/cache";
 import {
   acaoEntrega,
   acaoExtraCarga,
+  alterarProdutoCadastro,
+  buscarProdutosCadastro,
+  criarProdutoCadastro,
+  type ProdutoCadastro,
   buscarEntregas,
   type BuscaEntrega,
   buscarNfChave,
@@ -210,6 +214,19 @@ export async function buscarNfChaveAction(chave: string): Promise<ResultadoAcao<
   const c = String(chave || "").replace(/\D/g, "");
   if (c.length !== 44) return { ok: false, erro: "A chave tem 44 números." };
   return executar(() => buscarNfChave(c));
+}
+
+export async function buscarProdutosAction(q: string): Promise<ResultadoAcao<ProdutoCadastro[]>> {
+  if (String(q || "").trim().length < 2) return { ok: false, erro: "Digite pelo menos 2 letras ou o código." };
+  return executar(() => buscarProdutosCadastro(q.trim()));
+}
+export async function criarProdutoAction(input: { codigo: string; nome: string; preco: number; ncm: string; ean?: string; custo?: number }): Promise<ResultadoAcao<{ produto: ProdutoCadastro }>> {
+  if (!input.codigo.trim() || !input.nome.trim()) return { ok: false, erro: "Preencha código e nome." };
+  if (!(Number(input.preco) > 0)) return { ok: false, erro: "Informe o preço de venda." };
+  return executar((operador) => criarProdutoCadastro(input, operador));
+}
+export async function alterarProdutoAction(id: number, input: { preco?: number; nome?: string; ncm?: string; ean?: string; ativo?: boolean }): Promise<ResultadoAcao<{ produto: ProdutoCadastro; mudou?: string[]; aviso?: string }>> {
+  return executar((operador) => alterarProdutoCadastro(id, input, operador));
 }
 
 export async function previsaoCompraAction(id: number, data: string): Promise<ResultadoAcao<unknown>> {

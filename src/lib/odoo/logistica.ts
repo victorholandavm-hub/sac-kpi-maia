@@ -404,6 +404,20 @@ export async function mudarPrevisaoCompra(id: number, data: string, operador: st
 export async function cancelarPedidoCompra(id: number, motivo: string, operador: string): Promise<unknown> {
   return json(`/compras/pedido/${id}/cancelar`, { perfil: "logistica", metodo: "POST", corpo: { motivo, operador } });
 }
+// 26/10 (Pedro: "não é para usar o Odoo"): cadastro de produto e preço (tabela 087) pela aba Produtos
+export type ProdutoCadastro = { id: number; codigo: string; nome: string; preco: number; custo: number; ncm: string; ean: string;
+  ativo: boolean; vende: boolean; estocavel: boolean; estoque_cd: number; alterado: string };
+export async function buscarProdutosCadastro(q: string): Promise<ProdutoCadastro[]> {
+  const r = await json<{ itens: ProdutoCadastro[] }>("/produtos/cadastro", { perfil: "logistica", query: { q } });
+  return r.itens ?? [];
+}
+export function criarProdutoCadastro(input: { codigo: string; nome: string; preco: number; ncm: string; ean?: string; custo?: number }, operador: string): Promise<{ produto: ProdutoCadastro }> {
+  return json("/produtos/cadastro", { perfil: "logistica", metodo: "POST", corpo: { ...input, operador } });
+}
+export function alterarProdutoCadastro(id: number, input: { preco?: number; nome?: string; ncm?: string; ean?: string; ativo?: boolean }, operador: string): Promise<{ produto: ProdutoCadastro; mudou?: string[]; aviso?: string }> {
+  return json(`/produtos/cadastro/${int(id)}`, { perfil: "logistica", metodo: "POST", corpo: { ...input, operador } });
+}
+
 export type ParcelaPagar = { venc: string; valor: number; n?: string };
 export type NfChave = { achou: boolean; chave: string; numero: string; serie: string; emissao?: string; fornecedor?: string; cnpj?: string;
   total?: number; parcelas?: ParcelaPagar[]; itens?: { nome: string; qtd: number; preco: number; codigo: string }[]; aviso?: string };
