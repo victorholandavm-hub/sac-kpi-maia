@@ -1,4 +1,5 @@
 import { consultarEstoque, type EstoqueProduto } from "@/lib/estoqueLojas";
+import { TransferirParaAt } from "@/components/TransferirParaAt";
 
 // Estoque dos produtos por loja/CD (Odoo) -- pedido do Victor 26/10/2026.
 // Usada na aba do SAC e no menu da assistência. Ver estoqueLojas.ts.
@@ -6,6 +7,7 @@ import { consultarEstoque, type EstoqueProduto } from "@/lib/estoqueLojas";
 const qtd = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
 function Produto({ p }: { p: EstoqueProduto }) {
+  const cd = p.saldos.find((s) => /\bCD\b/.test(s.empresa));
   return (
     <li className="rounded-2xl p-4 sm:p-5 flex flex-col gap-3" style={{ background: "var(--surface-1)" }}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -40,10 +42,10 @@ function Produto({ p }: { p: EstoqueProduto }) {
             </thead>
             <tbody>
               {p.saldos.map((s) => {
-                const cd = /\bCD\b/.test(s.empresa);
+                const ehCd = /\bCD\b/.test(s.empresa);
                 return (
                   <tr key={s.empresaId} className="border-t" style={{ borderColor: "var(--border)" }}>
-                    <td className="px-1 py-1.5" style={{ color: "var(--text-primary)", fontWeight: cd ? 600 : 400 }}>
+                    <td className="px-1 py-1.5" style={{ color: "var(--text-primary)", fontWeight: ehCd ? 600 : 400 }}>
                       {s.empresa}
                     </td>
                     <td className="px-1 py-1.5 text-right font-semibold" style={{ color: s.disponivel > 0 ? "var(--text-primary)" : "var(--text-muted)" }}>
@@ -62,6 +64,9 @@ function Produto({ p }: { p: EstoqueProduto }) {
           </table>
         </div>
       )}
+      {cd && cd.disponivel >= 1 ? (
+        <TransferirParaAt codigo={p.codigo} produto={p.descricao} fabricante={p.fabricante} disponivelCd={cd.disponivel} />
+      ) : null}
     </li>
   );
 }

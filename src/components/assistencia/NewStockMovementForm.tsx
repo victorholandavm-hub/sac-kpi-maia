@@ -174,7 +174,7 @@ export function NewStockMovementForm({ factories, returnHref = "/assistencia/est
       {typeValue === "retirado" ? (
         <p className="text-xs -mt-2" style={{ color: "var(--text-muted)" }}>
           Pra &quot;Retirado do CD&quot;, deixe a Data da movimentação em branco -- a equipe técnica lança essa data quando confirmar
-          que a saída foi registrada no Protheus.
+          que a saída foi registrada no Odoo.
         </p>
       ) : null}
 

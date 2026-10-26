@@ -102,3 +102,14 @@ export async function consultarEstoque(busca: string): Promise<ResultadoEstoque>
   });
   return { busca: q, produtos: resultado, falhas, limitado };
 }
+
+// Saldo de um produto só no CD, lido na hora (sem cache) -- conferência da
+// transferência CD → AT antes de registrar (transferir-at-actions.ts).
+export async function saldoNoCd(codigo: string): Promise<{ empresa: string; disponivel: number; nome: string | null } | null> {
+  const cd = (await empresasCache()).find((e) => /\bCD\b/.test(e.name));
+  if (!cd) return null;
+  const r = await inventarioSaldo(cd.id, [codigo]);
+  const item = r.itens.find((i) => i.codigo === codigo);
+  if (!item || !item.existe) return { empresa: cd.name, disponivel: 0, nome: null };
+  return { empresa: cd.name, disponivel: Number(item.sistema ?? 0) - Number(item.reservado ?? 0), nome: item.nome ?? null };
+}

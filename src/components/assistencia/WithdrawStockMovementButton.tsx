@@ -37,7 +37,7 @@ export function WithdrawStockMovementButton({ movementId }: { movementId: string
         <button
           type="button"
           disabled={pending || !date}
-          onClick={() => run(() => withdrawStockMovement(movementId, date), "Baixa registrada -- confirmado o lançamento no Protheus.")}
+          onClick={() => run(() => withdrawStockMovement(movementId, date), "Baixa registrada -- confirmado o lançamento no Odoo.")}
           className="text-xs rounded-lg px-3 py-1.5 font-semibold text-white shadow-sm transition-all duration-200 hover:brightness-110 disabled:opacity-60 disabled:hover:brightness-100"
           style={{ background: "#1B5E3C" }}
         >

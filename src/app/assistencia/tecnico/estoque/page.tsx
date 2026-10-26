@@ -110,7 +110,7 @@ export default async function TecnicoEstoquePage({
               <div className="leading-tight min-w-0">
                 <h1 className="font-bold text-lg text-white truncate">Retiradas de Estoque</h1>
                 <p className="text-xs truncate" style={{ color: "rgba(255,255,255,0.78)" }}>
-                  Olá, {tecnicoName} — produto já retirado do CD pela assistência; confirme aqui quando o lançamento no Protheus estiver feito.
+                  Olá, {tecnicoName} — produto já retirado do CD pela assistência ou pelo SAC; confirme aqui quando o lançamento no Odoo estiver feito.
                 </p>
               </div>
             </div>

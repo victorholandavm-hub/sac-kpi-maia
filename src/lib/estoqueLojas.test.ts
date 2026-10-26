@@ -27,7 +27,7 @@ vi.mock("./odoo/logistica", () => ({
   mensagemDeErro: (e: unknown) => (e as Error).message,
 }));
 
-const { consultarEstoque } = await import("./estoqueLojas");
+const { consultarEstoque, saldoNoCd } = await import("./estoqueLojas");
 
 describe("consultarEstoque", () => {
   it("soma por loja, tira loja zerada e lista quem não respondeu (nunca como zero)", async () => {
@@ -44,5 +44,14 @@ describe("consultarEstoque", () => {
   });
   it("busca curta não consulta nada", async () => {
     expect((await consultarEstoque("gu")).produtos).toEqual([]);
+  });
+});
+
+describe("saldoNoCd", () => {
+  it("lê só o CD e devolve o disponível", async () => {
+    expect(await saldoNoCd("L003206")).toEqual({ empresa: "213 CD", disponivel: 44, nome: "GUARDA ROUPA" });
+  });
+  it("produto que o Odoo não conhece vale zero", async () => {
+    expect((await saldoNoCd("X999999"))?.disponivel).toBe(0);
   });
 });
