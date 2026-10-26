@@ -274,6 +274,8 @@ async function enviarRegistro(b) {
     geoLng: b.geoLng,
     registradoEm: b.registradoEm,
     fotoUrls: (b.fotos || []).map((f) => f.url).filter(Boolean),
+    itens: b.itens ?? null,
+    fotoTipos: b.fotos.filter((f) => !!f.url).map((f) => f.tipo ?? "canhoto"),
   };
   const r = await postar(`${ESCOPO}motorista/odoo/baixa`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) }, 45000);
   const d = desfechoDoStatus(r.status);

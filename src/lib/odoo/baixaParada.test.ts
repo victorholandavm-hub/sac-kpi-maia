@@ -27,14 +27,14 @@ beforeEach(() => {
 
 describe("registrarBaixaParada (rota da fila offline)", () => {
   it("sem sessão = 'sessao' (fica na fila)", async () => {
-    const r = await registrarBaixaParada(null, { cargaId: 28, paradaId: 7, resultado: "entregue" });
+    const r = await registrarBaixaParada(null, { cargaId: 28, paradaId: 7, resultado: "entregue", fotoTipos: ["canhoto", "mercadoria"] });
     expect(r).toMatchObject({ ok: false, tipo: "sessao" });
   });
   it("manda evento_uid para a ponte e o mesmo uid reenviado não registra 2x", async () => {
     exigir.mockResolvedValue(carga());
     registrar.mockResolvedValue({ ...ok });
     const uid = "3f1c2e9a-1b2c-4d3e-8f40-0a1b2c3d4e5f";
-    const e = { cargaId: 28, paradaId: 7, resultado: "entregue" as const, eventoUid: uid };
+    const e = { cargaId: 28, paradaId: 7, resultado: "entregue" as const, fotoTipos: ["canhoto", "mercadoria"], eventoUid: uid };
     const r1 = await registrarBaixaParada(sessao, e);
     const r2 = await registrarBaixaParada(sessao, e);
     expect(r1).toEqual({ ok: true, dados: ok });
@@ -44,29 +44,29 @@ describe("registrarBaixaParada (rota da fila offline)", () => {
   });
   it("parada que já tem resultado = 'ja_registrada' (sai da fila)", async () => {
     exigir.mockResolvedValue(carga("entregue"));
-    const r = await registrarBaixaParada(sessao, { cargaId: 28, paradaId: 7, resultado: "entregue", eventoUid: "5a1c2e9a-1b2c-4d3e-8f40-0a1b2c3d4e5f" });
+    const r = await registrarBaixaParada(sessao, { cargaId: 28, paradaId: 7, resultado: "entregue", fotoTipos: ["canhoto", "mercadoria"], eventoUid: "5a1c2e9a-1b2c-4d3e-8f40-0a1b2c3d4e5f" });
     expect(r).toMatchObject({ ok: false, tipo: "ja_registrada" });
     expect(registrar).not.toHaveBeenCalled();
   });
   it("Odoo fora = 'transitorio' e libera o uid para a próxima tentativa", async () => {
     exigir.mockResolvedValue(carga());
     registrar.mockRejectedValueOnce(new OdooBridgeError("Odoo não respondeu em 20 s", "/logistica/parada/7", null)).mockResolvedValueOnce({ ...ok });
-    const e = { cargaId: 28, paradaId: 7, resultado: "entregue" as const, eventoUid: "6b1c2e9a-1b2c-4d3e-8f40-0a1b2c3d4e5f" };
+    const e = { cargaId: 28, paradaId: 7, resultado: "entregue" as const, fotoTipos: ["canhoto", "mercadoria"], eventoUid: "6b1c2e9a-1b2c-4d3e-8f40-0a1b2c3d4e5f" };
     expect(await registrarBaixaParada(sessao, e)).toMatchObject({ ok: false, tipo: "transitorio" });
     expect(await registrarBaixaParada(sessao, e)).toMatchObject({ ok: true });
   });
   it("recusa do Odoo (400) = 'recusada'; insucesso sem motivo nem chega na ponte", async () => {
     exigir.mockResolvedValue(carga());
     registrar.mockRejectedValueOnce(new OdooBridgeError("motivo X não existe", "/logistica/parada/7", 400));
-    expect(await registrarBaixaParada(sessao, { cargaId: 28, paradaId: 7, resultado: "insucesso", motivo: "X" })).toMatchObject({ ok: false, tipo: "recusada", erro: "motivo X não existe" });
+    expect(await registrarBaixaParada(sessao, { cargaId: 28, paradaId: 7, resultado: "insucesso", motivo: "X", fotoTipos: ["local"] })).toMatchObject({ ok: false, tipo: "recusada", erro: "motivo X não existe" });
     expect(await registrarBaixaParada(sessao, { cargaId: 28, paradaId: 7, resultado: "insucesso" })).toMatchObject({ ok: false, tipo: "recusada" });
     expect(registrar).toHaveBeenCalledTimes(1);
   });
   it("baixa feita offline leva a hora real do toque na observação", async () => {
     exigir.mockResolvedValue(carga());
     registrar.mockResolvedValue({ ...ok });
-    await registrarBaixaParada(sessao, { cargaId: 28, paradaId: 7, resultado: "entregue", obs: "porteiro", registradoEm: new Date(Date.now() - 3600_000).toISOString() });
-    expect(registrar.mock.calls[0][1].obs).toMatch(/^\[baixa offline \d{2}\/\d{2} \d{2}:\d{2}\] porteiro$/);
+    await registrarBaixaParada(sessao, { cargaId: 28, paradaId: 7, resultado: "entregue", fotoTipos: ["canhoto", "mercadoria"], obs: "porteiro", registradoEm: new Date(Date.now() - 3600_000).toISOString() });
+    expect(registrar.mock.calls[0][1].obs).toMatch(/^\[baixa offline \d{2}\/\d{2} \d{2}:\d{2}\] porteiro · fotos: canhoto, mercadoria$/);
   });
 });
 
