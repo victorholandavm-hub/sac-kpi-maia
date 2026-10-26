@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { acaoEntregaAction, estornarEntregaAction, historicoEntregaAction } from "@/app/assistencia/logistica/logistica-actions";
+import { acaoEntregaAction, estornarEntregaAction, historicoEntregaAction, retiradaNoCdAction } from "@/app/assistencia/logistica/logistica-actions";
 import { ACAO_ENTREGA_LABELS, ESTADO_CARGA_LABELS, formatarDataHoraOdoo, formatarDiaIso, type AcaoEntrega, type CargaOdoo, type EmpresaOdoo, type HistoricoEntrega } from "@/lib/odoo/logisticaTipos";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { botaoClass, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
-export type AlvoEntrega = { pickingId: number; nome: string; cliente: string; acao: AcaoEntrega; cargaId?: number };
+export type AlvoEntrega = { pickingId: number; nome: string; cliente: string; acao: AcaoEntrega; cargaId?: number; companyId?: number };
 
 // Um diálogo só para todos os verbos da entrega (o que o CD faz no
 // "Outras ações ▸ Alterar" do Roteirizador). Cada verbo pede o valor certo:
@@ -48,6 +48,15 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
       return;
     }
     if (alvo.acao === "historico") return;
+    if (alvo.acao === "retirada_cd") {
+      if (!window.confirm(`Confirmar que ${valor || "o fretista"} retirou ${alvo.nome} no CD? Sai a nota de saída (5117) agora.`)) return;
+      run(
+        () => retiradaNoCdAction(alvo.companyId ?? 13, alvo.pickingId, valor),
+        (d) => `Retirada registrada (carga ${d.romaneio}). ${d.notas.join(" · ") || "Nota emitida."} Imprima a DANFE em Cargas › ${d.romaneio}.`,
+        onFechar,
+      );
+      return;
+    }
     const v = alvo.acao === "transferir_filial" || alvo.acao === "mover_carga" ? Number(valor) : alvo.acao === "fila" || alvo.acao === "remover_da_carga" ? null : valor;
     run(() => acaoEntregaAction(alvo.pickingId, alvo.acao as Exclude<AcaoEntrega, "historico" | "estornar">, v, alvo.cargaId), "Feito.", onFechar);
   }
@@ -74,6 +83,15 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
           </button>
         </div>
 
+        {alvo.acao === "retirada_cd" ? (
+          <>
+            <p className="text-sm">
+              O cliente mandou alguém buscar no CD. Escreva <b>quem retirou</b> (nome, documento e placa). O sistema emite a nota de saída (5117), dá
+              baixa como entregue e guarda o nome no histórico do pedido. Leva até 1 minuto.
+            </p>
+            <textarea autoFocus rows={2} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="ex.: José da Silva, CPF 000.000.000-00, fretista, placa ABC1D23" className={inputClass} style={inputStyle} />
+          </>
+        ) : null}
         {alvo.acao === "pendencia" || alvo.acao === "anotar" ? (
           <textarea
             autoFocus

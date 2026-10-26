@@ -289,6 +289,11 @@ export function historicoEntrega(pickingId: number, operador: string): Promise<H
 
 // ---------------------------------------------------------------- motorista
 
+// 26/10: baixa feita pelo CD (retirada no balcão do CD), sem o app do motorista
+export function registrarParadaPeloCd(paradaId: number, input: RegistrarParadaInput): Promise<ResultadoParadaResposta> {
+  return json<ResultadoParadaResposta>(`/logistica/parada/${int(paradaId)}`, { perfil: "logistica", metodo: "POST", corpo: { origem: "odoo", ...input } });
+}
+
 export function registrarResultadoParada(paradaId: number, input: RegistrarParadaInput): Promise<ResultadoParadaResposta> {
   if (input.resultado === "insucesso" && !input.motivo) {
     throw new OdooBridgeError("Informe o motivo do insucesso.", `/logistica/parada/${paradaId}`, null);

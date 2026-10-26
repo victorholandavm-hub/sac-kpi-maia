@@ -123,7 +123,7 @@ export function ExpedicaoBoard({
   }
 
   function acao(e: EntregaOdoo, a: AcaoEntrega) {
-    setAlvo({ pickingId: e.picking_id, nome: e.nome, cliente: e.cliente, acao: a });
+    setAlvo({ pickingId: e.picking_id, nome: e.nome, cliente: e.cliente, acao: a, companyId });
   }
 
   return (
@@ -372,6 +372,7 @@ export function ExpedicaoBoard({
                       <option value="">Ações…</option>
                       {e.pendencia ? <option value="fila">Voltar à fila</option> : <option value="pendencia">Enviar para pendência</option>}
                       <option value="programar">Data programada</option>
+                      <option value="retirada_cd">Cliente/fretista retirou no CD</option>
                       <option value="transferir_filial">Transferir filial</option>
                       <option value="anotar">Anotação</option>
                       <option value="historico">Histórico</option>

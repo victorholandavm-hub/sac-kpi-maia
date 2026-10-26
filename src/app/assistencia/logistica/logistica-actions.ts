@@ -9,6 +9,8 @@ import { revalidatePath } from "next/cache";
 import {
   acaoEntrega,
   acaoExtraCarga,
+  lerCarga,
+  registrarParadaPeloCd,
   estornarEntrega,
   executarAcaoCarga,
   historicoEntrega,
@@ -65,6 +67,33 @@ export async function incluirNaCargaAction(cargaId: number, pickingIds: number[]
   if (!(cargaId > 0)) return { ok: false, erro: "Escolha a carga." };
   if (!pickingIds.length) return { ok: false, erro: "Marque pelo menos uma saída." };
   return executar((operador) => acaoExtraCarga(cargaId, "adicionar", pickingIds, operador) as Promise<CargaDetalhe>, [`${BASE}/expedicao`, `${BASE}/cargas`, `${BASE}/cargas/${cargaId}`]);
+}
+
+// 26/10 (Pedro): cliente mandou fretista RETIRAR no CD. Faz o caminho já testado de uma carga, numa carga só dela:
+// monta (tipo retira agendada, motorista/veículo "RETIRADA NO CD") -> separação -> conferida -> liberada -> SAIR (emite a 5117)
+// -> baixa "entregue" com quem retirou na observação -> fim. Ids criados no Odoo em 26/10 (maia16).
+const RETIRA_CD = { motorista_id: 51, veiculo_id: 35, zona_id: 21 };
+export async function retiradaNoCdAction(companyId: number, pickingId: number, quem: string): Promise<ResultadoAcao<{ romaneio: string; carga_id: number; notas: string[] }>> {
+  const q = String(quem || "").trim();
+  if (q.length < 3) return { ok: false, erro: "Escreva quem retirou (nome, documento e placa do fretista)." };
+  return executar(
+    async (operador) => {
+      const c = await montarCarga({
+        company_id: companyId, picking_ids: [pickingId], tipo: "retira_agendada", ...RETIRA_CD,
+        descricao: `RETIRADA NO CD · ${q}`.slice(0, 100), operador,
+      });
+      for (const a of ["separacao", "conferir", "liberar"] as const) await executarAcaoCarga(c.carga_id, a, { operador });
+      const r = await executarAcaoCarga(c.carga_id, "sair", { operador });
+      const d = await lerCarga(c.carga_id);
+      for (const p of d.paradas) {
+        await registrarParadaPeloCd(p.parada_id, { resultado: "entregue", obs: `Retirado no CD por ${q} (liberado por ${operador})`.slice(0, 500) });
+      }
+      await executarAcaoCarga(c.carga_id, "finalizar", { operador });
+      const notas = ((r as { notas?: { pedido: string; nf5117: string | null }[] }).notas ?? []).map((n) => `${n.pedido}: 5117 nº ${n.nf5117 ?? "?"}`);
+      return { romaneio: c.romaneio, carga_id: c.carga_id, notas };
+    },
+    [`${BASE}/expedicao`, `${BASE}/cargas`],
+  );
 }
 
 export async function acaoCargaAction(

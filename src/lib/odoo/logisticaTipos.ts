@@ -76,6 +76,7 @@ export type AcaoEntrega =
   | "historico"
   | "remover_da_carga"
   | "mover_carga"
+  | "retirada_cd"
   | "estornar";
 
 export const ACAO_ENTREGA_LABELS: Record<AcaoEntrega, string> = {
@@ -87,6 +88,7 @@ export const ACAO_ENTREGA_LABELS: Record<AcaoEntrega, string> = {
   historico: "Histórico",
   remover_da_carga: "Remover da carga",
   mover_carga: "Transferir para outra carga",
+  retirada_cd: "Cliente/fretista retirou no CD",
   estornar: "Estornar entrega",
 };
 
