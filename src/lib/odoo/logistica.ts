@@ -278,6 +278,16 @@ export function baixarDanfePdf(pedidoId: number, doc: "5117" | "5922" = "5117", 
 
 // ---------------------------------------------------------------- entrega (pedido)
 
+// 26/10 (Pedro/Jhon): pendência por item -- escolhe o que espera; o resto segue
+export type ItemEntregaOdoo = { move_id: number; codigo: string; nome: string; qtd: number; tem_estoque: boolean };
+export async function lerItensEntrega(pickingId: number): Promise<ItemEntregaOdoo[]> {
+  const r = await json<{ itens: ItemEntregaOdoo[] }>(`/logistica/entrega/${int(pickingId)}/itens`, { perfil: "logistica" });
+  return r.itens ?? [];
+}
+export function separarPendencia(pickingId: number, motivo: string, codigos: string[], operador: string): Promise<{ pendencia: string; itens: string }> {
+  return json<{ pendencia: string; itens: string }>(`/logistica/entrega/${int(pickingId)}/separar_pendencia`, { perfil: "logistica", metodo: "POST", corpo: { valor: { motivo, codigos }, operador } });
+}
+
 export function acaoEntrega(
   pickingId: number,
   acao: Exclude<AcaoEntrega, "historico" | "estornar">,
@@ -348,6 +358,11 @@ export async function atenderSolicitacaoAbast(
   });
 }
 
+// 26/10 (Pedro/Eduardo): o CD inclui o pedido para QUALQUER loja e pode já faturar (5152)
+export async function novoPedidoAbast(input: { company_id_loja: number; itens: { codigo: string; qtd: number }[]; atender: boolean; obs?: string }, operador: string): Promise<AtenderAbastResposta & { solicitacao?: { id: number; nome: string; loja: string } }> {
+  return json("/abastecimento/novo", { perfil: "logistica", metodo: "POST", corpo: { ...input, operador }, timeoutMs: TIMEOUT_FATURAMENTO_MS });
+}
+
 export async function cancelarSolicitacaoAbast(id: number, operador: string, motivo: string): Promise<unknown> {
   return json(`/abastecimento/${id}/cancelar`, { perfil: "logistica", metodo: "POST", corpo: { operador, motivo } });
 }
@@ -406,7 +421,12 @@ export async function cancelarPedidoCompra(id: number, motivo: string, operador:
 }
 // 26/10 (Pedro: "não é para usar o Odoo"): cadastro de produto e preço (tabela 087) pela aba Produtos
 export type ProdutoCadastro = { id: number; codigo: string; nome: string; preco: number; custo: number; ncm: string; ean: string;
-  ativo: boolean; vende: boolean; estocavel: boolean; estoque_cd: number; alterado: string };
+  ativo: boolean; vende: boolean; estocavel: boolean; estoque_cd: number; alterado: string; reservado_cd?: number; disponivel_cd?: number };
+export type EstoqueLoja = { loja: string; saldo: number; reservado: number; disponivel: number };
+// 26/10 (Pedro/Flávio): lupa com o estoque do produto em cada loja
+export async function lojasProdutoCadastro(id: number): Promise<{ lojas: EstoqueLoja[]; total: number }> {
+  return json<{ lojas: EstoqueLoja[]; total: number }>(`/produtos/cadastro/${int(id)}/lojas`, { perfil: "logistica" });
+}
 export async function buscarProdutosCadastro(q: string): Promise<ProdutoCadastro[]> {
   const r = await json<{ itens: ProdutoCadastro[] }>("/produtos/cadastro", { perfil: "logistica", query: { q } });
   return r.itens ?? [];

@@ -8,9 +8,14 @@
 import { revalidatePath } from "next/cache";
 import {
   acaoEntrega,
+  lerItensEntrega,
+  separarPendencia,
+  type ItemEntregaOdoo,
   acaoExtraCarga,
   alterarProdutoCadastro,
   buscarProdutosCadastro,
+  lojasProdutoCadastro,
+  type EstoqueLoja,
   criarProdutoCadastro,
   type ProdutoCadastro,
   buscarEntregas,
@@ -29,6 +34,7 @@ import {
   reordenarParadas,
   atenderSolicitacaoAbast,
   cancelarSolicitacaoAbast,
+  novoPedidoAbast,
   darEntradaCompra,
   mudarPrevisaoCompra,
   cancelarPedidoCompra,
@@ -177,6 +183,18 @@ export async function acaoEntregaAction(
   return executar((operador) => acaoEntrega(pickingId, acao, valor, operador), revalidar);
 }
 
+export async function itensEntregaAction(pickingId: number): Promise<ResultadoAcao<ItemEntregaOdoo[]>> {
+  return executar(() => lerItensEntrega(pickingId));
+}
+
+export async function separarPendenciaAction(pickingId: number, motivo: string, codigos: string[], cargaId?: number): Promise<ResultadoAcao<{ pendencia: string; itens: string }>> {
+  if (!String(motivo || "").trim()) return { ok: false, erro: "Escreva o motivo." };
+  if (!codigos.length) return { ok: false, erro: "Marque o item que vai para a pendência." };
+  const revalidar = [`${BASE}/expedicao`];
+  if (cargaId) revalidar.push(`${BASE}/cargas/${cargaId}`);
+  return executar((operador) => separarPendencia(pickingId, motivo.trim(), codigos, operador), revalidar);
+}
+
 export async function estornarEntregaAction(pickingId: number): Promise<ResultadoAcao<{ estornada: string; retorno: string; nova: string }>> {
   return executar((operador) => estornarEntrega(pickingId, operador), [`${BASE}/expedicao`]);
 }
@@ -190,6 +208,13 @@ export async function atenderAbastAction(id: number, itens: { codigo: string; qt
   const lista = itens.filter((i) => i.codigo && Number(i.qtd) > 0).map((i) => ({ codigo: i.codigo, qtd: Number(i.qtd) }));
   if (!lista.length) return { ok: false, erro: "Nada para atender: as quantidades estão zeradas." };
   return executar((operador) => atenderSolicitacaoAbast(id, lista, operador), [`${BASE}/abastecimento`]);
+}
+
+export async function novoAbastAction(companyId: number, itens: { codigo: string; qtd: number }[], atender: boolean) {
+  const lista = itens.filter((i) => i.codigo && Number(i.qtd) > 0).map((i) => ({ codigo: i.codigo, qtd: Number(i.qtd) }));
+  if (!(companyId > 0)) return { ok: false as const, erro: "Escolha a loja." };
+  if (!lista.length) return { ok: false as const, erro: "Coloque pelo menos um produto com quantidade." };
+  return executar((operador) => novoPedidoAbast({ company_id_loja: companyId, itens: lista, atender }, operador), [`${BASE}/abastecimento`]);
 }
 
 export async function cancelarAbastAction(id: number, motivo: string): Promise<ResultadoAcao<unknown>> {
@@ -214,6 +239,10 @@ export async function buscarNfChaveAction(chave: string): Promise<ResultadoAcao<
   const c = String(chave || "").replace(/\D/g, "");
   if (c.length !== 44) return { ok: false, erro: "A chave tem 44 números." };
   return executar(() => buscarNfChave(c));
+}
+
+export async function lojasProdutoAction(id: number): Promise<ResultadoAcao<{ lojas: EstoqueLoja[]; total: number }>> {
+  return executar(() => lojasProdutoCadastro(id));
 }
 
 export async function buscarProdutosAction(q: string): Promise<ResultadoAcao<ProdutoCadastro[]>> {

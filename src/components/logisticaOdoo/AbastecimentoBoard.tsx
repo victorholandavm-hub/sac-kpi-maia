@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { SolicitacaoAbast } from "@/lib/odoo/logisticaTipos";
-import { atenderAbastAction, cancelarAbastAction } from "@/app/assistencia/logistica/logistica-actions";
+import type { EmpresaOdoo, SolicitacaoAbast } from "@/lib/odoo/logisticaTipos";
+import type { ProdutoCadastro } from "@/lib/odoo/logistica";
+import { atenderAbastAction, buscarProdutosAction, cancelarAbastAction, novoAbastAction } from "@/app/assistencia/logistica/logistica-actions";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { botaoClass, botaoPerigoStyle, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
@@ -148,16 +149,85 @@ function Cartao({ s }: { s: SolicitacaoAbast }) {
   );
 }
 
-export function AbastecimentoBoard({ solicitacoes }: { solicitacoes: SolicitacaoAbast[] }) {
+// 26/10 (Pedro/Eduardo): o CD inclui um pedido para qualquer loja e pode já faturar (NF 5152)
+function NovoPedido({ empresas }: { empresas: EmpresaOdoo[] }) {
+  const { pending, run } = useAcaoOdoo();
+  const [aberto, setAberto] = useState(false);
+  const [loja, setLoja] = useState(0);
+  const [q, setQ] = useState("");
+  const [achados, setAchados] = useState<ProdutoCadastro[]>([]);
+  const [linhas, setLinhas] = useState<{ codigo: string; nome: string; qtd: number; cd: number }[]>([]);
+  const lojas = empresas.filter((e) => /^2\d\d /.test(e.name) && !/^213 /.test(e.name)).sort((a, b) => a.name.localeCompare(b.name));
+  async function buscar() {
+    if (q.trim().length < 2) return;
+    const r = await buscarProdutosAction(q.trim());
+    setAchados(r.ok && r.dados ? r.dados.filter((p) => p.ativo) : []);
+  }
+  function incluir(atender: boolean) {
+    const nome = lojas.find((l) => l.id === loja)?.name ?? "a loja";
+    if (atender && !confirm(`Incluir o pedido para ${nome} e JÁ emitir a NF de transferência (5152)?`)) return;
+    run(
+      () => novoAbastAction(loja, linhas.map((l) => ({ codigo: l.codigo, qtd: l.qtd })), atender),
+      (d) => (atender ? `Pedido ${d.solicitacao?.nome ?? ""} incluído e faturado: NF 5152 nº ${d.transferencia?.numero ?? d.numero ?? ""}` : `Pedido ${d.solicitacao?.nome ?? ""} incluído para ${nome}. Ele aparece na lista abaixo para atender.`),
+      () => { setLinhas([]); setAchados([]); setQ(""); setAberto(false); },
+    );
+  }
+  if (!aberto)
+    return (
+      <div>
+        <button type="button" className={botaoClass} style={botaoPrimarioStyle} onClick={() => setAberto(true)}>+ Novo pedido para loja</button>
+      </div>
+    );
+  return (
+    <div className="cartao p-4 flex flex-col gap-2">
+      <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>Novo pedido de abastecimento</h3>
+      <select className={inputClass} style={{ ...inputStyle, maxWidth: 320 }} value={loja} onChange={(e) => setLoja(Number(e.target.value))}>
+        <option value={0}>Escolha a loja…</option>
+        {lojas.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+      </select>
+      <div className="flex gap-2 flex-wrap">
+        <input className={inputClass} style={{ ...inputStyle, maxWidth: 360 }} placeholder="Produto: código ou nome" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); buscar(); } }} />
+        <button type="button" className={botaoClass} style={botaoStyle} onClick={buscar}>Buscar</button>
+      </div>
+      {achados.length ? (
+        <div className="flex flex-col gap-1 text-sm" style={{ maxHeight: 220, overflowY: "auto" }}>
+          {achados.map((p) => (
+            <button key={p.id} type="button" className="text-left underline" onClick={() => { setLinhas((ls) => (ls.some((x) => x.codigo === p.codigo) ? ls : [...ls, { codigo: p.codigo, nome: p.nome, qtd: 1, cd: p.disponivel_cd ?? p.estoque_cd }])); }}>
+              <b>{p.codigo}</b> {p.nome} <span style={{ color: "var(--text-secondary)" }}>(CD disp. {p.disponivel_cd ?? p.estoque_cd})</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {linhas.map((l, i) => (
+        <div key={l.codigo} className="flex gap-2 items-center text-sm">
+          <span style={{ flex: 1 }}><b>{l.codigo}</b> {l.nome} <span style={{ color: "var(--text-secondary)" }}>(CD {l.cd})</span></span>
+          <input type="number" min={1} className={inputClass} style={{ ...inputStyle, maxWidth: 90 }} value={l.qtd} onChange={(e) => setLinhas((ls) => ls.map((x, j) => (j === i ? { ...x, qtd: Number(e.target.value) } : x)))} />
+          <button type="button" className={botaoClass} style={botaoStyle} onClick={() => setLinhas((ls) => ls.filter((_, j) => j !== i))}>✕</button>
+        </div>
+      ))}
+      <div className="flex gap-2 flex-wrap">
+        <button type="button" disabled={pending || !loja || !linhas.length} className={botaoClass} style={botaoStyle} onClick={() => incluir(false)}>Só incluir</button>
+        <button type="button" disabled={pending || !loja || !linhas.length} className={botaoClass} style={botaoPrimarioStyle} onClick={() => incluir(true)}>{pending ? "Emitindo a nota…" : "Incluir e faturar (5152)"}</button>
+        <button type="button" disabled={pending} className={botaoClass} style={botaoStyle} onClick={() => setAberto(false)}>Fechar</button>
+      </div>
+    </div>
+  );
+}
+
+export function AbastecimentoBoard({ solicitacoes, empresas = [] }: { solicitacoes: SolicitacaoAbast[]; empresas?: EmpresaOdoo[] }) {
   if (!solicitacoes.length) {
     return (
-      <div className="cartao p-6 text-sm" style={{ color: "var(--text-secondary)" }}>
-        Nenhum pedido de abastecimento aberto.
+      <div className="flex flex-col gap-3">
+        <NovoPedido empresas={empresas} />
+        <div className="cartao p-6 text-sm" style={{ color: "var(--text-secondary)" }}>
+          Nenhum pedido de abastecimento aberto.
+        </div>
       </div>
     );
   }
   return (
     <div className="flex flex-col gap-3">
+      <NovoPedido empresas={empresas} />
       {solicitacoes.map((s) => (
         <Cartao key={s.id} s={s} />
       ))}

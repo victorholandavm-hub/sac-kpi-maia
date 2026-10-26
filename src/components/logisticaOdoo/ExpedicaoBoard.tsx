@@ -329,6 +329,7 @@ export function ExpedicaoBoard({
                   </td>
                   <td className="p-2 align-top">
                     <b style={{ color: "var(--text-primary)" }}>{e.cliente}</b>
+                    {e.vendedor ? <div className="text-xs" style={{ color: "var(--text-secondary)" }}>Vend.: {e.vendedor}</div> : null}
                     <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       {e.telefone}
                     </div>

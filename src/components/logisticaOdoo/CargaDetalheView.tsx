@@ -340,6 +340,9 @@ export function CargaDetalheView({
                 <b>
                   {i + 1}. {p.cliente}
                 </b>
+                {Array.from(new Set(p.pickings.map((pk) => pk.vendedor).filter(Boolean))).length ? (
+                  <div className="text-xs" style={{ color: "var(--text-secondary)" }}>Vend.: {Array.from(new Set(p.pickings.map((pk) => pk.vendedor).filter(Boolean))).join(", ")}</div>
+                ) : null}
                 {p.resultado ? (
                   <span className="ml-2">
                     <Chip cor={COR_RESULTADO[p.resultado]}>{RESULTADO_LABELS[p.resultado] ?? p.resultado}</Chip>

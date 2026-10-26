@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { acaoEntregaAction, estornarEntregaAction, historicoEntregaAction, retiradaNoCdAction } from "@/app/assistencia/logistica/logistica-actions";
+import { acaoEntregaAction, estornarEntregaAction, historicoEntregaAction, itensEntregaAction, retiradaNoCdAction, separarPendenciaAction } from "@/app/assistencia/logistica/logistica-actions";
 import { ACAO_ENTREGA_LABELS, ESTADO_CARGA_LABELS, formatarDataHoraOdoo, formatarDiaIso, type AcaoEntrega, type CargaOdoo, type EmpresaOdoo, type HistoricoEntrega } from "@/lib/odoo/logisticaTipos";
+import type { ItemEntregaOdoo } from "@/lib/odoo/logistica";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { botaoClass, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
@@ -23,6 +24,23 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
   const [valor, setValor] = useState(() => (alvo.acao === "programar" ? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) : ""));
   const [hist, setHist] = useState<HistoricoEntrega | null>(null);
   const [erroHist, setErroHist] = useState<string | null>(null);
+  const [itens, setItens] = useState<ItemEntregaOdoo[] | null>(null);
+  const [marcados, setMarcados] = useState<string[]>([]);
+  const [resto, setResto] = useState<"segue" | "espera">("segue");
+
+  useEffect(() => {
+    if (alvo.acao !== "pendencia") return;
+    let vivo = true;
+    itensEntregaAction(alvo.pickingId).then((r) => {
+      if (!vivo) return;
+      const l = r.ok ? r.dados : [];
+      setItens(l);
+      setMarcados(l.filter((i) => !i.tem_estoque).map((i) => i.codigo));
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [alvo]);
 
   useEffect(() => {
     if (alvo.acao !== "historico") return;
@@ -55,6 +73,10 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
         (d) => `Retirada registrada (carga ${d.romaneio}). ${d.notas.join(" · ") || "Nota emitida."} Imprima a DANFE em Cargas › ${d.romaneio}.`,
         onFechar,
       );
+      return;
+    }
+    if (alvo.acao === "pendencia" && itens && itens.length > 1 && resto === "segue" && marcados.length > 0 && marcados.length < itens.length) {
+      run(() => separarPendenciaAction(alvo.pickingId, valor, marcados, alvo.cargaId), (d) => `Pendência separada em ${d.pendencia} (${d.itens}); o resto segue.`, onFechar);
       return;
     }
     const v = alvo.acao === "transferir_filial" || alvo.acao === "mover_carga" ? Number(valor) : alvo.acao === "fila" || alvo.acao === "remover_da_carga" ? null : valor;
@@ -102,6 +124,21 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
             className={inputClass}
             style={inputStyle}
           />
+        ) : null}
+        {alvo.acao === "pendencia" && itens && itens.length > 1 ? (
+          <div className="flex flex-col gap-1 text-sm">
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Marque o que vai para a pendência:</p>
+            {itens.map((i) => (
+              <label key={i.move_id} className="flex items-start gap-2">
+                <input type="checkbox" className="w-5 h-5 mt-0.5" checked={marcados.includes(i.codigo)}
+                  onChange={() => setMarcados((m) => (m.includes(i.codigo) ? m.filter((x) => x !== i.codigo) : [...m, i.codigo]))} />
+                <span>{i.qtd}× {i.codigo} {i.nome}{i.tem_estoque ? "" : " · sem estoque"}</span>
+              </label>
+            ))}
+            <p className="text-xs mt-2" style={{ color: "var(--text-secondary)" }}>Os outros itens:</p>
+            <label className="flex items-center gap-2"><input type="radio" checked={resto === "segue"} onChange={() => setResto("segue")} /> seguem para a rota agora</label>
+            <label className="flex items-center gap-2"><input type="radio" checked={resto === "espera"} onChange={() => setResto("espera")} /> esperam junto a pendência</label>
+          </div>
         ) : null}
         {alvo.acao === "programar" ? <input type="date" value={valor} onChange={(e) => setValor(e.target.value)} className={inputClass} style={inputStyle} /> : null}
         {alvo.acao === "transferir_filial" ? (

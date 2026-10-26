@@ -1,4 +1,4 @@
-import { listarSolicitacoesAbast, listarTransferencias, mensagemDeErro, type TransferenciaEmitida } from "@/lib/odoo/logistica";
+import { listarEmpresas, listarSolicitacoesAbast, listarTransferencias, mensagemDeErro, type TransferenciaEmitida } from "@/lib/odoo/logistica";
 import { AbastecimentoBoard } from "@/components/logisticaOdoo/AbastecimentoBoard";
 import { ErroOdoo } from "@/components/logisticaOdoo/ui";
 
@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function AbastecimentoPage() {
   let lista;
   let notas: TransferenciaEmitida[] = [];
+  const empresas = await listarEmpresas().catch(() => []);
   try {
     notas = await listarTransferencias(7);
   } catch {
@@ -29,7 +30,7 @@ export default async function AbastecimentoPage() {
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
         A loja pede pelo caixa. Ajuste o que vai no caminhão e clique em Atender: sai a nota de transferência do CD para a loja.
       </p>
-      <AbastecimentoBoard solicitacoes={lista} />
+      <AbastecimentoBoard solicitacoes={lista} empresas={empresas} />
       <div className="cartao p-4 flex flex-col gap-2">
         <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
           Notas de transferência emitidas (últimos 7 dias)

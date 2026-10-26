@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { ProdutoCadastro } from "@/lib/odoo/logistica";
-import { alterarProdutoAction, buscarProdutosAction, criarProdutoAction } from "@/app/assistencia/logistica/logistica-actions";
+import type { EstoqueLoja, ProdutoCadastro } from "@/lib/odoo/logistica";
+import { alterarProdutoAction, buscarProdutosAction, criarProdutoAction, lojasProdutoAction } from "@/app/assistencia/logistica/logistica-actions";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { Chip, botaoClass, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
@@ -14,8 +14,18 @@ function Linha({ p, onSalvo }: { p: ProdutoCadastro; onSalvo: (n: ProdutoCadastr
   const [nome, setNome] = useState(p.nome);
   const [ncm, setNcm] = useState(p.ncm);
   const [ean, setEan] = useState(p.ean);
+  const [lojas, setLojas] = useState<EstoqueLoja[] | null>(null);
+  const [abrindo, setAbrindo] = useState(false);
   const mudou = Number(preco) !== p.preco || nome !== p.nome || ncm !== p.ncm || ean !== p.ean;
+  async function lupa() {
+    if (lojas) { setLojas(null); return; }
+    setAbrindo(true);
+    const r = await lojasProdutoAction(p.id);
+    setAbrindo(false);
+    setLojas(r.ok && r.dados ? r.dados.lojas : []);
+  }
   return (
+    <>
     <tr style={{ borderBottom: "1px solid var(--border)", opacity: p.ativo ? 1 : 0.6 }}>
       <td className="p-2 align-top whitespace-nowrap"><b>{p.codigo}</b>{!p.ativo ? <div><Chip cor="var(--status-critical)">bloqueado</Chip></div> : null}</td>
       <td className="p-2 align-top"><input className={inputClass} style={{ ...inputStyle, minWidth: 280 }} value={nome} onChange={(e) => setNome(e.target.value)} /></td>
@@ -23,7 +33,12 @@ function Linha({ p, onSalvo }: { p: ProdutoCadastro; onSalvo: (n: ProdutoCadastr
       <td className="p-2 align-top text-xs" style={{ color: "var(--text-secondary)" }}>{brl(p.custo)}</td>
       <td className="p-2 align-top"><input className={inputClass} style={{ ...inputStyle, maxWidth: 120 }} value={ncm} onChange={(e) => setNcm(e.target.value)} /></td>
       <td className="p-2 align-top"><input className={inputClass} style={{ ...inputStyle, maxWidth: 150 }} value={ean} onChange={(e) => setEan(e.target.value)} placeholder="EAN" /></td>
-      <td className="p-2 align-top text-center">{p.estoque_cd}</td>
+      <td className="p-2 align-top text-center whitespace-nowrap">
+        <b>{p.estoque_cd}</b>
+        {p.reservado_cd ? <div className="text-xs" style={{ color: "var(--status-warning, #B45309)" }}>reservado {p.reservado_cd}</div> : null}
+        <div className="text-xs" style={{ color: "var(--text-secondary)" }}>disponível {p.disponivel_cd ?? p.estoque_cd}</div>
+        <button type="button" title="Estoque nas lojas" className={botaoClass} style={{ ...botaoStyle, padding: "2px 8px", marginTop: 4 }} onClick={lupa}>{abrindo ? "…" : "🔍 lojas"}</button>
+      </td>
       <td className="p-2 align-top whitespace-nowrap">
         <button type="button" disabled={pending || !mudou} className={botaoClass} style={botaoPrimarioStyle}
           onClick={() => run(() => alterarProdutoAction(p.id, { preco: Number(preco), nome, ncm, ean }), (d) => (d.mudou?.length ? `${p.codigo}: ${d.mudou.join("; ")}` : "Nada mudou."), (d) => onSalvo(d.produto))}>
@@ -36,6 +51,24 @@ function Linha({ p, onSalvo }: { p: ProdutoCadastro; onSalvo: (n: ProdutoCadastr
         </button>
       </td>
     </tr>
+    {lojas ? (
+      <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface-2, rgba(0,0,0,.03))" }}>
+        <td colSpan={8} className="p-2 text-sm">
+          {lojas.length ? (
+            <div className="flex flex-wrap gap-2">
+              {lojas.map((l) => (
+                <span key={l.loja} className="rounded-lg border px-2 py-1" style={{ borderColor: "var(--border)" }}>
+                  <b>{l.loja}</b>: {l.saldo}{l.reservado ? ` · reservado ${l.reservado}` : ""} · disp. <b>{l.disponivel}</b>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span style={{ color: "var(--text-secondary)" }}>Sem estoque em nenhuma loja.</span>
+          )}
+        </td>
+      </tr>
+    ) : null}
+    </>
   );
 }
 
@@ -60,7 +93,7 @@ export function ProdutosBoard() {
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border)" }}>
                 <th className="p-2">Código</th><th className="p-2">Nome</th><th className="p-2">Preço (tabela)</th><th className="p-2">Custo</th>
-                <th className="p-2">NCM</th><th className="p-2">EAN</th><th className="p-2">Estoque CD</th><th className="p-2" />
+                <th className="p-2">NCM</th><th className="p-2">EAN</th><th className="p-2">Estoque CD (reservado)</th><th className="p-2" />
               </tr>
             </thead>
             <tbody>
