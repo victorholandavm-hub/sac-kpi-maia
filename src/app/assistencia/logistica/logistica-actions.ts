@@ -67,7 +67,7 @@ export async function acaoCargaAction(
 ): Promise<ResultadoAcao<AcaoCargaResposta>> {
   if (!ACOES_CARGA.includes(acao)) return { ok: false, erro: `Ação inválida: ${acao}` };
   return executar(
-    (operador) => executarAcaoCarga(cargaId, acao, { operador, motorista_id: extra.motorista_id, veiculo_id: extra.veiculo_id }),
+    (operador) => executarAcaoCarga(cargaId, acao, { operador, motorista_id: extra.motorista_id, veiculo_id: extra.veiculo_id, parciais: extra.parciais ?? null }),
     [`${BASE}/cargas`, `${BASE}/cargas/${cargaId}`],
   );
 }
