@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   acaoCargaAction,
   baixarEntregaManualAction,
+  naoSaiuAction,
   editarCargaAction,
   excluirCargaAction,
   listarDanfesAction,
@@ -121,6 +122,12 @@ export function CargaDetalheView({
   function excluir() {
     if (!window.confirm(`Excluir a carga ${carga.romaneio}? Todas as entregas voltam para a fila.`)) return;
     run(() => excluirCargaAction(carga.carga_id), "Carga excluída; entregas de volta à fila.", () => router.push("/assistencia/logistica/cargas"));
+  }
+
+  function naoSaiu(p: ParadaOdoo) {
+    const obs = window.prompt(`${p.cliente} NÃO saiu do CD (foi para a rota por engano)? O pedido volta para a fila da Expedição. Motivo (opcional):`, "carregado por engano");
+    if (obs === null) return;
+    run(() => naoSaiuAction(carga.carga_id, p.parada_id, obs), "Pedido voltou para a fila da Expedição.");
   }
 
   function baixaManual(p: ParadaOdoo) {
@@ -285,14 +292,14 @@ export function CargaDetalheView({
         <div className="cartao p-4 flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-bold">DANFEs da carga</h3>
-            {danfes.filter((d) => d.tem_pdf).length > 1 ? (
+            {danfes.filter((d) => d.tem_pdf || d.estado === "protheus").length > 1 ? (
               <button
                 type="button"
                 className={botaoClass}
                 style={botaoStyle}
                 onClick={() => window.open(`/assistencia/logistica/pdf/danfes/${carga.carga_id}`, "_blank")}
               >
-                🖨 Imprimir todas ({danfes.filter((d) => d.tem_pdf).length}) num PDF só
+                🖨 Imprimir todas ({danfes.filter((d) => d.tem_pdf || d.estado === "protheus").length}) num PDF só
               </button>
             ) : null}
           </div>
@@ -302,7 +309,7 @@ export function CargaDetalheView({
               <span>
                 <b>{d.cliente}</b> · {d.pedido} · 5117 {d.nf5117 || "—"}{d.estado === "sem nota" ? "" : ` · ${d.estado}`}
               </span>
-              {d.tem_pdf ? (
+              {d.tem_pdf || d.estado === "protheus" ? (
                 <a href={`/assistencia/logistica/pdf/danfe/${d.pedido_id}?doc=5117`} target="_blank" rel="noopener noreferrer" className={botaoClass} style={botaoStyle}>
                   Imprimir
                 </a>
@@ -403,9 +410,14 @@ export function CargaDetalheView({
                   </>
                 ) : null}
                 {carga.estado === "em_rota" && !p.resultado ? (
-                  <button type="button" disabled={pending} onClick={() => baixaManual(p)} className={botaoClass} style={botaoPrimarioStyle}>
-                    Baixar entrega
-                  </button>
+                  <>
+                    <button type="button" disabled={pending} onClick={() => baixaManual(p)} className={botaoClass} style={botaoPrimarioStyle}>
+                      Baixar entrega
+                    </button>
+                    <button type="button" disabled={pending} onClick={() => naoSaiu(p)} className={botaoClass} style={botaoStyle}>
+                      Não saiu · voltar à fila
+                    </button>
+                  </>
                 ) : null}
               </div>
             </div>

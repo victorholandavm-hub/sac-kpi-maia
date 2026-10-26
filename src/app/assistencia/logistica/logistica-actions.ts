@@ -131,6 +131,15 @@ export async function baixarEntregaManualAction(cargaId: number, paradaId: numbe
   return executar((operador) => acaoExtraCarga(cargaId, "baixar_entrega", paradaId, operador), [`${BASE}/cargas/${cargaId}`]);
 }
 
+// 26/10 (Pedro): pedido posto em rota por engano -> "não saiu": registra não entregue com o motivo nao_saiu_cd;
+// o Odoo devolve o pedido para a fila do CD (mesmo caminho do "não entregue" do motorista). A carga segue.
+export async function naoSaiuAction(cargaId: number, paradaId: number, obs: string): Promise<ResultadoAcao<unknown>> {
+  return executar(
+    (operador) => registrarParadaPeloCd(paradaId, { resultado: "insucesso", motivo: "nao_saiu_cd", obs: `Não saiu do CD (${operador}): ${obs || "carregado por engano"}`.slice(0, 500) }),
+    [`${BASE}/cargas/${cargaId}`, `${BASE}/expedicao`],
+  );
+}
+
 export async function listarDanfesAction(cargaId: number): Promise<ResultadoAcao<DanfeCarga[]>> {
   return executar(() => listarDanfesCarga(cargaId));
 }
