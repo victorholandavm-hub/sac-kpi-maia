@@ -19,6 +19,7 @@ export type EntradaBaixa = {
   geoLat?: number | null;
   geoLng?: number | null;
   fotoUrls?: string[];
+  itens?: { codigo: string; qtd_entregue: number }[];
   eventoUid?: string | null;
   registradoEm?: string | null; // ISO, hora do toque no celular
 };
@@ -36,6 +37,7 @@ function recusa(erro: string, tipo: FalhaBaixa = "recusada"): ResultadoBaixa {
 async function executar(s: MotoristaSessao, e: EntradaBaixa): Promise<ResultadoBaixa> {
   if (!RESULTADOS.includes(e.resultado)) return recusa("Resultado inválido.");
   if (e.resultado === "insucesso" && !e.motivo) return recusa("Escolha o motivo.");
+  if (e.resultado === "entrega_parcial" && !(e.itens ?? []).length) return recusa("Entrega parcial: informe o que foi entregue de cada item.");
   try {
     const { carga, employeeId } = await exigirCargaDoMotorista(s, e.cargaId);
     if (carga.estado !== "em_rota") return recusa(`A baixa só abre com a carga em rota (carga está "${carga.estado}").`);
@@ -50,6 +52,7 @@ async function executar(s: MotoristaSessao, e: EntradaBaixa): Promise<ResultadoB
     const dados = await registrarResultadoParada(e.paradaId, {
       resultado: e.resultado,
       motivo: e.resultado === "insucesso" ? e.motivo : null,
+      itens: e.resultado === "entrega_parcial" ? (e.itens ?? []).map((i) => ({ codigo: String(i.codigo).trim().toUpperCase(), qtd_entregue: Number(i.qtd_entregue) || 0 })) : null,
       geo_lat: geoOk ? e.geoLat : null,
       geo_lng: geoOk ? e.geoLng : null,
       origem: "app",

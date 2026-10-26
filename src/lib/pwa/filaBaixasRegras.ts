@@ -22,6 +22,7 @@ export type BaixaPendente = {
   resultado: ResultadoParada;
   motivo: string | null;
   obs: string | null;
+  itens?: { codigo: string; qtd_entregue: number }[] | null; // entrega parcial (26/10)
   geoLat: number | null;
   geoLng: number | null;
   registradoEm: string; // ISO do toque no botão
@@ -68,6 +69,7 @@ export function corpoDaBaixa(b: BaixaPendente) {
     resultado: b.resultado,
     motivo: b.motivo,
     obs: b.obs,
+    itens: b.itens ?? null,
     geoLat: b.geoLat,
     geoLng: b.geoLng,
     registradoEm: b.registradoEm,

@@ -27,6 +27,7 @@ import {
   type ParadaOdoo,
 } from "@/lib/odoo/logisticaTipos";
 import { AcaoEntregaDialog, type AlvoEntrega } from "./AcaoEntregaDialog";
+import { ConferenciaCarregamento, type Parciais } from "./ConferenciaCarregamento";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import {
   Chip,
@@ -67,6 +68,7 @@ export function CargaDetalheView({
   const [motorista, setMotorista] = useState(carga.motorista_id ? String(carga.motorista_id) : "");
   const [veiculo, setVeiculo] = useState(carga.veiculo_id ? String(carga.veiculo_id) : "");
   const [notas, setNotas] = useState<NotaSaida[] | null>(null);
+  const [conferindo, setConferindo] = useState(false);
   const [danfes, setDanfes] = useState<DanfeCarga[] | null>(null);
   const [alvo, setAlvo] = useState<AlvoEntrega | null>(null);
   const [edicao, setEdicao] = useState<{ campo: "programar" | "descricao" | "transportadora"; valor: string } | null>(null);
@@ -84,9 +86,16 @@ export function CargaDetalheView({
   const proxima = PROXIMA_ACAO[carga.estado];
   const faltamBaixas = carga.paradas.filter((p) => !p.resultado).length;
 
+  function sair(parciais: Parciais | null) {
+    run(
+      () => acaoCargaAction(carga.carga_id, "sair", parciais ? { parciais } : {}),
+      (r) => `Carga ${r.romaneio}: ${ESTADO_CARGA_LABELS[r.estado] ?? r.estado}.${parciais ? " O que não foi carregado voltou para a Expedição." : ""}`,
+      (r) => { setConferindo(false); if (r.notas?.length) setNotas(r.notas); },
+    );
+  }
   function avancar() {
     if (!proxima) return;
-    if (proxima.acao === "sair" && !window.confirm(`Sair em rota com ${carga.romaneio}? As NF-e 5117 de todos os pedidos são emitidas agora.`)) return;
+    if (proxima.acao === "sair") { setConferindo(true); return; }   // 26/10: conferência do carregamento antes de sair
     if (proxima.acao === "liberar" && (!motorista || !veiculo)) {
       window.alert("Para liberar, escolha motorista e veículo.");
       return;
@@ -169,6 +178,9 @@ export function CargaDetalheView({
           </div>
         </div>
 
+        {conferindo && carga.estado === "liberada" ? (
+          <ConferenciaCarregamento carga={carga} pending={pending} onConfirmar={sair} onCancelar={() => setConferindo(false)} />
+        ) : null}
         {carga.estado === "em_rota" && proxima?.acao === "finalizar" && faltamBaixas > 0 ? (
           <p className="text-xs" style={{ color: "var(--status-serious)" }}>
             Fim de rota só depois do resultado de todas as paradas (faltam {faltamBaixas}). O motorista dá baixa no app; o CD pode dar baixa manual abaixo.

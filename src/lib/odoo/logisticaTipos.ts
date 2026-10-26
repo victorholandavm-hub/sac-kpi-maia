@@ -144,7 +144,10 @@ export type ExpedicaoResposta = {
   total_pendencias: number;
 };
 
-export type PickingParada = { picking_id: number; nome: string; pedido: string; estado: string };
+export type ItemParada = { codigo: string; nome: string; qtd: number };
+export type PickingParada = { picking_id: number; nome: string; pedido: string; pedido_id?: number | false; estado: string; itens?: ItemParada[] };
+// 26/10: entrega parcial leva o que foi entregue de cada item; o resto volta para o CD (reentrega)
+export type ItemEntregue = { codigo: string; qtd_entregue: number };
 
 export type ParadaOdoo = {
   parada_id: number;
@@ -276,6 +279,7 @@ export type RegistrarParadaInput = {
   origem?: "app" | "odoo";
   motorista_id?: number | null;
   obs?: string | null; // Odoo corta em 500 caracteres
+  itens?: ItemEntregue[] | null; // obrigatório na entrega_parcial
   // UUID gerado no celular no toque do botão (fila offline da PWA). A ponte
   // ainda IGNORA este campo (lê só os de cima com d.get) -- quando o Odoo
   // aceitar, deve deduplicar por ele. Ver docs/LOGISTICA-ODOO.md (PWA).

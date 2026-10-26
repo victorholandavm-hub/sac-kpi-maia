@@ -93,7 +93,7 @@ export default async function ParadaOdooPage({ params }: { params: Promise<{ car
             </div>
             {dono && !parada.resultado ? (
               carga.estado === "em_rota" ? (
-                <ParadaOdooBaixa cargaId={carga.carga_id} paradaId={parada.parada_id} rotulo={parada.cliente} motivos={cat?.motivos ?? []} />
+                <ParadaOdooBaixa cargaId={carga.carga_id} paradaId={parada.parada_id} rotulo={parada.cliente} motivos={cat?.motivos ?? []} itens={parada.pickings.flatMap((pk) => pk.itens ?? [])} />
               ) : (
                 <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                   A baixa abre depois de “Saí para a rota”.

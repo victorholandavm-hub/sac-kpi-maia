@@ -63,7 +63,7 @@ export async function montarCargaAction(input: Omit<MontarCargaInput, "operador"
 export async function acaoCargaAction(
   cargaId: number,
   acao: AcaoCarga,
-  extra: { motorista_id?: number | null; veiculo_id?: number | null } = {},
+  extra: { motorista_id?: number | null; veiculo_id?: number | null; parciais?: Record<string, { codigo: string; qtd: number }[]> | null } = {},
 ): Promise<ResultadoAcao<AcaoCargaResposta>> {
   if (!ACOES_CARGA.includes(acao)) return { ok: false, erro: `Ação inválida: ${acao}` };
   return executar(

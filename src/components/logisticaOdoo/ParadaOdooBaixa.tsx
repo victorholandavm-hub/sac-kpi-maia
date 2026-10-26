@@ -31,7 +31,10 @@ type Guardada = { motivo: "sem_rede" | "sessao"; erro: string | null };
 // com evento_uid e as fotos), depois é enviada. Sem rede, fica guardada e
 // segue sozinha quando a conexão voltar (ver src/lib/pwa/filaBaixas.ts). As
 // fotos ficam no celular até o envio da baixa (não sobem na hora da escolha).
-export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos }: { cargaId: number; paradaId: number; rotulo: string; motivos: CatalogosOdoo["motivos"] }) {
+export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos, itens = [] }: { cargaId: number; paradaId: number; rotulo: string; motivos: CatalogosOdoo["motivos"]; itens?: { codigo: string; nome: string; qtd: number }[] }) {
+  // 26/10 (Pedro): entrega parcial = o motorista diz o que entregou de cada item; o resto "volta" para o CD
+  const [parcial, setParcial] = useState(false);
+  const [entregue, setEntregue] = useState<Record<string, string>>(() => Object.fromEntries(itens.map((i) => [i.codigo, String(i.qtd)])));
   const router = useRouter();
   const { showToast } = useToast();
   const [pending, startTransition] = useTransition();
@@ -133,6 +136,7 @@ export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos }: { cargaI
         resultado,
         motivo: resultado === "insucesso" ? motivo : null,
         obs: obs.trim() || null,
+        itens: resultado === "entrega_parcial" ? itens.map((i) => ({ codigo: i.codigo, qtd_entregue: Number(entregue[i.codigo] ?? 0) })) : null,
         geoLat: g?.lat ?? null,
         geoLng: g?.lng ?? null,
         registradoEm: agora,
@@ -273,7 +277,24 @@ export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos }: { cargaI
       <button type="button" disabled={ocupado} onClick={() => baixa("entregue")} className="text-base font-bold rounded-xl px-4 py-4 disabled:opacity-60" style={{ background: "var(--brand-green)", color: "var(--brand-green-ink)" }}>
         {pending ? "Registrando…" : "✅ Entreguei"}
       </button>
-      <button type="button" disabled={ocupado} onClick={() => baixa("entrega_parcial")} className="text-base font-semibold rounded-xl px-4 py-3 border disabled:opacity-60" style={{ borderColor: "var(--status-warning)", color: "var(--text-primary)", background: "var(--surface-1)" }}>
+      {parcial ? (
+        <div className="rounded-lg p-3 flex flex-col gap-2" style={{ border: "2px solid var(--brand-orange)", background: "var(--surface-1)" }}>
+          <b className="text-sm" style={{ color: "var(--text-primary)" }}>Quanto foi entregue de cada item? O resto volta para o CD.</b>
+          {itens.map((i) => (
+            <label key={i.codigo} className="flex items-center justify-between gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+              <span><b>{i.codigo}</b> {i.nome.replace(/^\[[^\]]*\]\s*/, "").slice(0, 40)} <span style={{ color: "var(--text-secondary)" }}>(levou {i.qtd})</span></span>
+              <input type="number" min={0} max={i.qtd} step={1} inputMode="numeric" className="rounded-lg border px-2 py-2 w-20 text-center" style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }} value={entregue[i.codigo] ?? ""} onChange={(e) => setEntregue((m) => ({ ...m, [i.codigo]: e.target.value }))} />
+            </label>
+          ))}
+          <div className="flex gap-2">
+            <button type="button" disabled={ocupado || !itens.some((i) => Number(entregue[i.codigo]) > 0)} onClick={() => baixa("entrega_parcial")} className="text-base font-bold rounded-xl px-4 py-3 flex-1 disabled:opacity-60" style={{ background: "var(--brand-orange)", color: "#fff" }}>
+              {ocupado ? "Registrando…" : "Confirmar entrega parcial"}
+            </button>
+            <button type="button" onClick={() => setParcial(false)} className="text-sm rounded-xl px-3 py-3 border" style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}>Voltar</button>
+          </div>
+        </div>
+      ) : null}
+      <button type="button" disabled={ocupado || parcial || !itens.length} onClick={() => setParcial(true)} className="text-base font-semibold rounded-xl px-4 py-3 border disabled:opacity-60" style={{ borderColor: "var(--status-warning)", color: "var(--text-primary)", background: "var(--surface-1)" }}>
         Entrega parcial
       </button>
 
