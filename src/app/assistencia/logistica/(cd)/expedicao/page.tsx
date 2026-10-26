@@ -1,4 +1,4 @@
-import { lerCatalogos, lerExpedicao, listarCargas, listarEmpresas, mensagemDeErro } from "@/lib/odoo/logistica";
+import { lerCatalogosComMotoristas, lerExpedicao, listarCargas, listarEmpresas, mensagemDeErro } from "@/lib/odoo/logistica";
 import { ESTADOS_EDITAVEIS } from "@/lib/odoo/logisticaTipos";
 import { empresaDaUrl } from "@/lib/odoo/logisticaAuth";
 import { ExpedicaoBoard } from "@/components/logisticaOdoo/ExpedicaoBoard";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ExpedicaoPage({ searchParams }: { searchParams: Promise<{ empresa?: string }> }) {
   const empresa = empresaDaUrl((await searchParams).empresa);
-  const [exp, cat, emps, abertas] = await Promise.allSettled([lerExpedicao(empresa), lerCatalogos(empresa), listarEmpresas(), listarCargas(empresa, { estados: ESTADOS_EDITAVEIS, dias: 60 })]);
+  const [exp, cat, emps, abertas] = await Promise.allSettled([lerExpedicao(empresa), lerCatalogosComMotoristas(empresa), listarEmpresas(), listarCargas(empresa, { estados: ESTADOS_EDITAVEIS, dias: 60 })]);
   const empresas = emps.status === "fulfilled" ? emps.value : [];
   return (
     <div className="flex flex-col gap-4 min-w-0">

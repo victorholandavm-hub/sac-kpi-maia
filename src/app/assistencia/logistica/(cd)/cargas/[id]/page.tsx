@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { lerCarga, lerCatalogos, listarCargas, listarEmpresas, mensagemDeErro } from "@/lib/odoo/logistica";
+import { lerCarga, lerCatalogosComMotoristas, listarCargas, listarEmpresas, mensagemDeErro } from "@/lib/odoo/logistica";
 import { ESTADOS_EDITAVEIS } from "@/lib/odoo/logisticaTipos";
 import { empresaDaUrl } from "@/lib/odoo/logisticaAuth";
 import { CargaDetalheView } from "@/components/logisticaOdoo/CargaDetalheView";
@@ -16,7 +16,7 @@ export default async function CargaPage({ params, searchParams }: { params: Prom
   const cargaId = Number(id);
   if (!Number.isInteger(cargaId) || cargaId <= 0) notFound();
   const empresa = empresaDaUrl((await searchParams).empresa);
-  const [carga, cat, emps, abertas] = await Promise.allSettled([lerCarga(cargaId), lerCatalogos(empresa), listarEmpresas(), listarCargas(empresa, { estados: ESTADOS_EDITAVEIS, dias: 60 })]);
+  const [carga, cat, emps, abertas] = await Promise.allSettled([lerCarga(cargaId), lerCatalogosComMotoristas(empresa), listarEmpresas(), listarCargas(empresa, { estados: ESTADOS_EDITAVEIS, dias: 60 })]);
 
   return (
     <div className="flex flex-col gap-4 min-w-0">

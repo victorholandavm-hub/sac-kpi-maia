@@ -163,6 +163,15 @@ export async function listarCargas(
   return r.cargas ?? [];
 }
 
+const EMPRESA_CD = 13;
+// 26/10 (Jhon): motoristas e veículos estão cadastrados só no CD; carga de loja abria sem motorista para escolher
+export async function lerCatalogosComMotoristas(companyId: number, perfil: PerfilOdoo = "logistica"): Promise<CatalogosOdoo> {
+  const c = await lerCatalogos(companyId, perfil);
+  if (c.motoristas?.length || companyId === EMPRESA_CD) return c;
+  const cd = await lerCatalogos(EMPRESA_CD, perfil);
+  return { ...c, motoristas: cd.motoristas, veiculos: cd.veiculos };
+}
+
 export async function lerCatalogos(companyId: number, perfil: PerfilOdoo = "logistica"): Promise<CatalogosOdoo> {
   return json<CatalogosOdoo>("/logistica/catalogos", { perfil, query: { company_id: companyId } });
 }
