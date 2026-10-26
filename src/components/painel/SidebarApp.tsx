@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Users, Star, MessageSquare, Wrench, MessagesSquare, Truck, LogOut, Moon, Sun, BarChart3, ChevronDown } from "lucide-react";
+import { Home, Users, ShoppingBag, Star, MessageSquare, Wrench, MessagesSquare, Truck, LogOut, Moon, Sun, BarChart3, ChevronDown } from "lucide-react";
 import { signOutDashboard } from "@/app/login/actions";
 
 // Menu lateral de todas as telas do painel (pedido do Victor 17/10/2026:
@@ -15,6 +15,9 @@ type ItemMenu = { href: string; rotulo: string; Icone: typeof Home; ativo: (p: s
 const ITENS: ItemMenu[] = [
   { href: "/", rotulo: "Início", Icone: Home, ativo: (p) => p === "/" },
   { href: "/clientes", rotulo: "Clientes", Icone: Users, ativo: (p) => p.startsWith("/clientes") },
+  // Vendas por produto (veio da assistência em 18/08/2026) ficava só no link
+  // direto -- no menu desde 26/10/2026 pro SAC consultar (pedido do Victor).
+  { href: "/vendas", rotulo: "Vendas", Icone: ShoppingBag, ativo: (p) => p.startsWith("/vendas") },
   { href: "/avaliacoes", rotulo: "Avaliações", Icone: Star, ativo: (p) => p.startsWith("/avaliacoes") },
   {
     href: "/kpis",
