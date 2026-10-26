@@ -1,4 +1,5 @@
-import { consultarPedidos, type PedidoConsulta, type TentativaConsulta, type ItemConsulta } from "@/lib/consultaPedido";
+import { consultarPedidos, type PedidoConsulta, type TentativaConsulta, type ItemConsulta, type LogisticaPedido } from "@/lib/consultaPedido";
+import { STORE_LABELS } from "@/lib/labels";
 import { formatarDocumento } from "@/lib/rotasDoDiaCore";
 import { nomePedidoOdoo } from "@/lib/pedidoOdoo";
 import { numeroDaCarga } from "@/lib/consultaCarga";
@@ -70,6 +71,36 @@ function Rotulo({ children }: { children: React.ReactNode }) {
   );
 }
 
+const filialNome = (codigo: string | null) => (codigo ? `${STORE_LABELS[codigo] ?? `Loja ${codigo}`} (${codigo})` : null);
+
+// Filial de venda / de entrega / cliente retira -- Victor 26/10/2026.
+function Filiais({ l }: { l: LogisticaPedido }) {
+  const chip = (rotulo: string, valor: string, destaque = false) => (
+    <span
+      className="inline-flex items-baseline gap-1 rounded-lg px-2.5 py-1 text-xs"
+      style={{
+        background: destaque ? "color-mix(in srgb, var(--brand-orange) 18%, transparent)" : "var(--surface-2)",
+        color: "var(--text-primary)",
+      }}
+    >
+      <span style={{ color: "var(--text-muted)" }}>{rotulo}</span>
+      <b className="font-semibold">{valor}</b>
+    </span>
+  );
+  return (
+    <div className="flex flex-wrap gap-2">
+      {l.filialVenda ? chip("Venda:", filialNome(l.filialVenda)!) : null}
+      {l.modo === "retira"
+        ? chip("Cliente retira na loja", l.retiraEm || filialNome(l.filialEntrega) || "", true)
+        : l.filialEntrega
+          ? chip(l.modo === "express" ? "Entrega express por:" : "Entrega por:", filialNome(l.filialEntrega)!)
+          : l.modo
+            ? chip("Tipo:", l.modo === "express" ? "Entrega express" : "Entrega")
+            : null}
+    </div>
+  );
+}
+
 // DANFE pela ponte do Odoo (rota /assistencia/nota) -- Victor 26/10/2026.
 function BotoesNota({ pedido }: { pedido: string }) {
   const estilo = { background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" };
@@ -101,12 +132,12 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
             {e ? `Pedido ${e.pedido}` : `Venda NF ${v?.notaFiscal.replace(/^0+/, "")}`}
           </span>
           <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
-            {dataBr(p.data)} · filial {e?.filial ?? v?.filial}
-            {e?.loja ? ` · ${e.loja}` : ""}
+            {dataBr(p.data)}
           </span>
         </div>
         {e ? <Selo texto={e.statusAtual ?? "Sem status"} tom={tomStatusAtual(e.statusAtual)} /> : <Selo texto="Sem entrega" tom="neutro" />}
       </div>
+      {p.logistica ? <Filiais l={p.logistica} /> : null}
       {e && nomePedidoOdoo(e.pedido) ? <BotoesNota pedido={nomePedidoOdoo(e.pedido)!} /> : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-5">

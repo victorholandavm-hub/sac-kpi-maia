@@ -68,6 +68,8 @@ export function linhaDaSaida(e: EntregaOdoo, companyId: number, empresa: string,
     modo: e.modo || null,
     estado: e.estado || null,
     filial_entrega: e.filial_entrega || null,
+    retira_em: e.retira_em || null,
+    expresso: !!e.expresso,
     visto_em: agora,
   };
 }

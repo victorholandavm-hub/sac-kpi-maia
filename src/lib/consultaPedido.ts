@@ -61,13 +61,46 @@ export type EntregaConsulta = {
 
 // venda sem entrega = retirada na loja, venda sem carga ainda, ou venda de
 // antes do sync das entregas; entrega sem venda = venda não achada (5%).
-export type PedidoConsulta = { venda: VendaConsulta | null; entrega: EntregaConsulta | null; criterio: string | null; data: string };
+// Filial de venda, de entrega e se o cliente retira -- Victor 26/10/2026. No
+// Odoo vem da expedição/carga (odoo_expedicao); no Protheus só o tipo da
+// saída (a filial de entrega ficava na ZAE, que nunca sincronizamos).
+export type ModoEntrega = "entrega" | "express" | "retira";
+export type LogisticaPedido = { filialVenda: string | null; filialEntrega: string | null; modo: ModoEntrega | null; retiraEm: string | null };
+
+export type PedidoConsulta = {
+  venda: VendaConsulta | null;
+  entrega: EntregaConsulta | null;
+  criterio: string | null;
+  data: string;
+  logistica?: LogisticaPedido;
+};
 
 export type ClienteConsulta = { codigo: string; nome: string | null; documento: string | null; pedidos: PedidoConsulta[] };
 
 export type ResultadoConsulta = { busca: string; tipo: "documento" | "numero" | "nota" | "nome" | "curta"; clientes: ClienteConsulta[]; limitado: boolean };
 
 const digitos = (s: string) => s.replace(/\D/g, "");
+
+type LinhaExpedicao = { pedido: string; modo: string | null; expresso: boolean | null; filial_entrega: string | null; retira_em: string | null; empresa: string | null };
+
+export function modoDoProtheus(tipo: string | null | undefined): ModoEntrega | null {
+  if (!tipo) return null;
+  if (/retir/i.test(tipo)) return "retira";
+  if (/express/i.test(tipo)) return "express";
+  return /entrega/i.test(tipo) ? "entrega" : null;
+}
+
+export function logisticaDoOdoo(filialVenda: string | null, linhas: LinhaExpedicao[]): LogisticaPedido {
+  // A linha com modo (veio da expedição) sabe mais que a da carga.
+  const l = [...linhas].sort((a, b) => Number(!!b.modo) - Number(!!a.modo))[0];
+  const daEmpresa = l?.empresa?.match(/^\d{3}/)?.[0] ?? null;
+  return {
+    filialVenda,
+    filialEntrega: l?.filial_entrega || daEmpresa,
+    modo: !l?.modo ? null : l.modo.startsWith("retira") ? "retira" : l.expresso ? "express" : "entrega",
+    retiraEm: l?.retira_em ?? null,
+  };
+}
 
 export function tipoDaBusca(q: string): ResultadoConsulta["tipo"] {
   const d = digitos(q);
@@ -268,7 +301,20 @@ export async function consultarPedidos(busca: string): Promise<ResultadoConsulta
     if (usadas.has(v.id) || !v.client_id) continue;
     cliente(v.client_id, v.client_name, v.client_cpf_cnpj).pedidos.push({ venda: paraVenda(v), entrega: null, criterio: null, data: v.issue_date });
   }
-  for (const c of porCliente.values()) c.pedidos.sort((a, b) => b.data.localeCompare(a.data));
+  const nomesOdoo = [...porCliente.values()].flatMap((c) => c.pedidos.map((p) => (p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null))).filter((n): n is string => !!n);
+  const expedicao = nomesOdoo.length
+    ? (await admin.from("odoo_expedicao").select("pedido, modo, expresso, filial_entrega, retira_em, empresa").in("pedido", [...new Set(nomesOdoo)]).returns<LinhaExpedicao[]>()).data ?? []
+    : [];
+  for (const c of porCliente.values()) {
+    for (const p of c.pedidos) {
+      const filialVenda = p.entrega?.filial ?? p.venda?.filial ?? null;
+      const nome = p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null;
+      p.logistica = nome
+        ? logisticaDoOdoo(filialVenda, expedicao.filter((l) => l.pedido === nome))
+        : { filialVenda, filialEntrega: null, modo: modoDoProtheus(p.entrega?.tentativas.at(-1)?.tipo), retiraEm: null };
+    }
+    c.pedidos.sort((a, b) => b.data.localeCompare(a.data));
+  }
 
   const clientes = clienteIds.map((id) => porCliente.get(id)).filter((c): c is ClienteConsulta => !!c);
   return { busca: q, tipo, clientes, limitado: todos.length > MAX_CLIENTES };
