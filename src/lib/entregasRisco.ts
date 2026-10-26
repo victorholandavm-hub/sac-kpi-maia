@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { addBusinessDays } from "./businessDays";
 import { fetchInBatches } from "./supabaseBatch";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
+import { vendasDasEntregas } from "./vendaDaEntrega";
 
 // A regra de negócio compara RÓTULOS texto ("Programada", "Entregue",
 // "Cancelada"), nunca os códigos numéricos do TOTVS: statusEntregaCodigo é
@@ -74,7 +75,7 @@ export type EntregaRiscoItem = {
   nivel: EntregaRiscoNivel;
   motivo: string;
   baselineData: string;
-  baselineOrigem: "nota_fiscal" | "primeiro_sync";
+  baselineOrigem: "venda" | "primeiro_sync";
   cargaAtual: EntregaRiscoCarga | null;
   classificacao: EntregaRiscoClassificacao | null;
   assignedTo: EntregaRiscoAssignedTo | null;
@@ -139,26 +140,14 @@ export function computeRiscoAutomatico(
   return { nivel: "alerta", motivo: `Carga ${proxima.carga} agendada para ${proxima.dtPrevisao} — além do 5º dia útil (${deadline}).` };
 }
 
-// Estratégia de "data da venda": o payload de /ai/deliveries não expõe esse
-// campo (só as cargas têm dtPrevisao/dtRetorno) -- ver risco técnico no plano
-// da feature. Prioridade pra data de emissão da NF (totvs_orders.issue_date),
-// cruzada em código via nota_fiscal+serie de qualquer carga já faturada;
-// fallback pra first_seen_at (quando vimos o pedido pela 1ª vez no nosso
-// sync) se nenhuma carga tem nota fiscal ainda -- caso mais crítico da regra
-// 1, pedido ainda "Em Montagem"/"Em Separação".
-export function baselineFor(
-  cargas: { notaFiscal: string | null; serie: string | null }[],
-  ordersByInvoiceSerie: Map<string, string>,
-  firstSeenAt: string
-): { data: string; origem: "nota_fiscal" | "primeiro_sync" } {
-  const datas = cargas
-    .filter((c) => c.notaFiscal && c.serie)
-    .map((c) => ordersByInvoiceSerie.get(`${c.notaFiscal}|${c.serie}`))
-    .filter((d): d is string => !!d);
-
-  if (datas.length > 0) {
-    return { data: datas.reduce((min, d) => (d < min ? d : min)), origem: "nota_fiscal" };
-  }
+// "Data da venda": o payload de /ai/deliveries não expõe esse campo (só as
+// cargas têm dtPrevisao/dtRetorno).
+// Data da venda (venda_das_entregas, 0200: mesmo cliente e filial, pelos
+// produtos) -- até 26/10/2026 vinha da nota fiscal da carga, que é a de
+// remessa do CD e casava com a venda de outro cliente, então o prazo saía de
+// uma data qualquer. Sem venda achada, fica a 1ª vez que o sync viu o pedido.
+export function baselineFor(dataVenda: string | null, firstSeenAt: string): { data: string; origem: "venda" | "primeiro_sync" } {
+  if (dataVenda) return { data: dataVenda, origem: "venda" };
   return { data: firstSeenAt.slice(0, 10), origem: "primeiro_sync" };
 }
 
@@ -176,6 +165,7 @@ type DeliveryCargaRow = {
 };
 
 type DeliveryRow = {
+  id: string;
   pedido: string;
   filial_venda: string;
   loja: string | null;
@@ -214,7 +204,7 @@ function hasClassificacao(row: ClassificacaoRow): boolean {
 }
 
 const DELIVERY_COLUMNS =
-  "pedido, filial_venda, loja, client_id, client_name, client_cpf_cnpj, client_neighborhood, client_city, client_state, status_atual, first_seen_at, synced_at, risk_trigger_at, risk_trigger_reason, " +
+  "id, pedido, filial_venda, loja, client_id, client_name, client_cpf_cnpj, client_neighborhood, client_city, client_state, status_atual, first_seen_at, synced_at, risk_trigger_at, risk_trigger_reason, " +
   "totvs_delivery_cargas(carga, dt_previsao, tentativa, tipo_entrega, status_carga, status_entrega, motorista_nome, transportadora, nota_fiscal, serie)";
 
 function toEntregaRiscoCarga(row: DeliveryCargaRow): EntregaRiscoCarga {
@@ -268,15 +258,7 @@ export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
   const deliveries = deliveryRows.filter((d) => !PEDIDO_ENCERRADO_LABELS.includes(d.status_atual ?? ""));
   if (deliveries.length === 0) return [];
 
-  const invoices = [
-    ...new Set(
-      deliveries.flatMap((d) => (d.totvs_delivery_cargas ?? []).map((c) => c.nota_fiscal).filter((v): v is string => !!v))
-    ),
-  ];
-  const orderRows = await fetchInBatches<{ invoice: string; serie: string; issue_date: string }>(invoices, (batch) =>
-    admin.from("totvs_orders").select("invoice, serie, issue_date").in("invoice", batch)
-  );
-  const ordersByInvoiceSerie = new Map(orderRows.map((o) => [`${o.invoice}|${o.serie}`, o.issue_date]));
+  const vendas = await vendasDasEntregas(admin, deliveries.map((d) => d.id));
 
   const pedidos = [...new Set(deliveries.map((d) => d.pedido))];
   const statusRows = await fetchInBatches<ClassificacaoRow>(pedidos, (batch) =>
@@ -287,7 +269,7 @@ export async function listEntregasEmRisco(): Promise<EntregaRiscoItem[]> {
   const items: EntregaRiscoItem[] = [];
   for (const d of deliveries) {
     const cargas = (d.totvs_delivery_cargas ?? []).map(toEntregaRiscoCarga);
-    const baseline = baselineFor(cargas, ordersByInvoiceSerie, d.first_seen_at);
+    const baseline = baselineFor(vendas.get(d.id)?.issueDate ?? null, d.first_seen_at);
     const classificacaoRow = statusByKey.get(`${d.pedido}|${d.filial_venda}`);
 
     let risco = computeRiscoAutomatico(cargas, baseline.data, today);

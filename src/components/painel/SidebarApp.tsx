@@ -4,13 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Users, ShoppingBag, Star, MessageSquare, Wrench, MessagesSquare, Truck, LogOut, Moon, Sun, BarChart3, ChevronDown } from "lucide-react";
+import { Home, Users, ShoppingBag, PackageSearch, Star, MessageSquare, Wrench, MessagesSquare, Truck, LogOut, Moon, Sun, BarChart3, ChevronDown } from "lucide-react";
 import { signOutDashboard } from "@/app/login/actions";
 
 // Menu lateral de todas as telas do painel (pedido do Victor 17/10/2026:
 // "todas as telas com o layout da Logística") -- substitui o AppHeader. No
 // celular vira uma faixa rolável no topo.
-type ItemMenu = { href: string; rotulo: string; Icone: typeof Home; ativo: (p: string) => boolean };
+// kpi: vai dentro do grupo "KPIs" (o resto fica solto no topo).
+type ItemMenu = { href: string; rotulo: string; Icone: typeof Home; ativo: (p: string) => boolean; kpi?: boolean };
 
 const ITENS: ItemMenu[] = [
   { href: "/", rotulo: "Início", Icone: Home, ativo: (p) => p === "/" },
@@ -18,17 +19,23 @@ const ITENS: ItemMenu[] = [
   // Vendas por produto (veio da assistência em 18/08/2026) ficava só no link
   // direto -- no menu desde 26/10/2026 pro SAC consultar (pedido do Victor).
   { href: "/vendas", rotulo: "Vendas", Icone: ShoppingBag, ativo: (p) => p.startsWith("/vendas") },
+  // Consulta de pedido (venda + carga + entrega do cliente) -- 26/10/2026.
+  { href: "/pedidos", rotulo: "Pedidos", Icone: PackageSearch, ativo: (p) => p.startsWith("/pedidos") },
   { href: "/avaliacoes", rotulo: "Avaliações", Icone: Star, ativo: (p) => p.startsWith("/avaliacoes") },
   {
     href: "/kpis",
     rotulo: "SAC",
     Icone: MessageSquare,
     ativo: (p) => p === "/kpis" || p.startsWith("/kpis/chamados-do-dia"),
+    kpi: true,
   },
-  { href: "/kpis-assistencia", rotulo: "Assistência", Icone: Wrench, ativo: (p) => p.startsWith("/kpis-assistencia") },
-  { href: "/kpis/ghl", rotulo: "GHL", Icone: MessagesSquare, ativo: (p) => p.startsWith("/kpis/ghl") },
-  { href: "/kpis/logistica", rotulo: "Logística", Icone: Truck, ativo: (p) => p.startsWith("/kpis/logistica") },
+  { href: "/kpis-assistencia", rotulo: "Assistência", Icone: Wrench, ativo: (p) => p.startsWith("/kpis-assistencia"), kpi: true },
+  { href: "/kpis/ghl", rotulo: "GHL", Icone: MessagesSquare, ativo: (p) => p.startsWith("/kpis/ghl"), kpi: true },
+  { href: "/kpis/logistica", rotulo: "Logística", Icone: Truck, ativo: (p) => p.startsWith("/kpis/logistica"), kpi: true },
 ];
+
+const SOLTOS = ITENS.filter((i) => !i.kpi);
+const DO_GRUPO_KPIS = ITENS.filter((i) => i.kpi);
 
 const base = "flex flex-col items-center gap-1 rounded-xl px-2 py-2 min-w-[64px] text-[11px] transition-all duration-200";
 const hover = "hover:bg-[color-mix(in_srgb,var(--text-primary)_7%,transparent)] hover:text-[var(--text-primary)]";
@@ -169,10 +176,10 @@ export function SidebarApp() {
           <Image src="/logo.png" alt="Lojas Maia" width={225} height={225} className="h-10 w-10 object-contain mb-3" />
         </Link>
         <nav className="flex flex-col gap-1" aria-label="Seções">
-          {ITENS.slice(0, 3).map((i) => (
+          {SOLTOS.map((i) => (
             <Item key={i.href} item={i} pathname={pathname} />
           ))}
-          <GrupoKpis itens={ITENS.slice(3)} pathname={pathname} />
+          <GrupoKpis itens={DO_GRUPO_KPIS} pathname={pathname} />
         </nav>
         <div className="mt-auto flex flex-col gap-1">
           <BotaoTema />
@@ -185,10 +192,10 @@ export function SidebarApp() {
         aria-label="Seções"
       >
         <Image src="/logo.png" alt="Lojas Maia" width={225} height={225} className="h-8 w-8 object-contain shrink-0 mr-1" />
-        {ITENS.slice(0, 3).map((i) => (
+        {SOLTOS.map((i) => (
           <Item key={i.href} item={i} pathname={pathname} />
         ))}
-        <GrupoKpis itens={ITENS.slice(3)} pathname={pathname} />
+        <GrupoKpis itens={DO_GRUPO_KPIS} pathname={pathname} />
         <BotaoTema />
         <Sair />
       </nav>

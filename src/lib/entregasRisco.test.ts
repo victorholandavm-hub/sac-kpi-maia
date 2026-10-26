@@ -79,14 +79,10 @@ describe("computeRiscoAutomatico", () => {
 });
 
 describe("baselineFor", () => {
-  it("usa a data de emissão da NF quando alguma carga já tem nota fiscal cruzável", () => {
-    const ordersByInvoiceSerie = new Map([["000456|001", "2026-07-20"]]);
-    const result = baselineFor([{ notaFiscal: "000456", serie: "001" }], ordersByInvoiceSerie, "2026-07-29T10:00:00Z");
-    expect(result).toEqual({ data: "2026-07-20", origem: "nota_fiscal" });
+  it("usa a data da venda achada pela entrega", () => {
+    expect(baselineFor("2026-07-20", "2026-07-29T10:00:00Z")).toEqual({ data: "2026-07-20", origem: "venda" });
   });
-
-  it("cai pro first_seen_at quando nenhuma carga tem nota fiscal cruzável", () => {
-    const result = baselineFor([{ notaFiscal: null, serie: null }], new Map(), "2026-07-29T10:00:00Z");
-    expect(result).toEqual({ data: "2026-07-29", origem: "primeiro_sync" });
+  it("sem venda achada, usa a 1ª vez que o sync viu o pedido", () => {
+    expect(baselineFor(null, "2026-07-29T10:00:00Z")).toEqual({ data: "2026-07-29", origem: "primeiro_sync" });
   });
 });

@@ -5,6 +5,7 @@ import { RESOLVIDO_LABELS } from "./entregasRisco";
 import { findGhlConversationId, fetchGhlMessages, type GhlConta } from "./ghlClient";
 import { SUBCONTAS } from "./ghlSubcontas";
 import { fetchInBatches } from "./supabaseBatch";
+import { vendasDasEntregasResolvidas } from "./vendaDaEntrega";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN, sendNpsAutoReply, type NpsFaseResumo } from "./npsDetratores";
 
@@ -62,7 +63,6 @@ const BACKFILL_MAX_CODES_PER_RUN = 20;
 const WINDOW_DAYS = 7;
 const TARGET_DAYS_AGO = 20;
 
-type CargaRow = { nota_fiscal: string | null; serie: string | null };
 type OrderRow = { id: string; invoice: string | null; serie: string | null; client_id: string | null; client_name: string | null };
 
 function isoDaysAgo(days: number): string {
@@ -77,38 +77,16 @@ export async function enrollPendingCompraNps(): Promise<ResultadoEnvioNps> {
   // já usam.
   const fromDate = isoDaysAgo(TARGET_DAYS_AGO + WINDOW_DAYS);
   const toDate = isoDaysAgo(TARGET_DAYS_AGO);
-  const { data: cargas, error: cargasError } = await admin
-    .from("totvs_delivery_cargas")
-    .select("nota_fiscal, serie")
-    .not("nota_fiscal", "is", null)
-    .gte("dt_retorno", fromDate)
-    .lte("dt_retorno", toDate)
-    .in("status_entrega", RESOLVIDO_LABELS)
-    .returns<CargaRow[]>();
-  if (cargasError) return { enrolled: 0, semTelefone: 0, errors: [`compra-nps cargas: ${cargasError.message}`], avisos: [] };
-  if (!cargas || cargas.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
 
-  // 2. Cruza com o pedido de venda -- mesmo join (invoice+serie, sem
-  // branch/filial) já descoberto e usado em recompra.ts.
-  const notasFiscais = [...new Set(cargas.map((c) => c.nota_fiscal).filter((n): n is string => !!n))];
-  const seriesByNota = new Map<string, Set<string>>();
-  for (const c of cargas) {
-    if (!c.nota_fiscal || !c.serie) continue;
-    const set = seriesByNota.get(c.nota_fiscal) ?? new Set<string>();
-    set.add(c.serie);
-    seriesByNota.set(c.nota_fiscal, set);
-  }
-
-  let orderRows: OrderRow[];
+  // 2. Venda de cada entrega pelo cliente + filial + produtos (0200) -- não
+  // mais pela nota fiscal da carga, que é a de remessa do CD e casava com a
+  // venda de outro cliente (ver vendaDaEntrega.ts).
+  let candidates: OrderRow[];
   try {
-    orderRows = await fetchInBatches<OrderRow>(notasFiscais, (lote) =>
-      admin.from("totvs_orders").select("id, invoice, serie, client_id, client_name").in("invoice", lote)
-    );
+    candidates = (await vendasDasEntregasResolvidas(admin, fromDate, toDate, RESOLVIDO_LABELS)).filter((o) => o.client_id);
   } catch (err) {
-    return { enrolled: 0, semTelefone: 0, errors: [`compra-nps pedidos: ${(err as Error).message}`], avisos: [] };
+    return { enrolled: 0, semTelefone: 0, errors: [`compra-nps vendas: ${(err as Error).message}`], avisos: [] };
   }
-
-  const candidates = orderRows.filter((o) => o.invoice && o.serie && seriesByNota.get(o.invoice)?.has(o.serie) && o.client_id);
   if (candidates.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
 
   // 3. Já enviado pra esse pedido? Já opt-out desse cliente (mesma lista
@@ -181,6 +159,7 @@ export async function detectPendingCompraNpsResponses(): Promise<number> {
     .from("compra_nps")
     .select("order_id, ghl_contact_id, enviado_em, ghl_location_id")
     .is("respondido_em", null)
+    .is("descartada_em", null)
     // As mais recentes primeiro (ver vendaNps.ts): sem ordem, as 100 primeiras
     // pendentes eram sempre as mesmas e as novas não eram lidas.
     .gte("enviado_em", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
@@ -226,8 +205,9 @@ export async function getCompraNpsResumo(): Promise<NpsFaseResumo> {
     { data, error },
     { count: sentCount, error: sentError },
   ] = await Promise.all([
-    admin.from("compra_nps").select("score").not("score", "is", null),
-    admin.from("compra_nps").select("order_id", { count: "exact", head: true }),
+    // descartadas (0201): enviadas pra pessoa errada até 26/10/2026, não contam
+    admin.from("compra_nps").select("score").is("descartada_em", null).not("score", "is", null),
+    admin.from("compra_nps").select("order_id", { count: "exact", head: true }).is("descartada_em", null),
   ]);
   if (error) throw new Error(error.message);
   if (sentError) throw new Error(sentError.message);
