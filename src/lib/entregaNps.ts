@@ -3,7 +3,7 @@ import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { RESOLVIDO_LABELS } from "./entregasRisco";
 import { findGhlConversationId, fetchGhlMessages, sendGhlMessage } from "./ghlClient";
-import { fetchInBatches } from "./supabaseBatch";
+import { vendasDasEntregasResolvidas } from "./vendaDaEntrega";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 import { maybeRequestGoogleReview } from "./googleReviewRequest";
@@ -38,7 +38,6 @@ const BACKFILL_MAX_CODES_PER_RUN = 20;
 const WINDOW_DAYS = 1;
 const TARGET_DAYS_AGO = 1;
 
-type CargaRow = { nota_fiscal: string | null; serie: string | null };
 type OrderRow = { id: string; invoice: string | null; serie: string | null; client_id: string | null; client_name: string | null };
 
 function isoDaysAgo(days: number): string {
@@ -53,38 +52,16 @@ export async function enrollPendingEntregaNps(): Promise<ResultadoEnvioNps> {
   // nps2Meses.ts já usam.
   const fromDate = isoDaysAgo(TARGET_DAYS_AGO + WINDOW_DAYS);
   const toDate = isoDaysAgo(TARGET_DAYS_AGO);
-  const { data: cargas, error: cargasError } = await admin
-    .from("totvs_delivery_cargas")
-    .select("nota_fiscal, serie")
-    .not("nota_fiscal", "is", null)
-    .gte("dt_retorno", fromDate)
-    .lte("dt_retorno", toDate)
-    .in("status_entrega", RESOLVIDO_LABELS)
-    .returns<CargaRow[]>();
-  if (cargasError) return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps cargas: ${cargasError.message}`], avisos: [] };
-  if (!cargas || cargas.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
 
-  // 2. Cruza com o pedido de venda -- mesmo join (invoice+serie, sem
-  // branch/filial) já descoberto e usado em recompra.ts/nps2Meses.ts.
-  const notasFiscais = [...new Set(cargas.map((c) => c.nota_fiscal).filter((n): n is string => !!n))];
-  const seriesByNota = new Map<string, Set<string>>();
-  for (const c of cargas) {
-    if (!c.nota_fiscal || !c.serie) continue;
-    const set = seriesByNota.get(c.nota_fiscal) ?? new Set<string>();
-    set.add(c.serie);
-    seriesByNota.set(c.nota_fiscal, set);
-  }
-
-  let orderRows: OrderRow[];
+  // 2. Venda de cada entrega pelo cliente + filial + produtos (0200) -- não
+  // mais pela nota fiscal da carga, que é a de remessa do CD e casava com a
+  // venda de outro cliente (ver vendaDaEntrega.ts).
+  let candidates: OrderRow[];
   try {
-    orderRows = await fetchInBatches<OrderRow>(notasFiscais, (lote) =>
-      admin.from("totvs_orders").select("id, invoice, serie, client_id, client_name").in("invoice", lote)
-    );
+    candidates = (await vendasDasEntregasResolvidas(admin, fromDate, toDate, RESOLVIDO_LABELS)).filter((o) => o.client_id);
   } catch (err) {
-    return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps pedidos: ${(err as Error).message}`], avisos: [] };
+    return { enrolled: 0, semTelefone: 0, errors: [`entrega-nps vendas: ${(err as Error).message}`], avisos: [] };
   }
-
-  const candidates = orderRows.filter((o) => o.invoice && o.serie && seriesByNota.get(o.invoice)?.has(o.serie) && o.client_id);
   if (candidates.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
 
   // 3. Já enviado pra esse pedido? Já opt-out desse cliente (mesma lista
@@ -128,6 +105,7 @@ export async function detectPendingEntregaNpsResponses(): Promise<number> {
     .from("entrega_nps")
     .select("order_id, ghl_contact_id, enviado_em, client_id, totvs_orders(branch)")
     .is("respondido_em", null)
+    .is("descartada_em", null)
     // As mais recentes primeiro (ver vendaNps.ts): sem ordem, as 100 primeiras
     // pendentes eram sempre as mesmas e as novas não eram lidas.
     .gte("enviado_em", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
@@ -194,6 +172,8 @@ export async function detectPendingEntregaSugestoes(): Promise<number> {
     .from("entrega_nps")
     .select("order_id, ghl_contact_id, respondido_em, client_id, totvs_orders(branch, client_name)")
     .eq("sugestao_verificada", false)
+    // descartadas (0201): pessoa errada -- sem pedido de avaliação/sugestão
+    .is("descartada_em", null)
     .not("respondido_em", "is", null)
     .gte("respondido_em", sinceIso)
     .order("respondido_em", { ascending: false })

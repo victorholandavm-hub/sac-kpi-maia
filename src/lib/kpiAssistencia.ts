@@ -87,9 +87,8 @@ function toReportRowItem(r: RequestRow, productSummary?: string | null, dataCarr
     // (causa_carga) já exibido em DeliveryRequestDetailContent.tsx
     // ("Carga: X") pra erro_conferencia/sujeira_conferencia/erro_motorista.
     numeroCarga: r.causa_carga,
-    // Pedido do Victor 24/10/2026: data de emissão da NF daquela carga, não
-    // a data de abertura do chamado -- ver dataCarregamentoPorCarga em
-    // computeAssistenciaKpiData.
+    // Pedido do Victor 24/10/2026: data da carga, não a data de abertura do
+    // chamado -- ver dataCarregamentoPorCarga em computeAssistenciaKpiData.
     dataCarregamento: (r.causa_carga && dataCarregamentoPorCarga?.get(r.causa_carga)) || null,
   };
 }
@@ -691,31 +690,22 @@ async function computeAssistenciaKpiData(preset: RangePreset | "custom", fromIso
     { pageSize: PAGE_SIZE }
   );
 
-  // Data de emissão da NF por carga -- pedido do Victor 24/10/2026: no
-  // relatório de conferente, mostrar a data do ERRO (carga/NF), não a
-  // data em que o chamado foi aberto no sistema. causa_carga é texto
-  // livre (ver RequestRow acima); cruza com totvs_delivery_cargas pra
-  // achar nota_fiscal+serie daquela carga, e com totvs_orders pra achar a
-  // data de emissão -- mesmo cruzamento de baselineFor/listEntregasEmRisco
-  // (entregasRisco.ts), reaproveitado aqui via fetchInBatches
-  // (supabaseBatch.ts) em vez de inventar um 2º jeito de fazer a mesma
-  // coisa.
+  // Data da carga -- pedido do Victor 24/10/2026: no relatório de
+  // conferente, mostrar a data do ERRO (carga), não a data em que o chamado
+  // foi aberto. causa_carga é texto livre (ver RequestRow acima). Até
+  // 26/10/2026 vinha da "emissão da NF" cruzando a nota da carga com
+  // totvs_orders, mas a nota da carga é a de remessa do CD e casava com a
+  // venda de outra loja (data qualquer). Agora é a previsão da própria carga
+  // no Protheus (ZAG_DTPREV), o dia em que ela foi montada pra sair.
   const cargasUnicas = [...new Set(rows.map((r) => r.causa_carga).filter((c): c is string => !!c))];
-  const cargaRows = await fetchInBatches<{ carga: string; nota_fiscal: string | null; serie: string | null }>(cargasUnicas, (batch) =>
-    admin.from("totvs_delivery_cargas").select("carga, nota_fiscal, serie").in("carga", batch)
+  const cargaRows = await fetchInBatches<{ carga: string; dt_previsao: string | null }>(cargasUnicas, (batch) =>
+    admin.from("totvs_delivery_cargas").select("carga, dt_previsao").in("carga", batch)
   );
-  const cargaToInvoiceSerie = new Map(
-    cargaRows.filter((c) => c.nota_fiscal && c.serie).map((c) => [c.carga, `${c.nota_fiscal}|${c.serie}`])
-  );
-  const invoicesUnicas = [...new Set([...cargaToInvoiceSerie.values()].map((v) => v.split("|")[0]))];
-  const orderRows = await fetchInBatches<{ invoice: string; serie: string; issue_date: string }>(invoicesUnicas, (batch) =>
-    admin.from("totvs_orders").select("invoice, serie, issue_date").in("invoice", batch)
-  );
-  const ordersByInvoiceSerie = new Map(orderRows.map((o) => [`${o.invoice}|${o.serie}`, o.issue_date]));
   const dataCarregamentoPorCarga = new Map<string, string>();
-  for (const [carga, invoiceSerie] of cargaToInvoiceSerie) {
-    const issueDate = ordersByInvoiceSerie.get(invoiceSerie);
-    if (issueDate) dataCarregamentoPorCarga.set(carga, issueDate);
+  for (const c of cargaRows) {
+    if (!c.dt_previsao) continue;
+    const atual = dataCarregamentoPorCarga.get(c.carga);
+    if (!atual || c.dt_previsao < atual) dataCarregamentoPorCarga.set(c.carga, c.dt_previsao);
   }
 
   const ids = rows.map((r) => r.id);

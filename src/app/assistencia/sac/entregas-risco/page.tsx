@@ -74,7 +74,7 @@ function EntregaRiscoCard({ item, atendentes }: { item: EntregaRiscoItem; atende
       ) : null}
 
       <p className="text-xs text-gray-400 dark:text-gray-500">
-        {item.baselineOrigem === "nota_fiscal" ? `Venda em ${formatDate(item.baselineData)} (nota fiscal)` : `Visto pela 1ª vez em ${formatDate(item.baselineData)} (estimado)`}
+        {item.baselineOrigem === "venda" ? `Venda em ${formatDate(item.baselineData)}` : `Visto pela 1ª vez em ${formatDate(item.baselineData)} (estimado)`}
       </p>
       <SyncStaleness syncedAt={item.syncedAt} />
 

@@ -168,6 +168,7 @@ export async function listNpsDetratores(opts: { todoHistorico?: boolean } = {}):
     admin
       .from("compra_nps")
       .select("order_id, client_id, score, respondido_em, totvs_orders(client_name)")
+      .is("descartada_em", null)
       .not("score", "is", null)
       .lte("score", 2)
       .gte("respondido_em", sinceIso)
@@ -178,6 +179,7 @@ export async function listNpsDetratores(opts: { todoHistorico?: boolean } = {}):
     admin
       .from("entrega_nps")
       .select("order_id, client_id, score, respondido_em, totvs_orders(client_name)")
+      .is("descartada_em", null)
       .not("score", "is", null)
       .lte("score", 2)
       .gte("respondido_em", sinceIso)
@@ -465,6 +467,8 @@ export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit =
   const { data, error } = await admin
     .from(table)
     .select("order_id, client_id, score, respondido_em, totvs_orders(client_name, client_cpf_cnpj, seller_name)")
+    // descartadas (0201): enviadas pra pessoa errada, não contam
+    .is("descartada_em", null)
     .not("score", "is", null)
     .order("respondido_em", { ascending: false })
     .limit(limit);
@@ -546,11 +550,11 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
     { count: vendaSent, error: vendaSentError },
   ] = await Promise.all([
     admin.from("service_request_nps").select("tipo, score").not("score", "is", null),
-    admin.from("entrega_nps").select("score").not("score", "is", null),
+    admin.from("entrega_nps").select("score").is("descartada_em", null).not("score", "is", null),
     admin.from("venda_nps").select("score").not("score", "is", null),
     admin.from("service_request_nps").select("request_id", { count: "exact", head: true }).eq("tipo", "montagem"),
     admin.from("service_request_nps").select("request_id", { count: "exact", head: true }).eq("tipo", "assistencia_tecnica"),
-    admin.from("entrega_nps").select("order_id", { count: "exact", head: true }),
+    admin.from("entrega_nps").select("order_id", { count: "exact", head: true }).is("descartada_em", null),
     admin.from("venda_nps").select("order_id", { count: "exact", head: true }),
   ]);
   if (error) throw new Error(error.message);
