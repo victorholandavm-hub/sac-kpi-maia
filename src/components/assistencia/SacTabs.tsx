@@ -9,6 +9,10 @@ const TABS = [
   { key: "notificacoes", label: "Notificação de Assistência", href: "/assistencia/sac/notificacoes" },
   { key: "encomendas", label: "Minhas encomendas", href: "/assistencia/encomendas/sac" },
   { key: "montagens", label: "Montagens e serviços", href: "/assistencia/sac/montagens" },
+  // Consulta de pedido (venda + carga + entrega + status) -- pedido do Victor
+  // 26/10/2026: "onde o sac consulta os pedidos?". Mesma tela do painel
+  // (/pedidos, ConsultaPedidoView), com o login de cada atendente.
+  { key: "pedidos", label: "Consulta de pedido", href: "/assistencia/sac/pedidos" },
   // Pedido do Victor 01/10/2026: "quero que todos os atendentes fossem
   // colocando como feito, diariamente" -- checklist pessoal do atendente
   // (ou matriz de controle, se admin, ver cronograma/page.tsx).
