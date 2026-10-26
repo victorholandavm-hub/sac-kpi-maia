@@ -11,22 +11,26 @@ import { fotosDaParadaOdoo, type FotoEntrega } from "./fotosEntregaOdoo";
 
 const DIAS = 120;
 
-export type BuscaCarga = { ano: string | null; numero: number };
+export type BuscaCarga = { ano: string | null; numero: number; prefixo?: "ROM" | "PROT" };
 
-// "ROM/2026/00058", "rom 58", "carga 58", "carga ROM/2026/58". Número solto
+// "ROM/2026/00058", "rom 58", "carga 58", "carga ROM/2026/58" e as cargas
+// que vieram do Protheus pro Odoo ("PROT/005595", "prot 5595"). Número solto
 // fica para a consulta de pedido (é o número do pedido do Protheus).
 export function numeroDaCarga(q: string): BuscaCarga | null {
   const t = q.trim();
   const rom = t.match(/^(?:carga\s*)?rom\s*[/\s-]?\s*(?:(\d{4})\s*[/\s-]\s*)?0*(\d{1,6})$/i);
-  if (rom) return { ano: rom[1] ?? null, numero: Number(rom[2]) };
+  if (rom) return { ano: rom[1] ?? null, numero: Number(rom[2]), prefixo: "ROM" };
+  const prot = t.match(/^(?:carga\s*)?prot\s*[/\s-]?\s*0*(\d{1,6})$/i);
+  if (prot) return { ano: null, numero: Number(prot[1]), prefixo: "PROT" };
   const carga = t.match(/^carga\s*0*(\d{1,6})$/i);
   return carga ? { ano: null, numero: Number(carga[1]) } : null;
 }
 
 function casa(c: CargaOdoo, b: BuscaCarga): boolean {
-  const m = c.romaneio.match(/(\d{4})\D+0*(\d+)$/);
+  const m = c.romaneio.match(/^(ROM|PROT)\D*?(?:(\d{4})\D+)?0*(\d+)$/i);
   if (!m) return false;
-  return Number(m[2]) === b.numero && (!b.ano || m[1] === b.ano);
+  if (b.prefixo && m[1].toUpperCase() !== b.prefixo) return false;
+  return Number(m[3]) === b.numero && (!b.ano || m[2] === b.ano);
 }
 
 const empresasCache = memoizeWithTtl(() => listarEmpresas("logistica"), 60 * 60_000);
