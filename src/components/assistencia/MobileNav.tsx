@@ -88,6 +88,7 @@ const PRIMARY_TABS = [
 // 28/09/2026, mesmo motivo de AssistenciaNav.tsx/SacTabs.tsx.
 const MORE_TABS = [
   { label: "Encomendas", href: "/assistencia/encomendas/fila" },
+  { label: "Pedidos", href: "/assistencia/pedidos" },
   { label: "Pagamentos", href: "/assistencia/pagamentos" },
   { label: "Relatórios", href: "/assistencia/relatorios" },
 ];
