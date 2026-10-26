@@ -3,6 +3,7 @@ import { fetchInBatches } from "./supabaseBatch";
 import { vendasDasEntregas } from "./vendaDaEntrega";
 import type { FotoEntrega } from "./fotosEntregaOdoo";
 import { nomePedidoOdoo } from "./pedidoOdoo";
+import { fotosDoPedidoNaCarga, numeroDaCarga } from "./consultaCarga";
 
 // Consulta de pedido (pedido do Victor 26/10/2026: "onde eu vejo as vendas e
 // os status dos pedidos"): por CPF/CNPJ, número do pedido, nota da venda ou
@@ -14,6 +15,7 @@ import { nomePedidoOdoo } from "./pedidoOdoo";
 const MAX_CLIENTES = 10;
 const MAX_VENDAS_POR_BUSCA = 200;
 const MAX_ENTREGAS_POR_BUSCA = 200;
+const MAX_CARGAS_COM_FOTO = 8;
 
 export type ItemConsulta = { codigo: string | null; descricao: string | null; quantidade: number };
 
@@ -301,6 +303,23 @@ export async function consultarPedidos(busca: string): Promise<ResultadoConsulta
     if (usadas.has(v.id) || !v.client_id) continue;
     cliente(v.client_id, v.client_name, v.client_cpf_cnpj).pedidos.push({ venda: paraVenda(v), entrega: null, criterio: null, data: v.issue_date });
   }
+  // Fotos da baixa nas tentativas do Odoo: no máximo 8 tentativas por busca, 2
+  // leituras da ponte por vez; falha da ponte só deixa sem foto.
+  const tentativasOdoo = [...porCliente.values()]
+    .flatMap((c) => c.pedidos)
+    .flatMap((p) => {
+      const nome = p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null;
+      return nome ? p.entrega!.tentativas.filter((t) => numeroDaCarga(t.carga)).map((t) => ({ t, nome })) : [];
+    })
+    .slice(0, MAX_CARGAS_COM_FOTO);
+  for (let i = 0; i < tentativasOdoo.length; i += 2) {
+    await Promise.all(
+      tentativasOdoo.slice(i, i + 2).map(async ({ t, nome }) => {
+        t.fotos = await fotosDoPedidoNaCarga(t.carga, nome).catch(() => []);
+      })
+    );
+  }
+
   const nomesOdoo = [...porCliente.values()].flatMap((c) => c.pedidos.map((p) => (p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null))).filter((n): n is string => !!n);
   const expedicao = nomesOdoo.length
     ? (await admin.from("odoo_expedicao").select("pedido, modo, expresso, filial_entrega, retira_em, empresa").in("pedido", [...new Set(nomesOdoo)]).returns<LinhaExpedicao[]>()).data ?? []

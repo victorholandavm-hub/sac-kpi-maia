@@ -48,6 +48,20 @@ export async function acharCarga(b: BuscaCarga): Promise<CargaOdoo | null> {
   return achadas.sort(maisRecente)[0] ?? null;
 }
 
+const cargaPorId = memoizeWithTtl((cargaId: number) => lerCarga(cargaId), 2 * 60_000);
+
+// Fotos da baixa do pedido numa carga do Odoo (romaneio da tentativa) -- pra
+// consulta de pedido mostrar no próprio cartão (Victor 26/10/2026).
+export async function fotosDoPedidoNaCarga(romaneio: string, pedido: string): Promise<FotoEntrega[]> {
+  const b = numeroDaCarga(romaneio);
+  if (!b) return [];
+  const achada = await acharCarga(b);
+  if (!achada) return [];
+  const carga = await cargaPorId(achada.carga_id);
+  const parada = (carga.paradas ?? []).find((p) => (p.pickings ?? []).some((k) => k.pedido === pedido));
+  return parada ? fotosDaParadaOdoo(carga.carga_id, parada.parada_id) : [];
+}
+
 export type ParadaComFotos = ParadaOdoo & { fotos: FotoEntrega[] };
 export type CargaConsulta = Omit<CargaDetalhe, "paradas"> & { paradas: ParadaComFotos[] };
 export type ResultadoCarga = { busca: string; carga: CargaConsulta | null; erro: string | null };
@@ -58,7 +72,7 @@ export async function consultarCarga(busca: string): Promise<ResultadoCarga> {
   try {
     const achada = await acharCarga(b);
     if (!achada) return { busca, carga: null, erro: null };
-    const carga = await lerCarga(achada.carga_id);
+    const carga = await cargaPorId(achada.carga_id);
     const paradas = await Promise.all(
       (carga.paradas ?? []).map(async (p) => ({ ...p, fotos: await fotosDaParadaOdoo(carga.carga_id, p.parada_id).catch(() => []) }))
     );

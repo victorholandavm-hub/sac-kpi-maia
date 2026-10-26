@@ -13,12 +13,18 @@ vi.mock("./odoo/logistica", () => ({
     { id: 22, name: "208 GL" },
   ]),
   listarCargas: (id: number) => listarCargas(id),
-  lerCarga: vi.fn(),
+  lerCarga: vi.fn(async (id: number) => ({
+    carga_id: id,
+    paradas: [
+      { parada_id: 5, pickings: [{ pedido: "S01500" }] },
+      { parada_id: 6, pickings: [{ pedido: "S01589" }] },
+    ],
+  })),
   mensagemDeErro: (e: unknown) => (e as Error).message,
 }));
-vi.mock("./fotosEntregaOdoo", () => ({ fotosDaParadaOdoo: vi.fn(async () => []) }));
+vi.mock("./fotosEntregaOdoo", () => ({ fotosDaParadaOdoo: vi.fn(async (cargaId: number, paradaId: number) => [{ url: `/f/${cargaId}/${paradaId}.jpg` }]) }));
 
-const { numeroDaCarga, acharCarga } = await import("./consultaCarga");
+const { numeroDaCarga, acharCarga, fotosDoPedidoNaCarga } = await import("./consultaCarga");
 
 describe("numeroDaCarga", () => {
   it("reconhece o romaneio e 'carga N', e deixa número solto para a busca de pedido", () => {
@@ -40,5 +46,15 @@ describe("acharCarga", () => {
   it("vai nas lojas quando o CD não tem, e devolve null quando ninguém tem", async () => {
     expect((await acharCarga({ ano: null, numero: 200 }))?.carga_id).toBe(90);
     expect(await acharCarga({ ano: null, numero: 999 })).toBeNull();
+  });
+});
+
+describe("fotosDoPedidoNaCarga", () => {
+  it("traz as fotos da parada onde está o pedido", async () => {
+    expect(await fotosDoPedidoNaCarga("ROM/2026/00058", "S01589")).toEqual([{ url: "/f/72/6.jpg" }]);
+  });
+  it("pedido fora da carga ou carga do Protheus: sem foto", async () => {
+    expect(await fotosDoPedidoNaCarga("ROM/2026/00058", "S09999")).toEqual([]);
+    expect(await fotosDoPedidoNaCarga("012345", "S01589")).toEqual([]);
   });
 });
