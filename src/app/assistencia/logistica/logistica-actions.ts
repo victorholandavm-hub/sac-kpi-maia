@@ -15,6 +15,8 @@ import {
   listarManifesto,
   notasDaCarga,
   acaoMdfe,
+  progressoCarga,
+  type ProgressoCarga,
   type CargaManifesto,
   type NotaCarga,
   type MdfeCarga,
@@ -331,6 +333,10 @@ export async function listarManifestoAction(companyId: number): Promise<Resultad
 export async function notasDaCargaAction(cargaId: number): Promise<ResultadoAcao<{ romaneio: string; notas: NotaCarga[]; mdfe: MdfeCarga; faltas: string[] }>> {
   return executar(() => notasDaCarga(cargaId));
 }
+export async function progressoCargaAction(cargaId: number): Promise<ResultadoAcao<ProgressoCarga>> {
+  return executar(() => progressoCarga(cargaId));
+}
+
 export async function acaoMdfeAction(cargaId: number, acao: "emitir" | "encerrar" | "consultar"): Promise<ResultadoAcao<Record<string, unknown>>> {
   if (!["emitir", "encerrar", "consultar"].includes(acao)) return { ok: false, erro: "Ação inválida." };
   return executar((operador) => acaoMdfe(cargaId, acao, operador), [`${BASE}/manifesto`]);

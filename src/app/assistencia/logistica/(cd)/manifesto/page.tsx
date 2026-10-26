@@ -16,7 +16,7 @@ export default async function ManifestoPage({ searchParams }: { searchParams: Pr
     <div className="flex flex-col gap-4 min-w-0">
       <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>Manifesto de carga (MDF-e)</h2>
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-        Cargas liberadas, em rota ou finalizadas nos últimos 7 dias. Depois de &quot;Sair em rota&quot;, abra a carga para ver as notas
+        Cargas liberadas, em rota ou finalizadas nos últimos 3 dias. Depois de &quot;Sair em rota&quot;, abra a carga para ver as notas
         (a de transferência com todos os produtos do caminhão e a de cada cliente), imprimir tudo num PDF e emitir o manifesto.
       </p>
       {erro ? <ErroOdoo titulo="Não consegui ler as cargas" mensagem={erro} /> : <ManifestoBoard cargas={cargas} />}

@@ -506,6 +506,12 @@ export async function listarManifesto(companyId: number, dias = 7): Promise<Carg
 export function notasDaCarga(cargaId: number): Promise<{ romaneio: string; notas: NotaCarga[]; mdfe: MdfeCarga; faltas: string[] }> {
   return json(`/logistica/carga/${int(cargaId)}/notas`, { perfil: "logistica", timeoutMs: 120_000 });
 }
+// 26/10 (Pedro: "a gente não sabe qual nota está faturando"): andamento da emissão das notas da carga
+export type ProgressoItem = { pedido: string; cliente: string; estado: "aguardando" | "emitindo" | "ok" | "erro" | string; nf: string; sefaz: string };
+export type ProgressoCarga = { carga: string; estado: string; total: number; feitos: number; erros: number; itens: ProgressoItem[] };
+export function progressoCarga(cargaId: number): Promise<ProgressoCarga> {
+  return json<ProgressoCarga>(`/logistica/carga/${int(cargaId)}/progresso`, { perfil: "logistica", timeoutMs: 15_000 });
+}
 export function acaoMdfe(cargaId: number, acao: "emitir" | "encerrar" | "consultar", operador: string): Promise<Record<string, unknown>> {
   return json(`/logistica/carga/${int(cargaId)}/mdfe/${acao}`, { perfil: "logistica", metodo: "POST", corpo: { operador }, timeoutMs: 180_000 });
 }

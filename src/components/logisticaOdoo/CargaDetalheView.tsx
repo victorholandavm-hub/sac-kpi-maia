@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ProgressoCarga } from "@/lib/odoo/logistica";
 import { useRouter } from "next/navigation";
 import {
   acaoCargaAction,
+  acaoMdfeAction,
+  progressoCargaAction,
   baixarEntregaManualAction,
+  itensEntregaAction,
   naoSaiuAction,
   editarCargaAction,
   excluirCargaAction,
@@ -73,6 +77,31 @@ export function CargaDetalheView({
   const [veiculo, setVeiculo] = useState(carga.veiculo_id ? String(carga.veiculo_id) : "");
   const [notas, setNotas] = useState<NotaSaida[] | null>(null);
   const [conferindo, setConferindo] = useState(false);
+  // 26/10 (Pedro): ao faturar a rota, já emitir o manifesto (MDF-e) — marcado por padrão
+  const [emitirMdfe, setEmitirMdfe] = useState(true);
+  const [mdfeMsg, setMdfeMsg] = useState<string | null>(null);
+  // 26/10 (Pedro): painel animado enquanto as notas são emitidas no "Sair em rota"
+  const [emitindo, setEmitindo] = useState(false);
+  const [progresso, setProgresso] = useState<ProgressoCarga | null>(null);
+  const [painelProg, setPainelProg] = useState(false);
+  const comecou = useRef(false);
+  // 26/10 (Pedro): clicar na cliente mostra os itens da parada
+  const [abertas, setAbertas] = useState<number[]>([]);
+  const [estoqueItens, setEstoqueItens] = useState<Record<number, Record<string, boolean>>>({});
+  function alternarParada(p: { parada_id: number; pickings: { picking_id: number }[] }) {
+    const aberta = abertas.includes(p.parada_id);
+    setAbertas((a) => (aberta ? a.filter((x) => x !== p.parada_id) : [...a, p.parada_id]));
+    if (aberta) return;
+    for (const pk of p.pickings) {
+      if (estoqueItens[pk.picking_id]) continue;
+      itensEntregaAction(pk.picking_id).then((r) => {
+        if (!r.ok || !Array.isArray(r.dados)) return;
+        const m: Record<string, boolean> = {};
+        for (const it of r.dados) m[it.codigo] = it.tem_estoque;
+        setEstoqueItens((e) => ({ ...e, [pk.picking_id]: m }));
+      }).catch(() => {});
+    }
+  }
   const [danfes, setDanfes] = useState<DanfeCarga[] | null>(null);
   const [alvo, setAlvo] = useState<AlvoEntrega | null>(null);
   const [edicao, setEdicao] = useState<{ campo: "programar" | "descricao" | "transportadora"; valor: string } | null>(null);
@@ -92,12 +121,39 @@ export function CargaDetalheView({
   const todosLegado = carga.paradas.length > 0 && carga.paradas.every((p) => p.pickings.every((pk) => pk.legado));
 
   function sair(parciais: Parciais | null) {
+    setProgresso(null); setPainelProg(true); setEmitindo(true); comecou.current = false;
     run(
       () => acaoCargaAction(carga.carga_id, "sair", parciais ? { parciais } : {}),
       (r) => `Carga ${r.romaneio}: ${ESTADO_CARGA_LABELS[r.estado] ?? r.estado}.${parciais ? " O que não foi carregado voltou para a Expedição." : ""}`,
-      (r) => { setConferindo(false); if (r.notas?.length) setNotas(r.notas); },
+      (r) => {
+        setConferindo(false);
+        if (r.notas?.length) setNotas(r.notas);
+        if (emitirMdfe) {
+          setMdfeMsg("Emitindo o manifesto (MDF-e)…");
+          acaoMdfeAction(carga.carga_id, "emitir")
+            .then((m) => setMdfeMsg(m.ok ? `Manifesto emitido: nº ${String(m.dados?.numero ?? "")} (${String(m.dados?.estado ?? "")})` : `Manifesto NÃO emitido: ${m.erro}`))
+            .catch(() => setMdfeMsg("Manifesto NÃO emitido: falha de comunicação. Tente pela aba Manifesto."));
+        }
+      },
     );
   }
+  useEffect(() => {
+    if (!emitindo) return;
+    let vivo = true;
+    const ler = () => progressoCargaAction(carga.carga_id).then((r) => { if (vivo && r.ok && r.dados) setProgresso(r.dados); }).catch(() => {});
+    ler();
+    const t = setInterval(ler, 2000);
+    return () => { vivo = false; clearInterval(t); };
+  }, [emitindo, carga.carga_id]);
+  useEffect(() => {
+    if (!emitindo) return;
+    if (pending) { comecou.current = true; return; }
+    if (comecou.current) {
+      progressoCargaAction(carga.carga_id).then((r) => { if (r.ok && r.dados) setProgresso(r.dados); }).catch(() => {});
+      setEmitindo(false);
+    }
+  }, [pending, emitindo, carga.carga_id]);
+
   function avancar() {
     if (!proxima) return;
     if (proxima.acao === "sair") { setConferindo(true); return; }   // 26/10: conferência do carregamento antes de sair
@@ -194,7 +250,38 @@ export function CargaDetalheView({
         </div>
 
         {conferindo && carga.estado === "liberada" ? (
-          <ConferenciaCarregamento carga={carga} pending={pending} onConfirmar={sair} onCancelar={() => setConferindo(false)} />
+          <>
+            <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+              <input type="checkbox" checked={emitirMdfe} onChange={(e) => setEmitirMdfe(e.target.checked)} /> Emitir também o manifesto (MDF-e) depois de sair
+            </label>
+            <ConferenciaCarregamento carga={carga} pending={pending} onConfirmar={sair} onCancelar={() => setConferindo(false)} />
+          </>
+        ) : null}
+        {painelProg ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(11,11,11,.45)" }}>
+            <div className="cartao p-4 w-full max-w-lg flex flex-col gap-2" style={{ background: "var(--surface-1, #fff)", maxHeight: "85vh", overflow: "auto" }}>
+              <h3 className="font-bold">{emitindo ? "Emitindo as notas…" : "Notas emitidas"} {progresso ? `· ${progresso.carga}` : ""}</h3>
+              <div className="text-sm">{progresso ? `${progresso.feitos} de ${progresso.total} notas` : "Preparando…"}{progresso && progresso.erros ? ` · ${progresso.erros} com erro` : ""}</div>
+              <div style={{ height: 10, borderRadius: 6, background: "var(--border)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${progresso && progresso.total ? Math.round((progresso.feitos / progresso.total) * 100) : 5}%`, background: "var(--brand-green, #1B7E3B)", transition: "width .6s ease" }} className={emitindo ? "animate-pulse" : ""} />
+              </div>
+              <div className="flex flex-col gap-1 text-sm">
+                {(progresso?.itens ?? []).map((it) => (
+                  <div key={it.pedido} className="flex items-center gap-2">
+                    <span style={{ width: 22, display: "inline-block" }} className={it.estado === "emitindo" ? "animate-spin" : ""}>{it.estado === "ok" ? "✅" : it.estado === "erro" ? "❌" : it.estado === "emitindo" ? "🔄" : "⏳"}</span>
+                    <span className="flex-1">{it.cliente} <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{it.pedido}</span></span>
+                    <span className="text-xs">{it.nf ? `NF nº ${it.nf}` : it.estado === "erro" ? it.sefaz || "erro" : ""}</span>
+                  </div>
+                ))}
+              </div>
+              {!emitindo ? (
+                <button type="button" className={botaoClass} style={botaoPrimarioStyle} onClick={() => setPainelProg(false)}>Fechar</button>
+              ) : <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Não feche a tela: as notas estão sendo enviadas à SEFAZ.</p>}
+            </div>
+          </div>
+        ) : null}
+        {mdfeMsg ? (
+          <p className="text-sm" style={{ color: mdfeMsg.includes("NÃO") ? "var(--status-critical)" : "var(--text-secondary)" }}>{mdfeMsg}</p>
         ) : null}
         {carga.estado === "em_rota" && proxima?.acao === "finalizar" && faltamBaixas > 0 ? (
           <p className="text-xs" style={{ color: "var(--status-serious)" }}>
@@ -352,9 +439,9 @@ export function CargaDetalheView({
           {ordem.map((p, i) => (
             <div key={p.parada_id} className="flex gap-3 py-2 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
               <div className="flex-1 min-w-[220px]">
-                <b>
-                  {i + 1}. {p.cliente}
-                </b>
+                <button type="button" onClick={() => alternarParada(p)} className="text-left font-bold underline-offset-2 hover:underline" title="Ver os itens desta entrega">
+                  {abertas.includes(p.parada_id) ? "▾" : "▸"} {i + 1}. {p.cliente}
+                </button>
                 {Array.from(new Set(p.pickings.map((pk) => pk.vendedor).filter(Boolean))).length ? (
                   <div className="text-xs" style={{ color: "var(--text-secondary)" }}>Vend.: {Array.from(new Set(p.pickings.map((pk) => pk.vendedor).filter(Boolean))).join(", ")}</div>
                 ) : null}
@@ -367,6 +454,25 @@ export function CargaDetalheView({
                   {p.endereco}
                   {p.telefone ? ` · ${p.telefone}` : ""}
                 </div>
+                {abertas.includes(p.parada_id) ? (
+                  <div className="mt-1 mb-1 rounded-lg border p-2 text-sm" style={{ borderColor: "var(--border)" }}>
+                    {p.pickings.map((pk) => (
+                      <div key={pk.picking_id}>
+                        <div className="text-xs" style={{ color: "var(--text-secondary)" }}>{pk.nome}{pk.pedido ? ` · ${pk.pedido}` : ""}</div>
+                        {(pk.itens ?? []).length ? (pk.itens ?? []).map((it, j) => {
+                          const est = estoqueItens[pk.picking_id]?.[it.codigo];
+                          return (
+                            <div key={j} className="flex gap-2">
+                              <b>{it.qtd}×</b> <span>{it.codigo}</span> <span className="flex-1">{it.nome}</span>
+                              {est === undefined ? null : est ? <span className="text-xs" style={{ color: "var(--status-ok, #1B7E3B)" }}>com estoque</span> : <span className="text-xs" style={{ color: "var(--status-critical)" }}>sem estoque</span>}
+                            </div>
+                          );
+                        }) : <div className="text-xs">Sem itens listados.</div>}
+                      </div>
+                    ))}
+                    <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>Itens que foram para pendência saem desta carga e aparecem na Expedição › Pendências.</div>
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap gap-1 mt-1">
                   {p.pickings.map((pk) => (
                     <span key={pk.picking_id} className="inline-flex items-center gap-1">

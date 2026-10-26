@@ -27,18 +27,35 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
   const [itens, setItens] = useState<ItemEntregaOdoo[] | null>(null);
   const [marcados, setMarcados] = useState<string[]>([]);
   const [resto, setResto] = useState<"segue" | "espera">("segue");
+  const [erroItens, setErroItens] = useState<string | null>(null);
 
   useEffect(() => {
     if (alvo.acao !== "pendencia") return;
     let vivo = true;
-    itensEntregaAction(alvo.pickingId).then((r) => {
+    // 26/10 (Francisca/Débora): sem tratamento de erro/tempo, o diálogo ficava esperando para sempre e as opções não apareciam
+    const t = setTimeout(() => {
       if (!vivo) return;
-      const l = r.ok ? r.dados : [];
-      setItens(l);
-      setMarcados(l.filter((i) => !i.tem_estoque).map((i) => i.codigo));
-    });
+      setItens((cur) => (cur === null ? [] : cur));
+      setErroItens("Os itens demoraram para carregar. Você ainda pode mandar a entrega inteira para pendência, ou fechar e abrir de novo.");
+    }, 25_000);
+    itensEntregaAction(alvo.pickingId)
+      .then((r) => {
+        if (!vivo) return;
+        clearTimeout(t);
+        const l = r.ok && Array.isArray(r.dados) ? r.dados : [];
+        if (!r.ok) setErroItens(`Não consegui carregar os itens (${r.erro}). Você ainda pode mandar a entrega inteira para pendência.`);
+        setItens(l);
+        setMarcados(l.filter((i) => !i.tem_estoque).map((i) => i.codigo));
+      })
+      .catch(() => {
+        if (!vivo) return;
+        clearTimeout(t);
+        setItens([]);
+        setErroItens("Não consegui carregar os itens. Você ainda pode mandar a entrega inteira para pendência.");
+      });
     return () => {
       vivo = false;
+      clearTimeout(t);
     };
   }, [alvo]);
 
@@ -125,6 +142,9 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
             style={inputStyle}
           />
         ) : null}
+        {alvo.acao === "pendencia" && itens === null ? <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Carregando os itens da entrega…</p> : null}
+        {alvo.acao === "pendencia" && erroItens ? <p className="text-sm" style={{ color: "var(--status-serious)" }}>{erroItens}</p> : null}
+        {alvo.acao === "pendencia" && itens && itens.length === 1 ? <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Esta entrega tem só 1 item: vai inteira para a pendência.</p> : null}
         {alvo.acao === "pendencia" && itens && itens.length > 1 ? (
           <div className="flex flex-col gap-1 text-sm">
             <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Marque o que vai para a pendência:</p>
