@@ -571,3 +571,23 @@ export async function audCategorias(): Promise<{ id: number; nome: string }[]> {
   const r = await json<{ itens: { id: number; nome: string }[] }>("/auditoria/categorias", { perfil: "logistica" });
   return r.itens;
 }
+
+// ---------------------------------------------------------------- transferência entre estoques (26/10, Pedro/Flávio)
+// Cada empresa tem 3 estoques: "estoque" (o de venda), "avaria" e "assistencia" (fora do estoque de venda).
+export type TipoEstoque = "estoque" | "avaria" | "assistencia";
+export type LocalEstoque = { tipo: TipoEstoque; rotulo: string; location_id: number; nome: string; pecas: number; reservado: number };
+export type SaldoEstoqueItem = { codigo: string; produto: string; qtd: number };
+export type TransferenciaEstoques = { ok: boolean; picking: string; estado: string; de: string; para: string; qtd: number; msg: string;
+  itens: { codigo: string; qtd: number; nome: string }[] };
+export function locaisEstoque(companyId: number): Promise<{ locais: LocalEstoque[] }> {
+  return json("/inventario/locais", { perfil: "logistica", query: { company_id: companyId } });
+}
+export function saldoEstoqueTipo(companyId: number, tipo: "avaria" | "assistencia"): Promise<{ itens: SaldoEstoqueItem[]; pecas: number }> {
+  return json("/inventario/estoque", { perfil: "logistica", query: { company_id: companyId, tipo } });
+}
+export function transferirEstoques(
+  input: { company_id: number; origem: TipoEstoque; destino: TipoEstoque; itens: { codigo: string; qtd: number }[]; motivo: string },
+  operador: string,
+): Promise<TransferenciaEstoques> {
+  return json<TransferenciaEstoques>("/inventario/transferir", { perfil: "logistica", metodo: "POST", corpo: { ...input, operador }, timeoutMs: 120_000 });
+}
