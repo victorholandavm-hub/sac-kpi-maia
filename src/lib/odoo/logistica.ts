@@ -236,6 +236,13 @@ export function baixarRomaneioPdf(cargaId: number, operador: string): Promise<{ 
   });
 }
 
+// 26/10 (Eduardo, CD): DANFE da NF 5152 do abastecimento, que não tem pedido de venda -> pela chave
+export function baixarDanfeChavePdf(chave: string, perfil: PerfilOdoo = "logistica") {
+  const c = String(chave).replace(/\D/g, "");
+  if (c.length !== 44) throw new Error("Chave da nota inválida.");
+  return pdf(`/nota/${c}/danfe.pdf`, { perfil, timeoutMs: 60_000 });
+}
+
 export function baixarDanfePdf(pedidoId: number, doc: "5117" | "5922" = "5117", perfil: PerfilOdoo = "logistica") {
   return pdf(`/pedido/${int(pedidoId)}/danfe.pdf`, { perfil, query: { doc }, timeoutMs: 60_000 });
 }

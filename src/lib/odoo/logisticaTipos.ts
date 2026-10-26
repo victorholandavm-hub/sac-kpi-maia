@@ -430,4 +430,11 @@ export type SolicitacaoAbast = {
   itens: ItemSolicitacaoAbast[];
   historico: { data: string; texto: string }[];
 };
-export type AtenderAbastResposta = { saida?: string; entrada?: string; numero?: string | number; solicitacao?: SolicitacaoAbast };
+export type AtenderAbastResposta = {
+  saida?: string;
+  entrada?: string;
+  numero?: string | number;
+  solicitacao?: SolicitacaoAbast;
+  // 26/10: dados da NF 5152 emitida (chave -> imprimir DANFE)
+  transferencia?: { numero?: string | number; serie?: string; chave?: string; estado?: string; saida?: string; entrada?: string };
+};

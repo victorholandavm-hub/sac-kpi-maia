@@ -37,6 +37,8 @@ ${s.obs ? `<p class="m">Obs.: ${s.obs.replace(/<[^>]+>/g, " ")}</p>` : ""}
 
 function Cartao({ s }: { s: SolicitacaoAbast }) {
   const { pending, run } = useAcaoOdoo();
+  // 26/10 (Eduardo): depois de atender, link para imprimir a DANFE da 5152
+  const [nota, setNota] = useState<{ numero?: string | number; chave?: string } | null>(null);
   const [qtd, setQtd] = useState<Record<string, number>>(() =>
     Object.fromEntries(s.itens.map((i) => [i.codigo, Math.max(0, Math.min(i.qtd, i.saldo_cd))])),
   );
@@ -94,6 +96,20 @@ function Cartao({ s }: { s: SolicitacaoAbast }) {
           </tbody>
         </table>
       </div>
+      {nota ? (
+        <div className="cartao p-3 flex items-center gap-3 flex-wrap" style={{ background: "var(--brand-green-soft)" }}>
+          <b style={{ color: "var(--text-primary)" }}>NF 5152 nº {nota.numero ?? ""} emitida.</b>
+          {nota.chave ? (
+            <a href={`/assistencia/logistica/pdf/nota/${nota.chave}`} target="_blank" rel="noopener noreferrer" className={botaoClass} style={botaoPrimarioStyle}>
+              🖨 Imprimir DANFE (A4)
+            </a>
+          ) : (
+            <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+              A nota ainda não foi autorizada; abra o Odoo › Fiscal para imprimir.
+            </span>
+          )}
+        </div>
+      ) : null}
       <div className="flex gap-2 flex-wrap">
         <button type="button" className={botaoClass} style={botaoStyle} onClick={() => imprimirSeparacao(s, qtd)}>
           🖨️ Imprimir lista de separação
@@ -107,7 +123,8 @@ function Cartao({ s }: { s: SolicitacaoAbast }) {
             if (!confirm(`Atender o pedido ${s.nome} e emitir a NF de transferência para ${s.loja}?`)) return;
             run(
               () => atenderAbastAction(s.id, Object.entries(qtd).map(([codigo, q]) => ({ codigo, qtd: q }))),
-              (d) => `Atendido: transferência ${d.saida ?? ""} · NF ${d.numero ?? ""}`,
+              (d) => `Atendido: transferência ${d.saida ?? ""} · NF 5152 nº ${d.transferencia?.numero ?? d.numero ?? ""}`,
+              (d) => setNota({ numero: d.transferencia?.numero ?? d.numero, chave: d.transferencia?.chave }),
             );
           }}
         >
