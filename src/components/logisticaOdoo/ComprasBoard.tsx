@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { FornecedorOdoo, PedidoCompra } from "@/lib/odoo/logistica";
+import type { FornecedorOdoo, NfChave, ParcelaPagar, PedidoCompra } from "@/lib/odoo/logistica";
 import {
   buscarFornecedoresAction,
+  buscarNfChaveAction,
   cancelarCompraAction,
   criarCompraAction,
   entradaCompraAction,
@@ -24,6 +25,25 @@ function Pedido({ p, hoje }: { p: PedidoCompra; hoje: string }) {
   const [serie, setSerie] = useState("");
   const [chave, setChave] = useState("");
   const [novaData, setNovaData] = useState("");
+  // 26/10: boletos (contas a pagar) -- vêm do XML pela chave, editáveis
+  const [emissao, setEmissao] = useState("");
+  const [parcelas, setParcelas] = useState<ParcelaPagar[]>([]);
+  const [lancarPagar, setLancarPagar] = useState(true);
+  const [infoNf, setInfoNf] = useState<NfChave | null>(null);
+  function colarChave(v: string) {
+    setChave(v);
+    const c = v.replace(/\D/g, "");
+    if (c.length !== 44) return;
+    buscarNfChaveAction(c).then((r) => {
+      if (!r.ok || !r.dados) return;
+      const d = r.dados;
+      setInfoNf(d);
+      if (d.numero) setNf(d.numero);
+      if (d.serie) setSerie(d.serie);
+      if (d.emissao) setEmissao(d.emissao);
+      if (d.parcelas?.length) setParcelas(d.parcelas.map((x) => ({ venc: x.venc, valor: x.valor, n: x.n })));
+    });
+  }
   const pendente = p.recebimentos.find((r) => r.estado !== "done" && r.estado !== "cancel");
   const abertos = p.itens.filter((i) => i.falta > 0);
   return (
@@ -101,7 +121,7 @@ function Pedido({ p, hoje }: { p: PedidoCompra; hoje: string }) {
               <div className="flex gap-2 flex-wrap">
                 <input className={inputClass} style={{ ...inputStyle, maxWidth: 160 }} placeholder="Nº da nota" value={nf} onChange={(e) => setNf(e.target.value)} />
                 <input className={inputClass} style={{ ...inputStyle, maxWidth: 90 }} placeholder="Série" value={serie} onChange={(e) => setSerie(e.target.value)} />
-                <input className={inputClass} style={{ ...inputStyle, maxWidth: 420 }} placeholder="Chave de acesso (44 números, opcional)" value={chave} onChange={(e) => setChave(e.target.value)} />
+                <input className={inputClass} style={{ ...inputStyle, maxWidth: 420 }} placeholder="Chave de acesso (44 números) — preenche nota e boletos" value={chave} onChange={(e) => colarChave(e.target.value)} />
                 <button
                   type="button"
                   className={botaoClass}
@@ -110,6 +130,45 @@ function Pedido({ p, hoje }: { p: PedidoCompra; hoje: string }) {
                 >
                   Chegou tudo
                 </button>
+              </div>
+              {infoNf ? (
+                <p className="text-sm" style={{ color: infoNf.achou && infoNf.fornecedor && !p.fornecedor.toUpperCase().includes(infoNf.fornecedor.toUpperCase().split(" ")[0]) ? "var(--status-critical)" : "var(--text-secondary)" }}>
+                  {infoNf.achou
+                    ? `NF ${infoNf.numero}/${infoNf.serie} · ${infoNf.fornecedor} · emissão ${dBR(infoNf.emissao || "")} · total ${brl(infoNf.total || 0)} · ${infoNf.itens?.length ?? 0} item(ns)`
+                    : infoNf.aviso}
+                  {infoNf.achou && infoNf.fornecedor && !p.fornecedor.toUpperCase().includes(infoNf.fornecedor.toUpperCase().split(" ")[0]) ? " ⚠ fornecedor da nota diferente do pedido" : ""}
+                </p>
+              ) : null}
+              <div className="flex flex-col gap-1" style={{ borderTop: "1px dashed var(--border)", paddingTop: 6 }}>
+                <label className="text-sm flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
+                  <input type="checkbox" checked={lancarPagar} onChange={(e) => setLancarPagar(e.target.checked)} /> <b>Lançar contas a pagar (boletos)</b>
+                  <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                    {parcelas.length ? `${parcelas.length} boleto(s) · ${brl(parcelas.reduce((a, x) => a + (Number(x.valor) || 0), 0))}` : "sem boletos: vence na data de hoje"}
+                  </span>
+                </label>
+                {lancarPagar ? (
+                  <>
+                    <div className="flex gap-2 items-center text-sm">
+                      Emissão da nota <input type="date" className={inputClass} style={{ ...inputStyle, maxWidth: 170 }} value={emissao} onChange={(e) => setEmissao(e.target.value)} />
+                    </div>
+                    {parcelas.map((x, i) => (
+                      <div key={i} className="flex gap-2 items-center text-sm">
+                        <span style={{ width: 60 }}>Boleto {x.n || i + 1}</span>
+                        <input type="date" className={inputClass} style={{ ...inputStyle, maxWidth: 170 }} value={x.venc}
+                          onChange={(e) => setParcelas((ps) => ps.map((y, j) => (j === i ? { ...y, venc: e.target.value } : y)))} />
+                        <input type="number" step="0.01" min={0} className={inputClass} style={{ ...inputStyle, maxWidth: 140 }} value={x.valor}
+                          onChange={(e) => setParcelas((ps) => ps.map((y, j) => (j === i ? { ...y, valor: Number(e.target.value) } : y)))} />
+                        <button type="button" className={botaoClass} style={botaoStyle} onClick={() => setParcelas((ps) => ps.filter((_, j) => j !== i))}>✕</button>
+                      </div>
+                    ))}
+                    <button type="button" className={botaoClass} style={{ ...botaoStyle, alignSelf: "flex-start" }}
+                      onClick={() => setParcelas((ps) => [...ps, { venc: "", valor: 0, n: String(ps.length + 1).padStart(3, "0") }])}>
+                      ＋ boleto
+                    </button>
+                  </>
+                ) : null}
+              </div>
+              <div className="flex gap-2 flex-wrap">
                 <button
                   type="button"
                   className={botaoClass}
@@ -120,8 +179,10 @@ function Pedido({ p, hoje }: { p: PedidoCompra; hoje: string }) {
                     const total = itens.reduce((s, i) => s + i.qtd, 0);
                     if (!confirm(`Dar entrada da NF ${nf} no ${p.numero}: ${itens.length} produto(s), ${total} peça(s)? O estoque entra no CD.`)) return;
                     run(
-                      () => entradaCompraAction(pendente.id, { nf, serie, chave, itens }),
-                      (d) => `Entrada feita (${d.recebimento})${d.pendente?.length ? " · o resto continua previsto em " + d.pendente.join(", ") : " · pedido completo"}`,
+                      () => entradaCompraAction(pendente.id, { nf, serie, chave, itens, lancar_pagar: lancarPagar, emissao, parcelas }),
+                      (d) => `Entrada feita (${d.recebimento})${d.pendente?.length ? " · o resto continua previsto em " + d.pendente.join(", ") : " · pedido completo"}` +
+                        (d.pagar ? ` · contas a pagar ${d.pagar.conta}: ${d.pagar.parcelas.map((x) => dBR(x.venc) + " " + brl(x.valor)).join(", ")}` : "") +
+                        (d.aviso_pagar ? ` · ⚠ ${d.aviso_pagar}` : ""),
                     );
                   }}
                 >

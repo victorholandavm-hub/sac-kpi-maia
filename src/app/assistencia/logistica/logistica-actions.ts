@@ -9,6 +9,11 @@ import { revalidatePath } from "next/cache";
 import {
   acaoEntrega,
   acaoExtraCarga,
+  buscarEntregas,
+  type BuscaEntrega,
+  buscarNfChave,
+  type NfChave,
+  type ParcelaPagar,
   lerCarga,
   registrarParadaPeloCd,
   estornarEntrega,
@@ -140,6 +145,11 @@ export async function naoSaiuAction(cargaId: number, paradaId: number, obs: stri
   );
 }
 
+export async function buscarEntregasAction(q: string): Promise<ResultadoAcao<BuscaEntrega[]>> {
+  if (String(q || "").trim().length < 3) return { ok: true, dados: [] } as ResultadoAcao<BuscaEntrega[]>;
+  return executar(() => buscarEntregas(q.trim()));
+}
+
 export async function listarDanfesAction(cargaId: number): Promise<ResultadoAcao<DanfeCarga[]>> {
   return executar(() => listarDanfesCarga(cargaId));
 }
@@ -186,12 +196,20 @@ export async function cancelarAbastAction(id: number, motivo: string): Promise<R
 // Compras do CD: entrada da nota contra o pedido, previsão, pedido novo.
 export async function entradaCompraAction(
   recebimentoId: number,
-  input: { nf: string; serie: string; chave: string; itens: { codigo: string; qtd: number }[] },
+  input: { nf: string; serie: string; chave: string; itens: { codigo: string; qtd: number }[]; lancar_pagar?: boolean; emissao?: string; parcelas?: ParcelaPagar[] },
 ): Promise<ResultadoAcao<EntradaCompraResposta>> {
+  if (input.lancar_pagar && input.parcelas?.some((p) => !/^\d{4}-\d{2}-\d{2}$/.test(p.venc) || !(Number(p.valor) > 0)))
+    return { ok: false, erro: "Confira os boletos: cada um precisa de vencimento e valor." };
   const itens = input.itens.filter((i) => Number(i.qtd) > 0);
   if (!input.nf.trim()) return { ok: false, erro: "Informe o número da nota fiscal do fornecedor." };
   if (!itens.length) return { ok: false, erro: "Informe quanto chegou de pelo menos um produto." };
   return executar((operador) => darEntradaCompra(recebimentoId, { ...input, itens }, operador), [`${BASE}/compras`]);
+}
+
+export async function buscarNfChaveAction(chave: string): Promise<ResultadoAcao<NfChave>> {
+  const c = String(chave || "").replace(/\D/g, "");
+  if (c.length !== 44) return { ok: false, erro: "A chave tem 44 números." };
+  return executar(() => buscarNfChave(c));
 }
 
 export async function previsaoCompraAction(id: number, data: string): Promise<ResultadoAcao<unknown>> {

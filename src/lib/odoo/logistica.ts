@@ -251,6 +251,14 @@ export function baixarDanfesCargaPdf(cargaId: number, perfil: PerfilOdoo = "logi
   return pdf(`/logistica/carga/${int(cargaId)}/danfes.pdf`, { perfil, timeoutMs: 180_000 });
 }
 
+export type BuscaEntrega = { pedido: string; pedido_id: number; picking: string; picking_id: number; cliente: string; loja: string; modo: string;
+  nf5922: string; nf5117: string; nota: string; situacao: string; cor: "ok" | "info" | "alerta"; carga_id: number | false; na_fila: boolean };
+// 26/10 (Pedro): a busca da Expedição acha o pedido onde estiver (carga, rota, entregue, pendência, loja/reserva)
+export async function buscarEntregas(q: string): Promise<BuscaEntrega[]> {
+  const r = await json<{ itens: BuscaEntrega[] }>("/logistica/busca", { perfil: "logistica", query: { q } });
+  return r.itens ?? [];
+}
+
 export type TransferenciaEmitida = { numero: string; serie: string; data: string; loja: string; valor: number; estado: string; chave: string };
 // 26/10 (Eduardo): notas 5152 já emitidas (o pedido atendido sai da lista; a nota tem que continuar à mão)
 export async function listarTransferencias(dias = 7): Promise<TransferenciaEmitida[]> {
@@ -372,7 +380,9 @@ export type PedidoCompra = {
   recebimentos: { id: number; numero: string; estado: string; concluido: string }[];
 };
 export type FornecedorOdoo = { id: number; nome: string; cnpj: string; cidade: string; ja_fornece: boolean };
-export type EntradaCompraResposta = { recebimento: string; nota: string; pendente: string[]; pedido: PedidoCompra | null };
+export type EntradaCompraResposta = { recebimento: string; nota: string; pendente: string[]; pedido: PedidoCompra | null   pagar?: { conta: string; estado: string; total: number; parcelas: { venc: string; valor: number }[] } | null;
+  aviso_pagar?: string | null;
+};
 
 export async function listarPedidosCompra(estado: "abertos" | "todos" = "abertos", q = ""): Promise<{ hoje: string; pedidos: PedidoCompra[] }> {
   const r = await json<{ hoje: string; pedidos: PedidoCompra[] }>("/compras/pedidos", { perfil: "logistica", query: { estado, q } });
@@ -393,8 +403,17 @@ export async function mudarPrevisaoCompra(id: number, data: string, operador: st
 export async function cancelarPedidoCompra(id: number, motivo: string, operador: string): Promise<unknown> {
   return json(`/compras/pedido/${id}/cancelar`, { perfil: "logistica", metodo: "POST", corpo: { motivo, operador } });
 }
+export type ParcelaPagar = { venc: string; valor: number; n?: string };
+export type NfChave = { achou: boolean; chave: string; numero: string; serie: string; emissao?: string; fornecedor?: string; cnpj?: string;
+  total?: number; parcelas?: ParcelaPagar[]; itens?: { nome: string; qtd: number; preco: number; codigo: string }[]; aviso?: string };
+// 26/10 (Pedro/Eduardo): colou a chave -> dados da nota e os boletos (duplicatas do XML recebido da SEFAZ)
+export function buscarNfChave(chave: string): Promise<NfChave> {
+  return json<NfChave>("/compras/nf-chave", { perfil: "logistica", query: { chave } });
+}
+
 export async function darEntradaCompra(recebimentoId: number, input: {
   nf: string; serie: string; chave: string; itens: { codigo: string; qtd: number }[];
+  lancar_pagar?: boolean; emissao?: string; parcelas?: ParcelaPagar[];
 }, operador: string): Promise<EntradaCompraResposta> {
   return json(`/compras/receber/${recebimentoId}`, { perfil: "logistica", metodo: "POST", corpo: { ...input, operador }, timeoutMs: 60_000 });
 }

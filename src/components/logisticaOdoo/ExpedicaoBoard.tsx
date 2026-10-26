@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { incluirNaCargaAction, montarCargaAction } from "@/app/assistencia/logistica/logistica-actions";
+import { buscarEntregasAction, incluirNaCargaAction, montarCargaAction } from "@/app/assistencia/logistica/logistica-actions";
+import type { BuscaEntrega } from "@/lib/odoo/logistica";
+import { useEffect } from "react";
 import {
   CATEGORIA_LABELS,
   MODO_LABELS,
@@ -53,6 +55,16 @@ export function ExpedicaoBoard({
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [alvo, setAlvo] = useState<AlvoEntrega | null>(null);
   const [cargaDestino, setCargaDestino] = useState("");
+  // 26/10: busca em TUDO (carga, rota, entregue, pendência, loja) além da fila
+  const [fora, setFora] = useState<BuscaEntrega[]>([]);
+  useEffect(() => {
+    const q = busca.trim();
+    if (q.length < 3) { setFora([]); return; }
+    const t = setTimeout(() => {
+      buscarEntregasAction(q).then((r) => setFora(r.ok ? (r.dados ?? []).filter((x) => !x.na_fila) : [])).catch(() => setFora([]));
+    }, 500);
+    return () => clearTimeout(t);
+  }, [busca]);
   const [form, setForm] = useState({ tipo: "entrega", zona_id: "", motorista_id: "", veiculo_id: "", descricao: "", transportadora: "", data_prevista: "" });
 
   const todas = useMemo(() => [...expedicao.entregas, ...expedicao.pendencias], [expedicao]);
@@ -384,6 +396,30 @@ export function ExpedicaoBoard({
           </tbody>
         </table>
       </div>
+
+      {fora.length ? (
+        <div className="cartao p-4 flex flex-col gap-2">
+          <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
+            Fora da fila (em carga, em rota, entregue, pendência ou na loja) · {fora.length}
+          </h3>
+          {fora.map((x) => (
+            <div key={x.picking_id} className="flex items-start justify-between gap-2 text-sm py-1 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
+              <span>
+                <b>{x.cliente}</b> · {x.pedido} · loja {x.loja} · {x.nota}
+                <br />
+                <span style={{ color: x.cor === "alerta" ? "var(--status-critical)" : x.cor === "info" ? "var(--status-info)" : "var(--status-good)", fontWeight: 600 }}>
+                  {x.situacao}
+                </span>
+              </span>
+              {x.carga_id ? (
+                <a href={`/assistencia/logistica/cargas/${x.carga_id}?empresa=${companyId}`} className="text-sm underline">
+                  abrir carga
+                </a>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <AcaoEntregaDialog alvo={alvo} empresas={empresas} onFechar={() => setAlvo(null)} />
     </div>
