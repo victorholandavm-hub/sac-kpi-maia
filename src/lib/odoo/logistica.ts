@@ -376,3 +376,8 @@ export async function inventarioAplicar(companyId: number, itens: { codigo: stri
   Promise<{ itens: ItemInventarioAjuste[]; erros: string[]; ajustados: number }> {
   return json("/inventario/aplicar", { perfil: "logistica", metodo: "POST", corpo: { company_id: companyId, itens, operador, motivo }, timeoutMs: 120_000 });
 }
+
+// 26/10 (Pedro, igual ao uMov "A caminho da entrega"): motorista registra que chegou no cliente (GPS + hora)
+export function registrarChegadaParada(paradaId: number, geo_lat: number | null, geo_lng: number | null, motorista_id: number | null): Promise<{ ok: true; parada_id: number; ja_registrada?: boolean; em?: string }> {
+  return json(`/logistica/parada/${int(paradaId)}/chegada`, { perfil: "motorista", metodo: "POST", corpo: { geo_lat, geo_lng, motorista_id, origem: "app" } });
+}

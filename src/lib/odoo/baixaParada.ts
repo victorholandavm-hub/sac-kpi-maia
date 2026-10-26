@@ -19,6 +19,7 @@ export type EntradaBaixa = {
   geoLat?: number | null;
   geoLng?: number | null;
   fotoUrls?: string[];
+  fotoTipos?: string[]; // 26/10: canhoto | mercadoria | local (paralelo a fotoUrls)
   itens?: { codigo: string; qtd_entregue: number }[];
   eventoUid?: string | null;
   registradoEm?: string | null; // ISO, hora do toque no celular
@@ -38,6 +39,11 @@ async function executar(s: MotoristaSessao, e: EntradaBaixa): Promise<ResultadoB
   if (!RESULTADOS.includes(e.resultado)) return recusa("Resultado inválido.");
   if (e.resultado === "insucesso" && !e.motivo) return recusa("Escolha o motivo.");
   if (e.resultado === "entrega_parcial" && !(e.itens ?? []).length) return recusa("Entrega parcial: informe o que foi entregue de cada item.");
+  // 26/10 (Pedro, igual ao uMov): entrega exige canhoto assinado + mercadoria no local; não consegui exige foto do local
+  const tipos = (e.fotoTipos ?? []).map((t) => String(t));
+  if ((e.resultado === "entregue" || e.resultado === "entrega_parcial") && !(tipos.includes("canhoto") && tipos.includes("mercadoria")))
+    return recusa("Tire a foto do canhoto assinado E a foto da mercadoria no local.");
+  if (e.resultado === "insucesso" && !tipos.includes("local")) return recusa("Tire uma foto do local (fachada/porta) para registrar que você esteve lá.");
   try {
     const { carga, employeeId } = await exigirCargaDoMotorista(s, e.cargaId);
     if (carga.estado !== "em_rota") return recusa(`A baixa só abre com a carga em rota (carga está "${carga.estado}").`);
@@ -57,7 +63,7 @@ async function executar(s: MotoristaSessao, e: EntradaBaixa): Promise<ResultadoB
       geo_lng: geoOk ? e.geoLng : null,
       origem: "app",
       motorista_id: employeeId,
-      obs: montarObservacao(observacaoComHorario(e.obs, e.registradoEm), fotos),
+      obs: montarObservacao(observacaoComHorario([e.obs, tipos.length ? "fotos: " + tipos.join(", ") : ""].filter(Boolean).join(" · ") || null, e.registradoEm), fotos),
       evento_uid: eventoUidValido(e.eventoUid) ? e.eventoUid : null,
     });
     return { ok: true, dados };

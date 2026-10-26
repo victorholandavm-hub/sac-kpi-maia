@@ -6,7 +6,7 @@
 // encerrar a rota. A sessão é o login PIN do motorista deste sistema.
 
 import { revalidatePath } from "next/cache";
-import { executarAcaoCarga, mensagemDeErro } from "@/lib/odoo/logistica";
+import { executarAcaoCarga, mensagemDeErro, registrarChegadaParada } from "@/lib/odoo/logistica";
 import { registrarBaixaParada, type EntradaBaixa } from "@/lib/odoo/baixaParada";
 import { getMotoristaSessao } from "@/lib/odoo/logisticaAuth";
 import { exigirCargaDoMotorista } from "@/lib/odoo/rotaMotorista";
@@ -60,4 +60,19 @@ export async function registrarParadaAction(
   const r = await registrarBaixaParada(await getMotoristaSessao(), { ...entrada, cargaId, paradaId });
   if (r.ok) revalidatePath(BASE);
   return r.ok ? r : { ok: false, erro: r.erro };
+}
+
+// Chegada no cliente (26/10): GPS + hora no Odoo, 1 por parada.
+export async function registrarChegadaAction(cargaId: number, paradaId: number, lat: number | null, lng: number | null): Promise<ResultadoAcao<{ em?: string; ja_registrada?: boolean }>> {
+  try {
+    const sessao = await getMotoristaSessao();
+    if (!sessao) return { ok: false, erro: "Sessão expirada. Entre de novo." };
+    const { carga, employeeId } = await exigirCargaDoMotorista(sessao, cargaId);
+    if (!carga.paradas.some((p) => p.parada_id === paradaId)) return { ok: false, erro: "Essa parada não é desta carga." };
+    const r = await registrarChegadaParada(paradaId, lat, lng, employeeId);
+    revalidatePath(BASE);
+    return { ok: true, dados: { em: r.em, ja_registrada: r.ja_registrada } };
+  } catch (err) {
+    return { ok: false, erro: mensagemDeErro(err) };
+  }
 }

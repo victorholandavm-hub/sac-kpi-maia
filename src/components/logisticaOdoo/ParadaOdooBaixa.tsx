@@ -1,5 +1,6 @@
 "use client";
 
+import { registrarChegadaAction } from "@/app/assistencia/motorista/odoo/odoo-actions";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/assistencia/ToastProvider";
@@ -34,6 +35,11 @@ type Guardada = { motivo: "sem_rede" | "sessao"; erro: string | null };
 export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos, itens = [] }: { cargaId: number; paradaId: number; rotulo: string; motivos: CatalogosOdoo["motivos"]; itens?: { codigo: string; nome: string; qtd: number }[] }) {
   // 26/10 (Pedro): entrega parcial = o motorista diz o que entregou de cada item; o resto "volta" para o CD
   const [parcial, setParcial] = useState(false);
+  // 26/10 (Pedro, igual ao uMov): fotos com nome e obrigatórias — canhoto assinado + mercadoria no local (entrega),
+  // foto do local (não consegui). "Cheguei no cliente" registra GPS/hora antes da baixa.
+  const [tipoFoto, setTipoFoto] = useState<"canhoto" | "mercadoria" | "local">("canhoto");
+  const [chegou, setChegou] = useState<string | null>(null);
+  const tem = (t: string) => fotos.some((f) => f.tipo === t);
   const [entregue, setEntregue] = useState<Record<string, string>>(() => Object.fromEntries(itens.map((i) => [i.codigo, String(i.qtd)])));
   const router = useRouter();
   const { showToast } = useToast();
@@ -103,7 +109,7 @@ export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos, itens = []
       if (blob.size === 0) throw new Error("A foto veio vazia. Tire de novo.");
       if (blob.size > 10 * 1024 * 1024) throw new Error("Foto grande demais (máximo 10 MB).");
       const nome = red === file ? file.name || "comprovante.jpg" : "comprovante.jpg";
-      setFotos((f) => [...f, { id: novoEventoUid(), blob, nome, url: null, preview: URL.createObjectURL(blob) }]);
+      setFotos((f) => [...f, { id: novoEventoUid(), blob, nome, url: null, preview: URL.createObjectURL(blob), tipo: tipoFoto }]);
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Não foi possível usar a foto.", "error");
     } finally {
@@ -125,6 +131,14 @@ export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos, itens = []
       showToast("Escolha o motivo.", "error");
       return;
     }
+    if ((resultado === "entregue" || resultado === "entrega_parcial") && !(tem("canhoto") && tem("mercadoria"))) {
+      showToast("Tire a foto do canhoto assinado E a foto da mercadoria no local.", "error");
+      return;
+    }
+    if (resultado === "insucesso" && !tem("local")) {
+      showToast("Tire uma foto do local (fachada/porta) para registrar que você esteve lá.", "error");
+      return;
+    }
     startTransition(async () => {
       const g = await lerGeo();
       const agora = new Date().toISOString();
@@ -140,7 +154,7 @@ export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos, itens = []
         geoLat: g?.lat ?? null,
         geoLng: g?.lng ?? null,
         registradoEm: agora,
-        fotos: fotos.map(({ id, blob, nome, url }) => ({ id, blob, nome, url })),
+        fotos: fotos.map(({ id, blob, nome, url, tipo }) => ({ id, blob, nome, url, tipo })),
         estado: "pendente",
         tentativas: 0,
         ultimoErro: null,
@@ -243,11 +257,29 @@ export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos, itens = []
     <div className="flex flex-col gap-4">
       <div className="rounded-lg p-4 flex flex-col gap-3" style={{ background: "color-mix(in srgb, var(--status-warning) 8%, var(--surface-1))", border: "2px solid var(--status-warning)" }}>
         <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-          📝 Comprovante (foto do canhoto assinado)
+          📝 Fotos da entrega
         </h3>
         <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-          A foto vai junto com a baixa e o link segue para o Odoo. Sem sinal, fica guardada no celular até a rede voltar.
+          Entregou: foto do <b>canhoto assinado</b> e da <b>mercadoria no local</b>. Não conseguiu: foto do <b>local</b>. Sem sinal, fica guardada no celular até a rede voltar.
         </p>
+        <div className="flex gap-2 flex-wrap">
+          {(["canhoto", "mercadoria", "local"] as const).map((t) => (
+            <button key={t} type="button" onClick={() => setTipoFoto(t)} className="text-sm font-semibold rounded-full px-3 py-1.5 border"
+              style={{ borderColor: tipoFoto === t ? "var(--brand-green)" : "var(--border)", background: tipoFoto === t ? "var(--brand-green)" : "var(--surface-1)", color: tipoFoto === t ? "var(--brand-green-ink)" : "var(--text-secondary)" }}>
+              {t === "canhoto" ? "Canhoto assinado" : t === "mercadoria" ? "Mercadoria no local" : "Foto do local"}{tem(t) ? " ✓" : ""}
+            </button>
+          ))}
+        </div>
+        <button type="button" disabled={ocupado || !!chegou} className="text-sm font-bold rounded-xl px-4 py-3 border disabled:opacity-60"
+          style={{ borderColor: "var(--brand-green)", color: chegou ? "var(--text-secondary)" : "var(--brand-green)", background: "var(--surface-1)" }}
+          onClick={async () => {
+            const g = await lerGeo();
+            const r = await registrarChegadaAction(cargaId, paradaId, g?.lat ?? null, g?.lng ?? null);
+            if (!r.ok) { showToast(r.erro, "error"); return; }
+            setChegou(r.dados.em || "ok"); showToast(r.dados.ja_registrada ? "Chegada já estava registrada." : "Chegada registrada (hora e GPS).", "success");
+          }}>
+          {chegou ? "📍 Chegada registrada" : "📍 Cheguei no cliente"}
+        </button>
         <div className="grid grid-cols-2 gap-2">
           {fotoLabel("Tirar foto", "📷", true)}
           {fotoLabel("Da galeria", "🖼️", false)}

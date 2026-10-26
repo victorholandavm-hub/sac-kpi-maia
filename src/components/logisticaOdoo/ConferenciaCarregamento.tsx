@@ -16,6 +16,8 @@ export function ConferenciaCarregamento({ carga, onConfirmar, onCancelar, pendin
   );
   const muda = (n: number, v: string) => setLinhas((ls) => ls.map((l, i) => (i === n ? { ...l, carregada: v } : l)));
   const reduzidas = linhas.filter((l) => Number(l.carregada) < l.qtd);
+  // 26/10 (Pedro: "se eu clicar em sair em rota emite as notas de novo?"): carga do sistema antigo já tem as 5117 — sair só baixa a saída
+  const todosLegado = carga.paradas.every((p) => p.pickings.every((pk) => pk.legado));
   const zeradas = Object.values(linhas.reduce<Record<string, Linha[]>>((acc, l) => ((acc[l.picking] ??= []).push(l), acc), {})).filter((ls) => ls.every((l) => Number(l.carregada) <= 0));
   function confirmar() {
     if (zeradas.length) {
@@ -58,7 +60,7 @@ export function ConferenciaCarregamento({ carga, onConfirmar, onCancelar, pendin
       </div>
       <div className="flex gap-2 flex-wrap items-center">
         <button type="button" className={botaoClass} style={botaoLaranjaStyle} disabled={pending} onClick={confirmar}>
-          {pending ? "Emitindo as notas…" : reduzidas.length ? `Sair em rota com ${reduzidas.length} item(ns) a menos · emite as NF 5117` : "Tudo carregado · Sair em rota · emite as NF 5117"}
+          {pending ? (todosLegado ? "Saindo…" : "Emitindo as notas…") : reduzidas.length ? `Sair em rota com ${reduzidas.length} item(ns) a menos${todosLegado ? " · notas já emitidas no sistema antigo" : " · emite as NF 5117"}` : todosLegado ? "Tudo carregado · Sair em rota · notas já emitidas no sistema antigo (não emite nota)" : "Tudo carregado · Sair em rota · emite as NF 5117"}
         </button>
         <button type="button" className={botaoClass} style={botaoStyle} disabled={pending} onClick={onCancelar}>Voltar</button>
         {reduzidas.length ? <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{reduzidas.length} linha(s) com menos do que o pedido — o resto volta para a Expedição.</span> : null}

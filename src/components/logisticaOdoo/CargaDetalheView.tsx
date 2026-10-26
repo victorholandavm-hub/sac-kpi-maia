@@ -85,6 +85,7 @@ export function CargaDetalheView({
   const editavel = ESTADOS_EDITAVEIS.includes(carga.estado);
   const proxima = PROXIMA_ACAO[carga.estado];
   const faltamBaixas = carga.paradas.filter((p) => !p.resultado).length;
+  const todosLegado = carga.paradas.length > 0 && carga.paradas.every((p) => p.pickings.every((pk) => pk.legado));
 
   function sair(parciais: Parciais | null) {
     run(
@@ -150,7 +151,7 @@ export function CargaDetalheView({
           <div className="flex gap-2 flex-wrap">
             {proxima ? (
               <button type="button" disabled={pending} onClick={avancar} className={botaoClass} style={proxima.acao === "sair" ? botaoLaranjaStyle : botaoPrimarioStyle}>
-                {pending ? "Enviando ao Odoo…" : proxima.label}
+                {pending ? "Enviando ao Odoo…" : proxima.acao === "sair" && todosLegado ? "Sair em rota · notas já emitidas no sistema antigo (não emite nota)" : proxima.label}
               </button>
             ) : null}
             <a href={`/assistencia/logistica/pdf/romaneio/${carga.carga_id}`} target="_blank" rel="noopener noreferrer" className={botaoClass} style={botaoStyle}>

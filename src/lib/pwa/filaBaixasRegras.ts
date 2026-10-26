@@ -12,7 +12,8 @@ export const FILA_LOCK = "maia-fila-baixas";
 export const FILA_CANAL = "maia-fila-baixas";
 export const FILA_SYNC_TAG = "maia-fila-baixas";
 
-export type FotoPendente = { id: string; blob: Blob; nome: string; url: string | null };
+export type TipoFoto = "canhoto" | "mercadoria" | "local";
+export type FotoPendente = { id: string; blob: Blob; nome: string; url: string | null; tipo?: TipoFoto };
 
 export type BaixaPendente = {
   evento_uid: string;
@@ -74,6 +75,7 @@ export function corpoDaBaixa(b: BaixaPendente) {
     geoLng: b.geoLng,
     registradoEm: b.registradoEm,
     fotoUrls: b.fotos.map((f) => f.url).filter((u): u is string => !!u),
+    fotoTipos: b.fotos.filter((f) => !!f.url).map((f) => f.tipo ?? "canhoto"),
   };
 }
 

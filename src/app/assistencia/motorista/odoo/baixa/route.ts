@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     geoLat: num(corpo.geoLat),
     geoLng: num(corpo.geoLng),
     fotoUrls: Array.isArray(corpo.fotoUrls) ? corpo.fotoUrls.filter((u): u is string => typeof u === "string") : [],
+    fotoTipos: Array.isArray(corpo.fotoTipos) ? corpo.fotoTipos.filter((u): u is string => typeof u === "string") : [],
     itens: Array.isArray(corpo.itens) ? (corpo.itens as { codigo?: unknown; qtd_entregue?: unknown }[]).filter((i) => i && typeof i.codigo === "string").map((i) => ({ codigo: String(i.codigo), qtd_entregue: Number(i.qtd_entregue) || 0 })) : undefined,
     eventoUid: txt(corpo.eventoUid),
     registradoEm: txt(corpo.registradoEm),
