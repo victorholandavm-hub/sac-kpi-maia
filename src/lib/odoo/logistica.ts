@@ -365,3 +365,14 @@ export async function darEntradaCompra(recebimentoId: number, input: {
 }, operador: string): Promise<EntradaCompraResposta> {
   return json(`/compras/receber/${recebimentoId}`, { perfil: "logistica", metodo: "POST", corpo: { ...input, operador }, timeoutMs: 60_000 });
 }
+
+// ---- Inventário / contagem (25/10/2026 noite, Pedro) --------------------
+export type ItemInventarioSaldo = { codigo: string; existe: boolean; nome?: string; estocavel?: boolean; sistema?: number; reservado?: number };
+export type ItemInventarioAjuste = { codigo: string; nome: string; antes: number; depois: number; ajuste: number };
+export async function inventarioSaldo(companyId: number, codigos: string[]): Promise<{ empresa: string; deposito: string; itens: ItemInventarioSaldo[] }> {
+  return json("/inventario/saldo", { perfil: "logistica", metodo: "POST", corpo: { company_id: companyId, codigos } });
+}
+export async function inventarioAplicar(companyId: number, itens: { codigo: string; contado: number }[], operador: string, motivo: string):
+  Promise<{ itens: ItemInventarioAjuste[]; erros: string[]; ajustados: number }> {
+  return json("/inventario/aplicar", { perfil: "logistica", metodo: "POST", corpo: { company_id: companyId, itens, operador, motivo }, timeoutMs: 120_000 });
+}

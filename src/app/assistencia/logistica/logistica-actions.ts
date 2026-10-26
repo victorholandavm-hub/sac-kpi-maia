@@ -24,7 +24,8 @@ import {
   buscarFornecedores,
   criarPedidoCompra,
 } from "@/lib/odoo/logistica";
-import type { EntradaCompraResposta, FornecedorOdoo, PedidoCompra } from "@/lib/odoo/logistica";
+import type { EntradaCompraResposta, FornecedorOdoo, PedidoCompra, ItemInventarioSaldo, ItemInventarioAjuste } from "@/lib/odoo/logistica";
+import { inventarioAplicar, inventarioSaldo } from "@/lib/odoo/logistica";
 import { exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import type {
   AcaoCarga,
@@ -169,4 +170,17 @@ export async function criarCompraAction(input: {
   const itens = input.itens.filter((i) => i.codigo.trim());
   if (!itens.length) return { ok: false, erro: "Coloque pelo menos um produto." };
   return executar((operador) => criarPedidoCompra({ ...input, itens }, operador), [`${BASE}/compras`]);
+}
+
+// Inventário: consulta saldo de sistema e aplica a contagem (ajuste no Odoo).
+export async function inventarioSaldoAction(companyId: number, codigos: string[]): Promise<ResultadoAcao<{ empresa: string; deposito: string; itens: ItemInventarioSaldo[] }>> {
+  const lista = Array.from(new Set(codigos.map((c) => c.trim().toUpperCase()).filter(Boolean)));
+  if (!lista.length) return { ok: false, erro: "Digite pelo menos um código." };
+  return executar(() => inventarioSaldo(companyId, lista));
+}
+export async function inventarioAplicarAction(companyId: number, itens: { codigo: string; contado: number }[], motivo: string):
+  Promise<ResultadoAcao<{ itens: ItemInventarioAjuste[]; erros: string[]; ajustados: number }>> {
+  const lista = itens.filter((i) => i.codigo.trim() && Number.isFinite(i.contado) && i.contado >= 0);
+  if (!lista.length) return { ok: false, erro: "Nenhuma contagem válida para aplicar." };
+  return executar((operador) => inventarioAplicar(companyId, lista, operador, motivo.trim()), [`${BASE}/inventario`, `${BASE}/kardex`]);
 }
