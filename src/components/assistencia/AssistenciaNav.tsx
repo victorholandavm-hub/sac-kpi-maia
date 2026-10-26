@@ -27,10 +27,10 @@ const BASE_TABS = [
   // qualquer uma das 4.
   { label: "Controle Assistência", href: "/assistencia/cadastros", matches: ["/assistencia/cadastros", "/assistencia/pecas", "/assistencia/fornecedores", "/assistencia/estoque"] },
   { label: "Encomendas", href: "/assistencia/encomendas/fila" },
-  // Consulta de pedido (venda + carga + entrega + status) -- 26/10/2026.
-  { label: "Pedidos", href: "/assistencia/pedidos" },
-  // Estoque das lojas/CD (Odoo) -- não confundir com o estoque de peças.
-  { label: "Estoque lojas", href: "/assistencia/lojas-estoque" },
+  // Aba "Odoo" (Victor 26/10/2026, para Luis e Iasmyn): vendas e pedidos
+  // (consulta + nota fiscal) e estoque das lojas/CD (+ transferência pro AT),
+  // com sub-abas (OdooTabs.tsx). Não confundir com o estoque de peças.
+  { label: "Odoo", href: "/assistencia/pedidos", matches: ["/assistencia/pedidos", "/assistencia/lojas-estoque"] },
   { label: "Suprimentos", href: "/assistencia/suprimentos/fila" },
   // "Cargas" e "Prazos de produtos" inativadas (tiradas de exibição) --
   // pedido do Victor 28/09/2026. As rotas continuam existindo, só não têm

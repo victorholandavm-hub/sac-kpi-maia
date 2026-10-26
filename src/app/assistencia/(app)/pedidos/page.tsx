@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/dal";
 import { ConsultaPedidoView } from "@/components/ConsultaPedidoView";
+import { OdooTabs } from "@/components/assistencia/OdooTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -11,5 +12,10 @@ export default async function AssistenciaPedidosPage({ searchParams }: { searchP
   const profile = await getProfile();
   if (profile.role === "sac") redirect("/assistencia/sac/pedidos");
   const { q } = await searchParams;
-  return <ConsultaPedidoView busca={(q ?? "").trim()} acao="/assistencia/pedidos" embutida />;
+  return (
+    <div className="flex flex-col gap-5 min-w-0">
+      <OdooTabs active="pedidos" />
+      <ConsultaPedidoView busca={(q ?? "").trim()} acao="/assistencia/pedidos" embutida />
+    </div>
+  );
 }

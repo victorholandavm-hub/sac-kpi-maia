@@ -187,7 +187,7 @@ function Pedido({ p, busca }: { p: PedidoConsulta; busca: string }) {
   );
 }
 
-const EXEMPLOS = "CPF/CNPJ, número do pedido, nota da venda ou nome do cliente";
+const EXEMPLOS = "CPF/CNPJ, número do pedido (ex.: 062427 ou S01589), nota da venda ou nome do cliente";
 
 // Tela inteira da consulta (título, busca e resultado) -- usada no painel
 // (/pedidos) e no sistema da assistência (SAC e assistência), cada um com o
@@ -201,7 +201,7 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
     <div className={embutida ? "flex flex-col gap-6 min-w-0" : "max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-10 flex flex-col gap-6"}>
       {embutida ? (
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Venda, carga e entrega de cada pedido do cliente, com o status atual no Protheus (atualiza a cada 10 a 30 min).
+          Venda, carga e entrega de cada pedido do cliente (Odoo desde 25/10; histórico do Protheus até 24/10), atualizado a cada 30 min. Pedido do Odoo tem botão para imprimir a nota.
         </p>
       ) : (
         <div>
@@ -209,7 +209,7 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
             Consulta de pedido
           </h1>
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Venda, carga e entrega de cada pedido do cliente, com o status atual no Protheus.
+            Venda, carga e entrega de cada pedido do cliente (Odoo desde 25/10; histórico do Protheus até 24/10).
           </p>
         </div>
       )}
