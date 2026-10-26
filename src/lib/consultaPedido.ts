@@ -71,7 +71,10 @@ export type EntregaConsulta = {
 // Odoo vem da expedição/carga (odoo_expedicao); no Protheus só o tipo da
 // saída (a filial de entrega ficava na ZAE, que nunca sincronizamos).
 export type ModoEntrega = "entrega" | "express" | "retira";
-export type LogisticaPedido = { filialVenda: string | null; filialEntrega: string | null; modo: ModoEntrega | null; retiraEm: string | null };
+// Situação do pedido no Odoo (Victor 26/10: "se está em separação, previsão
+// de carga, previsão de entrega, qual a carga").
+export type SituacaoPedido = { texto: string; tom: "bom" | "atencao" | "critico" | "neutro"; carga: string | null; detalhes: string[] };
+export type LogisticaPedido = { filialVenda: string | null; filialEntrega: string | null; modo: ModoEntrega | null; retiraEm: string | null; situacao?: SituacaoPedido };
 
 export type PedidoConsulta = {
   venda: VendaConsulta | null;
@@ -112,7 +115,67 @@ export type ResultadoConsulta = {
 
 const digitos = (s: string) => s.replace(/\D/g, "");
 
-type LinhaExpedicao = { pedido: string; modo: string | null; expresso: boolean | null; filial_entrega: string | null; retira_em: string | null; empresa: string | null };
+type LinhaExpedicao = {
+  pedido: string;
+  modo: string | null;
+  expresso: boolean | null;
+  filial_entrega: string | null;
+  retira_em: string | null;
+  empresa: string | null;
+  data_programada?: string | null;
+  pendencia_motivo?: string | null;
+  carga_id?: number | null;
+  carga_romaneio?: string | null;
+  carga_estado?: string | null;
+  carga_prevista?: string | null;
+  carga_saiu_em?: string | null;
+  carga_fim_em?: string | null;
+  resultado?: string | null;
+};
+const COLUNAS_SITUACAO = "data_programada, pendencia_motivo, carga_id, carga_romaneio, carga_estado, carga_prevista, carga_saiu_em, carga_fim_em, resultado";
+
+const diaBr = (iso: string | null | undefined) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : null);
+const horaBr = (iso: string | null | undefined) =>
+  iso ? new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Recife", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
+
+const ESTADO_CARGA: Record<string, { texto: string; tom: SituacaoPedido["tom"] }> = {
+  montagem: { texto: "Em carga (montagem)", tom: "neutro" },
+  separacao: { texto: "Em separação", tom: "neutro" },
+  conferida: { texto: "Conferido, aguardando sair", tom: "neutro" },
+  liberada: { texto: "Carregado, liberado para sair", tom: "neutro" },
+  em_rota: { texto: "Saiu para entrega", tom: "atencao" },
+};
+
+export function situacaoDoOdoo(linhas: LinhaExpedicao[], modo: ModoEntrega | null): SituacaoPedido | undefined {
+  if (linhas.length === 0) return undefined;
+  // Linha da carga mais recente (o mesmo pedido pode ter passado por mais de uma).
+  const comCarga = [...linhas].filter((l) => l.carga_id).sort((a, b) => (b.carga_id ?? 0) - (a.carga_id ?? 0));
+  const c = comCarga[0];
+  const naFila = linhas.find((l) => l.modo && !l.carga_id);
+  const prog = linhas.map((l) => l.data_programada).find(Boolean);
+  const detalhes: string[] = [];
+  const carga = c?.carga_romaneio ?? null;
+  if (c?.carga_prevista) detalhes.push(`carga prevista ${diaBr(c.carga_prevista)}`);
+  if (c?.carga_saiu_em) detalhes.push(`saiu ${horaBr(c.carga_saiu_em)}`);
+  if (prog) detalhes.push(`programado ${diaBr(prog)}`);
+
+  const ultimo = c?.resultado ?? linhas.map((l) => l.resultado).find(Boolean) ?? null;
+  if (naFila) {
+    const pend = linhas.map((l) => l.pendencia_motivo).find(Boolean);
+    if (pend) return { texto: `Pendência: ${pend}`, tom: "critico", carga: null, detalhes };
+    const voltou = ultimo === "insucesso" || ultimo === "reagendada";
+    if (modo === "retira") return { texto: "Aguardando o cliente retirar", tom: "atencao", carga: null, detalhes };
+    return { texto: voltou ? "Voltou da entrega, aguardando nova carga" : "Aguardando carga", tom: voltou ? "critico" : "neutro", carga: null, detalhes };
+  }
+  if (!c) return undefined;
+  if (c.carga_estado === "cancelada") return { texto: "Carga cancelada", tom: "neutro", carga, detalhes };
+  if (c.resultado === "entregue") return { texto: "Entregue", tom: "bom", carga, detalhes: [...detalhes, ...(c.carga_fim_em ? [`fim da rota ${horaBr(c.carga_fim_em)}`] : [])] };
+  if (c.resultado === "entrega_parcial") return { texto: "Entregue em parte", tom: "atencao", carga, detalhes };
+  if (c.resultado === "insucesso" || c.resultado === "reagendada") return { texto: c.resultado === "reagendada" ? "Reagendado" : "Não entregue", tom: "critico", carga, detalhes };
+  if (c.carga_estado === "finalizada") return { texto: "Carga finalizada sem baixa deste pedido", tom: "atencao", carga, detalhes };
+  const e = ESTADO_CARGA[c.carga_estado ?? ""] ?? { texto: "Em carga", tom: "neutro" as const };
+  return { ...e, carga, detalhes };
+}
 type LinhaExpedicaoCompleta = LinhaExpedicao & { cliente: string | null; telefone: string | null; nf5922: string | null; nf5117: string | null; legado: boolean };
 
 const MAX_PEDIDOS_ODOO = 20;
@@ -143,7 +206,7 @@ export function agruparPedidosOdoo(linhas: LinhaExpedicaoCompleta[], jaMostrados
 
 async function pedidosOdooDaBusca(q: string, tipo: ResultadoConsulta["tipo"], jaMostrados: Set<string>): Promise<PedidoOdooConsulta[]> {
   const admin = getSupabaseAdmin();
-  const colunas = "pedido, cliente, telefone, empresa, nf5922, nf5117, legado, modo, expresso, filial_entrega, retira_em";
+  const colunas = `pedido, cliente, telefone, empresa, nf5922, nf5117, legado, modo, expresso, filial_entrega, retira_em, ${COLUNAS_SITUACAO}`;
   let consulta = admin.from("odoo_expedicao").select(colunas);
   const nome = nomePedidoOdoo(q);
   const d = digitos(q);
@@ -166,11 +229,13 @@ export function logisticaDoOdoo(filialVenda: string | null, linhas: LinhaExpedic
   // A linha com modo (veio da expedição) sabe mais que a da carga.
   const l = [...linhas].sort((a, b) => Number(!!b.modo) - Number(!!a.modo))[0];
   const daEmpresa = l?.empresa?.match(/^\d{3}/)?.[0] ?? null;
+  const modo: ModoEntrega | null = !l?.modo ? null : l.modo.startsWith("retira") ? "retira" : l.expresso ? "express" : "entrega";
   return {
     filialVenda,
     filialEntrega: l?.filial_entrega || daEmpresa,
-    modo: !l?.modo ? null : l.modo.startsWith("retira") ? "retira" : l.expresso ? "express" : "entrega",
+    modo,
     retiraEm: l?.retira_em ?? null,
+    situacao: situacaoDoOdoo(linhas, modo),
   };
 }
 
@@ -420,7 +485,7 @@ async function consultarBase(busca: string): Promise<ResultadoConsulta> {
 
   const nomesOdoo = [...porCliente.values()].flatMap((c) => c.pedidos.map((p) => (p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null))).filter((n): n is string => !!n);
   const expedicao = nomesOdoo.length
-    ? (await admin.from("odoo_expedicao").select("pedido, modo, expresso, filial_entrega, retira_em, empresa").in("pedido", [...new Set(nomesOdoo)]).returns<LinhaExpedicao[]>()).data ?? []
+    ? (await admin.from("odoo_expedicao").select(`pedido, modo, expresso, filial_entrega, retira_em, empresa, ${COLUNAS_SITUACAO}`).in("pedido", [...new Set(nomesOdoo)]).returns<LinhaExpedicao[]>()).data ?? []
     : [];
   for (const c of porCliente.values()) {
     for (const p of c.pedidos) {

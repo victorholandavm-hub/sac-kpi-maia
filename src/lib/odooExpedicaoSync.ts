@@ -34,6 +34,13 @@ export function linhasDaCarga(c: CargaDetalhe, empresa: string, agora: string) {
         telefone: p.telefone || null,
         legado: !!k.legado,
         estado: k.estado || null,
+        carga_id: c.carga_id,
+        carga_romaneio: c.romaneio || null,
+        carga_estado: c.cancelada ? "cancelada" : c.estado || null,
+        carga_prevista: odooDia(c.data_prevista),
+        carga_saiu_em: odooUtc(c.saiu_em),
+        carga_fim_em: odooUtc(c.fim_rota_em),
+        resultado: p.resultado || null,
         visto_em: agora,
       }))
   );
@@ -50,6 +57,15 @@ async function gravar(admin: ReturnType<typeof getSupabaseAdmin>, linhas: { pick
     if (error) throw new Error(error.message);
   }
   return unicas.length;
+}
+
+// Datas do Odoo vêm em UTC sem fuso ("2026-10-26 15:36:38"). Formato fora do
+// esperado vira null: uma data estranha não pode derrubar a gravação da empresa.
+function odooUtc(v: string | false | null | undefined): string | null {
+  return v && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(v) ? `${v.slice(0, 19).replace(" ", "T")}Z` : null;
+}
+function odooDia(v: string | false | null | undefined): string | null {
+  return v && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null;
 }
 
 export function linhaDaSaida(e: EntregaOdoo, companyId: number, empresa: string, agora: string) {
@@ -70,6 +86,17 @@ export function linhaDaSaida(e: EntregaOdoo, companyId: number, empresa: string,
     filial_entrega: e.filial_entrega || null,
     retira_em: e.retira_em || null,
     expresso: !!e.expresso,
+    data_programada: odooDia(e.data_programada),
+    pendencia_motivo: e.pendencia ? e.pendencia_motivo || "pendência" : null,
+    // Situação da carga: zerada aqui e preenchida pela leitura das cargas, logo
+    // depois na mesma rodada (saída que voltou pra fila não fica com a carga
+    // antiga). O resultado da última tentativa não é apagado.
+    carga_id: e.carga_id || null,
+    carga_romaneio: e.carga_id ? e.carga || null : null,
+    carga_estado: null,
+    carga_prevista: null,
+    carga_saiu_em: null,
+    carga_fim_em: null,
     visto_em: agora,
   };
 }

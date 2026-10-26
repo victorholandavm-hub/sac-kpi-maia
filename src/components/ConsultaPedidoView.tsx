@@ -1,4 +1,4 @@
-import { consultarPedidos, type PedidoConsulta, type PedidoOdooConsulta, type TentativaConsulta, type ItemConsulta, type LogisticaPedido } from "@/lib/consultaPedido";
+import { consultarPedidos, type PedidoConsulta, type PedidoOdooConsulta, type TentativaConsulta, type ItemConsulta, type LogisticaPedido, type SituacaoPedido } from "@/lib/consultaPedido";
 import { STORE_LABELS } from "@/lib/labels";
 import { formatarDocumento } from "@/lib/rotasDoDiaCore";
 import { nomePedidoOdoo } from "@/lib/pedidoOdoo";
@@ -101,6 +101,29 @@ function Filiais({ l }: { l: LogisticaPedido }) {
   );
 }
 
+// Situação no Odoo: em separação / em rota / entregue, qual carga e as datas.
+function Situacao({ s, acao }: { s: SituacaoPedido; acao: string }) {
+  const cor = COR_TOM[s.tom];
+  return (
+    <div className="rounded-xl px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1" style={{ background: `color-mix(in srgb, ${cor} 10%, var(--surface-2))` }}>
+      <span className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+        <span aria-hidden className="inline-block w-2 h-2 rounded-full" style={{ background: cor }} />
+        {s.texto}
+      </span>
+      {s.carga ? (
+        <a href={`${acao}?q=${encodeURIComponent(s.carga)}`} className="text-sm underline font-medium" style={{ color: "var(--text-primary)" }}>
+          Carga {s.carga}
+        </a>
+      ) : null}
+      {s.detalhes.length ? (
+        <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
+          {s.detalhes.join(" · ")}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 // Nota do Protheus: sem XML não há DANFE; a chave é o que dá pra entregar.
 function ChaveNota({ chave }: { chave: string }) {
   return (
@@ -139,7 +162,7 @@ function BotoesNota({ pedido }: { pedido: string }) {
   );
 }
 
-function PedidoOdoo({ p }: { p: PedidoOdooConsulta }) {
+function PedidoOdoo({ p, acao }: { p: PedidoOdooConsulta; acao: string }) {
   return (
     <li className="rounded-2xl p-4 sm:p-5 flex flex-col gap-3" style={{ background: "var(--surface-1)" }}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -161,6 +184,7 @@ function PedidoOdoo({ p }: { p: PedidoOdooConsulta }) {
           {p.legado ? " · venda do Protheus" : ""}
         </span>
       </div>
+      {p.logistica.situacao ? <Situacao s={p.logistica.situacao} acao={acao} /> : null}
       <Filiais l={p.logistica} />
       <BotoesNota pedido={p.pedido} />
     </li>
@@ -188,6 +212,7 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
         </div>
         {e ? <Selo texto={e.statusAtual ?? "Sem status"} tom={tomStatusAtual(e.statusAtual)} /> : <Selo texto="Sem entrega" tom="neutro" />}
       </div>
+      {p.logistica?.situacao ? <Situacao s={p.logistica.situacao} acao={acao} /> : null}
       {p.logistica ? <Filiais l={p.logistica} /> : null}
       {e && nomePedidoOdoo(e.pedido) ? <BotoesNota pedido={nomePedidoOdoo(e.pedido)!} /> : null}
 
@@ -389,7 +414,7 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
               </div>
               <ul className="flex flex-col gap-3">
                 {r.odoo.map((p) => (
-                  <PedidoOdoo key={p.pedido} p={p} />
+                  <PedidoOdoo key={p.pedido} p={p} acao={acao} />
                 ))}
               </ul>
             </section>
