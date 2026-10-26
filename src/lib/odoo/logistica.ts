@@ -42,7 +42,8 @@ export type PerfilOdoo = "logistica" | "motorista";
 const TIMEOUT_PADRAO_MS = 20_000;
 // "sair em rota" emite uma NF-e 5117 por pedido (transmissão SEFAZ), pode
 // levar bem mais que uma leitura.
-const TIMEOUT_FATURAMENTO_MS = 120_000;
+// 26/10: carga de 16 notas levou 202 s; a tela segue acompanhando pelo progresso se a resposta não vier a tempo
+const TIMEOUT_FATURAMENTO_MS = 290_000;
 
 export class OdooBridgeError extends Error {
   constructor(

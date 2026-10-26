@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   acaoCargaAction,
   acaoMdfeAction,
-  progressoCargaAction,
   baixarEntregaManualAction,
   itensEntregaAction,
   naoSaiuAction,
@@ -56,6 +55,17 @@ const COR_RESULTADO: Record<string, string> = {
   reagendada: "var(--status-info)",
 };
 
+// 26/10: GET comum (não server action) para atualizar enquanto o faturamento roda
+async function lerProgresso(cargaId: number): Promise<ProgressoCarga | null> {
+  try {
+    const r = await fetch(`/api/logistica/carga-progresso/${cargaId}`, { cache: "no-store" });
+    const j = (await r.json()) as { ok: boolean; dados?: ProgressoCarga };
+    return j.ok && j.dados ? j.dados : null;
+  } catch {
+    return null;
+  }
+}
+
 export function CargaDetalheView({
   carga,
   catalogos,
@@ -85,6 +95,18 @@ export function CargaDetalheView({
   const [progresso, setProgresso] = useState<ProgressoCarga | null>(null);
   const [painelProg, setPainelProg] = useState(false);
   const comecou = useRef(false);
+  // 26/10 (Jhon travado na ROM/2026/00054): a resposta do "Sair" pode não chegar (202 s no servidor) mas as notas
+  // continuam saindo. A tela segue lendo o progresso até acabar e só então emite o manifesto.
+  const fimResposta = useRef<number | null>(null);
+  const mdfeFeito = useRef(false);
+  function emitirManifesto() {
+    if (mdfeFeito.current) return;
+    mdfeFeito.current = true;
+    setMdfeMsg("Emitindo o manifesto (MDF-e)…");
+    acaoMdfeAction(carga.carga_id, "emitir")
+      .then((m) => setMdfeMsg(m.ok ? `Manifesto emitido: nº ${String(m.dados?.numero ?? "")} (${String(m.dados?.estado ?? "")})` : `Manifesto NÃO emitido: ${m.erro}`))
+      .catch(() => setMdfeMsg("Manifesto NÃO emitido: falha de comunicação. Tente pela aba Manifesto."));
+  }
   // 26/10 (Pedro): clicar na cliente mostra os itens da parada
   const [abertas, setAbertas] = useState<number[]>([]);
   const [estoqueItens, setEstoqueItens] = useState<Record<number, Record<string, boolean>>>({});
@@ -121,26 +143,21 @@ export function CargaDetalheView({
   const todosLegado = carga.paradas.length > 0 && carga.paradas.every((p) => p.pickings.every((pk) => pk.legado));
 
   function sair(parciais: Parciais | null) {
-    setProgresso(null); setPainelProg(true); setEmitindo(true); comecou.current = false;
+    setProgresso(null); setPainelProg(true); setEmitindo(true); comecou.current = false; fimResposta.current = null; mdfeFeito.current = false; setMdfeMsg(null);
     run(
       () => acaoCargaAction(carga.carga_id, "sair", parciais ? { parciais } : {}),
       (r) => `Carga ${r.romaneio}: ${ESTADO_CARGA_LABELS[r.estado] ?? r.estado}.${parciais ? " O que não foi carregado voltou para a Expedição." : ""}`,
       (r) => {
         setConferindo(false);
         if (r.notas?.length) setNotas(r.notas);
-        if (emitirMdfe) {
-          setMdfeMsg("Emitindo o manifesto (MDF-e)…");
-          acaoMdfeAction(carga.carga_id, "emitir")
-            .then((m) => setMdfeMsg(m.ok ? `Manifesto emitido: nº ${String(m.dados?.numero ?? "")} (${String(m.dados?.estado ?? "")})` : `Manifesto NÃO emitido: ${m.erro}`))
-            .catch(() => setMdfeMsg("Manifesto NÃO emitido: falha de comunicação. Tente pela aba Manifesto."));
-        }
+        if (emitirMdfe) emitirManifesto();
       },
     );
   }
   useEffect(() => {
     if (!emitindo) return;
     let vivo = true;
-    const ler = () => progressoCargaAction(carga.carga_id).then((r) => { if (vivo && r.ok && r.dados) setProgresso(r.dados); }).catch(() => {});
+    const ler = () => lerProgresso(carga.carga_id).then((r) => { if (vivo && r) setProgresso(r); });
     ler();
     const t = setInterval(ler, 2000);
     return () => { vivo = false; clearInterval(t); };
@@ -148,11 +165,21 @@ export function CargaDetalheView({
   useEffect(() => {
     if (!emitindo) return;
     if (pending) { comecou.current = true; return; }
-    if (comecou.current) {
-      progressoCargaAction(carga.carga_id).then((r) => { if (r.ok && r.dados) setProgresso(r.dados); }).catch(() => {});
-      setEmitindo(false);
-    }
+    if (comecou.current && fimResposta.current === null) fimResposta.current = Date.now();
   }, [pending, emitindo, carga.carga_id]);
+  // depois que a resposta do "Sair" voltou (ou desistiu por tempo): continua lendo o progresso até todas as notas
+  // saírem; se a carga não ficou "em rota" é porque a saída falhou de verdade (o aviso de erro já apareceu)
+  useEffect(() => {
+    if (!emitindo || pending || fimResposta.current === null || !progresso) return;
+    const decorrido = Date.now() - fimResposta.current;
+    const falhou = progresso.estado !== "em_rota" && decorrido > 4000;
+    const acabou = progresso.estado === "em_rota" && progresso.itens.length > 0 && progresso.itens.every((i) => i.estado === "ok" || i.estado === "erro");
+    if (falhou || acabou || decorrido > 15 * 60_000) {
+      setEmitindo(false);
+      if (acabou && emitirMdfe) emitirManifesto();
+      router.refresh();
+    }
+  }, [progresso, pending, emitindo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function avancar() {
     if (!proxima) return;
@@ -258,8 +285,8 @@ export function CargaDetalheView({
           </>
         ) : null}
         {painelProg ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(11,11,11,.45)" }}>
-            <div className="cartao p-4 w-full max-w-lg flex flex-col gap-2" style={{ background: "var(--surface-1, #fff)", maxHeight: "85vh", overflow: "auto" }}>
+          <div>
+            <div className="cartao p-4 w-full flex flex-col gap-2" style={{ borderColor: "var(--brand-green, #1B7E3B)" }}>
               <h3 className="font-bold">{emitindo ? "Emitindo as notas…" : "Notas emitidas"} {progresso ? `· ${progresso.carga}` : ""}</h3>
               <div className="text-sm">{progresso ? `${progresso.feitos} de ${progresso.total} notas` : "Preparando…"}{progresso && progresso.erros ? ` · ${progresso.erros} com erro` : ""}</div>
               <div style={{ height: 10, borderRadius: 6, background: "var(--border)", overflow: "hidden" }}>
@@ -276,7 +303,7 @@ export function CargaDetalheView({
               </div>
               {!emitindo ? (
                 <button type="button" className={botaoClass} style={botaoPrimarioStyle} onClick={() => setPainelProg(false)}>Fechar</button>
-              ) : <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Não feche a tela: as notas estão sendo enviadas à SEFAZ.</p>}
+              ) : <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{pending ? "Não feche a tela: as notas estão sendo enviadas à SEFAZ." : "O servidor continua emitindo as notas; esta tela acompanha até a última e depois emite o manifesto."}</p>}
             </div>
           </div>
         ) : null}
