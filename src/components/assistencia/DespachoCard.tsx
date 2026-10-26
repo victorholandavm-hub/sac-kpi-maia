@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { formatFullAddress, type ServiceRequestDetail } from "@/lib/serviceRequests";
 import { formatDateOnlyBr } from "@/lib/formatDateTime";
-import { REQUEST_TYPE_LABELS, pickupDestinationLabel } from "@/lib/assistenciaLabels";
+import { REQUEST_TYPE_LABELS, pickupDestinationLabel, PRODUCT_CHECKLIST_LOCATION_LABELS, type ProductChecklistLocation } from "@/lib/assistenciaLabels";
 import type { RequestPhoto } from "@/lib/servicePhotos";
 import { NotaFiscalPdf } from "./NotaFiscalPdf";
 
@@ -256,6 +256,21 @@ export function DespachoCard({ request, invoicePhoto }: { request: ServiceReques
         <Field label="Atendente" value={request.requestedByName} />
         <Field label="Autorizado por" value={request.authorizedBy} />
         <Field label="Problema" value={request.reason} />
+        {/* Em destaque entre Problema e Observação -- pedido do Victor
+            26/10/2026, mesmo padrão visual do retângulo de "Produto
+            recolhido vai pra" abaixo. Só aparece pros 3 tipos com checklist
+            (envio_peca/troca_produto/entrega_produto, ver
+            CHECKLIST_REQUIRED_TYPES em assistenciaLabels.ts) -- os outros
+            nunca preenchem checklistLocalizacao. */}
+        {request.checklistLocalizacao ? (
+          <div
+            className="self-start px-3 py-1.5 rounded-lg border-2 text-sm font-bold"
+            style={{ color: "#000", borderColor: "#000" }}
+          >
+            Onde o produto está:{" "}
+            {PRODUCT_CHECKLIST_LOCATION_LABELS[request.checklistLocalizacao as ProductChecklistLocation] ?? request.checklistLocalizacao}
+          </div>
+        ) : null}
         <Field label="Observação" value={request.restrictionNote || request.notes} />
         {/* Destino do produto recolhido em destaque -- pedido do Victor
             30/09/2026: "na notificação essa informação tem que aparecer em
