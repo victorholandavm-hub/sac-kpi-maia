@@ -121,6 +121,9 @@ export type ClienteConsulta = { codigo: string; nome: string | null; documento: 
 export type PedidoOdooConsulta = {
   pedido: string;
   cliente: string | null;
+  // Código do cliente no Odoo e CPF/CNPJ (Victor 27/10: "preciso do código do cliente").
+  clienteCodigo?: string | null;
+  clienteDocumento?: string | null;
   telefone: string | null;
   empresa: string | null;
   nf5922: string | null;
@@ -644,6 +647,8 @@ export function cartaoDaConsulta(p: PedidoOdooPonte): PedidoOdooConsulta {
   return {
     pedido: p.pedido,
     cliente: p.cliente?.nome || null,
+    clienteCodigo: p.cliente?.id ? String(p.cliente.id) : null,
+    clienteDocumento: p.cliente?.cpf?.replace(/\D/g, "") || null,
     telefone: p.cliente?.telefone || null,
     empresa: p.loja || null,
     nf5922,
@@ -676,6 +681,8 @@ async function juntarBuscaDoOdoo(r: ResultadoConsulta, q: string): Promise<Pedid
     p.nf5922 ??= a.nf5922;
     p.nf5117 ??= a.nf5117;
     p.telefone ??= a.telefone;
+    p.clienteCodigo ??= a.clienteCodigo;
+    p.clienteDocumento ??= a.clienteDocumento;
     Object.assign(p, { dataVenda: a.dataVenda, vendedor: a.vendedor, total: a.total, itens: a.itens, notas: a.notas, naHora: a.naHora });
   }
   const jaMostrados = new Set([
@@ -693,7 +700,9 @@ async function juntarBuscaDoOdoo(r: ResultadoConsulta, q: string): Promise<Pedid
   const extras = novos.map((n) => {
     const a = porPedido.get(n)!;
     const t = daTabela.get(n);
-    return t ? { ...a, ...t, nf5922: t.nf5922 ?? a.nf5922, nf5117: t.nf5117 ?? a.nf5117, telefone: t.telefone ?? a.telefone, situacaoOdoo: a.situacaoOdoo } : a;
+    return t
+      ? { ...a, ...t, nf5922: t.nf5922 ?? a.nf5922, nf5117: t.nf5117 ?? a.nf5117, telefone: t.telefone ?? a.telefone, clienteCodigo: a.clienteCodigo, clienteDocumento: a.clienteDocumento, situacaoOdoo: a.situacaoOdoo }
+      : a;
   });
   return [...atuais, ...extras];
 }

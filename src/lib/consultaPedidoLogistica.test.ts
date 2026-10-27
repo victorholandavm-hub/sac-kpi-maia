@@ -137,7 +137,7 @@ describe("cartaoDaConsulta (/consulta/pedidos)", () => {
   };
   it("itens com código, nota de venda do Protheus pela chave e a nota pra ligar com a venda", () => {
     const c = cartaoDaConsulta(base);
-    expect(c).toMatchObject({ pedido: "S00408", telefone: "83 98845", nf5922: "23797/1", legado: true, vendedor: "L67 · Fernanda Fernandes", total: 537.8 });
+    expect(c).toMatchObject({ pedido: "S00408", clienteCodigo: "1", clienteDocumento: "04682762460", telefone: "83 98845", nf5922: "23797/1", legado: true, vendedor: "L67 · Fernanda Fernandes", total: 537.8 });
     expect(c.itens).toEqual([{ codigo: "071280", descricao: "MULTI-USO NEW ATACAMA", quantidade: 1 }]);
     expect(c.notas).toEqual([{ tipo: "5922 (Protheus)", numero: "23797/1", chave: "25260939537682000373550010000237971194893562" }]);
     expect(c.situacaoOdoo).toBe("Aguardando o cliente retirar na loja 212");

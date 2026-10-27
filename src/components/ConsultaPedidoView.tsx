@@ -241,6 +241,11 @@ function PedidoOdoo({ p, acao }: { p: PedidoOdooConsulta; acao: string }) {
           <span className="text-sm" style={{ color: "var(--text-primary)" }}>
             {p.cliente ?? "Cliente sem nome"}
           </span>
+          {p.clienteDocumento || p.clienteCodigo ? (
+            <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
+              {[p.clienteDocumento ? formatarDocumento(p.clienteDocumento) : null, p.clienteCodigo ? `código ${p.clienteCodigo}` : null].filter(Boolean).join(" · ")}
+            </span>
+          ) : null}
           {p.telefone ? (
             <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
               {p.telefone}
