@@ -49,6 +49,8 @@ import {
   criarProdutoCadastro,
   type ProdutoCadastro,
   buscarEntregas,
+  historicoCliente,
+  type HistCliente,
   type BuscaEntrega,
   buscarNfChave,
   type NfChave,
@@ -199,6 +201,11 @@ export async function naoSaiuAction(cargaId: number, paradaId: number, obs: stri
     (operador) => registrarParadaPeloCd(paradaId, { resultado: "insucesso", motivo: "nao_saiu_cd", obs: `Não saiu do CD (${operador}): ${obs || "carregado por engano"}`.slice(0, 500) }),
     [`${BASE}/cargas/${cargaId}`, `${BASE}/expedicao`],
   );
+}
+
+export async function historicoClienteAction(q: string): Promise<ResultadoAcao<HistCliente[]>> {
+  if (String(q || "").trim().length < 3) return { ok: true, dados: [] } as ResultadoAcao<HistCliente[]>;
+  return executar(() => historicoCliente(q.trim()));
 }
 
 export async function buscarEntregasAction(q: string): Promise<ResultadoAcao<BuscaEntrega[]>> {

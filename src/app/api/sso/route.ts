@@ -53,11 +53,13 @@ function validar(t: string): Payload | null {
   return p;
 }
 
-function paraLogin(req: NextRequest, assistencia: boolean) {
-  const url = req.nextUrl.clone();
-  url.pathname = assistencia ? "/assistencia/login" : "/login";
-  url.search = "?sso=expirado";
-  return NextResponse.redirect(url, 303);
+// endereço PÚBLICO fixo (atrás do nginx o req.nextUrl vem como localhost:300x; não confiar no Host recebido)
+function base(): string {
+  return process.env.ASSISTENCIA_ONLY_PROJECT ? "https://assistencia.lojasmaia.com.br" : "https://sac.lojasmaia.com.br";
+}
+
+function paraLogin(_req: NextRequest, assistencia: boolean) {
+  return NextResponse.redirect(base() + (assistencia ? "/assistencia/login" : "/login") + "?sso=expirado", 303);
 }
 
 export async function GET(req: NextRequest) {
@@ -66,9 +68,7 @@ export async function GET(req: NextRequest) {
   const p = validar(t);
   if (!p) return paraLogin(req, somenteAssistencia);
   const assistencia = p.d.startsWith("/assistencia");
-  const destino = req.nextUrl.clone();
-  destino.pathname = p.d.split("?")[0];
-  destino.search = p.d.includes("?") ? "?" + p.d.split("?").slice(1).join("?") : "";
+  const destino = base() + p.d;
 
   if (assistencia) {
     try {

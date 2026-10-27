@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { buscarEntregasAction, incluirNaCargaAction, montarCargaAction } from "@/app/assistencia/logistica/logistica-actions";
-import type { BuscaEntrega } from "@/lib/odoo/logistica";
+import { buscarEntregasAction, historicoClienteAction, incluirNaCargaAction, montarCargaAction } from "@/app/assistencia/logistica/logistica-actions";
+import type { BuscaEntrega, HistCliente } from "@/lib/odoo/logistica";
 import { useEffect } from "react";
 import {
   CATEGORIA_LABELS,
@@ -59,12 +59,27 @@ export function ExpedicaoBoard({
   const [fora, setFora] = useState<BuscaEntrega[]>([]);
   useEffect(() => {
     const q = busca.trim();
-    if (q.length < 3) { setFora([]); return; }
+    if (q.length < 3) return;
     const t = setTimeout(() => {
       buscarEntregasAction(q).then((r) => setFora(r.ok ? (r.dados ?? []).filter((x) => !x.na_fila) : [])).catch(() => setFora([]));
     }, 500);
     return () => clearTimeout(t);
   }, [busca]);
+  // 27/10 (Pedro): buscando cliente/CPF, mostrar também o histórico do sistema antigo (se já foi entregue, em qual carga)
+  const [hist, setHist] = useState<HistCliente[]>([]);
+  const [histCarregando, setHistCarregando] = useState(false);
+  useEffect(() => {
+    const q = busca.trim();
+    const digitos = q.replace(/\D/g, "");
+    const pareceCliente = digitos.length === 11 || digitos.length === 14 || /[A-Za-zÀ-ú]{3,}\s+[A-Za-zÀ-ú]{2,}/.test(q);
+    if (!pareceCliente) return;
+    const t = setTimeout(() => {
+      setHistCarregando(true);
+      historicoClienteAction(q).then((r) => setHist(r.ok ? r.dados ?? [] : [])).catch(() => setHist([])).finally(() => setHistCarregando(false));
+    }, 800);
+    return () => clearTimeout(t);
+  }, [busca]);
+  const buscaEhCliente = (() => { const q = busca.trim(); const d = q.replace(/\D/g, ""); return d.length === 11 || d.length === 14 || /[A-Za-zÀ-ú]{3,}\s+[A-Za-zÀ-ú]{2,}/.test(q); })();
   const [form, setForm] = useState({ tipo: "entrega", zona_id: "", motorista_id: "", veiculo_id: "", descricao: "", transportadora: "", data_prevista: "" });
 
   const todas = useMemo(() => [...expedicao.entregas, ...expedicao.pendencias], [expedicao]);
@@ -98,12 +113,25 @@ export function ExpedicaoBoard({
     if (z && !form.zona_id) setForm((f) => ({ ...f, zona_id: String(z) }));
   }
 
+  // 27/10: com a fila de todas as empresas, a carga nasce na empresa da fila das saídas marcadas (CD = 213 na maioria)
+  function empresaDaSelecao(): number | null {
+    const emps = new Set([...sel].map((id) => todas.find((e) => e.picking_id === id)?.empresa_id ?? companyId));
+    if (emps.size > 1) {
+      const nomes = [...new Set([...sel].map((id) => todas.find((e) => e.picking_id === id)?.empresa_nome ?? "?"))].join(", ");
+      window.alert(`As saídas marcadas são de filas diferentes (${nomes}). Monte uma carga para cada fila, ou use o seletor de empresa.`);
+      return null;
+    }
+    return [...emps][0] ?? companyId;
+  }
+
   function montar() {
     const n = (v: string) => (v ? Number(v) : null);
+    const empresaCarga = empresaDaSelecao();
+    if (empresaCarga == null) return;
     run(
       () =>
         montarCargaAction({
-          company_id: companyId,
+          company_id: empresaCarga,
           picking_ids: [...sel],
           tipo: form.tipo,
           zona_id: n(form.zona_id),
@@ -116,7 +144,7 @@ export function ExpedicaoBoard({
       (c) => `Carga ${c.romaneio} montada com ${c.qtd_paradas} parada(s).`,
       (c) => {
         setSel(new Set());
-        router.push(`/assistencia/logistica/cargas/${c.carga_id}?empresa=${companyId}`);
+        router.push(`/assistencia/logistica/cargas/${c.carga_id}?empresa=${empresaCarga}`);
       },
     );
   }
@@ -135,7 +163,7 @@ export function ExpedicaoBoard({
   }
 
   function acao(e: EntregaOdoo, a: AcaoEntrega) {
-    setAlvo({ pickingId: e.picking_id, nome: e.nome, cliente: e.cliente, acao: a, companyId });
+    setAlvo({ pickingId: e.picking_id, nome: e.nome, cliente: e.cliente, acao: a, companyId: e.empresa_id ?? companyId });
   }
 
   return (
@@ -343,9 +371,16 @@ export function ExpedicaoBoard({
                     {e.pedido || e.origem}
                     <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       {e.nome}
+                      {e.empresa_nome ? <> · fila <b>{e.empresa_nome}</b></> : null}
                     </div>
                     {e.nf5922 ? <Chip>5922 nº {e.nf5922}</Chip> : <Chip cor="var(--status-critical)">sem nota</Chip>}
                     {e.nf5117 ? <Chip forte>5117 nº {e.nf5117}</Chip> : null}
+                    {e.chave5117 ? (
+                      <a href={`/assistencia/logistica/pdf/nota/${e.chave5117}`} target="_blank" rel="noopener noreferrer" className="text-xs underline ml-1" title="DANFE da nota de entrega (vai com a mercadoria)">🖨 5117</a>
+                    ) : null}
+                    {e.chave5922 ? (
+                      <a href={`/assistencia/logistica/pdf/nota/${e.chave5922}`} target="_blank" rel="noopener noreferrer" className="text-xs underline ml-1" title="DANFE da nota de venda">🖨 5922</a>
+                    ) : null}
                   </td>
                   <td className="p-2 align-top">
                     {e.zona ? <Chip forte>{e.zona}</Chip> : <Chip>sem região</Chip>}
@@ -398,7 +433,7 @@ export function ExpedicaoBoard({
         </table>
       </div>
 
-      {fora.length ? (
+      {busca.trim().length >= 3 && fora.length ? (
         <div className="cartao p-4 flex flex-col gap-2">
           <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
             Fora da fila (em carga, em rota, entregue, pendência ou na loja) · {fora.length}
@@ -417,6 +452,46 @@ export function ExpedicaoBoard({
                   abrir carga
                 </a>
               ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {histCarregando && buscaEhCliente ? (
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Buscando o histórico do sistema antigo…</p>
+      ) : null}
+      {buscaEhCliente && hist.some((c) => (c.vendas?.length ?? 0) > 0 || (c.pendentes_antigo?.length ?? 0) > 0 || c.erro) ? (
+        <div className="cartao p-3 flex flex-col gap-2">
+          <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>Histórico do sistema antigo (até 24/10)</h3>
+          {hist.map((c) => (
+            <div key={c.cpf} className="flex flex-col gap-1">
+              <div className="text-sm"><b>{c.nome}</b> · {c.cpf}{c.cidade ? ` · ${c.cidade}` : ""}{c.erro ? ` · ${c.erro}` : ""}</div>
+              {(c.vendas ?? []).map((v) => (
+                <div key={`${v.loja}-${v.nf}`} className="text-sm py-1" style={{ borderBottom: "1px solid var(--border)" }}>
+                  <div>
+                    Loja <b>{v.loja}</b> · {v.tipo === "5922" ? "venda" : v.tipo} nº <b>{v.nf}</b> · {formatarDiaIso(v.data)}
+                    {v.no_sistema ? (
+                      <span style={{ color: "var(--status-info)", fontWeight: 600 }}> · no sistema novo: {v.no_sistema.pedido} — {v.no_sistema.situacao}</span>
+                    ) : null}
+                  </div>
+                  <div style={{ color: "var(--text-secondary)" }}>
+                    {v.itens.map((i) => `${i.qtd}× ${i.codigo} ${i.nome}`).join(" · ")}
+                  </div>
+                  {v.entregas.length ? v.entregas.map((e) => (
+                    <div key={e.nf}>
+                      entrega nº {e.nf}{e.como ? <> — <b>{e.como}</b></> : null}
+                      {e.atencao ? (
+                        <div className="px-2 py-1 rounded mt-1" style={{ background: "#FFF3BF", color: "#5C4400", fontWeight: 700 }}>⚠ {e.atencao}</div>
+                      ) : null}
+                    </div>
+                  )) : <div style={{ color: "var(--status-critical)", fontWeight: 600 }}>sem nota de entrega (pendente)</div>}
+                </div>
+              ))}
+              {(c.pendentes_antigo ?? []).map((p) => (
+                <div key={`${p.pedido}-${p.nota}`} className="text-sm py-1" style={{ borderBottom: "1px solid var(--border)", color: "var(--status-serious)" }}>
+                  Programado no sistema antigo · loja {p.loja} · pedido {p.pedido}{p.nota ? ` · nota ${p.nota}` : ""} — <b>{p.como}</b>
+                </div>
+              ))}
             </div>
           ))}
         </div>

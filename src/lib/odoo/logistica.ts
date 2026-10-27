@@ -260,6 +260,18 @@ export async function buscarEntregas(q: string): Promise<BuscaEntrega[]> {
   return r.itens ?? [];
 }
 
+// 27/10 (Pedro: "pesquisando o cliente na Expedição era pra aparecer se já foi entregue, em qual carga"): histórico do sistema antigo
+export type HistEntrega = { nf: string; chave?: string; data: string; como?: string; atencao?: string };
+export type HistVenda = { loja: string; tipo: string; nf: string; data: string; valor?: number; chave?: string; atencao?: boolean;
+  itens: { codigo: string; nome: string; qtd: number; entregue: number }[]; entregas: HistEntrega[];
+  no_sistema: { pedido: string; loja: string; estado: string; situacao: string } | null };
+export type HistCliente = { cpf: string; nome?: string; cidade?: string; erro?: string; vendas?: HistVenda[];
+  pendentes_antigo?: { pedido: string; data_venda: string; loja: string; nota: string; como: string; carga: string; status: string }[] };
+export async function historicoCliente(q: string): Promise<HistCliente[]> {
+  const r = await json<{ clientes: HistCliente[] }>("/logistica/historico-cliente", { perfil: "logistica", query: { q }, timeoutMs: 90_000 });
+  return r.clientes ?? [];
+}
+
 export type TransferenciaEmitida = { numero: string; serie: string; data: string; loja: string; valor: number; estado: string; chave: string };
 // 26/10 (Eduardo): notas 5152 já emitidas (o pedido atendido sai da lista; a nota tem que continuar à mão)
 export async function listarTransferencias(dias = 7): Promise<TransferenciaEmitida[]> {

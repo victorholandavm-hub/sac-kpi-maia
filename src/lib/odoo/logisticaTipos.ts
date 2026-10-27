@@ -143,6 +143,12 @@ export type EntregaOdoo = {
   abastece?: string;
   // 26/10: venda EXPRESS (filtro "Entrega" não pode misturar)
   expresso?: boolean;
+  // 27/10: Expedição juntando todas as empresas (como a aba Cargas): de qual fila (empresa) a saída veio
+  empresa_id?: number;
+  empresa_nome?: string;
+  // 27/10 (Pedro/John): chave da 5117 (vai com a mercadoria) e da 5922 (venda), inclusive do sistema antigo -> imprimir DANFE
+  chave5117?: string;
+  chave5922?: string;
 };
 
 export type ExpedicaoResposta = {
@@ -156,7 +162,7 @@ export type ExpedicaoResposta = {
 };
 
 export type ItemParada = { codigo: string; nome: string; qtd: number };
-export type PickingParada = { picking_id: number; nome: string; pedido: string; pedido_id?: number | false; vendedor?: string; estado: string; itens?: ItemParada[]; legado?: boolean };
+export type PickingParada = { picking_id: number; nome: string; pedido: string; pedido_id?: number | false; vendedor?: string; estado: string; itens?: ItemParada[]; legado?: boolean; chave5117?: string; chave5922?: string };
 // 26/10: entrega parcial leva o que foi entregue de cada item; o resto volta para o CD (reentrega)
 export type ItemEntregue = { codigo: string; qtd_entregue: number };
 
