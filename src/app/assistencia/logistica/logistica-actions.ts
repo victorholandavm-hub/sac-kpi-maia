@@ -6,7 +6,7 @@
 // dado -- ver ResultadoAcao em logisticaTipos.ts.
 
 import { revalidatePath } from "next/cache";
-import { limparCacheExpedicao } from "@/lib/odoo/logistica";
+import { transferirItens, limparCacheExpedicao } from "@/lib/odoo/logistica";
 import {
   acaoEntrega,
   lerItensEntrega,
@@ -254,6 +254,12 @@ export async function separarPendenciaAction(pickingId: number, motivo: string, 
   const revalidar = [`${BASE}/expedicao`];
   if (cargaId) revalidar.push(`${BASE}/cargas/${cargaId}`);
   return executar((operador) => separarPendencia(pickingId, motivo.trim(), codigos, operador), revalidar);
+}
+
+export async function transferirItensAction(pickingId: number, companyId: number, codigos: string[]): Promise<ResultadoAcao<EntregaOdoo>> {
+  if (!(companyId > 0)) return { ok: false, erro: "Escolha a filial." };
+  if (!codigos.length) return { ok: false, erro: "Marque os itens que vão." };
+  return executar((operador) => transferirItens(pickingId, companyId, codigos, operador), [`${BASE}/expedicao`]);
 }
 
 export async function estornarEntregaAction(pickingId: number): Promise<ResultadoAcao<{ estornada: string; retorno: string; nova: string }>> {

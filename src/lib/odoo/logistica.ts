@@ -317,6 +317,11 @@ export function separarPendencia(pickingId: number, motivo: string, codigos: str
   return json<{ pendencia: string; itens: string }>(`/logistica/entrega/${int(pickingId)}/separar_pendencia`, { perfil: "logistica", metodo: "POST", corpo: { valor: { motivo, codigos }, operador } });
 }
 
+// 27/10 (Pedro/John): transferir de filial só os itens marcados (a ponte separa a saída e transfere só eles)
+export function transferirItens(pickingId: number, companyId: number, codigos: string[], operador: string): Promise<EntregaOdoo> {
+  return json<EntregaOdoo>(`/logistica/entrega/${int(pickingId)}/transferir_itens`, { perfil: "logistica", metodo: "POST", corpo: { valor: { company_id: int(companyId), codigos }, operador } });
+}
+
 export function acaoEntrega(
   pickingId: number,
   acao: Exclude<AcaoEntrega, "historico" | "estornar">,

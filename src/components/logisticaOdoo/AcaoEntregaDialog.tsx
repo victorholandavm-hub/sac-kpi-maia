@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { acaoEntregaAction, estornarEntregaAction, historicoEntregaAction, itensEntregaAction, retiradaNoCdAction, separarPendenciaAction } from "@/app/assistencia/logistica/logistica-actions";
+import { acaoEntregaAction, estornarEntregaAction, historicoEntregaAction, itensEntregaAction, retiradaNoCdAction, separarPendenciaAction, transferirItensAction } from "@/app/assistencia/logistica/logistica-actions";
 import { ACAO_ENTREGA_LABELS, ESTADO_CARGA_LABELS, formatarDataHoraOdoo, formatarDiaIso, type AcaoEntrega, type CargaOdoo, type EmpresaOdoo, type HistoricoEntrega } from "@/lib/odoo/logisticaTipos";
 import type { ItemEntregaOdoo } from "@/lib/odoo/logistica";
 import { useAcaoOdoo } from "./useAcaoOdoo";
@@ -30,7 +30,7 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
   const [erroItens, setErroItens] = useState<string | null>(null);
 
   useEffect(() => {
-    if (alvo.acao !== "pendencia") return;
+    if (alvo.acao !== "pendencia" && alvo.acao !== "transferir_filial") return;
     let vivo = true;
     // 26/10 (Francisca/Débora): sem tratamento de erro/tempo, o diálogo ficava esperando para sempre e as opções não apareciam
     const t = setTimeout(() => {
@@ -45,7 +45,7 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
         const l = r.ok && Array.isArray(r.dados) ? r.dados : [];
         if (!r.ok) setErroItens(`Não consegui carregar os itens (${r.erro}). Você ainda pode mandar a entrega inteira para pendência.`);
         setItens(l);
-        setMarcados(l.filter((i) => !i.tem_estoque).map((i) => i.codigo));
+        setMarcados(alvo.acao === "transferir_filial" ? l.map((i) => i.codigo) : l.filter((i) => !i.tem_estoque).map((i) => i.codigo));
       })
       .catch(() => {
         if (!vivo) return;
@@ -94,6 +94,10 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
     }
     if (alvo.acao === "pendencia" && itens && itens.length > 1 && resto === "segue" && marcados.length > 0 && marcados.length < itens.length) {
       run(() => separarPendenciaAction(alvo.pickingId, valor, marcados, alvo.cargaId), (d) => `Pendência separada em ${d.pendencia} (${d.itens}); o resto segue.`, onFechar);
+      return;
+    }
+    if (alvo.acao === "transferir_filial" && itens && itens.length > 1 && marcados.length > 0 && marcados.length < itens.length) {
+      run(() => transferirItensAction(alvo.pickingId, Number(valor), marcados), `Só ${marcados.join(", ")} mudou de filial; o resto segue como estava.`, onFechar);
       return;
     }
     const v = alvo.acao === "transferir_filial" || alvo.acao === "mover_carga" ? Number(valor) : alvo.acao === "fila" || alvo.acao === "remover_da_carga" ? null : valor;
@@ -170,6 +174,18 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
               </option>
             ))}
           </select>
+        ) : null}
+        {alvo.acao === "transferir_filial" && itens && itens.length > 1 ? (
+          <div className="flex flex-col gap-1 text-sm">
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Quais itens vão para essa filial? (desmarque o que fica como está)</p>
+            {itens.map((i) => (
+              <label key={i.move_id} className="flex items-start gap-2">
+                <input type="checkbox" className="w-5 h-5 mt-0.5" checked={marcados.includes(i.codigo)}
+                  onChange={() => setMarcados((m) => (m.includes(i.codigo) ? m.filter((x) => x !== i.codigo) : [...m, i.codigo]))} />
+                <span>{i.qtd}× {i.codigo} {i.nome}</span>
+              </label>
+            ))}
+          </div>
         ) : null}
         {alvo.acao === "mover_carga" ? (
           <>
