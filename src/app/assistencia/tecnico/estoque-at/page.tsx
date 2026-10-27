@@ -3,6 +3,7 @@ import { getTecnicoSession } from "@/app/assistencia/tecnico-actions";
 import { TecnicoCabecalho } from "@/components/assistencia/TecnicoCabecalho";
 import { TecnicoTabs } from "@/components/assistencia/TecnicoTabs";
 import { listarEmpresas, mensagemDeErro, saldoEstoqueTipo, type SaldoEstoqueItem } from "@/lib/odoo/logistica";
+import { TransferenciaAtForm } from "@/components/assistencia/TransferenciaAtForm";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function TecnicoEstoqueAtPage({ searchParams }: { searchPar
       <TecnicoCabecalho titulo="Estoque AT" subtitulo={`Olá, ${tecnicoName} — o que está no estoque da Assistência de cada loja e do CD, no Odoo.`} />
       <div className="max-w-6xl mx-auto w-full px-6 py-5 flex flex-col gap-5 min-w-0">
         <TecnicoTabs active="estoque-at" />
+        <TransferenciaAtForm empresas={empresas.map((e) => ({ id: e.id, name: e.name }))} empresaAtual={empresaId} />
         <form method="GET" action="/assistencia/tecnico/estoque-at" className="flex flex-wrap gap-2 items-end">
           <select name="empresa" defaultValue={String(empresaId)} className="rounded-xl px-3 py-2.5 text-sm" style={campo}>
             {empresas.map((e) => (
