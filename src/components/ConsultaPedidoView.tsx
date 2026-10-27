@@ -264,7 +264,9 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
       ) : null}
       {p.logistica ? <Filiais l={p.logistica} /> : null}
       {e && nomePedidoOdoo(e.pedido) ? <BotoesNota pedido={nomePedidoOdoo(e.pedido)!} /> : null}
-      {e && !nomePedidoOdoo(e.pedido) && e.tentativas.some((t) => t.comResultado) ? (
+      {/* Qualquer pedido do Protheus que passou por carga (com ou sem baixa
+          registrada) -- a rota avisa quando o Protheus não tem a nota. */}
+      {e && !nomePedidoOdoo(e.pedido) && e.tentativas.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 -mt-1">
           <a
             href={`/assistencia/nota-protheus/${e.filial}/${e.pedido}`}
