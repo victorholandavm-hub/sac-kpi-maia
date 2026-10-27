@@ -7,6 +7,7 @@ import { clientesDoCadastro, type ClienteCadastro } from "./clienteCadastro";
 import { fotosDoPedidoNaCarga, notasDeEntregaDaCarga, numeroDaCarga } from "./consultaCarga";
 import { fotosDaParadaOdoo } from "./fotosEntregaOdoo";
 import { buscarEntregas, type BuscaEntrega } from "./odoo/logistica";
+import { consultarPedidosOdoo, type PedidoOdooPonte } from "./consultaOdooPonte";
 
 // Consulta de pedido (pedido do Victor 26/10/2026: "onde eu vejo as vendas e
 // os status dos pedidos"): por CPF/CNPJ, número do pedido, nota da venda ou
@@ -126,6 +127,14 @@ export type PedidoOdooConsulta = {
   situacaoOdoo?: string | null;
   // Nota de venda do Protheus a que este pedido corresponde ("NF 31039").
   vendaProtheus?: string | null;
+  // Da /consulta/pedidos (Pedro): data, vendedor, total, itens com código e as
+  // notas com chave (DANFE pela ponte, inclusive as do Protheus).
+  dataVenda?: string | null;
+  vendedor?: string | null;
+  total?: number | null;
+  itens?: ItemConsulta[];
+  notas?: { tipo: string; numero: string; chave: string }[];
+  naHora?: boolean;
 };
 
 export type ResultadoConsulta = {
@@ -548,17 +557,78 @@ export function cartaoDaBusca(i: BuscaEntrega): PedidoOdooConsulta {
   };
 }
 
+const diaHoraBr = (s: string) => {
+  const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : `${s.replace(" ", "T")}Z`);
+  return isNaN(d.getTime()) ? s : d.toLocaleString("pt-BR", { timeZone: "America/Recife", day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
+// Situação em texto a partir das entregas da /consulta/pedidos.
+export function situacaoDaConsulta(p: PedidoOdooPonte): string | null {
+  if (p.modo === "na_hora") return "Venda levada na hora (balcão)";
+  if (p.estado === "cancel") return "Pedido cancelado";
+  const e = [...(p.entregas ?? [])].sort((a, b) => (b.data_programada || "").localeCompare(a.data_programada || ""))[0];
+  if (!e) return null;
+  if (e.entregue_em) return `Entregue em ${diaHoraBr(e.entregue_em)}`;
+  if (e.pendencia) return `Pendência: ${e.pendencia_motivo || "sem motivo"}`;
+  if (e.carga) return `Na carga ${e.carga}${e.carga_estado ? ` (${e.carga_estado.replace(/_/g, " ")})` : ""}`;
+  if (p.modo === "retira_depois") return `Aguardando o cliente retirar${p.retira_em ? ` na loja ${p.retira_em}` : ""}`;
+  return "Aguardando carga";
+}
+
+// Itens, notas, vendedor, data e total da /consulta/pedidos pro cartão.
+function detalhesDaConsulta(p: PedidoOdooPonte): Partial<PedidoOdooConsulta> {
+  const notas = (p.notas ?? []).filter((n) => n.chave).map((n) => ({ tipo: n.tipo, numero: n.numero, chave: n.chave }));
+  if (p.legado?.chave_5922) notas.unshift({ tipo: "5922 (Protheus)", numero: p.legado.nf_5922 ?? "", chave: p.legado.chave_5922 });
+  if (p.legado?.chave_5117) notas.push({ tipo: "5117 (Protheus)", numero: p.legado.nf_5117 ?? "", chave: p.legado.chave_5117 });
+  return {
+    dataVenda: p.data || null,
+    vendedor: p.vendedor || null,
+    total: Number.isFinite(p.total) ? p.total : null,
+    itens: (p.itens ?? []).map((i) => ({ codigo: i.codigo || null, descricao: i.nome || null, quantidade: Number(i.qtd ?? 0) })),
+    notas,
+    naHora: p.modo === "na_hora",
+  };
+}
+
+export function cartaoDaConsulta(p: PedidoOdooPonte): PedidoOdooConsulta {
+  const modo: ModoEntrega | null = p.modo === "retira_depois" ? "retira" : p.modo === "entrega" ? "entrega" : null;
+  const nf5922 = p.legado?.nf_5922 || p.notas?.find((n) => n.tipo === "5922")?.numero || null;
+  return {
+    pedido: p.pedido,
+    cliente: p.cliente?.nome || null,
+    telefone: p.cliente?.telefone || null,
+    empresa: p.loja || null,
+    nf5922,
+    nf5117: p.legado?.nf_5117 || p.notas?.find((n) => n.tipo === "5117")?.numero || null,
+    legado: !!p.legado,
+    logistica: { filialVenda: /^\d{3}$/.test(p.loja ?? "") ? p.loja : null, filialEntrega: p.entregas?.[0]?.sai_de || null, modo, retiraEm: p.retira_em || null },
+    situacaoOdoo: situacaoDaConsulta(p),
+    ...detalhesDaConsulta(p),
+  };
+}
+
+// Pergunta direto ao Odoo: /consulta/pedidos (Pedro, 26/10 -- itens, notas,
+// vendedor, balcão); se ela falhar, a /logistica/busca de antes. Junta com o
+// que já veio de odoo_expedicao (motorista, fotos, situação da carga).
 async function juntarBuscaDoOdoo(r: ResultadoConsulta, q: string): Promise<PedidoOdooConsulta[]> {
   const atuais = r.odoo ?? [];
   if (q.length < 3) return atuais;
-  const itens = await buscarEntregas(q).catch(() => [] as BuscaEntrega[]);
-  if (itens.length === 0) return atuais;
-  const porPedido = new Map(itens.map((i) => [i.pedido, i]));
+  let achados: PedidoOdooConsulta[];
+  try {
+    achados = (await consultarPedidosOdoo(q)).map(cartaoDaConsulta);
+  } catch {
+    achados = (await buscarEntregas(q).catch(() => [] as BuscaEntrega[])).map(cartaoDaBusca);
+  }
+  if (achados.length === 0) return atuais;
+  const porPedido = new Map(achados.map((a) => [a.pedido, a]));
   for (const p of atuais) {
-    const i = porPedido.get(p.pedido);
-    p.situacaoOdoo ??= i?.situacao ?? null;
-    p.nf5922 ??= i?.nf5922 || null;
-    p.nf5117 ??= i?.nf5117 || null;
+    const a = porPedido.get(p.pedido);
+    if (!a) continue;
+    p.situacaoOdoo ??= a.situacaoOdoo ?? null;
+    p.nf5922 ??= a.nf5922;
+    p.nf5117 ??= a.nf5117;
+    p.telefone ??= a.telefone;
+    Object.assign(p, { dataVenda: a.dataVenda, vendedor: a.vendedor, total: a.total, itens: a.itens, notas: a.notas, naHora: a.naHora });
   }
   const jaMostrados = new Set([
     ...atuais.map((p) => p.pedido),
@@ -573,9 +643,9 @@ async function juntarBuscaDoOdoo(r: ResultadoConsulta, q: string): Promise<Pedid
     .returns<LinhaExpedicaoCompleta[]>();
   const daTabela = new Map(agruparPedidosOdoo(data ?? [], new Set()).map((p) => [p.pedido, p]));
   const extras = novos.map((n) => {
-    const i = porPedido.get(n)!;
+    const a = porPedido.get(n)!;
     const t = daTabela.get(n);
-    return t ? { ...t, nf5922: t.nf5922 ?? (i.nf5922 || null), nf5117: t.nf5117 ?? (i.nf5117 || null), situacaoOdoo: i.situacao || null } : cartaoDaBusca(i);
+    return t ? { ...a, ...t, nf5922: t.nf5922 ?? a.nf5922, nf5117: t.nf5117 ?? a.nf5117, telefone: t.telefone ?? a.telefone, situacaoOdoo: a.situacaoOdoo } : a;
   });
   return [...atuais, ...extras];
 }

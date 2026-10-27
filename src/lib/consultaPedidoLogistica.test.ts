@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("./supabaseAdmin", () => ({ getSupabaseAdmin: () => ({}) }));
-const { modoDoProtheus, logisticaDoOdoo, agruparPedidosOdoo, situacaoDoOdoo, cartaoDaBusca, ligarVendasMigradas } = await import("./consultaPedido");
+const { modoDoProtheus, logisticaDoOdoo, agruparPedidosOdoo, situacaoDoOdoo, cartaoDaBusca, ligarVendasMigradas, cartaoDaConsulta, situacaoDaConsulta } = await import("./consultaPedido");
 
 const linha = (o: Partial<Parameters<typeof logisticaDoOdoo>[1][number]>) => ({ pedido: "S01589", modo: null, expresso: null, filial_entrega: null, retira_em: null, empresa: null, ...o });
 
@@ -122,5 +122,30 @@ describe("ligarVendasMigradas", () => {
     const r = { busca: "x", tipo: "nome" as const, limitado: false, clientes: [{ codigo: "1", nome: "A", documento: null, pedidos: [venda("100", "205"), venda("100", "212")] }], odoo: [odoo("S1", "100/1")] };
     ligarVendasMigradas(r);
     expect(r.odoo).toHaveLength(1);
+  });
+});
+
+describe("cartaoDaConsulta (/consulta/pedidos)", () => {
+  const base = {
+    pedido: "S00408", pedido_id: 407, data: "2026-10-01 01:56:00", loja: "207", retira_em: "212",
+    cliente: { id: 1, nome: "JANICLEIDE", cpf: "04682762460", telefone: "83 98845", email: "", endereco: "" },
+    vendedor: "L67 · Fernanda Fernandes", operador_caixa: "", total: 537.8, modo: "retira_depois", estado: "sale", data_entrega: "",
+    itens: [{ codigo: "071280", nome: "MULTI-USO NEW ATACAMA", qtd: 1, entregue: 0, pendente: 1, preco: 238.8, subtotal: 238.8 }],
+    notas: [],
+    entregas: [{ picking: "207 M/OUT/00051", estado: "assigned", carga: "", carga_estado: "", motorista: "", data_programada: "2026-10-25 01:08:20", entregue_em: "", sai_de: "212", pendencia: false, pendencia_motivo: "" }],
+    legado: { nf_5922: "23797/1", chave_5922: "25260939537682000373550010000237971194893562" },
+  };
+  it("itens com código, nota de venda do Protheus pela chave e a nota pra ligar com a venda", () => {
+    const c = cartaoDaConsulta(base);
+    expect(c).toMatchObject({ pedido: "S00408", telefone: "83 98845", nf5922: "23797/1", legado: true, vendedor: "L67 · Fernanda Fernandes", total: 537.8 });
+    expect(c.itens).toEqual([{ codigo: "071280", descricao: "MULTI-USO NEW ATACAMA", quantidade: 1 }]);
+    expect(c.notas).toEqual([{ tipo: "5922 (Protheus)", numero: "23797/1", chave: "25260939537682000373550010000237971194893562" }]);
+    expect(c.situacaoOdoo).toBe("Aguardando o cliente retirar na loja 212");
+  });
+  it("situação: balcão, entregue, pendência, carga", () => {
+    expect(situacaoDaConsulta({ ...base, modo: "na_hora" })).toBe("Venda levada na hora (balcão)");
+    expect(situacaoDaConsulta({ ...base, entregas: [{ ...base.entregas[0], entregue_em: "2026-10-26 18:00:00" }] })).toBe("Entregue em 26/10/2026");
+    expect(situacaoDaConsulta({ ...base, entregas: [{ ...base.entregas[0], pendencia: true, pendencia_motivo: "falta peça" }] })).toBe("Pendência: falta peça");
+    expect(situacaoDaConsulta({ ...base, modo: "entrega", entregas: [{ ...base.entregas[0], carga: "ROM/2026/00066", carga_estado: "em_rota" }] })).toBe("Na carga ROM/2026/00066 (em rota)");
   });
 });

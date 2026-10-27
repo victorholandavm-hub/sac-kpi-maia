@@ -56,7 +56,13 @@ function Itens({ itens }: { itens: ItemConsulta[] }) {
     <ul className="text-xs flex flex-col gap-0.5" style={{ color: "var(--text-secondary)" }}>
       {itens.map((i, n) => (
         <li key={`${i.codigo}-${n}`}>
-          {i.quantidade.toLocaleString("pt-BR")} × {i.descricao ?? i.codigo}
+          {i.quantidade.toLocaleString("pt-BR")} ×{" "}
+          {i.codigo ? (
+            <span className="font-mono tabular-nums select-all rounded px-1" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
+              {i.codigo}
+            </span>
+          ) : null}{" "}
+          {i.descricao ?? ""}
         </li>
       ))}
     </ul>
@@ -163,6 +169,15 @@ function NotaEntrega({ n }: { n: NonNullable<SituacaoPedido["notaEntrega"]> }) {
 function ChaveNota({ chave }: { chave: string }) {
   return (
     <div className="flex flex-col gap-1 pt-1">
+      <a
+        href={`/assistencia/nota-chave/${chave}`}
+        target="_blank"
+        rel="noopener"
+        className="self-start rounded-lg px-3 py-1.5 text-xs font-semibold"
+        style={{ background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+      >
+        🖨 Nota de venda (PDF)
+      </a>
       <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
         Chave de acesso da nota
       </span>
@@ -178,6 +193,24 @@ function ChaveNota({ chave }: { chave: string }) {
       >
         Consultar na SEFAZ (cole a chave)
       </a>
+    </div>
+  );
+}
+
+// Uma nota por botão, pela chave (rota /assistencia/nota-chave) -- notas da
+// /consulta/pedidos, inclusive a venda do Protheus de origem.
+function BotoesNotasPorChave({ notas }: { notas: { tipo: string; numero: string; chave: string }[] }) {
+  const estilo = { background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" };
+  const rotulo = (tipo: string) => (tipo.startsWith("5922") ? "Nota de venda" : tipo.startsWith("5117") ? "Nota de entrega" : `Nota ${tipo}`);
+  return (
+    <div className="flex flex-wrap gap-2 -mt-1">
+      {notas.map((n) => (
+        <a key={n.chave} href={`/assistencia/nota-chave/${n.chave}`} target="_blank" rel="noopener" className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={estilo}>
+          🖨 {rotulo(n.tipo)}
+          {n.numero ? ` ${n.numero}` : ""}
+          {n.tipo.includes("Protheus") ? " (Protheus)" : ""}
+        </a>
+      ))}
     </div>
   );
 }
@@ -227,7 +260,13 @@ function PedidoOdoo({ p, acao }: { p: PedidoOdooConsulta; acao: string }) {
       ) : null}
       {p.logistica.situacao ? <Situacao s={p.logistica.situacao} acao={acao} /> : null}
       <Filiais l={p.logistica} />
-      <BotoesNota pedido={p.pedido} />
+      {p.dataVenda || p.vendedor || p.total ? (
+        <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+          {[p.dataVenda ? `Venda ${dataBr(p.dataVenda)}` : null, p.vendedor, p.total ? brl(p.total) : null].filter(Boolean).join(" · ")}
+        </p>
+      ) : null}
+      {p.itens?.length ? <Itens itens={p.itens} /> : null}
+      {p.notas?.length ? <BotoesNotasPorChave notas={p.notas} /> : <BotoesNota pedido={p.pedido} />}
     </li>
   );
 }
@@ -320,7 +359,11 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
               ) : null}
               {p.odooLigado.logistica.situacao ? <Situacao s={p.odooLigado.logistica.situacao} acao={acao} /> : null}
               <Filiais l={{ ...p.odooLigado.logistica, filialVenda: null }} />
-              <BotoesNota pedido={p.odooLigado.pedido} />
+              {p.odooLigado.notas?.length ? (
+                <BotoesNotasPorChave notas={p.odooLigado.notas.filter((n) => !n.tipo.startsWith("5922"))} />
+              ) : (
+                <BotoesNota pedido={p.odooLigado.pedido} />
+              )}
             </div>
           ) : !e ? (
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
