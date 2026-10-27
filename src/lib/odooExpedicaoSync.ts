@@ -41,6 +41,10 @@ export function linhasDaCarga(c: CargaDetalhe, empresa: string, agora: string) {
         carga_saiu_em: odooUtc(c.saiu_em),
         carga_fim_em: odooUtc(c.fim_rota_em),
         resultado: p.resultado || null,
+        carga_motorista: c.motorista || null,
+        carga_veiculo: c.veiculo || null,
+        parada_id: p.parada_id || null,
+        ultima_carga_id: c.carga_id,
         visto_em: agora,
       }))
   );
@@ -122,7 +126,11 @@ export async function sincronizarExpedicaoOdoo(): Promise<ResumoExpedicao | { sk
         resumo.falhas.push({ empresa: emp.name, erro: mensagemDeErro(err) });
       }
     });
-    const aLer = [...new Map(cargas.map((c) => [c.carga_id, c])).values()].filter((c) => !cargasFechadasLidas.has(c.carga_id));
+    // Da mais antiga pra mais nova: o pedido que passou por mais de uma carga
+    // fica com a última (motorista, parada, fotos).
+    const aLer = [...new Map(cargas.map((c) => [c.carga_id, c])).values()]
+      .filter((c) => !cargasFechadasLidas.has(c.carga_id))
+      .sort((a, b) => a.carga_id - b.carga_id);
     await emPares(aLer, async (c) => {
       try {
         const detalhe = await lerCarga(c.carga_id);

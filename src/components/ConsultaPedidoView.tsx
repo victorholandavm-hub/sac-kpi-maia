@@ -102,7 +102,7 @@ function Filiais({ l }: { l: LogisticaPedido }) {
 }
 
 // Situação no Odoo: em separação / em rota / entregue, qual carga e as datas.
-function Situacao({ s, acao }: { s: SituacaoPedido; acao: string }) {
+function Situacao({ s, acao, semFotos = false }: { s: SituacaoPedido; acao: string; semFotos?: boolean }) {
   const cor = COR_TOM[s.tom];
   return (
     <div className="rounded-xl px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1" style={{ background: `color-mix(in srgb, ${cor} 10%, var(--surface-2))` }}>
@@ -120,7 +120,24 @@ function Situacao({ s, acao }: { s: SituacaoPedido; acao: string }) {
           {s.detalhes.join(" · ")}
         </span>
       ) : null}
+      {s.motorista || s.veiculo || s.conferente ? (
+        <span className="w-full text-xs" style={{ color: "var(--text-secondary)" }}>
+          {[s.motorista ? `Motorista: ${s.motorista}` : null, s.veiculo ? `veículo ${s.veiculo}` : null, s.conferente ? `conferida por ${s.conferente}` : null]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      ) : null}
       {s.notaEntrega ? <NotaEntrega n={s.notaEntrega} /> : null}
+      {!semFotos && s.fotos?.length ? (
+        <div className="w-full flex flex-wrap gap-2 pt-1">
+          {s.fotos.map((f) => (
+            <a key={f.url} href={f.url} target="_blank" rel="noopener noreferrer" title="Abrir a foto da baixa">
+              {/* eslint-disable-next-line @next/next/no-img-element -- foto do disco local, sem otimização do Next */}
+              <img src={f.url} alt="Foto da baixa" loading="lazy" className="w-20 h-20 object-cover rounded-lg" style={{ background: "var(--surface-1)" }} />
+            </a>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -230,7 +247,9 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
         </div>
         {e ? <Selo texto={e.statusAtual ?? "Sem status"} tom={tomStatusAtual(e.statusAtual)} /> : <Selo texto="Sem entrega" tom="neutro" />}
       </div>
-      {p.logistica?.situacao ? <Situacao s={p.logistica.situacao} acao={acao} /> : null}
+      {p.logistica?.situacao ? (
+        <Situacao s={p.logistica.situacao} acao={acao} semFotos={!!e?.tentativas.some((t) => t.fotos?.length)} />
+      ) : null}
       {p.logistica ? <Filiais l={p.logistica} /> : null}
       {e && nomePedidoOdoo(e.pedido) ? <BotoesNota pedido={nomePedidoOdoo(e.pedido)!} /> : null}
 

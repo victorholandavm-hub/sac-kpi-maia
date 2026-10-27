@@ -5,6 +5,7 @@ import type { FotoEntrega } from "./fotosEntregaOdoo";
 import { nomePedidoOdoo } from "./pedidoOdoo";
 import { clientesDoCadastro, type ClienteCadastro } from "./clienteCadastro";
 import { fotosDoPedidoNaCarga, notasDeEntregaDaCarga, numeroDaCarga } from "./consultaCarga";
+import { fotosDaParadaOdoo } from "./fotosEntregaOdoo";
 
 // Consulta de pedido (pedido do Victor 26/10/2026: "onde eu vejo as vendas e
 // os status dos pedidos"): por CPF/CNPJ, número do pedido, nota da venda ou
@@ -83,6 +84,13 @@ export type SituacaoPedido = {
   cargaId?: number | null;
   detalhes: string[];
   notaEntrega?: NotaEntregaSituacao;
+  // Motorista/veículo da carga atual, quem conferiu (odoo_carga_acoes, 0206) e
+  // as fotos da baixa da última carga (disco: odoo-entregas/carga-X/parada-Y).
+  motorista?: string | null;
+  veiculo?: string | null;
+  conferente?: string | null;
+  fotoRef?: { cargaId: number; paradaId: number };
+  fotos?: FotoEntrega[];
 };
 export type LogisticaPedido = { filialVenda: string | null; filialEntrega: string | null; modo: ModoEntrega | null; retiraEm: string | null; situacao?: SituacaoPedido };
 
@@ -141,8 +149,13 @@ type LinhaExpedicao = {
   carga_saiu_em?: string | null;
   carga_fim_em?: string | null;
   resultado?: string | null;
+  carga_motorista?: string | null;
+  carga_veiculo?: string | null;
+  parada_id?: number | null;
+  ultima_carga_id?: number | null;
 };
-const COLUNAS_SITUACAO = "data_programada, pendencia_motivo, carga_id, carga_romaneio, carga_estado, carga_prevista, carga_saiu_em, carga_fim_em, resultado";
+const COLUNAS_SITUACAO =
+  "data_programada, pendencia_motivo, carga_id, carga_romaneio, carga_estado, carga_prevista, carga_saiu_em, carga_fim_em, resultado, carga_motorista, carga_veiculo, parada_id, ultima_carga_id";
 
 const diaBr = (iso: string | null | undefined) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : null);
 const horaBr = (iso: string | null | undefined) =>
@@ -157,6 +170,19 @@ const ESTADO_CARGA: Record<string, { texto: string; tom: SituacaoPedido["tom"] }
 };
 
 export function situacaoDoOdoo(linhas: LinhaExpedicao[], modo: ModoEntrega | null): SituacaoPedido | undefined {
+  const s = situacaoBase(linhas, modo);
+  if (!s) return s;
+  const atual = linhas.find((l) => l.carga_id && l.carga_id === s.cargaId);
+  const comFoto = [...linhas].filter((l) => l.ultima_carga_id && l.parada_id).sort((a, b) => (b.ultima_carga_id ?? 0) - (a.ultima_carga_id ?? 0))[0];
+  return {
+    ...s,
+    motorista: atual?.ultima_carga_id === atual?.carga_id ? (atual?.carga_motorista ?? null) : null,
+    veiculo: atual?.ultima_carga_id === atual?.carga_id ? (atual?.carga_veiculo ?? null) : null,
+    fotoRef: comFoto ? { cargaId: comFoto.ultima_carga_id!, paradaId: comFoto.parada_id! } : undefined,
+  };
+}
+
+function situacaoBase(linhas: LinhaExpedicao[], modo: ModoEntrega | null): SituacaoPedido | undefined {
   if (linhas.length === 0) return undefined;
   // Linha da carga mais recente (o mesmo pedido pode ter passado por mais de uma).
   const comCarga = [...linhas].filter((l) => l.carga_id).sort((a, b) => (b.carga_id ?? 0) - (a.carga_id ?? 0));
@@ -428,7 +454,33 @@ async function anexarNotasDeEntrega(r: ResultadoConsulta): Promise<ResultadoCons
     const n = porCarga.get(a.s.cargaId!)?.get(a.pedido);
     if (n) a.s.notaEntrega = n;
   }
+  await anexarConferenteEFotos(r);
   return r;
+}
+
+async function anexarConferenteEFotos(r: ResultadoConsulta) {
+  const situacoes = [
+    ...r.clientes.flatMap((c) => c.pedidos.map((p) => p.logistica?.situacao)),
+    ...(r.odoo ?? []).map((p) => p.logistica.situacao),
+  ].filter((s): s is SituacaoPedido => !!s);
+  const cargas = [...new Set(situacoes.map((s) => s.cargaId).filter((id): id is number => !!id))];
+  if (cargas.length) {
+    const { data } = await getSupabaseAdmin()
+      .from("odoo_carga_acoes")
+      .select("carga_id, operador, em")
+      .eq("acao", "conferir")
+      .in("carga_id", cargas)
+      .order("em", { ascending: false })
+      .returns<{ carga_id: number; operador: string; em: string }[]>();
+    const quem = new Map<number, string>();
+    for (const a of data ?? []) if (!quem.has(a.carga_id)) quem.set(a.carga_id, a.operador.replace(/^(CD|Equipe) /, ""));
+    for (const s of situacoes) if (s.cargaId) s.conferente = quem.get(s.cargaId) ?? null;
+  }
+  await Promise.all(
+    situacoes.map(async (s) => {
+      if (s.fotoRef) s.fotos = await fotosDaParadaOdoo(s.fotoRef.cargaId, s.fotoRef.paradaId).catch(() => []);
+    })
+  );
 }
 
 export async function consultarPedidos(busca: string): Promise<ResultadoConsulta> {

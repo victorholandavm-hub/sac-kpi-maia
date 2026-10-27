@@ -6,6 +6,9 @@ import Link from "next/link";
 const TABS = [
   { key: "pedidos", label: "Vendas e pedidos", href: "/assistencia/pedidos" },
   { key: "estoque", label: "Estoque", href: "/assistencia/lojas-estoque" },
+  // Inventário (contagem e transferência entre estoques) é a tela da
+  // Logística do Pedro, já liberada pro perfil assistência -- Victor 27/10/2026.
+  { key: "inventario", label: "Inventário", href: "/assistencia/logistica/inventario" },
 ] as const;
 
 export type OdooTabKey = (typeof TABS)[number]["key"];

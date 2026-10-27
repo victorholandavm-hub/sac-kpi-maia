@@ -37,7 +37,16 @@ function Dado({ rotulo, valor }: { rotulo: string; valor: React.ReactNode }) {
   );
 }
 
-function Evento({ e }: { e: EventoCarga }) {
+// Evento do Odoo ↔ ação gravada pela tela de Logística (odoo_carga_acoes).
+const ACAO_DO_EVENTO: Record<string, string> = {
+  separacao_iniciada: "separacao",
+  conferida: "conferir",
+  liberada: "liberar",
+  saiu_em_rota: "sair",
+  fim_de_rota: "finalizar",
+};
+
+function Evento({ e, quem }: { e: EventoCarga; quem?: string }) {
   return (
     <li className="text-sm pl-3 py-0.5" style={{ borderLeft: "2px solid var(--brand-green)" }}>
       <b style={{ color: "var(--text-primary)" }}>{EVENTO_LABELS[e.tipo] ?? e.tipo.replace(/_/g, " ")}</b>{" "}
@@ -45,6 +54,7 @@ function Evento({ e }: { e: EventoCarga }) {
         {formatarDataHoraOdoo(e.em)}
         {e.picking ? ` · ${e.picking}` : ""}
         {e.motivo ? ` · ${e.motivo}` : ""}
+        {quem ? ` · por ${quem}` : ""}
       </span>
     </li>
   );
@@ -86,6 +96,8 @@ function Parada({ p }: { p: ParadaComFotos }) {
 
 function Carga({ c }: { c: CargaConsulta }) {
   const conferida = c.eventos.find((e) => e.tipo === "conferida");
+  const quem = (acao: string | undefined) => (acao ? [...c.acoes].reverse().find((a) => a.acao === acao)?.operador : undefined);
+  const conferente = quem("conferir");
   const eventos = [...c.eventos].sort((a, b) => String(a.em || "").localeCompare(String(b.em || "")));
   return (
     <div className="rounded-2xl p-4 sm:p-5 flex flex-col gap-5" style={{ background: "var(--surface-1)" }}>
@@ -113,8 +125,8 @@ function Carga({ c }: { c: CargaConsulta }) {
             conferida ? (
               <>
                 {formatarDataHoraOdoo(conferida.em)}
-                <span className="block text-xs" style={{ color: "var(--text-muted)" }}>
-                  conferente: o Odoo ainda não informa
+                <span className="block text-xs" style={{ color: conferente ? "var(--text-secondary)" : "var(--text-muted)" }}>
+                  {conferente ? `por ${conferente}` : "conferente não registrado (cargas até 26/10)"}
                 </span>
               </>
             ) : (
@@ -142,7 +154,7 @@ function Carga({ c }: { c: CargaConsulta }) {
                 Sem eventos ainda.
               </li>
             ) : (
-              eventos.map((e) => <Evento key={e.id} e={e} />)
+              eventos.map((e) => <Evento key={e.id} e={e} quem={quem(ACAO_DO_EVENTO[e.tipo])} />)
             )}
           </ol>
         </div>

@@ -54,12 +54,12 @@ describe("agruparPedidosOdoo", () => {
 describe("situacaoDoOdoo", () => {
   const base = { pedido: "S01", modo: "entrega", expresso: false, filial_entrega: null, retira_em: null, empresa: "213 CD" };
   it("na fila: aguardando carga com a data programada; pendência tem prioridade", () => {
-    expect(situacaoDoOdoo([{ ...base, data_programada: "2026-10-28" }], "entrega")).toEqual({ texto: "Aguardando carga", tom: "neutro", carga: null, detalhes: ["programado 28/10/2026"] });
+    expect(situacaoDoOdoo([{ ...base, data_programada: "2026-10-28" }], "entrega")).toMatchObject({ texto: "Aguardando carga", tom: "neutro", carga: null, detalhes: ["programado 28/10/2026"] });
     expect(situacaoDoOdoo([{ ...base, pendencia_motivo: "falta produto" }], "entrega")?.texto).toBe("Pendência: falta produto");
   });
   it("em separação e em rota mostram a carga e a previsão", () => {
     const r = situacaoDoOdoo([{ ...base, carga_id: 77, carga_romaneio: "ROM/2026/00063", carga_estado: "separacao", carga_prevista: "2026-10-27" }], "entrega");
-    expect(r).toEqual({ texto: "Em separação", tom: "neutro", carga: "ROM/2026/00063", cargaId: 77, detalhes: ["carga prevista 27/10/2026"] });
+    expect(r).toMatchObject({ texto: "Em separação", tom: "neutro", carga: "ROM/2026/00063", cargaId: 77, detalhes: ["carga prevista 27/10/2026"] });
     expect(situacaoDoOdoo([{ ...base, carga_id: 77, carga_romaneio: "ROM/2026/00063", carga_estado: "em_rota" }], "entrega")?.texto).toBe("Saiu para entrega");
   });
   it("resultado da parada: entregue; e o pedido que voltou pra fila", () => {
@@ -76,5 +76,20 @@ describe("situacaoDoOdoo", () => {
     );
     expect(r).toMatchObject({ texto: "Saiu para entrega", carga: "ROM/2026/00056" });
     expect(situacaoDoOdoo([{ ...base, modo: "retira_depois" }], "retira")?.texto).toBe("Aguardando o cliente retirar");
+  });
+});
+
+describe("situacaoDoOdoo: motorista e fotos", () => {
+  const base = { pedido: "S01", modo: "entrega", expresso: false, filial_entrega: null, retira_em: null, empresa: "213 CD" };
+  it("motorista da carga atual e fotos da parada", () => {
+    const r = situacaoDoOdoo(
+      [{ ...base, carga_id: 80, carga_romaneio: "ROM/2026/00066", carga_estado: "em_rota", carga_motorista: "Douglas", carga_veiculo: "HTT0D75", parada_id: 501, ultima_carga_id: 80 }],
+      "entrega"
+    );
+    expect(r).toMatchObject({ texto: "Saiu para entrega", motorista: "Douglas", veiculo: "HTT0D75", fotoRef: { cargaId: 80, paradaId: 501 } });
+  });
+  it("voltou pra fila: sem motorista atual, mas as fotos da tentativa ficam", () => {
+    const r = situacaoDoOdoo([{ ...base, resultado: "insucesso", carga_motorista: "Isaac", parada_id: 77, ultima_carga_id: 65 }], "entrega");
+    expect(r).toMatchObject({ texto: "Voltou da entrega, aguardando nova carga", motorista: null, fotoRef: { cargaId: 65, paradaId: 77 } });
   });
 });

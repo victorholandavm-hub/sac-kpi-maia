@@ -1,4 +1,5 @@
 import { memoizeWithTtl } from "./memoCache";
+import { getSupabaseAdmin } from "./supabaseAdmin";
 import { lerCarga, listarCargas, listarEmpresas, mensagemDeErro, progressoCarga } from "./odoo/logistica";
 import type { CargaDetalhe, CargaOdoo, ParadaOdoo } from "./odoo/logisticaTipos";
 import { fotosDaParadaOdoo, type FotoEntrega } from "./fotosEntregaOdoo";
@@ -67,7 +68,10 @@ export async function fotosDoPedidoNaCarga(romaneio: string, pedido: string): Pr
 }
 
 export type ParadaComFotos = ParadaOdoo & { fotos: FotoEntrega[] };
-export type CargaConsulta = Omit<CargaDetalhe, "paradas"> & { paradas: ParadaComFotos[] };
+// Quem fez cada passo no CD (odoo_carga_acoes, 0206, gravado pela tela de
+// Logística): separacao, conferir, liberar, sair, finalizar.
+export type AcaoCargaFeita = { acao: string; operador: string; em: string };
+export type CargaConsulta = Omit<CargaDetalhe, "paradas"> & { paradas: ParadaComFotos[]; acoes: AcaoCargaFeita[] };
 export type ResultadoCarga = { busca: string; carga: CargaConsulta | null; erro: string | null };
 
 export async function consultarCarga(busca: string): Promise<ResultadoCarga> {
@@ -80,7 +84,17 @@ export async function consultarCarga(busca: string): Promise<ResultadoCarga> {
     const paradas = await Promise.all(
       (carga.paradas ?? []).map(async (p) => ({ ...p, fotos: await fotosDaParadaOdoo(carga.carga_id, p.parada_id).catch(() => []) }))
     );
-    return { busca, carga: { ...carga, empresa: carga.empresa ?? achada.empresa, paradas }, erro: null };
+    const { data: acoes } = await getSupabaseAdmin()
+      .from("odoo_carga_acoes")
+      .select("acao, operador, em")
+      .eq("carga_id", carga.carga_id)
+      .order("em")
+      .returns<AcaoCargaFeita[]>();
+    return {
+      busca,
+      carga: { ...carga, empresa: carga.empresa ?? achada.empresa, paradas, acoes: (acoes ?? []).map((a) => ({ ...a, operador: a.operador.replace(/^(CD|Equipe) /, "") })) },
+      erro: null,
+    };
   } catch (err) {
     return { busca, carga: null, erro: `O Odoo não respondeu agora (${mensagemDeErro(err)}). Tente de novo em instantes.` };
   }
