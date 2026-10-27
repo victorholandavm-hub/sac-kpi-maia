@@ -391,7 +391,33 @@ export async function listNpsDetratores(opts: { todoHistorico?: boolean } = {}):
     };
   });
 
-  return [...sac, ...req, ...compra, ...entrega, ...venda, ...vendaOdoo].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
+  // Pós-entrega e pós 20 dias das entregas do Odoo (nps_entrega_odoo, 0214).
+  const { data: entregaOdooRows, error: entregaOdooError } = await admin
+    .from("nps_entrega_odoo")
+    .select("fase, pedido, cliente, telefone, score, respondido_em")
+    .is("descartada_em", null)
+    .not("score", "is", null)
+    .lte("score", 2)
+    .gte("respondido_em", sinceIso)
+    .order("respondido_em", { ascending: false });
+  if (entregaOdooError) throw new Error(entregaOdooError.message);
+  const entregaCompraOdoo: NpsDetrator[] = (entregaOdooRows ?? []).map((r) => {
+    const origem = r.fase === "compra" ? ("compra" as const) : ("entrega" as const);
+    const origemId = `odoo:${r.pedido}`;
+    return {
+      origem,
+      origemId,
+      score: r.score as number,
+      escala: "1-5" as const,
+      respondidoEm: r.respondido_em as string,
+      clientName: (r.cliente as string | null) ?? null,
+      clientPhone: (r.telefone as string | null) ?? null,
+      motivoSugerido: null,
+      ...resolveStatus(origem, origemId),
+    };
+  });
+
+  return [...sac, ...req, ...compra, ...entrega, ...venda, ...vendaOdoo, ...entregaCompraOdoo].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
 }
 
 export type NpsResposta = {
@@ -532,6 +558,28 @@ export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit =
       sellerName: order?.seller_name ?? null,
     };
   });
+  if (origem === "entrega" || origem === "compra") {
+    // Entregas do Odoo (nps_entrega_odoo, 0214).
+    const { data: ent, error: entError } = await admin
+      .from("nps_entrega_odoo")
+      .select("pedido, cliente, telefone, score, respondido_em")
+      .eq("fase", origem)
+      .is("descartada_em", null)
+      .not("score", "is", null)
+      .order("respondido_em", { ascending: false })
+      .limit(limit);
+    if (entError) throw new Error(entError.message);
+    const doOdooEnt: NpsResposta[] = (ent ?? []).map((r) => ({
+      origemId: `odoo:${r.pedido}`,
+      score: r.score as number,
+      respondidoEm: r.respondido_em as string,
+      clientName: (r.cliente as string | null) ?? null,
+      clientCpf: null,
+      clientPhone: (r.telefone as string | null) ?? null,
+      sellerName: null,
+    }));
+    return [...respostas, ...doOdooEnt].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm)).slice(0, limit);
+  }
   if (origem !== "venda") return respostas;
   // Pós-venda das vendas do Odoo (venda_nps_odoo, desde 25/10).
   const { data: odoo, error: odooError } = await admin
@@ -596,6 +644,8 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
     { count: vendaSent, error: vendaSentError },
     { data: vendaOdooData, error: vendaOdooError },
     { count: vendaOdooSent, error: vendaOdooSentError },
+    { data: entregaOdooData, error: entregaOdooError },
+    { count: entregaOdooSent, error: entregaOdooSentError },
   ] = await Promise.all([
     admin.from("service_request_nps").select("tipo, score").not("score", "is", null),
     admin.from("entrega_nps").select("score").is("descartada_em", null).not("score", "is", null),
@@ -606,7 +656,11 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
     admin.from("venda_nps").select("order_id", { count: "exact", head: true }),
     admin.from("venda_nps_odoo").select("score").is("descartada_em", null).not("score", "is", null),
     admin.from("venda_nps_odoo").select("pedido", { count: "exact", head: true }).is("descartada_em", null),
+    admin.from("nps_entrega_odoo").select("score").eq("fase", "entrega").is("descartada_em", null).not("score", "is", null),
+    admin.from("nps_entrega_odoo").select("pedido", { count: "exact", head: true }).eq("fase", "entrega").is("descartada_em", null),
   ]);
+  if (entregaOdooError) throw new Error(entregaOdooError.message);
+  if (entregaOdooSentError) throw new Error(entregaOdooSentError.message);
   if (vendaOdooError) throw new Error(vendaOdooError.message);
   if (vendaOdooSentError) throw new Error(vendaOdooSentError.message);
   if (error) throw new Error(error.message);
@@ -638,7 +692,10 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
   return {
     montagem: resumoFor("montagem", montagemSent ?? 0),
     assistencia_tecnica: resumoFor("assistencia_tecnica", assistSent ?? 0),
-    entrega: npsFromScores((entregaData ?? []).map((r) => r.score as number), entregaSent ?? 0),
+    entrega: npsFromScores(
+      [...(entregaData ?? []), ...(entregaOdooData ?? [])].map((r) => r.score as number),
+      (entregaSent ?? 0) + (entregaOdooSent ?? 0)
+    ),
     venda: npsFromScores(
       [...(vendaData ?? []), ...(vendaOdooData ?? [])].map((r) => r.score as number),
       (vendaSent ?? 0) + (vendaOdooSent ?? 0)

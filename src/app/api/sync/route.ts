@@ -11,6 +11,7 @@ import { enrollPendingCompraNps, detectPendingCompraNpsResponses } from "@/lib/n
 import { enrollPendingEntregaNps, detectPendingEntregaNpsResponses, detectPendingEntregaSugestoes } from "@/lib/entregaNps";
 import { enrollPendingVendaNps, detectPendingVendaNpsResponses } from "@/lib/vendaNps";
 import { enrollPendingVendaNpsOdoo, detectPendingVendaNpsOdooResponses } from "@/lib/vendaNpsOdoo";
+import { enrollNpsEntregaOdoo, detectNpsEntregaOdooResponses } from "@/lib/npsEntregaOdoo";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -26,10 +27,12 @@ const BASE_URL = "https://services.leadconnectorhq.com";
 // sobreposição. Conta a partir do FIM da última rodada (ran_at), que leva
 // ~10 min -- com 25, a chamada das :40 sempre caía ~21 min depois e pulava.
 const MIN_INTERVAL_MINUTES = 15;
-// Uma rodada leva ~9 min com 50 envios por pesquisa e pode triplicar com
-// 150 (21/10/2026); 60 min de TTL cobre a mais longa e libera sozinha se o
-// processo morrer no meio.
-const TRAVA_TTL_SEGUNDOS = 60 * 60;
+// Uma rodada leva ~9 min (14,5 com as 150 do NPS de venda do Odoo, 27/10).
+// 28 min (era 60): o cron roda :10/:40 e uma rodada cortada por troca de
+// versão do sac (27/10, duas vezes) segurava a trava por 1 h e pulava as duas
+// seguintes; com 28 ela já expirou quando a próxima começa. Rodada que passe
+// disso não manda pesquisa em dobro (o envio reserva a linha antes da tag).
+const TRAVA_TTL_SEGUNDOS = 28 * 60;
 
 const CHANNEL_MAP: Record<string, string> = {
   TYPE_WHATSAPP: "WhatsApp",
@@ -448,6 +451,12 @@ async function runSync() {
   errors.push(...vendaNpsOdooErrors);
   avisos.push(...vendaNpsOdooAvisos);
   const vendaNpsOdooAnswered = await detectPendingVendaNpsOdooResponses();
+  // Pós-entrega e pós 20 dias das entregas do Odoo -- npsEntregaOdoo.ts.
+  const entregaOdoo = await enrollNpsEntregaOdoo("entrega");
+  const compraOdoo = await enrollNpsEntregaOdoo("compra");
+  errors.push(...entregaOdoo.errors, ...compraOdoo.errors);
+  avisos.push(...entregaOdoo.avisos, ...compraOdoo.avisos);
+  const entregaCompraOdooAnswered = await detectNpsEntregaOdooResponses();
 
   const ok = errors.length === 0;
   await recordSyncRun(
@@ -475,6 +484,9 @@ async function runSync() {
       vendaNpsOdooEnrolled,
       vendaNpsOdooSemTelefone,
       vendaNpsOdooAnswered,
+      entregaNpsOdooEnrolled: entregaOdoo.enrolled,
+      compraNpsOdooEnrolled: compraOdoo.enrolled,
+      entregaCompraOdooAnswered,
       avisos,
     },
     errors
@@ -503,6 +515,9 @@ async function runSync() {
     vendaNpsOdooEnrolled,
     vendaNpsOdooSemTelefone,
     vendaNpsOdooAnswered,
+    entregaNpsOdooEnrolled: entregaOdoo.enrolled,
+    compraNpsOdooEnrolled: compraOdoo.enrolled,
+    entregaCompraOdooAnswered,
     avisos,
     errors,
   });

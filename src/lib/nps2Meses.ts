@@ -204,16 +204,23 @@ export async function getCompraNpsResumo(): Promise<NpsFaseResumo> {
   const [
     { data, error },
     { count: sentCount, error: sentError },
+    { data: odoo, error: odooError },
+    { count: odooSent, error: odooSentError },
   ] = await Promise.all([
     // descartadas (0201): enviadas pra pessoa errada até 26/10/2026, não contam
     admin.from("compra_nps").select("score").is("descartada_em", null).not("score", "is", null),
     admin.from("compra_nps").select("order_id", { count: "exact", head: true }).is("descartada_em", null),
+    // entregas do Odoo (nps_entrega_odoo, 0214)
+    admin.from("nps_entrega_odoo").select("score").eq("fase", "compra").is("descartada_em", null).not("score", "is", null),
+    admin.from("nps_entrega_odoo").select("pedido", { count: "exact", head: true }).eq("fase", "compra").is("descartada_em", null),
   ]);
   if (error) throw new Error(error.message);
   if (sentError) throw new Error(sentError.message);
+  if (odooError) throw new Error(odooError.message);
+  if (odooSentError) throw new Error(odooSentError.message);
 
-  const scores = (data ?? []).map((r) => r.score as number);
-  const sent = sentCount ?? 0;
+  const scores = [...(data ?? []), ...(odoo ?? [])].map((r) => r.score as number);
+  const sent = (sentCount ?? 0) + (odooSent ?? 0);
   const responseRatePct = sent > 0 ? Math.round((scores.length / sent) * 100) : null;
   if (scores.length === 0) return { npsIndex: null, responseCount: 0, sentCount: sent, responseRatePct };
   const promoters = scores.filter((s) => s >= 4).length;
