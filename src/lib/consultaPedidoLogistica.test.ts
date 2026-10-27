@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("./supabaseAdmin", () => ({ getSupabaseAdmin: () => ({}) }));
-const { modoDoProtheus, logisticaDoOdoo, agruparPedidosOdoo, situacaoDoOdoo } = await import("./consultaPedido");
+const { modoDoProtheus, logisticaDoOdoo, agruparPedidosOdoo, situacaoDoOdoo, cartaoDaBusca } = await import("./consultaPedido");
 
 const linha = (o: Partial<Parameters<typeof logisticaDoOdoo>[1][number]>) => ({ pedido: "S01589", modo: null, expresso: null, filial_entrega: null, retira_em: null, empresa: null, ...o });
 
@@ -91,5 +91,15 @@ describe("situacaoDoOdoo: motorista e fotos", () => {
   it("voltou pra fila: sem motorista atual, mas as fotos da tentativa ficam", () => {
     const r = situacaoDoOdoo([{ ...base, resultado: "insucesso", carga_motorista: "Isaac", parada_id: 77, ultima_carga_id: 65 }], "entrega");
     expect(r).toMatchObject({ texto: "Voltou da entrega, aguardando nova carga", motorista: null, fotoRef: { cargaId: 65, paradaId: 77 } });
+  });
+});
+
+describe("cartaoDaBusca", () => {
+  it("monta o cartão do pedido achado direto no Odoo (CPF de cliente novo)", () => {
+    const c = cartaoDaBusca({
+      pedido: "S00408", pedido_id: 407, picking: "x", picking_id: 1, cliente: "JANICLEIDE", loja: "207", modo: "retira_depois",
+      nf5922: "23797/1", nf5117: "", nota: "", situacao: "Na loja 207: peça reservada lá", cor: "info", carga_id: false, na_fila: true,
+    });
+    expect(c).toMatchObject({ pedido: "S00408", cliente: "JANICLEIDE", empresa: "207", nf5922: "23797/1", nf5117: null, situacaoOdoo: "Na loja 207: peça reservada lá", logistica: { filialVenda: "207", modo: "retira" } });
   });
 });

@@ -219,6 +219,12 @@ function PedidoOdoo({ p, acao }: { p: PedidoOdooConsulta; acao: string }) {
           {p.legado ? " · venda do Protheus" : ""}
         </span>
       </div>
+      {p.situacaoOdoo ? (
+        <p className="text-sm rounded-xl px-3 py-2" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
+          <span style={{ color: "var(--text-muted)" }}>No Odoo agora: </span>
+          <b className="font-semibold">{p.situacaoOdoo}</b>
+        </p>
+      ) : null}
       {p.logistica.situacao ? <Situacao s={p.logistica.situacao} acao={acao} /> : null}
       <Filiais l={p.logistica} />
       <BotoesNota pedido={p.pedido} />
@@ -429,7 +435,7 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
 
       {carga || !r || r.tipo === "curta" ? null : r.clientes.length === 0 && !r.odoo?.length ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-          Nada encontrado para “{r.busca}”.{r.tipo === "documento" && r.cadastro ? " Esse CPF/CNPJ também não está no cadastro de clientes." : ""}{r.tipo === "documento" && r.cadastro?.length ? " Busque pelo número do pedido ou da nota." : ""}
+          Nada encontrado para “{r.busca}”.{r.tipo === "documento" && r.cadastro ? " Esse CPF/CNPJ não aparece na nossa base, no cadastro de clientes nem nos pedidos do Odoo." : ""}{r.tipo === "documento" && r.cadastro?.length ? " Busque pelo número do pedido ou da nota." : ""}
         </p>
       ) : (
         <div className="flex flex-col gap-8">

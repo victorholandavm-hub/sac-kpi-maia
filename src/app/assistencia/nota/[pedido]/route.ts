@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOptionalProfile } from "@/lib/dal";
 import { getOperadorLogistica } from "@/lib/odoo/logisticaAuth";
-import { baixarDanfePdf, mensagemDeErro } from "@/lib/odoo/logistica";
+import { baixarDanfePdf, buscarEntregas, mensagemDeErro } from "@/lib/odoo/logistica";
 import { pedidoIdOdoo } from "@/lib/odooExpedicaoSync";
 import { nomePedidoOdoo } from "@/lib/pedidoOdoo";
 
@@ -30,11 +30,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ pedido: str
   if (!nome) {
     return aviso("Nota do Protheus", "Este pedido é do Protheus. A impressão das notas do Protheus ainda está sendo liberada.", 404);
   }
-  const id = await pedidoIdOdoo(nome);
+  // Pedido que ainda não passou pela leitura da expedição: o id vem da busca do Odoo.
+  const id = (await pedidoIdOdoo(nome)) ?? (await buscarEntregas(nome).catch(() => [])).find((i) => i.pedido === nome)?.pedido_id ?? null;
   if (!id) {
     return aviso(
       "Pedido ainda não localizado",
-      `O pedido ${escapar(nome)} ainda não apareceu na expedição do Odoo (a leitura roda a cada 30 minutos). Tente de novo mais tarde.`,
+      `O pedido ${escapar(nome)} não foi encontrado no Odoo agora. Confira o número ou tente de novo em instantes.`,
       404
     );
   }

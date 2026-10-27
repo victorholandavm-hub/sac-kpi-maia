@@ -6,6 +6,7 @@ import { nomePedidoOdoo } from "./pedidoOdoo";
 import { clientesDoCadastro, type ClienteCadastro } from "./clienteCadastro";
 import { fotosDoPedidoNaCarga, notasDeEntregaDaCarga, numeroDaCarga } from "./consultaCarga";
 import { fotosDaParadaOdoo } from "./fotosEntregaOdoo";
+import { buscarEntregas, type BuscaEntrega } from "./odoo/logistica";
 
 // Consulta de pedido (pedido do Victor 26/10/2026: "onde eu vejo as vendas e
 // os status dos pedidos"): por CPF/CNPJ, número do pedido, nota da venda ou
@@ -117,6 +118,9 @@ export type PedidoOdooConsulta = {
   nf5117: string | null;
   legado: boolean;
   logistica: LogisticaPedido;
+  // Situação em texto, direto do Odoo (/logistica/busca do Pedro): "Na loja
+  // 207: peça reservada lá", "Em rota na carga …" etc.
+  situacaoOdoo?: string | null;
 };
 
 export type ResultadoConsulta = {
@@ -484,7 +488,55 @@ async function anexarConferenteEFotos(r: ResultadoConsulta) {
 }
 
 export async function consultarPedidos(busca: string): Promise<ResultadoConsulta> {
-  return anexarNotasDeEntrega(await consultarSemNotas(busca));
+  const r = await consultarSemNotas(busca);
+  if (r.tipo !== "curta") r.odoo = await juntarBuscaDoOdoo(r, busca.trim());
+  return anexarNotasDeEntrega(r);
+}
+
+// Pergunta direto ao Odoo (/logistica/busca do Pedro: CPF/CNPJ com ou sem
+// pontuação, nome, pedido ou nota; < 1,5 s) -- Victor 27/10/2026: cliente
+// novo do Odoo não estava em lugar nenhum nosso, então o CPF não achava.
+// Junta com o que já veio de odoo_expedicao (motorista, fotos, situação).
+export function cartaoDaBusca(i: BuscaEntrega): PedidoOdooConsulta {
+  const modo: ModoEntrega | null = !i.modo ? null : i.modo.startsWith("retira") ? "retira" : "entrega";
+  return {
+    pedido: i.pedido,
+    cliente: i.cliente || null,
+    telefone: null,
+    empresa: i.loja || null,
+    nf5922: i.nf5922 || null,
+    nf5117: i.nf5117 || null,
+    legado: false,
+    logistica: { filialVenda: /^\d{3}$/.test(i.loja ?? "") ? i.loja : null, filialEntrega: null, modo, retiraEm: null },
+    situacaoOdoo: i.situacao || null,
+  };
+}
+
+async function juntarBuscaDoOdoo(r: ResultadoConsulta, q: string): Promise<PedidoOdooConsulta[]> {
+  const atuais = r.odoo ?? [];
+  if (q.length < 3) return atuais;
+  const itens = await buscarEntregas(q).catch(() => [] as BuscaEntrega[]);
+  if (itens.length === 0) return atuais;
+  const porPedido = new Map(itens.map((i) => [i.pedido, i]));
+  for (const p of atuais) p.situacaoOdoo ??= porPedido.get(p.pedido)?.situacao ?? null;
+  const jaMostrados = new Set([
+    ...atuais.map((p) => p.pedido),
+    ...r.clientes.flatMap((c) => c.pedidos.map((p) => (p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null)).filter((n): n is string => !!n)),
+  ]);
+  const novos = [...porPedido.keys()].filter((n) => !jaMostrados.has(n));
+  if (novos.length === 0) return atuais;
+  const { data } = await getSupabaseAdmin()
+    .from("odoo_expedicao")
+    .select(`pedido, cliente, telefone, empresa, nf5922, nf5117, legado, modo, expresso, filial_entrega, retira_em, ${COLUNAS_SITUACAO}`)
+    .in("pedido", novos)
+    .returns<LinhaExpedicaoCompleta[]>();
+  const daTabela = new Map(agruparPedidosOdoo(data ?? [], new Set()).map((p) => [p.pedido, p]));
+  const extras = novos.map((n) => {
+    const i = porPedido.get(n)!;
+    const t = daTabela.get(n);
+    return t ? { ...t, nf5922: t.nf5922 ?? (i.nf5922 || null), nf5117: t.nf5117 ?? (i.nf5117 || null), situacaoOdoo: i.situacao || null } : cartaoDaBusca(i);
+  });
+  return [...atuais, ...extras];
 }
 
 async function consultarSemNotas(busca: string): Promise<ResultadoConsulta> {
