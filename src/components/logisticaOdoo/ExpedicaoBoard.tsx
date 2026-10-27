@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { buscarEntregasAction, historicoClienteAction, incluirNaCargaAction, montarCargaAction } from "@/app/assistencia/logistica/logistica-actions";
+import { acaoEntregaAction, buscarEntregasAction, historicoClienteAction, incluirNaCargaAction, montarCargaAction } from "@/app/assistencia/logistica/logistica-actions";
 import type { BuscaEntrega, HistCliente } from "@/lib/odoo/logistica";
 import { useEffect } from "react";
 import {
@@ -98,7 +98,15 @@ export function ExpedicaoBoard({
   const temRetornoNoOdoo = todas.some((e) => typeof e.retorno === "boolean");
   const lista = filtrarExpedicao(expedicao.entregas, expedicao.pendencias, { visao, zona, modo, busca });
   const vols = somarVolumes(lista);
-  const selecionadas = expedicao.entregas.filter((e) => sel.has(e.picking_id));
+  const selecionadas = [...expedicao.entregas, ...expedicao.pendencias].filter((e) => sel.has(e.picking_id));
+  // 27/10 (CD: "cliente da pendência, não tem a opção de marcar"): pendência marcada volta à fila antes de entrar na carga
+  async function tirarPendencias() {
+    const ids = [...sel].filter((id) => expedicao.pendencias.some((p) => p.picking_id === id));
+    for (const id of ids) {
+      const r = await acaoEntregaAction(id, "fila", null);
+      if (!r.ok) throw new Error(`Não consegui tirar da pendência: ${r.erro}`);
+    }
+  }
   const volsSel = somarVolumes(selecionadas);
 
   function alternar(id: number) {
@@ -111,7 +119,7 @@ export function ExpedicaoBoard({
   }
 
   function selecionarVisiveis() {
-    if (visao !== "fila") return;
+    if (visao === "retornos") return;
     setSel(new Set(lista.map((e) => e.picking_id)));
   }
 
@@ -139,7 +147,7 @@ export function ExpedicaoBoard({
     if (sel.size === 0 && !window.confirm("Criar a carga VAZIA, sem pedidos? Depois é só marcar as saídas e usar \"Incluir na carga\".")) return;
     run(
       () =>
-        montarCargaAction({
+        tirarPendencias().then(() => montarCargaAction({
           company_id: empresaCarga,
           picking_ids: [...sel],
           tipo: form.tipo,
@@ -149,7 +157,7 @@ export function ExpedicaoBoard({
           descricao: form.descricao || null,
           transportadora: form.transportadora || null,
           data_prevista: form.data_prevista || null,
-        }),
+        })),
       (c) => (c.qtd_paradas ? `Carga ${c.romaneio} montada com ${c.qtd_paradas} parada(s).` : `Carga ${c.romaneio} criada vazia — inclua os pedidos quando quiser.`),
       (c) => {
         setSel(new Set());
@@ -162,7 +170,7 @@ export function ExpedicaoBoard({
   function incluirExistente() {
     const c = cargasAbertas.find((x) => String(x.carga_id) === cargaDestino);
     run(
-      () => incluirNaCargaAction(Number(cargaDestino), [...sel]),
+      () => tirarPendencias().then(() => incluirNaCargaAction(Number(cargaDestino), [...sel])),
       (r) => `${sel.size} saída(s) incluída(s) na carga ${r.romaneio ?? c?.romaneio ?? ""}.`,
       () => {
         setSel(new Set());
@@ -228,7 +236,7 @@ export function ExpedicaoBoard({
             <button type="button" onClick={() => router.refresh()} className={botaoClass} style={botaoStyle}>
               Atualizar
             </button>
-            {visao === "fila" ? (
+            {visao !== "retornos" ? (
               <button type="button" onClick={selecionarVisiveis} className={botaoClass} style={botaoStyle}>
                 Selecionar visíveis
               </button>
@@ -360,7 +368,7 @@ export function ExpedicaoBoard({
               return (
                 <tr key={e.picking_id} style={{ borderBottom: "1px solid var(--border)", background: marcada ? "var(--brand-green-soft)" : undefined }}>
                   <td className="p-2 align-top">
-                    {visao === "fila" ? (
+                    {visao !== "retornos" ? (
                       <input type="checkbox" checked={marcada} onChange={() => alternar(e.picking_id)} aria-label={`Selecionar ${e.cliente}`} className="w-5 h-5" />
                     ) : null}
                   </td>
