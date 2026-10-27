@@ -4,7 +4,7 @@ vi.mock("./supabaseAdmin", () => ({ getSupabaseAdmin: () => ({}) }));
 vi.mock("./ghlClient", () => ({}));
 vi.mock("./ghlSubcontas", () => ({ SUBCONTAS: { lojas_maia: { tokenEnv: "X", locationId: "L" } } }));
 vi.mock("./npsDetratores", () => ({ NPS_GHL_TAG: { venda: "t" }, NPS_1_5_PATTERN: /^([1-5])$/, sendNpsAutoReply: vi.fn() }));
-const { candidatosDasLinhas } = await import("./vendaNpsOdoo");
+const { candidatosDasLinhas, separarVendedorOdoo } = await import("./vendaNpsOdoo");
 const { linhasOdooComoProtheus } = await import("./npsVendedores");
 
 const l = (o: Record<string, unknown>) => ({ pedido: "S01741", cliente: "ADEMACIR", telefone: "83 98888-7777", empresa: "205 Mangabeira 1", vendedor: "JOSÉ", primeiro_visto: "2026-10-27T14:00:00Z", ...o });
@@ -38,5 +38,27 @@ describe("linhasOdooComoProtheus", () => {
     );
     expect(r.map((x) => x.totvs_orders.seller_id)).toEqual(["000123", null]);
     expect(r[1].totvs_orders).toMatchObject({ seller_name: "Maria Nova", branch: "212", issue_date: "2026-10-26" });
+  });
+});
+
+describe("separarVendedorOdoo", () => {
+  it("código do Odoo e nome", () => {
+    expect(separarVendedorOdoo("L17 · Joao Paulo")).toEqual({ codigo: "L17", nome: "Joao Paulo" });
+    expect(separarVendedorOdoo("Rayanne Kelly")).toEqual({ codigo: null, nome: "Rayanne Kelly" });
+    expect(separarVendedorOdoo(null)).toEqual({ codigo: null, nome: null });
+  });
+  it("no NPS por vendedor: nome que bate vai pro código do Protheus; senão, código do Odoo", () => {
+    const protheus = [{ score: 5, totvs_orders: { seller_id: "000123", seller_name: "Joao Paulo", branch: "205", issue_date: "2026-10-20" } }];
+    const r = linhasOdooComoProtheus(
+      [
+        { score: 4, vendedor: "L17 · Joao Paulo", loja: "205", data_venda: "2026-10-26" },
+        { score: 3, vendedor: "L80 · Isaias", loja: "212", data_venda: "2026-10-26" },
+      ],
+      protheus
+    );
+    expect(r.map((x) => [x.totvs_orders.seller_id, x.totvs_orders.seller_name])).toEqual([
+      ["000123", "Joao Paulo"],
+      ["L80", "Isaias"],
+    ]);
   });
 });

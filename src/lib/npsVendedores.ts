@@ -1,3 +1,4 @@
+import { separarVendedorOdoo } from "./vendaNpsOdoo";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllPagesParallel, type PagedQueryResult } from "./supabasePagination";
 
@@ -84,15 +85,20 @@ export function linhasOdooComoProtheus(
     const n = l.totvs_orders.seller_name?.trim();
     if (c && n) codigoPorNome.set(normalizarNome(n), c);
   }
-  return odoo.map((o) => ({
+  return odoo.map((o) => {
+    const v = separarVendedorOdoo(o.vendedor);
+    return {
     score: o.score,
     totvs_orders: {
-      seller_id: o.vendedor ? (codigoPorNome.get(normalizarNome(o.vendedor)) ?? null) : null,
-      seller_name: o.vendedor?.trim() || null,
+      // Nome bate com vendedor do Protheus: entra no código dele; senão, o
+      // código do vendedor no Odoo ("L17").
+      seller_id: (v.nome ? codigoPorNome.get(normalizarNome(v.nome)) : undefined) ?? v.codigo,
+      seller_name: v.nome,
       branch: o.loja ?? "",
       issue_date: o.data_venda,
     },
-  }));
+    };
+  });
 }
 
 async function linhasDoOdoo(filtro: FiltroNpsVendedores, protheus: Linha[]): Promise<Linha[]> {

@@ -28,6 +28,15 @@ function disparo(): { conta?: GhlConta; tag: string } {
   return process.env.VENDA_NPS_SUBCONTA === "lojas_maia" ? { conta: contaLojasMaia(), tag: TAG_LOJAS_MAIA } : { tag: NPS_GHL_TAG.venda! };
 }
 
+// O Odoo grava o vendedor como "L17 · Joao Paulo" (código do vendedor no
+// Odoo + nome); o Protheus só o nome. Separa pros dois casarem no ranking.
+export function separarVendedorOdoo(v: string | null | undefined): { codigo: string | null; nome: string | null } {
+  const t = (v ?? "").trim();
+  if (!t) return { codigo: null, nome: null };
+  const m = t.match(/^([A-Za-z]\d+)\s*[·•\-–]\s*(.+)$/);
+  return m ? { codigo: m[1].toUpperCase(), nome: m[2].trim() } : { codigo: null, nome: t };
+}
+
 type Linha = { pedido: string; cliente: string | null; telefone: string | null; empresa: string | null; vendedor: string | null; primeiro_visto: string };
 
 export type CandidatoOdoo = { pedido: string; cliente: string | null; telefone: string; loja: string | null; vendedor: string | null; dataVenda: string };

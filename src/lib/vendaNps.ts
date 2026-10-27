@@ -5,6 +5,7 @@ import { findGhlConversationId, fetchGhlMessages, type GhlConta } from "./ghlCli
 import { SUBCONTAS } from "./ghlSubcontas";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN, sendNpsAutoReply } from "./npsDetratores";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
+import { separarVendedorOdoo } from "./vendaNpsOdoo";
 
 // NPS "Pós-venda" -- pedido do Victor 19/10/2026: avaliar o ATENDIMENTO EM
 // LOJA, disparado assim que a venda é registrada no Protheus. Mais simples
@@ -196,7 +197,7 @@ export async function getVendaSellerRanking(): Promise<VendedorRankingEntry[]> {
   // Vendas do Odoo (venda_nps_odoo, desde 25/10): vendedor vem da expedição.
   const { data: odoo, error: odooError } = await admin.from("venda_nps_odoo").select("score, vendedor").not("score", "is", null).is("descartada_em", null);
   if (odooError) throw new Error(odooError.message);
-  for (const row of odoo ?? []) somar(row.vendedor as string | null, row.score as number);
+  for (const row of odoo ?? []) somar(separarVendedorOdoo(row.vendedor as string | null).nome, row.score as number);
 
   const entries: VendedorRankingEntry[] = [...scoresBySeller.entries()].map(([sellerName, scores]) => {
     const promoters = scores.filter((s) => s >= 4).length;
