@@ -6,7 +6,7 @@ import { TransferirParaAt } from "@/components/TransferirParaAt";
 
 const qtd = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
-function Produto({ p }: { p: EstoqueProduto }) {
+function Produto({ p, podeTransferir }: { p: EstoqueProduto; podeTransferir: boolean }) {
   const cd = p.saldos.find((s) => /\bCD\b/.test(s.empresa));
   return (
     <li className="rounded-2xl p-4 sm:p-5 flex flex-col gap-3" style={{ background: "var(--surface-1)" }}>
@@ -69,14 +69,15 @@ function Produto({ p }: { p: EstoqueProduto }) {
           </table>
         </div>
       )}
-      {cd && cd.disponivel >= 1 ? (
+      {podeTransferir && cd && cd.disponivel >= 1 ? (
         <TransferirParaAt codigo={p.codigo} produto={p.descricao} fabricante={p.fabricante} disponivelCd={cd.disponivel} />
       ) : null}
     </li>
   );
 }
 
-export async function ConsultaEstoqueView({ busca, acao }: { busca: string; acao: string }) {
+// podeTransferir=false na equipe técnica (a transferência pro AT é do SAC/assistência).
+export async function ConsultaEstoqueView({ busca, acao, podeTransferir = true }: { busca: string; acao: string; podeTransferir?: boolean }) {
   const r = busca ? await consultarEstoque(busca) : null;
   return (
     <div className="flex flex-col gap-6 min-w-0">
@@ -119,7 +120,7 @@ export async function ConsultaEstoqueView({ busca, acao }: { busca: string; acao
           ) : null}
           <ul className="flex flex-col gap-3">
             {r.produtos.map((p) => (
-              <Produto key={p.codigo} p={p} />
+              <Produto key={p.codigo} p={p} podeTransferir={podeTransferir} />
             ))}
           </ul>
         </div>

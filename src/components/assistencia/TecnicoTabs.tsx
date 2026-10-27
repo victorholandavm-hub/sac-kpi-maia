@@ -19,11 +19,15 @@ import { UnderlineTab } from "@/components/UnderlineTab";
 // unificado, pedido do Victor 18/10/2026: mesmo visual de pílula das outras
 // navegações agora (AssistenciaNav/SacTabs/SupervisaoTabs/LojaTabs), sem o
 // trilho `border-b` por baixo.
-export function TecnicoTabs({ active }: { active: "fila" | "estoque" | "pecas" }) {
+// "Estoque lojas" e "Estoque AT" -- Victor 27/10/2026; a "Estoque" de antes
+// (baixa das retiradas de peça) virou "Baixa de retiradas" pra não confundir.
+export function TecnicoTabs({ active }: { active: "fila" | "estoque" | "pecas" | "estoque-lojas" | "estoque-at" }) {
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto min-w-0 -mx-1 px-1 pb-1">
       <UnderlineTab href="/assistencia/tecnico" label="Fila de classificação" active={active === "fila"} pilula />
-      <UnderlineTab href="/assistencia/tecnico/estoque" label="Estoque" active={active === "estoque"} pilula />
+      <UnderlineTab href="/assistencia/tecnico/estoque" label="Baixa de retiradas" active={active === "estoque"} pilula />
+      <UnderlineTab href="/assistencia/tecnico/estoque-lojas" label="Estoque lojas" active={active === "estoque-lojas"} pilula />
+      <UnderlineTab href="/assistencia/tecnico/estoque-at" label="Estoque AT" active={active === "estoque-at"} pilula />
       <UnderlineTab href="/assistencia/tecnico/pecas" label="Peças" active={active === "pecas"} pilula />
     </div>
   );
