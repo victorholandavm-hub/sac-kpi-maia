@@ -1,5 +1,5 @@
 import { memoizeWithTtl } from "./memoCache";
-import { lerCarga, listarCargas, listarEmpresas, mensagemDeErro } from "./odoo/logistica";
+import { lerCarga, listarCargas, listarEmpresas, mensagemDeErro, progressoCarga } from "./odoo/logistica";
 import type { CargaDetalhe, CargaOdoo, ParadaOdoo } from "./odoo/logisticaTipos";
 import { fotosDaParadaOdoo, type FotoEntrega } from "./fotosEntregaOdoo";
 
@@ -84,4 +84,13 @@ export async function consultarCarga(busca: string): Promise<ResultadoCarga> {
   } catch (err) {
     return { busca, carga: null, erro: `O Odoo não respondeu agora (${mensagemDeErro(err)}). Tente de novo em instantes.` };
   }
+}
+
+// Andamento da emissão das notas de entrega da carga (aguardando / emitindo /
+// ok / erro, com a resposta da SEFAZ). Cache de 1 min: a emissão anda rápido.
+const progressoPorCarga = memoizeWithTtl((cargaId: number) => progressoCarga(cargaId), 60_000);
+
+export async function notasDeEntregaDaCarga(cargaId: number): Promise<Map<string, { estado: string; nf: string | null; sefaz: string | null }>> {
+  const r = await progressoPorCarga(cargaId);
+  return new Map((r.itens ?? []).map((i) => [i.pedido, { estado: i.estado, nf: i.nf || null, sefaz: i.sefaz || null }]));
 }

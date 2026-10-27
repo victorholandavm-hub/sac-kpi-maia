@@ -120,7 +120,25 @@ function Situacao({ s, acao }: { s: SituacaoPedido; acao: string }) {
           {s.detalhes.join(" · ")}
         </span>
       ) : null}
+      {s.notaEntrega ? <NotaEntrega n={s.notaEntrega} /> : null}
     </div>
+  );
+}
+
+function NotaEntrega({ n }: { n: NonNullable<SituacaoPedido["notaEntrega"]> }) {
+  const [texto, tom]: [string, keyof typeof COR_TOM] =
+    n.estado === "ok"
+      ? [`Nota de entrega emitida${n.nf ? ` (NF ${n.nf})` : ""}${n.sefaz ? ` · ${n.sefaz}` : ""}`, "bom"]
+      : n.estado === "emitindo"
+        ? ["Nota de entrega sendo emitida agora", "atencao"]
+        : n.estado === "erro"
+          ? [`Erro na nota de entrega${n.sefaz ? `: ${n.sefaz}` : ""} (o CD precisa reemitir)`, "critico"]
+          : ["Nota de entrega ainda não emitida (sai quando a carga sair em rota)", "neutro"];
+  return (
+    <span className="w-full inline-flex items-center gap-1.5 text-xs" style={{ color: "var(--text-primary)" }}>
+      <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: COR_TOM[tom] }} />
+      {texto}
+    </span>
   );
 }
 

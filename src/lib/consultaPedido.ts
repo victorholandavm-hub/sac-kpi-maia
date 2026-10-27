@@ -4,7 +4,7 @@ import { vendasDasEntregas } from "./vendaDaEntrega";
 import type { FotoEntrega } from "./fotosEntregaOdoo";
 import { nomePedidoOdoo } from "./pedidoOdoo";
 import { clientesDoCadastro, type ClienteCadastro } from "./clienteCadastro";
-import { fotosDoPedidoNaCarga, numeroDaCarga } from "./consultaCarga";
+import { fotosDoPedidoNaCarga, notasDeEntregaDaCarga, numeroDaCarga } from "./consultaCarga";
 
 // Consulta de pedido (pedido do Victor 26/10/2026: "onde eu vejo as vendas e
 // os status dos pedidos"): por CPF/CNPJ, número do pedido, nota da venda ou
@@ -73,7 +73,17 @@ export type EntregaConsulta = {
 export type ModoEntrega = "entrega" | "express" | "retira";
 // Situação do pedido no Odoo (Victor 26/10: "se está em separação, previsão
 // de carga, previsão de entrega, qual a carga").
-export type SituacaoPedido = { texto: string; tom: "bom" | "atencao" | "critico" | "neutro"; carga: string | null; detalhes: string[] };
+// Nota de entrega (5117) do pedido na carga: andamento da emissão pela ponte
+// (/logistica/carga/{id}/progresso) -- Victor 27/10: "minha nota já saiu?".
+export type NotaEntregaSituacao = { estado: string; nf: string | null; sefaz: string | null };
+export type SituacaoPedido = {
+  texto: string;
+  tom: "bom" | "atencao" | "critico" | "neutro";
+  carga: string | null;
+  cargaId?: number | null;
+  detalhes: string[];
+  notaEntrega?: NotaEntregaSituacao;
+};
 export type LogisticaPedido = { filialVenda: string | null; filialEntrega: string | null; modo: ModoEntrega | null; retiraEm: string | null; situacao?: SituacaoPedido };
 
 export type PedidoConsulta = {
@@ -155,6 +165,7 @@ export function situacaoDoOdoo(linhas: LinhaExpedicao[], modo: ModoEntrega | nul
   const prog = linhas.map((l) => l.data_programada).find(Boolean);
   const detalhes: string[] = [];
   const carga = c?.carga_romaneio ?? null;
+  const cargaId = c?.carga_id ?? null;
   if (c?.carga_prevista) detalhes.push(`carga prevista ${diaBr(c.carga_prevista)}`);
   if (c?.carga_saiu_em) detalhes.push(`saiu ${horaBr(c.carga_saiu_em)}`);
   if (prog) detalhes.push(`programado ${diaBr(prog)}`);
@@ -168,13 +179,13 @@ export function situacaoDoOdoo(linhas: LinhaExpedicao[], modo: ModoEntrega | nul
     return { texto: voltou ? "Voltou da entrega, aguardando nova carga" : "Aguardando carga", tom: voltou ? "critico" : "neutro", carga: null, detalhes };
   }
   if (!c) return undefined;
-  if (c.carga_estado === "cancelada") return { texto: "Carga cancelada", tom: "neutro", carga, detalhes };
-  if (c.resultado === "entregue") return { texto: "Entregue", tom: "bom", carga, detalhes: [...detalhes, ...(c.carga_fim_em ? [`fim da rota ${horaBr(c.carga_fim_em)}`] : [])] };
-  if (c.resultado === "entrega_parcial") return { texto: "Entregue em parte", tom: "atencao", carga, detalhes };
-  if (c.resultado === "insucesso" || c.resultado === "reagendada") return { texto: c.resultado === "reagendada" ? "Reagendado" : "Não entregue", tom: "critico", carga, detalhes };
-  if (c.carga_estado === "finalizada") return { texto: "Carga finalizada sem baixa deste pedido", tom: "atencao", carga, detalhes };
+  if (c.carga_estado === "cancelada") return { texto: "Carga cancelada", tom: "neutro", carga, cargaId, detalhes };
+  if (c.resultado === "entregue") return { texto: "Entregue", tom: "bom", carga, cargaId, detalhes: [...detalhes, ...(c.carga_fim_em ? [`fim da rota ${horaBr(c.carga_fim_em)}`] : [])] };
+  if (c.resultado === "entrega_parcial") return { texto: "Entregue em parte", tom: "atencao", carga, cargaId, detalhes };
+  if (c.resultado === "insucesso" || c.resultado === "reagendada") return { texto: c.resultado === "reagendada" ? "Reagendado" : "Não entregue", tom: "critico", carga, cargaId, detalhes };
+  if (c.carga_estado === "finalizada") return { texto: "Carga finalizada sem baixa deste pedido", tom: "atencao", carga, cargaId, detalhes };
   const e = ESTADO_CARGA[c.carga_estado ?? ""] ?? { texto: "Em carga", tom: "neutro" as const };
-  return { ...e, carga, detalhes };
+  return { ...e, carga, cargaId, detalhes };
 }
 type LinhaExpedicaoCompleta = LinhaExpedicao & { cliente: string | null; telefone: string | null; nf5922: string | null; nf5117: string | null; legado: boolean };
 
@@ -391,7 +402,40 @@ function paraVenda(o: OrderRow): VendaConsulta {
   };
 }
 
+const MAX_CARGAS_COM_NOTA = 6;
+
+// Situação da nota de entrega de cada pedido do Odoo que está numa carga.
+async function anexarNotasDeEntrega(r: ResultadoConsulta): Promise<ResultadoConsulta> {
+  const alvos: { s: SituacaoPedido; pedido: string }[] = [];
+  for (const c of r.clientes) {
+    for (const p of c.pedidos) {
+      const nome = p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null;
+      if (nome && p.logistica?.situacao?.cargaId) alvos.push({ s: p.logistica.situacao, pedido: nome });
+    }
+  }
+  for (const p of r.odoo ?? []) if (p.logistica.situacao?.cargaId) alvos.push({ s: p.logistica.situacao, pedido: p.pedido });
+  const cargas = [...new Set(alvos.map((a) => a.s.cargaId!))].slice(0, MAX_CARGAS_COM_NOTA);
+  const porCarga = new Map<number, Awaited<ReturnType<typeof notasDeEntregaDaCarga>>>();
+  for (let i = 0; i < cargas.length; i += 2) {
+    await Promise.all(
+      cargas.slice(i, i + 2).map(async (id) => {
+        const m = await notasDeEntregaDaCarga(id).catch(() => null);
+        if (m) porCarga.set(id, m);
+      })
+    );
+  }
+  for (const a of alvos) {
+    const n = porCarga.get(a.s.cargaId!)?.get(a.pedido);
+    if (n) a.s.notaEntrega = n;
+  }
+  return r;
+}
+
 export async function consultarPedidos(busca: string): Promise<ResultadoConsulta> {
+  return anexarNotasDeEntrega(await consultarSemNotas(busca));
+}
+
+async function consultarSemNotas(busca: string): Promise<ResultadoConsulta> {
   const r = await consultarBase(busca);
   if (r.tipo === "curta") return r;
   if (r.tipo === "documento" && r.clientes.length === 0) return consultarPeloCadastro(busca.trim());

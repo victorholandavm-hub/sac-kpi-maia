@@ -59,7 +59,7 @@ describe("situacaoDoOdoo", () => {
   });
   it("em separação e em rota mostram a carga e a previsão", () => {
     const r = situacaoDoOdoo([{ ...base, carga_id: 77, carga_romaneio: "ROM/2026/00063", carga_estado: "separacao", carga_prevista: "2026-10-27" }], "entrega");
-    expect(r).toEqual({ texto: "Em separação", tom: "neutro", carga: "ROM/2026/00063", detalhes: ["carga prevista 27/10/2026"] });
+    expect(r).toEqual({ texto: "Em separação", tom: "neutro", carga: "ROM/2026/00063", cargaId: 77, detalhes: ["carga prevista 27/10/2026"] });
     expect(situacaoDoOdoo([{ ...base, carga_id: 77, carga_romaneio: "ROM/2026/00063", carga_estado: "em_rota" }], "entrega")?.texto).toBe("Saiu para entrega");
   });
   it("resultado da parada: entregue; e o pedido que voltou pra fila", () => {

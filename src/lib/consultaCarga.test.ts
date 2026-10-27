@@ -22,10 +22,18 @@ vi.mock("./odoo/logistica", () => ({
     ],
   })),
   mensagemDeErro: (e: unknown) => (e as Error).message,
+  progressoCarga: vi.fn(async () => ({
+    carga: "ROM/2026/00066",
+    estado: "em_rota",
+    itens: [
+      { pedido: "S00445", cliente: "X", estado: "ok", nf: "24538", sefaz: "autorizada" },
+      { pedido: "S00600", cliente: "Y", estado: "aguardando", nf: "", sefaz: "" },
+    ],
+  })),
 }));
 vi.mock("./fotosEntregaOdoo", () => ({ fotosDaParadaOdoo: vi.fn(async (cargaId: number, paradaId: number) => [{ url: `/f/${cargaId}/${paradaId}.jpg` }]) }));
 
-const { numeroDaCarga, acharCarga, fotosDoPedidoNaCarga } = await import("./consultaCarga");
+const { numeroDaCarga, acharCarga, fotosDoPedidoNaCarga, notasDeEntregaDaCarga } = await import("./consultaCarga");
 
 describe("numeroDaCarga", () => {
   it("reconhece o romaneio e 'carga N', e deixa número solto para a busca de pedido", () => {
@@ -63,5 +71,13 @@ describe("fotosDoPedidoNaCarga", () => {
   it("pedido fora da carga ou carga do Protheus: sem foto", async () => {
     expect(await fotosDoPedidoNaCarga("ROM/2026/00058", "S09999")).toEqual([]);
     expect(await fotosDoPedidoNaCarga("012345", "S01589")).toEqual([]);
+  });
+});
+
+describe("notasDeEntregaDaCarga", () => {
+  it("indexa o andamento por pedido; vazio vira null", async () => {
+    const m = await notasDeEntregaDaCarga(80);
+    expect(m.get("S00445")).toEqual({ estado: "ok", nf: "24538", sefaz: "autorizada" });
+    expect(m.get("S00600")).toEqual({ estado: "aguardando", nf: null, sefaz: null });
   });
 });
