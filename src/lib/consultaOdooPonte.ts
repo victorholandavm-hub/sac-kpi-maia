@@ -51,3 +51,39 @@ export async function consultarPedidosOdoo(q: string): Promise<PedidoOdooPonte[]
   const j = (await r.json()) as { pedidos?: PedidoOdooPonte[] };
   return j.pedidos ?? [];
 }
+
+// Fotos da baixa das entregas do Protheus feitas pelo uMov (GET /umov/fotos,
+// Pedro 26/10): de 23/09 a 24/10 são links públicos do picviewer (o uMov guarda
+// ~60 dias); as mais antigas (acervo migrado, 08/02 a 22/09) vêm como
+// /umov/foto-legado/<id>, que exige a chave -- passam pela nossa rota
+// /assistencia/umov-foto/<id>. Cache de 10 min por pedido.
+export type TarefaUmov = { carga: string; fotos: { url: string; legenda: string | null }[] };
+
+const cacheUmov = new Map<string, { em: number; tarefas: TarefaUmov[] }>();
+
+export async function fotosUmovDoPedido(pedido: string, filial: string): Promise<TarefaUmov[]> {
+  const chaveCache = `${filial}/${pedido}`;
+  const hit = cacheUmov.get(chaveCache);
+  if (hit && Date.now() - hit.em < 10 * 60_000) return hit.tarefas;
+  const base = (process.env.ODOO_BRIDGE_URL ?? "").replace(/\/+$/, "");
+  const chave = process.env.ODOO_KEY_LOGISTICA;
+  if (!base || !chave) return [];
+  const r = await fetch(`${base}/umov/fotos?pedido=${encodeURIComponent(pedido)}&filial=${encodeURIComponent(filial)}`, {
+    headers: { "X-Maia-Perfil": "logistica", "X-Maia-Key": chave, Accept: "application/json" },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    cache: "no-store",
+  });
+  if (!r.ok) throw new Error(`ponte respondeu ${r.status}`);
+  const j = (await r.json()) as { tarefas?: { carga?: string; fotos?: { url?: string; legenda?: string }[] }[] };
+  const tarefas = (j.tarefas ?? []).map((t) => ({
+    carga: (t.carga ?? "").trim(),
+    fotos: (t.fotos ?? [])
+      .filter((f) => f.url)
+      .map((f) => {
+        const legado = f.url!.match(/^\/umov\/foto-legado\/([\w-]+)$/);
+        return { url: legado ? `/assistencia/umov-foto/${legado[1]}` : f.url!, legenda: f.legenda?.trim() || null };
+      }),
+  }));
+  cacheUmov.set(chaveCache, { em: Date.now(), tarefas });
+  return tarefas;
+}

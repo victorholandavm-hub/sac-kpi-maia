@@ -397,6 +397,13 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
                       {[t.tipo, t.motorista ?? "sem motorista", t.veiculo, t.transportadora].filter(Boolean).join(" · ")}
                       {t.baixaDia ? ` · baixa ${dataBr(t.baixaDia)}${t.baixaHora ? ` ${t.baixaHora}` : ""}` : ""}
                     </p>
+                    {t.conferente || t.separadoPor || t.faturadoPor ? (
+                      <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                        {[t.conferente ? `conferida por ${t.conferente}` : null, t.separadoPor ? `separada por ${t.separadoPor}` : null, t.faturadoPor ? `faturada por ${t.faturadoPor}` : null]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    ) : null}
                     {t.fotos && t.fotos.length > 0 ? (
                       <div className="flex flex-wrap gap-2 pt-1">
                         {t.fotos.map((f) => (

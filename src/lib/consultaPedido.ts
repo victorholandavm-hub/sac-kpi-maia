@@ -7,7 +7,7 @@ import { clientesDoCadastro, type ClienteCadastro } from "./clienteCadastro";
 import { fotosDoPedidoNaCarga, notasDeEntregaDaCarga, numeroDaCarga } from "./consultaCarga";
 import { fotosDaParadaOdoo } from "./fotosEntregaOdoo";
 import { buscarEntregas, type BuscaEntrega } from "./odoo/logistica";
-import { consultarPedidosOdoo, type PedidoOdooPonte } from "./consultaOdooPonte";
+import { consultarPedidosOdoo, fotosUmovDoPedido, type PedidoOdooPonte } from "./consultaOdooPonte";
 
 // Consulta de pedido (pedido do Victor 26/10/2026: "onde eu vejo as vendas e
 // os status dos pedidos"): por CPF/CNPJ, número do pedido, nota da venda ou
@@ -56,6 +56,11 @@ export type TentativaConsulta = {
   itens: ItemConsulta[];
   // Fotos da baixa (só entrega do Odoo -- as do Protheus ficaram no uMov).
   fotos?: FotoEntrega[];
+  // Quem conferiu/separou/faturou a carga do Protheus (protheus_cargas_historico,
+  // 0212, exportado pelo Pedro da ZAG/ZAD/AC4).
+  conferente?: string | null;
+  separadoPor?: string | null;
+  faturadoPor?: string | null;
 };
 
 export type EntregaConsulta = {
@@ -515,7 +520,50 @@ export async function consultarPedidos(busca: string): Promise<ResultadoConsulta
   }
   if (r.tipo !== "curta") r.odoo = await juntarBuscaDoOdoo(r, busca.trim());
   ligarVendasMigradas(r);
+  await anexarHistoricoDasCargasProtheus(r);
+  await anexarFotosUmov(r);
   return anexarNotasDeEntrega(r);
+}
+
+const MAX_ENTREGAS_COM_FOTO_UMOV = 8;
+
+// Fotos do uMov nas tentativas das entregas do Protheus (até 8 entregas por
+// busca, 2 por vez). Casa a tarefa com a tentativa pela carga.
+async function anexarFotosUmov(r: ResultadoConsulta) {
+  const entregas = r.clientes
+    .flatMap((c) => c.pedidos.map((p) => p.entrega))
+    .filter((e): e is EntregaConsulta => !!e && !nomePedidoOdoo(e.pedido) && e.tentativas.some((t) => t.comResultado))
+    .slice(0, MAX_ENTREGAS_COM_FOTO_UMOV);
+  for (let i = 0; i < entregas.length; i += 2) {
+    await Promise.all(
+      entregas.slice(i, i + 2).map(async (e) => {
+        const tarefas = await fotosUmovDoPedido(e.pedido, e.filial).catch(() => []);
+        for (const t of e.tentativas) {
+          const fotos = tarefas.filter((x) => x.carga === t.carga).flatMap((x) => x.fotos);
+          if (fotos.length && !t.fotos?.length) t.fotos = fotos.map((f) => ({ url: f.url, tipo: f.legenda }));
+        }
+      })
+    );
+  }
+}
+
+async function anexarHistoricoDasCargasProtheus(r: ResultadoConsulta) {
+  const tentativas = r.clientes.flatMap((c) => c.pedidos.flatMap((p) => p.entrega?.tentativas ?? [])).filter((t) => /^\d+$/.test(t.carga));
+  const cargas = [...new Set(tentativas.map((t) => t.carga))];
+  if (cargas.length === 0) return;
+  const { data } = await getSupabaseAdmin()
+    .from("protheus_cargas_historico")
+    .select("carga, conferente_nome, separacao_por, faturada_por")
+    .in("carga", cargas)
+    .returns<{ carga: string; conferente_nome: string | null; separacao_por: string | null; faturada_por: string | null }[]>();
+  const porCarga = new Map((data ?? []).map((h) => [h.carga, h]));
+  for (const t of tentativas) {
+    const h = porCarga.get(t.carga);
+    if (!h) continue;
+    t.conferente = h.conferente_nome;
+    t.separadoPor = h.separacao_por;
+    t.faturadoPor = h.faturada_por;
+  }
 }
 
 // Venda do Protheus que foi migrada pro Odoo: o pedido do Odoo guarda a nota de
