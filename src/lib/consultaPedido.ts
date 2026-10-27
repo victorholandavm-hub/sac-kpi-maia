@@ -380,12 +380,17 @@ async function clientesDaBusca(q: string, tipo: ResultadoConsulta["tipo"]): Prom
   } else if (tipo === "numero" || tipo === "nota") {
     // Cada filial tem a própria numeração de pedido e de nota: o mesmo número
     // aparece em várias lojas. A venda mais recente vem primeiro.
-    const [a, b] = await Promise.all([
+    const [a, b, codigo] = await Promise.all([
       tipo === "numero"
         ? admin.from("totvs_deliveries").select("client_id").eq("pedido", d.padStart(6, "0")).order("first_seen_at", { ascending: false }).limit(20)
         : Promise.resolve({ data: [] }),
       admin.from("totvs_orders").select("client_id").eq("invoice", d.padStart(9, "0")).order("issue_date", { ascending: false }).limit(20),
+      // Código do cliente no Protheus (ex.: 129163) -- Victor 27/10/2026: "eu
+      // consigo achá-lo pelo código?". Mesmo número pode ser pedido e cliente:
+      // aparecem os dois.
+      tipo === "numero" ? admin.from("totvs_orders").select("client_id").eq("client_id", d.padStart(6, "0")).limit(1) : Promise.resolve({ data: [] }),
     ]);
+    juntar(codigo.data);
     juntar(b.data);
     juntar(a.data);
   } else if (tipo === "nome" && nomePedidoOdoo(q)) {
@@ -516,7 +521,7 @@ export async function consultarPedidos(busca: string): Promise<ResultadoConsulta
   // CPF achado na nossa base: os pedidos do Odoo do mesmo cliente também pelo
   // nome (a expedição não tem CPF) -- assim CPF e nome mostram a mesma coisa
   // mesmo se a busca do Odoo não responder.
-  if (r.tipo === "documento" && r.clientes[0]?.nome) {
+  if ((r.tipo === "documento" || r.tipo === "numero") && r.clientes[0]?.nome) {
     const jaTem = new Set((r.odoo ?? []).map((o) => o.pedido));
     const porNome = await pedidosOdooDaBusca(r.clientes[0].nome, "nome", jaTem).catch(() => []);
     r.odoo = [...(r.odoo ?? []), ...porNome];

@@ -76,7 +76,18 @@ const so = (v: string | undefined) => (v ?? "").trim();
 
 // Busca a nota da saída no Protheus e guarda. null = saída sem nota impressa
 // (o Protheus responde 404 enquanto a DANFE não foi gerada).
-export async function baixarNotaDaSaida(filial: string, pedido: string, zaeId: string): Promise<NotaEntregaProtheus | null> {
+// PDF ~150 KB, XML ~10 KB: a cópia de madrugada (pdfSoRecente) guarda o PDF só
+// dos últimos 90 dias -- 2024 a 10/2026 em PDF passaria de 9 GB, com 12 GB
+// livres no disco (medido 27/10). Nota sem PDF guardado sai pela ponte, pela
+// chave (/assistencia/nota-chave).
+const DIAS_PDF = 90;
+
+export async function baixarNotaDaSaida(
+  filial: string,
+  pedido: string,
+  zaeId: string,
+  opts: { pdfSoRecente?: boolean } = {}
+): Promise<NotaEntregaProtheus | null> {
   const r = await getProtheus(`/ai/deliveries/nota/${encodeURIComponent(filial)}/${encodeURIComponent(pedido)}/${encodeURIComponent(zaeId)}`);
   if (r.status === 404) return null;
   if (r.status !== 200) throw new Error(`Protheus respondeu ${r.status}: ${r.corpo.slice(0, 120)}`);
@@ -85,7 +96,10 @@ export async function baixarNotaDaSaida(filial: string, pedido: string, zaeId: s
   if (chave.length !== 44) return null;
   const pasta = pastaNotas();
   await mkdir(pasta, { recursive: true });
-  if (n.nfeBase64) await writeFile(join(pasta, `${chave}.pdf`), Buffer.from(n.nfeBase64, "base64"));
+  const emissao = /^\d{4}-\d{2}-\d{2}/.test(so(n.dataEmissao)) ? so(n.dataEmissao).slice(0, 10) : null;
+  const limitePdf = new Date(Date.now() - DIAS_PDF * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const guardarPdf = !!n.nfeBase64 && (!opts.pdfSoRecente || !emissao || emissao >= limitePdf);
+  if (guardarPdf) await writeFile(join(pasta, `${chave}.pdf`), Buffer.from(n.nfeBase64!, "base64"));
   if (n.nfeXml) await writeFile(join(pasta, `${chave}.xml`), n.nfeXml, "utf-8");
   const linha: NotaEntregaProtheus = {
     chave,
@@ -95,8 +109,8 @@ export async function baixarNotaDaSaida(filial: string, pedido: string, zaeId: s
     nota: so(n.invoice).replace(/^0+/, "") || null,
     serie: so(n.serie) || null,
     cfop: (Array.isArray(n.cfop) ? n.cfop.join(",") : so(n.cfop)) || null,
-    emissao: /^\d{4}-\d{2}-\d{2}/.test(so(n.dataEmissao)) ? so(n.dataEmissao).slice(0, 10) : null,
-    tem_pdf: !!n.nfeBase64,
+    emissao,
+    tem_pdf: guardarPdf,
     tem_xml: !!n.nfeXml,
   };
   const { error } = await getSupabaseAdmin().from("protheus_notas_entrega").upsert(linha, { onConflict: "chave" });
@@ -183,7 +197,7 @@ export async function copiarNotasDeEntrega(limiteMs: number, desde = PRIMEIRO_DI
             return;
           }
           try {
-            const n = await baixarNotaDaSaida(so(i.branch), so(i.order), so(i.id));
+            const n = await baixarNotaDaSaida(so(i.branch), so(i.order), so(i.id), { pdfSoRecente: true });
             if (n) doDia.notas++;
             else doDia.semNota++;
           } catch {

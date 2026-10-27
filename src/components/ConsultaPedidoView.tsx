@@ -440,7 +440,7 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
   );
 }
 
-const EXEMPLOS = "CPF/CNPJ, número do pedido (ex.: 062427 ou S01589), nota da venda, nome do cliente ou carga (ex.: ROM/2026/00058)";
+const EXEMPLOS = "CPF/CNPJ, código do cliente, número do pedido (ex.: 062427 ou S01589), nota da venda, nome do cliente ou carga (ex.: ROM/2026/00058)";
 
 // Tela inteira da consulta (título, busca e resultado) -- usada no painel
 // (/pedidos) e no sistema da assistência (SAC e assistência), cada um com o

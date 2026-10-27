@@ -74,6 +74,15 @@ describe("baixarNotaDaSaida", () => {
     expect([...arquivos.keys()].sort()).toEqual([`${CHAVE}.pdf`, `${CHAVE}.xml`]);
     expect(gravadas.protheus_notas_entrega).toHaveLength(1);
   });
+  it("na cópia de madrugada, nota com mais de 90 dias guarda só o XML", async () => {
+    respostas.set("/ai/deliveries/nota/209/010000/01", {
+      status: 200,
+      corpo: { invoice: "000010000", serie: "1", dataEmissao: "2025-03-01", chave: CHAVE, cfop: "5117", nfeXml: "<?xml?>", nfeBase64: "JVBE" },
+    });
+    const n = await baixarNotaDaSaida("209", "010000", "01", { pdfSoRecente: true });
+    expect(n).toMatchObject({ tem_pdf: false, tem_xml: true, emissao: "2025-03-01" });
+    expect([...arquivos.keys()]).toEqual([`${CHAVE}.xml`]);
+  });
   it("sem nota impressa (404) devolve null", async () => {
     expect(await baixarNotaDaSaida("209", "013716", "02")).toBeNull();
   });

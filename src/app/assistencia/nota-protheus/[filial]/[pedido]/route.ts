@@ -30,7 +30,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ filial: str
   } catch (err) {
     return aviso("Protheus não respondeu", `Não consegui buscar a nota agora (${(err as Error).message}). Tente de novo em instantes.`, 502);
   }
-  const escolhida = notas.find((n) => n.chave === req.nextUrl.searchParams.get("chave")) ?? notas.find((n) => n.tem_pdf);
+  const escolhida = notas.find((n) => n.chave === req.nextUrl.searchParams.get("chave")) ?? notas.find((n) => n.tem_pdf) ?? notas[0];
+  // Nota antiga copiada só com o XML: a DANFE sai pela ponte, pela chave.
+  // Caminho relativo: atrás do nginx o req.url é o endereço interno.
+  if (escolhida && !escolhida.tem_pdf) return new NextResponse(null, { status: 307, headers: { Location: `/assistencia/nota-chave/${escolhida.chave}` } });
   if (!escolhida) {
     return aviso("Nota de entrega não encontrada", `O pedido ${pedido} (filial ${filial}) não tem nota de entrega impressa no Protheus. A nota de venda do Protheus só tem a chave de acesso (aparece na consulta).`, 404);
   }
