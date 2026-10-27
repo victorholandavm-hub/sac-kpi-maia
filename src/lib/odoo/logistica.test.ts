@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OdooBridgeError, executarAcaoCarga, lerExpedicao, registrarResultadoParada } from "./logistica";
+import { OdooBridgeError, executarAcaoCarga, lerExpedicao, limparCacheExpedicao, registrarResultadoParada } from "./logistica";
 
 const fetchMock = vi.fn();
 
 beforeEach(() => {
+  limparCacheExpedicao();
   vi.stubGlobal("fetch", fetchMock);
   process.env.ODOO_BRIDGE_URL = "https://ponte.test/api/odoo/";
   process.env.ODOO_KEY_LOGISTICA = "k-log";
