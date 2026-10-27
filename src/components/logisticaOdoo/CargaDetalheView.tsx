@@ -481,6 +481,12 @@ export function CargaDetalheView({
                   {p.endereco}
                   {p.telefone ? ` · ${p.telefone}` : ""}
                 </div>
+                {/* 27/10 (CD, Expresso 28/10): restrição de horário/observação da loja e data programada de cada pedido da parada */}
+                {Array.from(new Set(p.pickings.map((pk) => [pk.obs ? `📝 ${pk.obs}` : "", pk.data_programada ? `📅 programada ${pk.data_programada.split("-").reverse().join("/")}` : ""].filter(Boolean).join(" · ")).filter(Boolean))).map((t, k) => (
+                  <div key={k} className="text-sm mt-1 px-2 py-1 rounded-md inline-block" style={{ background: "#fff3c4", color: "#5a4300", fontWeight: 600 }}>
+                    {t}
+                  </div>
+                ))}
                 {abertas.includes(p.parada_id) ? (
                   <div className="mt-1 mb-1 rounded-lg border p-2 text-sm" style={{ borderColor: "var(--border)" }}>
                     {p.pickings.map((pk) => (
