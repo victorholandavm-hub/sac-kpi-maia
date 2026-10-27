@@ -6,6 +6,9 @@ import Link from "next/link";
 const TABS = [
   { key: "pedidos", label: "Vendas e pedidos", href: "/assistencia/pedidos" },
   { key: "estoque", label: "Estoque", href: "/assistencia/lojas-estoque" },
+  // Expedição e Kardex só leitura -- Victor 27/10/2026.
+  { key: "expedicao", label: "Expedição", href: "/assistencia/odoo-expedicao" },
+  { key: "kardex", label: "Kardex", href: "/assistencia/odoo-kardex" },
   // Inventário (contagem e transferência entre estoques) é a tela da
   // Logística do Pedro, já liberada pro perfil assistência -- Victor 27/10/2026.
   { key: "inventario", label: "Inventário", href: "/assistencia/logistica/inventario" },

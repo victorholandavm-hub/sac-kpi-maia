@@ -101,6 +101,7 @@ export function linhaDaSaida(e: EntregaOdoo, companyId: number, empresa: string,
     carga_prevista: null,
     carga_saiu_em: null,
     carga_fim_em: null,
+    na_expedicao_em: agora,
     visto_em: agora,
   };
 }

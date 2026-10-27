@@ -15,6 +15,9 @@ const TABS = [
   { key: "pedidos", label: "Consulta de pedido", href: "/assistencia/sac/pedidos" },
   // Estoque por loja/CD (Odoo) -- 26/10/2026, mesmo pedido.
   { key: "estoque", label: "Estoque", href: "/assistencia/sac/estoque" },
+  // Expedição e Kardex do Odoo, só leitura -- Victor 27/10/2026.
+  { key: "expedicao", label: "Expedição", href: "/assistencia/sac/expedicao" },
+  { key: "kardex", label: "Kardex", href: "/assistencia/sac/kardex" },
   // Pedido do Victor 01/10/2026: "quero que todos os atendentes fossem
   // colocando como feito, diariamente" -- checklist pessoal do atendente
   // (ou matriz de controle, se admin, ver cronograma/page.tsx).
