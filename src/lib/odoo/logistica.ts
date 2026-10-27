@@ -149,8 +149,24 @@ export function listarEmpresas(perfil: PerfilOdoo = "logistica"): Promise<Empres
   return json<EmpresaOdoo[]>("/empresas", { perfil });
 }
 
+// 27/10 (Pedro: "lentidão"): a Expedição de todas as empresas pedia as 16 filas a cada abertura/refresh (35 s cada no
+// Odoo, ~2.500 leituras/dia) e travava o Odoo das lojas. Cache de 45 s por empresa, compartilhado entre usuários e
+// chamadas simultâneas; qualquer ação da logística limpa o cache (limparCacheExpedicao) para mostrar o efeito na hora.
+const CACHE_EXPEDICAO_MS = 45_000;
+const cacheExpedicao = new Map<string, { em: number; p: Promise<ExpedicaoResposta> }>();
+
+export function limparCacheExpedicao(): void {
+  cacheExpedicao.clear();
+}
+
 export function lerExpedicao(companyId: number, dias = 90): Promise<ExpedicaoResposta> {
-  return json<ExpedicaoResposta>("/logistica/expedicao", { perfil: "logistica", query: { company_id: companyId, dias } });
+  const k = `${companyId}:${dias}`;
+  const c = cacheExpedicao.get(k);
+  if (c && Date.now() - c.em < CACHE_EXPEDICAO_MS) return c.p;
+  const p = json<ExpedicaoResposta>("/logistica/expedicao", { perfil: "logistica", query: { company_id: companyId, dias } });
+  cacheExpedicao.set(k, { em: Date.now(), p });
+  p.catch(() => cacheExpedicao.delete(k));
+  return p;
 }
 
 export async function listarCargas(

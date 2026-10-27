@@ -6,6 +6,7 @@
 // dado -- ver ResultadoAcao em logisticaTipos.ts.
 
 import { revalidatePath } from "next/cache";
+import { limparCacheExpedicao } from "@/lib/odoo/logistica";
 import {
   acaoEntrega,
   lerItensEntrega,
@@ -96,6 +97,7 @@ async function executar<T>(fn: (operador: string) => Promise<T>, revalidar: stri
   try {
     const op = await exigirOperadorLogistica();
     const dados = await fn(op.operadorOdoo);
+    limparCacheExpedicao();
     for (const p of revalidar) revalidatePath(p);
     return { ok: true, dados };
   } catch (err) {
