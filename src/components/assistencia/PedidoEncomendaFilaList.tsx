@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { bulkMarkEnviadoParaCD, advancePedidoStatus } from "@/app/assistencia/encomendas-actions";
+import { bulkAvancarFabrica, advancePedidoStatus } from "@/app/assistencia/encomendas-actions";
 import { useQuickAction } from "./useQuickAction";
 import { PedidoEncomendaStatusBadge } from "./PedidoEncomendaStatusBadge";
 import { NewSinceBadge } from "./NewSinceBadge";
@@ -21,10 +21,13 @@ import type { PedidoEncomendaSummary, PedidoEncomendaItem } from "@/lib/pedidosE
 // grandes → linha compacta) é o que de fato elimina rolagem, mesmo
 // mostrando tudo de uma vez sem acordeão escondendo nada.
 
-// Único status de origem elegível pra seleção em lote hoje: fábrica termina a
-// produção de vários pedidos e marca todos como "enviado para o CD" de uma
-// vez, em vez de abrir pedido por pedido (ver bulkMarkEnviadoParaCD).
-const BULK_ELIGIBLE_STATUS = "em_producao";
+// Seleção em lote da fábrica (ver bulkAvancarFabrica): "em produção" ->
+// "pronto" e "pronto" -> "enviado para o CD" ("Pronto" entrou 27/10/2026).
+// Uma fase por vez: o primeiro pedido marcado define qual.
+const BULK_PROXIMO: Record<string, { toStatus: "pronto" | "pronto_para_expedicao"; rotulo: string; feito: string }> = {
+  em_producao: { toStatus: "pronto", rotulo: "Marcar como pronto", feito: "pronto" },
+  pronto: { toStatus: "pronto_para_expedicao", rotulo: "Marcar como enviado para o CD", feito: "enviado para o CD" },
+};
 
 // A partir daqui o CD já confirmou o pedido de alguma forma (botou em carga
 // ou marcou recebido/em estoque) -- só nesse ponto existe uma data real de
@@ -300,13 +303,17 @@ export function PedidoEncomendaFilaList({
     });
   }
 
+  const faseSelecionada = pedidos.find((p) => selected.has(p.id))?.status ?? null;
+  const proximoLote = faseSelecionada ? BULK_PROXIMO[faseSelecionada] : undefined;
+
   function markSelected() {
+    if (!proximoLote) return;
     const ids = [...selected];
     const plural = ids.length > 1 ? "s" : "";
     run(async () => {
-      await bulkMarkEnviadoParaCD(ids);
+      await bulkAvancarFabrica(ids, proximoLote.toStatus);
       setSelected(new Set());
-    }, `${ids.length} pedido${plural} marcado${plural} como enviado para o CD.`);
+    }, `${ids.length} pedido${plural} marcado${plural} como ${proximoLote.feito}.`);
   }
 
   function advance(p: PedidoEncomendaSummary, toStatus: string) {
@@ -319,7 +326,7 @@ export function PedidoEncomendaFilaList({
 
   function renderRow(p: PedidoEncomendaSummary) {
     const needsAction = actionNeededIds.has(p.id);
-    const eligible = canBulkAdvance && p.status === BULK_ELIGIBLE_STATUS;
+    const eligible = canBulkAdvance && !!BULK_PROXIMO[p.status] && (!faseSelecionada || faseSelecionada === p.status);
     return (
       <PedidoRow
         key={p.id}
@@ -388,12 +395,12 @@ export function PedidoEncomendaFilaList({
             {selected.size} selecionado{selected.size > 1 ? "s" : ""}
           </span>
           <button
-            disabled={pending}
+            disabled={pending || !proximoLote}
             onClick={markSelected}
             className="text-sm rounded-lg px-3 py-2 font-medium disabled:opacity-60"
-            style={{ background: PEDIDO_ENCOMENDA_STATUS_COLORS.pronto_para_expedicao, color: "#fff" }}
+            style={{ background: PEDIDO_ENCOMENDA_STATUS_COLORS[proximoLote?.toStatus ?? "pronto_para_expedicao"], color: "#fff" }}
           >
-            Marcar como enviado para o CD
+            {proximoLote?.rotulo ?? "Marcar"}
           </button>
           <button onClick={() => setSelected(new Set())} className="text-sm underline text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
             Limpar seleção

@@ -156,6 +156,8 @@ export const ROLE_LABELS: Record<string, string> = {
 export const PEDIDO_ENCOMENDA_STATUS_LABELS: Record<string, string> = {
   solicitado: "Solicitado",
   em_producao: "Em produção",
+  // "Pronto" -- Victor 27/10/2026: a fábrica terminou, ainda não despachou pro CD.
+  pronto: "Pronto",
   pronto_para_expedicao: "Enviado para o CD",
   em_carga: "Em carga",
   faturado: "Faturado",
@@ -175,6 +177,7 @@ export const PEDIDO_ENCOMENDA_STATUS_LABELS: Record<string, string> = {
 export const PEDIDO_ENCOMENDA_STATUS_STEPS: { key: string; label: string }[] = [
   { key: "solicitado", label: "Solicitado" },
   { key: "em_producao", label: "Em produção" },
+  { key: "pronto", label: "Pronto" },
   { key: "pronto_para_expedicao", label: "Enviado CD" },
   { key: "em_carga", label: "Em carga" },
   { key: "faturado", label: "Faturado" },
@@ -201,6 +204,7 @@ export const PEDIDO_ENCOMENDA_STATUS_STEPS: { key: string; label: string }[] = [
 export const PEDIDO_ENCOMENDA_STATUS_COLORS: Record<string, string> = {
   solicitado: "var(--status-warning)",
   em_producao: "var(--series-5)",
+  pronto: "var(--status-info)",
   pronto_para_expedicao: "var(--status-serious)",
   em_carga: "var(--brand-orange)",
   faturado: "var(--brand-green)",

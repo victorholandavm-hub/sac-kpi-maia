@@ -55,6 +55,7 @@ const FILTERS: { label: string; value: string | null }[] = [
   { label: "Todos", value: "todos" },
   { label: "Solicitado", value: "solicitado" },
   { label: "Em produção", value: "em_producao" },
+  { label: "Pronto", value: "pronto" },
   { label: "Enviado para o CD", value: "pronto_para_expedicao" },
   { label: "Recebido no CD", value: "recebido_cd" },
   { label: "Em carga", value: "em_carga" },

@@ -357,9 +357,13 @@ export async function advancePedidoStatus(
 // -- mesma regra de transição de advancePedidoStatus (requireEncomendaAction),
 // só que validada pra todos os ids ANTES de gravar qualquer um (tudo ou nada,
 // sem aplicar parcial se algum pedido não puder avançar).
-export async function bulkMarkEnviadoParaCD(pedidoIds: string[]): Promise<void> {
+// Em lote, os dois passos da fábrica depois de "Em produção" -- "Pronto"
+// entrou 27/10/2026 (pedido do Victor): em_producao -> pronto ->
+// pronto_para_expedicao (enviado para o CD).
+export async function bulkAvancarFabrica(pedidoIds: string[], toStatus: "pronto" | "pronto_para_expedicao"): Promise<void> {
   const actor = await requireEncomendaActor();
   if (pedidoIds.length === 0) throw new Error("Selecione ao menos um pedido.");
+  if (toStatus !== "pronto" && toStatus !== "pronto_para_expedicao") throw new Error("Etapa inválida.");
 
   const admin = getSupabaseAdmin();
   const { data: rows, error: fetchError } = await admin
@@ -371,10 +375,10 @@ export async function bulkMarkEnviadoParaCD(pedidoIds: string[]): Promise<void> 
   }
 
   for (const row of rows) {
-    requireEncomendaAction(actor, { status: row.status, fornecedorTipo: row.fornecedor_tipo, fabricaId: row.fabrica_id }, "pronto_para_expedicao");
+    requireEncomendaAction(actor, { status: row.status, fornecedorTipo: row.fornecedor_tipo, fabricaId: row.fabrica_id }, toStatus);
   }
   for (const row of rows) {
-    await updatePedidoStatus(row.id, actor, row.status, "pronto_para_expedicao");
+    await updatePedidoStatus(row.id, actor, row.status, toStatus);
   }
 
   revalidatePath("/assistencia/encomendas/fila");

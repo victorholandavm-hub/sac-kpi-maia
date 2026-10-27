@@ -25,7 +25,8 @@ type NextStep = {
 };
 
 const NEXT_STEP: Record<string, NextStep | undefined> = {
-  em_producao: { toStatus: "pronto_para_expedicao", label: "Marcar como enviado para o CD" },
+  em_producao: { toStatus: "pronto", label: "Marcar como pronto" },
+  pronto: { toStatus: "pronto_para_expedicao", label: "Marcar como enviado para o CD" },
   // Não pede mais nº da carga -- deixou de ser obrigatório (a NF-e da etapa
   // seguinte continua sendo). "recebido_cd" (pedido direto pro cliente, sem
   // passar pela loja) é um botão separado, renderizado à parte logo abaixo,
@@ -52,7 +53,7 @@ function getNextStep(status: string, fornecedorTipo: "fabrica_interna" | "fabric
 // servidor (requireEncomendaAction em src/lib/dal.ts) já barra o resto, isso
 // aqui é só pra não mostrar um botão que vai dar erro.
 const ROLE_CAN_ADVANCE_INTERNA: Record<string, string[]> = {
-  fabrica: ["solicitado", "em_producao"],
+  fabrica: ["solicitado", "em_producao", "pronto"],
   cd: ["pronto_para_expedicao", "em_carga", "faturado"],
 };
 const ROLE_CAN_ADVANCE_EXTERNA: Record<string, string[]> = {

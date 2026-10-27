@@ -7,6 +7,7 @@ import { sanitizeOrFilterValue } from "./searchFilter";
 export type PedidoEncomendaStatus =
   | "solicitado"
   | "em_producao"
+  | "pronto"
   | "pronto_para_expedicao"
   | "em_carga"
   | "faturado"
@@ -18,6 +19,7 @@ export type PedidoEncomendaStatus =
 export const PEDIDO_ENCOMENDA_STATUSES: PedidoEncomendaStatus[] = [
   "solicitado",
   "em_producao",
+  "pronto",
   "pronto_para_expedicao",
   "em_carga",
   "faturado",
@@ -36,6 +38,7 @@ export function isPedidoEncomendaStatus(value: string | undefined | null): value
 export const OPEN_PEDIDO_ENCOMENDA_STATUSES: PedidoEncomendaStatus[] = [
   "solicitado",
   "em_producao",
+  "pronto",
   "pronto_para_expedicao",
   "em_carga",
   "faturado",

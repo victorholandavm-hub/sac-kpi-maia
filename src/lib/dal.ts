@@ -148,7 +148,8 @@ export function canSeeOwnAssemblerStoreRequests(profile: Profile): boolean {
 // Regras de transição de status do pedido de encomenda (ver
 // supabase/migrations/0027_pedidos_encomenda.sql / 0028_encomenda_pin_auth.sql
 // / 0052_pedido_encomenda_fornecedor.sql):
-// fábrica própria só avança solicitado -> em_producao -> pronto_para_expedicao,
+// fábrica própria só avança solicitado -> em_producao -> pronto ->
+// pronto_para_expedicao ("Pronto" entrou 27/10/2026, pedido do Victor),
 // e só nos pedidos da fábrica que é dela; CD só avança daí em diante até
 // entregue. Fornecedor externo não tem etapa de produção -- CD assume desde
 // "solicitado" (pula direto pra pronto_para_expedicao). Só admin/assistencia
@@ -157,7 +158,8 @@ export function canSeeOwnAssemblerStoreRequests(profile: Profile): boolean {
 // EncomendaActor em src/lib/encomendaAuth.ts.
 const FABRICA_TRANSITIONS: Record<string, string[]> = {
   solicitado: ["em_producao"],
-  em_producao: ["pronto_para_expedicao"],
+  em_producao: ["pronto"],
+  pronto: ["pronto_para_expedicao"],
 };
 
 const CD_TRANSITIONS: Record<string, string[]> = {

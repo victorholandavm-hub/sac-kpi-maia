@@ -226,9 +226,10 @@ export default async function EncomendasSacPage({
       ) : null}
 
       {!showCompleted && !showAll ? (
-        <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <StatTile label="Em aberto" value={pedidos.length} />
           <StatTile label="Em produção" value={byStatus.em_producao ?? 0} />
+          <StatTile label="Pronto" value={byStatus.pronto ?? 0} />
           <StatTile label="Em carga" value={byStatus.em_carga ?? 0} />
           <StatTile label="Faturados" value={byStatus.faturado ?? 0} />
         </section>
