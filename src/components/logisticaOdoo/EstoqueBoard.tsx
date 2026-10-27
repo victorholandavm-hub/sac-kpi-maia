@@ -29,6 +29,7 @@ const PAGINA = 200;
 type Item = AudPosicaoItem | AudReservaItem | AudSefazItem | AudPedidoItem | AudGeralItem | AudGrupoLinha | AudRotItem;
 type Extra = { calculado_em?: string; protheus_em?: string; faixas?: AudFaixa[] };
 const COM_GRUPO: Vis[] = ["posicao", "negativo", "geral", "parado", "giro"];
+const CONTAGEM: Vis[] = ["posicao", "negativo", "geral", "fornecedor", "grupo", "parado", "giro"];
 const COM_SALDO: Vis[] = ["geral", "fornecedor", "grupo"];
 
 const num = (v: number) => Number(v || 0).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
@@ -154,7 +155,22 @@ export function EstoqueBoard({ empresas, grupos }: { empresas: EmpresaOdoo[]; gr
       return;
     }
     const nomeEmp = empresa ? (empresas.find((e) => e.id === empresa)?.name.split(" ")[0] ?? empresa) : "todas";
-    csv(r.dados.itens as unknown as Record<string, unknown>[], `${vis}_${nomeEmp}_${new Date().toISOString().slice(0, 10)}.csv`);
+    const linhas = r.dados.itens as unknown as Record<string, unknown>[];
+    // 27/10 (Pedro): relatório de CONTAGEM na sequência Filial · Código · Descrição · Fabricante · Quant. Sistema · Quant. Físico (em branco, p/ contar) · Armazém
+    // Armazém igual ao antigo: 01 = estoque da loja, 75 = avaria, AT = assistência (linha própria quando tem saldo lá)
+    if (CONTAGEM.includes(vis)) {
+      const fil = (l: Record<string, unknown>) => String(l.loja || nomeEmp || "").split(" ")[0];
+      const out: Record<string, unknown>[] = [];
+      for (const l of linhas) {
+        const base = { Filial: fil(l), "Codigo do produto": l.codigo ?? "", "Descrição": l.produto ?? "", Fabricante: l.fornecedor ?? "" };
+        out.push({ ...base, "Quant. Sistema": Number(l.fisico ?? 0), "Quant. Físico": "", "Armazém": "01" });
+        if (Number(l.avaria ?? 0)) out.push({ ...base, "Quant. Sistema": Number(l.avaria), "Quant. Físico": "", "Armazém": "75" });
+        if (Number(l.assistencia ?? 0)) out.push({ ...base, "Quant. Sistema": Number(l.assistencia), "Quant. Físico": "", "Armazém": "AT" });
+      }
+      csv(out, `contagem_${vis}_${nomeEmp}_${new Date().toISOString().slice(0, 10)}.csv`);
+      return;
+    }
+    csv(linhas, `${vis}_${nomeEmp}_${new Date().toISOString().slice(0, 10)}.csv`);
   }
 
   const T = dados?.totais ?? {};
