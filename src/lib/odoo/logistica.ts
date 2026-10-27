@@ -619,3 +619,21 @@ export async function audGrupos(): Promise<string[]> {
   const r = await json<{ itens: string[] }>("/auditoria/grupos", { perfil: "logistica" });
   return r.itens;
 }
+
+// ---- 27/10 (Eduardo/CD): CARTA DE CORREÇÃO (CC-e) — ponte /nota/cce (cce_bridge.py)
+export type CartaCorrecao = { sequencia: string; texto: string; protocolo: string; situacao: string; codigo: string; data: string };
+export type NotaCce = {
+  nota: { chave: string; numero: string; serie: string; cliente: string; empresa: string; company_id: number; operacao: string; data: string; situacao: string; valor: number };
+  cartas: CartaCorrecao[];
+  aviso: string;
+  pode: boolean;
+};
+export function lerCce(q: { chave?: string; numero?: string; company_id?: number }): Promise<NotaCce> {
+  return json<NotaCce>("/nota/cce", { perfil: "logistica", query: { chave: q.chave, numero: q.numero, company_id: q.company_id } });
+}
+export function enviarCce(chave: string, texto: string, operador: string): Promise<{ carta: CartaCorrecao; cartas: CartaCorrecao[] }> {
+  return json("/nota/cce", { perfil: "logistica", metodo: "POST", corpo: { chave, texto, operador }, timeoutMs: 120_000 });
+}
+export function baixarCcePdf(chave: string, seq: string): Promise<{ bytes: ArrayBuffer; nome: string }> {
+  return pdf("/nota/cce/pdf", { perfil: "logistica", query: { chave, seq }, timeoutMs: 60_000 });
+}
