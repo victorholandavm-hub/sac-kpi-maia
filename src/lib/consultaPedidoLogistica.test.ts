@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("./supabaseAdmin", () => ({ getSupabaseAdmin: () => ({}) }));
-const { modoDoProtheus, logisticaDoOdoo, agruparPedidosOdoo, situacaoDoOdoo, cartaoDaBusca } = await import("./consultaPedido");
+const { modoDoProtheus, logisticaDoOdoo, agruparPedidosOdoo, situacaoDoOdoo, cartaoDaBusca, ligarVendasMigradas } = await import("./consultaPedido");
 
 const linha = (o: Partial<Parameters<typeof logisticaDoOdoo>[1][number]>) => ({ pedido: "S01589", modo: null, expresso: null, filial_entrega: null, retira_em: null, empresa: null, ...o });
 
@@ -101,5 +101,26 @@ describe("cartaoDaBusca", () => {
       nf5922: "23797/1", nf5117: "", nota: "", situacao: "Na loja 207: peça reservada lá", cor: "info", carga_id: false, na_fila: true,
     });
     expect(c).toMatchObject({ pedido: "S00408", cliente: "JANICLEIDE", empresa: "207", nf5922: "23797/1", nf5117: null, situacaoOdoo: "Na loja 207: peça reservada lá", logistica: { filialVenda: "207", modo: "retira" } });
+  });
+});
+
+describe("ligarVendasMigradas", () => {
+  const venda = (nf: string, filial: string) => ({
+    venda: { id: nf + filial, notaFiscal: nf.padStart(9, "0"), serie: "1", filial, data: "2026-10-24", vendedor: null, formaPagamento: null, valor: 1, itens: [], chave: null },
+    entrega: null,
+    criterio: null,
+    data: "2026-10-24",
+  });
+  const odoo = (pedido: string, nf5922: string | null) => ({ pedido, cliente: "JONAS", telefone: null, empresa: "213 CD", nf5922, nf5117: null, legado: true, logistica: { filialVenda: null, filialEntrega: "213", modo: null, retiraEm: null } });
+  it("põe o pedido do Odoo dentro da venda do Protheus de mesma nota e tira da lista solta", () => {
+    const r = { busca: "x", tipo: "nome" as const, limitado: false, clientes: [{ codigo: "129163", nome: "JONAS", documento: null, pedidos: [venda("31039", "213")] }], odoo: [odoo("S00672", "31039/1"), odoo("S00700", null)] };
+    ligarVendasMigradas(r);
+    expect(r.clientes[0].pedidos[0]).toMatchObject({ odooLigado: { pedido: "S00672", vendaProtheus: "NF 31039" } });
+    expect(r.odoo.map((o) => o.pedido)).toEqual(["S00700"]);
+  });
+  it("mesma nota em duas filiais: não liga (ambíguo)", () => {
+    const r = { busca: "x", tipo: "nome" as const, limitado: false, clientes: [{ codigo: "1", nome: "A", documento: null, pedidos: [venda("100", "205"), venda("100", "212")] }], odoo: [odoo("S1", "100/1")] };
+    ligarVendasMigradas(r);
+    expect(r.odoo).toHaveLength(1);
   });
 });

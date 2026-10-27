@@ -251,7 +251,13 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
             {dataBr(p.data)}
           </span>
         </div>
-        {e ? <Selo texto={e.statusAtual ?? "Sem status"} tom={tomStatusAtual(e.statusAtual)} /> : <Selo texto="Sem entrega" tom="neutro" />}
+        {e ? (
+          <Selo texto={e.statusAtual ?? "Sem status"} tom={tomStatusAtual(e.statusAtual)} />
+        ) : p.odooLigado ? (
+          <Selo texto={p.odooLigado.logistica.situacao?.texto ?? "No Odoo"} tom={p.odooLigado.logistica.situacao?.tom ?? "neutro"} />
+        ) : (
+          <Selo texto="Sem entrega" tom="neutro" />
+        )}
       </div>
       {p.logistica?.situacao ? (
         <Situacao s={p.logistica.situacao} acao={acao} semFotos={!!e?.tentativas.some((t) => t.fotos?.length)} />
@@ -299,7 +305,22 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
 
         <div className="flex flex-col gap-2">
           <Rotulo>Entrega</Rotulo>
-          {!e ? (
+          {!e && p.odooLigado ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                Venda migrada pro Odoo: pedido <b style={{ color: "var(--text-primary)" }}>{p.odooLigado.pedido}</b>
+              </p>
+              {p.odooLigado.situacaoOdoo ? (
+                <p className="text-sm rounded-xl px-3 py-2" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
+                  <span style={{ color: "var(--text-muted)" }}>No Odoo agora: </span>
+                  <b className="font-semibold">{p.odooLigado.situacaoOdoo}</b>
+                </p>
+              ) : null}
+              {p.odooLigado.logistica.situacao ? <Situacao s={p.odooLigado.logistica.situacao} acao={acao} /> : null}
+              <Filiais l={{ ...p.odooLigado.logistica, filialVenda: null }} />
+              <BotoesNota pedido={p.odooLigado.pedido} />
+            </div>
+          ) : !e ? (
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               Sem entrega registrada: retirada na loja, ou ainda sem carga.
             </p>

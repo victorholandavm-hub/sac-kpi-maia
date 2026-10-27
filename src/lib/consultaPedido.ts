@@ -101,6 +101,9 @@ export type PedidoConsulta = {
   criterio: string | null;
   data: string;
   logistica?: LogisticaPedido;
+  // Venda do Protheus migrada pro Odoo (mesma nota de venda): a entrega
+  // agora anda no Odoo -- Victor 27/10/2026, print do Jonas (NF 31039 = S00672).
+  odooLigado?: PedidoOdooConsulta;
 };
 
 export type ClienteConsulta = { codigo: string; nome: string | null; documento: string | null; pedidos: PedidoConsulta[] };
@@ -121,6 +124,8 @@ export type PedidoOdooConsulta = {
   // Situação em texto, direto do Odoo (/logistica/busca do Pedro): "Na loja
   // 207: peça reservada lá", "Em rota na carga …" etc.
   situacaoOdoo?: string | null;
+  // Nota de venda do Protheus a que este pedido corresponde ("NF 31039").
+  vendaProtheus?: string | null;
 };
 
 export type ResultadoConsulta = {
@@ -443,7 +448,8 @@ async function anexarNotasDeEntrega(r: ResultadoConsulta): Promise<ResultadoCons
       if (nome && p.logistica?.situacao?.cargaId) alvos.push({ s: p.logistica.situacao, pedido: nome });
     }
   }
-  for (const p of r.odoo ?? []) if (p.logistica.situacao?.cargaId) alvos.push({ s: p.logistica.situacao, pedido: p.pedido });
+  for (const p of [...(r.odoo ?? []), ...r.clientes.flatMap((c) => c.pedidos.map((x) => x.odooLigado).filter((o): o is PedidoOdooConsulta => !!o))])
+    if (p.logistica.situacao?.cargaId) alvos.push({ s: p.logistica.situacao, pedido: p.pedido });
   const cargas = [...new Set(alvos.map((a) => a.s.cargaId!))].slice(0, MAX_CARGAS_COM_NOTA);
   const porCarga = new Map<number, Awaited<ReturnType<typeof notasDeEntregaDaCarga>>>();
   for (let i = 0; i < cargas.length; i += 2) {
@@ -466,6 +472,7 @@ async function anexarConferenteEFotos(r: ResultadoConsulta) {
   const situacoes = [
     ...r.clientes.flatMap((c) => c.pedidos.map((p) => p.logistica?.situacao)),
     ...(r.odoo ?? []).map((p) => p.logistica.situacao),
+    ...r.clientes.flatMap((c) => c.pedidos.map((p) => p.odooLigado?.logistica.situacao)),
   ].filter((s): s is SituacaoPedido => !!s);
   const cargas = [...new Set(situacoes.map((s) => s.cargaId).filter((id): id is number => !!id))];
   if (cargas.length) {
@@ -489,8 +496,37 @@ async function anexarConferenteEFotos(r: ResultadoConsulta) {
 
 export async function consultarPedidos(busca: string): Promise<ResultadoConsulta> {
   const r = await consultarSemNotas(busca);
+  // CPF achado na nossa base: os pedidos do Odoo do mesmo cliente também pelo
+  // nome (a expedição não tem CPF) -- assim CPF e nome mostram a mesma coisa
+  // mesmo se a busca do Odoo não responder.
+  if (r.tipo === "documento" && r.clientes[0]?.nome) {
+    const jaTem = new Set((r.odoo ?? []).map((o) => o.pedido));
+    const porNome = await pedidosOdooDaBusca(r.clientes[0].nome, "nome", jaTem).catch(() => []);
+    r.odoo = [...(r.odoo ?? []), ...porNome];
+  }
   if (r.tipo !== "curta") r.odoo = await juntarBuscaDoOdoo(r, busca.trim());
+  ligarVendasMigradas(r);
   return anexarNotasDeEntrega(r);
+}
+
+// Venda do Protheus que foi migrada pro Odoo: o pedido do Odoo guarda a nota de
+// venda do Protheus em nf5922 ("31039/1" = nota 31039, série 1). Casa com a
+// venda sem entrega do Protheus e mostra os dois no mesmo cartão (o pedido sai
+// da lista "Pedidos do Odoo"). Mesma nota em mais de uma filial: só liga se
+// for uma venda só.
+export function ligarVendasMigradas(r: ResultadoConsulta) {
+  if (!r.odoo?.length) return;
+  const vendasSemEntrega = r.clientes.flatMap((c) => c.pedidos).filter((p) => p.venda && !p.entrega && !p.odooLigado);
+  const ligados = new Set<string>();
+  for (const o of r.odoo) {
+    const m = (o.nf5922 ?? "").match(/^0*(\d+)\/(\w+)$/);
+    if (!m) continue;
+    const iguais = vendasSemEntrega.filter((p) => p.venda!.notaFiscal.replace(/^0+/, "") === m[1] && p.venda!.serie.trim() === m[2] && !p.odooLigado);
+    if (iguais.length !== 1) continue;
+    iguais[0].odooLigado = { ...o, vendaProtheus: `NF ${m[1]}` };
+    ligados.add(o.pedido);
+  }
+  r.odoo = r.odoo.filter((o) => !ligados.has(o.pedido));
 }
 
 // Pergunta direto ao Odoo (/logistica/busca do Pedro: CPF/CNPJ com ou sem
@@ -518,7 +554,12 @@ async function juntarBuscaDoOdoo(r: ResultadoConsulta, q: string): Promise<Pedid
   const itens = await buscarEntregas(q).catch(() => [] as BuscaEntrega[]);
   if (itens.length === 0) return atuais;
   const porPedido = new Map(itens.map((i) => [i.pedido, i]));
-  for (const p of atuais) p.situacaoOdoo ??= porPedido.get(p.pedido)?.situacao ?? null;
+  for (const p of atuais) {
+    const i = porPedido.get(p.pedido);
+    p.situacaoOdoo ??= i?.situacao ?? null;
+    p.nf5922 ??= i?.nf5922 || null;
+    p.nf5117 ??= i?.nf5117 || null;
+  }
   const jaMostrados = new Set([
     ...atuais.map((p) => p.pedido),
     ...r.clientes.flatMap((c) => c.pedidos.map((p) => (p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null)).filter((n): n is string => !!n)),
