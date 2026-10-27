@@ -252,6 +252,22 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
       ) : null}
       {p.logistica ? <Filiais l={p.logistica} /> : null}
       {e && nomePedidoOdoo(e.pedido) ? <BotoesNota pedido={nomePedidoOdoo(e.pedido)!} /> : null}
+      {e && !nomePedidoOdoo(e.pedido) && e.tentativas.some((t) => t.comResultado) ? (
+        <div className="flex flex-wrap items-center gap-2 -mt-1">
+          <a
+            href={`/assistencia/nota-protheus/${e.filial}/${e.pedido}`}
+            target="_blank"
+            rel="noopener"
+            className="rounded-lg px-3 py-1.5 text-xs font-semibold"
+            style={{ background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+          >
+            🖨 Nota de entrega (Protheus)
+          </a>
+          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+            a nota de venda do Protheus só tem a chave de acesso
+          </span>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-5">
         <div className="flex flex-col gap-2">
