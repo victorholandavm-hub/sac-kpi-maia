@@ -65,6 +65,8 @@ const PASSTHROUGH_PREFIXES = [
   // 27/10 (Pedro, caixas sem material de consumo): pedido de suprimentos do caixa das lojas (X-API-Key
   // própria CAIXA_API_KEYS, ver api/caixa/suprimentos/route.ts) -- sem isso caía no redirect de login (307). Publicado 27/10.
   "/api/caixa/suprimentos",
+  // 27/10 (Pedro): login único vindo do dash (token HMAC de uso único) -- a própria rota valida
+  "/api/sso",
   // Resumo de estornos por loja (ver route.ts) -- pedido do Gabriel/
   // financeiro 14/10/2026, só existe de verdade na instância embutida
   // (ESTORNO_EMBED), mas o passthrough fica disponível sempre, mesmo
