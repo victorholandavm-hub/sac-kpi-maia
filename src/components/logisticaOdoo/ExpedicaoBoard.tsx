@@ -27,6 +27,13 @@ import { AcaoEntregaDialog, type AlvoEntrega } from "./AcaoEntregaDialog";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { Chip, Kpi, VolumesChips, botaoClass, botaoLaranjaStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
+// 27/10 (Rafael/John: "observações dos pedidos não aparecem na expedição"): a nota do pedido vem como
+// "<obs do vendedor> | entrega: … | frete … | pagto: […]" — mostra só a parte do vendedor
+function obsVendedor(nota?: string | null): string {
+  const t = (nota || "").split(/\s*\|\s*entrega:/)[0].replace(/pagto(_caixa)?:[\s\S]*$/, "").trim();
+  return t.length > 300 ? t.slice(0, 300) + "…" : t;
+}
+
 const VISOES: { id: VisaoExpedicao; label: string }[] = [
   { id: "fila", label: "Fila (sem carga)" },
   { id: "pendencias", label: "Pendências do CD" },
@@ -405,6 +412,11 @@ export function ExpedicaoBoard({
                       ))}
                     </div>
                     {e.pendencia ? <Chip cor="var(--status-serious)">pendência: {e.pendencia_motivo}</Chip> : null}
+                    {obsVendedor(e.obs) ? (
+                      <div className="text-xs mt-1 rounded px-2 py-1" style={{ background: "#FFF3C4", color: "#5C4400" }}>
+                        📝 Obs. do pedido: {obsVendedor(e.obs)}
+                      </div>
+                    ) : null}
                     {e.anotacao ? (
                       <div className="text-xs italic mt-1" style={{ color: "var(--text-muted)" }}>
                         {e.anotacao.slice(-140)}

@@ -129,6 +129,8 @@ export type EntregaOdoo = {
   pendencia: boolean;
   pendencia_motivo: string;
   anotacao: string;
+  /** 27/10: observação do vendedor (nota do pedido, sem a parte técnica de entrega/pagamento) */
+  obs?: string;
   filial_entrega: string;
   dias: number | null;
   volumes: number;
