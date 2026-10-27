@@ -665,3 +665,21 @@ export function enviarCce(chave: string, texto: string, operador: string): Promi
 export function baixarCcePdf(chave: string, seq: string): Promise<{ bytes: ArrayBuffer; nome: string }> {
   return pdf("/nota/cce/pdf", { perfil: "logistica", query: { chave, seq }, timeoutMs: 60_000 });
 }
+
+// ---- 27/10 (Edu/CD + Gabriel): DEVOLUÇÃO AO FORNECEDOR — ponte /compras/devolucao (NF-e 5202/6202, refNFe por nota de entrada)
+export type ItemNotaEntrada = {
+  codigo: string; descricao: string; qtd: number; preco: number; icms_percent: number; ipi_percent?: number; ipi_valor?: number; cfop?: string; ja_devolvido?: number;
+};
+export type NotaEntrada = { chave: string; nf: string; serie?: string; emissao?: string; valor?: number; fornecedor: string; cnpj: string; origem: string; itens: ItemNotaEntrada[] };
+export type DevolucaoFornecedor = { numero?: string; serie?: string; chave?: string; estado?: string; xml_erro?: string; saida?: string; local?: string; fornecedor?: string; valor?: number };
+
+export function notaEntradaDevolucao(chave: string): Promise<NotaEntrada> {
+  return json<NotaEntrada>("/compras/devolucao/nota", { perfil: "logistica", query: { chave }, timeoutMs: 60_000 });
+}
+
+export function emitirDevolucaoFornecedor(corpo: {
+  company_id: number; origem: string; fornecedor: string; motivo: string; operador: string;
+  itens: { codigo: string; qtd: number; preco: number; icms_percent: number; ipi_devol: number; chave_origem: string }[];
+}): Promise<DevolucaoFornecedor> {
+  return json<DevolucaoFornecedor>("/compras/devolucao", { perfil: "logistica", metodo: "POST", corpo, timeoutMs: 180_000 });
+}

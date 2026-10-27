@@ -3,6 +3,7 @@ import { listarEmpresas } from "@/lib/odoo/logistica";
 import { empresaDaUrl } from "@/lib/odoo/logisticaAuth";
 import { InventarioBoard } from "@/components/logisticaOdoo/InventarioBoard";
 import { TransferenciaEstoques } from "@/components/logisticaOdoo/TransferenciaEstoques";
+import { DevolucaoFornecedor } from "@/components/logisticaOdoo/DevolucaoFornecedor";
 
 // Inventário / contagem (25/10/2026 noite). Antes: contagem do SIGAEST no Protheus. O operador escolhe a loja/CD,
 // digita código e quantidade contada; a tela mostra o saldo do sistema e a diferença; "Aplicar" grava o ajuste no Odoo.
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function InventarioPage({ searchParams }: { searchParams: Promise<{ empresa?: string; aba?: string }> }) {
   const sp = await searchParams;
   const empresa = empresaDaUrl(sp.empresa);
-  const aba = sp.aba === "transferencia" ? "transferencia" : "contagem";
+  const aba = sp.aba === "transferencia" ? "transferencia" : sp.aba === "devolucao" ? "devolucao" : "contagem";
   const empresas = (await listarEmpresas().catch(() => [])).filter((e) => /^2\d\d /.test(e.name));
   const pill = (a: string, rotulo: string) => (
     <Link href={`/assistencia/logistica/inventario?aba=${a}&empresa=${empresa}`} className="text-sm px-4 py-1.5 rounded-full border font-semibold"
@@ -22,7 +23,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
   );
   return (
     <div className="flex flex-col gap-4 min-w-0">
-      <div className="flex gap-2 flex-wrap">{pill("contagem", "Contagem")}{pill("transferencia", "Transferência entre estoques")}</div>
+      <div className="flex gap-2 flex-wrap">{pill("contagem", "Contagem")}{pill("transferencia", "Transferência entre estoques")}{pill("devolucao", "Devolução ao fornecedor")}</div>
       {aba === "contagem" ? (
         <>
           <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>Inventário · contagem de estoque</h2>
@@ -30,6 +31,14 @@ export default async function InventarioPage({ searchParams }: { searchParams: P
             Digite o código e quanto contou. A tela mostra o que o sistema tem e a diferença. Confira e clique em Aplicar: o estoque do Odoo passa a ser o contado, com histórico no Kardex.
           </p>
           <InventarioBoard empresas={empresas} empresaAtual={empresa} />
+        </>
+      ) : aba === "devolucao" ? (
+        <>
+          <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>Devolução ao fornecedor</h2>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Bipe a chave da nota de ENTRADA, marque o que volta e emita a NF-e de devolução (5202/6202). Sai com os mesmos preços e ICMS da entrada e a referência de cada nota. O financeiro (Gabriel) é avisado sozinho.
+          </p>
+          <DevolucaoFornecedor empresas={empresas} empresaAtual={empresa} />
         </>
       ) : (
         <>
