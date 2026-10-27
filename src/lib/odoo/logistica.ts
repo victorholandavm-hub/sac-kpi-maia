@@ -184,7 +184,7 @@ export function lerCarga(cargaId: number, perfil: PerfilOdoo = "logistica"): Pro
 // ---------------------------------------------------------------- carga (CD)
 
 export function montarCarga(input: MontarCargaInput): Promise<CargaDetalhe> {
-  if (!input.picking_ids.length) throw new OdooBridgeError("Selecione ao menos uma saída.", "/logistica/carga", null);
+  // 27/10 (John): pode criar a carga vazia e incluir os pedidos depois
   return json<CargaDetalhe>("/logistica/carga", { perfil: "logistica", metodo: "POST", corpo: input });
 }
 

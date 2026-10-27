@@ -128,6 +128,8 @@ export function ExpedicaoBoard({
     const n = (v: string) => (v ? Number(v) : null);
     const empresaCarga = empresaDaSelecao();
     if (empresaCarga == null) return;
+    // 27/10 (John): "criar carga sem necessariamente ter que selecionar um pedido"
+    if (sel.size === 0 && !window.confirm("Criar a carga VAZIA, sem pedidos? Depois é só marcar as saídas e usar \"Incluir na carga\".")) return;
     run(
       () =>
         montarCargaAction({
@@ -141,7 +143,7 @@ export function ExpedicaoBoard({
           transportadora: form.transportadora || null,
           data_prevista: form.data_prevista || null,
         }),
-      (c) => `Carga ${c.romaneio} montada com ${c.qtd_paradas} parada(s).`,
+      (c) => (c.qtd_paradas ? `Carga ${c.romaneio} montada com ${c.qtd_paradas} parada(s).` : `Carga ${c.romaneio} criada vazia — inclua os pedidos quando quiser.`),
       (c) => {
         setSel(new Set());
         router.push(`/assistencia/logistica/cargas/${c.carga_id}?empresa=${empresaCarga}`);
@@ -239,7 +241,7 @@ export function ExpedicaoBoard({
         <div className="cartao p-4 flex flex-col gap-3" style={{ border: sel.size ? "2px solid var(--brand-orange)" : "1px solid var(--border)" }} onFocus={abrirMontar} onMouseEnter={abrirMontar}>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
-              {sel.size ? `Montar carga com ${sel.size} saída(s)` : "Montar carga — marque as saídas na lista abaixo"}
+              {sel.size ? `Montar carga com ${sel.size} saída(s)` : "Montar carga — marque as saídas abaixo, ou crie a carga vazia"}
             </h3>
             <VolumesChips volumes={volsSel} />
           </div>
@@ -294,8 +296,8 @@ export function ExpedicaoBoard({
               <input type="date" value={form.data_prevista} onChange={(e) => setForm({ ...form, data_prevista: e.target.value })} className={inputClass} style={inputStyle} />
             </Campo>
             <div className="flex items-end gap-2">
-              <button type="button" disabled={pending || sel.size === 0} onClick={montar} className={`${botaoClass} flex-1`} style={botaoLaranjaStyle}>
-                {pending ? "Montando no Odoo…" : "Montar carga"}
+              <button type="button" disabled={pending} onClick={montar} className={`${botaoClass} flex-1`} style={botaoLaranjaStyle}>
+                {pending ? "Montando no Odoo…" : sel.size ? "Montar carga" : "Criar carga vazia"}
               </button>
               <button type="button" onClick={() => setSel(new Set())} className={botaoClass} style={botaoStyle}>
                 Limpar
