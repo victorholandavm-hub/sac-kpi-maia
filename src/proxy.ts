@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { computeDashboardToken, DASHBOARD_COOKIE_NAME } from "@/lib/dashboardSession";
+import { CD_COOKIE_NAME, verifyCdSession } from "@/lib/cdAuth";
+import { operadorLoja, ROTAS_OPERADOR_LOJA } from "@/lib/operadorLoja";
 
 // Rotas que precisam passar direto, sem cair em nenhum redirect de auth
 // abaixo (webhooks/sync externos, assets estáticos, upload de foto). Isso
@@ -135,6 +137,16 @@ export async function proxy(req: NextRequest) {
   // individual da equipe assistência (Supabase Auth), verificado dentro da
   // aplicação ao entrar em "Equipe assistência" (ver src/lib/dal.ts) — não aqui.
   if (pathname.startsWith("/assistencia")) {
+    // 27/10/2026: conferente de loja (PIN do CD) só anda em Estoque e Kardex, sempre na loja dele
+    if (process.env.CD_OPERADOR_LOJA && req.cookies.get(CD_COOKIE_NAME)?.value && !pathname.startsWith("/assistencia/encomendas/cd/login")) {
+      const lj = operadorLoja(verifyCdSession(req.cookies.get(CD_COOKIE_NAME)?.value));
+      if (lj && !ROTAS_OPERADOR_LOJA.some((r) => pathname.startsWith(r))) {
+        const u = req.nextUrl.clone();
+        u.pathname = ROTAS_OPERADOR_LOJA[0];
+        u.search = `?empresa=${lj.companyId}`;
+        return NextResponse.redirect(u, 307);
+      }
+    }
     return NextResponse.next();
   }
 

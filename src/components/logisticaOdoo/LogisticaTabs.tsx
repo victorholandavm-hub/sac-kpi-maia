@@ -17,14 +17,14 @@ const ABAS = [
   { href: "/assistencia/logistica/consulta", label: "Consulta e fotos" },
 ];
 
-export function LogisticaTabs() {
+export function LogisticaTabs({ somente }: { somente?: string[] } = {}) {
   const pathname = usePathname();
   const params = useSearchParams();
   const empresa = params.get("empresa");
   const sufixo = empresa ? `?empresa=${encodeURIComponent(empresa)}` : "";
   return (
     <nav className="flex gap-2 flex-wrap" aria-label="Logística">
-      {ABAS.map((a) => {
+      {ABAS.filter((a) => !somente || somente.includes(a.href)).map((a) => {
         const ativa = pathname.startsWith(a.href);
         return (
           <Link

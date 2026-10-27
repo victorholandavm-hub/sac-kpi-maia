@@ -76,7 +76,7 @@ import {
 } from "@/lib/odoo/logistica";
 import type { EntradaCompraResposta, FornecedorOdoo, PedidoCompra, ItemInventarioSaldo, ItemInventarioAjuste } from "@/lib/odoo/logistica";
 import { inventarioAplicar, inventarioSaldo } from "@/lib/odoo/logistica";
-import { exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
+import { getOperadorLogistica, exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import type {
   AcaoCarga,
@@ -92,6 +92,12 @@ import type {
 } from "@/lib/odoo/logisticaTipos";
 
 const BASE = "/assistencia/logistica";
+
+// 27/10/2026: conferente de loja só consulta a loja dele (o filtro vem do servidor, não da tela)
+async function soLoja<T extends object>(f: T): Promise<T> {
+  const op = await getOperadorLogistica();
+  return op?.loja ? { ...f, company_id: op.loja.companyId } : f;
+}
 
 async function executar<T>(fn: (operador: string) => Promise<T>, revalidar: string[] = []): Promise<ResultadoAcao<T>> {
   try {
@@ -386,23 +392,23 @@ export async function acaoMdfeAction(cargaId: number, acao: "emitir" | "encerrar
 
 // 26/10 (auditoria do CD — Flávio): aba Estoque (só leitura)
 export async function audPosicaoAction(f: AudFiltro): Promise<ResultadoAcao<AudLista<AudPosicaoItem>>> {
-  return executar(() => audPosicao(f));
+  return executar(async () => audPosicao(await soLoja(f)));
 }
 export async function audReservasAction(f: AudFiltro): Promise<ResultadoAcao<AudLista<AudReservaItem>>> {
-  return executar(() => audReservas(f));
+  return executar(async () => audReservas(await soLoja(f)));
 }
 export async function audSefazAction(f: AudFiltro): Promise<ResultadoAcao<AudLista<AudSefazItem>>> {
-  return executar(() => audSefaz(f));
+  return executar(async () => audSefaz(await soLoja(f)));
 }
 export async function audPedidosAction(f: AudFiltro): Promise<ResultadoAcao<AudLista<AudPedidoItem>>> {
-  return executar(() => audPedidos(f));
+  return executar(async () => audPedidos(await soLoja(f)));
 }
 export async function audGeralAction(f: AudFiltro2): Promise<ResultadoAcao<AudLista<AudGeralItem>>> {
-  return executar(() => audGeral(f));
+  return executar(async () => audGeral(await soLoja(f)));
 }
 export async function audAgrupadoAction(f: AudFiltro2): Promise<ResultadoAcao<AudLista<AudGrupoLinha | AudGeralItem>>> {
-  return executar(() => audAgrupado(f));
+  return executar(async () => audAgrupado(await soLoja(f)));
 }
 export async function audRotatividadeAction(f: AudFiltro2): Promise<ResultadoAcao<AudRotLista>> {
-  return executar(() => audRotatividade(f));
+  return executar(async () => audRotatividade(await soLoja(f)));
 }

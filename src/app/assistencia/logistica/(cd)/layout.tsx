@@ -3,6 +3,7 @@ import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
 import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { getOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import { LogisticaTabs } from "@/components/logisticaOdoo/LogisticaTabs";
+import { ROTAS_OPERADOR_LOJA } from "@/lib/operadorLoja";
 
 // Logística do CD (roteirizador/expedição + cargas) sobre o Odoo. Mora sob
 // /assistencia de propósito: o proxy.ts deixa /assistencia passar e cada
@@ -31,12 +32,12 @@ export default async function LogisticaCdLayout({ children }: { children: React.
   return (
     <ToastProvider>
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 pt-6 pb-24 sm:pb-6 flex flex-col gap-5 min-w-0">
-        <AssistenciaHeader title="Logística — CD" subtitle={`${op.nome} · ${op.origem === "cd" ? "CD" : "Equipe"} · motor: Odoo`}>
+        <AssistenciaHeader title={op.loja ? `Estoque — loja ${op.loja.filial}` : "Logística — CD"} subtitle={`${op.nome} · ${op.loja ? "conferente da loja " + op.loja.filial : op.origem === "cd" ? "CD" : "Equipe"} · motor: Odoo`}>
           <Link href="/assistencia" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             ← Início
           </Link>
         </AssistenciaHeader>
-        <LogisticaTabs />
+        <LogisticaTabs somente={op.loja ? ROTAS_OPERADOR_LOJA : undefined} />
         {children}
       </div>
     </ToastProvider>

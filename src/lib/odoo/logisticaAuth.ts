@@ -15,13 +15,17 @@ import { CD_COOKIE_NAME, verifyCdSession } from "@/lib/cdAuth";
 import { DRIVER_COOKIE_NAME, verifyDriverSession } from "@/lib/driverAuth";
 import { getOptionalProfile } from "@/lib/dal";
 import { DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
+import { operadorLoja, type OperadorLoja } from "@/lib/operadorLoja";
 
-export type OperadorLogistica = { nome: string; origem: "cd" | "equipe"; operadorOdoo: string };
+export type OperadorLogistica = { nome: string; origem: "cd" | "equipe"; operadorOdoo: string; loja?: OperadorLoja | null };
 
 export async function getOperadorLogistica(): Promise<OperadorLogistica | null> {
   const store = await cookies();
   const cd = verifyCdSession(store.get(CD_COOKIE_NAME)?.value);
-  if (cd) return { nome: cd, origem: "cd", operadorOdoo: `CD ${cd}` };
+  if (cd) {
+    const loja = operadorLoja(cd);
+    return { nome: cd, origem: "cd", operadorOdoo: loja ? `Loja ${loja.filial} ${cd}` : `CD ${cd}`, loja };
+  }
   const profile = await getOptionalProfile();
   if (profile && (profile.role === "admin" || profile.role === "assistencia")) {
     return { nome: profile.fullName, origem: "equipe", operadorOdoo: `Equipe ${profile.fullName}` };

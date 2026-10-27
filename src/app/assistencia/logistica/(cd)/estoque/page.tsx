@@ -1,13 +1,15 @@
 import { audGrupos, listarEmpresas } from "@/lib/odoo/logistica";
 import { EstoqueBoard } from "@/components/logisticaOdoo/EstoqueBoard";
+import { getOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 
 // Estoque / auditoria (26/10/2026, Pedro via Antônio Costa — rotinas do Flávio): posição, geral (com e sem saldo), por
 // fornecedor, por grupo, saldo negativo, rotatividade (dias sem/com saída), reservas, pedidos parados e SEFAZ. Só leitura.
 export const dynamic = "force-dynamic";
 
 export default async function EstoquePage() {
+  const op = await getOperadorLogistica();
   const [empresas, grupos] = await Promise.all([
-    listarEmpresas().then((l) => l.filter((e) => /^2\d\d /.test(e.name))).catch(() => []),
+    listarEmpresas().then((l) => l.filter((e) => /^2\d\d /.test(e.name) && (!op?.loja || e.id === op.loja.companyId))).catch(() => []),
     audGrupos().catch(() => []),
   ]);
   return (

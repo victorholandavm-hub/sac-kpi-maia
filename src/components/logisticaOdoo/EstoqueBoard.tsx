@@ -72,7 +72,7 @@ function csv(linhas: Record<string, unknown>[], nome: string) {
 export function EstoqueBoard({ empresas, grupos }: { empresas: EmpresaOdoo[]; grupos: string[] }) {
   const cd = empresas.find((e) => e.name.startsWith("213 "));
   const [vis, setVis] = useState<Vis>("posicao");
-  const [empresa, setEmpresa] = useState<number>(cd?.id ?? 0);
+  const [empresa, setEmpresa] = useState<number>(cd?.id ?? (empresas.length === 1 ? empresas[0].id : 0));
   const [busca, setBusca] = useState("");
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [grupoNome, setGrupoNome] = useState("");

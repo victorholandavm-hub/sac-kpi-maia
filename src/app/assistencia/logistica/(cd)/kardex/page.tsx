@@ -1,5 +1,5 @@
 import { buscarProdutosCadastro, lerKardex, listarEmpresas, mensagemDeErro, type ProdutoCadastro } from "@/lib/odoo/logistica";
-import { empresaDaUrl } from "@/lib/odoo/logisticaAuth";
+import { empresaDaUrl, getOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import { ErroOdoo } from "@/components/logisticaOdoo/ui";
 
 // Kardex (25/10/2026, Rafael/CD): movimentos do produto numa loja/CD no Odoo (entradas, vendas, transferências,
@@ -13,7 +13,8 @@ function fmtData(s: string): string {
 
 export default async function KardexPage({ searchParams }: { searchParams: Promise<{ codigo?: string; empresa?: string; dias?: string }> }) {
   const sp = await searchParams;
-  const empresa = empresaDaUrl(sp.empresa);
+  const op = await getOperadorLogistica();
+  const empresa = op?.loja ? op.loja.companyId : empresaDaUrl(sp.empresa);   // 27/10: conferente de loja = só a loja dele
   const codigo = (sp.codigo ?? "").trim().toUpperCase();
   const dias = Math.min(Math.max(Number(sp.dias) || 90, 1), 400);
   const empresas = await listarEmpresas().catch(() => []);
@@ -37,7 +38,7 @@ export default async function KardexPage({ searchParams }: { searchParams: Promi
         </label>
         <label className="flex flex-col text-sm" style={{ color: "var(--text-secondary)" }}>Loja
           <select name="empresa" defaultValue={String(empresa)} className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--border)", background: "var(--surface-1)", color: "var(--text-primary)" }}>
-            {empresas.filter((e) => /^2\d\d /.test(e.name)).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+            {empresas.filter((e) => /^2\d\d /.test(e.name) && (!op?.loja || e.id === op.loja.companyId)).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
         </label>
         <label className="flex flex-col text-sm" style={{ color: "var(--text-secondary)" }}>Dias
