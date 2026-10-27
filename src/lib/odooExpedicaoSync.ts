@@ -91,6 +91,7 @@ export function linhaDaSaida(e: EntregaOdoo, companyId: number, empresa: string,
     retira_em: e.retira_em || null,
     expresso: !!e.expresso,
     data_programada: odooDia(e.data_programada),
+    vendedor: e.vendedor?.trim() || null,
     pendencia_motivo: e.pendencia ? e.pendencia_motivo || "pendência" : null,
     // Situação da carga: zerada aqui e preenchida pela leitura das cargas, logo
     // depois na mesma rodada (saída que voltou pra fila não fica com a carga

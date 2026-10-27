@@ -41,7 +41,10 @@ export async function preencherDeEstorno(id: string): Promise<PreenchimentoVouch
 }
 
 export async function preencherDeNps(chave: string): Promise<PreenchimentoVoucher | null> {
-  const [origem, origemId] = chave.split(":");
+  // Só no primeiro ":" -- o pós-venda do Odoo usa origemId "odoo:<pedido>".
+  const i = chave.indexOf(":");
+  const origem = i > 0 ? chave.slice(0, i) : "";
+  const origemId = i > 0 ? chave.slice(i + 1) : "";
   if (!origem || !origemId) return null;
   const d = (await listNpsDetratores({ todoHistorico: true })).find((x) => x.origem === origem && x.origemId === origemId);
   if (!d) return null;

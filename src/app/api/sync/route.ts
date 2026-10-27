@@ -10,6 +10,7 @@ import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "@/lib/npsDetratores";
 import { enrollPendingCompraNps, detectPendingCompraNpsResponses } from "@/lib/nps2Meses";
 import { enrollPendingEntregaNps, detectPendingEntregaNpsResponses, detectPendingEntregaSugestoes } from "@/lib/entregaNps";
 import { enrollPendingVendaNps, detectPendingVendaNpsResponses } from "@/lib/vendaNps";
+import { enrollPendingVendaNpsOdoo, detectPendingVendaNpsOdooResponses } from "@/lib/vendaNpsOdoo";
 
 const BASE_URL = "https://services.leadconnectorhq.com";
 
@@ -440,6 +441,13 @@ async function runSync() {
   errors.push(...vendaNpsErrors);
   avisos.push(...vendaNpsAvisos);
   const vendaNpsAnswered = await detectPendingVendaNpsResponses();
+  // Mesma pesquisa pras vendas do Odoo (Protheus congelado desde 25/10) --
+  // fonte: expedição do Odoo, ver vendaNpsOdoo.ts.
+  const { enrolled: vendaNpsOdooEnrolled, semTelefone: vendaNpsOdooSemTelefone, errors: vendaNpsOdooErrors, avisos: vendaNpsOdooAvisos } =
+    await enrollPendingVendaNpsOdoo();
+  errors.push(...vendaNpsOdooErrors);
+  avisos.push(...vendaNpsOdooAvisos);
+  const vendaNpsOdooAnswered = await detectPendingVendaNpsOdooResponses();
 
   const ok = errors.length === 0;
   await recordSyncRun(
@@ -464,6 +472,9 @@ async function runSync() {
       vendaNpsEnrolled,
       vendaNpsSemTelefone,
       vendaNpsAnswered,
+      vendaNpsOdooEnrolled,
+      vendaNpsOdooSemTelefone,
+      vendaNpsOdooAnswered,
       avisos,
     },
     errors
@@ -489,6 +500,9 @@ async function runSync() {
     vendaNpsEnrolled,
     vendaNpsSemTelefone,
     vendaNpsAnswered,
+    vendaNpsOdooEnrolled,
+    vendaNpsOdooSemTelefone,
+    vendaNpsOdooAnswered,
     avisos,
     errors,
   });

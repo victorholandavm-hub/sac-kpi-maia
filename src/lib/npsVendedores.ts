@@ -68,6 +68,47 @@ export function agruparPorVendedor(linhas: Linha[]): NpsVendedor[] {
     .sort((a, b) => (b.nps ?? -999) - (a.nps ?? -999) || b.respostas - a.respostas || (a.nome ?? "").localeCompare(b.nome ?? ""));
 }
 
+const normalizarNome = (n: string) => n.normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/\s+/g, " ").trim().toUpperCase();
+
+// Vendas do Odoo (venda_nps_odoo, desde a virada de 25/10): o Odoo só dá o nome
+// do vendedor; quando o nome bate com um vendedor do Protheus, entra no código
+// dele (mesma linha no resultado). Filtro por código de vendedor não se aplica
+// a quem só tem nome.
+export function linhasOdooComoProtheus(
+  odoo: { score: number | null; vendedor: string | null; loja: string | null; data_venda: string }[],
+  protheus: Linha[]
+): Linha[] {
+  const codigoPorNome = new Map<string, string>();
+  for (const l of protheus) {
+    const c = l.totvs_orders.seller_id?.trim();
+    const n = l.totvs_orders.seller_name?.trim();
+    if (c && n) codigoPorNome.set(normalizarNome(n), c);
+  }
+  return odoo.map((o) => ({
+    score: o.score,
+    totvs_orders: {
+      seller_id: o.vendedor ? (codigoPorNome.get(normalizarNome(o.vendedor)) ?? null) : null,
+      seller_name: o.vendedor?.trim() || null,
+      branch: o.loja ?? "",
+      issue_date: o.data_venda,
+    },
+  }));
+}
+
+async function linhasDoOdoo(filtro: FiltroNpsVendedores, protheus: Linha[]): Promise<Linha[]> {
+  let q = getSupabaseAdmin()
+    .from("venda_nps_odoo")
+    .select("score, vendedor, loja, data_venda")
+    .is("descartada_em", null)
+    .gte("data_venda", filtro.de)
+    .lte("data_venda", filtro.ate);
+  if (filtro.filial) q = q.eq("loja", filtro.filial);
+  const { data, error } = await q.limit(20000);
+  if (error) throw new Error(error.message);
+  const linhas = linhasOdooComoProtheus((data ?? []) as Parameters<typeof linhasOdooComoProtheus>[0], protheus);
+  return filtro.vendedor ? linhas.filter((l) => l.totvs_orders.seller_id === filtro.vendedor) : linhas;
+}
+
 export async function getNpsVendedores(filtro: FiltroNpsVendedores) {
   const admin = getSupabaseAdmin();
   const linhas = await fetchAllPagesParallel<Linha>((from, to) => {
@@ -80,11 +121,12 @@ export async function getNpsVendedores(filtro: FiltroNpsVendedores) {
     if (filtro.vendedor) q = q.eq("totvs_orders.seller_id", filtro.vendedor);
     return q.order("order_id").range(from, to) as unknown as PromiseLike<PagedQueryResult<Linha>>;
   });
+  const todas = [...linhas, ...(await linhasDoOdoo(filtro, linhas))];
   return {
     periodo: { de: filtro.de, ate: filtro.ate },
     filtros: { filial: filtro.filial, vendedor: filtro.vendedor },
     geradoEm: new Date().toISOString(),
-    total: resumirNps(linhas.map((l) => l.score)),
-    vendedores: agruparPorVendedor(linhas),
+    total: resumirNps(todas.map((l) => l.score)),
+    vendedores: agruparPorVendedor(todas),
   };
 }

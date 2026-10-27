@@ -365,7 +365,33 @@ export async function listNpsDetratores(opts: { todoHistorico?: boolean } = {}):
     };
   });
 
-  return [...sac, ...req, ...compra, ...entrega, ...venda].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
+  // Vendas do Odoo (venda_nps_odoo, desde 25/10): origemId "odoo:<pedido>",
+  // telefone e cliente gravados no envio.
+  const { data: odooRows, error: odooError } = await admin
+    .from("venda_nps_odoo")
+    .select("pedido, cliente, telefone, score, respondido_em")
+    .is("descartada_em", null)
+    .not("score", "is", null)
+    .lte("score", 2)
+    .gte("respondido_em", sinceIso)
+    .order("respondido_em", { ascending: false });
+  if (odooError) throw new Error(odooError.message);
+  const vendaOdoo: NpsDetrator[] = (odooRows ?? []).map((r) => {
+    const origemId = `odoo:${r.pedido}`;
+    return {
+      origem: "venda" as const,
+      origemId,
+      score: r.score as number,
+      escala: "1-5" as const,
+      respondidoEm: r.respondido_em as string,
+      clientName: (r.cliente as string | null) ?? null,
+      clientPhone: (r.telefone as string | null) ?? null,
+      motivoSugerido: null,
+      ...resolveStatus("venda", origemId),
+    };
+  });
+
+  return [...sac, ...req, ...compra, ...entrega, ...venda, ...vendaOdoo].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm));
 }
 
 export type NpsResposta = {
@@ -494,7 +520,7 @@ export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit =
     if (clientesError) throw new Error(clientesError.message);
     for (const c of clienteRows ?? []) phoneByClientId.set(c.protheus_code as string, c.phone1 as string | null);
   }
-  return rows.map((r) => {
+  const respostas: NpsResposta[] = rows.map((r) => {
     const order = Array.isArray(r.totvs_orders) ? r.totvs_orders[0] : r.totvs_orders;
     return {
       origemId: r.order_id,
@@ -506,6 +532,26 @@ export async function listNpsRespostasPorFase(origem: NpsDetratorOrigem, limit =
       sellerName: order?.seller_name ?? null,
     };
   });
+  if (origem !== "venda") return respostas;
+  // Pós-venda das vendas do Odoo (venda_nps_odoo, desde 25/10).
+  const { data: odoo, error: odooError } = await admin
+    .from("venda_nps_odoo")
+    .select("pedido, cliente, telefone, vendedor, score, respondido_em")
+    .is("descartada_em", null)
+    .not("score", "is", null)
+    .order("respondido_em", { ascending: false })
+    .limit(limit);
+  if (odooError) throw new Error(odooError.message);
+  const doOdoo: NpsResposta[] = (odoo ?? []).map((r) => ({
+    origemId: `odoo:${r.pedido}`,
+    score: r.score as number,
+    respondidoEm: r.respondido_em as string,
+    clientName: (r.cliente as string | null) ?? null,
+    clientCpf: null,
+    clientPhone: (r.telefone as string | null) ?? null,
+    sellerName: (r.vendedor as string | null) ?? null,
+  }));
+  return [...respostas, ...doOdoo].sort((a, b) => b.respondidoEm.localeCompare(a.respondidoEm)).slice(0, limit);
 }
 
 // sentCount/responseRatePct adicionados em 19/10/2026 -- pedido do Victor:
@@ -548,6 +594,8 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
     { count: assistSent, error: assistSentError },
     { count: entregaSent, error: entregaSentError },
     { count: vendaSent, error: vendaSentError },
+    { data: vendaOdooData, error: vendaOdooError },
+    { count: vendaOdooSent, error: vendaOdooSentError },
   ] = await Promise.all([
     admin.from("service_request_nps").select("tipo, score").not("score", "is", null),
     admin.from("entrega_nps").select("score").is("descartada_em", null).not("score", "is", null),
@@ -556,7 +604,11 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
     admin.from("service_request_nps").select("request_id", { count: "exact", head: true }).eq("tipo", "assistencia_tecnica"),
     admin.from("entrega_nps").select("order_id", { count: "exact", head: true }).is("descartada_em", null),
     admin.from("venda_nps").select("order_id", { count: "exact", head: true }),
+    admin.from("venda_nps_odoo").select("score").is("descartada_em", null).not("score", "is", null),
+    admin.from("venda_nps_odoo").select("pedido", { count: "exact", head: true }).is("descartada_em", null),
   ]);
+  if (vendaOdooError) throw new Error(vendaOdooError.message);
+  if (vendaOdooSentError) throw new Error(vendaOdooSentError.message);
   if (error) throw new Error(error.message);
   if (entregaError) throw new Error(entregaError.message);
   if (vendaError) throw new Error(vendaError.message);
@@ -587,7 +639,10 @@ export async function getNpsResumoPorFaseAdicional(): Promise<Record<"montagem" 
     montagem: resumoFor("montagem", montagemSent ?? 0),
     assistencia_tecnica: resumoFor("assistencia_tecnica", assistSent ?? 0),
     entrega: npsFromScores((entregaData ?? []).map((r) => r.score as number), entregaSent ?? 0),
-    venda: npsFromScores((vendaData ?? []).map((r) => r.score as number), vendaSent ?? 0),
+    venda: npsFromScores(
+      [...(vendaData ?? []), ...(vendaOdooData ?? [])].map((r) => r.score as number),
+      (vendaSent ?? 0) + (vendaOdooSent ?? 0)
+    ),
   };
 }
 

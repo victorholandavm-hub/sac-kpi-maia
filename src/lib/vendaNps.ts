@@ -184,14 +184,19 @@ export async function getVendaSellerRanking(): Promise<VendedorRankingEntry[]> {
   if (error) throw new Error(error.message);
 
   const scoresBySeller = new Map<string, number[]>();
+  const somar = (nome: string | null | undefined, score: number) => {
+    const sellerName = nome?.trim();
+    if (!sellerName) return;
+    scoresBySeller.set(sellerName, [...(scoresBySeller.get(sellerName) ?? []), score]);
+  };
   for (const row of data ?? []) {
     const order = Array.isArray(row.totvs_orders) ? row.totvs_orders[0] : row.totvs_orders;
-    const sellerName = order?.seller_name?.trim();
-    if (!sellerName) continue;
-    const scores = scoresBySeller.get(sellerName) ?? [];
-    scores.push(row.score);
-    scoresBySeller.set(sellerName, scores);
+    somar(order?.seller_name, row.score);
   }
+  // Vendas do Odoo (venda_nps_odoo, desde 25/10): vendedor vem da expedição.
+  const { data: odoo, error: odooError } = await admin.from("venda_nps_odoo").select("score, vendedor").not("score", "is", null).is("descartada_em", null);
+  if (odooError) throw new Error(odooError.message);
+  for (const row of odoo ?? []) somar(row.vendedor as string | null, row.score as number);
 
   const entries: VendedorRankingEntry[] = [...scoresBySeller.entries()].map(([sellerName, scores]) => {
     const promoters = scores.filter((s) => s >= 4).length;
