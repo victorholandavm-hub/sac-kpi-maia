@@ -2367,8 +2367,9 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
   const clientName = String(formData.get("client_name") ?? "").trim();
   if (!clientName) return { error: "Informe o nome do cliente." };
 
+  // Código do cliente opcional desde 27/10/2026 (Victor): cliente novo do Odoo
+  // não tem código do Protheus; o CPF abaixo continua obrigatório.
   const clientProtheusCode = String(formData.get("client_protheus_code") ?? "").trim();
-  if (!clientProtheusCode) return { error: "Informe o código do cliente." };
 
   // CPF obrigatório em toda solicitação (pedido do Victor 19/08/2026) --
   // identifica o cliente de verdade, independente de ter código do

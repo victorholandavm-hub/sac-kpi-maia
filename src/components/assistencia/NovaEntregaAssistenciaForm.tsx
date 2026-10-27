@@ -644,12 +644,13 @@ export function NovaEntregaAssistenciaForm({
           ) : null}
         </div>
 
-        <Field label="Código do cliente *">
+        {/* Opcional desde 27/10/2026 (Victor): cliente novo do Odoo não tem código do
+            Protheus; o CPF (obrigatório) identifica o cliente. */}
+        <Field label="Código do cliente">
           <input
             name="client_protheus_code"
             value={clientCode}
             onChange={(e) => setClientCode(e.target.value)}
-            required
             className="rounded border px-3 py-2"
             style={inputStyle}
           />
