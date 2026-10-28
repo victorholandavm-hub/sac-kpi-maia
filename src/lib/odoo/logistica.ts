@@ -693,3 +693,13 @@ export function emitirDevolucaoFornecedor(corpo: {
 }): Promise<DevolucaoFornecedor> {
   return json<DevolucaoFornecedor>("/compras/devolucao", { perfil: "logistica", metodo: "POST", corpo, timeoutMs: 180_000 });
 }
+
+// 28/10/2026 (Pedro/Flávio): transferências enviadas/recebidas de uma loja ou do CD (ponte /caixa/transferencias, perfil logistica)
+export type TransferenciaLoja = {
+  sentido: "enviada" | "recebida"; numero: string; serie: string; data: string; loja: string; valor: number; estado: string; chave: string; obs?: string;
+  itens: { codigo: string; nome: string; qtd: number }[];
+};
+export async function listarTransferenciasLoja(companyId: number, dias = 30): Promise<TransferenciaLoja[]> {
+  const r = await json<{ transferencias?: TransferenciaLoja[] }>("/caixa/transferencias", { perfil: "logistica", query: { company_id: companyId, dias } });
+  return r.transferencias ?? [];
+}
