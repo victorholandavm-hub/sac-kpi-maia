@@ -5,12 +5,14 @@ import { useRouter, usePathname } from "next/navigation";
 import type { EmpresaOdoo } from "@/lib/odoo/logisticaTipos";
 import type { LocalEstoque, SaldoEstoqueItem, TipoEstoque, TransferenciaEstoques as Resultado } from "@/lib/odoo/logistica";
 import { locaisEstoqueAction, saldoEstoqueTipoAction, transferirEstoquesAction } from "@/app/assistencia/logistica/transferencia-estoques-actions";
+import { buscarProdutosAction, inventarioSaldoAction } from "@/app/assistencia/logistica/logistica-actions";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { botaoClass, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
 // 26/10/2026 (Pedro, rotina do Flávio/auditoria): produto do estoque de venda para Avaria ou Assistência, e a volta.
 const ROTULO: Record<TipoEstoque, string> = { estoque: "Estoque (venda)", avaria: "Avaria", assistencia: "Assistência" };
-type Linha = { codigo: string; qtd: string };
+// 28/10 (Flávio): mostrar a descrição ao digitar o código e buscar por nome, igual ao inventário.
+type Linha = { codigo: string; qtd: string; nome?: string; existe?: boolean; sistema?: number };
 
 export function TransferenciaEstoques({ empresas, empresaAtual }: { empresas: EmpresaOdoo[]; empresaAtual: number }) {
   const router = useRouter(); const pathname = usePathname();
@@ -23,6 +25,8 @@ export function TransferenciaEstoques({ empresas, empresaAtual }: { empresas: Em
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [verTipo, setVerTipo] = useState<"avaria" | "assistencia" | null>(null);
   const [saldo, setSaldo] = useState<SaldoEstoqueItem[] | null>(null);
+  const [busca, setBusca] = useState("");
+  const [achados, setAchados] = useState<{ codigo: string; nome: string }[]>([]);
 
   function carregarLocais() {
     locaisEstoqueAction(empresaAtual).then((r) => { if (r.ok) setLocais(r.dados.locais); else showToast(r.erro, "error"); });
@@ -32,7 +36,28 @@ export function TransferenciaEstoques({ empresas, empresaAtual }: { empresas: Em
     setVerTipo(t); setSaldo(null);
     saldoEstoqueTipoAction(empresaAtual, t).then((r) => { if (r.ok) setSaldo(r.dados.itens); else showToast(r.erro, "error"); });
   }
-  const muda = (n: number, k: keyof Linha, v: string) => setLinhas((ls) => ls.map((l, i) => (i === n ? { ...l, [k]: v } : l)));
+  const muda = (n: number, k: "codigo" | "qtd", v: string) => setLinhas((ls) => ls.map((l, i) => (i === n ? { ...l, [k]: v, ...(k === "codigo" ? { nome: undefined, existe: undefined, sistema: undefined } : {}) } : l)));
+  async function descrever(ls: Linha[]) {
+    const cods = ls.map((l) => l.codigo.trim()).filter(Boolean);
+    if (!cods.length) return;
+    const r = await inventarioSaldoAction(empresaAtual, cods);
+    if (!r.ok) return;
+    const por = Object.fromEntries(r.dados.itens.map((i) => [i.codigo, i]));
+    setLinhas((atual) => atual.map((l) => { const s = por[l.codigo.trim().toUpperCase()]; return s ? { ...l, nome: s.nome, existe: s.existe, sistema: s.sistema } : l; }));
+  }
+  async function procurar() {
+    const q = busca.trim();
+    if (q.length < 2) return;
+    const r = await buscarProdutosAction(q);
+    if (!r.ok) { showToast(r.erro, "error"); return; }
+    setAchados((r.dados ?? []).slice(0, 15).map((p) => ({ codigo: p.codigo, nome: p.nome })));
+    if (!(r.dados ?? []).length) showToast("Nenhum produto com esse nome ou código.", "error");
+  }
+  function incluir(p: { codigo: string; nome: string }) {
+    const novas = [...linhas.filter((l) => l.codigo.trim()), ...(linhas.some((l) => l.codigo.trim().toUpperCase() === p.codigo.toUpperCase()) ? [] : [{ codigo: p.codigo, qtd: "1", nome: p.nome }])];
+    setLinhas(novas.length ? novas : [{ codigo: "", qtd: "1" }]); setAchados([]); setBusca("");
+    void descrever(novas);
+  }
   const prontas = linhas.filter((l) => l.codigo.trim() && Number(l.qtd) > 0);
 
   return (
@@ -83,11 +108,27 @@ export function TransferenciaEstoques({ empresas, empresaAtual }: { empresas: Em
           </label>
           <input className={inputClass} style={{ ...inputStyle, maxWidth: 380 }} placeholder="Motivo (ex.: avaria no transporte, peça para o chamado 1234)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </div>
-        <table className="text-sm"><thead><tr style={{ color: "var(--text-secondary)" }}><th className="text-left">Código</th><th className="text-left">Quantidade</th><th /></tr></thead>
+        <div className="flex gap-2 flex-wrap">
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void procurar(); }}
+            placeholder="Buscar produto por nome ou código (Enter)" className={inputClass} style={{ ...inputStyle, minWidth: 320 }} />
+          <button type="button" className={botaoClass} style={botaoStyle} onClick={() => void procurar()}>Buscar</button>
+        </div>
+        {achados.length ? (
+          <div className="flex flex-col gap-1 text-sm">
+            {achados.map((p) => (
+              <button key={p.codigo} type="button" onClick={() => incluir(p)} className="text-left hover:underline">+ {p.codigo} — {p.nome.replace(/^\[[^\]]*\]\s*/, "")}</button>
+            ))}
+          </div>
+        ) : null}
+        <table className="text-sm"><thead><tr style={{ color: "var(--text-secondary)" }}><th className="text-left">Código</th><th className="text-left">Produto</th><th className="text-left">Quantidade</th><th /></tr></thead>
           <tbody>
             {linhas.map((l, n) => (
               <tr key={n}>
-                <td><input className={inputClass} style={{ ...inputStyle, width: 130 }} value={l.codigo} placeholder="071351" onChange={(e) => muda(n, "codigo", e.target.value)} /></td>
+                <td><input className={inputClass} style={{ ...inputStyle, width: 130 }} value={l.codigo} placeholder="071351" onChange={(e) => muda(n, "codigo", e.target.value)}
+                  onBlur={() => void descrever(linhas)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void descrever(linhas); } }} /></td>
+                <td style={{ color: l.existe === false ? "var(--status-critical)" : undefined, minWidth: 260 }}>
+                  {l.existe === false ? "código não encontrado" : l.nome ? <>{l.nome.replace(/^\[[^\]]*\]\s*/, "")}{l.sistema !== undefined ? <span className="text-xs" style={{ color: "var(--text-secondary)" }}> · saldo {l.sistema}</span> : null}</> : ""}
+                </td>
                 <td><input type="number" min={1} step={1} className={inputClass} style={{ ...inputStyle, width: 100 }} value={l.qtd} onChange={(e) => muda(n, "qtd", e.target.value)} /></td>
                 <td>{linhas.length > 1 ? <button type="button" className={botaoClass} style={botaoStyle} onClick={() => setLinhas((ls) => ls.filter((_, i) => i !== n))}>✕</button> : null}</td>
               </tr>
