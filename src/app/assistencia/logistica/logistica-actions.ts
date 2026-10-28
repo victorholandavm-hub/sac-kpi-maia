@@ -67,6 +67,7 @@ import {
   reordenarParadas,
   atenderSolicitacaoAbast,
   cancelarSolicitacaoAbast,
+  bloquearProduto,
   novoPedidoAbast,
   darEntradaCompra,
   mudarPrevisaoCompra,
@@ -292,6 +293,13 @@ export async function novoAbastAction(companyId: number, itens: { codigo: string
   if (!(companyId > 0)) return { ok: false as const, erro: "Escolha a loja." };
   if (!lista.length) return { ok: false as const, erro: "Coloque pelo menos um produto com quantidade." };
   return executar((operador) => novoPedidoAbast({ company_id_loja: companyId, itens: lista, atender, obs: obs || (_op?.loja ? `Pedido do conferente ${_op.nome}` : undefined) }, operador), [`${BASE}/abastecimento`, `${BASE}/pedir-transferencia`]);
+}
+
+export async function bloquearProdutoAction(codigo: string, motivo: string): Promise<ResultadoAcao<unknown>> {
+  const _b = await bloqueiaConferente();
+  if (_b) return { ok: false, erro: _b };
+  if (!motivo.trim()) return { ok: false, erro: "Escreva o motivo do bloqueio." };
+  return executar((operador) => bloquearProduto(codigo, operador, motivo.trim()), [`${BASE}/abastecimento`]);
 }
 
 export async function cancelarAbastAction(id: number, motivo: string): Promise<ResultadoAcao<unknown>> {

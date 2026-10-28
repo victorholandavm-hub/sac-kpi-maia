@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { EmpresaOdoo, SolicitacaoAbast } from "@/lib/odoo/logisticaTipos";
 import type { ProdutoCadastro } from "@/lib/odoo/logistica";
-import { atenderAbastAction, buscarProdutosAction, cancelarAbastAction, novoAbastAction } from "@/app/assistencia/logistica/logistica-actions";
+import { atenderAbastAction, bloquearProdutoAction, buscarProdutosAction, cancelarAbastAction, novoAbastAction } from "@/app/assistencia/logistica/logistica-actions";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { botaoClass, botaoPerigoStyle, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
@@ -74,7 +74,21 @@ function Cartao({ s }: { s: SolicitacaoAbast }) {
             {s.itens.map((i) => (
               <tr key={i.codigo} style={{ color: "var(--text-primary)" }}>
                 <td className="py-1">
-                  <b>{i.codigo}</b> {i.nome.slice(0, 60)}
+                  <b>{i.codigo}</b> {i.nome.slice(0, 60)}{" "}
+                  <button
+                    type="button"
+                    className="text-xs underline"
+                    style={{ color: "var(--status-critical)" }}
+                    disabled={pending}
+                    title="Bloquear este produto para as lojas: some da busca e não pode mais ser pedido"
+                    onClick={() => {
+                      const m = window.prompt(`Bloquear ${i.codigo} para as lojas? Escreva o motivo (ex.: código errado, use 0xxxxx):`);
+                      if (m === null) return;
+                      run(() => bloquearProdutoAction(i.codigo, m), `Produto ${i.codigo} bloqueado para as lojas.`);
+                    }}
+                  >
+                    bloquear
+                  </button>
                 </td>
                 <td className="text-center">{i.qtd}</td>
                 <td className="text-center" style={{ color: i.saldo_cd >= i.qtd ? "var(--status-ok, #1B7E3B)" : "var(--status-critical)" }}>

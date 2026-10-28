@@ -397,6 +397,11 @@ export async function novoPedidoAbast(input: { company_id_loja: number; itens: {
   return json("/abastecimento/novo", { perfil: "logistica", metodo: "POST", corpo: { ...input, operador }, timeoutMs: TIMEOUT_FATURAMENTO_MS });
 }
 
+// 28/10/2026 (Pedro/Edu): o CD bloqueia produto para as lojas (some da busca e não pode ser pedido)
+export async function bloquearProduto(codigo: string, operador: string, motivo: string, desbloquear = false): Promise<unknown> {
+  return json(`/produtos/${encodeURIComponent(codigo)}/bloquear`, { perfil: "logistica", metodo: "POST", corpo: { operador, motivo, desbloquear } });
+}
+
 export async function cancelarSolicitacaoAbast(id: number, operador: string, motivo: string): Promise<unknown> {
   return json(`/abastecimento/${id}/cancelar`, { perfil: "logistica", metodo: "POST", corpo: { operador, motivo } });
 }
