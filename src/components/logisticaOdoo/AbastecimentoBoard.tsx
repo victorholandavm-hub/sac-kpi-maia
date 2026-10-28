@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { EmpresaOdoo, SolicitacaoAbast } from "@/lib/odoo/logisticaTipos";
 import type { ProdutoCadastro } from "@/lib/odoo/logistica";
-import { atenderAbastAction, bloquearProdutoAction, buscarProdutosAction, cancelarAbastAction, novoAbastAction } from "@/app/assistencia/logistica/logistica-actions";
+import { atenderAbastAction, bloquearProdutoAction, buscarProdutosAction, cancelarAbastAction, editarAbastAction, novoAbastAction } from "@/app/assistencia/logistica/logistica-actions";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { botaoClass, botaoPerigoStyle, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
@@ -44,6 +44,15 @@ function Cartao({ s }: { s: SolicitacaoAbast }) {
     Object.fromEntries(s.itens.map((i) => [i.codigo, Math.max(0, Math.min(i.qtd, i.saldo_cd))])),
   );
   const obs = semHtml(s.obs || "");
+  // 28/10 (Pedro): editar o pedido da loja — incluir/tirar produto e mudar a quantidade pedida (grava no pedido, a loja vê na hora)
+  const [editando, setEditando] = useState<{ codigo: string; nome: string; qtd: number }[] | null>(null);
+  const [busca, setBusca] = useState("");
+  const [achados, setAchados] = useState<{ codigo: string; nome: string; cd: number }[]>([]);
+  async function procurar() {
+    if (busca.trim().length < 2) return;
+    const r = await buscarProdutosAction(busca.trim());
+    setAchados(r.ok ? (r.dados ?? []).slice(0, 12).map((p) => ({ codigo: p.codigo, nome: p.nome, cd: p.disponivel_cd ?? p.estoque_cd ?? 0 })) : []);
+  }
   return (
     <div className="cartao p-4 flex flex-col gap-3">
       <div className="flex justify-between gap-2 flex-wrap">
@@ -111,6 +120,38 @@ function Cartao({ s }: { s: SolicitacaoAbast }) {
           </tbody>
         </table>
       </div>
+      {editando ? (
+        <div className="cartao p-3 flex flex-col gap-2" style={{ color: "var(--text-primary)", border: "2px solid var(--brand-green, #1B7E3B)" }}>
+          <b>Editar o pedido da loja</b>
+          {editando.map((l, n) => (
+            <div key={l.codigo} className="flex gap-2 items-center text-sm flex-wrap">
+              <span style={{ minWidth: 320 }}><b>{l.codigo}</b> {l.nome.slice(0, 60)}</span>
+              <input type="number" min={1} step={1} className={inputClass} style={{ ...inputStyle, width: 80 }} value={l.qtd}
+                onChange={(e) => setEditando((ls) => (ls ?? []).map((x, j) => (j === n ? { ...x, qtd: Number(e.target.value) } : x)))} />
+              <button type="button" className="text-xs underline" style={{ color: "var(--status-critical)" }}
+                onClick={() => setEditando((ls) => (ls ?? []).filter((_, j) => j !== n))}>tirar</button>
+            </div>
+          ))}
+          <div className="flex gap-2 flex-wrap">
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void procurar(); }}
+              placeholder="Incluir produto: nome ou código (Enter)" className={inputClass} style={{ ...inputStyle, minWidth: 300 }} />
+            <button type="button" className={botaoClass} style={botaoStyle} onClick={() => void procurar()}>Buscar</button>
+          </div>
+          {achados.map((p) => (
+            <button key={p.codigo} type="button" className="text-left text-sm hover:underline"
+              onClick={() => { setEditando((ls) => ((ls ?? []).some((x) => x.codigo === p.codigo) ? ls : [...(ls ?? []), { codigo: p.codigo, nome: p.nome, qtd: 1 }])); setAchados([]); setBusca(""); }}>
+              + {p.codigo} {p.nome} <span className="text-xs" style={{ color: "var(--text-secondary)" }}>(CD tem {p.cd})</span>
+            </button>
+          ))}
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" className={botaoClass} style={botaoPrimarioStyle} disabled={pending || !editando.length}
+              onClick={() => run(() => editarAbastAction(s.id, editando.map((l) => ({ codigo: l.codigo, qtd: l.qtd }))), (d) => d.msg ?? "Pedido alterado.", () => setEditando(null))}>
+              {pending ? "Salvando…" : "💾 Salvar pedido"}
+            </button>
+            <button type="button" className={botaoClass} style={botaoStyle} onClick={() => { setEditando(null); setAchados([]); }}>Desistir</button>
+          </div>
+        </div>
+      ) : null}
       {nota ? (
         <div className="cartao p-3 flex items-center gap-3 flex-wrap" style={{ background: "var(--brand-green-soft)" }}>
           <b style={{ color: "var(--text-primary)" }}>NF 5152 nº {nota.numero ?? ""} emitida.</b>
@@ -126,6 +167,10 @@ function Cartao({ s }: { s: SolicitacaoAbast }) {
         </div>
       ) : null}
       <div className="flex gap-2 flex-wrap">
+        <button type="button" className={botaoClass} style={botaoStyle} disabled={pending || !!editando}
+          onClick={() => setEditando(s.itens.map((i) => ({ codigo: i.codigo, nome: i.nome, qtd: i.qtd })))}>
+          ✏️ Editar pedido (incluir / tirar produto)
+        </button>
         <button type="button" className={botaoClass} style={botaoStyle} onClick={() => imprimirSeparacao(s, qtd)}>
           🖨️ Imprimir lista de separação
         </button>
@@ -243,7 +288,7 @@ export function AbastecimentoBoard({ solicitacoes, empresas = [] }: { solicitaco
     <div className="flex flex-col gap-3">
       <NovoPedido empresas={empresas} />
       {solicitacoes.map((s) => (
-        <Cartao key={s.id} s={s} />
+        <Cartao key={`${s.id}-${s.itens.map((i) => i.codigo + ":" + i.qtd).join(",")}`} s={s} />
       ))}
     </div>
   );

@@ -402,6 +402,10 @@ export async function bloquearProduto(codigo: string, operador: string, motivo: 
   return json(`/produtos/${encodeURIComponent(codigo)}/bloquear`, { perfil: "logistica", metodo: "POST", corpo: { operador, motivo, desbloquear } });
 }
 
+// 28/10 (Pedro, tela do Flávio): CD inclui/tira produto e muda a quantidade pedida; grava no pedido (a loja vê na hora).
+export async function editarSolicitacaoAbast(id: number, itens: { codigo: string; qtd: number }[], operador: string): Promise<{ ok: boolean; msg?: string; alteracoes?: string[] }> {
+  return json(`/abastecimento/${id}/editar`, { perfil: "logistica", metodo: "POST", corpo: { itens, operador } });
+}
 export async function cancelarSolicitacaoAbast(id: number, operador: string, motivo: string): Promise<unknown> {
   return json(`/abastecimento/${id}/cancelar`, { perfil: "logistica", metodo: "POST", corpo: { operador, motivo } });
 }

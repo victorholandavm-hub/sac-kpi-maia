@@ -66,7 +66,7 @@ import {
   montarCarga,
   reordenarParadas,
   atenderSolicitacaoAbast,
-  cancelarSolicitacaoAbast,
+  editarSolicitacaoAbast, cancelarSolicitacaoAbast,
   bloquearProduto,
   novoPedidoAbast,
   darEntradaCompra,
@@ -302,6 +302,12 @@ export async function bloquearProdutoAction(codigo: string, motivo: string): Pro
   return executar((operador) => bloquearProduto(codigo, operador, motivo.trim()), [`${BASE}/abastecimento`]);
 }
 
+export async function editarAbastAction(id: number, itens: { codigo: string; qtd: number }[]): Promise<ResultadoAcao<{ ok: boolean; msg?: string }>> {
+  const _b = await bloqueiaConferente();
+  if (_b) return { ok: false, erro: _b };
+  if (!itens.some((i) => i.qtd > 0)) return { ok: false, erro: "O pedido precisa ter pelo menos um produto. Para desistir de tudo, use Cancelar." };
+  return executar((operador) => editarSolicitacaoAbast(id, itens, operador), [`${BASE}/abastecimento`]);
+}
 export async function cancelarAbastAction(id: number, motivo: string): Promise<ResultadoAcao<unknown>> {
   const _b = await bloqueiaConferente();
   if (_b) return { ok: false, erro: _b };
