@@ -537,10 +537,16 @@ export function registrarChegadaParada(paradaId: number, geo_lat: number | null,
 
 // ---- Manifesto (MDF-e) das cargas (26/10/2026, Pedro) -------------------
 export type NotaCarga = { tipo: "5152" | "5922" | "5117"; titulo: string; numero: string; serie: string; chave: string; pedido: string; cliente: string; legado?: boolean };
-export type MdfeCarga = { numero: string; serie: string; chave: string; estado: string } | null;
+export type MdfeCarga = {
+  numero: string; serie: string; chave: string; estado: string;
+  doc_id?: number; encerrado?: boolean; encerrado_em?: string | null; autorizado_em?: string | null;
+} | null;
+// 28/10 (Pedro): o caminhão (placa) já tem MDF-e autorizado e não encerrado de OUTRA carga -> a SEFAZ recusa o novo
+export type MdfeAbertoPlaca = { doc_id: number; numero: string; serie: string; romaneio: string; carga_id: number; estado_carga: string; autorizado_em: string | null } | null;
 export type CargaManifesto = {
   carga_id: number; romaneio: string; tipo: string; estado: string; motorista: string; veiculo: string;
   notas: NotaCarga[] | null; mdfe: MdfeCarga; faltas: string[]; criada_em?: string;
+  placa?: string; mdfe_aberto_placa?: MdfeAbertoPlaca;
 };
 export async function listarManifesto(companyId: number, dias = 7): Promise<CargaManifesto[]> {
   const r = await json<{ cargas: CargaManifesto[] }>("/logistica/manifesto", { perfil: "logistica", query: { company_id: companyId, dias }, timeoutMs: 120_000 });
@@ -565,6 +571,13 @@ export function progressoCarga(cargaId: number): Promise<ProgressoCarga> {
 }
 export function acaoMdfe(cargaId: number, acao: "emitir" | "encerrar" | "consultar", operador: string): Promise<Record<string, unknown>> {
   return json(`/logistica/carga/${int(cargaId)}/mdfe/${acao}`, { perfil: "logistica", metodo: "POST", corpo: { operador }, timeoutMs: 180_000 });
+}
+// 28/10: encerrar / cancelar um MDF-e pelo número do documento (pode ser de outra carga do mesmo caminhão)
+export function encerrarMdfeDoc(docId: number, operador: string): Promise<Record<string, unknown>> {
+  return json(`/logistica/mdfe/${int(docId)}/encerrar`, { perfil: "logistica", metodo: "POST", corpo: { operador }, timeoutMs: 180_000 });
+}
+export function cancelarMdfeDoc(docId: number, justificativa: string, operador: string): Promise<Record<string, unknown>> {
+  return json(`/logistica/mdfe/${int(docId)}/cancelar`, { perfil: "logistica", metodo: "POST", corpo: { justificativa, operador }, timeoutMs: 180_000 });
 }
 export function baixarDamdfePdf(cargaId: number): Promise<{ bytes: ArrayBuffer; nome: string }> {
   return pdf(`/logistica/carga/${int(cargaId)}/mdfe/damdfe`, { perfil: "logistica", metodo: "POST", corpo: {}, timeoutMs: 120_000 });

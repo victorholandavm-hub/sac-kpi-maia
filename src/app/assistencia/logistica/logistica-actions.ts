@@ -33,6 +33,8 @@ import {
   listarManifesto,
   notasDaCarga,
   acaoMdfe,
+  encerrarMdfeDoc,
+  cancelarMdfeDoc,
   progressoCarga,
   type ProgressoCarga,
   type CargaManifesto,
@@ -443,4 +445,16 @@ export async function audAgrupadoAction(f: AudFiltro2): Promise<ResultadoAcao<Au
 }
 export async function audRotatividadeAction(f: AudFiltro2): Promise<ResultadoAcao<AudRotLista>> {
   return executar(async () => audRotatividade(await soLoja(f)));
+}
+
+// 28/10 (Pedro: "tem que aparecer para Eduardo visualizar isso e aí ele resolve lá"): MDF-e aberto do mesmo caminhão
+export async function encerrarMdfeDocAction(docId: number): Promise<ResultadoAcao<Record<string, unknown>>> {
+  if (!(docId > 0)) return { ok: false, erro: "Manifesto inválido." };
+  return executar((operador) => encerrarMdfeDoc(docId, operador), [`${BASE}/manifesto`]);
+}
+export async function cancelarMdfeDocAction(docId: number, justificativa: string): Promise<ResultadoAcao<Record<string, unknown>>> {
+  if (!(docId > 0)) return { ok: false, erro: "Manifesto inválido." };
+  const j = (justificativa ?? "").replace(/\s+/g, " ").trim();
+  if (j.length < 15) return { ok: false, erro: "Escreva o motivo do cancelamento com pelo menos 15 letras." };
+  return executar((operador) => cancelarMdfeDoc(docId, j.slice(0, 255), operador), [`${BASE}/manifesto`]);
 }
