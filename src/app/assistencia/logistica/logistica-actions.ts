@@ -271,20 +271,32 @@ export async function historicoEntregaAction(pickingId: number): Promise<Resulta
 }
 
 // Pedido de abastecimento da loja: CD atende (NF 5152 CD -> loja) ou cancela.
+async function bloqueiaConferente(): Promise<string | null> {
+  const op = await getOperadorLogistica();
+  return op?.loja ? "Login de conferente da loja: só pede transferência; quem atende é o CD." : null;
+}
+
 export async function atenderAbastAction(id: number, itens: { codigo: string; qtd: number }[]): Promise<ResultadoAcao<AtenderAbastResposta>> {
+  const _b = await bloqueiaConferente();
+  if (_b) return { ok: false, erro: _b };
   const lista = itens.filter((i) => i.codigo && Number(i.qtd) > 0).map((i) => ({ codigo: i.codigo, qtd: Number(i.qtd) }));
   if (!lista.length) return { ok: false, erro: "Nada para atender: as quantidades estão zeradas." };
   return executar((operador) => atenderSolicitacaoAbast(id, lista, operador), [`${BASE}/abastecimento`]);
 }
 
-export async function novoAbastAction(companyId: number, itens: { codigo: string; qtd: number }[], atender: boolean) {
+export async function novoAbastAction(companyId: number, itens: { codigo: string; qtd: number }[], atender: boolean, obs?: string) {
+  // 27/10 (Pedro/Antônio): conferente de loja pede transferência só para a loja dele e nunca atende (atender = emitir a 5152 no CD)
+  const _op = await getOperadorLogistica();
+  if (_op?.loja) { companyId = _op.loja.companyId; atender = false; }
   const lista = itens.filter((i) => i.codigo && Number(i.qtd) > 0).map((i) => ({ codigo: i.codigo, qtd: Number(i.qtd) }));
   if (!(companyId > 0)) return { ok: false as const, erro: "Escolha a loja." };
   if (!lista.length) return { ok: false as const, erro: "Coloque pelo menos um produto com quantidade." };
-  return executar((operador) => novoPedidoAbast({ company_id_loja: companyId, itens: lista, atender }, operador), [`${BASE}/abastecimento`]);
+  return executar((operador) => novoPedidoAbast({ company_id_loja: companyId, itens: lista, atender, obs: obs || (_op?.loja ? `Pedido do conferente ${_op.nome}` : undefined) }, operador), [`${BASE}/abastecimento`, `${BASE}/pedir-transferencia`]);
 }
 
 export async function cancelarAbastAction(id: number, motivo: string): Promise<ResultadoAcao<unknown>> {
+  const _b = await bloqueiaConferente();
+  if (_b) return { ok: false, erro: _b };
   if (!motivo.trim()) return { ok: false, erro: "Escreva o motivo do cancelamento." };
   return executar((operador) => cancelarSolicitacaoAbast(id, operador, motivo.trim()), [`${BASE}/abastecimento`]);
 }

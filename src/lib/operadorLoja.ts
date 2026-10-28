@@ -12,4 +12,4 @@ export function operadorLoja(nome: string | null | undefined): OperadorLoja | nu
   return null;
 }
 
-export const ROTAS_OPERADOR_LOJA = ["/assistencia/logistica/estoque", "/assistencia/logistica/kardex"];
+export const ROTAS_OPERADOR_LOJA = ["/assistencia/logistica/estoque", "/assistencia/logistica/kardex", "/assistencia/logistica/pedir-transferencia"];
