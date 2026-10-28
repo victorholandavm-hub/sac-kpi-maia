@@ -119,7 +119,6 @@ export function ExpedicaoBoard({
   }
 
   function selecionarVisiveis() {
-    if (visao === "retornos") return;
     setSel(new Set(lista.map((e) => e.picking_id)));
   }
 
@@ -236,7 +235,7 @@ export function ExpedicaoBoard({
             <button type="button" onClick={() => router.refresh()} className={botaoClass} style={botaoStyle}>
               Atualizar
             </button>
-            {visao !== "retornos" ? (
+            {true ? (
               <button type="button" onClick={selecionarVisiveis} className={botaoClass} style={botaoStyle}>
                 Selecionar visíveis
               </button>
@@ -368,9 +367,8 @@ export function ExpedicaoBoard({
               return (
                 <tr key={e.picking_id} style={{ borderBottom: "1px solid var(--border)", background: marcada ? "var(--brand-green-soft)" : undefined }}>
                   <td className="p-2 align-top">
-                    {visao !== "retornos" ? (
-                      <input type="checkbox" checked={marcada} onChange={() => alternar(e.picking_id)} aria-label={`Selecionar ${e.cliente}`} className="w-5 h-5" />
-                    ) : null}
+                    {/* 28/10 (Rafael): retorno também pode ir para outra carga */}
+                    <input type="checkbox" checked={marcada} onChange={() => alternar(e.picking_id)} aria-label={`Selecionar ${e.cliente}`} className="w-5 h-5" />
                   </td>
                   <td className="p-2 align-top">
                     <b style={{ color: "var(--text-primary)" }}>{e.cliente}</b>
