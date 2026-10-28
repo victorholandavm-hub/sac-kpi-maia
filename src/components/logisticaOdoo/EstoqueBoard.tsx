@@ -509,6 +509,61 @@ function Cabecalho({ vis, todas }: { vis: Vis; todas: boolean }) {
   );
 }
 
+// 28/10/2026 (Pedro, para o Flávio): lupa no RESERVADO -> de onde vem cada reserva (pedido, cliente, documento, desde quando)
+function LupaBotao({ item }: { item: AudPosicaoItem }) {
+  const [aberto, setAberto] = useState(false);
+  const [lista, setLista] = useState<AudReservaItem[] | null>(null);
+  const [erro, setErro] = useState("");
+  if (!(item.reservado > 0)) return null;
+  return (
+    <span style={{ position: "relative" }}>
+      <button
+        type="button"
+        title="Ver de onde vem a reserva"
+        className="ml-1"
+        onClick={async () => {
+          const abre = !aberto;
+          setAberto(abre);
+          if (abre && lista === null) {
+            const r = await audReservasAction({ company_id: item.company_id, q: item.codigo, limit: 100 });
+            if (r.ok) setLista((r.dados?.itens ?? []).filter((x) => x.codigo === item.codigo));
+            else setErro(r.erro || "não carregou");
+          }
+        }}
+      >
+        🔍
+      </button>
+      {aberto ? (
+        <div
+          className="text-xs text-left p-2 rounded"
+          style={{ position: "absolute", right: 0, top: "1.6em", zIndex: 20, minWidth: 420, background: "var(--surface, #fff)", border: "1px solid var(--border)", boxShadow: "0 4px 14px rgba(0,0,0,.18)", color: "var(--text-primary)" }}
+        >
+          <div className="flex justify-between mb-1">
+            <b>Reservas de {item.codigo}{item.loja ? ` · ${item.loja}` : ""}</b>
+            <button type="button" onClick={() => setAberto(false)}>✕</button>
+          </div>
+          {erro ? (
+            <span style={{ color: "var(--status-critical)" }}>{erro}</span>
+          ) : lista === null ? (
+            "Carregando…"
+          ) : lista.length === 0 ? (
+            "Nenhuma reserva de pedido encontrada (pode ser reserva de transferência ou abastecimento)."
+          ) : (
+            lista.map((r, n) => (
+              <div key={n} className="py-1" style={{ borderTop: n ? "1px solid var(--border)" : undefined }}>
+                <b>{num(r.qtd)}×</b> {r.cliente || "—"}{r.pedido ? ` · pedido ${r.pedido}` : ""}
+                <div style={{ color: "var(--text-secondary)" }}>
+                  {r.tipo} · {r.documento}{r.origem ? ` · ${r.origem}` : ""} · desde {dia(r.desde)} ({r.dias} dias)
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
+    </span>
+  );
+}
+
 function Linha({ vis, item, todas }: { vis: Vis; item: Item; todas: boolean }) {
   const borda = { borderTop: "1px solid var(--border)" };
   const td = "py-2 pr-3 align-top";
@@ -527,7 +582,7 @@ function Linha({ vis, item, todas }: { vis: Vis; item: Item; todas: boolean }) {
           <div className="text-xs" style={muted}>{i.fornecedor}</div>
         </td>
         <td className={tdR} style={i.fisico < 0 ? ruim : undefined}>{num(i.fisico)}</td>
-        <td className={tdR}>{num(i.reservado)}</td>
+        <td className={tdR}>{num(i.reservado)}<LupaBotao item={i} /></td>
         <td className={tdR}>{i.custo_medio ? brl(i.custo_medio) : "—"}</td>
         <td className={tdR}>{brl(i.valor)}</td>
       </tr>
@@ -570,7 +625,7 @@ function Linha({ vis, item, todas }: { vis: Vis; item: Item; todas: boolean }) {
         </td>
         {todas || vis === "negativo" ? <td className={td}>{i.loja}</td> : null}
         <td className={tdR} style={i.fisico < 0 ? ruim : undefined}>{num(i.fisico)}</td>
-        <td className={tdR}>{num(i.reservado)}</td>
+        <td className={tdR}>{num(i.reservado)}<LupaBotao item={i} /></td>
         <td className={tdR}><b>{num(i.disponivel)}</b></td>
         {vis === "posicao" ? (
           <>
