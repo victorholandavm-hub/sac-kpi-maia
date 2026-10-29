@@ -4,6 +4,7 @@ import { empresaDaUrl } from "@/lib/odoo/logisticaAuth";
 import { ExpedicaoBoard } from "./ExpedicaoBoard";
 import { EmpresaSelect } from "./EmpresaSelect";
 import { ErroOdoo } from "./ui";
+import { NotasDeOutros } from "./NotasDeOutros";
 
 // Fila de expedição = tela "Entregas e Retiradas" do Roteirizador do
 // Protheus: saídas sem carga, filtros (região, modo/ABA, pendência,
@@ -54,6 +55,7 @@ export async function ExpedicaoFila({ sp, sac = false }: { sp: { empresa?: strin
         </h2>
         <EmpresaSelect empresas={empresas} atual={empresa} />
       </div>
+      {!sac ? <NotasDeOutros /> : null}
       {falhas.length && falhas.length < partes.length ? (
         <p className="text-sm" style={{ color: "var(--status-serious)" }}>Algumas lojas não responderam agora ({falhas.length}); a lista pode estar incompleta.</p>
       ) : null}

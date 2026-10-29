@@ -4,6 +4,7 @@ import { empresaDaUrl } from "@/lib/odoo/logisticaAuth";
 import { ESTADOS_CARGA, ESTADO_CARGA_LABELS, TIPO_CARGA_LABELS, formatarDiaIso, type CargaOdoo } from "@/lib/odoo/logisticaTipos";
 import { EmpresaSelect } from "@/components/logisticaOdoo/EmpresaSelect";
 import { Chip, ErroOdoo, VolumesChips } from "@/components/logisticaOdoo/ui";
+import { NotasDeOutros } from "@/components/logisticaOdoo/NotasDeOutros";
 
 // Aba "Cargas" do Roteirizador: kanban por estado do maia_entrega.
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function CargasPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="flex flex-col gap-4 min-w-0">
+      <NotasDeOutros />
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
           Cargas · últimos {dias} dias{todasEmpresas ? " · todas as lojas e o CD" : ""}

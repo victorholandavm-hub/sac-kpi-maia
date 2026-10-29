@@ -10,6 +10,7 @@ import { executarAcaoCarga, mensagemDeErro, registrarChegadaParada } from "@/lib
 import { registrarBaixaParada, type EntradaBaixa } from "@/lib/odoo/baixaParada";
 import { getMotoristaSessao } from "@/lib/odoo/logisticaAuth";
 import { exigirCargaDoMotorista } from "@/lib/odoo/rotaMotorista";
+import { registrarAcaoCarga } from "@/lib/odoo/cargaAcoes";
 import type { AcaoCargaResposta, ResultadoAcao, ResultadoParadaResposta } from "@/lib/odoo/logisticaTipos";
 
 const BASE = "/assistencia/motorista/odoo";
@@ -26,6 +27,7 @@ export async function sairParaRotaAction(cargaId: number): Promise<ResultadoAcao
     const { carga, employeeId } = await exigirCargaDoMotorista(s, cargaId);
     if (carga.estado !== "liberada") return { ok: false, erro: `A carga está "${carga.estado}", não "liberada".` };
     const r = await executarAcaoCarga(cargaId, "sair", { operador: `Motorista ${s.nome}`, motorista_id: employeeId, perfil: "motorista" });
+    await registrarAcaoCarga(cargaId, carga.romaneio ?? null, "sair", r?.estado ?? null, `Motorista ${s.nome}`);
     revalidatePath(BASE);
     return { ok: true, dados: r };
   } catch (err) {

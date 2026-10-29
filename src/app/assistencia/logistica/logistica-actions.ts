@@ -81,6 +81,7 @@ import type { EntradaCompraResposta, FornecedorOdoo, PedidoCompra, ItemInventari
 import { inventarioAplicar, inventarioSaldo } from "@/lib/odoo/logistica";
 import { getOperadorLogistica, exigirOperadorExpedicao, exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { registrarAcaoCarga } from "@/lib/odoo/cargaAcoes";
 import type {
   AcaoCarga,
   AcaoCargaResposta,
@@ -144,6 +145,7 @@ export async function retiradaNoCdAction(companyId: number, pickingId: number, q
       });
       for (const a of ["separacao", "conferir", "liberar"] as const) await executarAcaoCarga(c.carga_id, a, { operador });
       const r = await executarAcaoCarga(c.carga_id, "sair", { operador });
+      await registrarAcaoCarga(c.carga_id, c.romaneio, "sair", r?.estado ?? null, operador);
       const d = await lerCarga(c.carga_id);
       for (const p of d.paradas) {
         await registrarParadaPeloCd(p.parada_id, { resultado: "entregue", obs: `Retirado no CD por ${q} (liberado por ${operador})`.slice(0, 500) });
@@ -171,17 +173,6 @@ export async function acaoCargaAction(
     },
     [`${BASE}/cargas`, `${BASE}/cargas/${cargaId}`],
   );
-}
-
-// 26/10 (Victor: "quem conferiu" nos eventos da carga): grava quem fez cada passo (tabela odoo_carga_acoes, 0206).
-// Nunca derruba a ação: o Odoo já aceitou; se o banco falhar, só fica no log.
-async function registrarAcaoCarga(cargaId: number, romaneio: string | null, acao: string, estado: string | null, operador: string) {
-  try {
-    const { error } = await getSupabaseAdmin().from("odoo_carga_acoes").insert({ carga_id: cargaId, romaneio, acao, estado, operador });
-    if (error) console.error("[logistica-odoo] registrar ação da carga", cargaId, acao, error.message);
-  } catch (err) {
-    console.error("[logistica-odoo] registrar ação da carga", cargaId, acao, err);
-  }
 }
 
 export async function reordenarParadasAction(cargaId: number, paradaIds: number[]): Promise<ResultadoAcao<CargaDetalhe>> {
@@ -473,4 +464,18 @@ export async function cancelarMdfeDocAction(docId: number, justificativa: string
   const j = (justificativa ?? "").replace(/\s+/g, " ").trim();
   if (j.length < 15) return { ok: false, erro: "Escreva o motivo do cancelamento com pelo menos 15 letras." };
   return executar((operador) => cancelarMdfeDoc(docId, j.slice(0, 255), operador), [`${BASE}/manifesto`]);
+}
+
+// 29/10 (Victor): o John dá ciente nas notas de entrega faturadas por outras pessoas (notasDeOutros.ts).
+export async function cienteNotaDeOutroAction(acaoId: number): Promise<ResultadoAcao<null>> {
+  return executar(
+    async (operador) => {
+      const { error } = await getSupabaseAdmin()
+        .from("notas_de_outros_ciente")
+        .upsert({ acao_id: acaoId, ciente_por: operador.replace(/^(CD|Equipe) /, "") }, { onConflict: "acao_id", ignoreDuplicates: true });
+      if (error) throw new Error(error.message);
+      return null;
+    },
+    [`${BASE}/expedicao`, `${BASE}/cargas`],
+  );
 }
