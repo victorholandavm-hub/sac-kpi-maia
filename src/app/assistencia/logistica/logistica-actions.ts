@@ -6,7 +6,7 @@
 // dado -- ver ResultadoAcao em logisticaTipos.ts.
 
 import { revalidatePath } from "next/cache";
-import { transferirItens, limparCacheExpedicao, devolverTransferenciaLoja } from "@/lib/odoo/logistica";
+import { transferirItens, limparCacheExpedicao, devolverTransferenciaLoja, aceitarTransferenciaLoja } from "@/lib/odoo/logistica";
 import {
   acaoEntrega,
   lerItensEntrega,
@@ -294,6 +294,13 @@ export async function devolverTransferenciaAction(companyId: number, chave: stri
   const lista = itens.filter((i) => i.codigo && Number(i.qtd) > 0).map((i) => ({ codigo: i.codigo, qtd: Number(i.qtd) }));
   if (!lista.length) return { ok: false as const, erro: "Marque pelo menos um item com quantidade." };
   return executar((operador) => devolverTransferenciaLoja({ company_id: companyId, chave, itens: lista, obs }, operador), [`${BASE}/inventario`]);
+}
+
+// 29/10 (Antonio/CD + Pedro): o CD confere e ACEITA a transferência recebida; itens = quantidade que chegou (o que faltou volta por devolução)
+export async function aceitarTransferenciaAction(companyId: number, pickingId: number, itens: { codigo: string; qtd_recebida: number }[]) {
+  const lista = itens.filter((i) => i.codigo && Number(i.qtd_recebida) >= 0).map((i) => ({ codigo: i.codigo, qtd_recebida: Number(i.qtd_recebida) }));
+  if (!pickingId) return { ok: false as const, erro: "Transferência não informada." };
+  return executar((operador) => aceitarTransferenciaLoja({ company_id: companyId, picking_id: pickingId, itens: lista }, operador), [`${BASE}/inventario`]);
 }
 
 export async function novoAbastAction(companyId: number, itens: { codigo: string; qtd: number }[], atender: boolean, obs?: string) {

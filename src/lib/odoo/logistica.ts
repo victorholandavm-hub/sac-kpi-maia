@@ -724,3 +724,19 @@ export async function listarTransferenciasLoja(companyId: number, dias = 30): Pr
   const r = await json<{ transferencias?: TransferenciaLoja[] }>("/caixa/transferencias", { perfil: "logistica", query: { company_id: companyId, dias } });
   return r.transferencias ?? [];
 }
+// 29/10 (Antonio/CD + Pedro): transferência recebida fica AGUARDANDO ACEITE até o destino conferir; o que faltou volta por 5152 de devolução
+export type TransferenciaAceitar = {
+  picking_id: number; entrada: string; nota: { numero: string; serie: string; chave: string }; de: string; de_company_id: number; para: string; company_id: number;
+  enviado_por: string; obs: string; data: string; referencia: string; itens: { codigo: string; nome: string; qtd: number }[];
+};
+export type AceiteResposta = {
+  ok: boolean; entrada?: string; picking_id?: number; aceito?: { codigo: string; nome: string; qtd: number }[]; devolvido?: { codigo: string; nome: string; qtd: number }[];
+  nf_devolucao?: { numero?: string; serie?: string; chave?: string; estado?: string } | null; erro?: string;
+};
+export async function listarTransferenciasAceitar(companyId: number): Promise<TransferenciaAceitar[]> {
+  const r = await json<{ transferencias?: TransferenciaAceitar[] }>("/caixa/transferencias/aceitar", { perfil: "logistica", query: { company_id: companyId } });
+  return r.transferencias ?? [];
+}
+export function aceitarTransferenciaLoja(dados: { company_id: number; picking_id: number; itens: { codigo: string; qtd_recebida: number }[] }, operador: string) {
+  return json<AceiteResposta>("/caixa/transferencias/aceitar", { perfil: "logistica", metodo: "POST", corpo: { ...dados, operador } });
+}
