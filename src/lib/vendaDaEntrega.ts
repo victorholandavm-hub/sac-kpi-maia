@@ -37,10 +37,13 @@ export async function vendasDasEntregasResolvidas(
   ate: string,
   resolvidos: readonly string[]
 ): Promise<VendaCandidata[]> {
+  // Cargas do Odoo gravadas no formato do Protheus (odooCargasComoProtheus.ts)
+  // ficam de fora: as pesquisas delas saem por npsEntregaOdoo.ts.
   const cargas = await fetchAllPagesParallel<{ delivery_id: string }>((from, to) =>
     admin
       .from("totvs_delivery_cargas")
-      .select("delivery_id", { count: "exact" })
+      .select("delivery_id, totvs_deliveries!inner(pedido)", { count: "exact" })
+      .not("totvs_deliveries.pedido", "like", "ODOO-%")
       .gte("dt_retorno", de)
       .lte("dt_retorno", ate)
       .in("status_entrega", resolvidos as string[])

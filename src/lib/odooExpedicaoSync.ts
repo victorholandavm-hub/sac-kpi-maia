@@ -3,6 +3,7 @@ import { comTrava } from "./travaSync";
 import { lerCarga, lerExpedicao, listarCargas, listarEmpresas, mensagemDeErro } from "./odoo/logistica";
 import type { CargaDetalhe, CargaOdoo, EntregaOdoo } from "./odoo/logisticaTipos";
 import { nomePedidoOdoo } from "./pedidoOdoo";
+import { gravarCargaComoProtheus, motoristasDoProtheus } from "./odooCargasComoProtheus";
 
 // Retrato da expedição do Odoo em odoo_expedicao (0203) -- Victor 26/10/2026:
 // dá o id numérico do pedido no Odoo pra imprimir a nota pela ponte, sem
@@ -17,7 +18,7 @@ const SIMULTANEAS = 2;
 const DIAS_CARGAS = 30;
 const cargasFechadasLidas = new Set<number>();
 
-export type ResumoExpedicao = { empresas: number; saidas: number; cargas: number; falhas: { empresa: string; erro: string }[] };
+export type ResumoExpedicao = { empresas: number; saidas: number; cargas: number; comoProtheus: number; falhas: { empresa: string; erro: string }[] };
 
 export function linhasDaCarga(c: CargaDetalhe, empresa: string, agora: string) {
   return (c.paradas ?? []).flatMap((p) =>
@@ -113,7 +114,7 @@ export async function sincronizarExpedicaoOdoo(): Promise<ResumoExpedicao | { sk
   const admin = getSupabaseAdmin();
   return comTrava(admin, "odoo_expedicao", "cron", 15 * 60, async () => {
     const empresas = await listarEmpresas("logistica");
-    const resumo: ResumoExpedicao = { empresas: empresas.length, saidas: 0, cargas: 0, falhas: [] };
+    const resumo: ResumoExpedicao = { empresas: empresas.length, saidas: 0, cargas: 0, comoProtheus: 0, falhas: [] };
     const agora = new Date().toISOString();
     const nomeEmpresa = new Map(empresas.map((e) => [e.id, e.name]));
     const cargas: CargaOdoo[] = [];
@@ -135,17 +136,28 @@ export async function sincronizarExpedicaoOdoo(): Promise<ResumoExpedicao | { sk
     const aLer = [...new Map(cargas.map((c) => [c.carga_id, c])).values()]
       .filter((c) => !cargasFechadasLidas.has(c.carga_id))
       .sort((a, b) => a.carga_id - b.carga_id);
+    // 29/10: as mesmas cargas também vão no formato do Protheus, pros KPIs de logística (odooCargasComoProtheus.ts).
+    const motoristas = await motoristasDoProtheus(admin).catch(() => []);
     await emPares(aLer, async (c) => {
       try {
         const detalhe = await lerCarga(c.carga_id);
         const gravadas = await gravar(admin, linhasDaCarga(detalhe, nomeEmpresa.get(detalhe.company_id) ?? c.empresa ?? "", agora));
         resumo.saidas += gravadas;
         resumo.cargas += 1;
+        try {
+          resumo.comoProtheus += await gravarCargaComoProtheus(admin, { ...detalhe, empresa: detalhe.empresa ?? nomeEmpresa.get(detalhe.company_id) ?? c.empresa }, motoristas);
+        } catch (err) {
+          resumo.falhas.push({ empresa: `KPIs carga ${c.romaneio}`, erro: mensagemDeErro(err) });
+        }
         if (c.estado === "finalizada" || c.cancelada) cargasFechadasLidas.add(c.carga_id);
       } catch (err) {
         resumo.falhas.push({ empresa: `carga ${c.romaneio}`, erro: mensagemDeErro(err) });
       }
     });
+    if (resumo.comoProtheus) {
+      const { error } = await admin.rpc("renumerar_tentativas_odoo");
+      if (error) resumo.falhas.push({ empresa: "KPIs tentativas", erro: error.message });
+    }
     return resumo;
   });
 }

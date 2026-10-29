@@ -88,7 +88,9 @@ export default async function KpisLogisticaPage({ searchParams }: { searchParams
   const ultimoSyncPromise = Promise.all([
     getLastSuccessfulRunAt("totvs").catch(() => null),
     getLastSuccessfulRunAt("totvs-cargas").catch(() => null),
-  ]).then(([completo, cargas]) => maisRecente(completo, cargas));
+    // Desde a virada (25/10/2026) as cargas vêm do Odoo.
+    getLastSuccessfulRunAt("odoo-cargas").catch(() => null),
+  ]).then(([completo, cargas, odoo]) => maisRecente(maisRecente(completo, cargas), odoo));
   // Dia sem carga (domingo): o mural mostra o último dia de operação. Carga
   // de dia anterior ainda em rota não conta como carga do dia.
   const rotasPromise = getRotasDoDia(hojeRecife())

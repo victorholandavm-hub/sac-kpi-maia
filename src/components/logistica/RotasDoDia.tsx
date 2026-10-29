@@ -299,7 +299,7 @@ function PendentesAnteriores({
     >
       <div className="flex flex-col gap-3">
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Continuam Em Rota no Protheus: falta a baixa dessas notas ou o encerramento da carga. Não entram nos números de hoje.
+          Continuam Em Rota: falta a baixa dessas notas ou o encerramento da carga. Não entram nos números de hoje.
         </p>
         <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {cargas.map((c) => (
@@ -749,7 +749,7 @@ export function RotasDoDia({
             <span
               className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest"
               style={{ color: atrasado ? "var(--status-warning)" : "var(--brand-green)" }}
-              title={atrasado ? "O Protheus não sincroniza há mais de 45 minutos" : undefined}
+              title={atrasado ? "O Odoo não é lido há mais de 70 minutos" : undefined}
             >
               <span aria-hidden className={`luz-ao-vivo ${atrasado ? "atrasada" : ""} inline-block w-2.5 h-2.5 rounded-full shrink-0`} />
               {atrasado ? "ATRASADO" : "AO VIVO"}
@@ -769,7 +769,7 @@ export function RotasDoDia({
             color: atrasado ? "var(--text-primary)" : "var(--text-secondary)",
           }}
         >
-          {dadosDe ? `Protheus às ${dadosDe}` : "Sem sincronização recente"} · atualiza a cada 10 min
+          {dadosDe ? `Odoo às ${dadosDe}` : "Sem sincronização recente"} · atualiza a cada 30 min
         </span>
       </header>
 

@@ -150,7 +150,7 @@ export function FiltrosLogistica({
           {carregando
             ? "Atualizando…"
             : dadosDe
-              ? `Dados do Protheus das ${dadosDe}${dadosAtrasados ? " (atrasado)" : ""}`
+              ? `Dados do Odoo das ${dadosDe}${dadosAtrasados ? " (atrasado)" : ""}`
               : "Sem sincronização recente"}
         </button>
       </div>

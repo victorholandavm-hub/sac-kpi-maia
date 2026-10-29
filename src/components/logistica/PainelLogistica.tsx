@@ -33,7 +33,8 @@ function hojeRecifeIso(): string {
 const SEM_VARIACAO: Variacao = { atual: 0, anterior: null, delta: null, melhorou: null };
 
 function syncAtrasado(ultimoSync: string | null): boolean {
-  return !ultimoSync || Date.now() - Date.parse(ultimoSync) > 45 * 60_000;
+  // A leitura do Odoo roda a cada 30 min (era 10 com o Protheus).
+  return !ultimoSync || Date.now() - Date.parse(ultimoSync) > 70 * 60_000;
 }
 
 const horaRecife = (d: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Recife", hour: "2-digit", minute: "2-digit" }).format(d);
