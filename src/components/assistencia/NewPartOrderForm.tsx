@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import { createPartOrder, type PartOrderFormState } from "@/app/assistencia/pecas-actions";
+import { EmailNovoPedidoPeca } from "./EmailNovoPedidoPeca";
 import type { SupplierContact } from "@/lib/partOrders";
 
 const inputStyle = { borderColor: "var(--border)" };
@@ -76,6 +77,7 @@ export function NewPartOrderForm({
         <p className="text-sm font-medium" style={{ color: "var(--status-good)" }}>
           Pedido de peça criado!
         </p>
+        {state.partOrderId ? <EmailNovoPedidoPeca partOrderId={state.partOrderId} /> : null}
         <div className="flex items-center gap-3 flex-wrap">
           {/* Pedido do Victor 15/09/2026: "preciso que tenha um botão de
               fazer uma nova solicitação de peça assim que eu faço um

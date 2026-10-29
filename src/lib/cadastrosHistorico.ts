@@ -515,3 +515,11 @@ export async function listHistoricoCliente(cpf: string | null, telefone: string 
 
   return [...items.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 25);
 }
+
+// Excluir cadastro (duplicado, lançado errado) -- Victor 29/10/2026. Devolve a
+// linha apagada pra quem chamou registrar no log (dá pra recriar se foi engano).
+export async function deleteCadastroHistorico(id: string): Promise<Record<string, unknown> | null> {
+  const { data, error } = await getSupabaseAdmin().from("assistencia_cadastros_historico").delete().eq("id", id).select("*").maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}

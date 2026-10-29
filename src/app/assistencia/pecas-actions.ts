@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { isPartOrderStatus, listPartOrdersByGroupId, listPartOrderItems, type PartOrder, type PartOrderItem } from "@/lib/partOrders";
+import { getPartOrder, isPartOrderStatus, listPartOrdersByGroupId, listPartOrderItems, type PartOrder, type PartOrderItem } from "@/lib/partOrders";
 import { formatDateTimeBr } from "@/lib/formatDateTime";
 import { requirePecasActor } from "@/lib/pecasAccess";
 import { savePhotoFile } from "@/lib/localPhotoStorage";
@@ -52,7 +52,7 @@ function revalidatePecasPaths(id?: string) {
   }
 }
 
-export type PartOrderFormState = { error?: string; success?: boolean } | undefined;
+export type PartOrderFormState = { error?: string; success?: boolean; partOrderId?: string } | undefined;
 
 // Uma solicitação pode ter várias peças -- pedido do Victor 16/09/2026:
 // "adicione a opção de eu adicionar mais de uma peça na mesma solicitação,
@@ -209,7 +209,15 @@ export async function createPartOrder(_state: PartOrderFormState, formData: Form
   }
 
   revalidatePecasPaths();
-  return { success: true };
+  return { success: true, partOrderId };
+}
+
+// Pedido recém-criado com todas as peças, pro e-mail do representante já
+// aparecer na tela de "Pedido de peça criado!" -- Victor 29/10/2026.
+export async function getPartOrderEmailAction(partOrderId: string): Promise<{ o: PartOrder; extras: PartOrderItem[] } | null> {
+  await requirePecasActor();
+  const o = await getPartOrder(partOrderId);
+  return o ? { o, extras: await listPartOrderItems(partOrderId) } : null;
 }
 
 // Peças-irmãs de uma solicitação (mesmo group_id) -- usado pelo botão de

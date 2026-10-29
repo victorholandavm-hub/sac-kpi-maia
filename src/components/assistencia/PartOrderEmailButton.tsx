@@ -117,6 +117,72 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
+// Para / Assunto / Corpo do e-mail, com os botões de copiar -- no diálogo do
+// botão "✉️ E-mail" e na tela de "Pedido de peça criado!" (Victor 29/10/2026:
+// "já nessa janela de novo pedido de peça, já mostre o e-mail").
+export function EmailRepresentante({ o, subject, body }: { o: Pick<PartOrder, "representativeEmail">; subject: string; body: string }) {
+  return (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+            Para (representante)
+          </span>
+          {/* Pedido do Victor 24/09/2026: "preciso que... fique o
+              e-mail do representante daquela solicitação" -- já
+              existia em part_orders.representative_email, mas não
+              aparecia em lugar nenhum desse modal. Campo próprio
+              (não dentro do corpo -- não faz sentido o destinatário
+              aparecer no texto do e-mail em si), com o mesmo botão
+              de copiar dos outros dois campos. */}
+          {o.representativeEmail ? <CopyButton text={o.representativeEmail} label="Copiar e-mail" /> : null}
+        </div>
+        <p
+          className="text-sm rounded border px-3 py-2"
+          style={{ borderColor: "var(--border)", color: o.representativeEmail ? "var(--text-primary)" : "var(--text-muted)" }}
+        >
+          {o.representativeEmail ?? "Sem e-mail cadastrado pro representante."}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+            Assunto
+          </span>
+          <CopyButton text={subject} label="Copiar assunto" />
+        </div>
+        <p className="text-sm rounded border px-3 py-2" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
+          {subject}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+            Corpo do e-mail
+          </span>
+          <CopyButton text={body} label="Copiar corpo" />
+        </div>
+        <textarea
+          readOnly
+          rows={16}
+          value={body}
+          onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+          className="text-sm rounded border px-3 py-2 whitespace-pre-line font-mono"
+          style={{ borderColor: "var(--border)", color: "var(--text-primary)", background: "var(--surface-1)" }}
+        />
+      </div>
+    </>
+  );
+}
+
+// Pedido inteiro (1ª peça + as demais) -> assunto e corpo.
+export function emailDoPedido(o: PartOrder, extras: { partName: string; partCode: string | null; color: string | null; product: string | null }[]) {
+  const pieces = [toPiece(o), ...extras];
+  return { subject: buildSubject(o, pieces), body: buildBody(o, pieces) };
+}
+
 export function PartOrderEmailButton({
   o,
   groupId,
@@ -228,56 +294,7 @@ export function PartOrderEmailButton({
               </button>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  Para (representante)
-                </span>
-                {/* Pedido do Victor 24/09/2026: "preciso que... fique o
-                    e-mail do representante daquela solicitação" -- já
-                    existia em part_orders.representative_email, mas não
-                    aparecia em lugar nenhum desse modal. Campo próprio
-                    (não dentro do corpo -- não faz sentido o destinatário
-                    aparecer no texto do e-mail em si), com o mesmo botão
-                    de copiar dos outros dois campos. */}
-                {o.representativeEmail ? <CopyButton text={o.representativeEmail} label="Copiar e-mail" /> : null}
-              </div>
-              <p
-                className="text-sm rounded border px-3 py-2"
-                style={{ borderColor: "var(--border)", color: o.representativeEmail ? "var(--text-primary)" : "var(--text-muted)" }}
-              >
-                {o.representativeEmail ?? "Sem e-mail cadastrado pro representante."}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  Assunto
-                </span>
-                <CopyButton text={subject} label="Copiar assunto" />
-              </div>
-              <p className="text-sm rounded border px-3 py-2" style={{ borderColor: "var(--border)", color: "var(--text-primary)" }}>
-                {subject}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                  Corpo do e-mail
-                </span>
-                <CopyButton text={body} label="Copiar corpo" />
-              </div>
-              <textarea
-                readOnly
-                rows={16}
-                value={body}
-                onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-                className="text-sm rounded border px-3 py-2 whitespace-pre-line font-mono"
-                style={{ borderColor: "var(--border)", color: "var(--text-primary)", background: "var(--surface-1)" }}
-              />
-            </div>
+            <EmailRepresentante o={o} subject={subject} body={body} />
           </div>
         </>
       ) : null}

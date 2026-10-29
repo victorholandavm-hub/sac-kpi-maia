@@ -7,6 +7,7 @@ import { DateRangeQuickFilter } from "@/components/assistencia/DateRangeQuickFil
 import { CadastroDetalheModal } from "@/components/assistencia/CadastroDetalheModal";
 import { NovoCadastroDrawer } from "@/components/assistencia/NovoCadastroDrawer";
 import { EditarCadastroDrawer } from "@/components/assistencia/EditarCadastroDrawer";
+import { ExcluirCadastroBotao } from "@/components/assistencia/ExcluirCadastroBotao";
 import {
   listCadastros,
   getCadastroPillCounts,
@@ -199,6 +200,7 @@ function CadastroRow({ cadastro }: { cadastro: Cadastro }) {
         <div className="flex items-center justify-end gap-1.5">
           <CadastroDetalheModal cadastro={cadastro} />
           <EditarCadastroDrawer cadastro={cadastro} />
+          <ExcluirCadastroBotao id={cadastro.id} cliente={cadastro.cliente} />
         </div>
       </td>
     </tr>

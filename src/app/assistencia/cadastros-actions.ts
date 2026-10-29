@@ -5,6 +5,7 @@ import { getProfile, requireRole } from "@/lib/dal";
 import {
   addCadastroHistorico,
   updateCadastroHistorico,
+  deleteCadastroHistorico,
   listHistoricoCliente,
   CADASTRO_TIPOS,
   CADASTRO_STATUSES,
@@ -131,4 +132,21 @@ export async function getHistoricoClienteAction(cpf: string | null, telefone: st
   const profile = await getProfile();
   requireRole(profile, "admin", "assistencia");
   return listHistoricoCliente(cpf, telefone);
+}
+
+// Excluir cadastro -- Victor 29/10/2026 (cadastro em dobro). Mesmo acesso de
+// editar; a linha apagada vai inteira pro log.
+export async function excluirCadastroHistoricoAction(id: string): Promise<FormState> {
+  const profile = await getProfile();
+  requireRole(profile, "admin", "assistencia");
+  if (!id) return { error: "Cadastro inválido." };
+  try {
+    const apagado = await deleteCadastroHistorico(id);
+    if (!apagado) return { error: "Cadastro não encontrado (já foi excluído?)." };
+    console.info("[cadastros] excluído por", profile.fullName, JSON.stringify(apagado));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Não foi possível excluir." };
+  }
+  revalidatePath("/assistencia/cadastros");
+  return undefined;
 }
