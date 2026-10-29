@@ -68,9 +68,10 @@ export function ExpedicaoBoard({
   const [cargaDestino, setCargaDestino] = useState("");
   // 26/10: busca em TUDO (carga, rota, entregue, pendência, loja) além da fila
   const [fora, setFora] = useState<BuscaEntrega[]>([]);
-  // 29/10 (Victor, SAC buscando pelo CPF): a fila não tem CPF; o que a busca
-  // do Odoo acha NA fila entra na lista mesmo sem casar com o filtro local.
-  const [naFilaPelaBusca, setNaFilaPelaBusca] = useState<Set<number>>(new Set());
+  // 29/10 (Victor): a busca do Odoo acha pelo CPF e por nome parecido
+  // ("Moraes" x "MORAIS", pendência do John); o que ela achar e estiver na
+  // visão aberta (fila ou pendências) entra na lista, marcável e com as ações.
+  const [achadosPelaBusca, setAchadosPelaBusca] = useState<Set<number>>(new Set());
   useEffect(() => {
     const q = busca.trim();
     if (q.length < 3) return;
@@ -79,11 +80,11 @@ export function ExpedicaoBoard({
         .then((r) => {
           const itens = r.ok ? (r.dados ?? []) : [];
           setFora(itens.filter((x) => !x.na_fila));
-          setNaFilaPelaBusca(new Set(itens.filter((x) => x.na_fila).map((x) => x.picking_id)));
+          setAchadosPelaBusca(new Set(itens.map((x) => x.picking_id)));
         })
         .catch(() => {
           setFora([]);
-          setNaFilaPelaBusca(new Set());
+          setAchadosPelaBusca(new Set());
         });
     }, 500);
     return () => clearTimeout(t);
@@ -113,13 +114,14 @@ export function ExpedicaoBoard({
   }, [todas]);
   const temRetornoNoOdoo = todas.some((e) => typeof e.retorno === "boolean");
   const filtradas = filtrarExpedicao(expedicao.entregas, expedicao.pendencias, { visao, zona, modo, busca });
-  const doCpf =
+  const daBusca =
     busca.trim().length >= 3
       ? filtrarExpedicao(expedicao.entregas, expedicao.pendencias, { visao, zona: "", modo: "", busca: "" }).filter(
-          (e) => naFilaPelaBusca.has(e.picking_id) && !filtradas.some((f) => f.picking_id === e.picking_id),
+          (e) => achadosPelaBusca.has(e.picking_id) && !filtradas.some((f) => f.picking_id === e.picking_id),
         )
       : [];
-  const lista = [...filtradas, ...doCpf];
+  const lista = [...filtradas, ...daBusca];
+  const foraDaLista = fora.filter((x) => !lista.some((e) => e.picking_id === x.picking_id));
   const vols = somarVolumes(lista);
   const selecionadas = [...expedicao.entregas, ...expedicao.pendencias].filter((e) => sel.has(e.picking_id));
   // 27/10 (CD: "cliente da pendência, não tem a opção de marcar"): pendência marcada volta à fila antes de entrar na carga
@@ -478,12 +480,12 @@ export function ExpedicaoBoard({
         </table>
       </div>
 
-      {busca.trim().length >= 3 && fora.length ? (
+      {busca.trim().length >= 3 && foraDaLista.length ? (
         <div className="cartao p-4 flex flex-col gap-2">
           <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
-            Fora da fila (em carga, em rota, entregue, pendência ou na loja) · {fora.length}
+            Fora da fila (em carga, em rota, entregue, pendência ou na loja) · {foraDaLista.length}
           </h3>
-          {fora.map((x) => (
+          {foraDaLista.map((x) => (
             <div key={x.picking_id} className="flex items-start justify-between gap-2 text-sm py-1 flex-wrap" style={{ borderBottom: "1px solid var(--border)" }}>
               <span>
                 <b>{x.cliente}</b> · {x.pedido} · loja {x.loja} · {x.nota}
