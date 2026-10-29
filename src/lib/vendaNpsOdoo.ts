@@ -4,7 +4,7 @@ import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessage
 import { SUBCONTAS } from "./ghlSubcontas";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 import type { ResultadoEnvioNps } from "./npsEnvio";
-import { clientePeloTelefone, encaminharPelaNota } from "./npsEncaminhar";
+import { clientePeloTelefone, ehPedidoDeTroca, encaminharPelaNota } from "./npsEncaminhar";
 
 // NPS de atendimento em loja das vendas do Odoo -- Victor 27/10/2026. O de
 // sempre (vendaNps.ts) parte de totvs_orders e parou na virada (25/10). Até a
@@ -38,7 +38,7 @@ export function separarVendedorOdoo(v: string | null | undefined): { codigo: str
   return m ? { codigo: m[1].toUpperCase(), nome: m[2].trim() } : { codigo: null, nome: t };
 }
 
-type Linha = { pedido: string; cliente: string | null; telefone: string | null; empresa: string | null; vendedor: string | null; primeiro_visto: string };
+type Linha = { pedido: string; cliente: string | null; telefone: string | null; empresa: string | null; vendedor: string | null; primeiro_visto: string; obs?: string | null };
 
 export type CandidatoOdoo = { pedido: string; cliente: string | null; telefone: string; loja: string | null; vendedor: string | null; dataVenda: string };
 
@@ -54,6 +54,7 @@ export function candidatosDasLinhas(linhas: Linha[]): CandidatoOdoo[] {
   for (const [pedido, ls] of porPedido) {
     const cliente = ls.find((l) => l.cliente)?.cliente ?? null;
     if (/teste/i.test(cliente ?? "") || isMostruarioRequest(null, cliente)) continue;
+    if (ls.some((l) => ehPedidoDeTroca(l.obs))) continue;
     const tel = ls.map((l) => l.telefone).find((t) => t && !isPlaceholderPhone(t));
     if (!tel) continue;
     const primeiro = ls.map((l) => l.primeiro_visto).sort()[0];
@@ -75,7 +76,7 @@ export async function enrollPendingVendaNpsOdoo(): Promise<ResultadoEnvioNps> {
   const desde = new Date(Date.now() - JANELA_DIAS * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await admin
     .from("odoo_expedicao")
-    .select("pedido, cliente, telefone, empresa, vendedor, primeiro_visto")
+    .select("pedido, cliente, telefone, empresa, vendedor, primeiro_visto, obs")
     .eq("legado", false)
     .gte("primeiro_visto", desde)
     .returns<Linha[]>();

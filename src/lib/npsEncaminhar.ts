@@ -10,6 +10,11 @@ import { maybeRequestGoogleReview, type GoogleReviewOrigem } from "./googleRevie
 
 export const NOTA_MAXIMA_SAC = 3;
 
+// Pedido de troca do SAC é lançado como venda ("TROCA C/ RECOLHIMENTO SAC" na
+// observação): nenhuma pesquisa de loja/entrega/compra -- Victor 29/10/2026,
+// só o NPS de assistência técnica do chamado.
+export const ehPedidoDeTroca = (obs: string | null | undefined) => /\btroca\b/i.test(obs ?? "");
+
 // Quem recebe as notas baixas (Victor 29/10/2026: "deixe só Ingrid, Jaluska
 // e Flávio"). Mesma atendente pro mesmo contato (rodízio pelo id do contato).
 export const ATENDENTES_NOTA_BAIXA = ATENDENTES_SAC.filter((a) => ["Ingrid", "Jaluska", "Flávio"].includes(a.nome));

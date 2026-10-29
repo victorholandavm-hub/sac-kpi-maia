@@ -3,7 +3,7 @@ import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "./serviceRe
 import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages, sendGhlMessage, type GhlConta } from "./ghlClient";
 import { SUBCONTAS } from "./ghlSubcontas";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
-import { clientePeloTelefone, encaminharPelaNota } from "./npsEncaminhar";
+import { clientePeloTelefone, ehPedidoDeTroca, encaminharPelaNota } from "./npsEncaminhar";
 import type { ResultadoEnvioNps } from "./npsEnvio";
 
 // Pós-entrega e pós 20 dias das entregas do Odoo -- Victor 27/10/2026. Os de
@@ -40,7 +40,7 @@ const diaRecife = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Ame
 const diasAtras = (n: number) => diaRecife(new Date(Date.now() - n * 24 * 60 * 60 * 1000));
 const soDigitos = (t: string) => t.replace(/\D/g, "");
 
-type Linha = { pedido: string; cliente: string | null; telefone: string | null; empresa: string | null; carga_fim_em: string | null; carga_saiu_em: string | null; carga_id?: number | null; ultima_carga_id?: number | null };
+type Linha = { pedido: string; cliente: string | null; telefone: string | null; empresa: string | null; carga_fim_em: string | null; carga_saiu_em: string | null; carga_id?: number | null; ultima_carga_id?: number | null; obs?: string | null };
 
 // Victor 29/10/2026: entrega faturada pelo SAC ou pela assistência ("Nota de
 // entrega", retirada com a equipe) não dispara template nenhum -- só o NPS de
@@ -62,6 +62,7 @@ export function candidatosEntregues(linhas: Linha[], de: string, ate: string): C
   for (const [pedido, ls] of porPedido) {
     const cliente = ls.find((l) => l.cliente)?.cliente ?? null;
     if (/teste/i.test(cliente ?? "") || isMostruarioRequest(null, cliente)) continue;
+    if (ls.some((l) => ehPedidoDeTroca(l.obs))) continue;
     const tel = ls.map((l) => l.telefone).find((t) => t && !isPlaceholderPhone(t));
     const quando = ls.map((l) => l.carga_fim_em ?? l.carga_saiu_em).filter((x): x is string => !!x).sort().at(-1);
     if (!tel || !quando) continue;
@@ -80,7 +81,7 @@ export async function enrollNpsEntregaOdoo(fase: FaseOdoo): Promise<ResultadoEnv
   const rotulo = `${fase}-nps-odoo`;
   const { data, error } = await admin
     .from("odoo_expedicao")
-    .select("pedido, cliente, telefone, empresa, carga_fim_em, carga_saiu_em, carga_id, ultima_carga_id")
+    .select("pedido, cliente, telefone, empresa, carga_fim_em, carga_saiu_em, carga_id, ultima_carga_id, obs")
     .in("resultado", ["entregue", "entrega_parcial"])
     .gte("carga_saiu_em", new Date(Date.now() - (r.diasDepois + r.janela + 3) * 24 * 60 * 60 * 1000).toISOString())
     .returns<Linha[]>();
