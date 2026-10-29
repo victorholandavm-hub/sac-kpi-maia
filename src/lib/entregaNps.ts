@@ -7,6 +7,7 @@ import { vendasDasEntregasResolvidas } from "./vendaDaEntrega";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 import { maybeRequestGoogleReview } from "./googleReviewRequest";
+import { encaminharPelaNota } from "./npsEncaminhar";
 
 // NPS "Pós-entrega" -- pedido do Victor 22/09/2026: pergunta sobre a
 // entrega ORIGINAL da compra (o caminhão leva o móvel pela primeira vez),
@@ -127,6 +128,7 @@ export async function detectPendingEntregaNpsResponses(): Promise<number> {
     const score = Number(NPS_1_5_PATTERN.exec(reply.body!.trim())![1]);
     await admin.from("entrega_nps").update({ score, respondido_em: reply.dateAdded }).eq("order_id", row.order_id);
     answered++;
+    await encaminharPelaNota(admin, { score, ghlContactId: row.ghl_contact_id });
 
     // Pergunta de sugestão -- mandada direto daqui (texto livre, sem
     // Template/Workflow, ver sendGhlMessage), pra TODO MUNDO que respondeu a

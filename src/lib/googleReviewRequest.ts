@@ -25,7 +25,10 @@ import { listClientesNaoContatar } from "./recompra";
 // Best-effort de propósito: nunca lança -- um problema aqui (loja sem link,
 // GHL fora do ar) não pode derrubar a detecção da pesquisa original por
 // trás, que já rodou e gravou o score antes de chamar isso.
-export type GoogleReviewOrigem = "entrega";
+// "venda" e "compra": desde 29/10/2026 (Victor: "4 e 5 é avaliação do
+// Google") toda pesquisa 1-5 pede; o intervalo de 90 dias por cliente evita
+// pedir de novo.
+export type GoogleReviewOrigem = "entrega" | "venda" | "compra";
 
 // "Pós-entrega" não tem o limite de 1 pesquisa a cada X dias por cliente
 // que "compra" tem (um cliente com 2 entregas na mesma semana recebe as

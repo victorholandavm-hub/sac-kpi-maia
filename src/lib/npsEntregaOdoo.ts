@@ -2,8 +2,8 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "./serviceRequests";
 import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages, sendGhlMessage, type GhlConta } from "./ghlClient";
 import { SUBCONTAS } from "./ghlSubcontas";
-import { NPS_GHL_TAG, NPS_1_5_PATTERN, sendNpsAutoReply } from "./npsDetratores";
-import { maybeRequestGoogleReview } from "./googleReviewRequest";
+import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
+import { clientePeloTelefone, encaminharPelaNota } from "./npsEncaminhar";
 import type { ResultadoEnvioNps } from "./npsEnvio";
 
 // Pós-entrega e pós 20 dias das entregas do Odoo -- Victor 27/10/2026. Os de
@@ -131,7 +131,7 @@ export async function detectNpsEntregaOdooResponses(): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data: pendentes } = await admin
     .from("nps_entrega_odoo")
-    .select("fase, pedido, loja, ghl_contact_id, enviado_em, ghl_location_id")
+    .select("fase, pedido, telefone, loja, ghl_contact_id, enviado_em, ghl_location_id")
     .is("respondido_em", null)
     .is("descartada_em", null)
     .gte("enviado_em", new Date(Date.now() - RESPOSTA_JANELA_DIAS * 24 * 60 * 60 * 1000).toISOString())
@@ -150,8 +150,9 @@ export async function detectNpsEntregaOdooResponses(): Promise<number> {
     const score = Number(NPS_1_5_PATTERN.exec(resposta.body!.trim())![1]);
     await admin.from("nps_entrega_odoo").update({ score, respondido_em: resposta.dateAdded }).eq("fase", row.fase).eq("pedido", row.pedido);
     respondidas++;
+    const avaliacao = { origem: row.fase === "compra" ? ("compra" as const) : ("entrega" as const), origemId: `odoo:${row.pedido}`, clientId: clientePeloTelefone(row.telefone), storeId: row.loja };
     if (row.fase === "compra") {
-      await sendNpsAutoReply(row.ghl_contact_id, score, conta);
+      await encaminharPelaNota(admin, { score, ghlContactId: row.ghl_contact_id, conta, avaliacao });
       continue;
     }
     try {
@@ -159,14 +160,7 @@ export async function detectNpsEntregaOdooResponses(): Promise<number> {
     } catch {
       // sem a mensagem de agradecimento a nota já está gravada
     }
-    await maybeRequestGoogleReview(admin, {
-      origem: "entrega",
-      origemId: `odoo:${row.pedido}`,
-      clientId: null,
-      score,
-      ghlContactId: row.ghl_contact_id,
-      storeId: row.loja,
-    });
+    await encaminharPelaNota(admin, { score, ghlContactId: row.ghl_contact_id, conta, avaliacao });
   }
   return respondidas;
 }

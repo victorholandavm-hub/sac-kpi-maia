@@ -113,6 +113,17 @@ export async function sendGhlMessage(ghlContactId: string, message: string, cont
   return res.ok;
 }
 
+// Atribui o contato a um usuário do GHL -- a conversa do WhatsApp segue o
+// dono do contato (é o que aparece como responsável na caixa de entrada).
+export async function assignGhlContact(ghlContactId: string, userId: string, conta?: GhlConta): Promise<boolean> {
+  const res = await fetch(`${BASE_URL}/contacts/${ghlContactId}`, {
+    method: "PUT",
+    headers: { ...ghlHeaders(conta?.token), "Content-Type": "application/json" },
+    body: JSON.stringify({ assignedTo: userId }),
+  });
+  return res.ok;
+}
+
 // Aplica uma tag no contato -- é o próprio gatilho de envio das pesquisas
 // de NPS (montagem/assistência técnica/entrega/compra, pedido do Victor
 // 22/09/2026): cada Workflow no GHL já tem "Contact Tag" (filtro "Tag

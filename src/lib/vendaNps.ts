@@ -3,9 +3,10 @@ import { isMostruarioRequest } from "./serviceRequests";
 import { listClientesNaoContatar } from "./recompra";
 import { findGhlConversationId, fetchGhlMessages, type GhlConta } from "./ghlClient";
 import { SUBCONTAS } from "./ghlSubcontas";
-import { NPS_GHL_TAG, NPS_1_5_PATTERN, sendNpsAutoReply } from "./npsDetratores";
+import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 import { enviarNpsPorPedido, pedidosComNps, type ResultadoEnvioNps } from "./npsEnvio";
 import { separarVendedorOdoo } from "./vendaNpsOdoo";
+import { encaminharPelaNota } from "./npsEncaminhar";
 
 // NPS "Pós-venda" -- pedido do Victor 19/10/2026: avaliar o ATENDIMENTO EM
 // LOJA, disparado assim que a venda é registrada no Protheus. Mais simples
@@ -149,7 +150,7 @@ export async function detectPendingVendaNpsResponses(): Promise<number> {
     if (!reply) continue;
     const score = Number(NPS_1_5_PATTERN.exec(reply.body!.trim())![1]);
     await admin.from("venda_nps").update({ score, respondido_em: reply.dateAdded }).eq("order_id", row.order_id);
-    await sendNpsAutoReply(row.ghl_contact_id, score, conta);
+    await encaminharPelaNota(admin, { score, ghlContactId: row.ghl_contact_id, conta });
     answered++;
   }
   return answered;

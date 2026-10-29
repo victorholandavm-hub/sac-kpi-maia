@@ -26,7 +26,14 @@ export function useAcaoOdoo() {
         depois?.(r.dados);
         router.refresh();
       } catch (e) {
-        // Falha de transporte (deploy novo trocou o ID da action, rede caiu)
+        // Tela aberta de antes de uma atualização: a action antiga não existe
+        // mais (29/10, transferência Assistência → Avaria). Recarrega sozinha.
+        if (e instanceof Error && /Server Action .* (was )?not found|Failed to find Server Action/i.test(e.message)) {
+          showToast("O sistema foi atualizado. Recarregando a tela — faça a operação de novo.", "error");
+          setTimeout(() => window.location.reload(), 1500);
+          return;
+        }
+        // Falha de transporte (rede caiu)
         showToast(e instanceof Error ? `${e.message} — recarregue a página.` : "Erro inesperado — recarregue a página.", "error");
       }
     });

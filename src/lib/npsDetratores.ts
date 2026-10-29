@@ -1,5 +1,4 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { sendGhlMessage, type GhlConta } from "./ghlClient";
 
 // Lista de trabalho unificada de detratores -- pedido do Victor 08/09/2026:
 // nome/contato/motivo de todo mundo que deu nota baixa em QUALQUER NPS que
@@ -54,32 +53,10 @@ export const NPS_GHL_TAG: Partial<Record<NpsDetratorOrigem, string>> = {
 // nps2Meses.ts, entregaNps.ts) -- evita as 3 cópias divergirem um dia.
 export const NPS_1_5_PATTERN = /^([1-5])\s*-\s*(muito insatisfeito|insatisfeito|indiferente|satisfeito|muito satisfeito)\s*$/i;
 
-// Resposta automática pós-nota -- achado do Pedro 24/10/2026 (loja de
-// Tambaú, cliente "Charles"): o cliente respondia a pesquisa e a conversa
-// ficava parada, sem retorno nenhum -- ninguém via que tinha chegado
-// resposta. "nota boa - agradecer, nota baixa - tentar entender o motivo"
-// (pedido do Pedro). Restrito por enquanto a quem já roda pela subconta
-// Lojas Maia -- venda/compra (decisão do Victor 24/10/2026, não pra
-// montagem/assistência técnica/SAC); "entrega" fica de fora por já ter o
-// próprio "obrigado" + pedido de avaliação Google (ver entregaNps.ts/
-// googleReviewRequest.ts), não precisa desse aqui. Mesmo corte de
-// promotor/detrator de npsFromScores (getNpsResumoPorFaseAdicional abaixo)
-// -- "nota baixa" aqui inclui o neutro (3) de propósito, tentar entender o
-// motivo também faz sentido pra quem ficou "indiferente". Best-effort
-// (nunca lança) -- mesmo padrão de maybeRequestGoogleReview: um problema
-// aqui não pode derrubar a detecção da nota, que já foi gravada antes de
-// chamar isso.
-export async function sendNpsAutoReply(ghlContactId: string, score: number, conta?: GhlConta): Promise<void> {
-  const message =
-    score >= 4
-      ? "Muito obrigado pela sua avaliação! 🙏 Ficamos felizes que você teve uma boa experiência com a gente. Contamos com você sempre!"
-      : "Poxa, sentimos muito que sua experiência não tenha sido tão boa. Pode nos contar o que aconteceu? Isso nos ajuda a melhorar de verdade. 🙏";
-  try {
-    await sendGhlMessage(ghlContactId, message, conta);
-  } catch {
-    // best-effort, ver comentário acima.
-  }
-}
+// Resposta automática pós-nota (sendNpsAutoReply, Pedro 24/10/2026): tirada
+// em 29/10/2026 -- o fluxo do GHL já responde e o cliente recebia duas
+// mensagens (Victor: "deixe só a do fluxo"). Nota baixa agora vai pro SAC e
+// nota alta recebe o pedido de avaliação Google (npsEncaminhar.ts).
 
 // Taxonomia de recuperação de detrator -- padrão de "closed-loop feedback"
 // usado em CX de varejo (contatar -> tentar reverter -> registrar

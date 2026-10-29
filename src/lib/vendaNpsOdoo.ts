@@ -2,8 +2,9 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { isMostruarioRequest, isPlaceholderPhone, firstPhone } from "./serviceRequests";
 import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessages, type GhlConta } from "./ghlClient";
 import { SUBCONTAS } from "./ghlSubcontas";
-import { NPS_GHL_TAG, NPS_1_5_PATTERN, sendNpsAutoReply } from "./npsDetratores";
+import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 import type { ResultadoEnvioNps } from "./npsEnvio";
+import { clientePeloTelefone, encaminharPelaNota } from "./npsEncaminhar";
 
 // NPS de atendimento em loja das vendas do Odoo -- Victor 27/10/2026. O de
 // sempre (vendaNps.ts) parte de totvs_orders e parou na virada (25/10). Até a
@@ -135,7 +136,7 @@ export async function detectPendingVendaNpsOdooResponses(): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data: pendentes } = await admin
     .from("venda_nps_odoo")
-    .select("pedido, ghl_contact_id, enviado_em, ghl_location_id")
+    .select("pedido, telefone, loja, ghl_contact_id, enviado_em, ghl_location_id")
     .is("respondido_em", null)
     .gte("enviado_em", new Date(Date.now() - RESPOSTA_JANELA_DIAS * 24 * 60 * 60 * 1000).toISOString())
     .order("enviado_em", { ascending: false })
@@ -152,7 +153,12 @@ export async function detectPendingVendaNpsOdooResponses(): Promise<number> {
     if (!resposta) continue;
     const score = Number(NPS_1_5_PATTERN.exec(resposta.body!.trim())![1]);
     await admin.from("venda_nps_odoo").update({ score, respondido_em: resposta.dateAdded }).eq("pedido", row.pedido);
-    await sendNpsAutoReply(row.ghl_contact_id, score, conta);
+    await encaminharPelaNota(admin, {
+      score,
+      ghlContactId: row.ghl_contact_id,
+      conta,
+      avaliacao: { origem: "venda", origemId: `odoo:${row.pedido}`, clientId: clientePeloTelefone(row.telefone), storeId: row.loja },
+    });
     respondidas++;
   }
   return respondidas;

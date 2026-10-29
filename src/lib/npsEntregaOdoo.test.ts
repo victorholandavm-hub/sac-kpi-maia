@@ -3,7 +3,8 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("./supabaseAdmin", () => ({ getSupabaseAdmin: () => ({}) }));
 vi.mock("./ghlClient", () => ({}));
 vi.mock("./ghlSubcontas", () => ({ SUBCONTAS: { lojas_maia: { tokenEnv: "X", locationId: "L" } } }));
-vi.mock("./npsDetratores", () => ({ NPS_GHL_TAG: { entrega: "e", compra: "c" }, NPS_1_5_PATTERN: /^([1-5])$/, sendNpsAutoReply: vi.fn() }));
+vi.mock("./npsEncaminhar", () => ({ encaminharPelaNota: vi.fn(), clientePeloTelefone: () => null }));
+vi.mock("./npsDetratores", () => ({ NPS_GHL_TAG: { entrega: "e", compra: "c" }, NPS_1_5_PATTERN: /^([1-5])$/ }));
 vi.mock("./googleReviewRequest", () => ({ maybeRequestGoogleReview: vi.fn() }));
 const { candidatosEntregues } = await import("./npsEntregaOdoo");
 
