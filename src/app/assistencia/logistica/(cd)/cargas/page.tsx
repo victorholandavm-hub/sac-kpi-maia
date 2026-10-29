@@ -59,7 +59,7 @@ export default async function CargasPage({ searchParams }: { searchParams: Promi
             const lista = limitar ? [...todas].sort((a, b) => b.carga_id - a.carga_id).slice(0, LIMITE_FINALIZADAS) : todas;
             const escondidas = todas.length - lista.length;
             return (
-              <section key={estado} className="rounded-xl p-2.5 flex flex-col gap-2 min-h-[140px]" style={{ background: "var(--surface-2)" }}>
+              <section key={estado} className="rounded-xl p-2.5 flex flex-col gap-2 min-h-[140px] min-w-0" style={{ background: "var(--surface-2)" }}>
                 <h3 className="text-xs font-bold uppercase tracking-wide px-1" style={{ color: "var(--text-muted)" }}>
                   {ESTADO_CARGA_LABELS[estado]} · {todas.length}
                 </h3>
@@ -88,10 +88,12 @@ function CartaoCarga({ carga: c, empresa }: { carga: CargaOdoo; empresa: number 
   return (
     <Link
       href={`/assistencia/logistica/cargas/${c.carga_id}?empresa=${empresa}`}
-      className="cartao p-3 flex flex-col gap-1.5 text-sm hover:opacity-90"
+      // 29/10 (Victor, tela do Jhon): texto longo sem espaço (veículo "MERCEDES-BENZ/311CDISTREETC/HTT0D75",
+      // descrição das retiradas) vazava da coluna -- o card fica na largura da coluna e quebra onde precisar.
+      className="cartao p-3 flex flex-col gap-1.5 text-sm hover:opacity-90 min-w-0 overflow-hidden [overflow-wrap:anywhere]"
       style={{ color: "var(--text-primary)" }}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
         <b>{c.romaneio}</b>
         <Chip forte>{c.zona || TIPO_CARGA_LABELS[c.tipo] || c.tipo}</Chip>
       </div>
