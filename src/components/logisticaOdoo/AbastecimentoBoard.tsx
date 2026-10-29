@@ -174,6 +174,20 @@ function Cartao({ s }: { s: SolicitacaoAbast }) {
         <button type="button" className={botaoClass} style={botaoStyle} onClick={() => imprimirSeparacao(s, qtd)}>
           🖨️ Imprimir lista de separação
         </button>
+        {/* 29/10 (Pedro): pedido errado precisa poder ser excluído por qualquer um com acesso — botão sempre visível, ao lado de Editar */}
+        <button
+          type="button"
+          className={botaoClass}
+          style={botaoPerigoStyle}
+          disabled={pending}
+          onClick={() => {
+            const m = prompt(`Excluir o pedido ${s.nome} da loja ${s.loja}? Diga o motivo:`, "");
+            if (m === null) return;
+            run(() => cancelarAbastAction(s.id, m || "pedido errado"), "Pedido excluído.");
+          }}
+        >
+          🗑️ Excluir pedido (errado)
+        </button>
         <button
           type="button"
           className={botaoClass}
@@ -189,19 +203,6 @@ function Cartao({ s }: { s: SolicitacaoAbast }) {
           }}
         >
           {pending ? "Emitindo a nota…" : "✅ Atender (sai a NF de transferência)"}
-        </button>
-        <button
-          type="button"
-          className={botaoClass}
-          style={botaoPerigoStyle}
-          disabled={pending}
-          onClick={() => {
-            const m = prompt("Motivo do cancelamento:", "");
-            if (m === null) return;
-            run(() => cancelarAbastAction(s.id, m), "Pedido cancelado.");
-          }}
-        >
-          Cancelar
         </button>
       </div>
     </div>
