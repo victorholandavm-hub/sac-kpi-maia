@@ -53,7 +53,7 @@ export const RESULTADO_LABELS: Record<ResultadoParada, string> = {
 
 // Transições do maia_entrega na ordem do CD. "sair" = faturar a carga:
 // emite a NF-e 5117 de cada pedido com 5922 (ver cargas_api.py, acao()).
-export type AcaoCarga = "separacao" | "conferir" | "liberar" | "sair" | "finalizar";
+export type AcaoCarga = "separacao" | "conferir" | "liberar" | "sair" | "finalizar" | "reemitir";
 export const PROXIMA_ACAO: Record<EstadoCarga, { acao: AcaoCarga; label: string } | null> = {
   montagem: { acao: "separacao", label: "Iniciar separação" },
   separacao: { acao: "conferir", label: "Marcar conferida" },

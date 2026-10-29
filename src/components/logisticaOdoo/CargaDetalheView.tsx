@@ -310,6 +310,14 @@ export function CargaDetalheView({
         {mdfeMsg ? (
           <p className="text-sm" style={{ color: mdfeMsg.includes("NÃO") ? "var(--status-critical)" : "var(--text-secondary)" }}>{mdfeMsg}</p>
         ) : null}
+        {carga.estado === "em_rota" ? (
+          /* 29/10 (Pedro, ROM/155): erro ou atualização no meio do "Sair em rota" deixava a carga sem as notas e sem como retransmitir */
+          <button type="button" disabled={pending} className={botaoClass} style={botaoStyle}
+            onClick={() => { if (!confirm("Emitir agora as notas de entrega (5117) que ficaram faltando nesta carga? As que já saíram não são repetidas.")) return;
+              run(() => acaoCargaAction(carga.carga_id, "reemitir", {}), (d) => { const ns = ((d as { notas?: { pedido: string; nf5117?: string | null; erro?: string | null }[] }).notas ?? []); return ns.length ? ns.map((n) => `${n.pedido}: ${n.nf5117 ? "5117 nº " + n.nf5117 : n.erro ?? "sem nota"}`).join(" · ") : "Nenhuma nota pendente nesta carga."; }); }}>
+            🔁 Retransmitir notas pendentes (5117)
+          </button>
+        ) : null}
         {carga.estado === "em_rota" && proxima?.acao === "finalizar" && faltamBaixas > 0 ? (
           <p className="text-xs" style={{ color: "var(--status-serious)" }}>
             Fim de rota só depois do resultado de todas as paradas (faltam {faltamBaixas}). O motorista dá baixa no app; o CD pode dar baixa manual abaixo.
