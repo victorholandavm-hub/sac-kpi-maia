@@ -2364,30 +2364,50 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
     return { error: "Esse tipo de solicitação é gerenciado pelo SAC." };
   }
 
-  const clientName = String(formData.get("client_name") ?? "").trim();
-  if (!clientName) return { error: "Informe o nome do cliente." };
+  // Montagem/desmontagem do mostruário da própria loja, sem cliente -- Victor
+  // 29/10/2026 (Luis: "Nova visita" não tinha a opção). Mesmo registro do
+  // "Solicitar" da loja: cliente "Mostruário — <loja>", sem CPF/endereço
+  // (isMostruarioRequest tira das pesquisas).
+  const isStoreTarget = String(formData.get("request_target") ?? "cliente") === "loja" && (type === "montagem" || type === "desmontagem");
 
-  // Código do cliente opcional desde 27/10/2026 (Victor): cliente novo do Odoo
-  // não tem código do Protheus; o CPF abaixo continua obrigatório.
-  const clientProtheusCode = String(formData.get("client_protheus_code") ?? "").trim();
+  let clientName = "";
+  let clientProtheusCode = "";
+  let clientCpf = "";
+  let clientPhone = "";
+  let clientAddress = "";
+  let clientNeighborhood = "";
+  let addressNumberFields: { number: string; isApartment: boolean; complement: string } = { number: "", isApartment: false, complement: "" };
+  if (isStoreTarget) {
+    const { data: loja } = await admin.from("stores").select("name").eq("id", storeId).maybeSingle();
+    if (!loja) return { error: "Loja não encontrada." };
+    clientName = `Mostruário — ${loja.name}`;
+  } else {
+    clientName = String(formData.get("client_name") ?? "").trim();
+    if (!clientName) return { error: "Informe o nome do cliente." };
 
-  // CPF obrigatório em toda solicitação (pedido do Victor 19/08/2026) --
-  // identifica o cliente de verdade, independente de ter código do
-  // Protheus certo ou não.
-  const clientCpf = String(formData.get("client_cpf") ?? "").trim();
-  if (!clientCpf) return { error: "Informe o CPF do cliente." };
+    // Código do cliente opcional desde 27/10/2026 (Victor): cliente novo do Odoo
+    // não tem código do Protheus; o CPF abaixo continua obrigatório.
+    clientProtheusCode = String(formData.get("client_protheus_code") ?? "").trim();
 
-  const clientPhone = String(formData.get("client_phone") ?? "").trim();
-  if (!clientPhone) return { error: "Informe o telefone." };
+    // CPF obrigatório em toda solicitação (pedido do Victor 19/08/2026) --
+    // identifica o cliente de verdade, independente de ter código do
+    // Protheus certo ou não.
+    clientCpf = String(formData.get("client_cpf") ?? "").trim();
+    if (!clientCpf) return { error: "Informe o CPF do cliente." };
 
-  const clientAddress = String(formData.get("client_address") ?? "").trim();
-  if (!clientAddress) return { error: "Informe o endereço." };
+    clientPhone = String(formData.get("client_phone") ?? "").trim();
+    if (!clientPhone) return { error: "Informe o telefone." };
 
-  const clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
-  if (!clientNeighborhood) return { error: "Informe o bairro." };
+    clientAddress = String(formData.get("client_address") ?? "").trim();
+    if (!clientAddress) return { error: "Informe o endereço." };
 
-  const addressNumberFields = readAddressNumberFields(formData, type);
-  if (addressNumberFields.error) return { error: addressNumberFields.error };
+    clientNeighborhood = String(formData.get("client_neighborhood") ?? "").trim();
+    if (!clientNeighborhood) return { error: "Informe o bairro." };
+
+    const numero = readAddressNumberFields(formData, type);
+    if (numero.error) return { error: numero.error };
+    addressNumberFields = numero;
+  }
 
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) return { error: "Informe o que precisa ser feito." };
@@ -2667,10 +2687,10 @@ export async function createQuickRequest(_state: FormState, formData: FormData):
       // que ficar como responsável quem fez a solicitação, sempre").
       assigned_to: profile.id,
       client_name: clientName,
-      client_cpf: clientCpf,
-      client_phone: clientPhone,
-      client_address: clientAddress,
-      client_neighborhood: clientNeighborhood,
+      client_cpf: emptyToNull(clientCpf),
+      client_phone: emptyToNull(clientPhone),
+      client_address: emptyToNull(clientAddress),
+      client_neighborhood: emptyToNull(clientNeighborhood),
       client_address_number: emptyToNull(addressNumberFields.number),
       client_is_apartment: addressNumberFields.isApartment,
       client_address_complement: emptyToNull(addressNumberFields.complement),

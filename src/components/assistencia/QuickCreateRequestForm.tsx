@@ -206,6 +206,10 @@ export function QuickCreateRequestForm({
   const [type, setType] = useState<string>("vistoria");
   const [storeId, setStoreId] = useState("");
   const showCombo = type === "montagem" || type === "desmontagem";
+  // Montagem/desmontagem do mostruário da própria loja, sem cliente -- Victor
+  // 29/10/2026 (Luis), igual ao "Solicitar" da loja (PublicRequestForm.tsx).
+  const [target, setTarget] = useState<"cliente" | "loja">("cliente");
+  const isStoreTarget = showCombo && target === "loja";
   // Pedido do Victor 15/08/2026: código do produto passa a ser obrigatório
   // pra montagem/desmontagem -- validado de novo no servidor (ver
   // createQuickRequest), isso aqui é só o feedback imediato no navegador.
@@ -438,13 +442,13 @@ export function QuickCreateRequestForm({
       typeLabel: REQUEST_TYPE_LABELS[type as keyof typeof REQUEST_TYPE_LABELS] ?? type,
       combo,
       linkedPartOrderRef: linkedPartOrder ? (linkedPartOrder.externalReference ?? `#${linkedPartOrder.ticketNumber}`) : "",
-      clientName,
-      clientCpf,
-      clientPhone,
-      clientAddress,
-      clientNeighborhood,
-      addressNumber,
-      addressComplement: isApartment ? addressComplement : "",
+      clientName: isStoreTarget ? "Mostruário da própria loja (sem cliente)" : clientName,
+      clientCpf: isStoreTarget ? "" : clientCpf,
+      clientPhone: isStoreTarget ? "" : clientPhone,
+      clientAddress: isStoreTarget ? "" : clientAddress,
+      clientNeighborhood: isStoreTarget ? "" : clientNeighborhood,
+      addressNumber: isStoreTarget ? "" : addressNumber,
+      addressComplement: isApartment && !isStoreTarget ? addressComplement : "",
       reason: str("reason"),
       montadorInstruction: str("montador_instruction"),
       scheduledDate,
@@ -518,8 +522,30 @@ export function QuickCreateRequestForm({
             {type === "montagem" ? "Também precisa desmontar o móvel antigo" : "Também precisa montar o móvel novo"}
           </label>
         ) : null}
+
+        {showCombo ? (
+          <Field label="Para quem é?">
+            <select
+              name="request_target"
+              value={target}
+              onChange={(e) => setTarget(e.target.value as "cliente" | "loja")}
+              className="rounded border px-3 py-2"
+              style={inputStyle}
+            >
+              <option value="cliente">Cliente</option>
+              <option value="loja">Mostruário da própria loja</option>
+            </select>
+          </Field>
+        ) : null}
       </FormSection>
 
+      {isStoreTarget ? (
+        <FormSection title="Dados do cliente" number={2}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Sem cliente nessa visita — é montagem/desmontagem de móvel do mostruário da loja escolhida acima.
+          </p>
+        </FormSection>
+      ) : (
       <FormSection
         title="Dados do cliente"
         number={2}
@@ -732,6 +758,7 @@ export function QuickCreateRequestForm({
           </Field>
         ) : null}
       </FormSection>
+      )}
 
       <FormSection title="Agendamento e responsável" number={3}>
         <div className="grid sm:grid-cols-4 gap-4">
