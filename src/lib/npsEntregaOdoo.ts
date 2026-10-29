@@ -40,7 +40,17 @@ const diaRecife = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Ame
 const diasAtras = (n: number) => diaRecife(new Date(Date.now() - n * 24 * 60 * 60 * 1000));
 const soDigitos = (t: string) => t.replace(/\D/g, "");
 
-type Linha = { pedido: string; cliente: string | null; telefone: string | null; empresa: string | null; carga_fim_em: string | null; carga_saiu_em: string | null };
+type Linha = { pedido: string; cliente: string | null; telefone: string | null; empresa: string | null; carga_fim_em: string | null; carga_saiu_em: string | null; carga_id?: number | null; ultima_carga_id?: number | null };
+
+// Victor 29/10/2026: entrega faturada pelo SAC ou pela assistência ("Nota de
+// entrega", retirada com a equipe) não dispara template nenhum -- só o NPS de
+// assistência técnica, quando o motorista dá baixa no chamado. Quem faturou
+// fica no "sair" de odoo_carga_acoes ("SAC Fulano" / "Equipe Fulano").
+export const faturouPeloSacOuAssistencia = (operador: string) => /^(SAC|Equipe) /.test(operador);
+
+export function pedidosFaturadosPeloSac(linhas: Linha[], cargasDoSac: Set<number>): Set<string> {
+  return new Set(linhas.filter((l) => [l.carga_id, l.ultima_carga_id].some((c) => c && cargasDoSac.has(c))).map((l) => l.pedido));
+}
 export type CandidatoEntregaOdoo = { pedido: string; cliente: string | null; telefone: string; loja: string | null; entregueEm: string };
 
 // Um por pedido, com o dia da entrega (fim da rota; sem ele, a saída) dentro
@@ -70,12 +80,21 @@ export async function enrollNpsEntregaOdoo(fase: FaseOdoo): Promise<ResultadoEnv
   const rotulo = `${fase}-nps-odoo`;
   const { data, error } = await admin
     .from("odoo_expedicao")
-    .select("pedido, cliente, telefone, empresa, carga_fim_em, carga_saiu_em")
+    .select("pedido, cliente, telefone, empresa, carga_fim_em, carga_saiu_em, carga_id, ultima_carga_id")
     .in("resultado", ["entregue", "entrega_parcial"])
     .gte("carga_saiu_em", new Date(Date.now() - (r.diasDepois + r.janela + 3) * 24 * 60 * 60 * 1000).toISOString())
     .returns<Linha[]>();
   if (error) return { enrolled: 0, semTelefone: 0, errors: [`${rotulo} pedidos: ${error.message}`], avisos: [] };
-  const candidatos = candidatosEntregues(data ?? [], de, ate);
+  const todosCandidatos = candidatosEntregues(data ?? [], de, ate);
+  if (todosCandidatos.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
+  const cargas = [...new Set((data ?? []).flatMap((l) => [l.carga_id, l.ultima_carga_id]).filter((c): c is number => !!c))];
+  const { data: saidas, error: saidasError } = cargas.length
+    ? await admin.from("odoo_carga_acoes").select("carga_id, operador").eq("acao", "sair").in("carga_id", cargas).returns<{ carga_id: number; operador: string }[]>()
+    : { data: [], error: null };
+  // Sem saber quem faturou, não manda (melhor perder uma pesquisa que mandar a errada).
+  if (saidasError) return { enrolled: 0, semTelefone: 0, errors: [`${rotulo} quem faturou: ${saidasError.message}`], avisos: [] };
+  const doSac = pedidosFaturadosPeloSac(data ?? [], new Set((saidas ?? []).filter((s) => faturouPeloSacOuAssistencia(s.operador)).map((s) => s.carga_id)));
+  const candidatos = todosCandidatos.filter((c) => !doSac.has(c.pedido));
   if (candidatos.length === 0) return { enrolled: 0, semTelefone: 0, errors: [], avisos: [] };
 
   const desdeTel = new Date(Date.now() - r.umPorTelefoneDias * 24 * 60 * 60 * 1000).toISOString();

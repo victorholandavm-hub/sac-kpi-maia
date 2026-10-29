@@ -32,3 +32,20 @@ describe("candidatosEntregues", () => {
     expect(r.map((c) => c.pedido)).toEqual(["S1"]);
   });
 });
+
+describe("faturado pelo SAC ou pela assistência", () => {
+  it("não entra nas pesquisas de entrega e compra", async () => {
+    const { faturouPeloSacOuAssistencia, pedidosFaturadosPeloSac } = await import("./npsEntregaOdoo");
+    expect(faturouPeloSacOuAssistencia("SAC Ingrid")).toBe(true);
+    expect(faturouPeloSacOuAssistencia("Equipe Iasmyn")).toBe(true);
+    expect(faturouPeloSacOuAssistencia("CD Jhon")).toBe(false);
+    expect(faturouPeloSacOuAssistencia("Motorista Douglas")).toBe(false);
+    const base = { cliente: null, telefone: null, empresa: null, carga_fim_em: null, carga_saiu_em: null };
+    const linhas = [
+      { ...base, pedido: "S1", carga_id: 10 },
+      { ...base, pedido: "S2", ultima_carga_id: 11 },
+      { ...base, pedido: "S3", carga_id: 12 },
+    ];
+    expect([...pedidosFaturadosPeloSac(linhas, new Set([10, 11]))].sort()).toEqual(["S1", "S2"]);
+  });
+});
