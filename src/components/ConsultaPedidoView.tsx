@@ -199,15 +199,17 @@ function NotaEntrega({ n }: { n: NonNullable<SituacaoPedido["notaEntrega"]> }) {
 function ChaveNota({ chave }: { chave: string }) {
   return (
     <div className="flex flex-col gap-1 pt-1">
-      <a
-        href={`/assistencia/nota-chave/${chave}`}
-        target="_blank"
-        rel="noopener"
-        className="self-start rounded-lg px-3 py-1.5 text-xs font-semibold"
-        style={{ background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
-      >
-        🖨 Nota de venda (PDF)
-      </a>
+      {IMPRIME_NOTA_DE_VENDA ? (
+        <a
+          href={`/assistencia/nota-chave/${chave}`}
+          target="_blank"
+          rel="noopener"
+          className="self-start rounded-lg px-3 py-1.5 text-xs font-semibold"
+          style={{ background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+        >
+          🖨 Nota de venda (PDF)
+        </a>
+      ) : null}
       <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
         Chave de acesso da nota
       </span>
@@ -227,38 +229,46 @@ function ChaveNota({ chave }: { chave: string }) {
   );
 }
 
-// Uma nota por botão, pela chave (rota /assistencia/nota-chave) -- notas da
-// /consulta/pedidos, inclusive a venda do Protheus de origem.
-function BotoesNotasPorChave({ notas }: { notas: { tipo: string; numero: string; chave: string }[] }) {
-  const estilo = { background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" };
+// A ponte não imprime a nota de venda (5922): "a nota que acompanha a
+// mercadoria é a 5117" (Pedro, 29/10/2026 -- os botões davam erro). Fica só a
+// chave da 5922; volta a imprimir se a ponte liberar.
+const IMPRIME_NOTA_DE_VENDA = false;
+
+const estiloBotaoNota = { background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" };
+
+// Notas do pedido do Odoo pra imprimir -- Victor 29/10/2026 ("o SAC tirar as
+// notas de entrega que aparecem pra uns clientes e pra outros não"). Pela
+// chave quando a /consulta/pedidos traz; senão, a nota de entrega pelo
+// pedido (rota /assistencia/nota) se o Odoo já disse que ela saiu.
+function BotoesNotas({ pedido, notas, entregaEmitida }: { pedido: string; notas?: { tipo: string; numero: string; chave: string }[]; entregaEmitida?: string | null }) {
+  const lista = (notas ?? []).filter((n) => IMPRIME_NOTA_DE_VENDA || !n.tipo.startsWith("5922"));
+  const temEntrega = lista.some((n) => n.tipo.startsWith("5117"));
   const rotulo = (tipo: string) => (tipo.startsWith("5922") ? "Nota de venda" : tipo.startsWith("5117") ? "Nota de entrega" : `Nota ${tipo}`);
+  const semNotaDeEntrega = !temEntrega && !entregaEmitida && notas !== undefined;
   return (
-    <div className="flex flex-wrap gap-2 -mt-1">
-      {notas.map((n) => (
-        <a key={n.chave} href={`/assistencia/nota-chave/${n.chave}`} target="_blank" rel="noopener" className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={estilo}>
+    <div className="flex flex-wrap items-center gap-2 -mt-1">
+      {lista.map((n) => (
+        <a key={n.chave} href={`/assistencia/nota-chave/${n.chave}`} target="_blank" rel="noopener" className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={estiloBotaoNota}>
           🖨 {rotulo(n.tipo)}
           {n.numero ? ` ${n.numero}` : ""}
           {n.tipo.includes("Protheus") ? " (Protheus)" : ""}
         </a>
       ))}
+      {!temEntrega && !semNotaDeEntrega ? (
+        <a href={`/assistencia/nota/${pedido}?doc=5117`} target="_blank" rel="noopener" className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={estiloBotaoNota}>
+          🖨 Nota de entrega{entregaEmitida ? ` ${entregaEmitida}` : ""}
+        </a>
+      ) : null}
+      {semNotaDeEntrega ? (
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Nota de entrega ainda não emitida (sai quando a carga sai em rota).
+        </span>
+      ) : null}
     </div>
   );
 }
 
-// DANFE pela ponte do Odoo (rota /assistencia/nota) -- Victor 26/10/2026.
-function BotoesNota({ pedido }: { pedido: string }) {
-  const estilo = { background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" };
-  return (
-    <div className="flex flex-wrap gap-2 -mt-1">
-      <a href={`/assistencia/nota/${pedido}?doc=5922`} target="_blank" rel="noopener" className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={estilo}>
-        🖨 Nota de venda
-      </a>
-      <a href={`/assistencia/nota/${pedido}?doc=5117`} target="_blank" rel="noopener" className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={estilo}>
-        🖨 Nota de entrega
-      </a>
-    </div>
-  );
-}
+const entregaEmitida = (p: PedidoOdooConsulta) => p.nf5117 ?? (p.logistica.situacao?.notaEntrega?.estado === "ok" ? p.logistica.situacao.notaEntrega.nf : null);
 
 function PedidoOdoo({ p, acao }: { p: PedidoOdooConsulta; acao: string }) {
   return (
@@ -301,7 +311,7 @@ function PedidoOdoo({ p, acao }: { p: PedidoOdooConsulta; acao: string }) {
         </p>
       ) : null}
       {p.itens?.length ? <Itens itens={p.itens} /> : null}
-      {p.notas?.length ? <BotoesNotasPorChave notas={p.notas} /> : <BotoesNota pedido={p.pedido} />}
+      <BotoesNotas pedido={p.pedido} notas={p.notas} entregaEmitida={entregaEmitida(p)} />
       {p.historico?.length ? <Historico eventos={p.historico} /> : null}
     </li>
   );
@@ -339,7 +349,7 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
         <Situacao s={p.logistica.situacao} acao={acao} semFotos={!!e?.tentativas.some((t) => t.fotos?.length)} />
       ) : null}
       {p.logistica ? <Filiais l={p.logistica} /> : null}
-      {e && nomePedidoOdoo(e.pedido) ? <BotoesNota pedido={nomePedidoOdoo(e.pedido)!} /> : null}
+      {e && nomePedidoOdoo(e.pedido) ? <BotoesNotas pedido={nomePedidoOdoo(e.pedido)!} /> : null}
       {/* Qualquer pedido do Protheus que passou por carga (com ou sem baixa
           registrada) -- a rota avisa quando o Protheus não tem a nota. */}
       {e && !nomePedidoOdoo(e.pedido) && e.tentativas.length > 0 ? (
@@ -396,11 +406,7 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
               ) : null}
               {p.odooLigado.logistica.situacao ? <Situacao s={p.odooLigado.logistica.situacao} acao={acao} /> : null}
               <Filiais l={{ ...p.odooLigado.logistica, filialVenda: null }} />
-              {p.odooLigado.notas?.length ? (
-                <BotoesNotasPorChave notas={p.odooLigado.notas.filter((n) => !n.tipo.startsWith("5922"))} />
-              ) : (
-                <BotoesNota pedido={p.odooLigado.pedido} />
-              )}
+              <BotoesNotas pedido={p.odooLigado.pedido} notas={p.odooLigado.notas} entregaEmitida={entregaEmitida(p.odooLigado)} />
             </div>
           ) : null}
           {p.odooLigado && e ? (
