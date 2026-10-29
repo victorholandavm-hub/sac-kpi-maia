@@ -43,6 +43,7 @@ const CLIENT_TIME_BUDGET_MS = 120_000;
 // 1x/dia, então não há risco de sobrepor com a próxima chamada.
 const ORDER_PAGE_SIZE = 100;
 const ORDERS_WINDOW_DAYS = 1;
+const ULTIMO_DIA_PROTHEUS = "2026-10-24";
 const ORDERS_TIME_BUDGET_MS = 900_000;
 const INITIAL_ORDERS_LOOKBACK_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -965,6 +966,9 @@ async function syncOrders(supabase: SupabaseAdmin): Promise<SyncResult> {
 
   while (new Date(day).getTime() <= today.getTime()) {
     if (Date.now() - started > ORDERS_TIME_BUDGET_MS) break;
+    // 29/10/2026: desde a virada as vendas vêm da ponte do Odoo (odooVendas.ts);
+    // a compat gravava só parte delas.
+    if (day > ULTIMO_DIA_PROTHEUS) break;
 
     let json: TotvsOrderListResponse;
     try {

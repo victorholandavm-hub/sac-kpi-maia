@@ -16,7 +16,9 @@ export type SyncJob =
   | "sac-cronograma-check"
   | "reprocess-compra-nps"
   // 29/10/2026: leitura do Odoo (expedição + cargas, também no formato do Protheus pros KPIs).
-  | "odoo-cargas";
+  | "odoo-cargas"
+  // 29/10/2026: vendas do Odoo (/consulta/vendas) em totvs_orders.
+  | "odoo-vendas";
 
 const JOB_LABELS: Record<SyncJob, string> = {
   totvs: "TOTVS",
@@ -30,6 +32,7 @@ const JOB_LABELS: Record<SyncJob, string> = {
   // enquanto o Workflow estava em Draft -- ver api/admin/reprocess-compra-nps.
   "reprocess-compra-nps": "Reprocessamento NPS Compra (backlog Draft)",
   "odoo-cargas": "Odoo — expedição e cargas",
+  "odoo-vendas": "Odoo — vendas do dia",
 };
 
 // Só observabilidade -- uma falha ao gravar o histórico nunca pode derrubar

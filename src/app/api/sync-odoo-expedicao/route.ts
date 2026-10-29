@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sincronizarExpedicaoOdoo } from "@/lib/odooExpedicaoSync";
 import { recordSyncRun } from "@/lib/syncRuns";
+import { sincronizarVendasOdoo } from "@/lib/odooVendas";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 // Retrato da expedição do Odoo (odooExpedicaoSync.ts), cron próprio na VPS a
 // cada 30 min (~/bin/odoo-expedicao-cron.sh). Passa pelo proxy porque começa
@@ -15,7 +17,10 @@ export async function GET(req: NextRequest) {
     const r = await sincronizarExpedicaoOdoo();
     // A hora "dados das HH:MM" dos KPIs de logística vem daqui (29/10/2026).
     if (!("skipped" in r)) await recordSyncRun("odoo-cargas", r.falhas.length < r.empresas, { ...r, falhas: r.falhas.length }, r.falhas.map((f) => `${f.empresa}: ${f.erro}`).slice(0, 20));
-    return NextResponse.json(r);
+    // Vendas do dia pela ponte (odooVendas.ts) -- na mesma rodada, depois da expedição.
+    const vendas = "skipped" in r ? null : await sincronizarVendasOdoo(getSupabaseAdmin()).catch((err) => ({ dias: [], vendas: 0, falhas: [(err as Error).message] }));
+    if (vendas) await recordSyncRun("odoo-vendas", vendas.falhas.length < Math.max(1, vendas.dias.length), { dias: vendas.dias, vendas: vendas.vendas }, vendas.falhas);
+    return NextResponse.json({ ...r, vendas });
   } catch (err) {
     await recordSyncRun("odoo-cargas", false, {}, [(err as Error).message]);
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });

@@ -85,7 +85,8 @@ export async function enrollPendingVendaNps(): Promise<ResultadoEnvioNps> {
     .select("id, client_id, client_name, invoice, issue_date")
     .not("client_id", "is", null)
     .gte("issue_date", fromDate)
-    .lte("issue_date", toDate)
+    // Só vendas do Protheus: desde a virada (25/10) as do Odoo saem por vendaNpsOdoo.ts.
+    .lte("issue_date", toDate < "2026-10-24" ? toDate : "2026-10-24")
     .order("issue_date", { ascending: false })
     .order("created_at", { ascending: false })
     .returns<OrderRow[]>();

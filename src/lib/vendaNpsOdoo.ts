@@ -4,6 +4,7 @@ import { upsertGhlContact, addContactTag, findGhlConversationId, fetchGhlMessage
 import { SUBCONTAS } from "./ghlSubcontas";
 import { NPS_GHL_TAG, NPS_1_5_PATTERN } from "./npsDetratores";
 import type { ResultadoEnvioNps } from "./npsEnvio";
+import { vendasDoDia, type VendaOdoo } from "./odooVendas";
 import { clientePeloTelefone, ehPedidoDeTroca, encaminharPelaNota } from "./npsEncaminhar";
 
 // NPS de atendimento em loja das vendas do Odoo -- Victor 27/10/2026. O de
@@ -71,6 +72,21 @@ export function candidatosDasLinhas(linhas: Linha[]): CandidatoOdoo[] {
   return out.sort((a, b) => b.dataVenda.localeCompare(a.dataVenda) || b.pedido.localeCompare(a.pedido));
 }
 
+// Venda de balcão ("levou na hora") não passa pela expedição -- Victor
+// 29/10/2026: vem da lista de vendas do dia da ponte (/consulta/vendas).
+export function candidatosDoBalcao(vendas: VendaOdoo[], jaTem: Set<string>): CandidatoOdoo[] {
+  const out: CandidatoOdoo[] = [];
+  for (const v of vendas) {
+    if (v.modo !== "na_hora" || v.estado === "cancel" || jaTem.has(v.pedido)) continue;
+    const cliente = v.cliente?.nome || null;
+    if (/teste/i.test(cliente ?? "") || isMostruarioRequest(null, cliente)) continue;
+    const tel = [v.cliente?.telefone, v.cliente?.telefone2].find((t) => t && !isPlaceholderPhone(t));
+    if (!tel) continue;
+    out.push({ pedido: v.pedido, cliente, telefone: firstPhone(tel), loja: v.loja || null, vendedor: v.vendedor || null, dataVenda: diaRecife(`${v.data.replace(" ", "T")}Z`) });
+  }
+  return out;
+}
+
 export async function enrollPendingVendaNpsOdoo(): Promise<ResultadoEnvioNps> {
   const admin = getSupabaseAdmin();
   const desde = new Date(Date.now() - JANELA_DIAS * 24 * 60 * 60 * 1000).toISOString();
@@ -82,8 +98,15 @@ export async function enrollPendingVendaNpsOdoo(): Promise<ResultadoEnvioNps> {
     .returns<Linha[]>();
   if (error) return { enrolled: 0, semTelefone: 0, errors: [`venda-nps-odoo pedidos: ${error.message}`], avisos: [] };
   const todos = new Set((data ?? []).map((l) => l.pedido));
-  const candidatos = candidatosDasLinhas(data ?? []);
-  const semTelefone = todos.size - candidatos.length;
+  const daExpedicao = candidatosDasLinhas(data ?? []);
+  const dias = Array.from({ length: JANELA_DIAS }, (_, i) => diaRecife(new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString()));
+  const balcao: CandidatoOdoo[] = [];
+  for (const dia of dias) {
+    const vendas = await vendasDoDia(dia).catch(() => [] as VendaOdoo[]);
+    balcao.push(...candidatosDoBalcao(vendas, new Set([...todos, ...balcao.map((c) => c.pedido)])));
+  }
+  const candidatos = [...daExpedicao, ...balcao].sort((a, b) => b.dataVenda.localeCompare(a.dataVenda) || b.pedido.localeCompare(a.pedido));
+  const semTelefone = todos.size - daExpedicao.length;
   if (candidatos.length === 0) return { enrolled: 0, semTelefone, errors: [], avisos: [] };
 
   const { data: enviados, error: enviadosError } = await admin
