@@ -1,4 +1,6 @@
-import { listarManifesto, mensagemDeErro, type CargaManifesto } from "@/lib/odoo/logistica";
+import { lerCatalogosComMotoristas, listarManifesto, listarMdfeAvulsas, mensagemDeErro, type CargaManifesto, type NotaAvulsa } from "@/lib/odoo/logistica";
+import type { CatalogosOdoo } from "@/lib/odoo/logisticaTipos";
+import { ManifestoAvulso } from "@/components/logisticaOdoo/ManifestoAvulso";
 import { empresaDaUrl } from "@/lib/odoo/logisticaAuth";
 import { ErroOdoo } from "@/components/logisticaOdoo/ui";
 import { ManifestoBoard } from "@/components/logisticaOdoo/ManifestoBoard";
@@ -11,7 +13,9 @@ export default async function ManifestoPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const empresa = empresaDaUrl(sp.empresa);
   let cargas: CargaManifesto[] = [], erro = "";
+  let avulsas: NotaAvulsa[] = [], catalogos: CatalogosOdoo | null = null;
   try { cargas = await listarManifesto(empresa); } catch (e) { erro = mensagemDeErro(e); }
+  try { [avulsas, catalogos] = await Promise.all([listarMdfeAvulsas(empresa), lerCatalogosComMotoristas(empresa)]); } catch (e) { console.error("[manifesto avulso]", e); }
   return (
     <div className="flex flex-col gap-4 min-w-0">
       <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>Manifesto de carga (MDF-e)</h2>
@@ -19,6 +23,7 @@ export default async function ManifestoPage({ searchParams }: { searchParams: Pr
         Cargas liberadas, em rota ou finalizadas nos últimos 3 dias. Depois de &quot;Sair em rota&quot;, abra a carga para ver as notas
         (a de transferência com todos os produtos do caminhão e a de cada cliente), imprimir tudo num PDF e emitir o manifesto.
       </p>
+      <ManifestoAvulso empresa={empresa} notas={avulsas} catalogos={catalogos} />
       {erro ? <ErroOdoo titulo="Não consegui ler as cargas" mensagem={erro} /> : <ManifestoBoard cargas={cargas} />}
     </div>
   );

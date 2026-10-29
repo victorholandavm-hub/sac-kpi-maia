@@ -740,3 +740,13 @@ export async function listarTransferenciasAceitar(companyId: number): Promise<Tr
 export function aceitarTransferenciaLoja(dados: { company_id: number; picking_id: number; itens: { codigo: string; qtd_recebida: number }[] }, operador: string) {
   return json<AceiteResposta>("/caixa/transferencias/aceitar", { perfil: "logistica", metodo: "POST", corpo: { ...dados, operador } });
 }
+
+// 29/10 (Pedro/Adonis, Campina): manifesto SÓ da nota de transferência (5152 do atendimento, sem carga)
+export type NotaAvulsa = { doc_id: number; numero: string; serie: string; chave: string; loja: string; valor: number; data: string; ref: string; itens: number };
+export async function listarMdfeAvulsas(companyId: number, dias = 7): Promise<NotaAvulsa[]> {
+  const r = await json<{ notas: NotaAvulsa[] }>("/logistica/mdfe/avulsas", { perfil: "logistica", query: { company_id: companyId, dias }, timeoutMs: 120_000 });
+  return r.notas ?? [];
+}
+export function emitirMdfeAvulso(companyId: number, docIds: number[], veiculoId: number, motoristaId: number, operador: string): Promise<Record<string, unknown>> {
+  return json("/logistica/mdfe/avulso", { perfil: "logistica", metodo: "POST", corpo: { company_id: companyId, doc_ids: docIds.map(int), veiculo_id: int(veiculoId), motorista_id: int(motoristaId), operador }, timeoutMs: 180_000 });
+}

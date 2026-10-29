@@ -6,7 +6,7 @@
 // dado -- ver ResultadoAcao em logisticaTipos.ts.
 
 import { revalidatePath } from "next/cache";
-import { transferirItens, limparCacheExpedicao, devolverTransferenciaLoja, aceitarTransferenciaLoja } from "@/lib/odoo/logistica";
+import { transferirItens, limparCacheExpedicao, devolverTransferenciaLoja, aceitarTransferenciaLoja, emitirMdfeAvulso } from "@/lib/odoo/logistica";
 import {
   acaoEntrega,
   lerItensEntrega,
@@ -458,6 +458,11 @@ export async function notasDaCargaAction(cargaId: number): Promise<ResultadoAcao
 }
 export async function progressoCargaAction(cargaId: number): Promise<ResultadoAcao<ProgressoCarga>> {
   return executar(() => progressoCarga(cargaId));
+}
+
+export async function emitirMdfeAvulsoAction(companyId: number, docIds: number[], veiculoId: number, motoristaId: number): Promise<ResultadoAcao<Record<string, unknown>>> {
+  if (!docIds.length || !veiculoId || !motoristaId) return { ok: false, erro: "Escolha as notas, o veículo e o motorista." };
+  return executar((operador) => emitirMdfeAvulso(companyId, docIds, veiculoId, motoristaId, operador), [`${BASE}/manifesto`]);
 }
 
 export async function acaoMdfeAction(cargaId: number, acao: "emitir" | "encerrar" | "consultar"): Promise<ResultadoAcao<Record<string, unknown>>> {
