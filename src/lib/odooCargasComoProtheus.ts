@@ -1,5 +1,6 @@
 import type { getSupabaseAdmin } from "./supabaseAdmin";
 import type { CargaDetalhe, EventoCarga, ParadaOdoo } from "./odoo/logisticaTipos";
+import { consultarPedidosOdoo } from "./consultaOdooPonte";
 
 // Cargas do Odoo gravadas no formato das do Protheus (totvs_deliveries /
 // totvs_delivery_cargas / totvs_delivery_carga_itens) -- Victor 29/10/2026:
@@ -274,4 +275,48 @@ export async function gravarCargaComoProtheus(admin: Admin, c: CargaDetalhe, mot
     if (e3) throw new Error(e3.message);
   }
   return linhas.length;
+}
+
+const POR_RODADA_CPF = 40;
+
+// "Rua X, 12, apto 3, Tambauzinho, João Pessoa, 58000000" -> bairro e cidade
+// (os dois últimos pedaços que não são número).
+export function bairroECidade(endereco: string | null | undefined): { bairro: string | null; cidade: string | null } {
+  const semNumero = (endereco ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t && !/^\d[\d\s.-]*$/.test(t));
+  if (semNumero.length < 3) return { bairro: null, cidade: semNumero.at(-1) ?? null };
+  return { bairro: semNumero.at(-2) ?? null, cidade: semNumero.at(-1) ?? null };
+}
+
+// CPF/cidade do cliente nas entregas do Odoo -- a parada da carga não traz.
+// Sem CPF, a volta (devolução, chamado da assistência) não é atribuída ao
+// motorista da entrega (v_visitas_motorista). Pela /consulta/pedidos, 2 por
+// vez, até 40 por leitura; sem CPF no Odoo grava "" pra não perguntar de novo.
+export async function completarClientesOdoo(admin: Admin): Promise<number> {
+  const { data } = await admin
+    .from("totvs_deliveries")
+    .select("id, pedido")
+    .like("pedido", `${PREFIXO_ODOO}%`)
+    .is("client_cpf_cnpj", null)
+    .order("updated_at", { ascending: false })
+    .limit(POR_RODADA_CPF)
+    .returns<{ id: string; pedido: string }[]>();
+  let feitos = 0;
+  const lista = data ?? [];
+  for (let i = 0; i < lista.length; i += 2) {
+    await Promise.all(
+      lista.slice(i, i + 2).map(async (d) => {
+        const nome = d.pedido.slice(PREFIXO_ODOO.length);
+        const p = (await consultarPedidosOdoo(nome).catch(() => [])).find((x) => x.pedido === nome);
+        if (!p) return;
+        const cpf = (p.cliente?.cpf ?? "").replace(/\D/g, "");
+        const { bairro, cidade } = bairroECidade(p.cliente?.endereco);
+        const { error } = await admin.from("totvs_deliveries").update({ client_cpf_cnpj: cpf, client_city: cidade, client_neighborhood: bairro }).eq("id", d.id);
+        if (!error) feitos++;
+      })
+    );
+  }
+  return feitos;
 }

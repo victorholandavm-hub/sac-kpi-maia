@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cargaComoProtheus, casarMotorista, diaHoraRecife, motivoComoProtheus, placaDoVeiculo, transportadoraComoProtheus } from "./odooCargasComoProtheus";
+import { bairroECidade, cargaComoProtheus, casarMotorista, diaHoraRecife, motivoComoProtheus, placaDoVeiculo, transportadoraComoProtheus } from "./odooCargasComoProtheus";
 import type { CargaDetalhe } from "./odoo/logisticaTipos";
 
 const motoristas = [
@@ -56,6 +56,9 @@ describe("cargas do Odoo no formato do Protheus", () => {
     expect(motivoComoProtheus("Não saiu do CD (carregado por engano)")?.codigo).toBe("L06");
     expect(motivoComoProtheus("Endereço não encontrado")?.codigo).toBe("C04");
     expect(motivoComoProtheus("outro motivo qualquer")).toMatchObject({ codigo: "X99", descricao: "outro motivo qualquer" });
+    expect(bairroECidade("RUA ANTÔNIO GAMA, 123, EDIFÍCIO LUGANO /APT 302, TAMBAUZINHO, João Pessoa, 58042000")).toEqual({ bairro: "TAMBAUZINHO", cidade: "João Pessoa" });
+    expect(bairroECidade("RUA OTÁVIO NOVAIS 118, 118, POÇO, Cabedelo, 58102303")).toEqual({ bairro: "POÇO", cidade: "Cabedelo" });
+    expect(bairroECidade(null)).toEqual({ bairro: null, cidade: null });
     expect(placaDoVeiculo("Fiat/STRADA ENDURAN CS13/TPA9E78")).toBe("TPA9E78");
     expect(diaHoraRecife("2026-10-29 02:30:00")).toEqual(["2026-10-28", "23:30"]);
   });

@@ -5,6 +5,7 @@ import { ExpedicaoBoard } from "./ExpedicaoBoard";
 import { EmpresaSelect } from "./EmpresaSelect";
 import { ErroOdoo } from "./ui";
 import { NotasDeOutros } from "./NotasDeOutros";
+import { aplicarDatasProgramadas } from "@/lib/odoo/dataProgramada";
 
 // Fila de expedição = tela "Entregas e Retiradas" do Roteirizador do
 // Protheus: saídas sem carga, filtros (região, modo/ABA, pendência,
@@ -40,8 +41,8 @@ export async function ExpedicaoFila({ sp, sac = false }: { sp: { empresa?: strin
               .map((e) => ({ ...e, empresa_id: ids[i], empresa_nome: nomeDe(ids[i]) }))
           : [],
       );
-    const entregas = juntar("entregas");
-    const pendencias = juntar("pendencias");
+    const entregas = await aplicarDatasProgramadas(juntar("entregas"));
+    const pendencias = await aplicarDatasProgramadas(juntar("pendencias"));
     const por_zona: Record<string, number> = {};
     for (const e of entregas) por_zona[e.zona || "(sem zona)"] = (por_zona[e.zona || "(sem zona)"] ?? 0) + 1;
     exp = { status: "fulfilled", value: { ok: true, company_id: empresa, total: entregas.length, por_zona, entregas, pendencias, total_pendencias: pendencias.length } };

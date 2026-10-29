@@ -11,7 +11,7 @@ vi.mock("./supabaseAdmin", () => ({
     }),
   }),
 }));
-vi.mock("./odooCargasComoProtheus", () => ({ motoristasDoProtheus: async () => [], gravarCargaComoProtheus: async () => 0 }));
+vi.mock("./odooCargasComoProtheus", () => ({ motoristasDoProtheus: async () => [], gravarCargaComoProtheus: async () => 0, completarClientesOdoo: async () => 0 }));
 vi.mock("./travaSync", () => ({ comTrava: (_a: unknown, _j: string, _o: string, _t: number, fn: () => Promise<unknown>) => fn() }));
 const saida = (picking_id: number, pedido: string, pedido_id: number | false) => ({ picking_id, pedido, pedido_id, origem: pedido, cliente: "MARIA", cliente_id: 7, telefone: "", nf5922: "", nf5117: "", legado: false });
 vi.mock("./odoo/logistica", () => ({
@@ -41,7 +41,7 @@ const { nomePedidoOdoo } = await import("./pedidoOdoo");
 describe("sincronizarExpedicaoOdoo", () => {
   it("grava saídas da expedição e das paradas das cargas, sem repetir, e segue quando uma loja falha", async () => {
     const r = await sincronizarExpedicaoOdoo();
-    expect(r).toEqual({ empresas: 3, saidas: 4, cargas: 1, comoProtheus: 0, falhas: [{ empresa: "208 GL", erro: "Odoo não respondeu em 60 s" }] });
+    expect(r).toEqual({ empresas: 3, saidas: 4, cargas: 1, comoProtheus: 0, clientes: 0, falhas: [{ empresa: "208 GL", erro: "Odoo não respondeu em 60 s" }] });
     const todas = upserts.flat();
     expect(todas.map((l) => [l.picking_id, l.pedido, l.pedido_id])).toEqual([
       [1, "S00366", 365],

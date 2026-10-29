@@ -257,7 +257,21 @@ export async function acaoEntregaAction(
   if (acao === "mover_carga" && !(Number(valor) > 0)) return { ok: false, erro: "Escolha a carga de destino." };
   const revalidar = [`${BASE}/expedicao`];
   if (cargaId) revalidar.push(`${BASE}/cargas/${cargaId}`);
-  return executar((operador) => acaoEntrega(pickingId, acao, valor, operador), revalidar, { sac: true });
+  return executar(
+    async (operador) => {
+      const r = await acaoEntrega(pickingId, acao, valor, operador);
+      // 29/10 (Cleonice/Jhon): a ponte devolve a data de entrega do pedido, não a da saída -- a Expedição mostra esta.
+      if (acao === "programar") {
+        const { error } = await getSupabaseAdmin()
+          .from("odoo_data_programada")
+          .upsert({ picking_id: pickingId, dia: String(valor), por: operador, em: new Date().toISOString() }, { onConflict: "picking_id" });
+        if (error) console.error("[logistica-odoo] guardar data programada", pickingId, error.message);
+      }
+      return r;
+    },
+    revalidar,
+    { sac: true },
+  );
 }
 
 export async function itensEntregaAction(pickingId: number): Promise<ResultadoAcao<ItemEntregaOdoo[]>> {

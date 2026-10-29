@@ -3,7 +3,7 @@ import { comTrava } from "./travaSync";
 import { lerCarga, lerExpedicao, listarCargas, listarEmpresas, mensagemDeErro } from "./odoo/logistica";
 import type { CargaDetalhe, CargaOdoo, EntregaOdoo } from "./odoo/logisticaTipos";
 import { nomePedidoOdoo } from "./pedidoOdoo";
-import { gravarCargaComoProtheus, motoristasDoProtheus } from "./odooCargasComoProtheus";
+import { completarClientesOdoo, gravarCargaComoProtheus, motoristasDoProtheus } from "./odooCargasComoProtheus";
 
 // Retrato da expedição do Odoo em odoo_expedicao (0203) -- Victor 26/10/2026:
 // dá o id numérico do pedido no Odoo pra imprimir a nota pela ponte, sem
@@ -18,7 +18,7 @@ const SIMULTANEAS = 2;
 const DIAS_CARGAS = 30;
 const cargasFechadasLidas = new Set<number>();
 
-export type ResumoExpedicao = { empresas: number; saidas: number; cargas: number; comoProtheus: number; falhas: { empresa: string; erro: string }[] };
+export type ResumoExpedicao = { empresas: number; saidas: number; cargas: number; comoProtheus: number; clientes?: number; falhas: { empresa: string; erro: string }[] };
 
 export function linhasDaCarga(c: CargaDetalhe, empresa: string, agora: string) {
   return (c.paradas ?? []).flatMap((p) =>
@@ -158,6 +158,10 @@ export async function sincronizarExpedicaoOdoo(): Promise<ResumoExpedicao | { sk
       const { error } = await admin.rpc("renumerar_tentativas_odoo");
       if (error) resumo.falhas.push({ empresa: "KPIs tentativas", erro: error.message });
     }
+    resumo.clientes = await completarClientesOdoo(admin).catch((err) => {
+      resumo.falhas.push({ empresa: "KPIs CPF dos clientes", erro: mensagemDeErro(err) });
+      return 0;
+    });
     return resumo;
   });
 }
