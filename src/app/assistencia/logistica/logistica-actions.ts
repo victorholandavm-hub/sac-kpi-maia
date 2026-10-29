@@ -200,9 +200,29 @@ export async function baixarEntregaManualAction(cargaId: number, paradaId: numbe
 
 // 26/10 (Pedro): pedido posto em rota por engano -> "não saiu": registra não entregue com o motivo nao_saiu_cd;
 // o Odoo devolve o pedido para a fila do CD (mesmo caminho do "não entregue" do motorista). A carga segue.
+// 29/10 (Victor): a anotação "Voltou da carga…" da ponte só leva o nome do motivo ("Não saiu do CD (carregado por
+// engano)"), nunca o texto que o John digitou -- o do motorista aparece porque ele escolhe o motivo no catálogo. O
+// texto vai também como anotação em cada saída da parada (a que voltou pra fila; se a ponte trocou a saída, a da fila).
 export async function naoSaiuAction(cargaId: number, paradaId: number, obs: string): Promise<ResultadoAcao<unknown>> {
   return executar(
-    (operador) => registrarParadaPeloCd(paradaId, { resultado: "insucesso", motivo: "nao_saiu_cd", obs: `Não saiu do CD (${operador}): ${obs || "carregado por engano"}`.slice(0, 500) }),
+    async (operador) => {
+      const motivo = (obs || "").trim();
+      // O padrão da caixinha já é o que a ponte escreve; só anota o que o John trocou.
+      const anotar = !!motivo && motivo.toLowerCase() !== "carregado por engano";
+      const carga = anotar ? await lerCarga(cargaId).catch(() => null) : null;
+      const pickings = (carga?.paradas.find((p) => p.parada_id === paradaId)?.pickings ?? []).filter((k) => k.picking_id);
+      const r = await registrarParadaPeloCd(paradaId, { resultado: "insucesso", motivo: "nao_saiu_cd", obs: `Não saiu do CD (${operador}): ${motivo || "carregado por engano"}`.slice(0, 500) });
+      const texto = `Não saiu do CD — motivo (${operador.replace(/^(CD|Equipe) /, "")}): ${motivo}`.slice(0, 500);
+      for (const k of pickings) {
+        try {
+          await acaoEntrega(k.picking_id, "anotar", texto, operador);
+        } catch {
+          const naFila = (await buscarEntregas(k.pedido).catch(() => [])).find((b) => b.pedido === k.pedido && b.na_fila);
+          if (naFila) await acaoEntrega(naFila.picking_id, "anotar", texto, operador).catch((err) => console.error("[logistica-odoo] anotar motivo", k.pedido, err));
+        }
+      }
+      return r;
+    },
     [`${BASE}/cargas/${cargaId}`, `${BASE}/expedicao`],
   );
 }
