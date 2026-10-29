@@ -4,6 +4,7 @@ import { formatarDocumento } from "@/lib/rotasDoDiaCore";
 import { nomePedidoOdoo } from "@/lib/pedidoOdoo";
 import { numeroDaCarga } from "@/lib/consultaCarga";
 import { ConsultaCargaView } from "@/components/ConsultaCargaView";
+import { ordenar, type EventoHistorico } from "@/lib/historicoPedido";
 
 // Consulta de pedido -- pedido do Victor 26/10/2026 ("onde eu vejo as vendas
 // e os status dos pedidos"; no mesmo dia, "onde o sac consulta os
@@ -148,6 +149,35 @@ function Situacao({ s, acao, semFotos = false }: { s: SituacaoPedido; acao: stri
   );
 }
 
+// Linha do tempo do pedido: venda, carga, separação, nota, conferência, saída,
+// tentativas -- com quem fez (Victor 27/10/2026).
+function Historico({ eventos }: { eventos: EventoHistorico[] }) {
+  if (eventos.length === 0) return null;
+  const quando = (q: string) => `${q.slice(8, 10)}/${q.slice(5, 7)}${q.length > 10 ? ` ${q.slice(11, 16)}` : ""}`;
+  return (
+    <details className="rounded-xl px-3 py-2" style={{ background: "var(--surface-2)" }}>
+      <summary className="cursor-pointer text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+        Histórico do pedido <span className="font-normal text-xs" style={{ color: "var(--text-muted)" }}>({eventos.length} passos)</span>
+      </summary>
+      <ol className="mt-2 flex flex-col gap-1.5 border-l pl-3" style={{ borderColor: "var(--border)" }}>
+        {eventos.map((ev, i) => (
+          <li key={`${ev.quando}-${i}`} className="relative text-xs flex flex-wrap gap-x-2" style={{ color: "var(--text-secondary)" }}>
+            <span aria-hidden className="absolute -left-[17px] top-1 w-2 h-2 rounded-full" style={{ background: COR_TOM[ev.tom ?? "neutro"] }} />
+            <span className="tabular-nums font-mono" style={{ color: "var(--text-muted)" }}>
+              {quando(ev.quando)}
+            </span>
+            <span style={{ color: "var(--text-primary)" }}>{ev.texto}</span>
+            {ev.quem ? <span>· {ev.quem}</span> : null}
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
+// "No Odoo agora" só quando diz algo além da situação da carga.
+const situacaoExtra = (texto: string | null | undefined, s: SituacaoPedido | undefined) => (texto && texto !== s?.texto ? texto : null);
+
 function NotaEntrega({ n }: { n: NonNullable<SituacaoPedido["notaEntrega"]> }) {
   const [texto, tom]: [string, keyof typeof COR_TOM] =
     n.estado === "ok"
@@ -257,7 +287,7 @@ function PedidoOdoo({ p, acao }: { p: PedidoOdooConsulta; acao: string }) {
           {p.legado ? " · venda do Protheus" : ""}
         </span>
       </div>
-      {p.situacaoOdoo ? (
+      {situacaoExtra(p.situacaoOdoo, p.logistica.situacao) ? (
         <p className="text-sm rounded-xl px-3 py-2" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
           <span style={{ color: "var(--text-muted)" }}>No Odoo agora: </span>
           <b className="font-semibold">{p.situacaoOdoo}</b>
@@ -272,6 +302,7 @@ function PedidoOdoo({ p, acao }: { p: PedidoOdooConsulta; acao: string }) {
       ) : null}
       {p.itens?.length ? <Itens itens={p.itens} /> : null}
       {p.notas?.length ? <BotoesNotasPorChave notas={p.notas} /> : <BotoesNota pedido={p.pedido} />}
+      {p.historico?.length ? <Historico eventos={p.historico} /> : null}
     </li>
   );
 }
@@ -356,7 +387,7 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
               <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                 Venda migrada pro Odoo: pedido <b style={{ color: "var(--text-primary)" }}>{p.odooLigado.pedido}</b>
               </p>
-              {p.odooLigado.situacaoOdoo ? (
+              {situacaoExtra(p.odooLigado.situacaoOdoo, p.odooLigado.logistica.situacao) ? (
                 <p className="text-sm rounded-xl px-3 py-2" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
                   <span style={{ color: "var(--text-muted)" }}>No Odoo agora: </span>
                   <b className="font-semibold">{p.odooLigado.situacaoOdoo}</b>
@@ -436,6 +467,7 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
           )}
         </div>
       </div>
+      <Historico eventos={ordenar([...(p.historico ?? []), ...(p.odooLigado?.historico ?? [])])} />
     </li>
   );
 }

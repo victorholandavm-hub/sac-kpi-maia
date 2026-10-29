@@ -4,10 +4,12 @@ import { vendasDasEntregas } from "./vendaDaEntrega";
 import type { FotoEntrega } from "./fotosEntregaOdoo";
 import { nomePedidoOdoo } from "./pedidoOdoo";
 import { clientesDoCadastro, type ClienteCadastro } from "./clienteCadastro";
-import { fotosDoPedidoNaCarga, notasDeEntregaDaCarga, numeroDaCarga } from "./consultaCarga";
+import { cargaDoHistorico, fotosDoPedidoNaCarga, notasDeEntregaDaCarga, numeroDaCarga } from "./consultaCarga";
 import { fotosDaParadaOdoo } from "./fotosEntregaOdoo";
 import { buscarEntregas, type BuscaEntrega } from "./odoo/logistica";
+import type { CargaDetalhe } from "./odoo/logisticaTipos";
 import { consultarPedidosOdoo, fotosUmovDoPedido, type PedidoOdooPonte } from "./consultaOdooPonte";
+import { historicoOdoo, historicoProtheus, type CargaHistoricoProtheus, type EventoHistorico } from "./historicoPedido";
 
 // Consulta de pedido (pedido do Victor 26/10/2026: "onde eu vejo as vendas e
 // os status dos pedidos"): por CPF/CNPJ, número do pedido, nota da venda ou
@@ -110,6 +112,8 @@ export type PedidoConsulta = {
   // Venda do Protheus migrada pro Odoo (mesma nota de venda): a entrega
   // agora anda no Odoo -- Victor 27/10/2026, print do Jonas (NF 31039 = S00672).
   odooLigado?: PedidoOdooConsulta;
+  // Linha do tempo do pedido (historicoPedido.ts) -- Victor 27/10/2026.
+  historico?: EventoHistorico[];
 };
 
 export type ClienteConsulta = { codigo: string; nome: string | null; documento: string | null; pedidos: PedidoConsulta[] };
@@ -141,8 +145,11 @@ export type PedidoOdooConsulta = {
   vendedor?: string | null;
   total?: number | null;
   itens?: ItemConsulta[];
-  notas?: { tipo: string; numero: string; chave: string }[];
+  notas?: { tipo: string; numero: string; chave: string; data?: string | null }[];
   naHora?: boolean;
+  // Romaneios das cargas por onde o pedido passou (entregas da /consulta/pedidos).
+  cargasRomaneios?: string[];
+  historico?: EventoHistorico[];
 };
 
 export type ResultadoConsulta = {
@@ -530,6 +537,7 @@ export async function consultarPedidos(busca: string): Promise<ResultadoConsulta
   ligarVendasMigradas(r);
   await anexarHistoricoDasCargasProtheus(r);
   await anexarFotosUmov(r);
+  await anexarHistoricoOdoo(r);
   return anexarNotasDeEntrega(r);
 }
 
@@ -555,15 +563,16 @@ async function anexarFotosUmov(r: ResultadoConsulta) {
   }
 }
 
+const COLUNAS_HISTORICO_PROTHEUS =
+  "carga, incluida_em, incluida_por, separacao_em, separacao_hora, separacao_por, faturada_em, faturada_hora, faturada_por, liberada_em, liberada_hora, em_rota_em, em_rota_hora, conferente_nome";
+
 async function anexarHistoricoDasCargasProtheus(r: ResultadoConsulta) {
-  const tentativas = r.clientes.flatMap((c) => c.pedidos.flatMap((p) => p.entrega?.tentativas ?? [])).filter((t) => /^\d+$/.test(t.carga));
+  const pedidos = r.clientes.flatMap((c) => c.pedidos).filter((p) => !(p.entrega && nomePedidoOdoo(p.entrega.pedido)));
+  const tentativas = pedidos.flatMap((p) => p.entrega?.tentativas ?? []).filter((t) => /^\d+$/.test(t.carga));
   const cargas = [...new Set(tentativas.map((t) => t.carga))];
-  if (cargas.length === 0) return;
-  const { data } = await getSupabaseAdmin()
-    .from("protheus_cargas_historico")
-    .select("carga, conferente_nome, separacao_por, faturada_por")
-    .in("carga", cargas)
-    .returns<{ carga: string; conferente_nome: string | null; separacao_por: string | null; faturada_por: string | null }[]>();
+  const { data } = cargas.length
+    ? await getSupabaseAdmin().from("protheus_cargas_historico").select(COLUNAS_HISTORICO_PROTHEUS).in("carga", cargas).returns<CargaHistoricoProtheus[]>()
+    : { data: [] as CargaHistoricoProtheus[] };
   const porCarga = new Map((data ?? []).map((h) => [h.carga, h]));
   for (const t of tentativas) {
     const h = porCarga.get(t.carga);
@@ -571,6 +580,89 @@ async function anexarHistoricoDasCargasProtheus(r: ResultadoConsulta) {
     t.conferente = h.conferente_nome;
     t.separadoPor = h.separacao_por;
     t.faturadoPor = h.faturada_por;
+  }
+  for (const p of pedidos) {
+    p.historico = historicoProtheus(
+      p.venda ? { data: p.venda.data, notaFiscal: p.venda.notaFiscal, vendedor: p.venda.vendedor } : null,
+      (p.entrega?.tentativas ?? []).filter((t) => /^\d+$/.test(t.carga)),
+      porCarga
+    );
+  }
+}
+
+const MAX_CARGAS_NO_HISTORICO = 8;
+
+// Histórico dos pedidos do Odoo: lê cada carga por onde passaram (até 8 por
+// busca, 2 por vez; cache de 2 min no consultaCarga) e quem fez cada passo no
+// CD (odoo_carga_acoes). Falha da ponte só deixa o histórico mais curto.
+async function anexarHistoricoOdoo(r: ResultadoConsulta) {
+  type Alvo = {
+    pedido: string;
+    venda: Parameters<typeof historicoOdoo>[0];
+    notas: Parameters<typeof historicoOdoo>[1];
+    refs: { cargaId?: number | null; romaneio?: string | null }[];
+    guardar: (h: EventoHistorico[]) => void;
+  };
+  const alvos: Alvo[] = [];
+  const doCartao = (o: PedidoOdooConsulta): Alvo => ({
+    pedido: o.pedido,
+    venda: { data: o.dataVenda ?? null, vendedor: o.vendedor ?? null, loja: o.logistica.filialVenda ?? o.empresa?.match(/^\d{3}/)?.[0] ?? null },
+    notas: (o.notas ?? []).filter((n) => !n.tipo.includes("Protheus")),
+    refs: [{ cargaId: o.logistica.situacao?.cargaId ?? null }, ...(o.cargasRomaneios ?? []).map((romaneio) => ({ romaneio }))],
+    guardar: (h) => (o.historico = h),
+  });
+  for (const o of r.odoo ?? []) alvos.push(doCartao(o));
+  for (const c of r.clientes) {
+    for (const p of c.pedidos) {
+      // Venda migrada: a venda já está no histórico do Protheus.
+      if (p.odooLigado) alvos.push({ ...doCartao(p.odooLigado), venda: p.venda ? null : doCartao(p.odooLigado).venda });
+      const nome = p.entrega ? nomePedidoOdoo(p.entrega.pedido) : null;
+      if (!nome) continue;
+      alvos.push({
+        pedido: nome,
+        venda: null,
+        notas: [],
+        refs: [{ cargaId: p.logistica?.situacao?.cargaId ?? null }, ...p.entrega!.tentativas.map((t) => ({ romaneio: t.carga }))],
+        guardar: (h) => (p.historico = h),
+      });
+    }
+  }
+  if (alvos.length === 0) return;
+
+  const chave = (ref: { cargaId?: number | null; romaneio?: string | null }) => (ref.cargaId ? `id:${ref.cargaId}` : ref.romaneio ? `rom:${ref.romaneio}` : null);
+  const refs = new Map<string, { cargaId?: number | null; romaneio?: string | null }>();
+  for (const a of alvos) for (const ref of a.refs) if (chave(ref) && refs.size < MAX_CARGAS_NO_HISTORICO) refs.set(chave(ref)!, ref);
+  const lidas = new Map<string, CargaDetalhe>();
+  const lista = [...refs];
+  for (let i = 0; i < lista.length; i += 2) {
+    await Promise.all(
+      lista.slice(i, i + 2).map(async ([k, ref]) => {
+        const c = await cargaDoHistorico(ref).catch(() => null);
+        if (c) lidas.set(k, c);
+      })
+    );
+  }
+  const porId = new Map([...lidas.values()].map((c) => [c.carga_id, c]));
+  const { data: acoes } = porId.size
+    ? await getSupabaseAdmin().from("odoo_carga_acoes").select("carga_id, acao, operador, em").in("carga_id", [...porId.keys()]).order("em").returns<{ carga_id: number; acao: string; operador: string; em: string }[]>()
+    : { data: [] };
+
+  for (const a of alvos) {
+    const ids = new Set(a.refs.map((ref) => lidas.get(chave(ref) ?? "")?.carga_id).filter((id): id is number => !!id));
+    const cargas = [...ids].map((id) => porId.get(id)!);
+    const paradas = cargas.flatMap((c) => (c.paradas ?? []).filter((p) => (p.pickings ?? []).some((k) => k.pedido === a.pedido)));
+    const doPedido = {
+      pickings: new Set(paradas.flatMap((p) => p.pickings.filter((k) => k.pedido === a.pedido).map((k) => k.nome))),
+      paradas: new Set(paradas.map((p) => p.parada_id)),
+    };
+    a.guardar(
+      historicoOdoo(
+        a.venda,
+        a.notas,
+        cargas.map((c) => ({ romaneio: c.romaneio, motorista: c.motorista || null, eventos: c.eventos ?? [], acoes: (acoes ?? []).filter((x) => x.carga_id === c.carga_id) })),
+        doPedido
+      )
+    );
   }
 }
 
@@ -633,7 +725,7 @@ export function situacaoDaConsulta(p: PedidoOdooPonte): string | null {
 
 // Itens, notas, vendedor, data e total da /consulta/pedidos pro cartão.
 function detalhesDaConsulta(p: PedidoOdooPonte): Partial<PedidoOdooConsulta> {
-  const notas = (p.notas ?? []).filter((n) => n.chave).map((n) => ({ tipo: n.tipo, numero: n.numero, chave: n.chave }));
+  const notas: NonNullable<PedidoOdooConsulta["notas"]> = (p.notas ?? []).filter((n) => n.chave).map((n) => ({ tipo: n.tipo, numero: n.numero, chave: n.chave, data: n.data || null }));
   if (p.legado?.chave_5922) notas.unshift({ tipo: "5922 (Protheus)", numero: p.legado.nf_5922 ?? "", chave: p.legado.chave_5922 });
   if (p.legado?.chave_5117) notas.push({ tipo: "5117 (Protheus)", numero: p.legado.nf_5117 ?? "", chave: p.legado.chave_5117 });
   return {
@@ -643,6 +735,7 @@ function detalhesDaConsulta(p: PedidoOdooPonte): Partial<PedidoOdooConsulta> {
     itens: (p.itens ?? []).map((i) => ({ codigo: i.codigo || null, descricao: i.nome || null, quantidade: Number(i.qtd ?? 0) })),
     notas,
     naHora: p.modo === "na_hora",
+    cargasRomaneios: [...new Set((p.entregas ?? []).map((e) => e.carga).filter(Boolean))],
   };
 }
 
@@ -688,7 +781,7 @@ async function juntarBuscaDoOdoo(r: ResultadoConsulta, q: string): Promise<Pedid
     p.telefone ??= a.telefone;
     p.clienteCodigo ??= a.clienteCodigo;
     p.clienteDocumento ??= a.clienteDocumento;
-    Object.assign(p, { dataVenda: a.dataVenda, vendedor: a.vendedor, total: a.total, itens: a.itens, notas: a.notas, naHora: a.naHora });
+    Object.assign(p, { dataVenda: a.dataVenda, vendedor: a.vendedor, total: a.total, itens: a.itens, notas: a.notas, naHora: a.naHora, cargasRomaneios: a.cargasRomaneios });
   }
   const jaMostrados = new Set([
     ...atuais.map((p) => p.pedido),

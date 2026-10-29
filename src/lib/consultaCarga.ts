@@ -67,6 +67,14 @@ export async function fotosDoPedidoNaCarga(romaneio: string, pedido: string): Pr
   return parada ? fotosDaParadaOdoo(carga.carga_id, parada.parada_id) : [];
 }
 
+// Carga inteira (eventos, paradas) pelo id ou pelo romaneio, pro histórico do pedido.
+export async function cargaDoHistorico(ref: { cargaId?: number | null; romaneio?: string | null }): Promise<CargaDetalhe | null> {
+  if (ref.cargaId) return cargaPorId(ref.cargaId);
+  const b = ref.romaneio ? numeroDaCarga(ref.romaneio) : null;
+  const achada = b ? await acharCarga(b) : null;
+  return achada ? cargaPorId(achada.carga_id) : null;
+}
+
 export type ParadaComFotos = ParadaOdoo & { fotos: FotoEntrega[] };
 // Quem fez cada passo no CD (odoo_carga_acoes, 0206, gravado pela tela de
 // Logística): separacao, conferir, liberar, sair, finalizar.
