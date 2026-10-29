@@ -68,11 +68,23 @@ export function ExpedicaoBoard({
   const [cargaDestino, setCargaDestino] = useState("");
   // 26/10: busca em TUDO (carga, rota, entregue, pendência, loja) além da fila
   const [fora, setFora] = useState<BuscaEntrega[]>([]);
+  // 29/10 (Victor, SAC buscando pelo CPF): a fila não tem CPF; o que a busca
+  // do Odoo acha NA fila entra na lista mesmo sem casar com o filtro local.
+  const [naFilaPelaBusca, setNaFilaPelaBusca] = useState<Set<number>>(new Set());
   useEffect(() => {
     const q = busca.trim();
     if (q.length < 3) return;
     const t = setTimeout(() => {
-      buscarEntregasAction(q).then((r) => setFora(r.ok ? (r.dados ?? []).filter((x) => !x.na_fila) : [])).catch(() => setFora([]));
+      buscarEntregasAction(q)
+        .then((r) => {
+          const itens = r.ok ? (r.dados ?? []) : [];
+          setFora(itens.filter((x) => !x.na_fila));
+          setNaFilaPelaBusca(new Set(itens.filter((x) => x.na_fila).map((x) => x.picking_id)));
+        })
+        .catch(() => {
+          setFora([]);
+          setNaFilaPelaBusca(new Set());
+        });
     }, 500);
     return () => clearTimeout(t);
   }, [busca]);
@@ -100,7 +112,14 @@ export function ExpedicaoBoard({
     return m;
   }, [todas]);
   const temRetornoNoOdoo = todas.some((e) => typeof e.retorno === "boolean");
-  const lista = filtrarExpedicao(expedicao.entregas, expedicao.pendencias, { visao, zona, modo, busca });
+  const filtradas = filtrarExpedicao(expedicao.entregas, expedicao.pendencias, { visao, zona, modo, busca });
+  const doCpf =
+    busca.trim().length >= 3
+      ? filtrarExpedicao(expedicao.entregas, expedicao.pendencias, { visao, zona: "", modo: "", busca: "" }).filter(
+          (e) => naFilaPelaBusca.has(e.picking_id) && !filtradas.some((f) => f.picking_id === e.picking_id),
+        )
+      : [];
+  const lista = [...filtradas, ...doCpf];
   const vols = somarVolumes(lista);
   const selecionadas = [...expedicao.entregas, ...expedicao.pendencias].filter((e) => sel.has(e.picking_id));
   // 27/10 (CD: "cliente da pendência, não tem a opção de marcar"): pendência marcada volta à fila antes de entrar na carga

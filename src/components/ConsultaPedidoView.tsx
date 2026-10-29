@@ -210,6 +210,9 @@ function ChaveNota({ chave }: { chave: string }) {
           🖨 Nota de venda (PDF)
         </a>
       ) : null}
+      <a href={`/assistencia/nota-chave/${chave}?xml=1`} className="self-start text-xs underline" style={{ color: "var(--text-secondary)" }}>
+        XML da nota de venda
+      </a>
       <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
         Chave de acesso da nota
       </span>
@@ -230,9 +233,9 @@ function ChaveNota({ chave }: { chave: string }) {
 }
 
 // A ponte não imprime a nota de venda (5922): "a nota que acompanha a
-// mercadoria é a 5117" (Pedro, 29/10/2026 -- os botões davam erro). Fica só a
-// chave da 5922; volta a imprimir se a ponte liberar.
-const IMPRIME_NOTA_DE_VENDA = false;
+// mercadoria é a 5117" (Pedro). A 2ª via sai do XML autorizado, gerada na
+// rota /assistencia/nota-chave (danfe.ts) -- Victor 29/10/2026.
+const IMPRIME_NOTA_DE_VENDA = true;
 
 const estiloBotaoNota = { background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" };
 
@@ -254,6 +257,13 @@ function BotoesNotas({ pedido, notas, entregaEmitida }: { pedido: string; notas?
           {n.tipo.includes("Protheus") ? " (Protheus)" : ""}
         </a>
       ))}
+      {lista
+        .filter((n) => n.tipo.startsWith("5922"))
+        .map((n) => (
+          <a key={`${n.chave}-xml`} href={`/assistencia/nota-chave/${n.chave}?xml=1`} className="text-xs underline" style={{ color: "var(--text-secondary)" }}>
+            XML da nota de venda
+          </a>
+        ))}
       {!temEntrega && !semNotaDeEntrega ? (
         <a href={`/assistencia/nota/${pedido}?doc=5117`} target="_blank" rel="noopener" className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={estiloBotaoNota}>
           🖨 Nota de entrega{entregaEmitida ? ` ${entregaEmitida}` : ""}

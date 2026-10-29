@@ -1,4 +1,4 @@
-import { mkdir, statfs, writeFile } from "node:fs/promises";
+import { mkdir, readFile, statfs, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { pastaNotas } from "./notaEntregaProtheus";
@@ -26,6 +26,15 @@ export function chavesQueFaltam(vendas: Venda[], jaTem: Set<string>): Venda[] {
     vistas.add(c);
     return true;
   });
+}
+
+// XML de uma nota pela chave: a cópia guardada (notas de venda do Protheus)
+// ou a ponte -- pra DANFE da nota de venda que a ponte não imprime (danfe.ts).
+export async function xmlDaNota(chave: string): Promise<string> {
+  const c = chave.replace(/\D/g, "");
+  if (c.length !== 44) throw new Error("Chave da nota inválida.");
+  const guardado = await readFile(join(pastaNotas(), `${c}.xml`), "utf-8").catch(() => null);
+  return guardado ?? baixarXml(c);
 }
 
 async function baixarXml(chave: string): Promise<string> {
