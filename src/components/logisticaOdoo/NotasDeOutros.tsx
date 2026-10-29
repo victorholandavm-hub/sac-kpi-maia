@@ -56,7 +56,7 @@ export async function NotasDeOutros() {
       </summary>
       <div className="flex flex-col gap-1 pb-2">
         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-          Últimos 7 dias. Não entram as do Adonis e do John nem as emitidas direto no Odoo.
+          Últimos 7 dias. Não entram as do Adonis e do Jhon nem as emitidas direto no Odoo.
         </p>
         {pendentes.length ? (
           <ul>
