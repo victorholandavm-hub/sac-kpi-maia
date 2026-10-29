@@ -5,6 +5,7 @@ import { resolveEncomendaRequester } from "@/lib/encomendaRequester";
 import { listSuppliers } from "@/lib/partOrders";
 import { NovoPedidoEncomendaForm } from "@/components/assistencia/NovoPedidoEncomendaForm";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { BotaoSair } from "@/components/assistencia/BotaoSair";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,9 @@ export default async function SolicitarEncomendaPage({
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-6 w-full min-w-0">
-      <AssistenciaHeader title="Encomendar produto" subtitle="Pedido direto pro CD/fábrica, sem foto de nota nem WhatsApp." />
+      <AssistenciaHeader title="Encomendar produto" subtitle="Pedido direto pro CD/fábrica, sem foto de nota nem WhatsApp.">
+        <BotaoSair />
+      </AssistenciaHeader>
 
       <Link href={voltarHref} className="text-sm underline self-start" style={{ color: "var(--text-secondary)" }}>
         ← Voltar

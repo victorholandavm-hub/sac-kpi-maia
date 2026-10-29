@@ -326,10 +326,11 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
             {dataBr(p.data)}
           </span>
         </div>
-        {e ? (
+        {/* Venda migrada: o status do Protheus parou em 24/10, vale o do Odoo. */}
+        {p.odooLigado ? (
+          <Selo texto={p.odooLigado.logistica.situacao?.texto ?? p.odooLigado.situacaoOdoo ?? "No Odoo"} tom={p.odooLigado.logistica.situacao?.tom ?? "neutro"} />
+        ) : e ? (
           <Selo texto={e.statusAtual ?? "Sem status"} tom={tomStatusAtual(e.statusAtual)} />
-        ) : p.odooLigado ? (
-          <Selo texto={p.odooLigado.logistica.situacao?.texto ?? "No Odoo"} tom={p.odooLigado.logistica.situacao?.tom ?? "neutro"} />
         ) : (
           <Selo texto="Sem entrega" tom="neutro" />
         )}
@@ -382,7 +383,7 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
 
         <div className="flex flex-col gap-2">
           <Rotulo>Entrega</Rotulo>
-          {!e && p.odooLigado ? (
+          {p.odooLigado ? (
             <div className="flex flex-col gap-2">
               <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                 Venda migrada pro Odoo: pedido <b style={{ color: "var(--text-primary)" }}>{p.odooLigado.pedido}</b>
@@ -401,7 +402,13 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
                 <BotoesNota pedido={p.odooLigado.pedido} />
               )}
             </div>
-          ) : !e ? (
+          ) : null}
+          {p.odooLigado && e ? (
+            <p className="text-xs font-semibold pt-1" style={{ color: "var(--text-muted)" }}>
+              Antes, no Protheus (parado em 24/10 — o status abaixo não muda mais):
+            </p>
+          ) : null}
+          {p.odooLigado && !e ? null : !e ? (
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               Sem entrega registrada: retirada na loja, ou ainda sem carga.
             </p>

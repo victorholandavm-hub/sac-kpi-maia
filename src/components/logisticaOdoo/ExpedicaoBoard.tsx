@@ -46,12 +46,16 @@ export function ExpedicaoBoard({
   catalogos,
   empresas,
   cargasAbertas = [],
+  sac = false,
 }: {
   companyId: number;
   expedicao: ExpedicaoResposta;
   catalogos: CatalogosOdoo;
   empresas: EmpresaOdoo[];
   cargasAbertas?: CargaOdoo[];
+  // 29/10 (Victor): a Expedição do SAC -- observações e as ações por entrega
+  // (com "Nota de entrega" = faturar a 5117 e dar baixa), sem montar carga.
+  sac?: boolean;
 }) {
   const router = useRouter();
   const { pending, run } = useAcaoOdoo();
@@ -178,8 +182,9 @@ export function ExpedicaoBoard({
     );
   }
 
-  function acao(e: EntregaOdoo, a: AcaoEntrega) {
-    setAlvo({ pickingId: e.picking_id, nome: e.nome, cliente: e.cliente, acao: a, companyId: e.empresa_id ?? companyId });
+  function acao(e: EntregaOdoo, a: AcaoEntrega | "nota_entrega") {
+    const notaEntrega = a === "nota_entrega";
+    setAlvo({ pickingId: e.picking_id, nome: e.nome, cliente: e.cliente, acao: notaEntrega ? "retirada_cd" : a, companyId: e.empresa_id ?? companyId, notaEntrega });
   }
 
   return (
@@ -235,7 +240,7 @@ export function ExpedicaoBoard({
             <button type="button" onClick={() => router.refresh()} className={botaoClass} style={botaoStyle}>
               Atualizar
             </button>
-            {true ? (
+            {!sac ? (
               <button type="button" onClick={selecionarVisiveis} className={botaoClass} style={botaoStyle}>
                 Selecionar visíveis
               </button>
@@ -251,7 +256,7 @@ export function ExpedicaoBoard({
       </div>
 
       {/* 25/10 (Pedro): quadro de montar SEMPRE à vista — descrição e data programada visíveis antes de marcar */}
-      {sel.size >= 0 ? (
+      {!sac ? (
         <div className="cartao p-4 flex flex-col gap-3" style={{ border: sel.size ? "2px solid var(--brand-orange)" : "1px solid var(--border)" }} onFocus={abrirMontar} onMouseEnter={abrirMontar}>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
@@ -368,7 +373,7 @@ export function ExpedicaoBoard({
                 <tr key={e.picking_id} style={{ borderBottom: "1px solid var(--border)", background: marcada ? "var(--brand-green-soft)" : undefined }}>
                   <td className="p-2 align-top">
                     {/* 28/10 (Rafael): retorno também pode ir para outra carga */}
-                    <input type="checkbox" checked={marcada} onChange={() => alternar(e.picking_id)} aria-label={`Selecionar ${e.cliente}`} className="w-5 h-5" />
+                    {!sac ? <input type="checkbox" checked={marcada} onChange={() => alternar(e.picking_id)} aria-label={`Selecionar ${e.cliente}`} className="w-5 h-5" /> : null}
                   </td>
                   <td className="p-2 align-top">
                     <b style={{ color: "var(--text-primary)" }}>{e.cliente}</b>
@@ -432,7 +437,7 @@ export function ExpedicaoBoard({
                   <td className="p-2 align-top">
                     <select
                       value=""
-                      onChange={(ev) => ev.target.value && acao(e, ev.target.value as AcaoEntrega)}
+                      onChange={(ev) => ev.target.value && acao(e, ev.target.value as AcaoEntrega | "nota_entrega")}
                       className="rounded-lg border px-2 py-1 text-xs"
                       style={inputStyle}
                       aria-label={`Ações de ${e.cliente}`}
@@ -440,6 +445,7 @@ export function ExpedicaoBoard({
                       <option value="">Ações…</option>
                       {e.pendencia ? <option value="fila">Voltar à fila</option> : <option value="pendencia">Enviar para pendência</option>}
                       <option value="programar">Data programada</option>
+                      {sac ? <option value="nota_entrega">Nota de entrega (faturar e dar baixa)</option> : null}
                       <option value="retirada_cd">Cliente/fretista retirou no CD</option>
                       <option value="transferir_filial">Transferir filial</option>
                       <option value="anotar">Anotação</option>

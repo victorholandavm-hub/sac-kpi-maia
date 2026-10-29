@@ -118,6 +118,13 @@ describe("ligarVendasMigradas", () => {
     expect(r.clientes[0].pedidos[0]).toMatchObject({ odooLigado: { pedido: "S00672", vendaProtheus: "NF 31039" } });
     expect(r.odoo.map((o) => o.pedido)).toEqual(["S00700"]);
   });
+  it("venda que já tinha carga no Protheus também liga (o status atual é o do Odoo)", () => {
+    const comEntrega = { ...venda("54793", "212"), entrega: { pedido: "062198", filial: "212", loja: null, statusAtual: "Em Rota", bairro: null, cidade: null, tentativas: [] } };
+    const r = { busca: "x", tipo: "nome" as const, limitado: false, clientes: [{ codigo: "1", nome: "THALYTA", documento: null, pedidos: [comEntrega] }], odoo: [odoo("S00895", "54793/1")] };
+    ligarVendasMigradas(r);
+    expect(r.clientes[0].pedidos[0]).toMatchObject({ odooLigado: { pedido: "S00895" } });
+    expect(r.odoo).toHaveLength(0);
+  });
   it("mesma nota em duas filiais: não liga (ambíguo)", () => {
     const r = { busca: "x", tipo: "nome" as const, limitado: false, clientes: [{ codigo: "1", nome: "A", documento: null, pedidos: [venda("100", "205"), venda("100", "212")] }], odoo: [odoo("S1", "100/1")] };
     ligarVendasMigradas(r);

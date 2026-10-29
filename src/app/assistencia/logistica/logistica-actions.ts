@@ -79,7 +79,7 @@ import {
 } from "@/lib/odoo/logistica";
 import type { EntradaCompraResposta, FornecedorOdoo, PedidoCompra, ItemInventarioSaldo, ItemInventarioAjuste } from "@/lib/odoo/logistica";
 import { inventarioAplicar, inventarioSaldo } from "@/lib/odoo/logistica";
-import { getOperadorLogistica, exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
+import { getOperadorLogistica, exigirOperadorExpedicao, exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import type {
   AcaoCarga,
@@ -102,9 +102,10 @@ async function soLoja<T extends object>(f: T): Promise<T> {
   return op?.loja ? { ...f, company_id: op.loja.companyId } : f;
 }
 
-async function executar<T>(fn: (operador: string) => Promise<T>, revalidar: string[] = []): Promise<ResultadoAcao<T>> {
+// sac: true = ação por entrega que o SAC também faz na Expedição dele.
+async function executar<T>(fn: (operador: string) => Promise<T>, revalidar: string[] = [], { sac = false } = {}): Promise<ResultadoAcao<T>> {
   try {
-    const op = await exigirOperadorLogistica();
+    const op = sac ? await exigirOperadorExpedicao() : await exigirOperadorLogistica();
     const dados = await fn(op.operadorOdoo);
     limparCacheExpedicao();
     for (const p of revalidar) revalidatePath(p);
@@ -152,6 +153,7 @@ export async function retiradaNoCdAction(companyId: number, pickingId: number, q
       return { romaneio: c.romaneio, carga_id: c.carga_id, notas };
     },
     [`${BASE}/expedicao`, `${BASE}/cargas`],
+    { sac: true },
   );
 }
 
@@ -216,12 +218,12 @@ export async function naoSaiuAction(cargaId: number, paradaId: number, obs: stri
 
 export async function historicoClienteAction(q: string): Promise<ResultadoAcao<HistCliente[]>> {
   if (String(q || "").trim().length < 3) return { ok: true, dados: [] } as ResultadoAcao<HistCliente[]>;
-  return executar(() => historicoCliente(q.trim()));
+  return executar(() => historicoCliente(q.trim()), [], { sac: true });
 }
 
 export async function buscarEntregasAction(q: string): Promise<ResultadoAcao<BuscaEntrega[]>> {
   if (String(q || "").trim().length < 3) return { ok: true, dados: [] } as ResultadoAcao<BuscaEntrega[]>;
-  return executar(() => buscarEntregas(q.trim()));
+  return executar(() => buscarEntregas(q.trim()), [], { sac: true });
 }
 
 export async function listarDanfesAction(cargaId: number): Promise<ResultadoAcao<DanfeCarga[]>> {
@@ -244,11 +246,11 @@ export async function acaoEntregaAction(
   if (acao === "mover_carga" && !(Number(valor) > 0)) return { ok: false, erro: "Escolha a carga de destino." };
   const revalidar = [`${BASE}/expedicao`];
   if (cargaId) revalidar.push(`${BASE}/cargas/${cargaId}`);
-  return executar((operador) => acaoEntrega(pickingId, acao, valor, operador), revalidar);
+  return executar((operador) => acaoEntrega(pickingId, acao, valor, operador), revalidar, { sac: true });
 }
 
 export async function itensEntregaAction(pickingId: number): Promise<ResultadoAcao<ItemEntregaOdoo[]>> {
-  return executar(() => lerItensEntrega(pickingId));
+  return executar(() => lerItensEntrega(pickingId), [], { sac: true });
 }
 
 export async function separarPendenciaAction(pickingId: number, motivo: string, codigos: string[], cargaId?: number): Promise<ResultadoAcao<{ pendencia: string; itens: string }>> {
@@ -256,13 +258,13 @@ export async function separarPendenciaAction(pickingId: number, motivo: string, 
   if (!codigos.length) return { ok: false, erro: "Marque o item que vai para a pendência." };
   const revalidar = [`${BASE}/expedicao`];
   if (cargaId) revalidar.push(`${BASE}/cargas/${cargaId}`);
-  return executar((operador) => separarPendencia(pickingId, motivo.trim(), codigos, operador), revalidar);
+  return executar((operador) => separarPendencia(pickingId, motivo.trim(), codigos, operador), revalidar, { sac: true });
 }
 
 export async function transferirItensAction(pickingId: number, companyId: number, codigos: string[]): Promise<ResultadoAcao<EntregaOdoo>> {
   if (!(companyId > 0)) return { ok: false, erro: "Escolha a filial." };
   if (!codigos.length) return { ok: false, erro: "Marque os itens que vão." };
-  return executar((operador) => transferirItens(pickingId, companyId, codigos, operador), [`${BASE}/expedicao`]);
+  return executar((operador) => transferirItens(pickingId, companyId, codigos, operador), [`${BASE}/expedicao`], { sac: true });
 }
 
 export async function estornarEntregaAction(pickingId: number): Promise<ResultadoAcao<{ estornada: string; retorno: string; nova: string }>> {
@@ -270,7 +272,7 @@ export async function estornarEntregaAction(pickingId: number): Promise<Resultad
 }
 
 export async function historicoEntregaAction(pickingId: number): Promise<ResultadoAcao<HistoricoEntrega>> {
-  return executar((operador) => historicoEntrega(pickingId, operador));
+  return executar((operador) => historicoEntrega(pickingId, operador), [], { sac: true });
 }
 
 // Pedido de abastecimento da loja: CD atende (NF 5152 CD -> loja) ou cancela.

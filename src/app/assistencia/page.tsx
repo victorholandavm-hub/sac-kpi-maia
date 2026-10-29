@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import { Store, Box, Wrench, Headphones, Hammer, Truck, ShieldCheck, DollarSign, UserCheck } from "lucide-react";
 
 // Nunca servir isso de cache estático/CDN — sempre gerar fresco a cada request.
@@ -9,10 +8,13 @@ export const dynamic = "force-dynamic";
 // alternando laranja/verde por papel), ícone num círculo sutil, hierarquia
 // de texto mais clara, hover suave -- "faça isso localmente primeiro" (pra
 // ele revisar antes de estender esse mesmo estilo pras 9 telas de login).
+// Cada cartão passa por /assistencia/sair antes do login (Victor 29/10/2026:
+// voltar aqui e clicar num perfil sempre pede login de novo). <a> comum, sem
+// prefetch: o prefetch do Link sairia da sessão só de abrir a tela.
 function RoleCard({ href, icon, title, subtitle }: { href: string; icon: React.ReactNode; title: string; subtitle: string }) {
   return (
-    <Link
-      href={href}
+    <a
+      href={`/assistencia/sair?para=${encodeURIComponent(href)}`}
       className="group rounded-xl border p-5 flex flex-col items-center text-center gap-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--brand-green)]"
       style={{ background: "var(--surface-1)", borderColor: "var(--border)" }}
     >
@@ -30,7 +32,7 @@ function RoleCard({ href, icon, title, subtitle }: { href: string; icon: React.R
           {subtitle}
         </span>
       </div>
-    </Link>
+    </a>
   );
 }
 

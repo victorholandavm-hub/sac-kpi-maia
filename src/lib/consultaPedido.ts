@@ -671,14 +671,17 @@ async function anexarHistoricoOdoo(r: ResultadoConsulta) {
 // venda sem entrega do Protheus e mostra os dois no mesmo cartão (o pedido sai
 // da lista "Pedidos do Odoo"). Mesma nota em mais de uma filial: só liga se
 // for uma venda só.
+// 29/10 (Victor, cliente THALYTA: "o mesmo cliente mostrando duas informações
+// diferentes"): liga também a venda que já tinha carga no Protheus -- o
+// status do Protheus parou em 24/10 e o que vale agora é o do Odoo.
 export function ligarVendasMigradas(r: ResultadoConsulta) {
   if (!r.odoo?.length) return;
-  const vendasSemEntrega = r.clientes.flatMap((c) => c.pedidos).filter((p) => p.venda && !p.entrega && !p.odooLigado);
+  const vendasMigraveis = r.clientes.flatMap((c) => c.pedidos).filter((p) => p.venda && !p.odooLigado && !(p.entrega && nomePedidoOdoo(p.entrega.pedido)));
   const ligados = new Set<string>();
   for (const o of r.odoo) {
     const m = (o.nf5922 ?? "").match(/^0*(\d+)\/(\w+)$/);
     if (!m) continue;
-    const iguais = vendasSemEntrega.filter((p) => p.venda!.notaFiscal.replace(/^0+/, "") === m[1] && p.venda!.serie.trim() === m[2] && !p.odooLigado);
+    const iguais = vendasMigraveis.filter((p) => p.venda!.notaFiscal.replace(/^0+/, "") === m[1] && p.venda!.serie.trim() === m[2] && !p.odooLigado);
     if (iguais.length !== 1) continue;
     iguais[0].odooLigado = { ...o, vendaProtheus: `NF ${m[1]}` };
     ligados.add(o.pedido);

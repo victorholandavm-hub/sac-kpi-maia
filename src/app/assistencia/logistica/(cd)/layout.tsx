@@ -4,6 +4,7 @@ import { ToastProvider } from "@/components/assistencia/ToastProvider";
 import { getOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import { LogisticaTabs } from "@/components/logisticaOdoo/LogisticaTabs";
 import { ROTAS_OPERADOR_LOJA } from "@/lib/operadorLoja";
+import { BotaoSair } from "@/components/assistencia/BotaoSair";
 
 // Logística do CD (roteirizador/expedição + cargas) sobre o Odoo. Mora sob
 // /assistencia de propósito: o proxy.ts deixa /assistencia passar e cada
@@ -36,6 +37,7 @@ export default async function LogisticaCdLayout({ children }: { children: React.
           <Link href="/assistencia" className="text-sm underline" style={{ color: "var(--text-secondary)" }}>
             ← Início
           </Link>
+          <BotaoSair />
         </AssistenciaHeader>
         <LogisticaTabs somente={op.loja ? ROTAS_OPERADOR_LOJA : undefined} />
         {children}

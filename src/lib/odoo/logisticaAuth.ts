@@ -17,7 +17,7 @@ import { getOptionalProfile } from "@/lib/dal";
 import { DISPATCH_SUPERVISOR_DRIVERS } from "@/lib/assistenciaLabels";
 import { operadorLoja, type OperadorLoja } from "@/lib/operadorLoja";
 
-export type OperadorLogistica = { nome: string; origem: "cd" | "equipe"; operadorOdoo: string; loja?: OperadorLoja | null };
+export type OperadorLogistica = { nome: string; origem: "cd" | "equipe" | "sac"; operadorOdoo: string; loja?: OperadorLoja | null };
 
 export async function getOperadorLogistica(): Promise<OperadorLogistica | null> {
   const store = await cookies();
@@ -37,6 +37,16 @@ export async function exigirOperadorLogistica(): Promise<OperadorLogistica> {
   const op = await getOperadorLogistica();
   if (!op) throw new Error("Sessão do CD expirada. Entre de novo pelo login do CD.");
   return op;
+}
+
+// SAC na Expedição (Victor 29/10/2026): as ações por entrega (pendência, data
+// programada, filial, anotação, histórico, nota de entrega), nunca as da carga.
+export async function exigirOperadorExpedicao(): Promise<OperadorLogistica> {
+  const op = await getOperadorLogistica();
+  if (op) return op;
+  const profile = await getOptionalProfile();
+  if (profile?.role === "sac") return { nome: profile.fullName, origem: "sac", operadorOdoo: `SAC ${profile.fullName}` };
+  throw new Error("Sessão expirada. Entre de novo no sistema.");
 }
 
 export type MotoristaSessao = { nome: string; supervisor: boolean };

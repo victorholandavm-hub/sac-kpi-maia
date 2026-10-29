@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BotaoSair } from "@/components/assistencia/BotaoSair";
 
 // Menu de abas do SAC -- as 3 telas são rotas independentes (sac/* e
 // encomendas/sac ficam fora do grupo (app) de propósito, ver
@@ -37,6 +38,8 @@ const TABS = [
 
 export type SacTabKey = (typeof TABS)[number]["key"];
 
+// Sair em todas as abas menos Solicitações (já tem no cabeçalho) -- Victor
+// 29/10/2026.
 // Pílulas (era sublinhado) -- migração pro Design System unificado, pedido
 // do Victor 18/10/2026: "elimine a barra laranja horizontal dura do menu
 // superior antigo... os botões ativos devem ganhar uma pílula de cor
@@ -45,26 +48,29 @@ export type SacTabKey = (typeof TABS)[number]["key"];
 // só não precisa mais do trilho `border-b` por baixo.
 export function SacTabs({ active }: { active: SacTabKey }) {
   return (
-    <nav className="flex items-center gap-1.5 overflow-x-auto min-w-0 -mx-1 px-1 pb-1">
-      {TABS.filter((tab) => !("hidden" in tab && tab.hidden)).map((tab) => {
-        const isActive = tab.key === active;
-        return (
-          <Link
-            key={tab.key}
-            href={tab.href}
-            className={`text-sm font-medium tracking-wide px-3.5 py-1.5 rounded-full shrink-0 whitespace-nowrap transition-colors duration-200 ${
-              isActive ? "" : "bg-[var(--surface-2)] hover:bg-[var(--brand-green-soft)]"
-            }`}
-            style={{
-              background: isActive ? "var(--brand-green)" : undefined,
-              color: isActive ? "var(--brand-green-ink)" : "var(--text-secondary)",
-              fontWeight: isActive ? 600 : 500,
-            }}
-          >
-            {tab.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <div className="flex items-center gap-2 min-w-0">
+      <nav className="flex flex-1 items-center gap-1.5 overflow-x-auto min-w-0 -mx-1 px-1 pb-1">
+        {TABS.filter((tab) => !("hidden" in tab && tab.hidden)).map((tab) => {
+          const isActive = tab.key === active;
+          return (
+            <Link
+              key={tab.key}
+              href={tab.href}
+              className={`text-sm font-medium tracking-wide px-3.5 py-1.5 rounded-full shrink-0 whitespace-nowrap transition-colors duration-200 ${
+                isActive ? "" : "bg-[var(--surface-2)] hover:bg-[var(--brand-green-soft)]"
+              }`}
+              style={{
+                background: isActive ? "var(--brand-green)" : undefined,
+                color: isActive ? "var(--brand-green-ink)" : "var(--text-secondary)",
+                fontWeight: isActive ? 600 : 500,
+              }}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
+      </nav>
+      {active === "solicitacoes" ? null : <BotaoSair />}
+    </div>
   );
 }

@@ -7,7 +7,9 @@ import type { ItemEntregaOdoo } from "@/lib/odoo/logistica";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { botaoClass, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
-export type AlvoEntrega = { pickingId: number; nome: string; cliente: string; acao: AcaoEntrega; cargaId?: number; companyId?: number };
+// notaEntrega: a mesma retirada_cd vista pelo SAC ("Nota de entrega": emite a
+// 5117 e dá baixa como entregue) -- Victor 29/10/2026.
+export type AlvoEntrega = { pickingId: number; nome: string; cliente: string; acao: AcaoEntrega; cargaId?: number; companyId?: number; notaEntrega?: boolean };
 
 // Um diálogo só para todos os verbos da entrega (o que o CD faz no
 // "Outras ações ▸ Alterar" do Roteirizador). Cada verbo pede o valor certo:
@@ -74,7 +76,7 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
     };
   }, [alvo]);
 
-  const titulo = `${ACAO_ENTREGA_LABELS[alvo.acao]} · ${alvo.nome}`;
+  const titulo = `${alvo.notaEntrega ? "Nota de entrega" : ACAO_ENTREGA_LABELS[alvo.acao]} · ${alvo.nome}`;
 
   function confirmar() {
     if (!alvo) return;
@@ -84,10 +86,16 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
     }
     if (alvo.acao === "historico") return;
     if (alvo.acao === "retirada_cd") {
-      if (!window.confirm(`Confirmar que ${valor || "o fretista"} retirou ${alvo.nome} no CD? Sai a nota de saída (5117) agora.`)) return;
+      const pergunta = alvo.notaEntrega
+        ? `Emitir a nota de entrega (5117) de ${alvo.nome} e dar baixa como entregue para ${valor}?`
+        : `Confirmar que ${valor || "o fretista"} retirou ${alvo.nome} no CD? Sai a nota de saída (5117) agora.`;
+      if (!window.confirm(pergunta)) return;
       run(
         () => retiradaNoCdAction(alvo.companyId ?? 13, alvo.pickingId, valor),
-        (d) => `Retirada registrada (carga ${d.romaneio}). ${d.notas.join(" · ") || "Nota emitida."} Imprima a DANFE em Cargas › ${d.romaneio}.`,
+        (d) =>
+          alvo.notaEntrega
+            ? `Nota de entrega emitida e baixa dada (carga ${d.romaneio}). ${d.notas.join(" · ")} A DANFE sai na Consulta de pedido.`
+            : `Retirada registrada (carga ${d.romaneio}). ${d.notas.join(" · ") || "Nota emitida."} Imprima a DANFE em Cargas › ${d.romaneio}.`,
         onFechar,
       );
       return;
@@ -126,7 +134,15 @@ function Dialogo({ alvo, empresas, cargas, onFechar }: { alvo: AlvoEntrega; empr
           </button>
         </div>
 
-        {alvo.acao === "retirada_cd" ? (
+        {alvo.acao === "retirada_cd" && alvo.notaEntrega ? (
+          <>
+            <p className="text-sm">
+              Emite a <b>nota de entrega (5117)</b> deste pedido e dá <b>baixa como entregue</b>. Escreva <b>quem recebeu ou retirou</b> (nome,
+              documento; se for fretista, a placa) — fica no histórico do pedido. Leva até 1 minuto.
+            </p>
+            <textarea autoFocus rows={2} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="ex.: Maria da Silva, CPF 000.000.000-00" className={inputClass} style={inputStyle} />
+          </>
+        ) : alvo.acao === "retirada_cd" ? (
           <>
             <p className="text-sm">
               O cliente mandou alguém buscar no CD. Escreva <b>quem retirou</b> (nome, documento e placa). O sistema emite a nota de saída (5117), dá

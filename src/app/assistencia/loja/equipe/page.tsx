@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { listCaixasForStores } from "@/lib/caixas";
 import { listAssemblersForStoresWithStoreName } from "@/lib/payments";
 import { AssistenciaHeader } from "@/components/assistencia/AssistenciaHeader";
+import { BotaoSair } from "@/components/assistencia/BotaoSair";
 import { EquipeCaixaPinField } from "@/components/assistencia/EquipeCaixaPinField";
 import { AddEquipeCaixaForm } from "@/components/assistencia/AddEquipeCaixaForm";
 import { AddEquipeMontadorForm } from "@/components/assistencia/AddEquipeMontadorForm";
@@ -36,7 +37,9 @@ export default async function LojaEquipePage() {
     {/* Largura total -- pedido do Victor 31/08/2026, mesmo tratamento
         das outras telas fora do grupo (app). */}
     <div className="w-full p-6 flex flex-col gap-6 min-w-0">
-      <AssistenciaHeader title="Equipe da loja" subtitle="Cadastre a caixa que lança encomenda" />
+      <AssistenciaHeader title="Equipe da loja" subtitle="Cadastre a caixa que lança encomenda">
+        <BotaoSair />
+      </AssistenciaHeader>
 
       <Link href="/assistencia/loja" className="text-sm underline self-start text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
         ← Voltar
