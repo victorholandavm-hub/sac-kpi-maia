@@ -713,9 +713,13 @@ export function emitirDevolucaoFornecedor(corpo: {
 
 // 28/10/2026 (Pedro/Flávio): transferências enviadas/recebidas de uma loja ou do CD (ponte /caixa/transferencias, perfil logistica)
 export type TransferenciaLoja = {
-  sentido: "enviada" | "recebida"; numero: string; serie: string; data: string; loja: string; valor: number; estado: string; chave: string; obs?: string;
+  sentido: "enviada" | "recebida"; numero: string; serie: string; data: string; loja: string; valor: number; estado: string; chave: string; obs?: string; loja_company_id?: number;
   itens: { codigo: string; nome: string; qtd: number }[];
 };
+// 29/10 (Eduardo/Pedro): o CD devolve/recusa uma transferência recebida — sai 5152 do CD de volta para a loja só com o marcado
+export function devolverTransferenciaLoja(dados: { company_id: number; chave: string; itens: { codigo: string; qtd: number }[]; obs?: string }, operador: string) {
+  return json<{ ok: boolean; numero?: string; chave?: string; erro?: string }>("/caixa/transferencias/devolver", { perfil: "logistica", metodo: "POST", corpo: { ...dados, operador } });
+}
 export async function listarTransferenciasLoja(companyId: number, dias = 30): Promise<TransferenciaLoja[]> {
   const r = await json<{ transferencias?: TransferenciaLoja[] }>("/caixa/transferencias", { perfil: "logistica", query: { company_id: companyId, dias } });
   return r.transferencias ?? [];

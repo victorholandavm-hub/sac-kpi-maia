@@ -1,4 +1,5 @@
 import { listarTransferenciasLoja, type TransferenciaLoja } from "@/lib/odoo/logistica";
+import { DevolverTransferencia } from "./DevolverTransferencia";
 
 // 28/10/2026 (Pedro/Flávio): transferências que CHEGAM no CD (lojas mandando produto para o 213), com a observação
 // que a loja escreveu na nota (avaria, cliente, mostruário...). Também mostra as enviadas, para conferência.
@@ -30,6 +31,7 @@ export async function TransferenciasRecebidas({ empresaAtual, sentido }: { empre
             <th className="text-left pr-3">Observação da loja</th>
             <th className="text-right pr-3">Valor</th>
             <th className="text-left">DANFE</th>
+            {sentido === "recebida" ? <th className="text-left pl-3">Ação</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -42,6 +44,7 @@ export async function TransferenciasRecebidas({ empresaAtual, sentido }: { empre
               <td className="pr-3 align-top">{t.obs ? <b>{t.obs}</b> : <span style={{ color: "var(--text-secondary)" }}>—</span>}</td>
               <td className="pr-3 align-top text-right whitespace-nowrap">{brl(t.valor)}</td>
               <td className="align-top">{t.chave ? <a className="underline" href={`/assistencia/logistica/pdf/nota/${t.chave}`} target="_blank" rel="noreferrer">abrir</a> : "—"}</td>
+              {sentido === "recebida" ? <td className="align-top pl-3"><DevolverTransferencia companyId={empresaAtual || 13} chave={t.chave} numero={`${t.numero}/${t.serie}`} itens={t.itens} /></td> : null}
             </tr>
           ))}
         </tbody>

@@ -6,7 +6,7 @@
 // dado -- ver ResultadoAcao em logisticaTipos.ts.
 
 import { revalidatePath } from "next/cache";
-import { transferirItens, limparCacheExpedicao } from "@/lib/odoo/logistica";
+import { transferirItens, limparCacheExpedicao, devolverTransferenciaLoja } from "@/lib/odoo/logistica";
 import {
   acaoEntrega,
   lerItensEntrega,
@@ -287,6 +287,13 @@ export async function atenderAbastAction(id: number, itens: { codigo: string; qt
   const lista = itens.filter((i) => i.codigo && Number(i.qtd) > 0).map((i) => ({ codigo: i.codigo, qtd: Number(i.qtd) }));
   if (!lista.length) return { ok: false, erro: "Nada para atender: as quantidades estão zeradas." };
   return executar((operador) => atenderSolicitacaoAbast(id, lista, operador), [`${BASE}/abastecimento`]);
+}
+
+// 29/10 (Eduardo/Pedro): devolver/recusar transferência recebida no CD
+export async function devolverTransferenciaAction(companyId: number, chave: string, itens: { codigo: string; qtd: number }[], obs?: string) {
+  const lista = itens.filter((i) => i.codigo && Number(i.qtd) > 0).map((i) => ({ codigo: i.codigo, qtd: Number(i.qtd) }));
+  if (!lista.length) return { ok: false as const, erro: "Marque pelo menos um item com quantidade." };
+  return executar((operador) => devolverTransferenciaLoja({ company_id: companyId, chave, itens: lista, obs }, operador), [`${BASE}/inventario`]);
 }
 
 export async function novoAbastAction(companyId: number, itens: { codigo: string; qtd: number }[], atender: boolean, obs?: string) {

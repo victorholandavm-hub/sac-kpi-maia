@@ -136,7 +136,12 @@ export function ParadaOdooBaixa({ cargaId, paradaId, rotulo, motivos, itens = []
       return;
     }
     if (resultado === "insucesso" && !tem("local")) {
-      showToast("Tire uma foto do local (fachada/porta) para registrar que você esteve lá.", "error");
+      // 29/10 (Pedro, motorista travado): o motorista tirou a foto com o botão "Canhoto" marcado e o app recusava
+      // o "não consegui" 10 vezes. Se já tem foto, a última vale como foto do local; se não tem, deixa o botão
+      // "Foto do local" já marcado para a próxima foto.
+      // Pedro (29/10): NÃO reaproveitar outra foto — o motorista tem que tocar em "Foto do local" e tirar a foto do local.
+      setTipoFoto("local");
+      showToast("Marquei \"Foto do local\" para você: agora toque em Tirar foto e fotografe a fachada/porta.", "error");
       return;
     }
     startTransition(async () => {
