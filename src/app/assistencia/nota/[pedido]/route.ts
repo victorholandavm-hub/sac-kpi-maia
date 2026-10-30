@@ -4,10 +4,12 @@ import { getOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import { baixarDanfePdf, buscarEntregas, mensagemDeErro } from "@/lib/odoo/logistica";
 import { pedidoIdOdoo } from "@/lib/odooExpedicaoSync";
 import { nomePedidoOdoo } from "@/lib/pedidoOdoo";
+import { consultarPedidosOdoo } from "@/lib/consultaOdooPonte";
 
 // DANFE do cliente pro SAC imprimir -- Victor 26/10/2026. Pedido do Odoo pelo
 // nome (S01589 / ODOO-S01589); o id vem de odoo_expedicao. ?doc=5922 (venda,
-// padrão) ou 5117 (entrega). Nota emitida no Protheus a ponte não tem.
+// padrão) ou 5117 (entrega). Venda migrada do Protheus (30/10, Victor: SAC
+// imprimir a nota de entrega pela Expedição): a nota antiga sai pela chave.
 
 function aviso(titulo: string, texto: string, status: number) {
   const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${titulo}</title>
@@ -47,6 +49,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ pedido: str
   } catch (err) {
     const msg = mensagemDeErro(err);
     if (/não tem a 5(922|117)/.test(msg)) {
+      const legado = (await consultarPedidosOdoo(nome).catch(() => [])).find((x) => x.pedido === nome)?.legado;
+      const chave = doc === "5117" ? legado?.chave_5117 : legado?.chave_5922;
+      if (chave) return new NextResponse(null, { status: 303, headers: { Location: `/assistencia/nota-chave/${chave}` } });
       return aviso(
         doc === "5922" ? "Nota de venda não emitida no Odoo" : "Nota de entrega ainda não emitida",
         doc === "5922"

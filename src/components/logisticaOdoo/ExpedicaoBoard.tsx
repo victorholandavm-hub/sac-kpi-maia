@@ -545,11 +545,18 @@ export function ExpedicaoBoard({
                   {x.situacao}
                 </span>
               </span>
-              {x.carga_id ? (
-                <a href={`/assistencia/logistica/cargas/${x.carga_id}?empresa=${companyId}`} className="text-sm underline">
-                  abrir carga
-                </a>
-              ) : null}
+              <span className="flex gap-3 items-center">
+                {x.nf5117 && x.pedido ? (
+                  <a href={`/assistencia/nota/${encodeURIComponent(x.pedido)}?doc=5117`} target="_blank" rel="noopener noreferrer" className="text-sm underline" title="DANFE da nota de entrega (5117)">
+                    🖨 Nota de entrega
+                  </a>
+                ) : null}
+                {x.carga_id ? (
+                  <a href={`/assistencia/logistica/cargas/${x.carga_id}?empresa=${companyId}`} className="text-sm underline">
+                    abrir carga
+                  </a>
+                ) : null}
+              </span>
             </div>
           ))}
         </div>
