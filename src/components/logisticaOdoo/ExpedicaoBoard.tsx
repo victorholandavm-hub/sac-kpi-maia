@@ -63,6 +63,8 @@ export function ExpedicaoBoard({
   const [visao, setVisao] = useState<VisaoExpedicao>("fila");
   const [zona, setZona] = useState("");
   const [modo, setModo] = useState("");
+  // 30/10 (Victor/Jhon): no "Retira depois (ABA/CD)", filtrar pela loja onde o cliente retira.
+  const [lojaRetira, setLojaRetira] = useState("");
   const [busca, setBusca] = useState("");
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [alvo, setAlvo] = useState<AlvoEntrega | null>(null);
@@ -113,6 +115,11 @@ export function ExpedicaoBoard({
     if (todas.some((e) => e.expresso)) m.push("expresso");
     return m;
   }, [todas]);
+  const lojasRetira = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const e of expedicao.entregas) if (e.modo === "retira_depois") n.set(e.retira_em || "—", (n.get(e.retira_em || "—") ?? 0) + 1);
+    return [...n].sort(([a], [b]) => a.localeCompare(b));
+  }, [expedicao]);
   const temRetornoNoOdoo = todas.some((e) => typeof e.retorno === "boolean");
   const filtradas = filtrarExpedicao(expedicao.entregas, expedicao.pendencias, { visao, zona, modo, busca });
   const daBusca =
@@ -121,7 +128,7 @@ export function ExpedicaoBoard({
           (e) => achadosPelaBusca.has(e.picking_id) && !filtradas.some((f) => f.picking_id === e.picking_id),
         )
       : [];
-  const lista = [...filtradas, ...daBusca];
+  const lista = [...filtradas, ...daBusca].filter((e) => modo !== "retira_depois" || !lojaRetira || (e.retira_em || "—") === lojaRetira);
   // 30/10 (Jhon, S01825): a saída antiga (concluída, "Entregue") de um pedido que já tem saída aberta na lista não aparece aqui.
   const foraDaLista = fora.filter((x) => !lista.some((e) => e.picking_id === x.picking_id || (!!x.pedido && e.pedido === x.pedido)));
   const vols = somarVolumes(lista);
@@ -251,7 +258,16 @@ export function ExpedicaoBoard({
               </option>
             ))}
           </select>
-          <select value={modo} onChange={(e) => setModo(e.target.value)} className={inputClass} style={inputStyle} aria-label="Modo">
+          <select
+            value={modo}
+            onChange={(e) => {
+              setModo(e.target.value);
+              setLojaRetira("");
+            }}
+            className={inputClass}
+            style={inputStyle}
+            aria-label="Modo"
+          >
             <option value="">Todos os modos (entrega, retira ABA…)</option>
             {modos.map((m) => (
               <option key={m} value={m}>
@@ -259,6 +275,16 @@ export function ExpedicaoBoard({
               </option>
             ))}
           </select>
+          {modo === "retira_depois" ? (
+            <select value={lojaRetira} onChange={(e) => setLojaRetira(e.target.value)} className={inputClass} style={inputStyle} aria-label="Loja de retirada">
+              <option value="">Todas as lojas de retirada</option>
+              {lojasRetira.map(([loja, n]) => (
+                <option key={loja} value={loja}>
+                  {loja === "—" ? "Sem loja informada" : `Retira na loja ${loja}`} ({n})
+                </option>
+              ))}
+            </select>
+          ) : null}
           <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Cliente, pedido, bairro, CEP, NF" className={inputClass} style={inputStyle} />
           <div className="flex gap-2">
             <button type="button" onClick={() => router.refresh()} className={botaoClass} style={botaoStyle}>
