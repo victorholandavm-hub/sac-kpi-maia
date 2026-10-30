@@ -266,11 +266,16 @@ async function enrollPendingNps(
 // disso porque a mesma conversa pode ter mais de uma pesquisa (SAC +
 // montagem + assistência) ao longo do tempo.
 async function detectPendingNpsResponses(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<number> {
+  // 30/10 (Victor: "Pós-Montagem/Pós-Assistência publicados e nenhuma resposta"): sem ordem nem data, o limite
+  // pegava sempre as mesmas 100 pendentes mais antigas (desde 22/09) e as novas nunca eram lidas -- mesmo
+  // defeito já corrigido nas outras pesquisas. Agora: as mais recentes primeiro, dos últimos 30 dias.
   const { data: pending } = await supabase
     .from("service_request_nps")
     .select("request_id, ghl_contact_id, enviado_em")
     .is("respondido_em", null)
-    .limit(100);
+    .gte("enviado_em", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    .order("enviado_em", { ascending: false })
+    .limit(200);
   if (!pending || pending.length === 0) return 0;
 
   let answered = 0;
