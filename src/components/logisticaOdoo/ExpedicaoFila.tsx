@@ -5,6 +5,7 @@ import { ExpedicaoBoard } from "./ExpedicaoBoard";
 import { EmpresaSelect } from "./EmpresaSelect";
 import { ErroOdoo } from "./ui";
 import { NotasDeOutros } from "./NotasDeOutros";
+import { NaoEntreguesSemReentrega } from "./NaoEntreguesSemReentrega";
 import { aplicarDatasProgramadas } from "@/lib/odoo/dataProgramada";
 
 // Fila de expedição = tela "Entregas e Retiradas" do Roteirizador do
@@ -57,6 +58,7 @@ export async function ExpedicaoFila({ sp, sac = false }: { sp: { empresa?: strin
         <EmpresaSelect empresas={empresas} atual={empresa} />
       </div>
       {!sac ? <NotasDeOutros /> : null}
+      {!sac ? <NaoEntreguesSemReentrega /> : null}
       {falhas.length && falhas.length < partes.length ? (
         <p className="text-sm" style={{ color: "var(--status-serious)" }}>Algumas lojas não responderam agora ({falhas.length}); a lista pode estar incompleta.</p>
       ) : null}

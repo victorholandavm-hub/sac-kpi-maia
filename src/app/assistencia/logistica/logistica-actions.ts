@@ -82,6 +82,7 @@ import { inventarioAplicar, inventarioSaldo } from "@/lib/odoo/logistica";
 import { getOperadorLogistica, exigirOperadorExpedicao, exigirOperadorLogistica } from "@/lib/odoo/logisticaAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { registrarAcaoCarga } from "@/lib/odoo/cargaAcoes";
+import { corrigirBusca } from "@/lib/naoEntregues";
 import type {
   AcaoCarga,
   AcaoCargaResposta,
@@ -234,7 +235,7 @@ export async function historicoClienteAction(q: string): Promise<ResultadoAcao<H
 
 export async function buscarEntregasAction(q: string): Promise<ResultadoAcao<BuscaEntrega[]>> {
   if (String(q || "").trim().length < 3) return { ok: true, dados: [] } as ResultadoAcao<BuscaEntrega[]>;
-  return executar(() => buscarEntregas(q.trim()), [], { sac: true });
+  return executar(async () => corrigirBusca(await buscarEntregas(q.trim())), [], { sac: true });
 }
 
 export async function listarDanfesAction(cargaId: number): Promise<ResultadoAcao<DanfeCarga[]>> {
