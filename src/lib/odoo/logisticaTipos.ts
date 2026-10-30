@@ -43,6 +43,16 @@ export const MODO_LABELS: Record<string, string> = {
   na_hora: "Levou na hora",
 };
 
+// Situação da saída (stock.picking) em português -- Victor 30/10/2026.
+export const ESTADO_SAIDA_LABELS: Record<string, string> = {
+  draft: "rascunho",
+  waiting: "esperando outra operação",
+  confirmed: "aguardando estoque",
+  assigned: "pronta",
+  done: "concluída",
+  cancel: "cancelada",
+};
+
 export type ResultadoParada = "entregue" | "entrega_parcial" | "insucesso" | "reagendada";
 export const RESULTADO_LABELS: Record<ResultadoParada, string> = {
   entregue: "Entregue",

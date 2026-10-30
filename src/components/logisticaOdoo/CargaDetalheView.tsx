@@ -17,6 +17,7 @@ import {
 import {
   ESTADOS_EDITAVEIS,
   ESTADO_CARGA_LABELS,
+  ESTADO_SAIDA_LABELS,
   PROXIMA_ACAO,
   RESULTADO_LABELS,
   TIPO_CARGA_LABELS,
@@ -519,7 +520,7 @@ export function CargaDetalheView({
                     <span key={pk.picking_id} className="inline-flex items-center gap-1">
                       <Chip>
                         {pk.nome}
-                        {pk.pedido ? ` · ${pk.pedido}` : ""} ({pk.estado})
+                        {pk.pedido ? ` · ${pk.pedido}` : ""} ({ESTADO_SAIDA_LABELS[pk.estado] ?? pk.estado})
                       </Chip>
                       <select
                         value=""
