@@ -170,15 +170,20 @@ export async function detectNpsEntregaOdooResponses(): Promise<number> {
     const score = Number(NPS_1_5_PATTERN.exec(resposta.body!.trim())![1]);
     await admin.from("nps_entrega_odoo").update({ score, respondido_em: resposta.dateAdded }).eq("fase", row.fase).eq("pedido", row.pedido);
     respondidas++;
-    const avaliacao = { origem: row.fase === "compra" ? ("compra" as const) : ("entrega" as const), origemId: `odoo:${row.pedido}`, clientId: clientePeloTelefone(row.telefone), storeId: row.loja };
+    // Link do Google da loja onde o cliente COMPROU (a saída quase sempre é do CD 213, que não tem link) -- 30/10/2026.
+    const lojaDaVenda = (await admin.from("totvs_orders").select("branch").eq("invoice", row.pedido).eq("serie", "ODOO").limit(1).maybeSingle()).data?.branch as string | undefined;
+    const avaliacao = { origem: row.fase === "compra" ? ("compra" as const) : ("entrega" as const), origemId: `odoo:${row.pedido}`, clientId: clientePeloTelefone(row.telefone), storeId: lojaDaVenda ?? row.loja };
     if (row.fase === "compra") {
       await encaminharPelaNota(admin, { score, ghlContactId: row.ghl_contact_id, conta, avaliacao });
       continue;
     }
-    try {
-      await sendGhlMessage(row.ghl_contact_id, "Muito obrigado! 🙏 Se tiver alguma sugestão pra melhorarmos, pode escrever aqui 👇");
-    } catch {
-      // sem a mensagem de agradecimento a nota já está gravada
+    // Só pra nota 4-5 (30/10, Victor): na nota baixa o fluxo do GHL já manda o "Lamentamos…" e o SAC assume a conversa.
+    if (score >= 4) {
+      try {
+        await sendGhlMessage(row.ghl_contact_id, "Muito obrigado! 🙏 Se tiver alguma sugestão pra melhorarmos, pode escrever aqui 👇");
+      } catch {
+        // sem a mensagem de agradecimento a nota já está gravada
+      }
     }
     await encaminharPelaNota(admin, { score, ghlContactId: row.ghl_contact_id, conta, avaliacao });
   }
