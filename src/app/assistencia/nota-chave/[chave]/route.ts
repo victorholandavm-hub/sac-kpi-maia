@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOptionalProfile } from "@/lib/dal";
 import { getOperadorLogistica } from "@/lib/odoo/logisticaAuth";
-import { baixarDanfeChavePdf, mensagemDeErro } from "@/lib/odoo/logistica";
+import { mensagemDeErro } from "@/lib/odoo/logistica";
+import { pdfDaNotaPorChave } from "@/lib/notaPdf";
 import { xmlDaNota } from "@/lib/copiaXmlNotas";
-import { gerarDanfe, lerNfe } from "@/lib/danfe";
 
 // DANFE de qualquer nota pela chave de acesso -- Victor 27/10/2026. A ponte do
 // Pedro gera pelo XML guardado (SPED050/054 do Protheus e as do Odoo), então
@@ -22,14 +22,6 @@ const escapar = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)
 // Nota de venda (5922): a ponte recusa ("a nota que acompanha a mercadoria é
 // a 5117"); a 2ª via sai daqui, do XML autorizado -- Victor 29/10/2026.
 // ?xml=1 devolve o próprio XML.
-async function danfeDoXml(chave: string) {
-  const xml = await xmlDaNota(chave);
-  const nota = lerNfe(xml);
-  return new NextResponse(new Uint8Array(gerarDanfe(nota)), {
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="NF${nota.numero}-${chave.slice(-6)}.pdf"`, "Cache-Control": "no-store" },
-  });
-}
-
 export async function GET(req: NextRequest, ctx: { params: Promise<{ chave: string }> }) {
   const profile = await getOptionalProfile();
   const pode = (profile && ["sac", "assistencia", "admin"].includes(profile.role)) || (await getOperadorLogistica());
@@ -46,19 +38,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ chave: stri
     }
   }
   try {
-    const { bytes, nome } = await baixarDanfeChavePdf(chave, "logistica");
-    return new NextResponse(bytes, {
+    const { bytes, nome } = await pdfDaNotaPorChave(chave);
+    return new NextResponse(new Uint8Array(bytes), {
       headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${nome}"`, "Cache-Control": "no-store" },
     });
   } catch (err) {
     const msg = mensagemDeErro(err);
-    if (/5922|não é impressa/i.test(msg)) {
-      try {
-        return await danfeDoXml(chave);
-      } catch (e) {
-        return aviso("Não consegui gerar a nota", `${escapar(mensagemDeErro(e))}. Tente de novo em instantes.`, 502);
-      }
-    }
     if (/não encontrad/i.test(msg)) return aviso("Nota não encontrada", `A nota de chave ${chave} não está no Protheus nem no Odoo.`, 404);
     return aviso("Não consegui gerar a nota", `${escapar(msg)}. Tente de novo em instantes.`, 502);
   }

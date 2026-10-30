@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { after } from "next/server";
+import { pdfDaNotaPorChave } from "@/lib/notaPdf";
 import { TIPOS_ENTREGA, estoqueAtLigado, faltasNoCd, reconciliarEstoqueAt } from "@/lib/estoqueAt";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -2859,8 +2860,20 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   const isDeliveryTypeCreate = (DELIVERY_REQUEST_TYPES as readonly string[]).includes(type);
   const invoiceFileEntry = formData.get("invoice_file");
   const invoiceFile = invoiceFileEntry instanceof File && invoiceFileEntry.size > 0 ? invoiceFileEntry : null;
-  if (isDeliveryTypeCreate && !invoiceFile) {
-    return { error: "Anexe a nota fiscal (PDF)." };
+  // Nota do sistema escolhida no form (NotaAutomatica, Victor 30/10/2026) --
+  // o PDF é buscado aqui antes de criar, pra não nascer notificação sem nota.
+  const notaChave = String(formData.get("nota_chave") ?? "").replace(/\D/g, "");
+  let notaDoSistema: File | null = null;
+  if (!invoiceFile && notaChave.length === 44) {
+    try {
+      const pdf = await pdfDaNotaPorChave(notaChave);
+      notaDoSistema = new File([pdf.bytes as BlobPart], pdf.nome, { type: "application/pdf" });
+    } catch (err) {
+      return { error: `Não consegui puxar a nota do sistema (${err instanceof Error ? err.message : "erro"}). Tente de novo ou anexe o PDF.` };
+    }
+  }
+  if (isDeliveryTypeCreate && !invoiceFile && !notaDoSistema) {
+    return { error: "Anexe a nota fiscal (PDF) ou busque a nota do cliente." };
   }
   // Só PDF pra nota fiscal -- pedido do Victor 11/09/2026: "para o sac,
   // você so deve permitir que seja anexado pdf, imagem não pode" (foto
@@ -3233,8 +3246,8 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
   // mais (ver isDeliveryTypeCreate acima), então invoiceFile pode ser null
   // aqui.
   try {
-    if (invoiceFile) {
-      await saveRequestPhoto({ requestId: data.id, file: invoiceFile, uploadedBy: profile.fullName, caption: "Nota fiscal", isInvoice: true });
+    if (invoiceFile ?? notaDoSistema) {
+      await saveRequestPhoto({ requestId: data.id, file: (invoiceFile ?? notaDoSistema)!, uploadedBy: profile.fullName, caption: notaDoSistema ? "Nota fiscal (do sistema)" : "Nota fiscal", isInvoice: true });
     }
   } catch (err) {
     return {

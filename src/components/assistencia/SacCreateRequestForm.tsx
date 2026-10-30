@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useActionState } from "react";
 import { AvisoSaldoCd } from "./AvisoSaldoCd";
+import { NotaAutomatica } from "./NotaAutomatica";
 import {
   createSacRequest,
   lookupTotvsClientForTeam,
@@ -505,7 +506,7 @@ export function SacCreateRequestForm({
       storeName: selectedStoreName ?? "",
       categoryLabel: type === "notificacao_externa" ? (SAC_CATEGORY_LABELS[str("sac_category") as keyof typeof SAC_CATEGORY_LABELS] ?? "") : "",
       urgent: !!fd.get("urgent"),
-      invoiceFileName: invoiceFile instanceof File && invoiceFile.size > 0 ? invoiceFile.name : "",
+      invoiceFileName: invoiceFile instanceof File && invoiceFile.size > 0 ? invoiceFile.name : str("nota_rotulo") ? `${str("nota_rotulo")} (do sistema)` : "",
       clientCode,
       clientCpf,
       clientName,
@@ -612,22 +613,11 @@ export function SacCreateRequestForm({
             misturar a nota errada com o cliente errado ao imprimir várias
             de uma vez. */}
         {isDelivery ? (
-          <Field label="Nota fiscal * (PDF)">
-            {/* Só PDF -- pedido do Victor 11/09/2026: "para o sac, você so
-                deve permitir que seja anexado pdf, imagem não pode" (foto
-                de tela/celular vinha ilegível demais pra servir de
-                comprovante fiscal de verdade). `accept` só filtra o que
-                aparece no seletor de arquivo do navegador (UX, contorna
-                fácil) -- a validação de verdade é no servidor
-                (createSacRequest, actions.ts). */}
-            <input
-              name="invoice_file"
-              type="file"
-              required
-              accept="application/pdf"
-              className="rounded border px-3 py-2 text-sm"
-              style={inputStyle}
-            />
+          <Field label="Nota fiscal *">
+            {/* Victor 30/10/2026: a nota vem do sistema (busca pelo CPF/pedido,
+                NotaAutomatica); anexar o PDF à mão continua valendo. Só PDF
+                (11/09/2026) -- a validação de verdade é em createSacRequest. */}
+            <NotaAutomatica cpf={clientCpf} inputStyle={inputStyle} />
           </Field>
         ) : null}
       </FormSection>
