@@ -24,6 +24,7 @@ import {
   type VisaoExpedicao,
 } from "@/lib/odoo/logisticaTipos";
 import { AcaoEntregaDialog, type AlvoEntrega } from "./AcaoEntregaDialog";
+import { outrosPedidosDoCliente } from "@/lib/odoo/outrosPedidosCliente";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { Chip, Kpi, VolumesChips, botaoClass, botaoLaranjaStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
@@ -133,6 +134,7 @@ export function ExpedicaoBoard({
     }
   }
   const volsSel = somarVolumes(selecionadas);
+  const avisosCliente = useMemo(() => outrosPedidosDoCliente(todas, sel), [todas, sel]);
 
   function alternar(id: number) {
     setSel((s) => {
@@ -285,6 +287,28 @@ export function ExpedicaoBoard({
             </h3>
             <VolumesChips volumes={volsSel} />
           </div>
+          {/* 30/10 (Victor/Jhon): o cliente marcado tem outro pedido em aberto na fila ou na pendência */}
+          {avisosCliente.length ? (
+            <div className="rounded-lg px-3 py-2 text-sm flex flex-col gap-1" style={{ background: "#FFF3C4", color: "#5C4400" }}>
+              {avisosCliente.map((a) => (
+                <div key={a.cliente} className="flex flex-wrap items-center gap-2">
+                  <span>
+                    ⚠ <b>{a.cliente}</b> tem {a.outros.length === 1 ? "outro pedido" : `mais ${a.outros.length} pedidos`} em aberto:{" "}
+                    {a.outros
+                      .map((o) => `${o.pedido || o.nome}${o.pendencia ? ` (pendência: ${o.pendencia_motivo || "sem motivo"})` : " (fila)"}${o.data_programada ? ` · programada ${formatarDiaIso(String(o.data_programada))}` : ""}`)
+                      .join("; ")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSel((s) => new Set([...s, ...a.outros.map((o) => o.picking_id)]))}
+                    className="text-xs font-semibold underline"
+                  >
+                    marcar também
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <Campo rotulo="Tipo">
               <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className={inputClass} style={inputStyle}>
