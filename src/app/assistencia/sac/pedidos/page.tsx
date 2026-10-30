@@ -20,7 +20,7 @@ export default async function SacPedidosPage({ searchParams }: { searchParams: P
     <div className="max-w-6xl mx-auto w-full p-6 flex flex-col gap-6 min-w-0">
       <AssistenciaHeader title="Consulta de pedido" subtitle={`${profile.fullName} · ${ROLE_LABELS[profile.role] ?? profile.role}`} />
       <SacTabs active="pedidos" />
-      <ConsultaPedidoView busca={(q ?? "").trim()} acao="/assistencia/sac/pedidos" embutida />
+      <ConsultaPedidoView busca={(q ?? "").trim()} acao="/assistencia/sac/pedidos" embutida troca="/assistencia/sac/troca" />
     </div>
   );
 }

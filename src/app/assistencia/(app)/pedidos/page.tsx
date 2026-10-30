@@ -15,7 +15,7 @@ export default async function AssistenciaPedidosPage({ searchParams }: { searchP
   return (
     <div className="flex flex-col gap-5 min-w-0">
       <OdooTabs active="pedidos" />
-      <ConsultaPedidoView busca={(q ?? "").trim()} acao="/assistencia/pedidos" embutida />
+      <ConsultaPedidoView busca={(q ?? "").trim()} acao="/assistencia/pedidos" embutida troca="/assistencia/sac/troca" />
     </div>
   );
 }

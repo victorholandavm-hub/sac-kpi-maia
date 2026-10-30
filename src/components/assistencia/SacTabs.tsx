@@ -19,6 +19,8 @@ const TABS = [
   // Expedição e Kardex do Odoo, só leitura -- Victor 27/10/2026.
   { key: "expedicao", label: "Expedição", href: "/assistencia/sac/expedicao" },
   { key: "kardex", label: "Kardex", href: "/assistencia/sac/kardex" },
+  // Troca de produto na nota pelo SAC, autorizada pelo Victor -- 30/10/2026.
+  { key: "trocas", label: "Trocas", href: "/assistencia/sac/trocas" },
   // Pedido do Victor 01/10/2026: "quero que todos os atendentes fossem
   // colocando como feito, diariamente" -- checklist pessoal do atendente
   // (ou matriz de controle, se admin, ver cronograma/page.tsx).

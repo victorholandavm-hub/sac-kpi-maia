@@ -280,7 +280,17 @@ function BotoesNotas({ pedido, notas, entregaEmitida }: { pedido: string; notas?
 
 const entregaEmitida = (p: PedidoOdooConsulta) => p.nf5117 ?? (p.logistica.situacao?.notaEntrega?.estado === "ok" ? p.logistica.situacao.notaEntrega.nf : null);
 
-function PedidoOdoo({ p, acao }: { p: PedidoOdooConsulta; acao: string }) {
+// Troca de produto pelo SAC (autorizada pelo Victor) -- 30/10/2026. Só nas
+// telas do SAC e da assistência (prop `troca` = rota do formulário).
+function BotaoTroca({ href }: { href: string }) {
+  return (
+    <a href={href} className="self-start rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ background: "var(--brand-orange)", color: "#fff" }}>
+      ⇄ Trocar produto
+    </a>
+  );
+}
+
+function PedidoOdoo({ p, acao, troca }: { p: PedidoOdooConsulta; acao: string; troca?: string }) {
   return (
     <li className="rounded-2xl p-4 sm:p-5 flex flex-col gap-3" style={{ background: "var(--surface-1)" }}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -322,12 +332,13 @@ function PedidoOdoo({ p, acao }: { p: PedidoOdooConsulta; acao: string }) {
       ) : null}
       {p.itens?.length ? <Itens itens={p.itens} /> : null}
       <BotoesNotas pedido={p.pedido} notas={p.notas} entregaEmitida={entregaEmitida(p)} />
+      {troca ? <BotaoTroca href={`${troca}?pedido=${encodeURIComponent(p.pedido)}`} /> : null}
       {p.historico?.length ? <Historico eventos={p.historico} /> : null}
     </li>
   );
 }
 
-function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: string }) {
+function Pedido({ p, busca, acao, troca, documento }: { p: PedidoConsulta; busca: string; acao: string; troca?: string; documento?: string | null }) {
   const v = p.venda;
   const e = p.entrega;
   const destaque =
@@ -490,6 +501,11 @@ function Pedido({ p, busca, acao }: { p: PedidoConsulta; busca: string; acao: st
           )}
         </div>
       </div>
+      {troca && p.odooLigado ? (
+        <BotaoTroca href={`${troca}?pedido=${encodeURIComponent(p.odooLigado.pedido)}`} />
+      ) : troca && v?.chave && documento ? (
+        <BotaoTroca href={`${troca}?filial=${encodeURIComponent(v.filial)}&cpf=${encodeURIComponent(documento)}&chave=${v.chave}&nf=${encodeURIComponent(v.notaFiscal.replace(/^0+/, ""))}`} />
+      ) : null}
       <Historico eventos={ordenar([...(p.historico ?? []), ...(p.odooLigado?.historico ?? [])])} />
     </li>
   );
@@ -502,7 +518,7 @@ const EXEMPLOS = "CPF/CNPJ, código do cliente, número do pedido (ex.: 062427 o
 // próprio login. `acao` = a rota da própria página (o formulário é GET).
 // `embutida`: dentro de uma página que já tem título e abas (SAC/assistência)
 // -- sem o título e sem a margem da página do painel.
-export async function ConsultaPedidoView({ busca, acao, embutida = false }: { busca: string; acao: string; embutida?: boolean }) {
+export async function ConsultaPedidoView({ busca, acao, embutida = false, troca }: { busca: string; acao: string; embutida?: boolean; troca?: string }) {
   const carga = busca ? numeroDaCarga(busca) : null;
   const r = busca && !carga ? await consultarPedidos(busca) : null;
 
@@ -589,7 +605,7 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
               </div>
               <ul className="flex flex-col gap-3">
                 {c.pedidos.map((p) => (
-                  <Pedido key={`${p.entrega?.pedido ?? ""}-${p.entrega?.filial ?? ""}-${p.venda?.id ?? ""}`} p={p} busca={r.busca} acao={acao} />
+                  <Pedido key={`${p.entrega?.pedido ?? ""}-${p.entrega?.filial ?? ""}-${p.venda?.id ?? ""}`} p={p} busca={r.busca} acao={acao} troca={troca} documento={c.documento} />
                 ))}
               </ul>
             </section>
@@ -606,7 +622,7 @@ export async function ConsultaPedidoView({ busca, acao, embutida = false }: { bu
               </div>
               <ul className="flex flex-col gap-3">
                 {r.odoo.map((p) => (
-                  <PedidoOdoo key={p.pedido} p={p} acao={acao} />
+                  <PedidoOdoo key={p.pedido} p={p} acao={acao} troca={troca} />
                 ))}
               </ul>
             </section>
