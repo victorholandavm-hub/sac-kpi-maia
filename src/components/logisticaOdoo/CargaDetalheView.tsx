@@ -516,7 +516,16 @@ export function CargaDetalheView({
                   </div>
                 ) : null}
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {p.pickings.map((pk) => (
+                  {p.pickings.map((pk) =>
+                    // 30/10 (Jhon, S00436/S01704): saída cancelada que ficou presa na carga não aceita ação nenhuma -- só aviso.
+                    pk.estado === "cancel" ? (
+                      <span key={pk.picking_id} className="inline-flex items-center gap-1 opacity-60 line-through" title="Saída cancelada no Odoo: não vale mais, não precisa fazer nada com ela.">
+                        <Chip>
+                          {pk.nome}
+                          {pk.pedido ? ` · ${pk.pedido}` : ""} (cancelada — ignorar)
+                        </Chip>
+                      </span>
+                    ) : (
                     <span key={pk.picking_id} className="inline-flex items-center gap-1">
                       <Chip>
                         {pk.nome}
@@ -541,7 +550,8 @@ export function CargaDetalheView({
                         {pk.estado === "done" ? <option value="estornar">Estornar entrega</option> : null}
                       </select>
                     </span>
-                  ))}
+                    ),
+                  )}
                 </div>
               </div>
               <div className="flex items-start gap-1">
