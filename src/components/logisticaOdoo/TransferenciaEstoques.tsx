@@ -6,6 +6,7 @@ import type { EmpresaOdoo } from "@/lib/odoo/logisticaTipos";
 import type { LocalEstoque, SaldoEstoqueItem, TipoEstoque, TransferenciaEstoques as Resultado } from "@/lib/odoo/logistica";
 import { locaisEstoqueAction, saldoEstoqueTipoAction, transferirEstoquesAction } from "@/app/assistencia/logistica/transferencia-estoques-actions";
 import { buscarProdutosAction, inventarioSaldoAction } from "@/app/assistencia/logistica/logistica-actions";
+import { grupoProduto, type GrupoProduto } from "@/lib/grupoProduto";
 import { useAcaoOdoo } from "./useAcaoOdoo";
 import { botaoClass, botaoPrimarioStyle, botaoStyle, inputClass, inputStyle } from "./ui";
 
@@ -26,6 +27,7 @@ export function TransferenciaEstoques({ empresas, empresaAtual }: { empresas: Em
   const [verTipo, setVerTipo] = useState<"avaria" | "assistencia" | null>(null);
   // 30/10 (Victor): pesquisar o produto dentro da Avaria/Assistência
   const [filtroVer, setFiltroVer] = useState("");
+  const [grupoVer, setGrupoVer] = useState<GrupoProduto | "todos">("todos");
   const [saldo, setSaldo] = useState<SaldoEstoqueItem[] | null>(null);
   const [busca, setBusca] = useState("");
   const [achados, setAchados] = useState<{ codigo: string; nome: string }[]>([]);
@@ -88,11 +90,24 @@ export function TransferenciaEstoques({ empresas, empresaAtual }: { empresas: Em
         <div className="cartao p-3 text-sm" style={{ color: "var(--text-primary)" }}>
           <div className="flex justify-between"><b>{ROTULO[verTipo]}: produtos</b><button type="button" className="text-xs underline" onClick={() => setVerTipo(null)}>fechar</button></div>
           {saldo && saldo.length > 0 ? (
+            <div className="mt-2 flex gap-2 flex-wrap">
+              {(["todos", "estofados", "madeiras"] as const).map((g) => {
+                const n = g === "todos" ? saldo.length : saldo.filter((s) => grupoProduto(s.produto) === g).length;
+                return (
+                  <button key={g} type="button" onClick={() => setGrupoVer(g)} className="rounded-full px-3 py-1 text-xs font-semibold"
+                    style={grupoVer === g ? { background: "var(--brand-green)", color: "var(--brand-green-ink)" } : { background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+                    {g === "todos" ? "Todos" : g === "estofados" ? "Estofados" : "Madeiras"} · {n}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+          {saldo && saldo.length > 0 ? (
             <input value={filtroVer} onChange={(e) => setFiltroVer(e.target.value)} placeholder="Pesquisar produto por nome ou código" className="mt-2 w-full rounded-lg px-3 py-1.5 text-sm" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-primary)" }} />
           ) : null}
           {saldo === null ? <p>Carregando…</p> : saldo.length === 0 ? <p style={{ color: "var(--text-secondary)" }}>Nenhum produto.</p> : (
             <table className="w-full text-sm mt-2"><tbody>
-              {saldo.filter((s) => { const q = filtroVer.trim().toLowerCase(); return !q || q.split(/\s+/).every((w) => `${s.codigo} ${s.produto}`.toLowerCase().includes(w)); }).map((s) => <tr key={s.codigo}><td style={{ width: 90 }}>{s.codigo}</td><td>{s.produto.replace(/^\[[^\]]*\]\s*/, "")}</td><td className="text-right">{s.qtd}</td>
+              {saldo.filter((s) => { const q = filtroVer.trim().toLowerCase(); if (grupoVer !== "todos" && grupoProduto(s.produto) !== grupoVer) return false; return !q || q.split(/\s+/).every((w) => `${s.codigo} ${s.produto}`.toLowerCase().includes(w)); }).map((s) => <tr key={s.codigo}><td style={{ width: 90 }}>{s.codigo}</td><td>{s.produto.replace(/^\[[^\]]*\]\s*/, "")}</td><td className="text-right">{s.qtd}</td>
                 <td className="text-right"><button type="button" className="text-xs underline" onClick={() => { setOrigem(verTipo); setDestino("estoque"); setLinhas([{ codigo: s.codigo, qtd: String(s.qtd) }]); }}>devolver ao estoque</button></td></tr>)}
             </tbody></table>
           )}
