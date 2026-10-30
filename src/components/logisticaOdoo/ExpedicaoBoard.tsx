@@ -122,7 +122,8 @@ export function ExpedicaoBoard({
         )
       : [];
   const lista = [...filtradas, ...daBusca];
-  const foraDaLista = fora.filter((x) => !lista.some((e) => e.picking_id === x.picking_id));
+  // 30/10 (Jhon, S01825): a saída antiga (concluída, "Entregue") de um pedido que já tem saída aberta na lista não aparece aqui.
+  const foraDaLista = fora.filter((x) => !lista.some((e) => e.picking_id === x.picking_id || (!!x.pedido && e.pedido === x.pedido)));
   const vols = somarVolumes(lista);
   const selecionadas = [...expedicao.entregas, ...expedicao.pendencias].filter((e) => sel.has(e.picking_id));
   // 27/10 (CD: "cliente da pendência, não tem a opção de marcar"): pendência marcada volta à fila antes de entrar na carga
