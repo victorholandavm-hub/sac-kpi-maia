@@ -18,7 +18,9 @@ export type SyncJob =
   // 29/10/2026: leitura do Odoo (expedição + cargas, também no formato do Protheus pros KPIs).
   | "odoo-cargas"
   // 29/10/2026: vendas do Odoo (/consulta/vendas) em totvs_orders.
-  | "odoo-vendas";
+  | "odoo-vendas"
+  // 30/10/2026: estoque CD <-> AT das notificações de assistência (estoqueAt.ts).
+  | "estoque-at";
 
 const JOB_LABELS: Record<SyncJob, string> = {
   totvs: "TOTVS",
@@ -33,6 +35,7 @@ const JOB_LABELS: Record<SyncJob, string> = {
   "reprocess-compra-nps": "Reprocessamento NPS Compra (backlog Draft)",
   "odoo-cargas": "Odoo — expedição e cargas",
   "odoo-vendas": "Odoo — vendas do dia",
+  "estoque-at": "Odoo — estoque AT das notificações",
 };
 
 // Só observabilidade -- uma falha ao gravar o histórico nunca pode derrubar

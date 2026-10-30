@@ -14,6 +14,7 @@ import {
 import { listRequestPhotos } from "@/lib/servicePhotos";
 import { RequestDetailContent } from "@/components/assistencia/RequestDetailContent";
 import { DeliveryRequestDetailContent } from "@/components/assistencia/DeliveryRequestDetailContent";
+import { EstoqueAtDaNotificacao } from "@/components/assistencia/EstoqueAtDaNotificacao";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,7 @@ export default async function SolicitacaoDetailPage({ params }: { params: Promis
   ]);
 
   if (isDeliveryType) {
-    return <DeliveryRequestDetailContent profile={profile} result={result} photos={photos} />;
+    return <DeliveryRequestDetailContent profile={profile} result={result} photos={photos} estoque={result ? <EstoqueAtDaNotificacao requestId={result.request.id} /> : null} />;
   }
 
   return <RequestDetailContent profile={profile} result={result} assemblers={assemblers} photos={photos} />;

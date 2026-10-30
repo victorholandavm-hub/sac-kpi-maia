@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useActionState } from "react";
+import { AvisoSaldoCd } from "./AvisoSaldoCd";
 import {
   createSacRequest,
   lookupTotvsClientForTeam,
@@ -1279,6 +1280,12 @@ export function SacCreateRequestForm({
             <SummaryRow label="Instrução extra pro motorista" value={snapshot.restrictionNote} />
             <SummaryRow label="Checklist" value={snapshot.checklistLabel} />
           </div>
+
+          {type === "troca_produto" || type === "entrega_produto" ? (
+            <div className="mt-3">
+              <AvisoSaldoCd itens={items.map((i) => ({ codigo: i.code, qtd: i.quantity }))} />
+            </div>
+          ) : null}
 
           {state?.error ? (
             <p className="text-sm mt-3" style={{ color: "var(--status-critical)" }}>

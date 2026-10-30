@@ -46,6 +46,7 @@ const SYNC_JOB_LABELS: Record<SyncJob, string> = {
   "reprocess-compra-nps": "Reprocessamento NPS Compra (backlog perdido com o Workflow em Draft)",
   "odoo-cargas": "Odoo — expedição e cargas (KPIs de logística, a cada 30 min)",
   "odoo-vendas": "Odoo — vendas do dia, inclusive balcão (a cada 30 min)",
+  "estoque-at": "Odoo — estoque CD → AT das notificações de assistência (a cada 30 min)",
 };
 
 // Sem casa decimal nem "há 0h" logo depois de rodar -- minuto é preciso o

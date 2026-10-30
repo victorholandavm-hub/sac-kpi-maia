@@ -106,10 +106,12 @@ export function DeliveryRequestDetailContent({
   profile,
   result,
   photos,
+  estoque,
 }: {
   profile: Profile;
   result: { request: ServiceRequestDetail; events: RequestEvent[] } | null;
   photos: RequestPhoto[];
+  estoque?: React.ReactNode;
 }) {
   if (!result) {
     return (
@@ -422,6 +424,8 @@ export function DeliveryRequestDetailContent({
               />
             </MobileActionSheet>
           ) : null}
+
+          {estoque}
 
           <Card title="Histórico">
             <RequestHistoryTimeline

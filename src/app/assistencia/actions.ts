@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { TIPOS_ENTREGA, estoqueAtLigado, faltasNoCd, reconciliarEstoqueAt } from "@/lib/estoqueAt";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { getSupabaseServer } from "@/lib/supabaseServer";
@@ -3136,6 +3138,17 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
     if (semCodigoTroca) return { error: `Informe o código do produto "${semCodigoTroca.product}" (obrigatório em troca de produto).` };
   }
 
+  // Estoque AT (Victor 30/10/2026): o que vai faltar no CD tem que ser
+  // confirmado pelo atendente (AvisoSaldoCd no form) -- aqui é a defesa a mais.
+  let cienteSemSaldo = false;
+  if (estoqueAtLigado() && (TIPOS_ENTREGA as readonly string[]).includes(type)) {
+    const faltas = await faltasNoCd(items.map((i) => ({ codigo: i.partCode ?? "", qtd: i.quantity }))).catch(() => []);
+    if (faltas.length && formData.get("ciente_sem_saldo") !== "1") {
+      return { error: `Sem saldo livre no CD: ${faltas.map((f) => `${f.codigo} (tem ${f.livre}, precisa ${f.qtd})`).join("; ")}. Marque "Estou ciente" para criar mesmo assim.` };
+    }
+    cienteSemSaldo = faltas.length > 0;
+  }
+
   const admin = getSupabaseAdmin();
   // Motorista não é mais um campo livre na criação (pedido do Victor
   // 18/08/2026) -- só continua digitável pra "erro do motorista" (precisa
@@ -3203,6 +3216,8 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       checklist_placa: checklist.checklistPlaca,
       checklist_localizacao: checklist.checklistLocalizacao,
       checklist_completo: checklist.checklistCompleto,
+      estoque_ciente_sem_saldo_por: cienteSemSaldo ? profile.fullName : null,
+      estoque_ciente_sem_saldo_em: cienteSemSaldo ? new Date().toISOString() : null,
     })
     .select("id, ticket_number")
     .single();
@@ -3250,6 +3265,8 @@ export async function createSacRequest(_state: FormState, formData: FormData): P
       return { error: `Solicitação #${data.ticket_number} criada, mas falhou ao salvar os itens: ${itemsError.message}` };
     }
   }
+
+  if (estoqueAtLigado()) after(() => reconciliarEstoqueAt({ requestId: data.id }).catch((err) => console.error("[estoque-at]", err)));
 
   if (type === "notificacao_externa") {
     const protocolNumber = `SAC-${new Date().getFullYear()}-${data.id.slice(0, 8).toUpperCase()}`;
