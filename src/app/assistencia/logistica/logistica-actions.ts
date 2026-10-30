@@ -118,7 +118,7 @@ async function executar<T>(fn: (operador: string) => Promise<T>, revalidar: stri
   }
 }
 
-const ACOES_CARGA: AcaoCarga[] = ["separacao", "conferir", "liberar", "sair", "finalizar"];
+const ACOES_CARGA: AcaoCarga[] = ["separacao", "conferir", "liberar", "sair", "finalizar", "reemitir"];
 
 export async function montarCargaAction(input: Omit<MontarCargaInput, "operador">): Promise<ResultadoAcao<CargaDetalhe>> {
   return executar((operador) => montarCarga({ ...input, operador }), [`${BASE}/expedicao`, `${BASE}/cargas`]);
